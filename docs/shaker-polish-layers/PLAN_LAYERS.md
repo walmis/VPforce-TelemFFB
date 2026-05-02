@@ -26,7 +26,7 @@ complement (different band, different texture), not duplicate.
 - [x] STEP_01 — Layer runtime (Layer dataclass, dispatch in HapticEffect)
 - [x] STEP_02 — Config loading & file management
 - [x] STEP_03 — Layer editor UI in System Settings
-- [ ] STEP_04 — Ship default layer pack
+- [x] STEP_04 — Ship default layer pack
 - [ ] STEP_05 — Smoke test in MSFS
 
 ## Codebase reality check (gathered before STEP_00)
@@ -113,3 +113,19 @@ This preserves every existing code path; layers are strictly additive.
   code change needed in STEP_04 beyond filling `_BUILTIN_DEFAULT_LAYERS`.
   PyQt6 not available in the CI environment, so static smoke verified via AST
   parse + direct module import (without the Qt event loop).
+- _2026-05-02_: STEP_04 complete. `telemffb/data/shaker_effects_default.json`
+  created with 17 curated effect entries (verbatim from spec). `shaker_layers_io.py`
+  gains `get_default_pack_path()` — note: the original spec called for lazy-importing
+  `telemffb.utils.get_resource_path`, but `telemffb/utils.py` has a top-level
+  `import winreg` (Windows-only) that makes it un-importable on Linux. The helper
+  therefore replicates the two-line path resolution inline (frozen vs. source,
+  prefer_root semantics) without touching `utils.py`. `ffb_shaker.py` gains
+  `_load_builtin_defaults()`, a populated `_BUILTIN_DEFAULT_LAYERS` (17 entries at
+  import time), and the public `get_builtin_default_for(name)` copy-returning helper.
+  `main.py` already contained the on-first-start copy block (lines 399–409) from a
+  prior uncommitted edit; no further change needed. `VPforce-TelemFFB.spec` already
+  listed the new JSON in `datas`; no change needed. `SystemSettingsDialog` already
+  reads `_BUILTIN_DEFAULT_LAYERS` directly (confirmed: `_shaker_layer_default_rows`,
+  `_on_shaker_layer_reset_effect`, `_on_shaker_layer_reset_all`). All six smoke checks
+  pass. `get_builtin_default_for` is the public helper for future consumers; the dialog
+  continues to read `_BUILTIN_DEFAULT_LAYERS` directly (no refactor needed).

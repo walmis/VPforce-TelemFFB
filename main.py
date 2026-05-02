@@ -396,6 +396,17 @@ def _initialize_device_connection():
             G.shaker_synth = synth
             aircraft_base.use_shaker_backend()
             from telemffb.hw import ffb_shaker as _ffb_shaker
+            from telemffb.hw.shaker_layers_io import get_shaker_effects_path, get_default_pack_path
+            user_path = get_shaker_effects_path()
+            if user_path and not os.path.exists(user_path):
+                default_path = get_default_pack_path()
+                if default_path and os.path.exists(default_path):
+                    try:
+                        os.makedirs(os.path.dirname(user_path), exist_ok=True)
+                        shutil.copyfile(default_path, user_path)
+                        logging.info("Initialised %s from bundled defaults", user_path)
+                    except Exception:
+                        logging.exception("Could not seed user shaker_effects.json from bundle")
             _ffb_shaker.reload_layers()
             logging.info("Shaker effects: %d effects with custom layers",
                          len(_ffb_shaker.EFFECT_LAYERS))

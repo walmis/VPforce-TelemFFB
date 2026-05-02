@@ -32,6 +32,7 @@ Whitelist-based effect filtering is added in STEP_04.
 
 import argparse
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -141,14 +142,37 @@ def _layer_is_for_shaker(layer: Layer) -> bool:
     return layer.route in ("shaker", "both")
 
 
-# Built-in default layers — populated by STEP_04. For STEP_02 this is empty;
-# reload_layers() is written so STEP_04 can fill this dict and the logic
-# remains unchanged.
-_BUILTIN_DEFAULT_LAYERS: dict[str, list[Layer]] = {}
+def _load_builtin_defaults() -> "dict[str, list[Layer]]":
+    """Parse the bundled default layer pack at module import.
+
+    Returns an empty dict if the bundle is missing or malformed (logged at
+    warn level). Used as the base for reload_layers() and as the source for
+    "Reset to default" UI actions.
+    """
+    from .shaker_layers_io import get_default_pack_path, load
+    try:
+        path = get_default_pack_path()
+        if path and os.path.exists(path):
+            return load(path)
+    except Exception:
+        logger.exception("Could not load bundled shaker_effects_default.json")
+    return {}
+
+
+_BUILTIN_DEFAULT_LAYERS: dict[str, list[Layer]] = _load_builtin_defaults()
 
 # Populated at startup by reload_layers() from shaker_effects.json.
 # All entries come from disk; nothing is hardcoded here.
 EFFECT_LAYERS: dict[str, list[Layer]] = {}
+
+
+def get_builtin_default_for(name: str) -> "list[Layer]":
+    """Return a fresh copy of the bundled default layers for a single effect.
+
+    Used by the System Settings layer editor's "Reset effect to default"
+    button. Returns [] if there is no built-in default for that effect.
+    """
+    return list(_BUILTIN_DEFAULT_LAYERS.get(name, []))
 
 
 def reload_layers() -> None:

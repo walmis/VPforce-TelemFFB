@@ -101,3 +101,30 @@ def get_shaker_effects_path() -> Optional[str]:
     if not root:
         return None
     return os.path.join(root, "shaker_effects.json")
+
+
+def get_default_pack_path() -> str:
+    """Path to the bundled default shaker_effects JSON (read-only resource).
+
+    Resolves the path using the same logic as ``telemffb.utils.get_resource_path``
+    (prefer_root=True) but without importing the heavy ``utils`` module (which
+    has a Windows-only top-level ``import winreg``).  In a frozen PyInstaller
+    bundle ``sys._MEIPASS`` is used; in a normal Python environment the path is
+    resolved relative to this file's location (``telemffb/hw/ -> ../../``).
+    """
+    import sys as _sys
+    _rel = os.path.join("telemffb", "data", "shaker_effects_default.json")
+    if getattr(_sys, "frozen", False):
+        # PyInstaller bundle: _MEIPASS is the extraction directory.
+        bundle_dir = _sys._MEIPASS
+        script_dir = os.path.dirname(_sys.executable)
+    else:
+        # Running from source: go two levels up from this file (hw -> telemffb -> root).
+        bundle_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        script_dir = bundle_dir
+    # Prefer script_dir (repo root / exe dir) so an extracted copy wins over
+    # the bundle, matching get_resource_path(prefer_root=True) semantics.
+    candidate = os.path.join(script_dir, _rel)
+    if os.path.isfile(candidate):
+        return candidate
+    return os.path.join(bundle_dir, _rel)
