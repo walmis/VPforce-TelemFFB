@@ -1,14 +1,16 @@
 # TelemFFB Shaker — Funktionsumfang, Architektur, Limitationen
 
-_Stand: 2026-05-02 — Branch `claude/enhance-haptic-feedback-fZtQo`, nach STEP_05 (`9271808`)._
+_Stand: 2026-05-02 — Branch `claude/shaker-cleanups-noise-scSda`, nach STEP_08 (`889da0c`)._
 
 Diese Datei ist der zentrale Einstieg, wenn jemand verstehen will, **was die
 Shaker-Integration kann, wie sie funktioniert und was sie (noch) nicht kann**.
-Sie fasst den Stand nach den beiden Iterationen zusammen — der ursprünglichen
+Sie fasst den Stand nach drei Iterationen zusammen — der ursprünglichen
 MVP-Bringt-Effekte-auf-den-Shaker-Phase
-(`docs/shaker-mvp/`) plus der Polish-Phase
-(`docs/shaker-polish-layers/`) mit Envelope, räumlicher Positionierung und
-frequenzband-spezifischem Layered Routing.
+(`docs/shaker-mvp/`), der Polish-Phase mit Envelope, räumlicher Positionierung
+und frequenzband-spezifischem Layered Routing
+(`docs/shaker-polish-layers/`), und der aktuellen Cleanup- + Bandpass-Noise-
+Iteration (`docs/shaker-cleanups-noise/`), die die Carry-overs der Polish-
+Phase auflöst und einen neuen `bandpass_noise`-Synthese-Primitiv ergänzt.
 
 ---
 
@@ -120,7 +122,7 @@ Der Rest von `aircraft_base.py` (≈54 Effekt-Namen, alle `.periodic()`/
 
 ### 3.3 Audio-Synthese
 
-`telemffb/hw/shaker_synth.py` (≈500 Zeilen, dependency-frei: nur `numpy` +
+`telemffb/hw/shaker_synth.py` (≈630 Zeilen, dependency-frei: nur `numpy` +
 `sounddevice`, kein `telemffb.*`-Import) liefert:
 
 - **`Oscillator`** — phasenkontinuierliche Sinus-Quelle pro benannter
@@ -130,16 +132,39 @@ Der Rest von `aircraft_base.py` (≈54 Effekt-Namen, alle `.periodic()`/
   - `trigger(freq, amp, attack_ms, decay_ms)` für One-Shot-Transients.
     Linear Attack, exponentielles Decay (`k = ln(256)/decay_samples`),
     Envelope endet sich selbst, Re-Trigger startet bei Sample 0 neu.
+- **`BandpassNoiseGenerator`** — band-limitiertes Rauschen, gleiche
+  Render/Stop/`is_silent`-Schnittstelle wie `Oscillator`. White-Noise-
+  Quelle (per-Instance `np.random.default_rng()`) durch ein RBJ
+  Constant-Skirt-Gain-Bandpass-Biquad geleitet.
+  - `set(center_hz, bandwidth_hz, amplitude, ramp_ms=50)` —
+    Q wird aus `center / bandwidth` mit 0.5-Floor abgeleitet,
+    Center und Bandwidth werden auf `>= 1.0 Hz` geklemmt.
+  - Filter-Koeffizienten werden lazy bei Center/Bandwidth-Änderung
+    neu berechnet; Filter-Delay-Line (`z1`, `z2`) bleibt über
+    `render()`-Calls hinweg erhalten.
+  - Output `clip(-1, +1)` als Sicherheit gegen Q-bedingte Peaks.
+  - Inner-Biquad-Loop ist eine Python-`for`-Schleife (für die MVP
+    akzeptabel bei 256-Sample-Blöcken @ 187 Hz Callback-Rate);
+    Vektorisierung via `scipy.signal.lfilter` ist als Erweiterung
+    bewusst zurückgestellt.
 - **`ShakerSynth`** — Mixer + sounddevice-OutputStream-Wrapper:
-  - hält ein `dict[str, Oscillator]`, im Audio-Callback iteriert es alle
-    nicht-stillen Oszillatoren und summiert.
+  - hält ein `dict[str, Oscillator | BandpassNoiseGenerator]`, im
+    Audio-Callback iteriert es alle nicht-stillen Generatoren und
+    summiert.
   - Master Gain wird als finaler Multiplier angewandt, danach `clip(-1, +1)`.
   - **Channel-Routing** im Output: `mono` / `left only` / `right only` /
     `pan` (equal-power: `cos((pan+1)·π/4)` und `sin(...)`).
   - Block-Size 256 Samples @ 48 kHz Default → ~5 ms Latenz im Synth.
+  - **Public API** für externe Caller (HapticEffect, Layer-Editor-
+    Test-Worker): `get_oscillator(name)`, `get_noise_oscillator(name)`
+    (auto-vivify), `add_oscillator(name, osc)` (Replace),
+    `peek_oscillator(name)` (Read-only, kein Auto-Vivify),
+    `list_oscillator_names()` (Snapshot), `remove_oscillator(name)`.
+    Alle thread-safe — kein Caller fasst `_oscillators` oder `_lock`
+    direkt an.
 - **CLI-Selftest**: `python -m telemffb.hw.shaker_synth --selftest`,
-  `--selftest-transient`, `--list-devices`. Dependency-frei und ohne
-  TelemFFB-Master nutzbar.
+  `--selftest-transient`, `--selftest-noise [--center HZ --bandwidth HZ]`,
+  `--list-devices`. Dependency-frei und ohne TelemFFB-Master nutzbar.
 
 ### 3.4 HapticEffect-Facade
 
@@ -231,24 +256,35 @@ class Layer:
     freq_factor: float = 1.0   # multipliziert die Call-Site-Frequenz
     gain: float = 1.0          # multipliziert die Call-Site-Magnitude
     route: str = "both"        # "shaker" | "stick" | "both"
-    osc_type: str = "sine"     # "sine" | "impulse"
+    osc_type: str = "sine"     # "sine" | "impulse" | "bandpass_noise"
+    # Nur relevant, wenn osc_type == "bandpass_noise"
+    # (für sine/impulse werden sie ignoriert, dürfen aber im JSON stehen):
+    center_hz:    Optional[float] = None  # None → freq_factor · call_freq
+    bandwidth_hz: Optional[float] = None  # None → 20.0 Hz
 ```
 
-Ablauf für einen layer-getaggten Effekt:
+Ablauf für einen layer-getaggten Effekt (`_start_layered`):
 
-1. `_start_layered(layers)` iteriert die Layer.
-2. Für jeden Layer mit `route ∈ {shaker, both}` wird ein Sub-Oszillator
-   namens `f"{effect_name}__layer{idx}"` (Doppel-Underscore) angelegt
-   bzw. wiederverwendet.
-3. `osc_type="sine"` → `osc.set(freq · freq_factor, mag · gain)` mit
-   Standard-Rampe. `osc_type="impulse"` → `osc.trigger(...)`.
-4. Layer mit `route="stick"` werden **gefiltert** und produzieren keinen
-   Oszillator auf dem Shaker (die Stick-Seite ist in dieser Iteration
-   unverändert; sie spielt den Effekt unabhängig wie bisher).
-5. Duration-Timer wird nur scheduled, wenn mindestens ein Sine-Layer
-   geroutet ist — Impulse-Layer beenden sich über ihren Envelope selbst.
-6. `stop()` zerolt alle gerouteten Layer-Oszillatoren symmetrisch.
-7. `destroy()` entfernt sie aus dem Synth-Dict.
+1. Iteration über die Layer-Liste; Layer mit `route="stick"` werden
+   übersprungen (Filter `_layer_is_for_shaker`).
+2. Für jeden gerouteten Layer wird ein Sub-Oszillator namens
+   `f"{effect_name}__layer{idx}"` (Doppel-Underscore) angelegt bzw.
+   wiederverwendet — über die Public-API-Accessoren des Synths.
+3. Dispatch nach `osc_type`:
+   - `"sine"` → `synth.get_oscillator(name).set(freq · freq_factor, mag · gain)`.
+   - `"impulse"` → `synth.get_oscillator(name).trigger(freq · freq_factor, mag · gain)`.
+   - `"bandpass_noise"` → `synth.get_noise_oscillator(name).set(center, bw, mag · gain)`,
+     wobei `center = layer.center_hz ?? freq · freq_factor` und
+     `bw = layer.bandwidth_hz ?? 20.0`.
+   - Unbekannter `osc_type` → `logger.warning(...)` + Layer überspringen
+     (kein Sub-Oszillator angelegt, kein Eintrag im Duration-Timer).
+4. Duration-Timer wird scheduled, wenn mindestens ein **kontinuierlicher**
+   Layer (`sine` oder `bandpass_noise`) geroutet ist — Impulse-Layer
+   beenden sich über ihren Envelope selbst.
+5. `stop()` zerolt alle gerouteten Layer-Generatoren symmetrisch
+   (`Oscillator.stop()` und `BandpassNoiseGenerator.stop()` sind
+   schnittstellen-kompatibel).
+6. `destroy()` entfernt sie aus dem Synth-Dict.
 
 `EFFECT_LAYERS` wird zur Laufzeit aus `_BUILTIN_DEFAULT_LAYERS` (gebündelt
 beim Modul-Import) plus der User-JSON `shaker_effects.json` (überlagert
@@ -267,15 +303,19 @@ Jedes Profil definiert:
  "attack_ms" / "decay_ms" / "ramp_ms": <Envelope-/Rampen-Parameter>}
 ```
 
-Aktuelle Einträge u. a. `gearclunk` (55 Hz Transient, 110 ms Decay),
-`touchdown`, `runway_bump0/1`, `gunfire`, `cm`, `payload_rel`,
-`buffeting*` (Continuous mit 15 ms Snap-Rampe und Gain 1.1).
+Aktuelle Einträge (6, nach dem Cleanup in STEP_01): `gearclunk` (55 Hz
+Transient, 110 ms Decay), `runway_bump0`, `runway_bump1`, `payload_rel`,
+`buffeting2` (Continuous mit 15 ms Snap-Rampe und Gain 1.1) und
+`gearbuffet2`. Die früher hier eingetragenen Effekte `touchdown`,
+`gunfire`, `cm`, `buffeting`, `vrs_buffet` und `gearbuffet` sind im
+Default-Pack als Layer definiert und damit per Routing-Kette ohnehin
+nicht mehr durch das Profil getunt — entsprechend wurden ihre PROFILES-
+Einträge als Dead Code entfernt.
 
-Wichtig: Profile bleiben für Effekte ohne Layer-Eintrag im Spiel. Da
-`EFFECT_LAYERS` aus `shaker_effects_default.json` 17 Effekte als
-gelayert definiert, sind die meisten klassischen Hits dort. Profile
-greifen heute v. a. für `gearclunk`, `payload_rel` und Effekte, die im
-Default-Pack noch nicht enthalten sind.
+Wichtig: Profile bleiben für Effekte ohne Layer-Eintrag im Spiel. Wenn
+ein User einen heute „nur Profil"-Effekt in seine `shaker_effects.json`
+als Layer-Eintrag aufnimmt, gewinnt der Layer zur Laufzeit (Stufe 2 vor
+Stufe 3 in der Routing-Kette).
 
 ### 4.4 Heuristik / Default (Stufe 4)
 
@@ -325,34 +365,43 @@ Programmatisch in `_setup_shaker_tab()` und
 Inhalt:
 
 ```
-┌─ Shaker tab ────────────────────────────────────────────┐
-│  Output device:    [(System default) | ... soundcard ▼] │
-│  Master gain:      [QDoubleSpinBox 0.00 .. 2.00]        │
-│  Output channel:   [Mono / Left / Right / Stereo(pan) ▼]│
-│  Pan:              [-1 ──◯── +1]   (Center / L .. / R .)│
-│  [Test]                                                 │
-│                                                         │
-│  ── Effect layers ────────────────────────────────      │
-│  Effect:  [ je_rumble_1_1 ▼ ]   ●  (modified marker)    │
-│                                                         │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ #  Freq×   Gain   Route       OscType   Remove    │  │
-│  │ 0  0.50   0.85   shaker ▼     sine ▼    [-]       │  │
-│  │ 1  1.00   0.50   stick  ▼     sine ▼    [-]       │  │
-│  │ 2  2.00   0.30   stick  ▼     sine ▼    [-]       │  │
-│  └───────────────────────────────────────────────────┘  │
-│  [+ Add layer] [Reset effect to default] [Test effect]  │
-│                                                         │
-│  [Save all effects] [Reload from disk]                  │
-│  [Reset all effects to defaults]                        │
-└─────────────────────────────────────────────────────────┘
+┌─ Shaker tab ──────────────────────────────────────────────────────────────┐
+│  Output device:    [(System default) | ... soundcard ▼]                   │
+│  Master gain:      [QDoubleSpinBox 0.00 .. 2.00]                          │
+│  Output channel:   [Mono / Left / Right / Stereo(pan) ▼]                  │
+│  Pan:              [-1 ──◯── +1]   (Center / L .. / R .)                  │
+│  [Test]                                                                   │
+│                                                                           │
+│  ── Effect layers ────────────────────────────────────────────────────    │
+│  Effect:  [ je_rumble_1_1 ▼ ]   ●  (modified marker)                      │
+│                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │ # Freq× Gain Route     OscType          Remove Center  Bandwidth    │  │
+│  │ 0 0.50  0.85 shaker ▼  sine ▼           [-]    —       —            │  │
+│  │ 1 1.00  0.60 shaker ▼  bandpass_noise ▼ [-]    40.0    20.0         │  │
+│  │ 2 2.00  0.30 stick  ▼  sine ▼           [-]    —       —            │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│  [+ Add layer] [Reset effect to default] [Test effect]                    │
+│                                                                           │
+│  [Save all effects] [Reload from disk]                                    │
+│  [Reset all effects to defaults]                                          │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
 Verhalten:
 
 - Effekt-Dropdown: alle 48 Whitelisted Effekte, alphabetisch.
-- Tabelle pro Effekt: 6 Spalten mit echten Widgets (DoubleSpinBox /
+- Tabelle pro Effekt: 8 Spalten mit echten Widgets (DoubleSpinBox /
   ComboBox / Button), keine reinen Text-Zellen.
+- **OscType-ComboBox** akzeptiert drei Werte: `sine`, `impulse`,
+  `bandpass_noise`.
+- **Center Hz** und **Bandwidth Hz** sind nur für `bandpass_noise`-Layer
+  aktiv (range 5.0–200.0 step 0.5 / 1.0–100.0 step 1.0). Für sine- und
+  impulse-Layer werden die Spin-Boxen visuell deaktiviert. Beim Wechsel
+  von sine/impulse → bandpass_noise werden sinnvolle Defaults gesetzt
+  (Center = `freq_factor · 40` auf 1 Dezimalstelle gerundet,
+  Bandwidth = `20.0`); beim Wechsel zurück bleiben die Werte in der
+  Working-Copy stehen, falls der User später wieder zu Noise wechselt.
 - Letzter Layer kann nicht entfernt werden (Remove-Button disabled, sonst
   würde der Effekt komplett stumm).
 - `+ Add layer`: appendet einen `Layer()` mit Defaults (Sine, both, 1.0/1.0).
@@ -364,7 +413,9 @@ Verhalten:
 - **Test effect**: spielt den ungespeicherten Layer-Stack auf einem
   kurzlebigen `ShakerSynth` (eigener Worker-Thread, ~2 s, mit den
   aktuellen UI-Werten für Device/Gain/Channel/Pan), unabhängig vom
-  globalen Synth.
+  globalen Synth. Die Sub-Oszillatoren werden über
+  `synth.add_oscillator(...)` injiziert; `bandpass_noise`-Layer
+  instanziieren `BandpassNoiseGenerator(synth.samplerate)`.
 - **Reset effect to default** / **Reset all effects to defaults**: lesen
   aus `_BUILTIN_DEFAULT_LAYERS` (gebündelt bei Modul-Import).
 
@@ -374,15 +425,18 @@ Pfad: `<G.userconfig_rootpath>/shaker_effects.json` — das ist im
 Production-Build unter Windows `%LOCALAPPDATA%/VPForce-TelemFFB`, im
 Dev-Modus das Repo-Root (siehe `main.py:_setup_config_paths`).
 
-Format (Schema-Version 1):
+Format (aktuell **Schema-Version 2**):
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "effects": {
     "<effect_name>": {
       "layers": [
-        {"freq_factor": 0.5, "gain": 0.85, "route": "shaker", "osc_type": "sine"},
+        {"freq_factor": 0.5, "gain": 0.85, "route": "shaker", "osc_type": "sine",
+         "center_hz": null, "bandwidth_hz": null},
+        {"freq_factor": 1.0, "gain": 0.60, "route": "shaker", "osc_type": "bandpass_noise",
+         "center_hz": 30.0, "bandwidth_hz": 25.0},
         ...
       ]
     },
@@ -391,11 +445,23 @@ Format (Schema-Version 1):
 }
 ```
 
+`center_hz` und `bandwidth_hz` sind nur für `osc_type="bandpass_noise"`
+relevant; für sine/impulse werden sie zur Laufzeit ignoriert (dürfen aber
+im JSON stehen, damit ein Toggle sine ↔ bandpass_noise im Editor die UI-
+Werte über Save/Reload hinweg behält).
+
+**v1 ↔ v2-Migration:** Alte Schema-v1-Dateien (ohne Noise-Felder) werden
+ohne Warnung geladen — fehlende Felder kommen über die Dataclass-
+Defaults als `None` rein. Beim nächsten Save schreibt der Loader die
+Datei als v2 zurück. Das gebündelte Default-Pack bleibt absichtlich v1
+auf Disk; Noise-Layer werden vom User ggf. nach der laufenden MSFS-
+Validierung der bestehenden Default-Layer hinzugefügt.
+
 Robust gegen:
 
 - Datei fehlt → leere Map zurück (Built-ins greifen).
 - Malformed JSON → Exception geloggt, leere Map.
-- Versions-Mismatch → Warnung, Best-Effort-Load.
+- Versions-Mismatch (≠ 1, ≠ 2) → Warnung, Best-Effort-Load.
 - Einzelner kaputter Layer-Eintrag → Effekt überspringen, Rest laden.
 
 Atomisches Save schreibt nach `<path>.tmp` und benennt um — kein
@@ -437,15 +503,15 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 
 | Aufgabe | Datei | Symbole |
 |---------|-------|---------|
-| Audio-Synthese | `telemffb/hw/shaker_synth.py` | `Oscillator`, `ShakerSynth`, `_callback`, `--selftest*` CLI |
-| HapticEffect-Facade | `telemffb/hw/ffb_shaker.py` | `HapticEffect`, `Layer`, `EFFECT_LAYERS`, `SHAKER_EFFECT_WHITELIST`, `SHAKER_EFFECT_PROFILES`, `_BUILTIN_DEFAULT_LAYERS`, `reload_layers`, `get_builtin_default_for` |
-| JSON I/O + Pfade | `telemffb/hw/shaker_layers_io.py` | `load`, `save`, `get_shaker_effects_path`, `get_default_pack_path`, `CURRENT_VERSION` |
-| Default-Pack | `telemffb/data/shaker_effects_default.json` | 17 Effekte |
-| System Settings UI | `telemffb/SystemSettingsDialog.py` | `_setup_shaker_tab`, `_setup_shaker_layers_section`, `_on_shaker_layer_*` Slots |
+| Audio-Synthese | `telemffb/hw/shaker_synth.py` | `Oscillator`, `BandpassNoiseGenerator`, `ShakerSynth` (`get_oscillator`, `get_noise_oscillator`, `add_oscillator`, `peek_oscillator`, `list_oscillator_names`, `remove_oscillator`), `_callback`, `--selftest*` CLI |
+| HapticEffect-Facade | `telemffb/hw/ffb_shaker.py` | `HapticEffect`, `Layer` (mit v2-Feldern `center_hz` / `bandwidth_hz`), `EFFECT_LAYERS`, `SHAKER_EFFECT_WHITELIST`, `SHAKER_EFFECT_PROFILES` (jetzt 6 Einträge), `_BUILTIN_DEFAULT_LAYERS`, `reload_layers`, `get_builtin_default_for` |
+| JSON I/O + Pfade | `telemffb/hw/shaker_layers_io.py` | `load`, `save`, `get_shaker_effects_path`, `get_default_pack_path`, `CURRENT_VERSION = 2` |
+| Default-Pack | `telemffb/data/shaker_effects_default.json` | 17 Effekte (Schema-v1 auf Disk, lädt unter v2-Loader sauber) |
+| System Settings UI | `telemffb/SystemSettingsDialog.py` | `_setup_shaker_tab`, `_setup_shaker_layers_section`, `_make_layer_row_widgets` (Helper für 8-Spalten-Row), `_on_shaker_layer_*` Slots |
 | Settings-Defaults | `telemffb/utils.py` | `globl_sys_dict` (`shakerDevice`, `shakerGain`, `shakerChannelMode`, `shakerPan`) |
 | Shaker-Init | `main.py` | `_initialize_device_connection` (Shaker-Branch ~Zeile 380) |
 | Effekt-Definitionen | `telemffb/sim/aircraft_base.py` | `ac_update_*` Methoden, `effects[name].periodic/.constant/.start/.stop` |
-| Iterations-Pläne | `docs/shaker-mvp/`, `docs/shaker-polish-layers/` | STEP_*-Specs, PLAN_*.md |
+| Iterations-Pläne | `docs/shaker-mvp/`, `docs/shaker-polish-layers/`, `docs/shaker-cleanups-noise/` | STEP_*-Specs, PLAN_*.md, `SMOKETEST_RESULTS.md` |
 
 ---
 
@@ -453,10 +519,15 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 
 ### 8.1 Aktuelle Synth-Beschränkungen
 
-- **Nur Sinus + linearer Attack/expon. Decay-Envelope.** Kein
-  Bandpass-Rauschen, keine FM, keine Multi-Oszillator-Voices pro Layer.
-  Body-Texture (z. B. raues Dröhnen) muss durch mehrere Layer mit
-  unterschiedlichen Freq-Faktoren approximiert werden.
+- **Sinus + Impuls-Envelope + Bandpass-Rauschen** als Synthese-Primitive.
+  Keine FM, keine Multi-Oszillator-Voices pro Layer. Body-Texture, die
+  über das hinausgeht (z. B. modulierte Engine-Pitches), muss durch
+  mehrere Layer approximiert werden.
+- **Bandpass-Noise inner loop** ist eine Python-`for`-Schleife pro
+  Sample über das Biquad-Filter. Bei 256-Sample-Blöcken @ 48 kHz
+  unproblematisch; falls Profiling Bottlenecks zeigt, ist Vektorisierung
+  via `scipy.signal.lfilter` die nächste Stufe (ist heute bewusst
+  zurückgehalten, um die scipy-Dependency zu vermeiden).
 - **Effect-Type ignoriert**: `EFFECT_SQUARE`, `EFFECT_TRIANGLE`,
   `EFFECT_SAWTOOTH*` werden auf dem Shaker als Sinus gerendert. Die
   Charakteristik kommt aus Profil/Layer-Tuning, nicht aus der Wave-Shape.
@@ -471,8 +542,9 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
   `route="stick"` filtert auf der Shaker-Seite — auf der Stick-Seite ist
   es ohne Wirkung. Das ist beabsichtigt und reversibel; eine spätere
   Iteration kann die Stick-Pipeline auch layer-aware machen.
-- **Schema-Version 1.** Migrations-Mechanik existiert (`version`-Field
-  + Warnung bei Mismatch + Best-Effort-Load), aber es gibt nur ein Schema.
+- **Schema-Version 2.** Migrations-Mechanik (Loader akzeptiert v1 und v2,
+  Saver schreibt nur v2) existiert; weitere Schema-Bumps müssen bei
+  künftigen Layer-Feldern wieder durchlaufen werden.
 - **Keine Pro-Aircraft-Layer-Overrides.** Layer-Pack ist global.
 
 ### 8.3 Routing / Whitelist
@@ -480,14 +552,13 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 - **Whitelist-Drift.** Neue Effekte in `aircraft_base.py` sind erstmal
   stumm auf dem Shaker, bis sie der Whitelist hinzugefügt werden. Das ist
   eher Feature als Bug, sollte aber dokumentiert sein.
-- **`SHAKER_EFFECT_PROFILES` und `EFFECT_LAYERS` koexistieren.** Layer
-  gewinnt, aber für Effekte, die in beiden vorkommen (`touchdown`,
-  `gunfire`, `cm`, `buffeting*`, `gearbuffet*`, `runway_bump0/1`) ist
-  der Profile-Eintrag jetzt Dead Code. Carry-over aus den Reviews:
-  zukünftiger Cleanup empfohlen.
 - **`SHAKER_EFFECT_PROFILES` enthält nur Sinus-getunte Defaults.** Eine
   künftige Vereinheitlichung könnte alle Profile als 1-Layer-Einträge
-  ins Default-Pack migrieren und PROFILES streichen.
+  ins Default-Pack migrieren und PROFILES streichen — nach dem
+  STEP_01-Cleanup sind nur noch 6 Einträge übrig (`gearclunk`,
+  `runway_bump0`, `runway_bump1`, `payload_rel`, `buffeting2`,
+  `gearbuffet2`), die nicht von einem Default-Pack-Layer überschattet
+  werden.
 
 ### 8.4 Spatial Positioning
 
@@ -505,26 +576,19 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 
 ### 8.5 UI
 
-- **`_on_shaker_layer_add` und `_shaker_layer_rebuild_table` duplizieren**
-  ~40 Zeilen Cell-Erstellung. Funktioniert, aber bei Änderungen am Schema
-  (Spalten / Ranges) müssen beide Stellen synchron gepflegt werden.
-- **Test-Effect-Worker greift direkt auf `synth._oscillators` und
-  `synth._lock` zu**, um Multi-Layer auf einem temporären Synth zu
-  spielen. Bewusst, aber bei Refactoring von `ShakerSynth`-Internals
-  fragil.
 - **Tabelle wächst vertikal** ohne Maximum-Höhe; bei Effekten mit
   vielen Layern könnte der Dialog unhandlich werden. Praktisch sind
-  Effekte aktuell auf 2–3 Layer beschränkt.
+  Effekte aktuell auf 2–3 Layer beschränkt. Mit den 8 Spalten ist auch
+  die horizontale Breite eines Layer-Rows merklich gewachsen — auf
+  schmalen Displays ist horizontales Scrolling möglich.
+- **Center/Bandwidth-Werte werden auch für Nicht-Noise-Layer in der
+  Working-Copy gespeichert.** Ist beabsichtigt (User behält die Werte
+  über Toggle hinweg), bedeutet aber, dass eine sine-Zeile mit zuvor
+  gesetzten Noise-Werten im JSON `center_hz: 40.0, bandwidth_hz: 20.0`
+  hat. Zur Laufzeit ignoriert; round-trip-safe; aber für Code-Reader
+  potentiell verwirrend.
 
-### 8.6 Print-Statements
-
-- Sechs `print()`-Calls in `_selftest_layered()` (`ffb_shaker.py`).
-  Sie sind nur über die `--selftest-layered`-CLI erreichbar, nicht aus
-  Production-Code-Paths. Konsistent mit den existierenden
-  `--selftest`/`--selftest-transient`-Modi in `shaker_synth.py`. Cleaner
-  wäre `logging.info`.
-
-### 8.7 Sim-Coverage
+### 8.6 Sim-Coverage
 
 - **Effekt-Definitionen** in `aircraft_base.py` sind nicht in jedem Sim
   gleich vollständig. DCS, MSFS und IL-2 liefern jeweils unterschiedliche
@@ -538,23 +602,44 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 
 ## 9. Bekannte Issues / Carry-overs aus den Reviews
 
-Diese Punkte tauchen in den Step-Doku-Notes auf und sind für eine spätere
-Iteration vorgemerkt:
+### 9.1 Erledigt in der aktuellen Cleanup- + Bandpass-Noise-Iteration
 
-1. **`SHAKER_EFFECT_PROFILES` Cleanup**: Effekte, die im Default-Pack als
-   Layer definiert sind, haben tote Profile-Einträge. Cleanup
-   konflikt-frei möglich.
-2. **DRY-Refactor `_on_shaker_layer_add` ↔ `_shaker_layer_rebuild_table`**:
-   gemeinsamer Helper `_make_row_widgets(row, layer)`.
-3. **Test-Worker-Kapselung**: `_on_shaker_layer_test` sollte über eine
-   öffentliche `ShakerSynth.add_oscillator(name, osc)`-API laufen, statt
-   `_oscillators`/`_lock` direkt anzufassen.
-4. **Logging vs. print**: `_selftest_layered()` auf `logging.info`
-   umstellen.
-5. **MSFS-Test offen**: `docs/shaker-polish-layers/MSFS_LAYER_TEST.md` ist
+1. ✅ **`SHAKER_EFFECT_PROFILES` Cleanup** (STEP_01 / `8a89197`):
+   6 Dead-Profile-Einträge gelöscht (`touchdown`, `gunfire`, `cm`,
+   `buffeting`, `vrs_buffet`, `gearbuffet`), Surviving-Set kommentiert.
+2. ✅ **DRY-Refactor `_on_shaker_layer_add` ↔ `_shaker_layer_rebuild_table`**
+   (STEP_02 / `2ec3d48`): gemeinsamer Helper
+   `_make_layer_row_widgets(row, layer) -> dict`.
+3. ✅ **Test-Worker-Kapselung** (STEP_03 / `d542974`): neue Public-API auf
+   `ShakerSynth` (`add_oscillator`, `peek_oscillator`,
+   `list_oscillator_names`, `get_noise_oscillator`); `_oscillators` /
+   `_lock` werden außerhalb `shaker_synth.py` nirgends mehr direkt
+   angefasst.
+4. ✅ **Logging vs. print** (STEP_04 / `d509a25`): die sechs `print()`
+   in `_selftest_layered()` sind jetzt `logger.info(...)` mit lazy
+   `%`-Formatting.
+5. ✅ **Bandpass-Rauschen als zusätzlicher `osc_type`** (STEP_05–07 /
+   `c813ce8`–`fccfb4e`): `BandpassNoiseGenerator` + Layer-Schema-v2 mit
+   `center_hz` / `bandwidth_hz` + UI-Spalten + `--selftest-noise` CLI.
+6. ✅ **Nebenbei behoben** (`663310b`): `python -m telemffb.hw.ffb_shaker
+   --selftest-layered` lief in einen Circular-Import (runpy registrierte
+   das Entry-Modul nur als `__main__`, nicht unter dem Dotted-Name);
+   `Layer`-Import in `shaker_layers_io.py` jetzt funktion-lokal.
+
+### 9.2 Offen
+
+7. **MSFS-Test offen**: `docs/shaker-polish-layers/MSFS_LAYER_TEST.md` ist
    ein Template, das der User auf realer Hardware durchläuft. Defaults
    im Pack sind initial-curated und werden auf Basis der Test-Notes
-   nachgetuned.
+   nachgetuned. Außerdem: nach erfolgreichem MSFS-Test ist die
+   manuelle Verifikations-Checkliste in
+   `docs/shaker-cleanups-noise/SMOKETEST_RESULTS.md` für die UI- und
+   Bandpass-Noise-Funktionalität abzuarbeiten.
+8. **Noise-Defaults im Pack ergänzen**: Default-Pack bleibt absichtlich
+   v1 auf Disk; sobald die MSFS-Validierung der bestehenden Layer
+   abgeschlossen ist, kann der User per UI Noise-Layer (z. B. für
+   `je_rumble_*`, `prop_rpm0-1`, `runway0`) ergänzen und das Resultat
+   in `shaker_effects_default.json` zurückspielen.
 
 ---
 
@@ -571,15 +656,17 @@ naheliegend:
 - **Pro-Aircraft-Packs**: `shaker_effects.<aircraft>.json` overlay über
   dem globalen Pack — analog zur bestehenden Per-Aircraft-Profile-Logik
   in `defaults.xml`.
-- **Schema-Version 2 mit Envelope-Override pro Layer**: heutige
+- **Schema-Version 3 mit Envelope-Override pro Layer**: heutige
   Impulse-Layer benutzen den `Oscillator.trigger()`-Default (3 ms
   attack, 90 ms decay). Ein optionales `attack_ms` / `decay_ms` pro
   Layer würde Per-Effect-Tuning erlauben (z. B. längeres Decay für
-  Touchdown vs. snappy Decay für Gear-Clunk).
-- **Bandpass-Rauschen als zusätzlicher `osc_type`**: für
-  realitätsnahere Body-Texture (Engine-Rasseln, Rotor-Wash). Würde eine
-  neue Generator-Klasse in `shaker_synth.py` brauchen plus `"noise"`-
-  Wert für `osc_type`.
+  Touchdown vs. snappy Decay für Gear-Clunk). Schema-v2 hat dafür
+  bereits den nötigen Migrationsweg etabliert.
+- **Vektorisierte Bandpass-Noise-Pipeline**: heutige Implementierung
+  benutzt eine Python-`for`-Schleife im Biquad-Inner-Loop. Falls
+  Profiling auf Hardware das als Hotspot zeigt, ist `scipy.signal.lfilter`
+  der nächste Schritt — aktuell zurückgehalten, um die scipy-Dependency
+  zu vermeiden.
 - **Telemetrie-Ausweitung**: Damage-Hits, Stall-Break, Catapult-Launch,
   Arrestor-Wire — sind in den Sims als Telemetrie verfügbar, haben aber
   noch keine Shaker-Effekt-Definition in `aircraft_base.py`.
@@ -604,6 +691,7 @@ naheliegend:
 - `python -m telemffb.hw.shaker_synth --list-devices`
 - `python -m telemffb.hw.shaker_synth --selftest --device <idx>`
 - `python -m telemffb.hw.shaker_synth --selftest-transient --device <idx>`
+- `python -m telemffb.hw.shaker_synth --selftest-noise --device <idx> [--center HZ --bandwidth HZ]`
 - `python -m telemffb.hw.ffb_shaker --selftest-layered --device <idx>`
 
 **Settings zurücksetzen:**
