@@ -102,25 +102,21 @@ SHAKER_EFFECT_WHITELIST = {
 # kind="transient" routes through Oscillator.trigger() with attack_ms / decay_ms;
 # kind="continuous" uses Oscillator.set() with the given ramp_ms. freq overrides
 # the call-site frequency when present; gain multiplies the call-site magnitude.
+#
+# Per-effect single-oscillator profile tuning. These effects are not in the
+# default layer pack. If a user adds them to their shaker_effects.json as a
+# layered entry, the layer takes precedence at runtime
+# (start() priority: Whitelist -> EFFECT_LAYERS -> PROFILES -> Heuristic).
 SHAKER_EFFECT_PROFILES: dict = {
     "gearclunk":    {"kind": "transient", "freq": 55.0, "gain": 1.0,
                      "attack_ms": 3.0, "decay_ms": 110.0},
-    "touchdown":    {"kind": "transient", "freq": 45.0, "gain": 1.0,
-                     "attack_ms": 5.0, "decay_ms": 220.0},
     "runway_bump0": {"kind": "transient", "freq": 50.0, "gain": 0.9,
                      "attack_ms": 2.0, "decay_ms": 70.0},
     "runway_bump1": {"kind": "transient", "freq": 35.0, "gain": 0.9,
                      "attack_ms": 2.0, "decay_ms": 130.0},
-    "gunfire":      {"kind": "transient", "freq": 80.0, "gain": 1.0,
-                     "attack_ms": 1.0, "decay_ms": 60.0},
-    "cm":           {"kind": "transient", "freq": 70.0, "gain": 1.0,
-                     "attack_ms": 1.0, "decay_ms": 80.0},
     "payload_rel":  {"kind": "transient", "freq": 40.0, "gain": 1.0,
                      "attack_ms": 3.0, "decay_ms": 200.0},
-    "buffeting":    {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
     "buffeting2":   {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
-    "vrs_buffet":   {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
-    "gearbuffet":   {"kind": "continuous", "ramp_ms": 20.0, "gain": 1.0},
     "gearbuffet2":  {"kind": "continuous", "ramp_ms": 20.0, "gain": 1.0},
 }
 

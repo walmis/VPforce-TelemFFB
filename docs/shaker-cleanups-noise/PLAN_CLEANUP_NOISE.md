@@ -9,8 +9,8 @@
 ## Phases
 
 ### Stream A — Cleanups (independent, can be reviewed/merged separately)
-- [~] STEP_00 — Bootstrap planning
-- [ ] STEP_01 — Remove dead SHAKER_EFFECT_PROFILES entries
+- [x] STEP_00 — Bootstrap planning
+- [x] STEP_01 — Remove dead SHAKER_EFFECT_PROFILES entries
 - [ ] STEP_02 — DRY layer table row widget creation
 - [ ] STEP_03 — Public ShakerSynth.add_oscillator API
 - [ ] STEP_04 — Logging instead of print in _selftest_layered
