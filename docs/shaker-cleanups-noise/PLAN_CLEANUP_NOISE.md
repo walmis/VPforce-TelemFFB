@@ -13,7 +13,7 @@
 - [x] STEP_01 — Remove dead SHAKER_EFFECT_PROFILES entries
 - [x] STEP_02 — DRY layer table row widget creation
 - [x] STEP_03 — Public ShakerSynth.add_oscillator API
-- [ ] STEP_04 — Logging instead of print in _selftest_layered
+- [x] STEP_04 — Logging instead of print in _selftest_layered
 
 ### Stream B — Bandpass noise (depends on Stream A.3 only)
 - [ ] STEP_05 — BandpassNoiseGenerator in shaker_synth.py

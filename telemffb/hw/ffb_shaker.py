@@ -545,7 +545,7 @@ class HapticEffect:
 
 def _selftest_layered(device, samplerate: int) -> None:
     from telemffb.hw.shaker_synth import ShakerSynth as _ShakerSynth
-    print(f"ffb_shaker layered selftest: device={device!r} samplerate={samplerate}")
+    logger.info("ffb_shaker layered selftest: device=%r samplerate=%s", device, samplerate)
     synth = _ShakerSynth(samplerate=samplerate, device=device)
     synth.start()
     init_shaker(synth)
@@ -553,20 +553,20 @@ def _selftest_layered(device, samplerate: int) -> None:
         e = HapticEffect()
         e.name = "je_rumble_1_1"
         e.periodic(40, 0.5, 0).start()
-        print("Layered start issued — expect 20 Hz (layer0) and 80 Hz (layer2) oscillators in synth")
+        logger.info("Layered start issued — expect 20 Hz (layer0) and 80 Hz (layer2) oscillators in synth")
         names = synth.list_oscillator_names()
-        print(f"  oscillators in synth: {names}")
+        logger.info("  oscillators in synth: %s", names)
         assert "je_rumble_1_1__layer0" in names, "layer0 missing"
         assert "je_rumble_1_1__layer2" in names, "layer2 missing"
         assert "je_rumble_1_1__layer1" not in names, "stick layer1 must not be created"
-        print("  assertions passed")
+        logger.info("  assertions passed")
         time.sleep(2.0)
         e.stop()
-        print("Layered stop issued")
+        logger.info("Layered stop issued")
         for n in ["je_rumble_1_1__layer0", "je_rumble_1_1__layer2"]:
             osc = synth.peek_oscillator(n)
             assert osc is None or osc.is_silent, f"{n} not silent after stop"
-        print("  stop assertions passed")
+        logger.info("  stop assertions passed")
     finally:
         synth.stop()
 
