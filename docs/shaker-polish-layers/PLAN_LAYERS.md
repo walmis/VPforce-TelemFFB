@@ -27,7 +27,7 @@ complement (different band, different texture), not duplicate.
 - [x] STEP_02 — Config loading & file management
 - [x] STEP_03 — Layer editor UI in System Settings
 - [x] STEP_04 — Ship default layer pack
-- [ ] STEP_05 — Smoke test in MSFS
+- [~] STEP_05 — Smoke test in MSFS (scaffold ready; awaiting user MSFS run)
 
 ## Codebase reality check (gathered before STEP_00)
 
@@ -129,3 +129,30 @@ This preserves every existing code path; layers are strictly additive.
   `_on_shaker_layer_reset_effect`, `_on_shaker_layer_reset_all`). All six smoke checks
   pass. `get_builtin_default_for` is the public helper for future consumers; the dialog
   continues to read `_BUILTIN_DEFAULT_LAYERS` directly (no refactor needed).
+- _2026-05-02_: STEP_05 scaffold complete (docs-only). `MSFS_LAYER_TEST.md`
+  pre-populated with the 5-effect minimum test matrix plus 4 extras (gear-clunk,
+  payload release, AB rumble, ETL) and per-effect note skeletons. `KNOWN_ISSUES.md`
+  created in "no known issues" baseline form with the three-bucket template inlined
+  below. PLAN_LAYERS marked `[~]` (in progress). The user runs the MSFS test on
+  their own hardware; after the run they tick STEP_05 to `[x]`, fill in
+  `MSFS_LAYER_TEST.md`, and update `KNOWN_ISSUES.md` with any findings.
+
+## Iteration summary
+
+Brief recap of the four code steps that shipped in this layered-routing iteration,
+for anyone reading the plan at a later date:
+
+- **STEP_01 — Layer runtime:** Added the `Layer` dataclass, `EFFECT_LAYERS` dispatch
+  dict, and `_start_layered` / `_stop_layer_names` paths in `ffb_shaker.py`; each
+  effect can now define a stack of layers with independent `freq_factor`, `gain`,
+  `route`, and `osc_type`, with full backward compatibility for unlayered effects.
+- **STEP_02 — Config loading & file management:** Added `shaker_layers_io.py` with
+  `load()`, `save()`, `get_shaker_effects_path()`, and versioned JSON round-trip;
+  fixed two layer-awareness gaps in `HapticEffect.destroy()` and the `started`
+  property; wired `reload_layers()` into `main.py`.
+- **STEP_03 — Layer editor UI:** Added `_setup_shaker_layers_section()` to
+  `SystemSettingsDialog` with a per-effect layer table, add/reset/test buttons, and
+  save/reload/reset-all bottom buttons backed by a working-copy state model.
+- **STEP_04 — Default layer pack:** Created `telemffb/data/shaker_effects_default.json`
+  with 17 curated entries; wired first-start copy into `main.py`; exposed
+  `get_builtin_default_for()` for future consumers.
