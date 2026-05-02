@@ -25,7 +25,7 @@ complement (different band, different texture), not duplicate.
 - [x] STEP_00 — Bootstrap planning artifacts
 - [x] STEP_01 — Layer runtime (Layer dataclass, dispatch in HapticEffect)
 - [x] STEP_02 — Config loading & file management
-- [ ] STEP_03 — Layer editor UI in System Settings
+- [x] STEP_03 — Layer editor UI in System Settings
 - [ ] STEP_04 — Ship default layer pack
 - [ ] STEP_05 — Smoke test in MSFS
 
@@ -93,3 +93,23 @@ This preserves every existing code path; layers are strictly additive.
   `reload_layers()` after `aircraft_base.use_shaker_backend()`. No surprises:
   `G.userconfig_rootpath` confirmed at `telemffb/globals.py:55`; the shaker
   branch in `main.py` was exactly where expected (line 380).
+- _2026-05-02_: STEP_03 complete. New `_setup_shaker_layers_section()` method
+  added to `SystemSettingsDialog`, called from `_setup_shaker_tab()` before
+  `outer.addStretch(1)`. All required widgets created: effect dropdown
+  (`shaker_layer_effect_combo`), layer table (`shaker_layer_table`, 6 cols),
+  per-effect buttons (`shaker_layer_add_btn`, `shaker_layer_reset_btn`,
+  `shaker_layer_test_btn`) and bottom buttons (`shaker_layer_save_btn`,
+  `shaker_layer_reload_btn`, `shaker_layer_reset_all_btn`). State model:
+  `_shaker_layer_saved_state` (from disk), `_shaker_layer_working_copy` (dict
+  mutated by edits). Layout decisions: separator QFrame + bold "Effect layers"
+  label to visually delimit the section; table uses ResizeToContents for index/
+  freq/gain/remove columns and Stretch for route/osctype to use available width.
+  Test effect plays each layer at 40 Hz * freq_factor for ~2 s on a short-lived
+  ShakerSynth (same worker-thread pattern as the soundcard test button). Save
+  merges working copy over the on-disk state to preserve effects the user never
+  opened in this session. STEP_04 note: `_BUILTIN_DEFAULT_LAYERS` is currently
+  empty; "Reset effect to default" and "Reset all effects to defaults" both
+  fall back to a single `Layer()` row until STEP_04 populates that dict — no
+  code change needed in STEP_04 beyond filling `_BUILTIN_DEFAULT_LAYERS`.
+  PyQt6 not available in the CI environment, so static smoke verified via AST
+  parse + direct module import (without the Qt event loop).
