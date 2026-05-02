@@ -23,7 +23,11 @@ import os
 from dataclasses import asdict
 from typing import Optional
 
-from .ffb_shaker import Layer
+# Note: ``Layer`` is imported lazily inside ``load()`` to avoid a circular
+# import when this module is reached via ``python -m telemffb.hw.ffb_shaker``
+# (runpy registers the entry-point only as ``__main__``, so a top-level
+# ``from .ffb_shaker import Layer`` triggers a second module load mid-init).
+# Type hints below reference Layer as a string and are evaluated lazily.
 
 CURRENT_VERSION = 1
 log = logging.getLogger(__name__)
@@ -51,6 +55,8 @@ def load(path: str) -> "dict[str, list[Layer]]":
             "Shaker effects file version mismatch (%s != %s); attempting load anyway",
             file_version, CURRENT_VERSION,
         )
+
+    from .ffb_shaker import Layer  # local import — see module-level note
 
     out: "dict[str, list[Layer]]" = {}
     for eff_name, eff_data in data.get("effects", {}).items():
