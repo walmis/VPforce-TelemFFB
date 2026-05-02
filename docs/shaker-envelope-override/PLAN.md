@@ -10,7 +10,7 @@
 
 - [x] STEP_00 — Bootstrap planning artifacts
 - [x] STEP_01 — Schema v3: Layer attack_ms/decay_ms + runtime + test worker
-- [ ] STEP_02 — UI: two new columns (Attack ms / Decay ms) on impulse rows
+- [x] STEP_02 — UI: two new columns (Attack ms / Decay ms) on impulse rows
 - [ ] STEP_03 — SHAKER.md update + SMOKETEST_RESULTS
 
 ## Context

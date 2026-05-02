@@ -416,10 +416,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         effect_row.addStretch(1)
         parent_layout.addLayout(effect_row)
 
-        self.shaker_layer_table = QTableWidget(0, 8)
+        self.shaker_layer_table = QTableWidget(0, 10)
         self.shaker_layer_table.setHorizontalHeaderLabels(
             ["#", "Freq ×", "Gain", "Route", "OscType", "Remove",
-             "Center Hz", "Bandwidth Hz"])
+             "Center Hz", "Bandwidth Hz", "Attack ms", "Decay ms"])
         hdr = self.shaker_layer_table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -429,6 +429,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         hdr.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         hdr.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents)
         self.shaker_layer_table.verticalHeader().setVisible(False)
         self.shaker_layer_table.setSelectionMode(
             QTableWidget.SelectionMode.NoSelection)
@@ -551,16 +553,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             osc_combo = table.cellWidget(r, 4)
             center_spin = table.cellWidget(r, 6)
             bw_spin = table.cellWidget(r, 7)
+            attack_spin = table.cellWidget(r, 8)
+            decay_spin  = table.cellWidget(r, 9)
             freq = freq_spin.value() if freq_spin else 1.0
             gain = gain_spin.value() if gain_spin else 1.0
             route = route_combo.currentData() if route_combo else "both"
             osc_type = osc_combo.currentData() if osc_combo else "sine"
             center_hz = center_spin.value() if center_spin else None
             bandwidth_hz = bw_spin.value() if bw_spin else None
+            attack_ms = attack_spin.value() if attack_spin else None
+            decay_ms  = decay_spin.value()  if decay_spin  else None
             rows.append(Layer(freq_factor=freq, gain=gain,
                               route=route, osc_type=osc_type,
                               center_hz=center_hz,
-                              bandwidth_hz=bandwidth_hz))
+                              bandwidth_hz=bandwidth_hz,
+                              attack_ms=attack_ms,
+                              decay_ms=decay_ms))
         return rows
 
     def _make_layer_row_widgets(self, row_index: int, layer) -> dict:
@@ -623,6 +631,26 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         bw_spin.setValue(bw_default)
         bw_spin.setEnabled(layer.osc_type == "bandpass_noise")
 
+        # Attack ms spinbox (col 8)
+        attack_spin = QDoubleSpinBox()
+        attack_spin.setRange(0.1, 50.0)
+        attack_spin.setSingleStep(0.5)
+        attack_spin.setDecimals(1)
+        attack_spin.setValue(max(0.1, min(50.0,
+                              layer.attack_ms if layer.attack_ms is not None
+                              else 4.0)))
+        attack_spin.setEnabled(layer.osc_type == "impulse")
+
+        # Decay ms spinbox (col 9)
+        decay_spin = QDoubleSpinBox()
+        decay_spin.setRange(5.0, 500.0)
+        decay_spin.setSingleStep(5.0)
+        decay_spin.setDecimals(1)
+        decay_spin.setValue(max(5.0, min(500.0,
+                             layer.decay_ms if layer.decay_ms is not None
+                             else 90.0)))
+        decay_spin.setEnabled(layer.osc_type == "impulse")
+
         return {
             "freq_factor": freq_spin,
             "gain":        gain_spin,
@@ -632,6 +660,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "extras":      {
                 "center_hz":    center_spin,
                 "bandwidth_hz": bw_spin,
+                "attack_ms":    attack_spin,
+                "decay_ms":     decay_spin,
             },
         }
 
@@ -662,6 +692,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             table.setCellWidget(r, 6, w["extras"]["center_hz"])
             w["extras"]["bandwidth_hz"].valueChanged.connect(self._on_shaker_layer_cell_changed)
             table.setCellWidget(r, 7, w["extras"]["bandwidth_hz"])
+            w["extras"]["attack_ms"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 8, w["extras"]["attack_ms"])
+            w["extras"]["decay_ms"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 9, w["extras"]["decay_ms"])
 
         self._shaker_layer_update_remove_buttons()
 
@@ -692,13 +726,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # and populate defaults when switching to bandpass_noise.
         table = self.shaker_layer_table
         for r in range(table.rowCount()):
-            osc_combo = table.cellWidget(r, 4)
+            osc_combo   = table.cellWidget(r, 4)
             center_spin = table.cellWidget(r, 6)
-            bw_spin = table.cellWidget(r, 7)
-            if osc_combo is None or center_spin is None or bw_spin is None:
+            bw_spin     = table.cellWidget(r, 7)
+            attack_spin = table.cellWidget(r, 8)
+            decay_spin  = table.cellWidget(r, 9)
+            if any(w is None for w in (osc_combo, center_spin, bw_spin, attack_spin, decay_spin)):
                 continue
-            osc_type = osc_combo.currentData()
-            is_noise = (osc_type == "bandpass_noise")
+            osc_type   = osc_combo.currentData()
+            is_noise   = (osc_type == "bandpass_noise")
+            is_impulse = (osc_type == "impulse")
             if is_noise and not center_spin.isEnabled():
                 # Switching into bandpass_noise — populate defaults
                 freq_spin = table.cellWidget(r, 1)
@@ -711,8 +748,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 bw_spin.blockSignals(True)
                 bw_spin.setValue(20.0)
                 bw_spin.blockSignals(False)
+            # Switching into impulse — populate defaults
+            if is_impulse and not attack_spin.isEnabled():
+                attack_spin.blockSignals(True);  attack_spin.setValue(4.0);  attack_spin.blockSignals(False)
+                decay_spin.blockSignals(True);   decay_spin.setValue(90.0);  decay_spin.blockSignals(False)
             center_spin.setEnabled(is_noise)
             bw_spin.setEnabled(is_noise)
+            attack_spin.setEnabled(is_impulse)
+            decay_spin.setEnabled(is_impulse)
 
         rows = self._shaker_layer_read_table_rows()
         self._shaker_layer_working_copy[name] = rows
@@ -747,6 +790,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         table.setCellWidget(r, 6, w["extras"]["center_hz"])
         w["extras"]["bandwidth_hz"].valueChanged.connect(self._on_shaker_layer_cell_changed)
         table.setCellWidget(r, 7, w["extras"]["bandwidth_hz"])
+        w["extras"]["attack_ms"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 8, w["extras"]["attack_ms"])
+        w["extras"]["decay_ms"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 9, w["extras"]["decay_ms"])
 
         self._shaker_layer_update_remove_buttons()
         self._on_shaker_layer_cell_changed()
