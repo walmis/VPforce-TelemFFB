@@ -67,6 +67,7 @@ CONSTANT_FORCE_FREQUENCY_HZ = 25.0
 SHAKER_EFFECT_WHITELIST = {
     # wheel / runway
     "runway0", "runway1", "runway_bump0", "runway_bump1", "touchdown",
+    "gearclunk",
     # weapons / countermeasures
     "gunfire", "cm", "payload_rel",
     # buffeting
@@ -92,6 +93,34 @@ SHAKER_EFFECT_WHITELIST = {
     # interactive effect tester (telemffb.EffectTestDialog)
     "__effect_tester__",
 }
+
+# Per-effect tuning. Effects without an entry use _DEFAULT_PROFILE.
+# kind="transient" routes through Oscillator.trigger() with attack_ms / decay_ms;
+# kind="continuous" uses Oscillator.set() with the given ramp_ms. freq overrides
+# the call-site frequency when present; gain multiplies the call-site magnitude.
+SHAKER_EFFECT_PROFILES: dict = {
+    "gearclunk":    {"kind": "transient", "freq": 55.0, "gain": 1.0,
+                     "attack_ms": 3.0, "decay_ms": 110.0},
+    "touchdown":    {"kind": "transient", "freq": 45.0, "gain": 1.0,
+                     "attack_ms": 5.0, "decay_ms": 220.0},
+    "runway_bump0": {"kind": "transient", "freq": 50.0, "gain": 0.9,
+                     "attack_ms": 2.0, "decay_ms": 70.0},
+    "runway_bump1": {"kind": "transient", "freq": 35.0, "gain": 0.9,
+                     "attack_ms": 2.0, "decay_ms": 130.0},
+    "gunfire":      {"kind": "transient", "freq": 80.0, "gain": 1.0,
+                     "attack_ms": 1.0, "decay_ms": 60.0},
+    "cm":           {"kind": "transient", "freq": 70.0, "gain": 1.0,
+                     "attack_ms": 1.0, "decay_ms": 80.0},
+    "payload_rel":  {"kind": "transient", "freq": 40.0, "gain": 1.0,
+                     "attack_ms": 3.0, "decay_ms": 200.0},
+    "buffeting":    {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
+    "buffeting2":   {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
+    "vrs_buffet":   {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
+    "gearbuffet":   {"kind": "continuous", "ramp_ms": 20.0, "gain": 1.0},
+    "gearbuffet2":  {"kind": "continuous", "ramp_ms": 20.0, "gain": 1.0},
+}
+
+_DEFAULT_PROFILE = {"kind": "continuous", "ramp_ms": 50.0, "gain": 1.0}
 
 _synth: Optional[ShakerSynth] = None
 
@@ -281,20 +310,54 @@ class HapticEffect:
             logger.debug("Shaker start: effect %r not in whitelist; dropping", self.name)
             return self
 
+        profile = SHAKER_EFFECT_PROFILES.get(self.name)
+        if profile is None:
+            # Heuristic: short square pulses (gear/runway-bump-like calls
+            # without an explicit profile entry) are transients.
+            if (self.effect_type == EFFECT_SQUARE
+                    and 0 < self.duration <= 80):
+                use_transient = True
+                freq = float(self.frequency) if self.frequency > 0 else 50.0
+                gain = 1.0
+                attack_ms = 3.0
+                decay_ms = float(max(40, self.duration * 2))
+                ramp_ms = _DEFAULT_PROFILE["ramp_ms"]
+            else:
+                use_transient = False
+                freq = self.frequency
+                gain = _DEFAULT_PROFILE["gain"]
+                ramp_ms = _DEFAULT_PROFILE["ramp_ms"]
+        else:
+            use_transient = profile.get("kind") == "transient"
+            freq = float(profile.get("freq", self.frequency))
+            gain = float(profile.get("gain", 1.0))
+            ramp_ms = float(profile.get("ramp_ms", _DEFAULT_PROFILE["ramp_ms"]))
+            attack_ms = float(profile.get("attack_ms", 3.0))
+            decay_ms = float(profile.get("decay_ms", 120.0))
+
+        magnitude = self.magnitude * gain
+
         with _synth._lock:
             osc = _synth._oscillators.get(self.name)
             if osc is None:
                 osc = Oscillator(_synth.samplerate, _synth.blocksize)
                 _synth._oscillators[self.name] = osc
-            osc.set(self.frequency, self.magnitude)
-        logger.debug("Shaker start name=%r freq=%.2f mag=%.3f duration=%d",
-                     self.name, self.frequency, self.magnitude, self.duration)
+            if use_transient:
+                osc.trigger(freq, magnitude, attack_ms=attack_ms, decay_ms=decay_ms)
+            else:
+                osc.set(freq, magnitude, ramp_ms=ramp_ms)
 
-        # Cancel any prior duration timer; schedule a new stop if duration > 0.
+        logger.debug("Shaker start name=%r kind=%s freq=%.2f mag=%.3f dur=%d",
+                     self.name, "transient" if use_transient else "continuous",
+                     freq, magnitude, self.duration)
+
+        # Cancel any prior duration timer.
         if self._duration_timer is not None:
             self._duration_timer.cancel()
             self._duration_timer = None
-        if self.duration > 0:
+        # Transient envelopes end themselves; only continuous effects need
+        # the duration timer.
+        if not use_transient and self.duration > 0:
             t = threading.Timer(self.duration / 1000.0, self._timed_stop)
             t.daemon = True
             self._duration_timer = t

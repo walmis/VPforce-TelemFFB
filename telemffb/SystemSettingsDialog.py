@@ -290,7 +290,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         and disabled controls.
         """
         from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-                                       QLabel, QComboBox, QDoubleSpinBox, QPushButton)
+                                       QLabel, QComboBox, QDoubleSpinBox, QPushButton,
+                                       QSlider)
 
         self.tab_Shaker = QWidget()
         self.tab_Shaker.setObjectName("tab_Shaker")
@@ -332,6 +333,38 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.shaker_gain_spin.setValue(1.0)
         form.addRow("Master gain:", self.shaker_gain_spin)
 
+        # Output channel routing.
+        self.shaker_channel_combo = QComboBox()
+        self.shaker_channel_combo.addItem("Mono",            userData="mono")
+        self.shaker_channel_combo.addItem("Left only",       userData="left")
+        self.shaker_channel_combo.addItem("Right only",      userData="right")
+        self.shaker_channel_combo.addItem("Stereo (pan)",    userData="pan")
+        self.shaker_channel_combo.setToolTip(
+            "Routes the shaker mono signal to a specific stereo output channel. "
+            "Useful when the shaker amplifier sits behind the pilot while the "
+            "stick is in front. Restart the shaker child instance after changing.")
+        form.addRow("Output channel:", self.shaker_channel_combo)
+
+        # Pan slider (-1 left, +1 right) with live label.
+        self.shaker_pan_slider = QSlider(Qt.Orientation.Horizontal)
+        self.shaker_pan_slider.setRange(-100, 100)
+        self.shaker_pan_slider.setSingleStep(5)
+        self.shaker_pan_slider.setPageStep(10)
+        self.shaker_pan_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.shaker_pan_slider.setTickInterval(25)
+        self.shaker_pan_slider.setValue(0)
+        self.shaker_pan_label = QLabel(self._format_pan_label(0))
+        self.shaker_pan_label.setMinimumWidth(60)
+        pan_row = QHBoxLayout()
+        pan_row.addWidget(self.shaker_pan_slider, 1)
+        pan_row.addWidget(self.shaker_pan_label)
+        form.addRow("Pan:", pan_row)
+
+        self.shaker_pan_slider.valueChanged.connect(self._on_shaker_pan_changed)
+        self.shaker_channel_combo.currentIndexChanged.connect(
+            self._on_shaker_channel_changed)
+        self._on_shaker_channel_changed()
+
         # Test button.
         self.shaker_test_button = QPushButton(self._SHAKER_TEST_BUTTON_TEXT)
         self.shaker_test_button.clicked.connect(self._shaker_test_clicked)
@@ -348,6 +381,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.tabWidget.addTab(self.tab_Shaker, "Shaker")
 
+    @staticmethod
+    def _format_pan_label(slider_value: int) -> str:
+        v = slider_value / 100.0
+        if abs(v) < 0.01:
+            return "Center"
+        side = "L" if v < 0 else "R"
+        return f"{side} {abs(v):.2f}"
+
+    def _on_shaker_pan_changed(self, value: int) -> None:
+        self.shaker_pan_label.setText(self._format_pan_label(value))
+
+    def _on_shaker_channel_changed(self, *_args) -> None:
+        is_pan = self.shaker_channel_combo.currentData() == "pan"
+        self.shaker_pan_slider.setEnabled(is_pan)
+        self.shaker_pan_label.setEnabled(is_pan)
+
     def _shaker_test_clicked(self):
         """Play a short test tone on the currently-selected device.
 
@@ -361,20 +410,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         device_name = self.shaker_device_combo.currentData() or None
         gain = self.shaker_gain_spin.value()
+        channel_mode = self.shaker_channel_combo.currentData() or "mono"
+        pan = self.shaker_pan_slider.value() / 100.0
         self.shaker_test_button.setEnabled(False)
         self.shaker_test_button.setText("Testing…")
 
         def _run():
             try:
                 from telemffb.hw.shaker_synth import ShakerSynth
-                synth = ShakerSynth(device=device_name, master_gain=gain)
+                synth = ShakerSynth(device=device_name, master_gain=gain,
+                                    channel_mode=channel_mode, pan=pan)
                 synth.start()
                 try:
                     osc = synth.get_oscillator("test")
                     osc.set(35.0, 0.5, ramp_ms=100)
-                    time.sleep(2.0)
-                    osc.stop(ramp_ms=100)
-                    time.sleep(0.2)
+                    time.sleep(1.2)
+                    osc.stop(ramp_ms=80)
+                    time.sleep(0.15)
+                    osc.trigger(55.0, 0.9, attack_ms=3.0, decay_ms=120.0)
+                    time.sleep(0.4)
+                    osc.trigger(55.0, 0.9, attack_ms=3.0, decay_ms=120.0)
+                    time.sleep(0.4)
                 finally:
                     synth.stop()
             except Exception:
@@ -422,6 +478,23 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         except (TypeError, ValueError):
             gain = 1.0
         self.shaker_gain_spin.setValue(gain)
+
+        saved_mode = (settings_dict.get('shakerChannelMode', 'mono') or 'mono').strip().lower()
+        mode_idx = 0
+        for i in range(self.shaker_channel_combo.count()):
+            if self.shaker_channel_combo.itemData(i) == saved_mode:
+                mode_idx = i
+                break
+        self.shaker_channel_combo.setCurrentIndex(mode_idx)
+
+        try:
+            pan = float(settings_dict.get('shakerPan', 0.0))
+        except (TypeError, ValueError):
+            pan = 0.0
+        pan = max(-1.0, min(1.0, pan))
+        self.shaker_pan_slider.setValue(int(round(pan * 100)))
+        self.shaker_pan_label.setText(self._format_pan_label(self.shaker_pan_slider.value()))
+        self._on_shaker_channel_changed()
 
     def make_icons(self, pixmap, style):
         icon_enabled = QIcon()
@@ -777,6 +850,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'themeId': self.themeButtonGroup.checkedId(),
             'shakerDevice': self.shaker_device_combo.currentData() or '',
             'shakerGain': float(self.shaker_gain_spin.value()),
+            'shakerChannelMode': self.shaker_channel_combo.currentData() or 'mono',
+            'shakerPan': self.shaker_pan_slider.value() / 100.0,
         }
 
         instance_settings_dict = {
