@@ -302,6 +302,29 @@ class ShakerSynth:
         with self._lock:
             self._oscillators.pop(name, None)
 
+    def add_oscillator(self, name: str, oscillator) -> None:
+        """Insert a pre-built oscillator under the given name. Replaces any
+        existing oscillator with the same name. Thread-safe.
+
+        Used by callers that want to inject custom oscillator subclasses
+        (e.g. BandpassNoiseGenerator, or a one-shot test oscillator from the
+        layer editor) without going through get_oscillator's auto-vivify path.
+        """
+        with self._lock:
+            self._oscillators[name] = oscillator
+
+    def peek_oscillator(self, name: str):
+        """Return the oscillator under ``name`` or ``None`` if not present.
+        Read-only; does NOT auto-create. Thread-safe."""
+        with self._lock:
+            return self._oscillators.get(name)
+
+    def list_oscillator_names(self) -> list:
+        """Snapshot of currently-registered oscillator names. Thread-safe.
+        Used by callers that need to enumerate (e.g. diagnostics, selftests)."""
+        with self._lock:
+            return list(self._oscillators.keys())
+
     def set_master_gain(self, gain: float) -> None:
         with self._lock:
             self._master_gain = float(gain)

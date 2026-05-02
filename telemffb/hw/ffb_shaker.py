@@ -361,49 +361,43 @@ class HapticEffect:
     def started(self) -> bool:
         if _synth is None or self.name is None:
             return False
-        with _synth._lock:
-            if self.name in EFFECT_LAYERS:
-                # Layer-aware path: True if any shaker-routed layer oscillator
-                # exists and is not silent.
-                layers = EFFECT_LAYERS[self.name]
-                for idx, layer in enumerate(layers):
-                    if not _layer_is_for_shaker(layer):
-                        continue
-                    osc = _synth._oscillators.get(f"{self.name}__layer{idx}")
-                    if osc is not None and not osc.is_silent:
-                        return True
-                return False
-            # Legacy path: single oscillator keyed by plain effect name.
-            osc = _synth._oscillators.get(self.name)
-            return osc is not None and not osc.is_silent
+        if self.name in EFFECT_LAYERS:
+            # Layer-aware path: True if any shaker-routed layer oscillator
+            # exists and is not silent.
+            layers = EFFECT_LAYERS[self.name]
+            for idx, layer in enumerate(layers):
+                if not _layer_is_for_shaker(layer):
+                    continue
+                osc = _synth.peek_oscillator(f"{self.name}__layer{idx}")
+                if osc is not None and not osc.is_silent:
+                    return True
+            return False
+        # Legacy path: single oscillator keyed by plain effect name.
+        osc = _synth.peek_oscillator(self.name)
+        return osc is not None and not osc.is_silent
 
     def _stop_layer_names(self, names: list) -> None:
         if _synth is None:
             return
-        with _synth._lock:
-            for name in names:
-                osc = _synth._oscillators.get(name)
-                if osc is not None:
-                    osc.stop()
+        for name in names:
+            osc = _synth.peek_oscillator(name)
+            if osc is not None:
+                osc.stop()
 
     def _start_layered(self, layers: list) -> "HapticEffect":
         created_names = []
-        with _synth._lock:
-            for idx, layer in enumerate(layers):
-                if not _layer_is_for_shaker(layer):
-                    continue
-                osc_name = f"{self.name}__layer{idx}"
-                eff_freq = self.frequency * layer.freq_factor
-                eff_mag  = self.magnitude * layer.gain
-                osc = _synth._oscillators.get(osc_name)
-                if osc is None:
-                    osc = Oscillator(_synth.samplerate, _synth.blocksize)
-                    _synth._oscillators[osc_name] = osc
-                if layer.osc_type == "impulse":
-                    osc.trigger(eff_freq, eff_mag)
-                else:
-                    osc.set(eff_freq, eff_mag)
-                created_names.append(osc_name)
+        for idx, layer in enumerate(layers):
+            if not _layer_is_for_shaker(layer):
+                continue
+            osc_name = f"{self.name}__layer{idx}"
+            eff_freq = self.frequency * layer.freq_factor
+            eff_mag  = self.magnitude * layer.gain
+            osc = _synth.get_oscillator(osc_name)
+            if layer.osc_type == "impulse":
+                osc.trigger(eff_freq, eff_mag)
+            else:
+                osc.set(eff_freq, eff_mag)
+            created_names.append(osc_name)
 
         logger.debug("Shaker layered start name=%r layers=%d -> %s",
                      self.name, len(layers), created_names)
@@ -471,15 +465,11 @@ class HapticEffect:
 
         magnitude = self.magnitude * gain
 
-        with _synth._lock:
-            osc = _synth._oscillators.get(self.name)
-            if osc is None:
-                osc = Oscillator(_synth.samplerate, _synth.blocksize)
-                _synth._oscillators[self.name] = osc
-            if use_transient:
-                osc.trigger(freq, magnitude, attack_ms=attack_ms, decay_ms=decay_ms)
-            else:
-                osc.set(freq, magnitude, ramp_ms=ramp_ms)
+        osc = _synth.get_oscillator(self.name)
+        if use_transient:
+            osc.trigger(freq, magnitude, attack_ms=attack_ms, decay_ms=decay_ms)
+        else:
+            osc.set(freq, magnitude, ramp_ms=ramp_ms)
 
         logger.debug("Shaker start name=%r kind=%s freq=%.2f mag=%.3f dur=%d",
                      self.name, "transient" if use_transient else "continuous",
@@ -522,11 +512,10 @@ class HapticEffect:
             logger.debug("Shaker layered stop name=%r", self.name)
             return self
 
-        with _synth._lock:
-            osc = _synth._oscillators.get(self.name)
-            if osc is not None:
-                osc.stop()
-                logger.debug("Shaker stop name=%r", self.name)
+        osc = _synth.peek_oscillator(self.name)
+        if osc is not None:
+            osc.stop()
+            logger.debug("Shaker stop name=%r", self.name)
         return self
 
     def destroy(self) -> None:
@@ -565,8 +554,7 @@ def _selftest_layered(device, samplerate: int) -> None:
         e.name = "je_rumble_1_1"
         e.periodic(40, 0.5, 0).start()
         print("Layered start issued — expect 20 Hz (layer0) and 80 Hz (layer2) oscillators in synth")
-        with synth._lock:
-            names = list(synth._oscillators.keys())
+        names = synth.list_oscillator_names()
         print(f"  oscillators in synth: {names}")
         assert "je_rumble_1_1__layer0" in names, "layer0 missing"
         assert "je_rumble_1_1__layer2" in names, "layer2 missing"
@@ -575,10 +563,9 @@ def _selftest_layered(device, samplerate: int) -> None:
         time.sleep(2.0)
         e.stop()
         print("Layered stop issued")
-        with synth._lock:
-            for n in ["je_rumble_1_1__layer0", "je_rumble_1_1__layer2"]:
-                osc = synth._oscillators.get(n)
-                assert osc is None or osc.is_silent, f"{n} not silent after stop"
+        for n in ["je_rumble_1_1__layer0", "je_rumble_1_1__layer2"]:
+            osc = synth.peek_oscillator(n)
+            assert osc is None or osc.is_silent, f"{n} not silent after stop"
         print("  stop assertions passed")
     finally:
         synth.stop()

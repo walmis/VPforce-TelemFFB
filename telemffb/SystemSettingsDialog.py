@@ -739,11 +739,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                                     channel_mode=channel_mode, pan=pan)
                 synth.start()
                 try:
+                    created_oscs = []
                     for idx, layer in enumerate(rows):
                         osc_name = f"layer_test_{idx}"
                         osc = Oscillator(synth.samplerate, synth.blocksize)
-                        with synth._lock:
-                            synth._oscillators[osc_name] = osc
+                        synth.add_oscillator(osc_name, osc)
+                        created_oscs.append(osc)
                         freq = 40.0 * layer.freq_factor
                         amp = min(1.0, layer.gain)
                         if layer.osc_type == "impulse":
@@ -751,11 +752,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                         else:
                             osc.set(freq, amp, ramp_ms=80.0)
                     _time.sleep(1.8)
-                    with synth._lock:
-                        for idx in range(len(rows)):
-                            osc = synth._oscillators.get(f"layer_test_{idx}")
-                            if osc:
-                                osc.stop(ramp_ms=100)
+                    for osc in created_oscs:
+                        osc.stop(ramp_ms=100)
                     _time.sleep(0.2)
                 finally:
                     synth.stop()

@@ -12,7 +12,7 @@
 - [x] STEP_00 — Bootstrap planning
 - [x] STEP_01 — Remove dead SHAKER_EFFECT_PROFILES entries
 - [x] STEP_02 — DRY layer table row widget creation
-- [ ] STEP_03 — Public ShakerSynth.add_oscillator API
+- [x] STEP_03 — Public ShakerSynth.add_oscillator API
 - [ ] STEP_04 — Logging instead of print in _selftest_layered
 
 ### Stream B — Bandpass noise (depends on Stream A.3 only)
@@ -60,3 +60,19 @@ discretion; Stream B (steps 05-08) stays sequential.
   STEP_06 expands this into an explicit 3-way branch with a fallthrough warning.
 - **No `get_impulse_oscillator` exists** — `Oscillator` already handles impulses via
   `_env_active`. STEP_06 adds only `get_noise_oscillator`.
+- **STEP_03 expanded scope:** the spec's grep verification (`only internal references
+  inside shaker_synth.py`) caught 17 direct `_synth._oscillators` / `_synth._lock`
+  accesses inside `ffb_shaker.py` itself, not just the layer-editor test worker.
+  Added two more public accessors — `peek_oscillator(name)` (read-only, no
+  auto-vivify) and `list_oscillator_names()` (snapshot for diagnostics) — and
+  refactored 5 `HapticEffect` methods + the layered selftest. `_start_layered`
+  no longer holds the synth lock for the whole iteration; it relies on
+  `get_oscillator`'s per-oscillator atomicity. Reviewer accepted the lock-granularity
+  change as safe (callback sees only fully-inserted oscillators; new ones are silent).
+- **Pre-existing bug fixed in same branch:** `python -m telemffb.hw.ffb_shaker
+  --selftest-layered` was hitting an `ImportError: cannot import name
+  'get_default_pack_path' from partially initialized module shaker_layers_io`. Cause:
+  `runpy` registers the entry-point as `__main__` only, so a top-level `from
+  .ffb_shaker import Layer` in `shaker_layers_io.py` triggers a second module
+  load mid-init. Fix: deferred the `Layer` import to function-local inside `load()`.
+  Production import (non-CLI) was unaffected. Committed as `663310b`.
