@@ -141,21 +141,32 @@ def _layer_is_for_shaker(layer: Layer) -> bool:
     return layer.route in ("shaker", "both")
 
 
-EFFECT_LAYERS: dict[str, list[Layer]] = {
-    "je_rumble_1_1": [
-        Layer(freq_factor=0.5, gain=0.85, route="shaker", osc_type="sine"),
-        Layer(freq_factor=1.0, gain=0.50, route="stick",  osc_type="sine"),
-        Layer(freq_factor=2.0, gain=0.30, route="shaker", osc_type="sine"),
-    ],
-    "gunfire": [
-        Layer(freq_factor=0.4, gain=0.90, route="shaker", osc_type="impulse"),
-        Layer(freq_factor=1.0, gain=0.50, route="stick",  osc_type="sine"),
-    ],
-    "touchdown": [
-        Layer(freq_factor=0.4, gain=1.00, route="shaker", osc_type="impulse"),
-        Layer(freq_factor=2.0, gain=0.40, route="stick",  osc_type="impulse"),
-    ],
-}
+# Built-in default layers — populated by STEP_04. For STEP_02 this is empty;
+# reload_layers() is written so STEP_04 can fill this dict and the logic
+# remains unchanged.
+_BUILTIN_DEFAULT_LAYERS: dict[str, list[Layer]] = {}
+
+# Populated at startup by reload_layers() from shaker_effects.json.
+# All entries come from disk; nothing is hardcoded here.
+EFFECT_LAYERS: dict[str, list[Layer]] = {}
+
+
+def reload_layers() -> None:
+    """Re-read the user's shaker_effects.json and replace EFFECT_LAYERS.
+
+    Called at startup (main.py) and by the System Settings UI after Save
+    (STEP_03). Does NOT clear built-in defaults — anything not in the JSON
+    falls back to the built-in default layer pack (STEP_04).
+    """
+    from .shaker_layers_io import load, get_shaker_effects_path
+    path = get_shaker_effects_path()
+    if not path:
+        return
+    new_data = load(path)
+    EFFECT_LAYERS.clear()
+    EFFECT_LAYERS.update(_BUILTIN_DEFAULT_LAYERS)  # populated by STEP_04
+    EFFECT_LAYERS.update(new_data)
+    logger.info("EFFECT_LAYERS reloaded: %d entries", len(EFFECT_LAYERS))
 
 
 _synth: Optional[ShakerSynth] = None
@@ -331,6 +342,18 @@ class HapticEffect:
         if _synth is None or self.name is None:
             return False
         with _synth._lock:
+            if self.name in EFFECT_LAYERS:
+                # Layer-aware path: True if any shaker-routed layer oscillator
+                # exists and is not silent.
+                layers = EFFECT_LAYERS[self.name]
+                for idx, layer in enumerate(layers):
+                    if not _layer_is_for_shaker(layer):
+                        continue
+                    osc = _synth._oscillators.get(f"{self.name}__layer{idx}")
+                    if osc is not None and not osc.is_silent:
+                        return True
+                return False
+            # Legacy path: single oscillator keyed by plain effect name.
             osc = _synth._oscillators.get(self.name)
             return osc is not None and not osc.is_silent
 
@@ -492,7 +515,16 @@ class HapticEffect:
         if self._duration_timer is not None:
             self._duration_timer.cancel()
             self._duration_timer = None
-        _synth.remove_oscillator(self.name)
+        if self.name in EFFECT_LAYERS:
+            # Layer-aware path: remove each shaker-routed __layerN oscillator.
+            layers = EFFECT_LAYERS[self.name]
+            for idx, layer in enumerate(layers):
+                if not _layer_is_for_shaker(layer):
+                    continue
+                _synth.remove_oscillator(f"{self.name}__layer{idx}")
+        else:
+            # Legacy path: single oscillator keyed by plain effect name.
+            _synth.remove_oscillator(self.name)
         logger.debug("Shaker destroy name=%r", self.name)
 
     def __del__(self):

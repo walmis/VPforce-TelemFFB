@@ -24,7 +24,7 @@ complement (different band, different texture), not duplicate.
 
 - [x] STEP_00 — Bootstrap planning artifacts
 - [x] STEP_01 — Layer runtime (Layer dataclass, dispatch in HapticEffect)
-- [ ] STEP_02 — Config loading & file management
+- [x] STEP_02 — Config loading & file management
 - [ ] STEP_03 — Layer editor UI in System Settings
 - [ ] STEP_04 — Ship default layer pack
 - [ ] STEP_05 — Smoke test in MSFS
@@ -81,3 +81,15 @@ This preserves every existing code path; layers are strictly additive.
   profile"). STEP_02 implementer should remove `touchdown` and `gunfire` from
   `SHAKER_EFFECT_PROFILES` when the JSON-loaded layer pack ships, to keep the
   dicts consistent.
+- _2026-05-02_: STEP_02 complete. New `telemffb/hw/shaker_layers_io.py` with
+  `load()`, `save()`, `get_shaker_effects_path()`, and `CURRENT_VERSION = 1`.
+  `ffb_shaker.py`: hardcoded STEP_01 test dict replaced with empty `EFFECT_LAYERS`,
+  `_BUILTIN_DEFAULT_LAYERS` stub added, `reload_layers()` function wires the two
+  together. Two layer-awareness gaps from STEP_01 independent review fixed:
+  `HapticEffect.destroy()` now iterates `__layerN` oscillators for layered effects
+  instead of calling `remove_oscillator(self.name)` on the plain name; `started`
+  property checks all shaker-routed layer oscillators instead of the plain-name
+  oscillator (which never exists for layered effects). `main.py` calls
+  `reload_layers()` after `aircraft_base.use_shaker_backend()`. No surprises:
+  `G.userconfig_rootpath` confirmed at `telemffb/globals.py:55`; the shaker
+  branch in `main.py` was exactly where expected (line 380).

@@ -395,6 +395,10 @@ def _initialize_device_connection():
             init_shaker(synth)
             G.shaker_synth = synth
             aircraft_base.use_shaker_backend()
+            from telemffb.hw import ffb_shaker as _ffb_shaker
+            _ffb_shaker.reload_layers()
+            logging.info("Shaker effects: %d effects with custom layers",
+                         len(_ffb_shaker.EFFECT_LAYERS))
             G.device_connection_status = True
             logging.info(f"Shaker device initialised (output={device_name!r}, gain={gain})")
         except Exception as e:
