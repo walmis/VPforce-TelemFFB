@@ -554,9 +554,57 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                               route=route, osc_type=osc_type))
         return rows
 
+    def _make_layer_row_widgets(self, row_index: int, layer) -> dict:
+        """Build the cell widgets for one layer row.
+
+        Returns a dict of {column_name: widget} for placement and signal
+        wiring.  Signal connections and setCellWidget calls are the
+        caller's responsibility.  ``extras`` is intentionally empty for
+        STEP_02; STEP_07 will populate it for bandpass_noise rows.
+        """
+        from PyQt6.QtWidgets import QDoubleSpinBox, QComboBox, QPushButton
+
+        freq_spin = QDoubleSpinBox()
+        freq_spin.setRange(0.10, 4.00)
+        freq_spin.setSingleStep(0.05)
+        freq_spin.setDecimals(2)
+        freq_spin.setValue(layer.freq_factor)
+
+        gain_spin = QDoubleSpinBox()
+        gain_spin.setRange(0.00, 1.50)
+        gain_spin.setSingleStep(0.05)
+        gain_spin.setDecimals(2)
+        gain_spin.setValue(layer.gain)
+
+        route_combo = QComboBox()
+        route_combo.addItem("shaker", userData="shaker")
+        route_combo.addItem("stick",  userData="stick")
+        route_combo.addItem("both",   userData="both")
+        idx = route_combo.findData(layer.route)
+        if idx >= 0:
+            route_combo.setCurrentIndex(idx)
+
+        osc_combo = QComboBox()
+        osc_combo.addItem("sine",    userData="sine")
+        osc_combo.addItem("impulse", userData="impulse")
+        idx = osc_combo.findData(layer.osc_type)
+        if idx >= 0:
+            osc_combo.setCurrentIndex(idx)
+
+        remove_btn = QPushButton("−")
+        remove_btn.setFixedWidth(28)
+
+        return {
+            "freq_factor": freq_spin,
+            "gain":        gain_spin,
+            "route":       route_combo,
+            "osc_type":    osc_combo,
+            "remove":      remove_btn,
+            "extras":      {},
+        }
+
     def _shaker_layer_rebuild_table(self, name: str):
-        from PyQt6.QtWidgets import (
-            QDoubleSpinBox, QComboBox, QPushButton, QTableWidgetItem)
+        from PyQt6.QtWidgets import QTableWidgetItem
         rows = self._shaker_layer_get_rows(name)
         table = self.shaker_layer_table
         table.setRowCount(0)
@@ -566,46 +614,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             idx_item.setFlags(idx_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             table.setItem(r, 0, idx_item)
 
-            freq_spin = QDoubleSpinBox()
-            freq_spin.setRange(0.10, 4.00)
-            freq_spin.setSingleStep(0.05)
-            freq_spin.setDecimals(2)
-            freq_spin.setValue(layer.freq_factor)
-            freq_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
-            table.setCellWidget(r, 1, freq_spin)
-
-            gain_spin = QDoubleSpinBox()
-            gain_spin.setRange(0.00, 1.50)
-            gain_spin.setSingleStep(0.05)
-            gain_spin.setDecimals(2)
-            gain_spin.setValue(layer.gain)
-            gain_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
-            table.setCellWidget(r, 2, gain_spin)
-
-            route_combo = QComboBox()
-            route_combo.addItem("shaker", userData="shaker")
-            route_combo.addItem("stick",  userData="stick")
-            route_combo.addItem("both",   userData="both")
-            idx = route_combo.findData(layer.route)
-            if idx >= 0:
-                route_combo.setCurrentIndex(idx)
-            route_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
-            table.setCellWidget(r, 3, route_combo)
-
-            osc_combo = QComboBox()
-            osc_combo.addItem("sine",    userData="sine")
-            osc_combo.addItem("impulse", userData="impulse")
-            idx = osc_combo.findData(layer.osc_type)
-            if idx >= 0:
-                osc_combo.setCurrentIndex(idx)
-            osc_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
-            table.setCellWidget(r, 4, osc_combo)
-
-            remove_btn = QPushButton("−")
-            remove_btn.setFixedWidth(28)
-            remove_btn.clicked.connect(
+            w = self._make_layer_row_widgets(r, layer)
+            w["freq_factor"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 1, w["freq_factor"])
+            w["gain"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 2, w["gain"])
+            w["route"].currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 3, w["route"])
+            w["osc_type"].currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 4, w["osc_type"])
+            w["remove"].clicked.connect(
                 lambda checked, row=r: self._on_shaker_layer_remove(row))
-            table.setCellWidget(r, 5, remove_btn)
+            table.setCellWidget(r, 5, w["remove"])
 
         self._shaker_layer_update_remove_buttons()
 
@@ -638,8 +658,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     def _on_shaker_layer_add(self):
         from telemffb.hw.ffb_shaker import Layer
-        from PyQt6.QtWidgets import (
-            QDoubleSpinBox, QComboBox, QPushButton, QTableWidgetItem)
+        from PyQt6.QtWidgets import QTableWidgetItem
         table = self.shaker_layer_table
         r = table.rowCount()
         table.insertRow(r)
@@ -649,43 +668,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         table.setItem(r, 0, idx_item)
 
         layer = Layer()
-
-        freq_spin = QDoubleSpinBox()
-        freq_spin.setRange(0.10, 4.00)
-        freq_spin.setSingleStep(0.05)
-        freq_spin.setDecimals(2)
-        freq_spin.setValue(layer.freq_factor)
-        freq_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
-        table.setCellWidget(r, 1, freq_spin)
-
-        gain_spin = QDoubleSpinBox()
-        gain_spin.setRange(0.00, 1.50)
-        gain_spin.setSingleStep(0.05)
-        gain_spin.setDecimals(2)
-        gain_spin.setValue(layer.gain)
-        gain_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
-        table.setCellWidget(r, 2, gain_spin)
-
-        route_combo = QComboBox()
-        route_combo.addItem("shaker", userData="shaker")
-        route_combo.addItem("stick",  userData="stick")
-        route_combo.addItem("both",   userData="both")
-        route_combo.setCurrentIndex(route_combo.findData(layer.route))
-        route_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
-        table.setCellWidget(r, 3, route_combo)
-
-        osc_combo = QComboBox()
-        osc_combo.addItem("sine",    userData="sine")
-        osc_combo.addItem("impulse", userData="impulse")
-        osc_combo.setCurrentIndex(osc_combo.findData(layer.osc_type))
-        osc_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
-        table.setCellWidget(r, 4, osc_combo)
-
-        remove_btn = QPushButton("−")
-        remove_btn.setFixedWidth(28)
-        remove_btn.clicked.connect(
+        w = self._make_layer_row_widgets(r, layer)
+        w["freq_factor"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 1, w["freq_factor"])
+        w["gain"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 2, w["gain"])
+        w["route"].currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 3, w["route"])
+        w["osc_type"].currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 4, w["osc_type"])
+        w["remove"].clicked.connect(
             lambda checked, row=r: self._on_shaker_layer_remove(row))
-        table.setCellWidget(r, 5, remove_btn)
+        table.setCellWidget(r, 5, w["remove"])
 
         self._shaker_layer_update_remove_buttons()
         self._on_shaker_layer_cell_changed()
