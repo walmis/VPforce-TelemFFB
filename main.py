@@ -384,11 +384,32 @@ def _initialize_device_connection():
             from telemffb.sim import aircraft_base
             device_name = G.system_settings.get('shakerDevice', None) or None
             gain = float(G.system_settings.get('shakerGain', 1.0))
-            synth = ShakerSynth(device=device_name, master_gain=gain)
+            channel_mode = G.system_settings.get('shakerChannelMode', 'mono') or 'mono'
+            try:
+                pan = float(G.system_settings.get('shakerPan', 0.0))
+            except (TypeError, ValueError):
+                pan = 0.0
+            synth = ShakerSynth(device=device_name, master_gain=gain,
+                                channel_mode=channel_mode, pan=pan)
             synth.start()
             init_shaker(synth)
             G.shaker_synth = synth
             aircraft_base.use_shaker_backend()
+            from telemffb.hw import ffb_shaker as _ffb_shaker
+            from telemffb.hw.shaker_layers_io import get_shaker_effects_path, get_default_pack_path
+            user_path = get_shaker_effects_path()
+            if user_path and not os.path.exists(user_path):
+                default_path = get_default_pack_path()
+                if default_path and os.path.exists(default_path):
+                    try:
+                        os.makedirs(os.path.dirname(user_path), exist_ok=True)
+                        shutil.copyfile(default_path, user_path)
+                        logging.info("Initialised %s from bundled defaults", user_path)
+                    except Exception:
+                        logging.exception("Could not seed user shaker_effects.json from bundle")
+            _ffb_shaker.reload_layers()
+            logging.info("Shaker effects: %d effects with custom layers",
+                         len(_ffb_shaker.EFFECT_LAYERS))
             G.device_connection_status = True
             logging.info(f"Shaker device initialised (output={device_name!r}, gain={gain})")
         except Exception as e:

@@ -1230,7 +1230,7 @@ class AircraftBase(object):
             logging.debug(f"Landing Gear Pos: {gearpos}")
             effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
             effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 90, 3, phase=120).start()
-            if (gearpos == 0 or gearpos == 1) and self.is_joystick():
+            if (gearpos == 0 or gearpos == 1) and (self.is_joystick() or self.is_shaker()):
                 # Play short, sharp bump when gear fully extended/retracted
                 dir = 0 if gearpos == 0 else 180  # change direction of effect depending on if gear are closed or extended
                 effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 3), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()

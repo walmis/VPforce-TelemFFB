@@ -594,6 +594,8 @@ class SystemSettings(QSettings):
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
         'shakerDevice': '',  # bass-shaker output device name; '' = system default
         'shakerGain': 1.0,
+        'shakerChannelMode': 'mono',  # one of: 'mono', 'left', 'right', 'pan'
+        'shakerPan': 0.0,             # [-1, +1]; only used when shakerChannelMode == 'pan'
     }
 
     @property

@@ -30,8 +30,12 @@ are chainable no-ops.
 Whitelist-based effect filtering is added in STEP_04.
 """
 
+import argparse
 import logging
+import os
 import threading
+import time
+from dataclasses import dataclass
 from typing import Optional
 
 from telemffb.hw.shaker_synth import Oscillator, ShakerSynth
@@ -67,6 +71,7 @@ CONSTANT_FORCE_FREQUENCY_HZ = 25.0
 SHAKER_EFFECT_WHITELIST = {
     # wheel / runway
     "runway0", "runway1", "runway_bump0", "runway_bump1", "touchdown",
+    "gearclunk",
     # weapons / countermeasures
     "gunfire", "cm", "payload_rel",
     # buffeting
@@ -92,6 +97,101 @@ SHAKER_EFFECT_WHITELIST = {
     # interactive effect tester (telemffb.EffectTestDialog)
     "__effect_tester__",
 }
+
+# Per-effect tuning. Effects without an entry use _DEFAULT_PROFILE.
+# kind="transient" routes through Oscillator.trigger() with attack_ms / decay_ms;
+# kind="continuous" uses Oscillator.set() with the given ramp_ms. freq overrides
+# the call-site frequency when present; gain multiplies the call-site magnitude.
+SHAKER_EFFECT_PROFILES: dict = {
+    "gearclunk":    {"kind": "transient", "freq": 55.0, "gain": 1.0,
+                     "attack_ms": 3.0, "decay_ms": 110.0},
+    "touchdown":    {"kind": "transient", "freq": 45.0, "gain": 1.0,
+                     "attack_ms": 5.0, "decay_ms": 220.0},
+    "runway_bump0": {"kind": "transient", "freq": 50.0, "gain": 0.9,
+                     "attack_ms": 2.0, "decay_ms": 70.0},
+    "runway_bump1": {"kind": "transient", "freq": 35.0, "gain": 0.9,
+                     "attack_ms": 2.0, "decay_ms": 130.0},
+    "gunfire":      {"kind": "transient", "freq": 80.0, "gain": 1.0,
+                     "attack_ms": 1.0, "decay_ms": 60.0},
+    "cm":           {"kind": "transient", "freq": 70.0, "gain": 1.0,
+                     "attack_ms": 1.0, "decay_ms": 80.0},
+    "payload_rel":  {"kind": "transient", "freq": 40.0, "gain": 1.0,
+                     "attack_ms": 3.0, "decay_ms": 200.0},
+    "buffeting":    {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
+    "buffeting2":   {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
+    "vrs_buffet":   {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
+    "gearbuffet":   {"kind": "continuous", "ramp_ms": 20.0, "gain": 1.0},
+    "gearbuffet2":  {"kind": "continuous", "ramp_ms": 20.0, "gain": 1.0},
+}
+
+_DEFAULT_PROFILE = {"kind": "continuous", "ramp_ms": 50.0, "gain": 1.0}
+
+
+@dataclass(frozen=True)
+class Layer:
+    freq_factor: float = 1.0
+    gain: float = 1.0
+    route: str = "both"      # "shaker" | "stick" | "both"
+    osc_type: str = "sine"   # "sine" | "impulse"
+
+
+DEFAULT_LAYER = Layer()
+
+
+def _layer_is_for_shaker(layer: Layer) -> bool:
+    return layer.route in ("shaker", "both")
+
+
+def _load_builtin_defaults() -> "dict[str, list[Layer]]":
+    """Parse the bundled default layer pack at module import.
+
+    Returns an empty dict if the bundle is missing or malformed (logged at
+    warn level). Used as the base for reload_layers() and as the source for
+    "Reset to default" UI actions.
+    """
+    from .shaker_layers_io import get_default_pack_path, load
+    try:
+        path = get_default_pack_path()
+        if path and os.path.exists(path):
+            return load(path)
+    except Exception:
+        logger.exception("Could not load bundled shaker_effects_default.json")
+    return {}
+
+
+_BUILTIN_DEFAULT_LAYERS: dict[str, list[Layer]] = _load_builtin_defaults()
+
+# Populated at startup by reload_layers() from shaker_effects.json.
+# All entries come from disk; nothing is hardcoded here.
+EFFECT_LAYERS: dict[str, list[Layer]] = {}
+
+
+def get_builtin_default_for(name: str) -> "list[Layer]":
+    """Return a fresh copy of the bundled default layers for a single effect.
+
+    Used by the System Settings layer editor's "Reset effect to default"
+    button. Returns [] if there is no built-in default for that effect.
+    """
+    return list(_BUILTIN_DEFAULT_LAYERS.get(name, []))
+
+
+def reload_layers() -> None:
+    """Re-read the user's shaker_effects.json and replace EFFECT_LAYERS.
+
+    Called at startup (main.py) and by the System Settings UI after Save
+    (STEP_03). Does NOT clear built-in defaults — anything not in the JSON
+    falls back to the built-in default layer pack (STEP_04).
+    """
+    from .shaker_layers_io import load, get_shaker_effects_path
+    path = get_shaker_effects_path()
+    if not path:
+        return
+    new_data = load(path)
+    EFFECT_LAYERS.clear()
+    EFFECT_LAYERS.update(_BUILTIN_DEFAULT_LAYERS)  # populated by STEP_04
+    EFFECT_LAYERS.update(new_data)
+    logger.info("EFFECT_LAYERS reloaded: %d entries", len(EFFECT_LAYERS))
+
 
 _synth: Optional[ShakerSynth] = None
 
@@ -266,8 +366,72 @@ class HapticEffect:
         if _synth is None or self.name is None:
             return False
         with _synth._lock:
+            if self.name in EFFECT_LAYERS:
+                # Layer-aware path: True if any shaker-routed layer oscillator
+                # exists and is not silent.
+                layers = EFFECT_LAYERS[self.name]
+                for idx, layer in enumerate(layers):
+                    if not _layer_is_for_shaker(layer):
+                        continue
+                    osc = _synth._oscillators.get(f"{self.name}__layer{idx}")
+                    if osc is not None and not osc.is_silent:
+                        return True
+                return False
+            # Legacy path: single oscillator keyed by plain effect name.
             osc = _synth._oscillators.get(self.name)
             return osc is not None and not osc.is_silent
+
+    def _stop_layer_names(self, names: list) -> None:
+        if _synth is None:
+            return
+        with _synth._lock:
+            for name in names:
+                osc = _synth._oscillators.get(name)
+                if osc is not None:
+                    osc.stop()
+
+    def _start_layered(self, layers: list) -> "HapticEffect":
+        created_names = []
+        with _synth._lock:
+            for idx, layer in enumerate(layers):
+                if not _layer_is_for_shaker(layer):
+                    continue
+                osc_name = f"{self.name}__layer{idx}"
+                eff_freq = self.frequency * layer.freq_factor
+                eff_mag  = self.magnitude * layer.gain
+                osc = _synth._oscillators.get(osc_name)
+                if osc is None:
+                    osc = Oscillator(_synth.samplerate, _synth.blocksize)
+                    _synth._oscillators[osc_name] = osc
+                if layer.osc_type == "impulse":
+                    osc.trigger(eff_freq, eff_mag)
+                else:
+                    osc.set(eff_freq, eff_mag)
+                created_names.append(osc_name)
+
+        logger.debug("Shaker layered start name=%r layers=%d -> %s",
+                     self.name, len(layers), created_names)
+
+        if self._duration_timer is not None:
+            self._duration_timer.cancel()
+            self._duration_timer = None
+        needs_timer = self.duration > 0 and any(
+            l.osc_type == "sine" and _layer_is_for_shaker(l) for l in layers
+        )
+        if needs_timer:
+            sine_names = [
+                f"{self.name}__layer{i}"
+                for i, l in enumerate(layers)
+                if l.osc_type == "sine" and _layer_is_for_shaker(l)
+            ]
+            t = threading.Timer(
+                self.duration / 1000.0,
+                lambda: self._stop_layer_names(sine_names),
+            )
+            t.daemon = True
+            self._duration_timer = t
+            t.start()
+        return self
 
     def start(self, force: bool = False, **kw) -> "HapticEffect":
         if _synth is None:
@@ -281,20 +445,57 @@ class HapticEffect:
             logger.debug("Shaker start: effect %r not in whitelist; dropping", self.name)
             return self
 
+        if self.name in EFFECT_LAYERS:
+            return self._start_layered(EFFECT_LAYERS[self.name])
+
+        profile = SHAKER_EFFECT_PROFILES.get(self.name)
+        if profile is None:
+            # Heuristic: short square pulses (gear/runway-bump-like calls
+            # without an explicit profile entry) are transients.
+            if (self.effect_type == EFFECT_SQUARE
+                    and 0 < self.duration <= 80):
+                use_transient = True
+                freq = float(self.frequency) if self.frequency > 0 else 50.0
+                gain = 1.0
+                attack_ms = 3.0
+                decay_ms = float(max(40, self.duration * 2))
+                ramp_ms = _DEFAULT_PROFILE["ramp_ms"]
+            else:
+                use_transient = False
+                freq = self.frequency
+                gain = _DEFAULT_PROFILE["gain"]
+                ramp_ms = _DEFAULT_PROFILE["ramp_ms"]
+        else:
+            use_transient = profile.get("kind") == "transient"
+            freq = float(profile.get("freq", self.frequency))
+            gain = float(profile.get("gain", 1.0))
+            ramp_ms = float(profile.get("ramp_ms", _DEFAULT_PROFILE["ramp_ms"]))
+            attack_ms = float(profile.get("attack_ms", 3.0))
+            decay_ms = float(profile.get("decay_ms", 120.0))
+
+        magnitude = self.magnitude * gain
+
         with _synth._lock:
             osc = _synth._oscillators.get(self.name)
             if osc is None:
                 osc = Oscillator(_synth.samplerate, _synth.blocksize)
                 _synth._oscillators[self.name] = osc
-            osc.set(self.frequency, self.magnitude)
-        logger.debug("Shaker start name=%r freq=%.2f mag=%.3f duration=%d",
-                     self.name, self.frequency, self.magnitude, self.duration)
+            if use_transient:
+                osc.trigger(freq, magnitude, attack_ms=attack_ms, decay_ms=decay_ms)
+            else:
+                osc.set(freq, magnitude, ramp_ms=ramp_ms)
 
-        # Cancel any prior duration timer; schedule a new stop if duration > 0.
+        logger.debug("Shaker start name=%r kind=%s freq=%.2f mag=%.3f dur=%d",
+                     self.name, "transient" if use_transient else "continuous",
+                     freq, magnitude, self.duration)
+
+        # Cancel any prior duration timer.
         if self._duration_timer is not None:
             self._duration_timer.cancel()
             self._duration_timer = None
-        if self.duration > 0:
+        # Transient envelopes end themselves; only continuous effects need
+        # the duration timer.
+        if not use_transient and self.duration > 0:
             t = threading.Timer(self.duration / 1000.0, self._timed_stop)
             t.daemon = True
             self._duration_timer = t
@@ -313,6 +514,18 @@ class HapticEffect:
         if self._duration_timer is not None:
             self._duration_timer.cancel()
             self._duration_timer = None
+
+        if self.name in EFFECT_LAYERS:
+            layers = EFFECT_LAYERS[self.name]
+            names = [
+                f"{self.name}__layer{i}"
+                for i, l in enumerate(layers)
+                if _layer_is_for_shaker(l)
+            ]
+            self._stop_layer_names(names)
+            logger.debug("Shaker layered stop name=%r", self.name)
+            return self
+
         with _synth._lock:
             osc = _synth._oscillators.get(self.name)
             if osc is not None:
@@ -326,7 +539,16 @@ class HapticEffect:
         if self._duration_timer is not None:
             self._duration_timer.cancel()
             self._duration_timer = None
-        _synth.remove_oscillator(self.name)
+        if self.name in EFFECT_LAYERS:
+            # Layer-aware path: remove each shaker-routed __layerN oscillator.
+            layers = EFFECT_LAYERS[self.name]
+            for idx, layer in enumerate(layers):
+                if not _layer_is_for_shaker(layer):
+                    continue
+                _synth.remove_oscillator(f"{self.name}__layer{idx}")
+        else:
+            # Legacy path: single oscillator keyed by plain effect name.
+            _synth.remove_oscillator(self.name)
         logger.debug("Shaker destroy name=%r", self.name)
 
     def __del__(self):
@@ -334,3 +556,66 @@ class HapticEffect:
             self.destroy()
         except Exception:
             pass
+
+
+def _selftest_layered(device, samplerate: int) -> None:
+    from telemffb.hw.shaker_synth import ShakerSynth as _ShakerSynth
+    print(f"ffb_shaker layered selftest: device={device!r} samplerate={samplerate}")
+    synth = _ShakerSynth(samplerate=samplerate, device=device)
+    synth.start()
+    init_shaker(synth)
+    try:
+        e = HapticEffect()
+        e.name = "je_rumble_1_1"
+        e.periodic(40, 0.5, 0).start()
+        print("Layered start issued — expect 20 Hz (layer0) and 80 Hz (layer2) oscillators in synth")
+        with synth._lock:
+            names = list(synth._oscillators.keys())
+        print(f"  oscillators in synth: {names}")
+        assert "je_rumble_1_1__layer0" in names, "layer0 missing"
+        assert "je_rumble_1_1__layer2" in names, "layer2 missing"
+        assert "je_rumble_1_1__layer1" not in names, "stick layer1 must not be created"
+        print("  assertions passed")
+        time.sleep(2.0)
+        e.stop()
+        print("Layered stop issued")
+        with synth._lock:
+            for n in ["je_rumble_1_1__layer0", "je_rumble_1_1__layer2"]:
+                osc = synth._oscillators.get(n)
+                assert osc is None or osc.is_silent, f"{n} not silent after stop"
+        print("  stop assertions passed")
+    finally:
+        synth.stop()
+
+
+def _parse_device(spec):
+    if spec is None:
+        return None
+    try:
+        return int(spec)
+    except ValueError:
+        return spec
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="ffb_shaker layer dispatch selftest")
+    p.add_argument("--selftest-layered", action="store_true",
+                   help="Run the layered-dispatch acceptance selftest")
+    p.add_argument("--device", type=str, default=None,
+                   help="Output device (integer index or name substring)")
+    p.add_argument("--samplerate", type=int, default=48000,
+                   help="Sample rate in Hz (default 48000)")
+    args = p.parse_args()
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+    if args.selftest_layered:
+        _selftest_layered(_parse_device(args.device), args.samplerate)
+    else:
+        p.print_help()
+
+
+if __name__ == "__main__":
+    main()

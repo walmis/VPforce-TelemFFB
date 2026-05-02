@@ -290,7 +290,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         and disabled controls.
         """
         from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-                                       QLabel, QComboBox, QDoubleSpinBox, QPushButton)
+                                       QLabel, QComboBox, QDoubleSpinBox, QPushButton,
+                                       QSlider)
 
         self.tab_Shaker = QWidget()
         self.tab_Shaker.setObjectName("tab_Shaker")
@@ -332,6 +333,38 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.shaker_gain_spin.setValue(1.0)
         form.addRow("Master gain:", self.shaker_gain_spin)
 
+        # Output channel routing.
+        self.shaker_channel_combo = QComboBox()
+        self.shaker_channel_combo.addItem("Mono",            userData="mono")
+        self.shaker_channel_combo.addItem("Left only",       userData="left")
+        self.shaker_channel_combo.addItem("Right only",      userData="right")
+        self.shaker_channel_combo.addItem("Stereo (pan)",    userData="pan")
+        self.shaker_channel_combo.setToolTip(
+            "Routes the shaker mono signal to a specific stereo output channel. "
+            "Useful when the shaker amplifier sits behind the pilot while the "
+            "stick is in front. Restart the shaker child instance after changing.")
+        form.addRow("Output channel:", self.shaker_channel_combo)
+
+        # Pan slider (-1 left, +1 right) with live label.
+        self.shaker_pan_slider = QSlider(Qt.Orientation.Horizontal)
+        self.shaker_pan_slider.setRange(-100, 100)
+        self.shaker_pan_slider.setSingleStep(5)
+        self.shaker_pan_slider.setPageStep(10)
+        self.shaker_pan_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.shaker_pan_slider.setTickInterval(25)
+        self.shaker_pan_slider.setValue(0)
+        self.shaker_pan_label = QLabel(self._format_pan_label(0))
+        self.shaker_pan_label.setMinimumWidth(60)
+        pan_row = QHBoxLayout()
+        pan_row.addWidget(self.shaker_pan_slider, 1)
+        pan_row.addWidget(self.shaker_pan_label)
+        form.addRow("Pan:", pan_row)
+
+        self.shaker_pan_slider.valueChanged.connect(self._on_shaker_pan_changed)
+        self.shaker_channel_combo.currentIndexChanged.connect(
+            self._on_shaker_channel_changed)
+        self._on_shaker_channel_changed()
+
         # Test button.
         self.shaker_test_button = QPushButton(self._SHAKER_TEST_BUTTON_TEXT)
         self.shaker_test_button.clicked.connect(self._shaker_test_clicked)
@@ -344,9 +377,481 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         btn_row.addStretch(1)
         outer.addLayout(btn_row)
 
+        self._setup_shaker_layers_section(outer)
+
         outer.addStretch(1)
 
         self.tabWidget.addTab(self.tab_Shaker, "Shaker")
+
+    # ------------------------------------------------------------------
+    # Effect layers subsection
+    # ------------------------------------------------------------------
+
+    def _setup_shaker_layers_section(self, parent_layout):
+        from PyQt6.QtWidgets import (
+            QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
+            QLabel, QComboBox, QDoubleSpinBox, QPushButton,
+            QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
+            QScrollArea,
+        )
+        from telemffb.hw.ffb_shaker import SHAKER_EFFECT_WHITELIST
+        from telemffb.hw import shaker_layers_io
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        parent_layout.addWidget(sep)
+
+        section_label = QLabel("<b>Effect layers</b>")
+        parent_layout.addWidget(section_label)
+
+        effect_row = QHBoxLayout()
+        effect_row.addWidget(QLabel("Effect:"))
+        self.shaker_layer_effect_combo = QComboBox()
+        self.shaker_layer_effect_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        for name in sorted(SHAKER_EFFECT_WHITELIST):
+            self.shaker_layer_effect_combo.addItem(name, userData=name)
+        effect_row.addWidget(self.shaker_layer_effect_combo)
+        effect_row.addStretch(1)
+        parent_layout.addLayout(effect_row)
+
+        self.shaker_layer_table = QTableWidget(0, 6)
+        self.shaker_layer_table.setHorizontalHeaderLabels(
+            ["#", "Freq ×", "Gain", "Route", "OscType", "Remove"])
+        hdr = self.shaker_layer_table.horizontalHeader()
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        self.shaker_layer_table.verticalHeader().setVisible(False)
+        self.shaker_layer_table.setSelectionMode(
+            QTableWidget.SelectionMode.NoSelection)
+        self.shaker_layer_table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers)
+        parent_layout.addWidget(self.shaker_layer_table)
+
+        per_effect_row = QHBoxLayout()
+        self.shaker_layer_add_btn = QPushButton("+ Add layer")
+        self.shaker_layer_reset_btn = QPushButton("Reset effect to default")
+        self.shaker_layer_test_btn = QPushButton("Test effect")
+        if not self._shaker_backend_available:
+            self.shaker_layer_test_btn.setEnabled(False)
+            self.shaker_layer_test_btn.setToolTip(
+                "Audio backend (sounddevice / PortAudio) is unavailable.")
+        per_effect_row.addWidget(self.shaker_layer_add_btn)
+        per_effect_row.addWidget(self.shaker_layer_reset_btn)
+        per_effect_row.addWidget(self.shaker_layer_test_btn)
+        per_effect_row.addStretch(1)
+        parent_layout.addLayout(per_effect_row)
+
+        bottom_row1 = QHBoxLayout()
+        self.shaker_layer_save_btn = QPushButton("Save all effects")
+        self.shaker_layer_reload_btn = QPushButton("Reload from disk")
+        bottom_row1.addWidget(self.shaker_layer_save_btn)
+        bottom_row1.addWidget(self.shaker_layer_reload_btn)
+        bottom_row1.addStretch(1)
+        parent_layout.addLayout(bottom_row1)
+
+        bottom_row2 = QHBoxLayout()
+        self.shaker_layer_reset_all_btn = QPushButton("Reset all effects to defaults")
+        bottom_row2.addWidget(self.shaker_layer_reset_all_btn)
+        bottom_row2.addStretch(1)
+        parent_layout.addLayout(bottom_row2)
+
+        path = shaker_layers_io.get_shaker_effects_path()
+        if path:
+            self._shaker_layer_saved_state = shaker_layers_io.load(path)
+        else:
+            self._shaker_layer_saved_state = {}
+        self._shaker_layer_working_copy = {}
+
+        self._shaker_layer_loading = False
+        self._shaker_layer_prev_effect = None
+
+        self._shaker_layer_rebuild_table(
+            self.shaker_layer_effect_combo.currentData())
+        self._shaker_layer_prev_effect = self.shaker_layer_effect_combo.currentData()
+
+        self._shaker_layer_refresh_combo_markers()
+        self._shaker_layer_update_save_btn()
+
+        self.shaker_layer_effect_combo.currentIndexChanged.connect(
+            self._on_shaker_layer_effect_changed)
+        self.shaker_layer_add_btn.clicked.connect(self._on_shaker_layer_add)
+        self.shaker_layer_reset_btn.clicked.connect(self._on_shaker_layer_reset_effect)
+        self.shaker_layer_test_btn.clicked.connect(self._on_shaker_layer_test)
+        self.shaker_layer_save_btn.clicked.connect(self._on_shaker_layer_save_all)
+        self.shaker_layer_reload_btn.clicked.connect(self._on_shaker_layer_reload)
+        self.shaker_layer_reset_all_btn.clicked.connect(self._on_shaker_layer_reset_all)
+
+    def _shaker_layer_default_rows(self, name: str) -> list:
+        from telemffb.hw.ffb_shaker import Layer, _BUILTIN_DEFAULT_LAYERS
+        if name in _BUILTIN_DEFAULT_LAYERS:
+            return list(_BUILTIN_DEFAULT_LAYERS[name])
+        return [Layer()]
+
+    def _shaker_layer_get_rows(self, name: str) -> list:
+        if name in self._shaker_layer_working_copy:
+            return list(self._shaker_layer_working_copy[name])
+        if name in self._shaker_layer_saved_state:
+            return list(self._shaker_layer_saved_state[name])
+        return self._shaker_layer_default_rows(name)
+
+    def _shaker_layer_is_modified(self, name: str) -> bool:
+        working = self._shaker_layer_working_copy.get(name)
+        saved = self._shaker_layer_saved_state.get(name)
+        if working is None:
+            return False
+        default = self._shaker_layer_default_rows(name)
+        effective_saved = saved if saved is not None else default
+        return working != effective_saved
+
+    def _shaker_layer_any_modified(self) -> bool:
+        return any(self._shaker_layer_is_modified(n)
+                   for n in self._shaker_layer_working_copy)
+
+    def _shaker_layer_refresh_combo_markers(self):
+        self._shaker_layer_loading = True
+        try:
+            combo = self.shaker_layer_effect_combo
+            for i in range(combo.count()):
+                name = combo.itemData(i)
+                base = name
+                if self._shaker_layer_is_modified(name):
+                    combo.setItemText(i, f"● {base}")
+                else:
+                    combo.setItemText(i, base)
+        finally:
+            self._shaker_layer_loading = False
+
+    def _shaker_layer_update_save_btn(self):
+        self.shaker_layer_save_btn.setEnabled(self._shaker_layer_any_modified())
+
+    def _shaker_layer_flush_current_to_working_copy(self):
+        name = self._shaker_layer_prev_effect
+        if name is None:
+            return
+        rows = self._shaker_layer_read_table_rows()
+        self._shaker_layer_working_copy[name] = rows
+
+    def _shaker_layer_read_table_rows(self) -> list:
+        from telemffb.hw.ffb_shaker import Layer
+        table = self.shaker_layer_table
+        rows = []
+        for r in range(table.rowCount()):
+            freq_spin = table.cellWidget(r, 1)
+            gain_spin = table.cellWidget(r, 2)
+            route_combo = table.cellWidget(r, 3)
+            osc_combo = table.cellWidget(r, 4)
+            freq = freq_spin.value() if freq_spin else 1.0
+            gain = gain_spin.value() if gain_spin else 1.0
+            route = route_combo.currentData() if route_combo else "both"
+            osc_type = osc_combo.currentData() if osc_combo else "sine"
+            rows.append(Layer(freq_factor=freq, gain=gain,
+                              route=route, osc_type=osc_type))
+        return rows
+
+    def _shaker_layer_rebuild_table(self, name: str):
+        from PyQt6.QtWidgets import (
+            QDoubleSpinBox, QComboBox, QPushButton, QTableWidgetItem)
+        rows = self._shaker_layer_get_rows(name)
+        table = self.shaker_layer_table
+        table.setRowCount(0)
+        table.setRowCount(len(rows))
+        for r, layer in enumerate(rows):
+            idx_item = QTableWidgetItem(str(r))
+            idx_item.setFlags(idx_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            table.setItem(r, 0, idx_item)
+
+            freq_spin = QDoubleSpinBox()
+            freq_spin.setRange(0.10, 4.00)
+            freq_spin.setSingleStep(0.05)
+            freq_spin.setDecimals(2)
+            freq_spin.setValue(layer.freq_factor)
+            freq_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 1, freq_spin)
+
+            gain_spin = QDoubleSpinBox()
+            gain_spin.setRange(0.00, 1.50)
+            gain_spin.setSingleStep(0.05)
+            gain_spin.setDecimals(2)
+            gain_spin.setValue(layer.gain)
+            gain_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 2, gain_spin)
+
+            route_combo = QComboBox()
+            route_combo.addItem("shaker", userData="shaker")
+            route_combo.addItem("stick",  userData="stick")
+            route_combo.addItem("both",   userData="both")
+            idx = route_combo.findData(layer.route)
+            if idx >= 0:
+                route_combo.setCurrentIndex(idx)
+            route_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 3, route_combo)
+
+            osc_combo = QComboBox()
+            osc_combo.addItem("sine",    userData="sine")
+            osc_combo.addItem("impulse", userData="impulse")
+            idx = osc_combo.findData(layer.osc_type)
+            if idx >= 0:
+                osc_combo.setCurrentIndex(idx)
+            osc_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 4, osc_combo)
+
+            remove_btn = QPushButton("−")
+            remove_btn.setFixedWidth(28)
+            remove_btn.clicked.connect(
+                lambda checked, row=r: self._on_shaker_layer_remove(row))
+            table.setCellWidget(r, 5, remove_btn)
+
+        self._shaker_layer_update_remove_buttons()
+
+    def _shaker_layer_update_remove_buttons(self):
+        table = self.shaker_layer_table
+        only_one = table.rowCount() == 1
+        for r in range(table.rowCount()):
+            btn = table.cellWidget(r, 5)
+            if btn:
+                btn.setEnabled(not only_one)
+
+    def _on_shaker_layer_effect_changed(self, _index):
+        if self._shaker_layer_loading:
+            return
+        self._shaker_layer_flush_current_to_working_copy()
+        name = self.shaker_layer_effect_combo.currentData()
+        self._shaker_layer_rebuild_table(name)
+        self._shaker_layer_prev_effect = name
+        self._shaker_layer_refresh_combo_markers()
+        self._shaker_layer_update_save_btn()
+
+    def _on_shaker_layer_cell_changed(self, *_):
+        name = self.shaker_layer_effect_combo.currentData()
+        if name is None or self._shaker_layer_loading:
+            return
+        rows = self._shaker_layer_read_table_rows()
+        self._shaker_layer_working_copy[name] = rows
+        self._shaker_layer_refresh_combo_markers()
+        self._shaker_layer_update_save_btn()
+
+    def _on_shaker_layer_add(self):
+        from telemffb.hw.ffb_shaker import Layer
+        from PyQt6.QtWidgets import (
+            QDoubleSpinBox, QComboBox, QPushButton, QTableWidgetItem)
+        table = self.shaker_layer_table
+        r = table.rowCount()
+        table.insertRow(r)
+
+        idx_item = QTableWidgetItem(str(r))
+        idx_item.setFlags(idx_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        table.setItem(r, 0, idx_item)
+
+        layer = Layer()
+
+        freq_spin = QDoubleSpinBox()
+        freq_spin.setRange(0.10, 4.00)
+        freq_spin.setSingleStep(0.05)
+        freq_spin.setDecimals(2)
+        freq_spin.setValue(layer.freq_factor)
+        freq_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 1, freq_spin)
+
+        gain_spin = QDoubleSpinBox()
+        gain_spin.setRange(0.00, 1.50)
+        gain_spin.setSingleStep(0.05)
+        gain_spin.setDecimals(2)
+        gain_spin.setValue(layer.gain)
+        gain_spin.valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 2, gain_spin)
+
+        route_combo = QComboBox()
+        route_combo.addItem("shaker", userData="shaker")
+        route_combo.addItem("stick",  userData="stick")
+        route_combo.addItem("both",   userData="both")
+        route_combo.setCurrentIndex(route_combo.findData(layer.route))
+        route_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 3, route_combo)
+
+        osc_combo = QComboBox()
+        osc_combo.addItem("sine",    userData="sine")
+        osc_combo.addItem("impulse", userData="impulse")
+        osc_combo.setCurrentIndex(osc_combo.findData(layer.osc_type))
+        osc_combo.currentIndexChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 4, osc_combo)
+
+        remove_btn = QPushButton("−")
+        remove_btn.setFixedWidth(28)
+        remove_btn.clicked.connect(
+            lambda checked, row=r: self._on_shaker_layer_remove(row))
+        table.setCellWidget(r, 5, remove_btn)
+
+        self._shaker_layer_update_remove_buttons()
+        self._on_shaker_layer_cell_changed()
+
+    def _on_shaker_layer_remove(self, row: int):
+        table = self.shaker_layer_table
+        if table.rowCount() <= 1:
+            return
+        table.removeRow(row)
+        for r in range(table.rowCount()):
+            idx_item = table.item(r, 0)
+            if idx_item:
+                idx_item.setText(str(r))
+            btn = table.cellWidget(r, 5)
+            if btn:
+                btn.clicked.disconnect()
+                btn.clicked.connect(
+                    lambda checked, row=r: self._on_shaker_layer_remove(row))
+        self._shaker_layer_update_remove_buttons()
+        self._on_shaker_layer_cell_changed()
+
+    def _on_shaker_layer_reset_effect(self):
+        name = self.shaker_layer_effect_combo.currentData()
+        if self._shaker_layer_is_modified(name):
+            ans = QMessageBox.question(
+                self, "Reset effect",
+                f"Effect '{name}' has unsaved changes. Reset to default anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if ans != QMessageBox.StandardButton.Yes:
+                return
+        default_rows = self._shaker_layer_default_rows(name)
+        self._shaker_layer_working_copy[name] = list(default_rows)
+        self._shaker_layer_rebuild_table(name)
+        self._shaker_layer_prev_effect = name
+        self._shaker_layer_refresh_combo_markers()
+        self._shaker_layer_update_save_btn()
+
+    def _on_shaker_layer_test(self):
+        import threading
+        import time as _time
+        from PyQt6.QtCore import QTimer
+
+        rows = self._shaker_layer_read_table_rows()
+        device_name = self.shaker_device_combo.currentData() or None
+        gain = self.shaker_gain_spin.value()
+        channel_mode = self.shaker_channel_combo.currentData() or "mono"
+        pan = self.shaker_pan_slider.value() / 100.0
+
+        self.shaker_layer_test_btn.setEnabled(False)
+        self.shaker_layer_test_btn.setText("Testing…")
+
+        def _run():
+            try:
+                from telemffb.hw.shaker_synth import ShakerSynth, Oscillator
+                synth = ShakerSynth(device=device_name, master_gain=gain,
+                                    channel_mode=channel_mode, pan=pan)
+                synth.start()
+                try:
+                    for idx, layer in enumerate(rows):
+                        osc_name = f"layer_test_{idx}"
+                        osc = Oscillator(synth.samplerate, synth.blocksize)
+                        with synth._lock:
+                            synth._oscillators[osc_name] = osc
+                        freq = 40.0 * layer.freq_factor
+                        amp = min(1.0, layer.gain)
+                        if layer.osc_type == "impulse":
+                            osc.trigger(freq, amp, attack_ms=3.0, decay_ms=200.0)
+                        else:
+                            osc.set(freq, amp, ramp_ms=80.0)
+                    _time.sleep(1.8)
+                    with synth._lock:
+                        for idx in range(len(rows)):
+                            osc = synth._oscillators.get(f"layer_test_{idx}")
+                            if osc:
+                                osc.stop(ramp_ms=100)
+                    _time.sleep(0.2)
+                finally:
+                    synth.stop()
+            except Exception:
+                logging.exception("Shaker layer test failed")
+
+        threading.Thread(target=_run, daemon=True).start()
+        QTimer.singleShot(2500, self._on_shaker_layer_test_finished)
+
+    def _on_shaker_layer_test_finished(self):
+        self.shaker_layer_test_btn.setEnabled(self._shaker_backend_available)
+        self.shaker_layer_test_btn.setText("Test effect")
+
+    def _on_shaker_layer_save_all(self):
+        from telemffb.hw import shaker_layers_io, ffb_shaker
+        self._shaker_layer_flush_current_to_working_copy()
+        path = shaker_layers_io.get_shaker_effects_path()
+        if not path:
+            logging.warning("Cannot save shaker effects: userconfig path not set")
+            return
+        saved = shaker_layers_io.load(path)
+        merged = dict(saved)
+        merged.update(self._shaker_layer_working_copy)
+        shaker_layers_io.save(path, merged)
+        self._shaker_layer_saved_state = shaker_layers_io.load(path)
+        ffb_shaker.reload_layers()
+        self._shaker_layer_refresh_combo_markers()
+        self._shaker_layer_update_save_btn()
+
+    def _on_shaker_layer_reload(self):
+        if self._shaker_layer_any_modified():
+            ans = QMessageBox.question(
+                self, "Reload from disk",
+                "There are unsaved changes. Discard and reload from disk?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if ans != QMessageBox.StandardButton.Yes:
+                return
+        from telemffb.hw import shaker_layers_io
+        path = shaker_layers_io.get_shaker_effects_path()
+        if path:
+            self._shaker_layer_saved_state = shaker_layers_io.load(path)
+        else:
+            self._shaker_layer_saved_state = {}
+        self._shaker_layer_working_copy = {}
+        name = self.shaker_layer_effect_combo.currentData()
+        self._shaker_layer_rebuild_table(name)
+        self._shaker_layer_prev_effect = name
+        self._shaker_layer_refresh_combo_markers()
+        self._shaker_layer_update_save_btn()
+
+    def _on_shaker_layer_reset_all(self):
+        ans = QMessageBox.question(
+            self, "Reset all effects",
+            "This will overwrite all saved layer customisations with built-in "
+            "defaults. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        from telemffb.hw import shaker_layers_io, ffb_shaker
+        path = shaker_layers_io.get_shaker_effects_path()
+        if path:
+            shaker_layers_io.save(path, ffb_shaker._BUILTIN_DEFAULT_LAYERS)
+            self._shaker_layer_saved_state = shaker_layers_io.load(path)
+        else:
+            self._shaker_layer_saved_state = {}
+        self._shaker_layer_working_copy = {}
+        ffb_shaker.reload_layers()
+        name = self.shaker_layer_effect_combo.currentData()
+        self._shaker_layer_rebuild_table(name)
+        self._shaker_layer_prev_effect = name
+        self._shaker_layer_refresh_combo_markers()
+        self._shaker_layer_update_save_btn()
+
+    @staticmethod
+    def _format_pan_label(slider_value: int) -> str:
+        v = slider_value / 100.0
+        if abs(v) < 0.01:
+            return "Center"
+        side = "L" if v < 0 else "R"
+        return f"{side} {abs(v):.2f}"
+
+    def _on_shaker_pan_changed(self, value: int) -> None:
+        self.shaker_pan_label.setText(self._format_pan_label(value))
+
+    def _on_shaker_channel_changed(self, *_args) -> None:
+        is_pan = self.shaker_channel_combo.currentData() == "pan"
+        self.shaker_pan_slider.setEnabled(is_pan)
+        self.shaker_pan_label.setEnabled(is_pan)
 
     def _shaker_test_clicked(self):
         """Play a short test tone on the currently-selected device.
@@ -361,20 +866,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         device_name = self.shaker_device_combo.currentData() or None
         gain = self.shaker_gain_spin.value()
+        channel_mode = self.shaker_channel_combo.currentData() or "mono"
+        pan = self.shaker_pan_slider.value() / 100.0
         self.shaker_test_button.setEnabled(False)
         self.shaker_test_button.setText("Testing…")
 
         def _run():
             try:
                 from telemffb.hw.shaker_synth import ShakerSynth
-                synth = ShakerSynth(device=device_name, master_gain=gain)
+                synth = ShakerSynth(device=device_name, master_gain=gain,
+                                    channel_mode=channel_mode, pan=pan)
                 synth.start()
                 try:
                     osc = synth.get_oscillator("test")
                     osc.set(35.0, 0.5, ramp_ms=100)
-                    time.sleep(2.0)
-                    osc.stop(ramp_ms=100)
-                    time.sleep(0.2)
+                    time.sleep(1.2)
+                    osc.stop(ramp_ms=80)
+                    time.sleep(0.15)
+                    osc.trigger(55.0, 0.9, attack_ms=3.0, decay_ms=120.0)
+                    time.sleep(0.4)
+                    osc.trigger(55.0, 0.9, attack_ms=3.0, decay_ms=120.0)
+                    time.sleep(0.4)
                 finally:
                     synth.stop()
             except Exception:
@@ -422,6 +934,23 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         except (TypeError, ValueError):
             gain = 1.0
         self.shaker_gain_spin.setValue(gain)
+
+        saved_mode = (settings_dict.get('shakerChannelMode', 'mono') or 'mono').strip().lower()
+        mode_idx = 0
+        for i in range(self.shaker_channel_combo.count()):
+            if self.shaker_channel_combo.itemData(i) == saved_mode:
+                mode_idx = i
+                break
+        self.shaker_channel_combo.setCurrentIndex(mode_idx)
+
+        try:
+            pan = float(settings_dict.get('shakerPan', 0.0))
+        except (TypeError, ValueError):
+            pan = 0.0
+        pan = max(-1.0, min(1.0, pan))
+        self.shaker_pan_slider.setValue(int(round(pan * 100)))
+        self.shaker_pan_label.setText(self._format_pan_label(self.shaker_pan_slider.value()))
+        self._on_shaker_channel_changed()
 
     def make_icons(self, pixmap, style):
         icon_enabled = QIcon()
@@ -777,6 +1306,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'themeId': self.themeButtonGroup.checkedId(),
             'shakerDevice': self.shaker_device_combo.currentData() or '',
             'shakerGain': float(self.shaker_gain_spin.value()),
+            'shakerChannelMode': self.shaker_channel_combo.currentData() or 'mono',
+            'shakerPan': self.shaker_pan_slider.value() / 100.0,
         }
 
         instance_settings_dict = {
