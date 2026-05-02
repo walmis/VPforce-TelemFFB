@@ -128,7 +128,10 @@ class Layer:
     freq_factor: float = 1.0
     gain: float = 1.0
     route: str = "both"      # "shaker" | "stick" | "both"
-    osc_type: str = "sine"   # "sine" | "impulse"
+    osc_type: str = "sine"   # "sine" | "impulse" | "bandpass_noise"
+    # Only meaningful when osc_type == "bandpass_noise":
+    center_hz: Optional[float] = None     # if None, uses freq_factor * call_site_freq
+    bandwidth_hz: Optional[float] = None  # if None, defaults to 20.0 Hz at runtime
 
 
 DEFAULT_LAYER = Layer()
@@ -392,11 +395,21 @@ class HapticEffect:
             osc_name = f"{self.name}__layer{idx}"
             eff_freq = self.frequency * layer.freq_factor
             eff_mag  = self.magnitude * layer.gain
-            osc = _synth.get_oscillator(osc_name)
-            if layer.osc_type == "impulse":
-                osc.trigger(eff_freq, eff_mag)
-            else:
+            if layer.osc_type == "sine":
+                osc = _synth.get_oscillator(osc_name)
                 osc.set(eff_freq, eff_mag)
+            elif layer.osc_type == "impulse":
+                osc = _synth.get_oscillator(osc_name)
+                osc.trigger(eff_freq, eff_mag)
+            elif layer.osc_type == "bandpass_noise":
+                osc = _synth.get_noise_oscillator(osc_name)
+                center = layer.center_hz if layer.center_hz is not None else eff_freq
+                bw = layer.bandwidth_hz if layer.bandwidth_hz is not None else 20.0
+                osc.set(center_hz=center, bandwidth_hz=bw, amplitude=eff_mag)
+            else:
+                logger.warning("Unknown osc_type %r in layer for %s — skipping",
+                               layer.osc_type, self.name)
+                continue
             created_names.append(osc_name)
 
         logger.debug("Shaker layered start name=%r layers=%d -> %s",
@@ -406,17 +419,17 @@ class HapticEffect:
             self._duration_timer.cancel()
             self._duration_timer = None
         needs_timer = self.duration > 0 and any(
-            l.osc_type == "sine" and _layer_is_for_shaker(l) for l in layers
+            l.osc_type in ("sine", "bandpass_noise") and _layer_is_for_shaker(l) for l in layers
         )
         if needs_timer:
-            sine_names = [
+            continuous_names = [
                 f"{self.name}__layer{i}"
                 for i, l in enumerate(layers)
-                if l.osc_type == "sine" and _layer_is_for_shaker(l)
+                if l.osc_type in ("sine", "bandpass_noise") and _layer_is_for_shaker(l)
             ]
             t = threading.Timer(
                 self.duration / 1000.0,
-                lambda: self._stop_layer_names(sine_names),
+                lambda: self._stop_layer_names(continuous_names),
             )
             t.daemon = True
             self._duration_timer = t

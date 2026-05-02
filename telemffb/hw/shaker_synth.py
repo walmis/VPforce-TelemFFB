@@ -390,6 +390,20 @@ class ShakerSynth:
                 self._oscillators[name] = osc
             return osc
 
+    def get_noise_oscillator(self, name: str) -> "BandpassNoiseGenerator":
+        """Return the named noise oscillator, creating it if needed. Thread-safe.
+
+        If a different oscillator type is registered under this name, it is
+        replaced with a fresh BandpassNoiseGenerator (the caller is asking for
+        a noise oscillator specifically).
+        """
+        with self._lock:
+            osc = self._oscillators.get(name)
+            if not isinstance(osc, BandpassNoiseGenerator):
+                osc = BandpassNoiseGenerator(self.samplerate, self.blocksize)
+                self._oscillators[name] = osc
+            return osc
+
     def remove_oscillator(self, name: str) -> None:
         with self._lock:
             self._oscillators.pop(name, None)
