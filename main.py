@@ -410,6 +410,40 @@ def _initialize_device_connection():
             _ffb_shaker.reload_layers()
             logging.info("Shaker effects: %d effects with custom layers",
                          len(_ffb_shaker.EFFECT_LAYERS))
+
+            # Load shaker calibration profile pack and pick the active one.
+            from telemffb.hw import shaker_profiles_io
+            from telemffb.hw.shaker_profile import DEFAULT_PROFILE
+            profiles_user_path = shaker_profiles_io.get_user_profiles_path()
+            if profiles_user_path and not os.path.exists(profiles_user_path):
+                profiles_default_path = shaker_profiles_io.get_default_pack_path()
+                if profiles_default_path and os.path.exists(profiles_default_path):
+                    try:
+                        os.makedirs(os.path.dirname(profiles_user_path), exist_ok=True)
+                        shutil.copyfile(profiles_default_path, profiles_user_path)
+                        logging.info("Initialised %s from bundled defaults",
+                                     profiles_user_path)
+                    except Exception:
+                        logging.exception(
+                            "Could not seed user shaker_profiles.json from bundle")
+            file_active, profiles = (None, {})
+            if profiles_user_path:
+                file_active, profiles = shaker_profiles_io.load(profiles_user_path)
+            if not profiles:
+                bundled = shaker_profiles_io.get_default_pack_path()
+                if bundled and os.path.exists(bundled):
+                    file_active, profiles = shaker_profiles_io.load(bundled)
+            active_name = (G.system_settings.get('shakerProfile')
+                           or file_active or 'Generic')
+            active_profile = profiles.get(active_name)
+            if active_profile is None and profiles:
+                active_profile = next(iter(profiles.values()))
+            if active_profile is None:
+                active_profile = DEFAULT_PROFILE
+            _ffb_shaker.set_active_profile(active_profile)
+            G.shaker_active_profile = active_profile
+            logging.info("Shaker calibration profile: %r (loaded %d profiles)",
+                         active_profile.name, len(profiles))
             G.device_connection_status = True
             logging.info(f"Shaker device initialised (output={device_name!r}, gain={gain})")
         except Exception as e:

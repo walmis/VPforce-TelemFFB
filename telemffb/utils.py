@@ -596,6 +596,7 @@ class SystemSettings(QSettings):
         'shakerGain': 1.0,
         'shakerChannelMode': 'mono',  # one of: 'mono', 'left', 'right', 'pan'
         'shakerPan': 0.0,             # [-1, +1]; only used when shakerChannelMode == 'pan'
+        'shakerProfile': 'Generic',   # active ShakerProfile name in shaker_profiles.json
     }
 
     @property

@@ -378,6 +378,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         outer.addLayout(btn_row)
 
         self._setup_shaker_layers_section(outer)
+        self._setup_shaker_calibration_section(outer)
 
         outer.addStretch(1)
 
@@ -955,6 +956,640 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._shaker_layer_refresh_combo_markers()
         self._shaker_layer_update_save_btn()
 
+    # ------------------------------------------------------------------
+    # Shaker calibration section
+    # ------------------------------------------------------------------
+
+    def _setup_shaker_calibration_section(self, parent_layout):
+        """Build the Shaker calibration UI: profile management, resonance
+        sweep, and single-pulse tuner. Sliders feed a live preview waveform
+        widget; Play / Replay buttons drive a fresh ShakerSynth so the
+        master-instance dialog can audition without a running shaker child.
+        """
+        from copy import deepcopy
+        import threading
+
+        from PyQt6.QtWidgets import (
+            QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QFrame,
+            QGroupBox, QHBoxLayout, QInputDialog, QLabel, QPushButton,
+            QSlider, QSpinBox, QVBoxLayout, QWidget,
+        )
+
+        from telemffb.hw import shaker_profiles_io
+        from telemffb.hw.shaker_profile import ShakerProfile, DEFAULT_PROFILE
+        from telemffb.ui.ShakerWaveformWidget import ShakerWaveformWidget
+
+        self._shaker_calib_ShakerProfile = ShakerProfile
+        self._shaker_calib_profiles_io = shaker_profiles_io
+        self._shaker_calib_threading = threading
+        self._shaker_calib_deepcopy = deepcopy
+
+        # --- Load from disk (or bundled defaults) ---
+        path = shaker_profiles_io.get_user_profiles_path()
+        bundled = shaker_profiles_io.get_default_pack_path()
+        file_active, profiles = (None, {})
+        if path and os.path.exists(path):
+            file_active, profiles = shaker_profiles_io.load(path)
+        if not profiles and bundled and os.path.exists(bundled):
+            file_active, profiles = shaker_profiles_io.load(bundled)
+        if not profiles:
+            profiles = {DEFAULT_PROFILE.name: DEFAULT_PROFILE}
+            file_active = DEFAULT_PROFILE.name
+
+        self._shaker_calib_profiles: dict = dict(profiles)
+        self._shaker_calib_bundled: dict = {}
+        if bundled and os.path.exists(bundled):
+            _, self._shaker_calib_bundled = shaker_profiles_io.load(bundled)
+        self._shaker_calib_active_name: str = file_active or DEFAULT_PROFILE.name
+        self._shaker_calib_last_test_params = None
+        self._shaker_calib_sweep_thread = None
+        self._shaker_calib_sweep_stop_evt = None
+        self._shaker_calib_sweep_current_freq = 0.0
+        self._shaker_calib_loading_widgets = False
+
+        # --- Section header ---
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        parent_layout.addWidget(sep)
+        title = QLabel("<b>Shaker calibration</b>")
+        parent_layout.addWidget(title)
+        intro = QLabel(
+            "<i>Tune the bass-shaker drive shape for crisp single-pulse effects "
+            "(gear clunk, weapon release, hook engagement, …). "
+            "Restart the shaker child instance after saving to apply.</i>")
+        intro.setWordWrap(True)
+        parent_layout.addWidget(intro)
+
+        # --- Profile group ---
+        prof_box = QGroupBox("Profile")
+        prof_layout = QHBoxLayout(prof_box)
+        self.shaker_calib_profile_combo = QComboBox()
+        self._shaker_calib_rebuild_profile_combo()
+        self.shaker_calib_profile_save_btn = QPushButton("Save")
+        self.shaker_calib_profile_saveas_btn = QPushButton("Save As…")
+        self.shaker_calib_profile_delete_btn = QPushButton("Delete")
+        self.shaker_calib_profile_reset_btn = QPushButton("Reset to default")
+        if not self._shaker_backend_available:
+            for btn in (self.shaker_calib_profile_save_btn,
+                        self.shaker_calib_profile_saveas_btn,
+                        self.shaker_calib_profile_delete_btn,
+                        self.shaker_calib_profile_reset_btn):
+                btn.setEnabled(False)
+        prof_layout.addWidget(self.shaker_calib_profile_combo, 1)
+        prof_layout.addWidget(self.shaker_calib_profile_save_btn)
+        prof_layout.addWidget(self.shaker_calib_profile_saveas_btn)
+        prof_layout.addWidget(self.shaker_calib_profile_delete_btn)
+        prof_layout.addWidget(self.shaker_calib_profile_reset_btn)
+        parent_layout.addWidget(prof_box)
+
+        # --- Resonance sweep group ---
+        sweep_box = QGroupBox("Resonance sweep")
+        sweep_layout = QVBoxLayout(sweep_box)
+        sweep_form = QFormLayout()
+        self.shaker_calib_sweep_lo = QDoubleSpinBox()
+        self.shaker_calib_sweep_lo.setRange(5.0, 50.0)
+        self.shaker_calib_sweep_lo.setSingleStep(1.0)
+        self.shaker_calib_sweep_lo.setSuffix(" Hz")
+        self.shaker_calib_sweep_lo.setValue(20.0)
+        self.shaker_calib_sweep_hi = QDoubleSpinBox()
+        self.shaker_calib_sweep_hi.setRange(30.0, 200.0)
+        self.shaker_calib_sweep_hi.setSingleStep(5.0)
+        self.shaker_calib_sweep_hi.setSuffix(" Hz")
+        self.shaker_calib_sweep_hi.setValue(120.0)
+        self.shaker_calib_sweep_dur = QDoubleSpinBox()
+        self.shaker_calib_sweep_dur.setRange(3.0, 20.0)
+        self.shaker_calib_sweep_dur.setSingleStep(0.5)
+        self.shaker_calib_sweep_dur.setSuffix(" s")
+        self.shaker_calib_sweep_dur.setValue(9.0)
+        self.shaker_calib_sweep_amp = QDoubleSpinBox()
+        self.shaker_calib_sweep_amp.setRange(0.05, 1.0)
+        self.shaker_calib_sweep_amp.setSingleStep(0.05)
+        self.shaker_calib_sweep_amp.setDecimals(2)
+        self.shaker_calib_sweep_amp.setValue(0.4)
+        sweep_form.addRow("Low (Hz):", self.shaker_calib_sweep_lo)
+        sweep_form.addRow("High (Hz):", self.shaker_calib_sweep_hi)
+        sweep_form.addRow("Duration:", self.shaker_calib_sweep_dur)
+        sweep_form.addRow("Amplitude:", self.shaker_calib_sweep_amp)
+        sweep_layout.addLayout(sweep_form)
+        sweep_btn_row = QHBoxLayout()
+        self.shaker_calib_sweep_start_btn = QPushButton("Start sweep")
+        self.shaker_calib_sweep_mark_btn = QPushButton("Mark resonance")
+        self.shaker_calib_sweep_mark_btn.setEnabled(False)
+        self.shaker_calib_sweep_freq_label = QLabel("Sweep: --.- Hz")
+        self.shaker_calib_sweep_freq_label.setMinimumWidth(120)
+        sweep_btn_row.addWidget(self.shaker_calib_sweep_start_btn)
+        sweep_btn_row.addWidget(self.shaker_calib_sweep_mark_btn)
+        sweep_btn_row.addWidget(self.shaker_calib_sweep_freq_label)
+        sweep_btn_row.addStretch(1)
+        sweep_layout.addLayout(sweep_btn_row)
+        if not self._shaker_backend_available:
+            self.shaker_calib_sweep_start_btn.setEnabled(False)
+        parent_layout.addWidget(sweep_box)
+
+        from PyQt6.QtCore import QTimer
+        self._shaker_calib_sweep_timer = QTimer(self)
+        self._shaker_calib_sweep_timer.setInterval(50)
+        self._shaker_calib_sweep_timer.timeout.connect(self._on_shaker_calib_sweep_tick)
+
+        # --- Single-pulse tuner group ---
+        tuner_box = QGroupBox("Single-pulse tuner")
+        tuner_layout = QVBoxLayout(tuner_box)
+        tuner_form = QFormLayout()
+
+        self.shaker_calib_fres = QDoubleSpinBox()
+        self.shaker_calib_fres.setRange(5.0, 200.0)
+        self.shaker_calib_fres.setSingleStep(0.5)
+        self.shaker_calib_fres.setDecimals(1)
+        self.shaker_calib_fres.setSuffix(" Hz")
+
+        self.shaker_calib_carrier_offset = QDoubleSpinBox()
+        self.shaker_calib_carrier_offset.setRange(0.0, 50.0)
+        self.shaker_calib_carrier_offset.setSingleStep(1.0)
+        self.shaker_calib_carrier_offset.setDecimals(1)
+        self.shaker_calib_carrier_offset.setSuffix(" %")
+
+        self.shaker_calib_carrier_label = QLabel("--.- Hz")
+
+        self.shaker_calib_halfwaves = QSpinBox()
+        self.shaker_calib_halfwaves.setRange(1, 3)
+
+        self.shaker_calib_attack = QDoubleSpinBox()
+        self.shaker_calib_attack.setRange(0.1, 20.0)
+        self.shaker_calib_attack.setSingleStep(0.1)
+        self.shaker_calib_attack.setDecimals(1)
+        self.shaker_calib_attack.setSuffix(" ms")
+
+        self.shaker_calib_release = QDoubleSpinBox()
+        self.shaker_calib_release.setRange(0.1, 20.0)
+        self.shaker_calib_release.setSingleStep(0.1)
+        self.shaker_calib_release.setDecimals(1)
+        self.shaker_calib_release.setSuffix(" ms")
+
+        self.shaker_calib_brake_enabled = QCheckBox("Active braking")
+
+        brake_amp_row = QHBoxLayout()
+        self.shaker_calib_brake_amp = QSlider(Qt.Orientation.Horizontal)
+        self.shaker_calib_brake_amp.setRange(0, 100)
+        self.shaker_calib_brake_amp_label = QLabel("0%")
+        self.shaker_calib_brake_amp_label.setMinimumWidth(40)
+        brake_amp_row.addWidget(self.shaker_calib_brake_amp, 1)
+        brake_amp_row.addWidget(self.shaker_calib_brake_amp_label)
+
+        self.shaker_calib_brake_delay = QDoubleSpinBox()
+        self.shaker_calib_brake_delay.setRange(0.0, 20.0)
+        self.shaker_calib_brake_delay.setSingleStep(0.1)
+        self.shaker_calib_brake_delay.setDecimals(1)
+        self.shaker_calib_brake_delay.setSuffix(" ms")
+
+        self.shaker_calib_test_amp = QDoubleSpinBox()
+        self.shaker_calib_test_amp.setRange(0.1, 1.0)
+        self.shaker_calib_test_amp.setSingleStep(0.05)
+        self.shaker_calib_test_amp.setDecimals(2)
+        self.shaker_calib_test_amp.setValue(0.7)
+
+        tuner_form.addRow("f_res:", self.shaker_calib_fres)
+        tuner_form.addRow("Carrier offset:", self.shaker_calib_carrier_offset)
+        tuner_form.addRow("Carrier (derived):", self.shaker_calib_carrier_label)
+        tuner_form.addRow("Halfwaves:", self.shaker_calib_halfwaves)
+        tuner_form.addRow("Attack:", self.shaker_calib_attack)
+        tuner_form.addRow("Release:", self.shaker_calib_release)
+        tuner_form.addRow("", self.shaker_calib_brake_enabled)
+        tuner_form.addRow("Brake amplitude:", brake_amp_row)
+        tuner_form.addRow("Brake delay:", self.shaker_calib_brake_delay)
+        tuner_form.addRow("Test amplitude:", self.shaker_calib_test_amp)
+        tuner_layout.addLayout(tuner_form)
+
+        tuner_btn_row = QHBoxLayout()
+        self.shaker_calib_play_btn = QPushButton("Play (A)")
+        self.shaker_calib_replay_btn = QPushButton("Replay (B = last)")
+        self.shaker_calib_replay_btn.setToolTip(
+            "Replays the parameters from the last Play or Capture, including "
+            "test amplitude — useful for A/B against the current sliders.")
+        self.shaker_calib_replay_btn.setEnabled(False)
+        self.shaker_calib_capture_btn = QPushButton("Capture as A/B baseline")
+        self.shaker_calib_capture_btn.setToolTip(
+            "Stores the current slider values as the B reference without "
+            "playing. Then change a slider and press Play to compare.")
+        if not self._shaker_backend_available:
+            for btn in (self.shaker_calib_play_btn, self.shaker_calib_capture_btn):
+                btn.setEnabled(False)
+        tuner_btn_row.addWidget(self.shaker_calib_play_btn)
+        tuner_btn_row.addWidget(self.shaker_calib_replay_btn)
+        tuner_btn_row.addWidget(self.shaker_calib_capture_btn)
+        tuner_btn_row.addStretch(1)
+        tuner_layout.addLayout(tuner_btn_row)
+
+        parent_layout.addWidget(tuner_box)
+
+        # --- Waveform preview ---
+        self.shaker_calib_wave = ShakerWaveformWidget()
+        parent_layout.addWidget(self.shaker_calib_wave)
+
+        # --- Signal wiring ---
+        self.shaker_calib_profile_combo.currentIndexChanged.connect(
+            self._on_shaker_calib_profile_selected)
+        self.shaker_calib_profile_save_btn.clicked.connect(
+            self._on_shaker_calib_profile_save)
+        self.shaker_calib_profile_saveas_btn.clicked.connect(
+            self._on_shaker_calib_profile_save_as)
+        self.shaker_calib_profile_delete_btn.clicked.connect(
+            self._on_shaker_calib_profile_delete)
+        self.shaker_calib_profile_reset_btn.clicked.connect(
+            self._on_shaker_calib_profile_reset)
+
+        self.shaker_calib_sweep_start_btn.clicked.connect(
+            self._on_shaker_calib_sweep_toggle)
+        self.shaker_calib_sweep_mark_btn.clicked.connect(
+            self._on_shaker_calib_sweep_mark)
+
+        for w in (self.shaker_calib_fres, self.shaker_calib_carrier_offset,
+                  self.shaker_calib_attack, self.shaker_calib_release,
+                  self.shaker_calib_brake_delay, self.shaker_calib_test_amp):
+            w.valueChanged.connect(self._on_shaker_calib_param_changed)
+        self.shaker_calib_halfwaves.valueChanged.connect(
+            self._on_shaker_calib_param_changed)
+        self.shaker_calib_brake_enabled.toggled.connect(
+            self._on_shaker_calib_brake_toggle)
+        self.shaker_calib_brake_amp.valueChanged.connect(
+            self._on_shaker_calib_brake_amp_changed)
+
+        self.shaker_calib_play_btn.clicked.connect(
+            self._on_shaker_calib_play)
+        self.shaker_calib_replay_btn.clicked.connect(
+            self._on_shaker_calib_replay)
+        self.shaker_calib_capture_btn.clicked.connect(
+            self._on_shaker_calib_capture)
+
+        # Initial slider population from active profile.
+        self._shaker_calib_select_profile_by_name(self._shaker_calib_active_name)
+
+    # ----- profile combo helpers -----
+
+    def _shaker_calib_rebuild_profile_combo(self):
+        combo = self.shaker_calib_profile_combo
+        prev_block = combo.blockSignals(True)
+        combo.clear()
+        for name, prof in self._shaker_calib_profiles.items():
+            combo.addItem(name, userData=name)
+            tooltip = prof.description or ""
+            if tooltip:
+                combo.setItemData(combo.count() - 1, tooltip,
+                                  Qt.ItemDataRole.ToolTipRole)
+        combo.blockSignals(prev_block)
+
+    def _shaker_calib_select_profile_by_name(self, name: str) -> None:
+        combo = self.shaker_calib_profile_combo
+        idx = -1
+        for i in range(combo.count()):
+            if combo.itemData(i) == name:
+                idx = i
+                break
+        if idx < 0 and combo.count() > 0:
+            idx = 0
+            name = combo.itemData(0)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+            self._shaker_calib_active_name = name
+            self._shaker_calib_load_widgets_from_profile(
+                self._shaker_calib_profiles[name])
+
+    def _shaker_calib_load_widgets_from_profile(self, prof) -> None:
+        self._shaker_calib_loading_widgets = True
+        try:
+            self.shaker_calib_fres.setValue(prof.f_res_hz)
+            self.shaker_calib_carrier_offset.setValue(prof.carrier_offset_pct)
+            self.shaker_calib_halfwaves.setValue(prof.halfwaves)
+            self.shaker_calib_attack.setValue(prof.attack_ms)
+            self.shaker_calib_release.setValue(prof.release_ms)
+            self.shaker_calib_brake_enabled.setChecked(prof.brake_enabled)
+            self.shaker_calib_brake_amp.setValue(int(round(prof.brake_amp_pct)))
+            self.shaker_calib_brake_amp_label.setText(
+                f"{int(round(prof.brake_amp_pct))}%")
+            self.shaker_calib_brake_delay.setValue(prof.brake_delay_ms)
+            self._shaker_calib_apply_brake_enable_state()
+        finally:
+            self._shaker_calib_loading_widgets = False
+        self._shaker_calib_refresh_preview()
+
+    def _shaker_calib_widgets_to_profile(self, name: str):
+        return self._shaker_calib_ShakerProfile(
+            name=name,
+            schema_version=1,
+            description=self._shaker_calib_profiles.get(
+                name, self._shaker_calib_ShakerProfile()).description,
+            f_res_hz=float(self.shaker_calib_fres.value()),
+            carrier_offset_pct=float(self.shaker_calib_carrier_offset.value()),
+            halfwaves=int(self.shaker_calib_halfwaves.value()),
+            attack_ms=float(self.shaker_calib_attack.value()),
+            release_ms=float(self.shaker_calib_release.value()),
+            gain=1.0,
+            brake_enabled=bool(self.shaker_calib_brake_enabled.isChecked()),
+            brake_amp_pct=float(self.shaker_calib_brake_amp.value()),
+            brake_delay_ms=float(self.shaker_calib_brake_delay.value()),
+            created_iso="",
+            notes=self._shaker_calib_profiles.get(
+                name, self._shaker_calib_ShakerProfile()).notes,
+        )
+
+    # ----- preview / brake handling -----
+
+    def _shaker_calib_apply_brake_enable_state(self):
+        on = self.shaker_calib_brake_enabled.isChecked()
+        self.shaker_calib_brake_amp.setEnabled(on)
+        self.shaker_calib_brake_amp_label.setEnabled(on)
+        self.shaker_calib_brake_delay.setEnabled(on)
+
+    def _on_shaker_calib_brake_toggle(self, _checked):
+        self._shaker_calib_apply_brake_enable_state()
+        self._on_shaker_calib_param_changed()
+
+    def _on_shaker_calib_brake_amp_changed(self, v):
+        self.shaker_calib_brake_amp_label.setText(f"{int(v)}%")
+        self._on_shaker_calib_param_changed()
+
+    def _on_shaker_calib_param_changed(self, *_):
+        if self._shaker_calib_loading_widgets:
+            return
+        offset = float(self.shaker_calib_carrier_offset.value())
+        fres = float(self.shaker_calib_fres.value())
+        carrier = fres * (1.0 + offset / 100.0)
+        self.shaker_calib_carrier_label.setText(f"{carrier:.1f} Hz")
+        self._shaker_calib_refresh_preview()
+
+    def _shaker_calib_current_pulse_args(self) -> dict:
+        offset = float(self.shaker_calib_carrier_offset.value())
+        fres = float(self.shaker_calib_fres.value())
+        carrier_hz = max(1.0, fres * (1.0 + offset / 100.0))
+        amp = float(self.shaker_calib_test_amp.value())
+        brake_amp = ((self.shaker_calib_brake_amp.value() / 100.0) * amp
+                     if self.shaker_calib_brake_enabled.isChecked() else 0.0)
+        brake_delay = (float(self.shaker_calib_brake_delay.value())
+                       if self.shaker_calib_brake_enabled.isChecked() else 0.0)
+        return dict(
+            carrier_hz=carrier_hz,
+            halfwaves=int(self.shaker_calib_halfwaves.value()),
+            amplitude=amp,
+            attack_ms=float(self.shaker_calib_attack.value()),
+            release_ms=float(self.shaker_calib_release.value()),
+            brake_amp=brake_amp,
+            brake_delay_ms=brake_delay,
+        )
+
+    def _shaker_calib_refresh_preview(self):
+        try:
+            from telemffb.hw.shaker_synth import build_pulse_envelope
+            import numpy as np
+        except Exception:
+            return
+        args = self._shaker_calib_current_pulse_args()
+        sr = 48000
+        drive_env, brake_signal, drive_end, brake_start, brake_end = (
+            build_pulse_envelope(sr, args["carrier_hz"], args["halfwaves"],
+                                 args["amplitude"], args["attack_ms"],
+                                 args["release_ms"], args["brake_amp"],
+                                 args["brake_delay_ms"]))
+        total = max(brake_end, drive_end)
+        if total <= 0:
+            return
+        buf = np.zeros(total, dtype=np.float32)
+        if drive_end > 0:
+            t = np.arange(drive_end, dtype=np.float64) / sr
+            sine = np.sin(2.0 * np.pi * args["carrier_hz"] * t)
+            buf[:drive_end] = (sine * drive_env).astype(np.float32)
+        if brake_signal.size > 0 and brake_end > brake_start:
+            buf[brake_start:brake_end] = brake_signal.astype(np.float32)
+        self.shaker_calib_wave.set_buffer(buf, drive_end, brake_start, brake_end)
+
+    # ----- profile actions -----
+
+    def _on_shaker_calib_profile_selected(self, _idx):
+        name = self.shaker_calib_profile_combo.currentData()
+        if not name:
+            return
+        prof = self._shaker_calib_profiles.get(name)
+        if prof is None:
+            return
+        self._shaker_calib_active_name = name
+        self._shaker_calib_load_widgets_from_profile(prof)
+
+    def _shaker_calib_save_to_disk(self) -> bool:
+        path = self._shaker_calib_profiles_io.get_user_profiles_path()
+        if not path:
+            QMessageBox.warning(
+                self, "Save profile",
+                "Cannot save shaker profiles: user config path not set.")
+            return False
+        try:
+            self._shaker_calib_profiles_io.save(
+                path, self._shaker_calib_active_name,
+                self._shaker_calib_profiles)
+        except Exception:
+            logging.exception("Failed to save shaker_profiles.json")
+            QMessageBox.critical(self, "Save profile",
+                                 "Failed to write shaker_profiles.json — see log.")
+            return False
+        try:
+            from telemffb.hw import ffb_shaker
+            ffb_shaker.set_active_profile(
+                self._shaker_calib_profiles[self._shaker_calib_active_name])
+        except Exception:
+            logging.exception("Failed to set active shaker profile in-process")
+        return True
+
+    def _on_shaker_calib_profile_save(self):
+        name = self._shaker_calib_active_name
+        prof = self._shaker_calib_widgets_to_profile(name)
+        self._shaker_calib_profiles[name] = prof
+        if self._shaker_calib_save_to_disk():
+            QMessageBox.information(
+                self, "Profile saved",
+                f"Profile '{name}' saved.\n"
+                "Restart the shaker child instance to apply.")
+
+    def _on_shaker_calib_profile_save_as(self):
+        new_name, ok = QInputDialog.getText(
+            self, "Save profile as", "Profile name:")
+        if not ok:
+            return
+        new_name = (new_name or "").strip()
+        if not new_name:
+            return
+        if new_name in self._shaker_calib_profiles:
+            QMessageBox.warning(self, "Save As", "A profile with that name "
+                                                   "already exists.")
+            return
+        prof = self._shaker_calib_widgets_to_profile(new_name)
+        self._shaker_calib_profiles[new_name] = prof
+        self._shaker_calib_active_name = new_name
+        self._shaker_calib_rebuild_profile_combo()
+        self._shaker_calib_select_profile_by_name(new_name)
+        if self._shaker_calib_save_to_disk():
+            QMessageBox.information(
+                self, "Profile saved",
+                f"Profile '{new_name}' saved.\n"
+                "Restart the shaker child instance to apply.")
+
+    def _on_shaker_calib_profile_delete(self):
+        name = self._shaker_calib_active_name
+        if len(self._shaker_calib_profiles) <= 1:
+            QMessageBox.information(
+                self, "Delete profile",
+                "At least one profile must remain.")
+            return
+        ans = QMessageBox.question(
+            self, "Delete profile",
+            f"Delete profile '{name}'? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        del self._shaker_calib_profiles[name]
+        new_active = next(iter(self._shaker_calib_profiles.keys()))
+        self._shaker_calib_active_name = new_active
+        self._shaker_calib_rebuild_profile_combo()
+        self._shaker_calib_select_profile_by_name(new_active)
+        self._shaker_calib_save_to_disk()
+
+    def _on_shaker_calib_profile_reset(self):
+        name = self._shaker_calib_active_name
+        bundled = self._shaker_calib_bundled.get(name)
+        if bundled is None:
+            QMessageBox.information(
+                self, "Reset to default",
+                f"No bundled default for profile '{name}'.")
+            return
+        self._shaker_calib_profiles[name] = bundled
+        self._shaker_calib_load_widgets_from_profile(bundled)
+
+    # ----- sweep playback -----
+
+    def _on_shaker_calib_sweep_toggle(self):
+        if self._shaker_calib_sweep_thread is not None:
+            # Already running — request stop.
+            if self._shaker_calib_sweep_stop_evt is not None:
+                self._shaker_calib_sweep_stop_evt.set()
+            self._on_shaker_calib_sweep_finished()
+            return
+
+        lo = float(self.shaker_calib_sweep_lo.value())
+        hi = float(self.shaker_calib_sweep_hi.value())
+        dur = float(self.shaker_calib_sweep_dur.value())
+        amp = float(self.shaker_calib_sweep_amp.value())
+        if hi <= lo:
+            QMessageBox.warning(self, "Sweep",
+                                "High frequency must be greater than low.")
+            return
+
+        device_name = self.shaker_device_combo.currentData() or None
+        gain = self.shaker_gain_spin.value()
+        channel_mode = self.shaker_channel_combo.currentData() or "mono"
+        pan = self.shaker_pan_slider.value() / 100.0
+
+        stop_evt = self._shaker_calib_threading.Event()
+        self._shaker_calib_sweep_stop_evt = stop_evt
+        self.shaker_calib_sweep_start_btn.setText("Stop sweep")
+        self.shaker_calib_sweep_mark_btn.setEnabled(True)
+        self._shaker_calib_sweep_timer.start()
+
+        def _run():
+            import time as _time
+            try:
+                from telemffb.hw.shaker_synth import ShakerSynth
+                synth = ShakerSynth(device=device_name, master_gain=gain,
+                                    channel_mode=channel_mode, pan=pan)
+                synth.start()
+                try:
+                    osc = synth.get_oscillator("__calib_sweep__")
+                    t0 = _time.perf_counter()
+                    while not stop_evt.is_set():
+                        t = _time.perf_counter() - t0
+                        if t >= dur:
+                            break
+                        f = lo + (hi - lo) * (t / dur)
+                        osc.set(f, amp, ramp_ms=20.0)
+                        self._shaker_calib_sweep_current_freq = f
+                        _time.sleep(0.05)
+                    osc.stop(ramp_ms=80.0)
+                    _time.sleep(0.1)
+                finally:
+                    synth.stop()
+            except Exception:
+                logging.exception("Shaker calibration sweep failed")
+            finally:
+                from PyQt6.QtCore import QTimer as _QT
+                _QT.singleShot(0, self._on_shaker_calib_sweep_finished)
+
+        thr = self._shaker_calib_threading.Thread(target=_run, daemon=True)
+        self._shaker_calib_sweep_thread = thr
+        thr.start()
+
+    def _on_shaker_calib_sweep_tick(self):
+        f = self._shaker_calib_sweep_current_freq
+        if f > 0.0:
+            self.shaker_calib_sweep_freq_label.setText(f"Sweep: {f:.1f} Hz")
+
+    def _on_shaker_calib_sweep_mark(self):
+        f = self._shaker_calib_sweep_current_freq
+        if f > 0.0:
+            self.shaker_calib_fres.setValue(f)
+
+    def _on_shaker_calib_sweep_finished(self):
+        self._shaker_calib_sweep_timer.stop()
+        self._shaker_calib_sweep_thread = None
+        self._shaker_calib_sweep_stop_evt = None
+        self._shaker_calib_sweep_current_freq = 0.0
+        self.shaker_calib_sweep_freq_label.setText("Sweep: --.- Hz")
+        self.shaker_calib_sweep_start_btn.setText("Start sweep")
+        self.shaker_calib_sweep_mark_btn.setEnabled(False)
+
+    # ----- pulse playback (A/B) -----
+
+    def _shaker_calib_play_pulse(self, args: dict):
+        device_name = self.shaker_device_combo.currentData() or None
+        gain = self.shaker_gain_spin.value()
+        channel_mode = self.shaker_channel_combo.currentData() or "mono"
+        pan = self.shaker_pan_slider.value() / 100.0
+
+        def _run():
+            import time as _time
+            try:
+                from telemffb.hw.shaker_synth import ShakerSynth
+                synth = ShakerSynth(device=device_name, master_gain=gain,
+                                    channel_mode=channel_mode, pan=pan)
+                synth.start()
+                try:
+                    osc = synth.get_oscillator("__calib_pulse__")
+                    osc.trigger_pulse(**args)
+                    # Wait long enough for the pulse + brake to finish.
+                    half_period = 1.0 / max(1.0, args["carrier_hz"]) / 2.0
+                    drive_s = args["halfwaves"] * half_period
+                    brake_s = (half_period if args["brake_amp"] > 0.0 else 0.0)
+                    delay_s = args["brake_delay_ms"] / 1000.0
+                    _time.sleep(drive_s + delay_s + brake_s + 0.15)
+                finally:
+                    synth.stop()
+            except Exception:
+                logging.exception("Shaker calibration pulse failed")
+
+        thr = self._shaker_calib_threading.Thread(target=_run, daemon=True)
+        thr.start()
+
+    def _on_shaker_calib_play(self):
+        args = self._shaker_calib_current_pulse_args()
+        self._shaker_calib_play_pulse(args)
+        self._shaker_calib_last_test_params = dict(args)
+        self.shaker_calib_replay_btn.setEnabled(True)
+
+    def _on_shaker_calib_replay(self):
+        if self._shaker_calib_last_test_params is None:
+            return
+        self._shaker_calib_play_pulse(dict(self._shaker_calib_last_test_params))
+
+    def _on_shaker_calib_capture(self):
+        self._shaker_calib_last_test_params = self._shaker_calib_current_pulse_args()
+        self.shaker_calib_replay_btn.setEnabled(True)
+
     @staticmethod
     def _format_pan_label(slider_value: int) -> str:
         v = slider_value / 100.0
@@ -1069,6 +1704,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.shaker_pan_slider.setValue(int(round(pan * 100)))
         self.shaker_pan_label.setText(self._format_pan_label(self.shaker_pan_slider.value()))
         self._on_shaker_channel_changed()
+
+        active_name = (settings_dict.get('shakerProfile') or 'Generic').strip() or 'Generic'
+        self._shaker_calib_select_profile_by_name(active_name)
 
     def make_icons(self, pixmap, style):
         icon_enabled = QIcon()
@@ -1426,6 +2064,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'shakerGain': float(self.shaker_gain_spin.value()),
             'shakerChannelMode': self.shaker_channel_combo.currentData() or 'mono',
             'shakerPan': self.shaker_pan_slider.value() / 100.0,
+            'shakerProfile': self._shaker_calib_active_name or 'Generic',
         }
 
         instance_settings_dict = {
