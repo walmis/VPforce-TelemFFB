@@ -30,8 +30,11 @@ are chainable no-ops.
 Whitelist-based effect filtering is added in STEP_04.
 """
 
+import argparse
 import logging
 import threading
+import time
+from dataclasses import dataclass
 from typing import Optional
 
 from telemffb.hw.shaker_synth import Oscillator, ShakerSynth
@@ -121,6 +124,39 @@ SHAKER_EFFECT_PROFILES: dict = {
 }
 
 _DEFAULT_PROFILE = {"kind": "continuous", "ramp_ms": 50.0, "gain": 1.0}
+
+
+@dataclass(frozen=True)
+class Layer:
+    freq_factor: float = 1.0
+    gain: float = 1.0
+    route: str = "both"      # "shaker" | "stick" | "both"
+    osc_type: str = "sine"   # "sine" | "impulse"
+
+
+DEFAULT_LAYER = Layer()
+
+
+def _layer_is_for_shaker(layer: Layer) -> bool:
+    return layer.route in ("shaker", "both")
+
+
+EFFECT_LAYERS: dict[str, list[Layer]] = {
+    "je_rumble_1_1": [
+        Layer(freq_factor=0.5, gain=0.85, route="shaker", osc_type="sine"),
+        Layer(freq_factor=1.0, gain=0.50, route="stick",  osc_type="sine"),
+        Layer(freq_factor=2.0, gain=0.30, route="shaker", osc_type="sine"),
+    ],
+    "gunfire": [
+        Layer(freq_factor=0.4, gain=0.90, route="shaker", osc_type="impulse"),
+        Layer(freq_factor=1.0, gain=0.50, route="stick",  osc_type="sine"),
+    ],
+    "touchdown": [
+        Layer(freq_factor=0.4, gain=1.00, route="shaker", osc_type="impulse"),
+        Layer(freq_factor=2.0, gain=0.40, route="stick",  osc_type="impulse"),
+    ],
+}
+
 
 _synth: Optional[ShakerSynth] = None
 
@@ -298,6 +334,58 @@ class HapticEffect:
             osc = _synth._oscillators.get(self.name)
             return osc is not None and not osc.is_silent
 
+    def _stop_layer_names(self, names: list) -> None:
+        if _synth is None:
+            return
+        with _synth._lock:
+            for name in names:
+                osc = _synth._oscillators.get(name)
+                if osc is not None:
+                    osc.stop()
+
+    def _start_layered(self, layers: list) -> "HapticEffect":
+        created_names = []
+        with _synth._lock:
+            for idx, layer in enumerate(layers):
+                if not _layer_is_for_shaker(layer):
+                    continue
+                osc_name = f"{self.name}__layer{idx}"
+                eff_freq = self.frequency * layer.freq_factor
+                eff_mag  = self.magnitude * layer.gain
+                osc = _synth._oscillators.get(osc_name)
+                if osc is None:
+                    osc = Oscillator(_synth.samplerate, _synth.blocksize)
+                    _synth._oscillators[osc_name] = osc
+                if layer.osc_type == "impulse":
+                    osc.trigger(eff_freq, eff_mag)
+                else:
+                    osc.set(eff_freq, eff_mag)
+                created_names.append(osc_name)
+
+        logger.debug("Shaker layered start name=%r layers=%d -> %s",
+                     self.name, len(layers), created_names)
+
+        if self._duration_timer is not None:
+            self._duration_timer.cancel()
+            self._duration_timer = None
+        needs_timer = self.duration > 0 and any(
+            l.osc_type == "sine" and _layer_is_for_shaker(l) for l in layers
+        )
+        if needs_timer:
+            sine_names = [
+                f"{self.name}__layer{i}"
+                for i, l in enumerate(layers)
+                if l.osc_type == "sine" and _layer_is_for_shaker(l)
+            ]
+            t = threading.Timer(
+                self.duration / 1000.0,
+                lambda: self._stop_layer_names(sine_names),
+            )
+            t.daemon = True
+            self._duration_timer = t
+            t.start()
+        return self
+
     def start(self, force: bool = False, **kw) -> "HapticEffect":
         if _synth is None:
             logger.warning("HapticEffect.start called before init_shaker; dropping (name=%r)",
@@ -309,6 +397,9 @@ class HapticEffect:
         if self.name not in SHAKER_EFFECT_WHITELIST:
             logger.debug("Shaker start: effect %r not in whitelist; dropping", self.name)
             return self
+
+        if self.name in EFFECT_LAYERS:
+            return self._start_layered(EFFECT_LAYERS[self.name])
 
         profile = SHAKER_EFFECT_PROFILES.get(self.name)
         if profile is None:
@@ -376,6 +467,18 @@ class HapticEffect:
         if self._duration_timer is not None:
             self._duration_timer.cancel()
             self._duration_timer = None
+
+        if self.name in EFFECT_LAYERS:
+            layers = EFFECT_LAYERS[self.name]
+            names = [
+                f"{self.name}__layer{i}"
+                for i, l in enumerate(layers)
+                if _layer_is_for_shaker(l)
+            ]
+            self._stop_layer_names(names)
+            logger.debug("Shaker layered stop name=%r", self.name)
+            return self
+
         with _synth._lock:
             osc = _synth._oscillators.get(self.name)
             if osc is not None:
@@ -397,3 +500,66 @@ class HapticEffect:
             self.destroy()
         except Exception:
             pass
+
+
+def _selftest_layered(device, samplerate: int) -> None:
+    from telemffb.hw.shaker_synth import ShakerSynth as _ShakerSynth
+    print(f"ffb_shaker layered selftest: device={device!r} samplerate={samplerate}")
+    synth = _ShakerSynth(samplerate=samplerate, device=device)
+    synth.start()
+    init_shaker(synth)
+    try:
+        e = HapticEffect()
+        e.name = "je_rumble_1_1"
+        e.periodic(40, 0.5, 0).start()
+        print("Layered start issued — expect 20 Hz (layer0) and 80 Hz (layer2) oscillators in synth")
+        with synth._lock:
+            names = list(synth._oscillators.keys())
+        print(f"  oscillators in synth: {names}")
+        assert "je_rumble_1_1__layer0" in names, "layer0 missing"
+        assert "je_rumble_1_1__layer2" in names, "layer2 missing"
+        assert "je_rumble_1_1__layer1" not in names, "stick layer1 must not be created"
+        print("  assertions passed")
+        time.sleep(2.0)
+        e.stop()
+        print("Layered stop issued")
+        with synth._lock:
+            for n in ["je_rumble_1_1__layer0", "je_rumble_1_1__layer2"]:
+                osc = synth._oscillators.get(n)
+                assert osc is None or osc.is_silent, f"{n} not silent after stop"
+        print("  stop assertions passed")
+    finally:
+        synth.stop()
+
+
+def _parse_device(spec):
+    if spec is None:
+        return None
+    try:
+        return int(spec)
+    except ValueError:
+        return spec
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="ffb_shaker layer dispatch selftest")
+    p.add_argument("--selftest-layered", action="store_true",
+                   help="Run the layered-dispatch acceptance selftest")
+    p.add_argument("--device", type=str, default=None,
+                   help="Output device (integer index or name substring)")
+    p.add_argument("--samplerate", type=int, default=48000,
+                   help="Sample rate in Hz (default 48000)")
+    args = p.parse_args()
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+    if args.selftest_layered:
+        _selftest_layered(_parse_device(args.device), args.samplerate)
+    else:
+        p.print_help()
+
+
+if __name__ == "__main__":
+    main()

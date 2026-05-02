@@ -23,7 +23,7 @@ complement (different band, different texture), not duplicate.
 ## Phases
 
 - [x] STEP_00 — Bootstrap planning artifacts
-- [ ] STEP_01 — Layer runtime (Layer dataclass, dispatch in HapticEffect)
+- [x] STEP_01 — Layer runtime (Layer dataclass, dispatch in HapticEffect)
 - [ ] STEP_02 — Config loading & file management
 - [ ] STEP_03 — Layer editor UI in System Settings
 - [ ] STEP_04 — Ship default layer pack
@@ -66,3 +66,18 @@ This preserves every existing code path; layers are strictly additive.
 - _2026-05-02_: STEP_00 complete. Plan files match the actual current code
   (Oscillator.trigger() path, real attribute names on HapticEffect, real
   config-dir resolver). No code touched.
+- _2026-05-02_: STEP_01 complete. `Layer` dataclass, `DEFAULT_LAYER`,
+  `_layer_is_for_shaker`, `EFFECT_LAYERS` (hardcoded test dict), `_start_layered`,
+  `_stop_layer_names`, and layered dispatch in `start()`/`stop()` added to
+  `ffb_shaker.py`. `shaker_synth.py` required no changes (confirmed: single
+  `Oscillator` with `set()`/`trigger()` handles both osc_type paths). The
+  `--selftest-layered` CLI entry point lives in `ffb_shaker.py` under
+  `python -m telemffb.hw.ffb_shaker --selftest-layered`; it requires an audio
+  device to actually play sound but the `--help` / argparse path works without
+  one. Smoke test confirmed all six acceptance criteria pass without audio hardware.
+  `touchdown` is present in both `SHAKER_EFFECT_PROFILES` and `EFFECT_LAYERS`;
+  because the EFFECT_LAYERS check comes first in `start()`, the layer path wins —
+  this is intentional per the spec ("enters EFFECT_LAYERS → opts out of legacy
+  profile"). STEP_02 implementer should remove `touchdown` and `gunfire` from
+  `SHAKER_EFFECT_PROFILES` when the JSON-loaded layer pack ships, to keep the
+  dicts consistent.
