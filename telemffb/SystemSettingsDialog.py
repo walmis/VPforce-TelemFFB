@@ -416,9 +416,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         effect_row.addStretch(1)
         parent_layout.addLayout(effect_row)
 
-        self.shaker_layer_table = QTableWidget(0, 6)
+        self.shaker_layer_table = QTableWidget(0, 8)
         self.shaker_layer_table.setHorizontalHeaderLabels(
-            ["#", "Freq ×", "Gain", "Route", "OscType", "Remove"])
+            ["#", "Freq ×", "Gain", "Route", "OscType", "Remove",
+             "Center Hz", "Bandwidth Hz"])
         hdr = self.shaker_layer_table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -426,6 +427,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
         self.shaker_layer_table.verticalHeader().setVisible(False)
         self.shaker_layer_table.setSelectionMode(
             QTableWidget.SelectionMode.NoSelection)
@@ -546,12 +549,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             gain_spin = table.cellWidget(r, 2)
             route_combo = table.cellWidget(r, 3)
             osc_combo = table.cellWidget(r, 4)
+            center_spin = table.cellWidget(r, 6)
+            bw_spin = table.cellWidget(r, 7)
             freq = freq_spin.value() if freq_spin else 1.0
             gain = gain_spin.value() if gain_spin else 1.0
             route = route_combo.currentData() if route_combo else "both"
             osc_type = osc_combo.currentData() if osc_combo else "sine"
+            center_hz = center_spin.value() if center_spin else None
+            bandwidth_hz = bw_spin.value() if bw_spin else None
             rows.append(Layer(freq_factor=freq, gain=gain,
-                              route=route, osc_type=osc_type))
+                              route=route, osc_type=osc_type,
+                              center_hz=center_hz,
+                              bandwidth_hz=bandwidth_hz))
         return rows
 
     def _make_layer_row_widgets(self, row_index: int, layer) -> dict:
@@ -585,8 +594,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             route_combo.setCurrentIndex(idx)
 
         osc_combo = QComboBox()
-        osc_combo.addItem("sine",    userData="sine")
-        osc_combo.addItem("impulse", userData="impulse")
+        osc_combo.addItem("sine",           userData="sine")
+        osc_combo.addItem("impulse",        userData="impulse")
+        osc_combo.addItem("bandpass_noise", userData="bandpass_noise")
         idx = osc_combo.findData(layer.osc_type)
         if idx >= 0:
             osc_combo.setCurrentIndex(idx)
@@ -594,13 +604,35 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         remove_btn = QPushButton("−")
         remove_btn.setFixedWidth(28)
 
+        # Center Hz spinbox (col 6)
+        center_default = (layer.center_hz if layer.center_hz is not None
+                          else round(layer.freq_factor * 40, 1))
+        center_spin = QDoubleSpinBox()
+        center_spin.setRange(5.0, 200.0)
+        center_spin.setSingleStep(0.5)
+        center_spin.setDecimals(1)
+        center_spin.setValue(max(5.0, min(200.0, center_default)))
+        center_spin.setEnabled(layer.osc_type == "bandpass_noise")
+
+        # Bandwidth Hz spinbox (col 7)
+        bw_default = layer.bandwidth_hz if layer.bandwidth_hz is not None else 20.0
+        bw_spin = QDoubleSpinBox()
+        bw_spin.setRange(1.0, 100.0)
+        bw_spin.setSingleStep(1.0)
+        bw_spin.setDecimals(1)
+        bw_spin.setValue(bw_default)
+        bw_spin.setEnabled(layer.osc_type == "bandpass_noise")
+
         return {
             "freq_factor": freq_spin,
             "gain":        gain_spin,
             "route":       route_combo,
             "osc_type":    osc_combo,
             "remove":      remove_btn,
-            "extras":      {},
+            "extras":      {
+                "center_hz":    center_spin,
+                "bandwidth_hz": bw_spin,
+            },
         }
 
     def _shaker_layer_rebuild_table(self, name: str):
@@ -626,6 +658,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             w["remove"].clicked.connect(
                 lambda checked, row=r: self._on_shaker_layer_remove(row))
             table.setCellWidget(r, 5, w["remove"])
+            w["extras"]["center_hz"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 6, w["extras"]["center_hz"])
+            w["extras"]["bandwidth_hz"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+            table.setCellWidget(r, 7, w["extras"]["bandwidth_hz"])
 
         self._shaker_layer_update_remove_buttons()
 
@@ -651,6 +687,33 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         name = self.shaker_layer_effect_combo.currentData()
         if name is None or self._shaker_layer_loading:
             return
+
+        # Toggle Center/Bandwidth spin boxes based on current osc_type per row,
+        # and populate defaults when switching to bandpass_noise.
+        table = self.shaker_layer_table
+        for r in range(table.rowCount()):
+            osc_combo = table.cellWidget(r, 4)
+            center_spin = table.cellWidget(r, 6)
+            bw_spin = table.cellWidget(r, 7)
+            if osc_combo is None or center_spin is None or bw_spin is None:
+                continue
+            osc_type = osc_combo.currentData()
+            is_noise = (osc_type == "bandpass_noise")
+            if is_noise and not center_spin.isEnabled():
+                # Switching into bandpass_noise — populate defaults
+                freq_spin = table.cellWidget(r, 1)
+                freq_factor = freq_spin.value() if freq_spin else 1.0
+                default_center = round(freq_factor * 40, 1)
+                default_center = max(5.0, min(200.0, default_center))
+                center_spin.blockSignals(True)
+                center_spin.setValue(default_center)
+                center_spin.blockSignals(False)
+                bw_spin.blockSignals(True)
+                bw_spin.setValue(20.0)
+                bw_spin.blockSignals(False)
+            center_spin.setEnabled(is_noise)
+            bw_spin.setEnabled(is_noise)
+
         rows = self._shaker_layer_read_table_rows()
         self._shaker_layer_working_copy[name] = rows
         self._shaker_layer_refresh_combo_markers()
@@ -680,6 +743,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         w["remove"].clicked.connect(
             lambda checked, row=r: self._on_shaker_layer_remove(row))
         table.setCellWidget(r, 5, w["remove"])
+        w["extras"]["center_hz"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 6, w["extras"]["center_hz"])
+        w["extras"]["bandwidth_hz"].valueChanged.connect(self._on_shaker_layer_cell_changed)
+        table.setCellWidget(r, 7, w["extras"]["bandwidth_hz"])
 
         self._shaker_layer_update_remove_buttons()
         self._on_shaker_layer_cell_changed()
@@ -734,7 +801,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         def _run():
             try:
-                from telemffb.hw.shaker_synth import ShakerSynth, Oscillator
+                from telemffb.hw.shaker_synth import ShakerSynth, Oscillator, BandpassNoiseGenerator
                 synth = ShakerSynth(device=device_name, master_gain=gain,
                                     channel_mode=channel_mode, pan=pan)
                 synth.start()
@@ -742,15 +809,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     created_oscs = []
                     for idx, layer in enumerate(rows):
                         osc_name = f"layer_test_{idx}"
-                        osc = Oscillator(synth.samplerate, synth.blocksize)
-                        synth.add_oscillator(osc_name, osc)
-                        created_oscs.append(osc)
                         freq = 40.0 * layer.freq_factor
                         amp = min(1.0, layer.gain)
-                        if layer.osc_type == "impulse":
+                        if layer.osc_type == "bandpass_noise":
+                            osc = BandpassNoiseGenerator(synth.samplerate)
+                            center = (layer.center_hz if layer.center_hz is not None
+                                      else freq)
+                            bw = layer.bandwidth_hz if layer.bandwidth_hz is not None else 20.0
+                            osc.set(center_hz=center, bandwidth_hz=bw, amplitude=amp)
+                        elif layer.osc_type == "impulse":
+                            osc = Oscillator(synth.samplerate, synth.blocksize)
                             osc.trigger(freq, amp, attack_ms=3.0, decay_ms=200.0)
-                        else:
+                        else:  # sine
+                            osc = Oscillator(synth.samplerate, synth.blocksize)
                             osc.set(freq, amp, ramp_ms=80.0)
+                        synth.add_oscillator(osc_name, osc)
+                        created_oscs.append(osc)
                     _time.sleep(1.8)
                     for osc in created_oscs:
                         osc.stop(ramp_ms=100)

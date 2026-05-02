@@ -18,7 +18,7 @@
 ### Stream B — Bandpass noise (depends on Stream A.3 only)
 - [x] STEP_05 — BandpassNoiseGenerator in shaker_synth.py
 - [x] STEP_06 — Schema v2: layer fields + migration in shaker_layers_io.py
-- [ ] STEP_07 — UI: osc_type=bandpass_noise + center/bandwidth fields
+- [x] STEP_07 — UI: osc_type=bandpass_noise + center/bandwidth fields
 - [ ] STEP_08 — Smoke test: noise audible via UI test button
 
 ## Working agreement (recap)
