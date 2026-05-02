@@ -819,7 +819,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                             osc.set(center_hz=center, bandwidth_hz=bw, amplitude=amp)
                         elif layer.osc_type == "impulse":
                             osc = Oscillator(synth.samplerate, synth.blocksize)
-                            osc.trigger(freq, amp, attack_ms=3.0, decay_ms=200.0)
+                            kwargs = {}
+                            if layer.attack_ms is not None:
+                                kwargs["attack_ms"] = layer.attack_ms
+                            if layer.decay_ms is not None:
+                                kwargs["decay_ms"] = layer.decay_ms
+                            osc.trigger(freq, amp, **kwargs)
                         else:  # sine
                             osc = Oscillator(synth.samplerate, synth.blocksize)
                             osc.set(freq, amp, ramp_ms=80.0)

@@ -32,7 +32,10 @@ from typing import Optional
 # v1 → v2: added bandpass_noise fields (center_hz, bandwidth_hz) to Layer.
 # v1 files still load correctly via dataclass defaults (missing fields → None).
 # v2 files round-trip all fields including the new ones.
-CURRENT_VERSION = 2
+# v2 → v3: added impulse-envelope fields (attack_ms, decay_ms) to Layer.
+# v1 and v2 files still load correctly via dataclass defaults (missing fields → None).
+# v3 files round-trip all fields including attack_ms/decay_ms.
+CURRENT_VERSION = 3
 log = logging.getLogger(__name__)
 
 
@@ -53,7 +56,7 @@ def load(path: str) -> "dict[str, list[Layer]]":
         return {}
 
     file_version = data.get("version")
-    if file_version not in (1, CURRENT_VERSION):
+    if file_version not in (1, 2, CURRENT_VERSION):
         log.warning(
             "Shaker effects file version mismatch (%s != %s); attempting load anyway",
             file_version, CURRENT_VERSION,
