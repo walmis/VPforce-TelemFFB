@@ -207,6 +207,98 @@ class Oscillator:
         return self._current_amp == 0.0 and self._target_amp == 0.0
 
 
+class BandpassNoiseGenerator:
+    """Band-limited noise generator. Same interface as Oscillator.
+
+    Generates white noise filtered through a single RBJ-style biquad bandpass.
+    Center frequency and bandwidth are settable; like Oscillator, amplitude is
+    ramped on changes to avoid clicks.
+    """
+
+    def __init__(self, samplerate: int, blocksize: int | None = None):
+        # blocksize accepted for symmetry with Oscillator; unused (render allocates per call)
+        self.samplerate = samplerate
+        self.center_hz = 35.0
+        self.bandwidth_hz = 20.0
+        self.target_amp = 0.0
+        self.current_amp = 0.0
+        self.ramp_per_sample = 0.0
+        self._rng = np.random.default_rng()
+        self._coeffs_dirty = True
+        self._b0 = self._b1 = self._b2 = 0.0
+        self._a1 = self._a2 = 0.0
+        self._z1 = self._z2 = 0.0  # biquad delay line
+        self._compute_coeffs()
+
+    def set(self, center_hz: float, bandwidth_hz: float, amplitude: float, ramp_ms: float = 50.0):
+        if center_hz != self.center_hz or bandwidth_hz != self.bandwidth_hz:
+            self.center_hz = max(1.0, center_hz)
+            self.bandwidth_hz = max(1.0, bandwidth_hz)
+            self._coeffs_dirty = True
+        self.target_amp = float(np.clip(amplitude, 0.0, 1.5))
+        ramp_samples = max(1, int(self.samplerate * ramp_ms / 1000.0))
+        self.ramp_per_sample = (self.target_amp - self.current_amp) / ramp_samples
+
+    def stop(self, ramp_ms: float = 50.0):
+        self.target_amp = 0.0
+        ramp_samples = max(1, int(self.samplerate * ramp_ms / 1000.0))
+        self.ramp_per_sample = -self.current_amp / ramp_samples
+
+    @property
+    def is_silent(self) -> bool:
+        return self.current_amp <= 1e-6 and self.target_amp <= 1e-6
+
+    def render(self, num_samples: int) -> np.ndarray:
+        if self._coeffs_dirty:
+            self._compute_coeffs()
+        x = self._rng.standard_normal(num_samples).astype(np.float64)
+        y = np.empty(num_samples, dtype=np.float64)
+        z1, z2 = self._z1, self._z2
+        b0, b1, b2, a1, a2 = self._b0, self._b1, self._b2, self._a1, self._a2
+        for n in range(num_samples):
+            xn = x[n]
+            yn = b0 * xn + z1
+            z1 = b1 * xn - a1 * yn + z2
+            z2 = b2 * xn - a2 * yn
+            y[n] = yn
+        self._z1, self._z2 = z1, z2
+
+        env = np.empty(num_samples, dtype=np.float64)
+        amp = self.current_amp
+        for n in range(num_samples):
+            env[n] = amp
+            amp += self.ramp_per_sample
+            if (self.ramp_per_sample > 0 and amp >= self.target_amp) or \
+               (self.ramp_per_sample < 0 and amp <= self.target_amp):
+                amp = self.target_amp
+                self.ramp_per_sample = 0.0
+        self.current_amp = amp
+
+        out = (y * env).astype(np.float32)
+        return np.clip(out, -1.0, 1.0)
+
+    def _compute_coeffs(self):
+        """RBJ constant-skirt-gain bandpass biquad.
+        https://www.w3.org/TR/audio-eq-cookbook/
+        """
+        omega = 2.0 * np.pi * self.center_hz / self.samplerate
+        Q = max(0.5, self.center_hz / max(1.0, self.bandwidth_hz))
+        alpha = np.sin(omega) / (2.0 * Q)
+        cos_omega = np.cos(omega)
+        b0 = alpha
+        b1 = 0.0
+        b2 = -alpha
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+        self._b0 = b0 / a0
+        self._b1 = b1 / a0
+        self._b2 = b2 / a0
+        self._a1 = a1 / a0
+        self._a2 = a2 / a0
+        self._coeffs_dirty = False
+
+
 class ShakerSynth:
     """Mixer + sounddevice OutputStream wrapper. Thread-safe."""
 
@@ -477,6 +569,28 @@ def _selftest_transient(device, samplerate: int) -> None:
         synth.stop()
 
 
+def _selftest_noise(device, samplerate: int, center: float = 35.0,
+                    bandwidth: float = 20.0, channel_mode: str = "mono",
+                    pan: float = 0.0) -> None:
+    print(f"ShakerSynth noise selftest: device={device!r} samplerate={samplerate} "
+          f"center={center} Hz bandwidth={bandwidth} Hz "
+          f"channel_mode={channel_mode!r} pan={pan}")
+    synth = ShakerSynth(samplerate=samplerate, device=device,
+                        channel_mode=channel_mode, pan=pan)
+    synth.start()
+    try:
+        noise = BandpassNoiseGenerator(synth.samplerate)
+        noise.set(center, bandwidth, amplitude=0.5, ramp_ms=200)
+        synth.add_oscillator("noise", noise)
+        print(f"Playing {center} Hz bandpass noise for 3 seconds ...")
+        time.sleep(3.0)
+        noise.stop(ramp_ms=200)
+        time.sleep(0.5)
+        print("Done.")
+    finally:
+        synth.stop()
+
+
 def _parse_device(spec: Optional[str]):
     if spec is None:
         return None
@@ -496,6 +610,8 @@ def main() -> None:
                    help="Run a 6-second sine-tone selftest")
     g.add_argument("--selftest-transient", action="store_true",
                    help="Run a transient/thomp selftest with L/center/R pan")
+    g.add_argument("--selftest-noise", action="store_true",
+                   help="Run a 3-second bandpass-noise selftest")
     p.add_argument("--device", type=str, default=None,
                    help="Output device (integer index or name substring)")
     p.add_argument("--samplerate", type=int, default=48000,
@@ -505,6 +621,10 @@ def main() -> None:
                    help="Output channel routing (default mono)")
     p.add_argument("--pan", type=float, default=0.0,
                    help="Pan value in [-1, +1] when --channel-mode=pan (default 0)")
+    p.add_argument("--center", type=float, default=35.0,
+                   help="Bandpass center frequency in Hz for --selftest-noise (default 35)")
+    p.add_argument("--bandwidth", type=float, default=20.0,
+                   help="Bandpass bandwidth in Hz for --selftest-noise (default 20)")
     args = p.parse_args()
     logging.basicConfig(
         level=logging.INFO,
@@ -514,6 +634,10 @@ def main() -> None:
         _list_devices()
     elif args.selftest_transient:
         _selftest_transient(_parse_device(args.device), args.samplerate)
+    elif args.selftest_noise:
+        _selftest_noise(_parse_device(args.device), args.samplerate,
+                        center=args.center, bandwidth=args.bandwidth,
+                        channel_mode=args.channel_mode, pan=args.pan)
     else:
         _selftest(_parse_device(args.device), args.samplerate,
                   channel_mode=args.channel_mode, pan=args.pan)

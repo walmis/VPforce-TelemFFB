@@ -16,7 +16,7 @@
 - [x] STEP_04 — Logging instead of print in _selftest_layered
 
 ### Stream B — Bandpass noise (depends on Stream A.3 only)
-- [ ] STEP_05 — BandpassNoiseGenerator in shaker_synth.py
+- [x] STEP_05 — BandpassNoiseGenerator in shaker_synth.py
 - [ ] STEP_06 — Schema v2: layer fields + migration in shaker_layers_io.py
 - [ ] STEP_07 — UI: osc_type=bandpass_noise + center/bandwidth fields
 - [ ] STEP_08 — Smoke test: noise audible via UI test button
