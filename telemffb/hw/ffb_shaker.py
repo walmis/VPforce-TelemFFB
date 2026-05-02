@@ -132,6 +132,11 @@ class Layer:
     # Only meaningful when osc_type == "bandpass_noise":
     center_hz: Optional[float] = None     # if None, uses freq_factor * call_site_freq
     bandwidth_hz: Optional[float] = None  # if None, defaults to 20.0 Hz at runtime
+    # Only meaningful when osc_type == "impulse":
+    # If None, Oscillator.trigger() uses its built-in defaults
+    # (attack_ms=4.0, decay_ms=90.0).
+    attack_ms: Optional[float] = None
+    decay_ms:  Optional[float] = None
 
 
 DEFAULT_LAYER = Layer()
@@ -400,7 +405,12 @@ class HapticEffect:
                 osc.set(eff_freq, eff_mag)
             elif layer.osc_type == "impulse":
                 osc = _synth.get_oscillator(osc_name)
-                osc.trigger(eff_freq, eff_mag)
+                kwargs = {}
+                if layer.attack_ms is not None:
+                    kwargs["attack_ms"] = layer.attack_ms
+                if layer.decay_ms is not None:
+                    kwargs["decay_ms"] = layer.decay_ms
+                osc.trigger(eff_freq, eff_mag, **kwargs)
             elif layer.osc_type == "bandpass_noise":
                 osc = _synth.get_noise_oscillator(osc_name)
                 center = layer.center_hz if layer.center_hz is not None else eff_freq

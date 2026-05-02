@@ -1,6 +1,6 @@
 # TelemFFB Shaker — Funktionsumfang, Architektur, Limitationen
 
-_Stand: 2026-05-02 — Branch `claude/shaker-cleanups-noise-scSda`, nach STEP_08 (`889da0c`)._
+_Stand: 2026-05-02 — Branch `claude/shaker-cleanups-noise-scSda`, nach STEP_08 (`889da0c`), und der Schema-v3-Envelope-Override-Iteration (`docs/shaker-envelope-override/`), die per-Layer-`attack_ms`/`decay_ms`-Felder für Impulse-Layer ergänzt._
 
 Diese Datei ist der zentrale Einstieg, wenn jemand verstehen will, **was die
 Shaker-Integration kann, wie sie funktioniert und was sie (noch) nicht kann**.
@@ -130,7 +130,8 @@ Der Rest von `aircraft_base.py` (≈54 Effekt-Namen, alle `.periodic()`/
   - `set(freq, amp, ramp_ms)` für Continuous-Effekte mit linearer
     Amplituden-Rampe (Default 50 ms).
   - `trigger(freq, amp, attack_ms, decay_ms)` für One-Shot-Transients.
-    Linear Attack, exponentielles Decay (`k = ln(256)/decay_samples`),
+    Linear Attack, exponentielles Decay (`k = ln(256)/decay_samples`)
+    (Defaults: `attack_ms=4.0`, `decay_ms=90.0`; via Layer-Schema-v3 pro Layer überschreibbar),
     Envelope endet sich selbst, Re-Trigger startet bei Sample 0 neu.
 - **`BandpassNoiseGenerator`** — band-limitiertes Rauschen, gleiche
   Render/Stop/`is_silent`-Schnittstelle wie `Oscillator`. White-Noise-
@@ -261,6 +262,11 @@ class Layer:
     # (für sine/impulse werden sie ignoriert, dürfen aber im JSON stehen):
     center_hz:    Optional[float] = None  # None → freq_factor · call_freq
     bandwidth_hz: Optional[float] = None  # None → 20.0 Hz
+    # Nur relevant, wenn osc_type == "impulse"
+    # (für sine/bandpass_noise werden sie ignoriert, dürfen aber im JSON
+    # stehen — round-trip-safe, siehe Working-Copy-Verhalten in §6.1):
+    attack_ms: Optional[float] = None  # None → Oscillator.trigger-Default 4.0 ms
+    decay_ms:  Optional[float] = None  # None → Oscillator.trigger-Default 90.0 ms
 ```
 
 Ablauf für einen layer-getaggten Effekt (`_start_layered`):
@@ -273,6 +279,10 @@ Ablauf für einen layer-getaggten Effekt (`_start_layered`):
 3. Dispatch nach `osc_type`:
    - `"sine"` → `synth.get_oscillator(name).set(freq · freq_factor, mag · gain)`.
    - `"impulse"` → `synth.get_oscillator(name).trigger(freq · freq_factor, mag · gain)`.
+     Für `osc_type="impulse"` werden zusätzlich `layer.attack_ms` und
+     `layer.decay_ms` (falls nicht `None`) als Keyword-Argumente an
+     `Oscillator.trigger()` durchgereicht; bei `None` greifen die
+     Built-in-Defaults (4.0 ms / 90.0 ms).
    - `"bandpass_noise"` → `synth.get_noise_oscillator(name).set(center, bw, mag · gain)`,
      wobei `center = layer.center_hz ?? freq · freq_factor` und
      `bw = layer.bandwidth_hz ?? 20.0`.
@@ -365,33 +375,33 @@ Programmatisch in `_setup_shaker_tab()` und
 Inhalt:
 
 ```
-┌─ Shaker tab ──────────────────────────────────────────────────────────────┐
-│  Output device:    [(System default) | ... soundcard ▼]                   │
-│  Master gain:      [QDoubleSpinBox 0.00 .. 2.00]                          │
-│  Output channel:   [Mono / Left / Right / Stereo(pan) ▼]                  │
-│  Pan:              [-1 ──◯── +1]   (Center / L .. / R .)                  │
-│  [Test]                                                                   │
-│                                                                           │
-│  ── Effect layers ────────────────────────────────────────────────────    │
-│  Effect:  [ je_rumble_1_1 ▼ ]   ●  (modified marker)                      │
-│                                                                           │
-│  ┌─────────────────────────────────────────────────────────────────────┐  │
-│  │ # Freq× Gain Route     OscType          Remove Center  Bandwidth    │  │
-│  │ 0 0.50  0.85 shaker ▼  sine ▼           [-]    —       —            │  │
-│  │ 1 1.00  0.60 shaker ▼  bandpass_noise ▼ [-]    40.0    20.0         │  │
-│  │ 2 2.00  0.30 stick  ▼  sine ▼           [-]    —       —            │  │
-│  └─────────────────────────────────────────────────────────────────────┘  │
-│  [+ Add layer] [Reset effect to default] [Test effect]                    │
-│                                                                           │
-│  [Save all effects] [Reload from disk]                                    │
-│  [Reset all effects to defaults]                                          │
-└───────────────────────────────────────────────────────────────────────────┘
+┌─ Shaker tab ───────────────────────────────────────────────────────────────────────┐
+│  Output device:    [(System default) | ... soundcard ▼]                            │
+│  Master gain:      [QDoubleSpinBox 0.00 .. 2.00]                                   │
+│  Output channel:   [Mono / Left / Right / Stereo(pan) ▼]                           │
+│  Pan:              [-1 ──◯── +1]   (Center / L .. / R .)                           │
+│  [Test]                                                                            │
+│                                                                                    │
+│  ── Effect layers ─────────────────────────────────────────────────────────────    │
+│  Effect:  [ je_rumble_1_1 ▼ ]   ●  (modified marker)                               │
+│                                                                                    │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
+│  │ # Freq× Gain Route     OscType          Remove Center  Bandwidth Attack  Decay│  │
+│  │ 0 0.50  0.85 shaker ▼  sine ▼           [-]    —       —         —      —    │  │
+│  │ 1 0.40  1.00 shaker ▼  impulse ▼        [-]    —       —         4.0    90.0 │  │
+│  │ 2 1.00  0.60 shaker ▼  bandpass_noise ▼ [-]    40.0    20.0      —      —    │  │
+│  └──────────────────────────────────────────────────────────────────────────────┘  │
+│  [+ Add layer] [Reset effect to default] [Test effect]                             │
+│                                                                                    │
+│  [Save all effects] [Reload from disk]                                             │
+│  [Reset all effects to defaults]                                                   │
+└────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Verhalten:
 
 - Effekt-Dropdown: alle 48 Whitelisted Effekte, alphabetisch.
-- Tabelle pro Effekt: 8 Spalten mit echten Widgets (DoubleSpinBox /
+- Tabelle pro Effekt: **10 Spalten** mit echten Widgets (DoubleSpinBox /
   ComboBox / Button), keine reinen Text-Zellen.
 - **OscType-ComboBox** akzeptiert drei Werte: `sine`, `impulse`,
   `bandpass_noise`.
@@ -402,6 +412,11 @@ Verhalten:
   (Center = `freq_factor · 40` auf 1 Dezimalstelle gerundet,
   Bandwidth = `20.0`); beim Wechsel zurück bleiben die Werte in der
   Working-Copy stehen, falls der User später wieder zu Noise wechselt.
+- **Attack ms** und **Decay ms** sind nur für `impulse`-Layer aktiv (range
+  0.1–50.0 step 0.5 / 5.0–500.0 step 5.0). Beim Wechsel sine/noise →
+  impulse werden sinnvolle Defaults gesetzt (Attack = 4.0, Decay = 90.0
+  — die Built-in-Werte von `Oscillator.trigger()`); beim Wechsel zurück
+  bleiben die Werte in der Working-Copy stehen.
 - Letzter Layer kann nicht entfernt werden (Remove-Button disabled, sonst
   würde der Effekt komplett stumm).
 - `+ Add layer`: appendet einen `Layer()` mit Defaults (Sine, both, 1.0/1.0).
@@ -425,18 +440,18 @@ Pfad: `<G.userconfig_rootpath>/shaker_effects.json` — das ist im
 Production-Build unter Windows `%LOCALAPPDATA%/VPForce-TelemFFB`, im
 Dev-Modus das Repo-Root (siehe `main.py:_setup_config_paths`).
 
-Format (aktuell **Schema-Version 2**):
+Format (aktuell **Schema-Version 3**):
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "effects": {
     "<effect_name>": {
       "layers": [
         {"freq_factor": 0.5, "gain": 0.85, "route": "shaker", "osc_type": "sine",
-         "center_hz": null, "bandwidth_hz": null},
-        {"freq_factor": 1.0, "gain": 0.60, "route": "shaker", "osc_type": "bandpass_noise",
-         "center_hz": 30.0, "bandwidth_hz": 25.0},
+         "center_hz": null, "bandwidth_hz": null, "attack_ms": null, "decay_ms": null},
+        {"freq_factor": 0.4, "gain": 1.00, "route": "shaker", "osc_type": "impulse",
+         "center_hz": null, "bandwidth_hz": null, "attack_ms": 5.0, "decay_ms": 220.0},
         ...
       ]
     },
@@ -446,22 +461,23 @@ Format (aktuell **Schema-Version 2**):
 ```
 
 `center_hz` und `bandwidth_hz` sind nur für `osc_type="bandpass_noise"`
-relevant; für sine/impulse werden sie zur Laufzeit ignoriert (dürfen aber
-im JSON stehen, damit ein Toggle sine ↔ bandpass_noise im Editor die UI-
-Werte über Save/Reload hinweg behält).
+relevant; `attack_ms` und `decay_ms` sind nur für `osc_type="impulse"`
+relevant. Alle vier Felder dürfen für beliebige Layer-Typen im JSON stehen
+(round-trip-safe, damit Toggle-Operationen im Editor die UI-Werte über
+Save/Reload hinweg behalten).
 
-**v1 ↔ v2-Migration:** Alte Schema-v1-Dateien (ohne Noise-Felder) werden
-ohne Warnung geladen — fehlende Felder kommen über die Dataclass-
-Defaults als `None` rein. Beim nächsten Save schreibt der Loader die
-Datei als v2 zurück. Das gebündelte Default-Pack bleibt absichtlich v1
-auf Disk; Noise-Layer werden vom User ggf. nach der laufenden MSFS-
+**v1 ↔ v2 ↔ v3-Migration:** Loader akzeptiert v1, v2 und v3 silently;
+fehlende Felder kommen über die Dataclass-Defaults als `None` rein. Beim
+nächsten Save schreibt der Saver die Datei als v3 zurück. Das gebündelte
+Default-Pack bleibt absichtlich v1 auf Disk; Noise-Layer und
+Envelope-Override-Layer werden vom User ggf. nach der laufenden MSFS-
 Validierung der bestehenden Default-Layer hinzugefügt.
 
 Robust gegen:
 
 - Datei fehlt → leere Map zurück (Built-ins greifen).
 - Malformed JSON → Exception geloggt, leere Map.
-- Versions-Mismatch (≠ 1, ≠ 2) → Warnung, Best-Effort-Load.
+- Versions-Mismatch (≠ 1, ≠ 2, ≠ 3) → Warnung, Best-Effort-Load.
 - Einzelner kaputter Layer-Eintrag → Effekt überspringen, Rest laden.
 
 Atomisches Save schreibt nach `<path>.tmp` und benennt um — kein
@@ -504,10 +520,10 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 | Aufgabe | Datei | Symbole |
 |---------|-------|---------|
 | Audio-Synthese | `telemffb/hw/shaker_synth.py` | `Oscillator`, `BandpassNoiseGenerator`, `ShakerSynth` (`get_oscillator`, `get_noise_oscillator`, `add_oscillator`, `peek_oscillator`, `list_oscillator_names`, `remove_oscillator`), `_callback`, `--selftest*` CLI |
-| HapticEffect-Facade | `telemffb/hw/ffb_shaker.py` | `HapticEffect`, `Layer` (mit v2-Feldern `center_hz` / `bandwidth_hz`), `EFFECT_LAYERS`, `SHAKER_EFFECT_WHITELIST`, `SHAKER_EFFECT_PROFILES` (jetzt 6 Einträge), `_BUILTIN_DEFAULT_LAYERS`, `reload_layers`, `get_builtin_default_for` |
-| JSON I/O + Pfade | `telemffb/hw/shaker_layers_io.py` | `load`, `save`, `get_shaker_effects_path`, `get_default_pack_path`, `CURRENT_VERSION = 2` |
-| Default-Pack | `telemffb/data/shaker_effects_default.json` | 17 Effekte (Schema-v1 auf Disk, lädt unter v2-Loader sauber) |
-| System Settings UI | `telemffb/SystemSettingsDialog.py` | `_setup_shaker_tab`, `_setup_shaker_layers_section`, `_make_layer_row_widgets` (Helper für 8-Spalten-Row), `_on_shaker_layer_*` Slots |
+| HapticEffect-Facade | `telemffb/hw/ffb_shaker.py` | `HapticEffect`, `Layer` (mit v2/v3-Feldern `center_hz` / `bandwidth_hz` / `attack_ms` / `decay_ms`), `EFFECT_LAYERS`, `SHAKER_EFFECT_WHITELIST`, `SHAKER_EFFECT_PROFILES` (jetzt 6 Einträge), `_BUILTIN_DEFAULT_LAYERS`, `reload_layers`, `get_builtin_default_for` |
+| JSON I/O + Pfade | `telemffb/hw/shaker_layers_io.py` | `load`, `save`, `get_shaker_effects_path`, `get_default_pack_path`, `CURRENT_VERSION = 3` |
+| Default-Pack | `telemffb/data/shaker_effects_default.json` | 17 Effekte (Schema-v1 auf Disk, lädt unter v3-Loader sauber) |
+| System Settings UI | `telemffb/SystemSettingsDialog.py` | `_setup_shaker_tab`, `_setup_shaker_layers_section`, `_make_layer_row_widgets` (Helper für 10-Spalten-Row), `_on_shaker_layer_*` Slots |
 | Settings-Defaults | `telemffb/utils.py` | `globl_sys_dict` (`shakerDevice`, `shakerGain`, `shakerChannelMode`, `shakerPan`) |
 | Shaker-Init | `main.py` | `_initialize_device_connection` (Shaker-Branch ~Zeile 380) |
 | Effekt-Definitionen | `telemffb/sim/aircraft_base.py` | `ac_update_*` Methoden, `effects[name].periodic/.constant/.start/.stop` |
@@ -542,8 +558,8 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
   `route="stick"` filtert auf der Shaker-Seite — auf der Stick-Seite ist
   es ohne Wirkung. Das ist beabsichtigt und reversibel; eine spätere
   Iteration kann die Stick-Pipeline auch layer-aware machen.
-- **Schema-Version 2.** Migrations-Mechanik (Loader akzeptiert v1 und v2,
-  Saver schreibt nur v2) existiert; weitere Schema-Bumps müssen bei
+- **Schema-Version 3.** Migrations-Mechanik (Loader akzeptiert v1, v2 und v3,
+  Saver schreibt v3) existiert; weitere Schema-Bumps müssen bei
   künftigen Layer-Feldern wieder durchlaufen werden.
 - **Keine Pro-Aircraft-Layer-Overrides.** Layer-Pack ist global.
 
@@ -578,9 +594,17 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 
 - **Tabelle wächst vertikal** ohne Maximum-Höhe; bei Effekten mit
   vielen Layern könnte der Dialog unhandlich werden. Praktisch sind
-  Effekte aktuell auf 2–3 Layer beschränkt. Mit den 8 Spalten ist auch
+  Effekte aktuell auf 2–3 Layer beschränkt. Mit den 10 Spalten ist auch
   die horizontale Breite eines Layer-Rows merklich gewachsen — auf
   schmalen Displays ist horizontales Scrolling möglich.
+
+Mit 10 Spalten ist die horizontale Breite des Layer-Rows merklich
+gewachsen — auf schmalen Displays ist horizontales Scrolling
+wahrscheinlich. Eine künftige Iteration könnte impulse- und noise-
+spezifische Spalten in einen Popover/Expandable-Sub-Row verschieben
+(Option B aus dem STEP_07-Brief), wenn die Tabellen-Breite störend
+wird.
+
 - **Center/Bandwidth-Werte werden auch für Nicht-Noise-Layer in der
   Working-Copy gespeichert.** Ist beabsichtigt (User behält die Werte
   über Toggle hinweg), bedeutet aber, dass eine sine-Zeile mit zuvor
@@ -625,6 +649,12 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
    --selftest-layered` lief in einen Circular-Import (runpy registrierte
    das Entry-Modul nur als `__main__`, nicht unter dem Dotted-Name);
    `Layer`-Import in `shaker_layers_io.py` jetzt funktion-lokal.
+7. ✅ **Schema-v3 Per-Layer-Envelope-Override** (Iteration
+   `docs/shaker-envelope-override/`, STEP_01 / `bd387e2`,
+   STEP_02 / `8fe77f5`): `Layer.attack_ms` / `Layer.decay_ms` werden
+   bei `osc_type="impulse"` per kwargs an `Oscillator.trigger()`
+   durchgereicht; UI-Spalten 9/10 mit den gleichen
+   Toggle-/Working-Copy-Semantiken wie Center/Bandwidth.
 
 ### 9.2 Offen
 
@@ -656,12 +686,12 @@ naheliegend:
 - **Pro-Aircraft-Packs**: `shaker_effects.<aircraft>.json` overlay über
   dem globalen Pack — analog zur bestehenden Per-Aircraft-Profile-Logik
   in `defaults.xml`.
-- **Schema-Version 3 mit Envelope-Override pro Layer**: heutige
-  Impulse-Layer benutzen den `Oscillator.trigger()`-Default (3 ms
-  attack, 90 ms decay). Ein optionales `attack_ms` / `decay_ms` pro
-  Layer würde Per-Effect-Tuning erlauben (z. B. längeres Decay für
-  Touchdown vs. snappy Decay für Gear-Clunk). Schema-v2 hat dafür
-  bereits den nötigen Migrationsweg etabliert.
+- **PROFILES → Layer-Migration**: nach Schema v3 sind alle bisher in
+  `SHAKER_EFFECT_PROFILES` getunten Werte (`freq`, `gain`, `kind`,
+  `attack_ms`/`decay_ms`/`ramp_ms`) als 1-Layer-Default im Pack
+  abbildbar. Eine künftige Iteration könnte alle 6 surviving
+  Profile-Einträge ins Default-Pack migrieren und die `PROFILES`-Tabelle
+  plus die Stufe-3-Routing-Logik komplett streichen.
 - **Vektorisierte Bandpass-Noise-Pipeline**: heutige Implementierung
   benutzt eine Python-`for`-Schleife im Biquad-Inner-Loop. Falls
   Profiling auf Hardware das als Hotspot zeigt, ist `scipy.signal.lfilter`
