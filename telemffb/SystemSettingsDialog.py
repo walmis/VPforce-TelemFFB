@@ -1053,17 +1053,24 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         prof_layout = QHBoxLayout(prof_box)
         self.shaker_calib_profile_combo = QComboBox()
         self._shaker_calib_rebuild_profile_combo()
+        self.shaker_calib_wizard_btn = QPushButton("Calibration Wizard…")
+        self.shaker_calib_wizard_btn.setToolTip(
+            "Walk through calibration step by step with explanations and "
+            "best-of-N comparisons. Keeps the manual sliders below as expert "
+            "mode.")
         self.shaker_calib_profile_save_btn = QPushButton("Save")
         self.shaker_calib_profile_saveas_btn = QPushButton("Save As…")
         self.shaker_calib_profile_delete_btn = QPushButton("Delete")
         self.shaker_calib_profile_reset_btn = QPushButton("Reset to default")
         if not self._shaker_backend_available:
-            for btn in (self.shaker_calib_profile_save_btn,
+            for btn in (self.shaker_calib_wizard_btn,
+                        self.shaker_calib_profile_save_btn,
                         self.shaker_calib_profile_saveas_btn,
                         self.shaker_calib_profile_delete_btn,
                         self.shaker_calib_profile_reset_btn):
                 btn.setEnabled(False)
         prof_layout.addWidget(self.shaker_calib_profile_combo, 1)
+        prof_layout.addWidget(self.shaker_calib_wizard_btn)
         prof_layout.addWidget(self.shaker_calib_profile_save_btn)
         prof_layout.addWidget(self.shaker_calib_profile_saveas_btn)
         prof_layout.addWidget(self.shaker_calib_profile_delete_btn)
@@ -1281,6 +1288,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # --- Signal wiring ---
         self.shaker_calib_profile_combo.currentIndexChanged.connect(
             self._on_shaker_calib_profile_selected)
+        self.shaker_calib_wizard_btn.clicked.connect(
+            self._on_shaker_calib_open_wizard)
         self.shaker_calib_profile_save_btn.clicked.connect(
             self._on_shaker_calib_profile_save)
         self.shaker_calib_profile_saveas_btn.clicked.connect(
@@ -1573,6 +1582,30 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._shaker_calib_select_profile_by_name(new_active)
         self._shaker_calib_save_to_disk()
 
+    def _on_shaker_calib_open_wizard(self):
+        from .ShakerCalibrationWizard import ShakerCalibrationWizard
+        wiz = ShakerCalibrationWizard(
+            parent=self,
+            profiles=self._shaker_calib_profiles,
+            active_name=self._shaker_calib_active_name,
+        )
+        if wiz.exec() != QDialog.DialogCode.Accepted:
+            return
+        prof = wiz.result_profile
+        if prof is None:
+            return
+        # Adopt the wizard's result: replace or insert under the chosen name,
+        # mark it active, refresh combo + manual sliders, persist to disk.
+        self._shaker_calib_profiles[prof.name] = prof
+        self._shaker_calib_active_name = prof.name
+        self._shaker_calib_rebuild_profile_combo()
+        self._shaker_calib_select_profile_by_name(prof.name)
+        if self._shaker_calib_save_to_disk():
+            QMessageBox.information(
+                self, "Calibration Wizard",
+                f"Profile '{prof.name}' saved.\n"
+                "Restart the shaker child instance to apply.")
+
     def _on_shaker_calib_profile_reset(self):
         name = self._shaker_calib_active_name
         bundled = self._shaker_calib_bundled.get(name)
@@ -1603,48 +1636,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                                 "High frequency must be greater than low.")
             return
 
-        device_name = self.shaker_device_combo.currentData() or None
-        gain = self.shaker_gain_spin.value()
-        channel_mode = self.shaker_channel_combo.currentData() or "mono"
-        pan = self.shaker_pan_slider.value() / 100.0
-
+        from . import _shaker_calib_runtime as _runtime
         stop_evt = self._shaker_calib_threading.Event()
         self._shaker_calib_sweep_stop_evt = stop_evt
         self.shaker_calib_sweep_start_btn.setText("Stop sweep")
         self.shaker_calib_sweep_mark_btn.setEnabled(True)
         self._shaker_calib_sweep_timer.start()
-
-        def _run():
-            import time as _time
-            try:
-                from telemffb.hw.shaker_synth import ShakerSynth
-                synth = ShakerSynth(device=device_name, master_gain=gain,
-                                    channel_mode=channel_mode, pan=pan)
-                synth.start()
-                try:
-                    osc = synth.get_oscillator("__calib_sweep__")
-                    t0 = _time.perf_counter()
-                    while not stop_evt.is_set():
-                        t = _time.perf_counter() - t0
-                        if t >= dur:
-                            break
-                        f = lo + (hi - lo) * (t / dur)
-                        osc.set(f, amp, ramp_ms=20.0)
-                        self._shaker_calib_sweep_current_freq = f
-                        _time.sleep(0.05)
-                    osc.stop(ramp_ms=80.0)
-                    _time.sleep(0.1)
-                finally:
-                    synth.stop()
-            except Exception:
-                logging.exception("Shaker calibration sweep failed")
-            finally:
-                from PyQt6.QtCore import QTimer as _QT
-                _QT.singleShot(0, self._on_shaker_calib_sweep_finished)
-
-        thr = self._shaker_calib_threading.Thread(target=_run, daemon=True)
-        self._shaker_calib_sweep_thread = thr
-        thr.start()
+        self._shaker_calib_sweep_thread = _runtime.start_sweep(
+            self, lo, hi, dur, amp, stop_evt,
+            self._on_shaker_calib_sweep_finished)
 
     def _on_shaker_calib_sweep_tick(self):
         f = self._shaker_calib_sweep_current_freq
@@ -1668,34 +1668,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     # ----- pulse playback (A/B) -----
 
     def _shaker_calib_play_pulse(self, args: dict):
-        device_name = self.shaker_device_combo.currentData() or None
-        gain = self.shaker_gain_spin.value()
-        channel_mode = self.shaker_channel_combo.currentData() or "mono"
-        pan = self.shaker_pan_slider.value() / 100.0
-
-        def _run():
-            import time as _time
-            try:
-                from telemffb.hw.shaker_synth import ShakerSynth
-                synth = ShakerSynth(device=device_name, master_gain=gain,
-                                    channel_mode=channel_mode, pan=pan)
-                synth.start()
-                try:
-                    osc = synth.get_oscillator("__calib_pulse__")
-                    osc.trigger_pulse(**args)
-                    # Wait long enough for the pulse + brake to finish.
-                    half_period = 1.0 / max(1.0, args["carrier_hz"]) / 2.0
-                    drive_s = args["halfwaves"] * half_period
-                    brake_s = (half_period if args["brake_amp"] > 0.0 else 0.0)
-                    delay_s = args["brake_delay_ms"] / 1000.0
-                    _time.sleep(drive_s + delay_s + brake_s + 0.15)
-                finally:
-                    synth.stop()
-            except Exception:
-                logging.exception("Shaker calibration pulse failed")
-
-        thr = self._shaker_calib_threading.Thread(target=_run, daemon=True)
-        thr.start()
+        from . import _shaker_calib_runtime as _runtime
+        _runtime.play_pulse(self, args)
 
     def _on_shaker_calib_play(self):
         args = self._shaker_calib_current_pulse_args()
