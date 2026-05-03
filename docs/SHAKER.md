@@ -781,7 +781,14 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 
 - **Whitelist-Drift.** Neue Effekte in `aircraft_base.py` sind erstmal
   stumm auf dem Shaker, bis sie der Whitelist hinzugefügt werden. Das ist
-  eher Feature als Bug, sollte aber dokumentiert sein.
+  eher Feature als Bug, sollte aber dokumentiert sein. — Lint-Test
+  `tests/test_shaker_whitelist.py` scant die Sim-Module nach
+  `effects["..."]`-Triggern und schlägt fehl, wenn ein Name weder in
+  `SHAKER_EFFECT_WHITELIST` noch in der `KNOWN_NON_SHAKER_EFFECTS`-
+  Allowlist (test-lokal, gruppiert nach Begründung: Force-only,
+  Stick-only, Pending-Audit, etc.) steht. Damit wird Drift sichtbar.
+  Test läuft headless ohne Audio-Hardware (parst die Whitelist via AST
+  aus `ffb_shaker.py`).
 - **`SHAKER_EFFECT_PROFILES` enthält nur Sinus-getunte Defaults.** Eine
   künftige Vereinheitlichung könnte alle Profile als 1-Layer-Einträge
   ins Default-Pack migrieren und PROFILES streichen — nach dem
@@ -1004,6 +1011,12 @@ naheliegend:
 - `python -m tests.test_phase_locked_impulses` — 6 numerische Tests für
   `PhaseAccumulator` und `ImpulseTrainOscillator`. Läuft auch unter
   Linux/CI (winreg lazy-import).
+- `python -m unittest tests.test_shaker_whitelist` — statische Lint-
+  Suite, die Sim-Module gegen `SHAKER_EFFECT_WHITELIST` +
+  `KNOWN_NON_SHAKER_EFFECTS` diff't. Failt mit klarer Liste, wenn ein
+  neuer Effekt weder whitelisted noch allow-listed ist (siehe §8.3).
+  Importiert `ffb_shaker` nicht direkt — parst die Whitelist via AST,
+  damit der Test ohne `sounddevice`/PortAudio läuft.
 
 **Shaker-Profil wechseln:**
 - System Settings → Shaker → Calibration → Profile-Dropdown → Profil
