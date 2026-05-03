@@ -42,6 +42,75 @@ logger = logging.getLogger(__name__)
 TWO_PI = 2.0 * math.pi
 
 
+def build_pulse_envelope(samplerate: int,
+                         carrier_hz: float,
+                         halfwaves: int,
+                         amplitude: float,
+                         attack_ms: float,
+                         release_ms: float,
+                         brake_amp: float,
+                         brake_delay_ms: float
+                         ) -> "tuple[np.ndarray, np.ndarray, int, int, int]":
+    """Build the per-sample drive envelope and brake replacement signal.
+
+    Returns:
+        drive_env     -- length drive_end. Linear attack 0->amp, sustain at
+                         amp, linear release amp->0. Used as a multiplier for
+                         a fresh sine that starts at phase 0.
+        brake_signal  -- length (brake_end - brake_start). A precomputed
+                         phase-inverted half sine at brake_amp, replacing
+                         (not multiplying) the running sine for that span so
+                         brake polarity is exact regardless of carrier phase.
+        drive_end     -- sample index where drive section ends
+        brake_start   -- sample index where brake section starts (== drive_end + gap)
+        brake_end     -- sample index where brake section ends; total length
+
+    All sample counts are rounded to whole samples. Halfwave-precise
+    duration: drive_samples = round(halfwaves / (2*carrier_hz) * sr).
+
+    This helper is also used by ShakerWaveformWidget for the live-preview
+    paint, so the audio output and the visualisation are byte-identical.
+    """
+    sr = float(samplerate)
+    carrier = max(0.1, float(carrier_hz))
+    halfwaves = max(1, int(halfwaves))
+    amplitude = float(max(0.0, min(1.0, amplitude)))
+    drive_samples = max(1, int(round(halfwaves / (2.0 * carrier) * sr)))
+    attack_samples = min(int(round(attack_ms / 1000.0 * sr)), drive_samples // 2)
+    release_samples = min(int(round(release_ms / 1000.0 * sr)), drive_samples // 2)
+    attack_samples = max(0, attack_samples)
+    release_samples = max(0, release_samples)
+
+    drive_env = np.empty(drive_samples, dtype=np.float64)
+    if attack_samples > 0:
+        drive_env[:attack_samples] = np.linspace(
+            0.0, amplitude, attack_samples, endpoint=False)
+    sustain_end = drive_samples - release_samples
+    if sustain_end > attack_samples:
+        drive_env[attack_samples:sustain_end] = amplitude
+    if release_samples > 0:
+        drive_env[sustain_end:] = np.linspace(
+            amplitude, 0.0, release_samples, endpoint=False)
+
+    if brake_amp > 0.0 and brake_delay_ms >= 0.0:
+        gap_samples = max(0, int(round(brake_delay_ms / 1000.0 * sr)))
+        brake_samples = max(1, int(round(1.0 / (2.0 * carrier) * sr)))
+        brake_amp_clamped = float(max(0.0, min(1.0, brake_amp)))
+        # Phase-inverted halfwave: -sin(2*pi*carrier*t) for t in [0, half-period).
+        t = np.arange(brake_samples, dtype=np.float64) / sr
+        brake_signal = -brake_amp_clamped * np.sin(TWO_PI * carrier * t)
+        drive_end = drive_samples
+        brake_start = drive_end + gap_samples
+        brake_end = brake_start + brake_samples
+    else:
+        brake_signal = np.zeros(0, dtype=np.float64)
+        drive_end = drive_samples
+        brake_start = drive_end
+        brake_end = drive_end
+
+    return drive_env, brake_signal, drive_end, brake_start, brake_end
+
+
 class Oscillator:
     """Single phase-continuous sine oscillator with smooth amplitude ramping.
 
@@ -69,6 +138,14 @@ class Oscillator:
         self._env_attack = 0
         self._env_peak = 0.0
         self._env_decay_k = 0.0
+        # Pulse-mode state (set by trigger_pulse, read by render).
+        self._env_mode: str = "classic"   # "classic" | "pulse"
+        self._pulse_drive_env: Optional[np.ndarray] = None
+        self._pulse_brake_signal: Optional[np.ndarray] = None
+        self._pulse_pos: int = 0
+        self._pulse_drive_end: int = 0
+        self._pulse_brake_start: int = 0
+        self._pulse_brake_end: int = 0
 
     def _ensure_capacity(self, n: int) -> None:
         if n <= self._buf.size:
@@ -88,6 +165,7 @@ class Oscillator:
         self._target_amp = amplitude
         self._ramp_step = (self._target_amp - self._current_amp) / ramp_samples
         self._env_active = False
+        self._env_mode = "classic"
 
     def stop(self, ramp_ms: float = 50.0) -> None:
         """Ramp amplitude to 0."""
@@ -95,6 +173,7 @@ class Oscillator:
         self._target_amp = 0.0
         self._ramp_step = (self._target_amp - self._current_amp) / ramp_samples
         self._env_active = False
+        self._env_mode = "classic"
 
     def trigger(self, freq: float, amplitude: float,
                 attack_ms: float = 4.0, decay_ms: float = 90.0) -> None:
@@ -113,6 +192,35 @@ class Oscillator:
         self._env_decay_k = math.log(256.0) / decay
         self._env_pos = 0
         self._env_active = True
+        self._env_mode = "classic"
+        self._current_amp = 0.0
+        self._target_amp = 0.0
+        self._ramp_step = 0.0
+
+    def trigger_pulse(self, carrier_hz: float, halfwaves: int, amplitude: float,
+                      attack_ms: float = 1.5, release_ms: float = 2.0,
+                      brake_amp: float = 0.0, brake_delay_ms: float = 0.0) -> None:
+        """Fire one gated halfwave-count pulse with optional active brake.
+
+        Phase resets to 0 so the carrier always starts at a zero crossing
+        (required for halfwave-precise duration). Replaces any in-progress
+        envelope. Brake (if brake_amp > 0) is exactly one phase-inverted
+        halfwave at carrier_hz, started after brake_delay_ms.
+        """
+        drive_env, brake_signal, drive_end, brake_start, brake_end = (
+            build_pulse_envelope(int(self._samplerate), carrier_hz, halfwaves,
+                                 amplitude, attack_ms, release_ms,
+                                 brake_amp, brake_delay_ms))
+        self._frequency = float(max(0.1, carrier_hz))
+        self._phase = 0.0
+        self._pulse_drive_env = drive_env
+        self._pulse_brake_signal = brake_signal
+        self._pulse_drive_end = drive_end
+        self._pulse_brake_start = brake_start
+        self._pulse_brake_end = brake_end
+        self._pulse_pos = 0
+        self._env_mode = "pulse"
+        self._env_active = True
         self._current_amp = 0.0
         self._target_amp = 0.0
         self._ramp_step = 0.0
@@ -124,6 +232,12 @@ class Oscillator:
 
         if not self._env_active and self._current_amp == 0.0 and self._target_amp == 0.0:
             out[:] = 0.0
+            return out
+
+        # Pulse mode renders sample-accurate sections with explicit phase
+        # control; it does not share the running-phase pipeline below.
+        if self._env_active and self._env_mode == "pulse":
+            self._render_pulse(out)
             return out
 
         d_phi = TWO_PI * self._frequency / self._samplerate
@@ -199,6 +313,54 @@ class Oscillator:
         if end >= total:
             self._env_active = False
             self._env_pos = 0
+
+    def _render_pulse(self, out: np.ndarray) -> None:
+        """Fill ``out`` with the next slice of the active pulse envelope.
+
+        Drive section: fresh sine starting at phase 0 multiplied by the
+        precomputed drive envelope. Gap section: zeros. Brake section: the
+        precomputed phase-inverted half sine is copied directly into out
+        (overrides the running sine — guarantees exact polarity).
+        """
+        n = out.size
+        out[:] = 0.0
+        start = self._pulse_pos
+        end = start + n
+        sr = self._samplerate
+        d_e = self._pulse_drive_end
+        b_s = self._pulse_brake_start
+        b_e = self._pulse_brake_end
+
+        # Drive section.
+        if start < d_e:
+            seg_lo = start
+            seg_hi = min(d_e, end)
+            local_lo = seg_lo - start
+            local_hi = seg_hi - start
+            t = np.arange(seg_lo, seg_hi, dtype=np.float64) / sr
+            sine = np.sin(TWO_PI * self._frequency * t)
+            env = self._pulse_drive_env[seg_lo:seg_hi]
+            out[local_lo:local_hi] = (sine * env).astype(np.float32)
+
+        # Gap section [d_e .. b_s) — already zero from out[:] = 0.0.
+
+        # Brake section.
+        if self._pulse_brake_signal is not None and self._pulse_brake_signal.size > 0:
+            if start < b_e and end > b_s:
+                seg_lo = max(start, b_s)
+                seg_hi = min(b_e, end)
+                local_lo = seg_lo - start
+                local_hi = seg_hi - start
+                src_lo = seg_lo - b_s
+                src_hi = seg_hi - b_s
+                out[local_lo:local_hi] = (
+                    self._pulse_brake_signal[src_lo:src_hi].astype(np.float32))
+
+        self._pulse_pos = end
+        if end >= b_e:
+            self._env_active = False
+            self._env_mode = "classic"
+            self._pulse_pos = 0
 
     @property
     def is_silent(self) -> bool:
@@ -583,6 +745,30 @@ def _selftest_transient(device, samplerate: int) -> None:
         synth.stop()
 
 
+def _selftest_pulse(device, samplerate: int) -> None:
+    print(f"ShakerSynth pulse selftest: device={device!r} samplerate={samplerate}")
+    synth = ShakerSynth(samplerate=samplerate, device=device)
+    synth.start()
+    try:
+        osc = synth.get_oscillator("pulse")
+        print("Pulse #1: 50 Hz, 2 halfwaves, no brake")
+        osc.trigger_pulse(50, 2, 0.9, attack_ms=1.0, release_ms=2.0,
+                          brake_amp=0.0, brake_delay_ms=0.0)
+        time.sleep(0.6)
+
+        print("Pulse #2: 50 Hz, 2 halfwaves, brake 0.5 @ 0.5 ms")
+        osc.trigger_pulse(50, 2, 0.9, attack_ms=1.0, release_ms=2.0,
+                          brake_amp=0.5, brake_delay_ms=0.5)
+        time.sleep(0.6)
+
+        print("Pulse #3: 25 Hz, 1 halfwave, brake 0.7 @ 0.6 ms (Buttkicker-like)")
+        osc.trigger_pulse(25, 1, 0.9, attack_ms=1.0, release_ms=1.0,
+                          brake_amp=0.7, brake_delay_ms=0.6)
+        time.sleep(0.8)
+    finally:
+        synth.stop()
+
+
 def _selftest_noise(device, samplerate: int, center: float = 35.0,
                     bandwidth: float = 20.0, channel_mode: str = "mono",
                     pan: float = 0.0) -> None:
@@ -624,6 +810,8 @@ def main() -> None:
                    help="Run a 6-second sine-tone selftest")
     g.add_argument("--selftest-transient", action="store_true",
                    help="Run a transient/thomp selftest with L/center/R pan")
+    g.add_argument("--selftest-pulse", action="store_true",
+                   help="Run a gated halfwave pulse selftest with active brake")
     g.add_argument("--selftest-noise", action="store_true",
                    help="Run a 3-second bandpass-noise selftest")
     p.add_argument("--device", type=str, default=None,
@@ -648,6 +836,8 @@ def main() -> None:
         _list_devices()
     elif args.selftest_transient:
         _selftest_transient(_parse_device(args.device), args.samplerate)
+    elif args.selftest_pulse:
+        _selftest_pulse(_parse_device(args.device), args.samplerate)
     elif args.selftest_noise:
         _selftest_noise(_parse_device(args.device), args.samplerate,
                         center=args.center, bandwidth=args.bandwidth,

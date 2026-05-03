@@ -99,14 +99,11 @@ SHAKER_EFFECT_WHITELIST = {
 }
 
 # Per-effect tuning. Effects without an entry use _DEFAULT_PROFILE.
-# kind="transient" routes through Oscillator.trigger() with attack_ms / decay_ms;
-# kind="continuous" uses Oscillator.set() with the given ramp_ms. freq overrides
-# the call-site frequency when present; gain multiplies the call-site magnitude.
-#
-# Per-effect single-oscillator profile tuning. These effects are not in the
-# default layer pack. If a user adds them to their shaker_effects.json as a
-# layered entry, the layer takes precedence at runtime
-# (start() priority: Whitelist -> EFFECT_LAYERS -> PROFILES -> Heuristic).
+# kind="transient" routes through Oscillator.trigger_pulse() — the active
+# ShakerProfile (set by main.py at startup) supplies halfwaves / attack /
+# release / brake; the per-effect attack_ms / decay_ms below are LEGACY and
+# IGNORED on the transient path. Only freq and gain still apply for transients.
+# kind="continuous" uses Oscillator.set() with the given ramp_ms.
 SHAKER_EFFECT_PROFILES: dict = {
     "gearclunk":    {"kind": "transient", "freq": 55.0, "gain": 1.0,
                      "attack_ms": 3.0, "decay_ms": 110.0},
@@ -168,6 +165,43 @@ _BUILTIN_DEFAULT_LAYERS: dict[str, list[Layer]] = _load_builtin_defaults()
 # Populated at startup by reload_layers() from shaker_effects.json.
 # All entries come from disk; nothing is hardcoded here.
 EFFECT_LAYERS: dict[str, list[Layer]] = {}
+
+
+# Active shaker calibration profile. Replaced by main.py at startup via
+# set_active_profile() once shaker_profiles.json has been read. Until then,
+# transient effects use the dataclass defaults (a conservative no-brake shape).
+from .shaker_profile import ShakerProfile, DEFAULT_PROFILE  # noqa: E402
+
+ACTIVE_PROFILE: ShakerProfile = DEFAULT_PROFILE
+
+
+def set_active_profile(profile: Optional[ShakerProfile]) -> None:
+    """Set the global ShakerProfile consumed by transient/impulse effects.
+
+    Called from main.py at startup and from the System Settings calibration
+    UI when the user saves a profile. None resets to the dataclass default.
+    """
+    global ACTIVE_PROFILE
+    ACTIVE_PROFILE = profile if profile is not None else DEFAULT_PROFILE
+    logger.info("Shaker active profile set to %r", ACTIVE_PROFILE.name)
+
+
+def _pulse_kwargs(amplitude: float, layer: Optional[Layer] = None) -> dict:
+    """Compose Oscillator.trigger_pulse kwargs from the active profile.
+
+    Per-layer attack_ms / decay_ms (schema v3) override the profile's
+    attack_ms / release_ms when set, preserving the per-layer tuning hook.
+    The brake is gated by the profile's brake_enabled flag and scales with
+    the call-site amplitude.
+    """
+    p = ACTIVE_PROFILE
+    attack = (layer.attack_ms if (layer is not None and layer.attack_ms is not None)
+              else p.attack_ms)
+    release = (layer.decay_ms if (layer is not None and layer.decay_ms is not None)
+               else p.release_ms)
+    brake_amp = (p.brake_amp_pct / 100.0) * amplitude if p.brake_enabled else 0.0
+    return dict(halfwaves=p.halfwaves, attack_ms=attack, release_ms=release,
+                brake_amp=brake_amp, brake_delay_ms=p.brake_delay_ms)
 
 
 def get_builtin_default_for(name: str) -> "list[Layer]":
@@ -405,12 +439,8 @@ class HapticEffect:
                 osc.set(eff_freq, eff_mag)
             elif layer.osc_type == "impulse":
                 osc = _synth.get_oscillator(osc_name)
-                kwargs = {}
-                if layer.attack_ms is not None:
-                    kwargs["attack_ms"] = layer.attack_ms
-                if layer.decay_ms is not None:
-                    kwargs["decay_ms"] = layer.decay_ms
-                osc.trigger(eff_freq, eff_mag, **kwargs)
+                osc.trigger_pulse(carrier_hz=eff_freq, amplitude=eff_mag,
+                                  **_pulse_kwargs(eff_mag, layer))
             elif layer.osc_type == "bandpass_noise":
                 osc = _synth.get_noise_oscillator(osc_name)
                 center = layer.center_hz if layer.center_hz is not None else eff_freq
@@ -470,8 +500,6 @@ class HapticEffect:
                 use_transient = True
                 freq = float(self.frequency) if self.frequency > 0 else 50.0
                 gain = 1.0
-                attack_ms = 3.0
-                decay_ms = float(max(40, self.duration * 2))
                 ramp_ms = _DEFAULT_PROFILE["ramp_ms"]
             else:
                 use_transient = False
@@ -483,14 +511,13 @@ class HapticEffect:
             freq = float(profile.get("freq", self.frequency))
             gain = float(profile.get("gain", 1.0))
             ramp_ms = float(profile.get("ramp_ms", _DEFAULT_PROFILE["ramp_ms"]))
-            attack_ms = float(profile.get("attack_ms", 3.0))
-            decay_ms = float(profile.get("decay_ms", 120.0))
 
         magnitude = self.magnitude * gain
 
         osc = _synth.get_oscillator(self.name)
         if use_transient:
-            osc.trigger(freq, magnitude, attack_ms=attack_ms, decay_ms=decay_ms)
+            osc.trigger_pulse(carrier_hz=freq, amplitude=magnitude,
+                              **_pulse_kwargs(magnitude, layer=None))
         else:
             osc.set(freq, magnitude, ramp_ms=ramp_ms)
 

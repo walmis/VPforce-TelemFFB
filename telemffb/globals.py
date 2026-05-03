@@ -71,6 +71,7 @@ vpconf_init_pending: bool = False # switch to True when async device init is com
 
 # Shaker device-type state. None unless device_type == 'shaker'.
 shaker_synth: 'Optional[ShakerSynth]' = None  # populated by main.py when launching as a shaker child
+shaker_active_profile: Optional[Any] = None  # ShakerProfile; populated at startup, consumed by ffb_shaker._pulse_kwargs
 
 # Gain management
 startup_configurator_gains: Optional[Any] = None  # Gain object direct from 'device.get_gains'.  Gains get read at TelemFFB startup fallback baseline values.
