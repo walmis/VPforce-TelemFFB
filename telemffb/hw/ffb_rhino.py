@@ -1111,6 +1111,36 @@ class HapticEffect(Destroyable):
         self._h_effect.setConstantForce(magnitude, direction, **kwargs)
         return self
 
+    def physics(self, rpm: float, divisions: float, load: float = 1.0,
+                **shape_overrides):
+        """Rhino fallback for the shaker's phase-locked impulse train.
+
+        Hardware FFB cannot phase-lock to integrated phase the way the
+        software shaker can, so we degrade to a periodic sine at the same
+        carrier frequency the impulse train would have run at: ``rpm/60 *
+        divisions``. ``load`` scales magnitude. Direction is taken from the
+        ``direction`` override (default 0). All other shape kwargs are
+        ignored on this backend. Chainable.
+        """
+        impulse_hz = max(1.0, (float(rpm) / 60.0) * float(divisions))
+        magnitude = max(0.0, min(1.0, float(load) * float(shape_overrides.get("gain", 1.0))))
+        direction = float(shape_overrides.get("direction", 0.0))
+        return self.periodic(impulse_hz, magnitude, direction)
+
+    def fire_impulse(self, magnitude: float, **shape_overrides):
+        """Rhino fallback for the shaker's one-shot transient. Uses an
+        EFFECT_SQUARE pulse at the configured carrier with the magnitude as
+        amplitude. Caller is expected to ``.start()`` afterwards as with any
+        other effect.
+        """
+        carrier_hz = float(shape_overrides.get("carrier_hz", 30.0))
+        direction = float(shape_overrides.get("direction", 0.0))
+        magnitude = max(0.0, min(1.0, float(magnitude)))
+        # Use SQUARE for the sharper attack typical of an impact pulse.
+        return self.periodic(carrier_hz, magnitude, direction,
+                             effect_type=EFFECT_SQUARE,
+                             duration=int(shape_overrides.get("duration_ms", 80)))
+
     @property
     def started(self) -> bool:
         return self._h_effect and self._h_effect.started

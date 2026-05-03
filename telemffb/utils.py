@@ -50,7 +50,14 @@ import select
 import logging
 import sys
 
-import winreg
+try:
+    import winreg
+except ImportError:
+    # winreg is Windows-only; allow this module to import on Linux/macOS for
+    # offline tests of platform-agnostic helpers (filters, scaling, etc.).
+    # The two callers that actually use winreg are wrapped to fail loudly if
+    # invoked on a non-Windows host.
+    winreg = None
 import socket
 import time
 import zlib
@@ -1062,6 +1069,11 @@ class Derivative:
         var += derivative
 
         return var
+
+
+# PhaseAccumulator lives in telemffb.hw.shaker_synth (its only consumer).
+# Re-exported here so external code can keep importing from utils.
+from telemffb.hw.shaker_synth import PhaseAccumulator  # noqa: E402,F401
 
 
 class DirectionModulator:
