@@ -308,11 +308,18 @@ RPM (Telemetrie, ~30–60 Hz)
 - **Pulse-Onset ist block-quantisiert.** Onset-Jitter ist <= 5.3 ms
   (one block); im Vergleich zur Periode bei z. B. 25 Hz Blade-Pass
   (40 ms) kein hörbares Problem.
-- **Auto-Silencing oberhalb `max_impulse_rate_hz`.** Bei Raten oberhalb
-  der Per-Pulse-Drive-Dauer würden Pulses überlappen → würde zur
-  reinen Tone werden. Per-Voice konfigurierbar (typisch 80–220 Hz);
-  oberhalb wird der Effekt silenced — Caller kann auf
-  `bandpass_noise`-Voice umstecken (heute nicht automatisiert).
+- **Auto-Fallback auf Bandpass-Noise oberhalb `max_impulse_rate_hz`.**
+  Bei Raten oberhalb der Per-Pulse-Drive-Dauer würden Pulses überlappen
+  und zur reinen Tone werden. Per-Voice konfigurierbar (typisch
+  80–220 Hz); oberhalb schaltet `ImpulseTrainOscillator` automatisch
+  auf einen internen `BandpassNoiseGenerator` mit
+  `center_hz = impulse_rate` um. Hysterese: Eintritt in den Noise-Mode
+  bei 100% des Caps, Ausstieg erst bei 85% — Flapping bei steady-state
+  near-redline ist ausgeschlossen. Bandbreite default 20% des Centers
+  (Floor 15 Hz), via `noise_bandwidth_hz` in `SHAKER_PHYSICS_PROFILES`
+  überschreibbar. ~80 ms Crossfade auf beiden Voices vermeidet hörbare
+  Klicks am Übergang. Tests in
+  `tests/test_phase_locked_impulses.py`.
 - **Pulse-Shape** kommt aus `SHAKER_PHYSICS_PROFILES[name]` — pro Voice
   getuned (Carrier 28–80 Hz, 1–2 Halbwellen, Brake 0.3–0.6 von Drive).
   Layer-Override via `Layer.attack_ms` / `decay_ms` ist hier *nicht*
@@ -904,6 +911,16 @@ wird.
    Prop/Cylinder-Specs, Tail-Rotor, Touchdown-VS-Schwellen).
    6 Offline-Tests in `tests/test_phase_locked_impulses.py`,
    `--selftest-phase-locked` CLI.
+10. ✅ **Physics-Voice Auto-Fallback auf Bandpass-Noise**:
+    `ImpulseTrainOscillator` hostet einen internen
+    `BandpassNoiseGenerator` und schaltet automatisch um, sobald
+    `impulse_hz ≥ max_impulse_rate_hz` (Hysterese: Eintritt bei 100% des
+    Caps, Ausstieg erst bei 85%). Bandpass-Center wird auf die aktuelle
+    Impuls-Rate gesetzt; Bandbreite default = 20% des Centers (Floor
+    15 Hz), via `noise_bandwidth_hz` in `SHAKER_PHYSICS_PROFILES`
+    überschreibbar. ~80 ms Crossfade auf beiden Voices vermeidet Klicks
+    am Übergang. 4 neue Offline-Tests (Fallback-Engagement,
+    Hysterese-Stabilität, Re-Entry, Crossover ohne Silence-Dip).
 
 ### 9.2 Offen
 
@@ -932,14 +949,6 @@ wird.
     Niedrig-RPM-Taxi, Carrier-Landing für Touchdown-VS) steht aus —
     Tuning der Carrier/Halbwellen/Brake-Werte in
     `SHAKER_PHYSICS_PROFILES` erfolgt auf Basis der Hardware-Notes.
-11. **Physics-Voice Auto-Fallback auf Bandpass-Noise**: oberhalb
-    `max_impulse_rate_hz` (heute 80–220 Hz pro Voice) wird der
-    Impulse-Train einfach silenced. Cleanere Lösung wäre eine
-    automatische Umschaltung auf einen `bandpass_noise`-Voice mit
-    `center_hz = impulse_rate`, sodass der Effekt von Per-Pulse zu
-    Broadband-Thrum nahtlos überblendet — sinnvoll für Radial-
-    Engines bei hoher RPM oder Jet-Turbinen.
-
 ---
 
 ## 10. Erweiterungs-Hooks für die Zukunft
@@ -1008,9 +1017,11 @@ naheliegend:
 - `python -m telemffb.hw.ffb_shaker --selftest-layered --device <idx>`
 
 **Tests laufen lassen (offline, ohne Audio-Hardware):**
-- `python -m tests.test_phase_locked_impulses` — 6 numerische Tests für
-  `PhaseAccumulator` und `ImpulseTrainOscillator`. Läuft auch unter
-  Linux/CI (winreg lazy-import).
+- `python -m tests.test_phase_locked_impulses` — 9 numerische Tests für
+  `PhaseAccumulator` und `ImpulseTrainOscillator` (inkl. Auto-Fallback
+  auf Bandpass-Noise oberhalb `max_impulse_rate_hz`: Engagement,
+  Hysterese-Stabilität, Re-Entry, Crossover-ohne-Silence). Läuft auch
+  unter Linux/CI (winreg lazy-import).
 - `python -m unittest tests.test_shaker_whitelist` — statische Lint-
   Suite, die Sim-Module gegen `SHAKER_EFFECT_WHITELIST` +
   `KNOWN_NON_SHAKER_EFFECTS` diff't. Failt mit klarer Liste, wenn ein

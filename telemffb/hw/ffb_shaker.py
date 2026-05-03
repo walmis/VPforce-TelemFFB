@@ -614,7 +614,8 @@ class HapticEffect:
                       brake_amp=profile["brake_amp"],
                       brake_delay_ms=profile["brake_delay_ms"],
                       gain=profile["gain"],
-                      max_impulse_rate_hz=profile["max_impulse_rate_hz"])
+                      max_impulse_rate_hz=profile["max_impulse_rate_hz"],
+                      noise_bandwidth_hz=profile.get("noise_bandwidth_hz"))
         osc.set_rpm(self._phys_rpm, self._phys_divisions, self._phys_load)
         logger.debug("Shaker physics name=%r rpm=%.1f div=%.2f load=%.2f -> %.2f Hz",
                      self.name, self._phys_rpm, self._phys_divisions,
