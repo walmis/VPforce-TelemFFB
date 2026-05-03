@@ -74,7 +74,7 @@ CONSTANT_FORCE_FREQUENCY_HZ = 25.0
 # accidentally produce noise on the shaker; they need an explicit opt-in here.
 SHAKER_EFFECT_WHITELIST = {
     # wheel / runway
-    "runway0", "runway1", "runway_bump0", "runway_bump1", "touchdown",
+    "runway0", "runway0_delayed", "runway1", "runway_bump0", "runway_bump1", "touchdown",
     "gearclunk", "nw_shimmy",
     # weapons / countermeasures
     "gunfire", "cm", "payload_rel",

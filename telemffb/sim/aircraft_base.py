@@ -21,6 +21,7 @@ import logging
 import time
 import math
 import random
+from collections import deque
 from telemffb import telem
 import telemffb.utils as utils
 from typing import List, Dict
@@ -276,6 +277,13 @@ class AircraftBase(object):
 
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
     runway_rumble_enabled: bool = False
+    # Spatial runway rumble: nose-wheel HPF stream is rendered live on the
+    # stick (front) and on the shaker (rear) delayed by wheelbase / ground
+    # speed, so a runway joint reads as front-then-back. Override
+    # `aircraft_wheelbase` per-aircraft if 8 m is far off (XML/per-aircraft
+    # config). Speed floor avoids absurd delays at near-stationary taxi.
+    aircraft_wheelbase: float = 8.0                 # nose-to-main wheelbase in metres
+    runway_spatial_min_speed_kt: float = 5.0        # ground-speed floor for delay calc
 
     touchdown_effect_enabled: bool = False
     touchdown_effect_max_force: float = 0.5
@@ -383,6 +391,12 @@ class AircraftBase(object):
         self._telem_data = {}
         self._last_telem_data = {}
         self._ipc_telem = {}
+        # Per-instance ring buffer for nose-wheel HPF magnitude history,
+        # consumed by ac_update_runway_rumble to render the shaker's
+        # spatially-delayed copy of the front rumble. Sized for ~4 s at
+        # 30 Hz which covers slow-taxi wheelbase delays even on long
+        # aircraft. Each entry is a (perf_counter_seconds, value) tuple.
+        self._rumble_v1_buffer: deque = deque(maxlen=128)
         self.adv_g_settings_dict: dict = {}
         self.adv_spr_settings_dict: dict = {}
         self.active_deadzone_pct: float = 0.0
@@ -751,9 +765,42 @@ class AircraftBase(object):
             effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
 
 
+    def _sample_rumble_buffer_at(self, target_t: float) -> float:
+        """Linear-interpolate a value from the v1 ring buffer at target_t.
+
+        Returns 0 if the buffer is empty or target_t predates the oldest
+        sample (typical at startup or after a long airborne stretch). The
+        stick reads the live HPF value; this lookup feeds the shaker so the
+        rear rumble lags the front by wheelbase / ground-speed seconds.
+        """
+        buf = self._rumble_v1_buffer
+        if not buf:
+            return 0.0
+        if target_t <= buf[0][0]:
+            return 0.0
+        if target_t >= buf[-1][0]:
+            return buf[-1][1]
+        # Linear scan from the right: typical lookups land on the recent
+        # tail, so this is O(delay/dt) ~ a handful of comparisons.
+        prev_t, prev_v = buf[-1]
+        for t, v in reversed(buf):
+            if t <= target_t:
+                if prev_t == t:
+                    return v
+                frac = (target_t - t) / (prev_t - t)
+                return v + frac * (prev_v - v)
+            prev_t, prev_v = t, v
+        return 0.0
+
     def ac_update_runway_rumble(self, telem_data):
-        """Add wheel based rumble effects for immersion
-        Generates bumps/etc on touchdown, rolling, field landing etc
+        """Add wheel based rumble effects for immersion.
+
+        Generates bumps/etc on touchdown, rolling, field landing etc. The
+        nose-wheel HPF stream is rendered to two effects: ``runway0``
+        (live, stick-routed) and ``runway0_delayed`` (shaker-routed,
+        time-shifted by wheelbase / ground-speed) so a runway joint
+        propagates front→rear in the user's haptic field. ``runway1``
+        (left/right main asymmetry) is unaffected by the spatial split.
         """
         if self._sim_is_bms():
             # Fake it since BMS does not have weight on wheels - only has 'bumps' telemetry
@@ -762,7 +809,7 @@ class AircraftBase(object):
 
         if self.is_collective(): return
         if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
-            effects.dispose("runway0", "runway1")
+            effects.dispose("runway0", "runway0_delayed", "runway1")
             return
 
         WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # nose, left, right - wheels
@@ -774,17 +821,31 @@ class AircraftBase(object):
         v1 = utils.clamp_minmax(v1, 0.5)
         v2 = utils.clamp_minmax(v2, 0.5)
 
+        now = time.perf_counter()
+        self._rumble_v1_buffer.append((now, v1))
+
+        # Compute the shaker's delayed copy. Ground speed proxy: explicit
+        # GroundSpeed (MSFS/XPlane) when present, else TAS — at typical
+        # taxi speeds these agree to within wind, and the delay function
+        # is forgiving. Floor at runway_spatial_min_speed_kt to avoid
+        # divide-by-zero and absurd delays at standstill.
+        gs_ms = abs(float(telem_data.get("GroundSpeed", telem_data.get("TAS", 0)) or 0.0))
+        gs_floor = max(gs_ms, self.runway_spatial_min_speed_kt * kt2ms)
+        delay_s = self.aircraft_wheelbase / gs_floor
+        v1_delayed = self._sample_rumble_buffer_at(now - delay_s)
+
         # modulate constant effects for X and Y axis
         # connect Y axis to nosewheel, X axis to the side wheels
         tot_weight = sum(WoW)
 
         #if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
         if tot_weight:
-            logging.debug(f"Runway Rumble : v1 = {v1}. v2 = {v2}")
+            logging.debug(f"Runway Rumble : v1 = {v1}. v1_delayed = {v1_delayed} (delay={delay_s:.2f}s). v2 = {v2}")
             effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
+            effects["runway0_delayed"].constant(v1_delayed, utils.RandomDirectionModulator).start()
             effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
         else:
-            effects.dispose("runway0", "runway1")
+            effects.dispose("runway0", "runway0_delayed", "runway1")
 
     def _ac_run_new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.
