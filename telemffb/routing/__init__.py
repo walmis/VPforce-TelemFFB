@@ -22,7 +22,7 @@ from .effect_route import (
     layer_targets_device,
     parse_target_selector,
 )
-from .router import EffectRouter
+from .router import EffectRouter, load_routes_pack
 
 __all__ = [
     "DirectionPolicy",
@@ -31,5 +31,6 @@ __all__ = [
     "EffectRouter",
     "RouteLayer",
     "layer_targets_device",
+    "load_routes_pack",
     "parse_target_selector",
 ]
