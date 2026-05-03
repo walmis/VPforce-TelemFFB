@@ -291,11 +291,26 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """
         from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                                        QLabel, QComboBox, QDoubleSpinBox, QPushButton,
-                                       QSlider)
+                                       QSlider, QScrollArea, QFrame)
 
         self.tab_Shaker = QWidget()
         self.tab_Shaker.setObjectName("tab_Shaker")
-        outer = QVBoxLayout(self.tab_Shaker)
+
+        # The Shaker tab grows tall once the calibration section is added; wrap
+        # it in a scroll area so all controls remain reachable on smaller dialog
+        # sizes. `outer` keeps the same name/role so the section setup helpers
+        # below don't need to change.
+        tab_layout = QVBoxLayout(self.tab_Shaker)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        self._shaker_tab_scroll = QScrollArea()
+        self._shaker_tab_scroll.setWidgetResizable(True)
+        self._shaker_tab_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._shaker_tab_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_content = QWidget()
+        outer = QVBoxLayout(scroll_content)
+        self._shaker_tab_scroll.setWidget(scroll_content)
+        tab_layout.addWidget(self._shaker_tab_scroll)
 
         intro = QLabel(
             "Bass shaker output. These settings only take effect when a TelemFFB "
@@ -1021,6 +1036,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         intro.setWordWrap(True)
         parent_layout.addWidget(intro)
 
+        # Optional inline help: toggling this checkbox reveals a short
+        # description below every parameter so the user knows what each
+        # slider does and which direction to optimise it in.
+        self._shaker_calib_desc_labels: list = []
+        self.shaker_calib_show_desc = QCheckBox("Show parameter descriptions")
+        self.shaker_calib_show_desc.setToolTip(
+            "Reveal a short explanation underneath each control to help "
+            "you understand what to tune for.")
+        self.shaker_calib_show_desc.toggled.connect(
+            self._on_shaker_calib_show_desc_toggled)
+        parent_layout.addWidget(self.shaker_calib_show_desc)
+
         # --- Profile group ---
         prof_box = QGroupBox("Profile")
         prof_layout = QHBoxLayout(prof_box)
@@ -1067,10 +1094,26 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.shaker_calib_sweep_amp.setSingleStep(0.05)
         self.shaker_calib_sweep_amp.setDecimals(2)
         self.shaker_calib_sweep_amp.setValue(0.4)
-        sweep_form.addRow("Low (Hz):", self.shaker_calib_sweep_lo)
-        sweep_form.addRow("High (Hz):", self.shaker_calib_sweep_hi)
-        sweep_form.addRow("Duration:", self.shaker_calib_sweep_dur)
-        sweep_form.addRow("Amplitude:", self.shaker_calib_sweep_amp)
+        self._add_shaker_calib_form_row(
+            sweep_form, "Low (Hz):", self.shaker_calib_sweep_lo,
+            "Lower bound of the linear frequency sweep. Start a few Hz "
+            "below the expected mechanical resonance so you can hear the "
+            "response build up cleanly into the peak.")
+        self._add_shaker_calib_form_row(
+            sweep_form, "High (Hz):", self.shaker_calib_sweep_hi,
+            "Upper bound of the sweep. Set roughly 1.5–2× the expected "
+            "resonance so the peak is clearly bracketed and you can hear "
+            "the response roll off again above it.")
+        self._add_shaker_calib_form_row(
+            sweep_form, "Duration:", self.shaker_calib_sweep_dur,
+            "Total sweep length. Longer sweeps make the resonance peak "
+            "easier to pinpoint by ear, but require steadier listening; "
+            "8–12 s is usually a good compromise.")
+        self._add_shaker_calib_form_row(
+            sweep_form, "Amplitude:", self.shaker_calib_sweep_amp,
+            "Drive level (0–1) used during the sweep. Pick the smallest "
+            "level at which you can still clearly identify the resonance "
+            "peak — too loud and the cone bottoms out, masking the peak.")
         sweep_layout.addLayout(sweep_form)
         sweep_btn_row = QHBoxLayout()
         self.shaker_calib_sweep_start_btn = QPushButton("Start sweep")
@@ -1083,6 +1126,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         sweep_btn_row.addWidget(self.shaker_calib_sweep_freq_label)
         sweep_btn_row.addStretch(1)
         sweep_layout.addLayout(sweep_btn_row)
+        sweep_layout.addWidget(self._make_shaker_calib_desc_label(
+            "Workflow: press <b>Start sweep</b> and listen for the loudest, "
+            "buzziest frequency. When you hear it, press <b>Mark resonance</b> "
+            "— the current sweep frequency is then copied into <b>f_res</b> "
+            "below, which is the foundation for every single-pulse parameter."))
         if not self._shaker_backend_available:
             self.shaker_calib_sweep_start_btn.setEnabled(False)
         parent_layout.addWidget(sweep_box)
@@ -1148,16 +1196,60 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.shaker_calib_test_amp.setDecimals(2)
         self.shaker_calib_test_amp.setValue(0.7)
 
-        tuner_form.addRow("f_res:", self.shaker_calib_fres)
-        tuner_form.addRow("Carrier offset:", self.shaker_calib_carrier_offset)
-        tuner_form.addRow("Carrier (derived):", self.shaker_calib_carrier_label)
-        tuner_form.addRow("Halfwaves:", self.shaker_calib_halfwaves)
-        tuner_form.addRow("Attack:", self.shaker_calib_attack)
-        tuner_form.addRow("Release:", self.shaker_calib_release)
-        tuner_form.addRow("", self.shaker_calib_brake_enabled)
-        tuner_form.addRow("Brake amplitude:", brake_amp_row)
-        tuner_form.addRow("Brake delay:", self.shaker_calib_brake_delay)
-        tuner_form.addRow("Test amplitude:", self.shaker_calib_test_amp)
+        self._add_shaker_calib_form_row(
+            tuner_form, "f_res:", self.shaker_calib_fres,
+            "Mechanical resonance frequency of your bass shaker (Hz). "
+            "Find it with the resonance sweep above. Every other pulse "
+            "parameter is derived from this — get it right first.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Carrier offset:", self.shaker_calib_carrier_offset,
+            "Detune from f_res in percent. A small offset (a few %) pushes "
+            "the drive off the resonance peak, which makes the pulse decay "
+            "faster — a crisper 'thud'. 0 % = drive exactly at f_res = "
+            "longest, ringiest tail. Increase if pulses sound smeared.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Carrier (derived):", self.shaker_calib_carrier_label,
+            "Read-only: f_res reduced by the carrier offset percentage. "
+            "This is the actual frequency the synth feeds the shaker; you "
+            "tune it indirectly via f_res and carrier offset above.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Halfwaves:", self.shaker_calib_halfwaves,
+            "Number of sine half-cycles the pulse lasts. 1 = sharpest "
+            "click (best for gear/hook clunks), 2–3 = thumpier 'punch' "
+            "(useful for weapon release). Increase only if a single "
+            "halfwave feels too thin to be felt.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Attack:", self.shaker_calib_attack,
+            "Envelope attack time in ms — how quickly the pulse ramps up. "
+            "Shorter = sharper transient, longer = softer onset. Keep "
+            "small (≤ 1 ms) for snappy single-pulse effects.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Release:", self.shaker_calib_release,
+            "Envelope release time in ms — how the pulse tail fades. "
+            "Shorten to remove ringing on resonant shakers, lengthen for "
+            "a more sustained, resonant feel.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "", self.shaker_calib_brake_enabled,
+            "Adds a counter-pulse just after the main pulse to actively "
+            "stop the shaker cone from ringing on. Enable when even short "
+            "release times leave an audible 'boom' tail.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Brake amplitude:", brake_amp_row,
+            "Strength of the braking counter-pulse, 0–100 %. Increase "
+            "until the tail disappears. Too high produces its own audible "
+            "click — back off until that just goes away.")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Brake delay:", self.shaker_calib_brake_delay,
+            "Time between the main pulse and the brake counter-pulse "
+            "(ms). Tune to land on the cone's return swing — a useful "
+            "starting point is half the resonance period, "
+            "≈ 1000 / (2 · f_res) ms (e.g. ≈ 14 ms at 35 Hz).")
+        self._add_shaker_calib_form_row(
+            tuner_form, "Test amplitude:", self.shaker_calib_test_amp,
+            "Drive level (0–1) used by the Play / Replay buttons below. "
+            "Set to a level that's representative of in-flight effects "
+            "so you tune at realistic volume — quiet tuning rarely "
+            "translates well to loud playback.")
         tuner_layout.addLayout(tuner_form)
 
         tuner_btn_row = QHBoxLayout()
@@ -1223,6 +1315,36 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # Initial slider population from active profile.
         self._shaker_calib_select_profile_by_name(self._shaker_calib_active_name)
+
+    # ----- description helpers -----
+
+    def _make_shaker_calib_desc_label(self, text: str):
+        from PyQt6.QtWidgets import QLabel
+        lbl = QLabel(text)
+        lbl.setWordWrap(True)
+        lbl.setTextFormat(Qt.TextFormat.RichText)
+        lbl.setStyleSheet(
+            "color: gray; font-style: italic; padding: 2px 0 4px 8px;")
+        lbl.setVisible(False)
+        self._shaker_calib_desc_labels.append(lbl)
+        return lbl
+
+    def _add_shaker_calib_form_row(self, form, label, widget_or_layout, description):
+        from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLayout
+        container = QWidget()
+        vbox = QVBoxLayout(container)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(2)
+        if isinstance(widget_or_layout, QLayout):
+            vbox.addLayout(widget_or_layout)
+        else:
+            vbox.addWidget(widget_or_layout)
+        vbox.addWidget(self._make_shaker_calib_desc_label(description))
+        form.addRow(label, container)
+
+    def _on_shaker_calib_show_desc_toggled(self, checked: bool):
+        for lbl in self._shaker_calib_desc_labels:
+            lbl.setVisible(checked)
 
     # ----- profile combo helpers -----
 
