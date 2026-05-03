@@ -62,12 +62,20 @@ offline_config_mode: bool = False  # Tracks offline config mode for checking in 
 
 # Device information
 device_type : str = ""
-device_usbpid : str 
+device_usbpid : str
 device_usbvidpid : str  # "FFFF:2055"
 device_ident : str  #Joystick, Pedals, etc.. as set in configurator
 device_firmware_version : str  # Firmware version as reported by device
 device_connection_status: bool = False # status of HID connection to device
 vpconf_init_pending: bool = False # switch to True when async device init is complete
+
+# Multi-device routing (populated from [devices] section in config.ini at startup
+# by telemffb.device_inventory.load_inventory_from_ini; remains empty until the
+# Setup Wizard has run or the user hand-edits the inventory).
+device_id: str = ""                      # stable slug for THIS process's device, e.g. "stick_main"
+device_positions: list[str] = []         # position tags for THIS process's device
+devices: list[Any] = []                  # list[Device] — full inventory shared by all instances
+effect_router: Optional[Any] = None      # routing.EffectRouter instance (populated in main.py)
 
 # Shaker device-type state. None unless device_type == 'shaker'.
 shaker_synth: 'Optional[ShakerSynth]' = None  # populated by main.py when launching as a shaker child

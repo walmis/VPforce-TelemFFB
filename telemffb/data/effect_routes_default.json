@@ -1,0 +1,97 @@
+{
+  "version": 4,
+  "_comment": [
+    "Generalised effect-routing pack. Migrated 1:1 from",
+    "shaker_effects_default.json (schema v1) — semantics are unchanged:",
+    "  legacy 'route: shaker'  ->  target: 'type:shaker'",
+    "  legacy 'route: stick'   ->  target: 'type:joystick'",
+    "  legacy 'route: both'    ->  target: 'both'",
+    "Effects listed in SHAKER_EFFECT_WHITELIST that have no entry here fall",
+    "back to the per-effect code defaults in ffb_shaker.py (SHAKER_EFFECT_",
+    "PROFILES / SHAKER_PHYSICS_PROFILES). Adding them here makes them",
+    "configurable; not adding them keeps today's behaviour."
+  ],
+  "effects": {
+    "je_rumble_1_1": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.85, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"},
+      {"freq_factor": 2.0, "gain": 0.30, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "je_rumble_1_2": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.85, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"},
+      {"freq_factor": 2.0, "gain": 0.30, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "ab_rumble_1_1": { "layers": [
+      {"freq_factor": 0.4, "gain": 1.00, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.60, "target": "type:joystick", "osc_type": "sine"},
+      {"freq_factor": 2.5, "gain": 0.35, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "prop_rpm0-1": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.70, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.55, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "rotor_rpm0-1": { "layers": [
+      {"freq_factor": 0.4, "gain": 0.90, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "runway0": { "layers": [
+      {"freq_factor": 1.5, "gain": 0.40, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "runway0_delayed": { "layers": [
+      {"freq_factor": 0.6, "gain": 0.80, "target": "type:shaker",   "osc_type": "sine"}
+    ]},
+    "touchdown": { "layers": [
+      {"freq_factor": 0.4, "gain": 1.00, "target": "type:shaker",   "osc_type": "impulse"},
+      {"freq_factor": 2.0, "gain": 0.40, "target": "type:joystick", "osc_type": "impulse"}
+    ]},
+    "touchdown_vs_main": { "layers": [
+      {"freq_factor": 0.4, "gain": 1.00, "target": "type:shaker",   "osc_type": "impulse"},
+      {"freq_factor": 1.0, "gain": 0.20, "target": "type:joystick", "osc_type": "impulse"}
+    ]},
+    "touchdown_vs_nose": { "layers": [
+      {"freq_factor": 2.0, "gain": 0.40, "target": "type:joystick", "osc_type": "impulse"}
+    ]},
+    "gunfire": { "layers": [
+      {"freq_factor": 0.4, "gain": 0.90, "target": "type:shaker",   "osc_type": "impulse"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "cm": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.70, "target": "type:shaker",   "osc_type": "impulse"},
+      {"freq_factor": 1.0, "gain": 0.45, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "buffeting": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.65, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.55, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "vrs_buffet": { "layers": [
+      {"freq_factor": 0.4, "gain": 0.85, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "gearbuffet": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.60, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.55, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "gearmovement": { "layers": [
+      {"freq_factor": 0.6, "gain": 0.70, "target": "type:shaker",   "osc_type": "impulse"},
+      {"freq_factor": 1.5, "gain": 0.40, "target": "type:joystick", "osc_type": "impulse"}
+    ]},
+    "flapsmovement": { "layers": [
+      {"freq_factor": 0.7, "gain": 0.50, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "speedbrakemovement": { "layers": [
+      {"freq_factor": 0.6, "gain": 0.55, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "etlX": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.70, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"}
+    ]},
+    "etlY": { "layers": [
+      {"freq_factor": 0.5, "gain": 0.70, "target": "type:shaker",   "osc_type": "sine"},
+      {"freq_factor": 1.0, "gain": 0.50, "target": "type:joystick", "osc_type": "sine"}
+    ]}
+  },
+  "aircraft_class_overrides": {}
+}
