@@ -214,6 +214,28 @@ class AircraftBase(object):
     engine_rumble_highrpm: int  = 2800
     engine_rumble_highrpm_intensity: float = 0.06
 
+    # Phase-locked impulse synthesis. "physics" fires one trigger_pulse per
+    # blade-pass / cylinder-firing crossing of an integrated phase. "synthesis"
+    # is the legacy continuous-sine path. Physics mode only takes effect on
+    # the shaker backend; the Rhino backend degrades to a periodic at the same
+    # carrier frequency regardless.
+    engine_rumble_mode: str = "physics"
+    cylinder_firing_enabled: bool = False  # piston cylinder-firing voice
+    cylinder_count: int = 4
+    is_4_stroke: bool = True
+    prop_blade_count: int = 2
+    prop_reduction_ratio: float = 1.0
+    tailrotor_enabled: bool = False
+    tailrotor_blade_count: int = 2
+    tailrotor_gear_ratio: float = 4.5  # tail-rotor RPM = main * ratio
+    # Vertical-speed-driven landing impulse. Magnitudes sit between gentle and
+    # hard touchdown VS in m/s.
+    touchdown_vs_enabled: bool = False
+    touchdown_vs_gentle: float = 0.5  # m/s — barely felt
+    touchdown_vs_hard: float = 4.0    # m/s — full magnitude
+    touchdown_vs_min_amp: float = 0.15
+    touchdown_vs_max_amp: float = 1.0
+
     # gforce_effect_enable : bool = False
 
     flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
@@ -657,10 +679,15 @@ class AircraftBase(object):
     ########################################
 
     def ac_update_touchdown_effect(self, telem_data):
-        """Generates a g-based force upon landing or as a result of large bumps"""
+        """Generates a g-based force upon landing or as a result of large bumps.
 
-        max_force = 0.5
-        max_g = 2
+        On the WoW rising edge we additionally fire a one-shot impulse
+        whose magnitude scales with the smoothed vertical speed at the
+        moment of touchdown — gentle landing barely felt, carrier slam at
+        full magnitude. This is independent of the steady G-force-driven
+        constant the legacy path applies while rolling.
+        """
+
         if self.is_collective() or self.is_pedals():
             return
         if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
@@ -673,15 +700,36 @@ class AircraftBase(object):
         if not self.touchdown_effect_enabled:
             effects.dispose("touchdown")
             return
-        on_ground = telem_data.get("SimOnGround", 0)
+        on_ground = bool(telem_data.get("SimOnGround", 0))
+
+        # VS-driven one-shot on the WoW rising edge. Smoothed VS captures the
+        # actual descent rate at the moment of contact, not the post-touchdown
+        # bounce which the LPF would otherwise contaminate the read with.
+        if self.touchdown_vs_enabled:
+            vs_raw = telem_data.get("VerticalSpeed", 0.0) or 0.0
+            try:
+                vs_raw = float(vs_raw)
+            except (TypeError, ValueError):
+                vs_raw = 0.0
+            vs_smoothed = LPFs.get("touchdown_vs", 15).update(vs_raw)
+            # anything_has_changed returns True on a value transition; for a
+            # bool we get the rising AND the falling edge. We only fire on
+            # the air→ground edge, so guard with on_ground.
+            wow_changed = self.anything_has_changed("touchdown_wow", on_ground)
+            if wow_changed and on_ground:
+                amp = utils.scale_clamp(
+                    abs(vs_smoothed),
+                    (self.touchdown_vs_gentle, self.touchdown_vs_hard),
+                    (self.touchdown_vs_min_amp, self.touchdown_vs_max_amp))
+                logging.info(f"Touchdown impulse: VS={vs_smoothed:.2f} m/s -> amp={amp:.2f}")
+                effects['touchdown_vs'].fire_impulse(amp)
+
         if not on_ground:
             effects.dispose("touchdown")
             return
         force = round(utils.scale_clamp(gs, (0, self.touchdown_effect_max_gs), (0,self.touchdown_effect_max_force)), 2)
 
         logging.debug(f"Touchdown Effect: Realtime Gs: {gs}, Force:{force}")
-        # telem_data["_gs"] = gs
-        # telem_data["_force"] = force
         effects['touchdown'].constant(force, 180).start()
 
     def bms_taxi_bumps(self, telem_data):
@@ -1557,50 +1605,85 @@ class AircraftBase(object):
             effects["aoa"].constant(mag, dir).start()
 
     def ac_update_piston_engine_rumble(self, telem_data):
+        legacy_voices = ("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+        physics_voices = ("prop_phys_1", "prop_phys_2", "prop_phys_3", "prop_phys_4",
+                          "cyl_phys_1", "cyl_phys_2", "cyl_phys_3", "cyl_phys_4")
         if not self.engine_prop_rumble_enabled:
-            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+            effects.dispose(*legacy_voices, *physics_voices)
             return
 
+        # Per-engine RPM. Most sims expose only one combined value; MSFS gives
+        # PropRPM as a list. We drive one prop voice per engine when a list is
+        # available, else just engine 1.
         if self._sim_is('DCS'):
-            rpm = telem_data.get("ActualRPM", 0.0)
+            rpm_in = telem_data.get("ActualRPM", 0.0)
         elif self._sim_is('MSFS') or self._sim_is_xplane():
-            rpm = telem_data.get("PropRPM", 0.0)
+            rpm_in = telem_data.get("PropRPM", 0.0)
         elif self._sim_is('IL2'):
-            rpm = telem_data.get("RPM", 0.0)
+            rpm_in = telem_data.get("RPM", 0.0)
         else:
             logging.warning("Unknown sim trying to play Engine Rumble effect")
-            rpm = 0.0
-        
-        if type(rpm) == list:
-            rpm = max(rpm)
+            rpm_in = 0.0
 
-        if rpm < 5:
-            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+        if isinstance(rpm_in, list):
+            per_engine = [float(r) for r in rpm_in if r is not None]
+        else:
+            per_engine = [float(rpm_in)]
+
+        max_rpm = max(per_engine) if per_engine else 0.0
+        if max_rpm < 5:
+            effects.dispose(*legacy_voices, *physics_voices)
             return
 
-        frequency = float(rpm) / 60
+        force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
+        dynamic_rumble_intensity = utils.clamp(self.ac_calc_engine_intensity(max_rpm), 0, force_limit)
 
-        # frequency = 20
+        if self.engine_rumble_mode == "physics":
+            # Propeller blade-pass: prop_blade_count blades per prop revolution,
+            # prop spinning at engine RPM × reduction ratio.
+            blade_count = max(1, int(self.prop_blade_count))
+            for idx, rpm in enumerate(per_engine[:4]):
+                if rpm < 5:
+                    effects.dispose(f"prop_phys_{idx+1}")
+                    continue
+                prop_rpm = rpm * float(self.prop_reduction_ratio)
+                effects[f"prop_phys_{idx+1}"].physics(
+                    rpm=prop_rpm, divisions=blade_count,
+                    load=dynamic_rumble_intensity).start()
+            # Cylinder-firing voice: only on if explicitly enabled (it can be
+            # either a great or a too-busy effect depending on the engine).
+            if self.cylinder_firing_enabled:
+                cylinders = max(1, int(self.cylinder_count))
+                # 4-stroke: cylinders/2 firings per crank rev. 2-stroke: cylinders.
+                firings = (cylinders / 2.0) if self.is_4_stroke else float(cylinders)
+                for idx, rpm in enumerate(per_engine[:4]):
+                    if rpm < 5:
+                        effects.dispose(f"cyl_phys_{idx+1}")
+                        continue
+                    effects[f"cyl_phys_{idx+1}"].physics(
+                        rpm=rpm, divisions=firings,
+                        load=dynamic_rumble_intensity * 0.7).start()
+            else:
+                effects.dispose("cyl_phys_1", "cyl_phys_2", "cyl_phys_3", "cyl_phys_4")
+            # Make sure legacy voices are off.
+            effects.dispose(*legacy_voices)
+            return
+
+        # ---- Legacy synthesis-mode path (continuous sine) ----
+        frequency = max_rpm / 60.0
         median_modulation = 2
-        modulation_pos = 2
-        modulation_neg = 1
         frequency2 = frequency + median_modulation
-        precision = 2
-
         r1_modulation = utils.sine_point_in_time(3, 10000)
         r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
-
         if frequency > 0:
-            force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
-            dynamic_rumble_intensity = utils.clamp(self.ac_calc_engine_intensity(rpm), 0, force_limit)
-            logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
-
-            effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
-            effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X
-            effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()  # vib on Y axis
-            effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()  # vib on Y
+            effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()
+            effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()
+            effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()
+            effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()
         else:
-            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+            effects.dispose(*legacy_voices)
+        # Make sure physics voices are off.
+        effects.dispose(*physics_voices)
 
     def ac_calc_engine_intensity(self, rpm) -> float:
         """
@@ -1789,7 +1872,8 @@ class AircraftBase(object):
 
     def ac_update_heli_engine_rumble(self, telem_data, blade_ct=None):
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
-            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1",
+                            "rotor_phys_main", "rotor_phys_tail")
             return
         if self._sim_is_xplane():
             rrpm = telem_data.get("PropRPM", 0)
@@ -1799,34 +1883,70 @@ class AircraftBase(object):
             rrpm = telem_data.get("RotorRPM", 0)
             if isinstance(rrpm, list):
                 rrpm = max(rrpm)
-        mod = telem_data.get("N")
-        tas = telem_data.get("TAS", 0)
         eng_rpm = telem_data.get("EngRPM", 0)
         if isinstance(eng_rpm, list):
             eng_rpm = max(eng_rpm)
-
-        # rotor = telem_data.get("RotorRPM")
 
         if blade_ct is None:
             blade_ct = 2
             rrpm = 250
 
-
         if rrpm < 5:
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1",
+                            "rotor_phys_main", "rotor_phys_tail")
+            return
+
+        if self.engine_rumble_mode == "physics":
+            # Phase-locked impulse train: one thump per blade pass. Amplitude
+            # weighted by RPM proximity to nominal so spool-up reads as a
+            # laboured chuff that fattens up as the rotor reaches operating
+            # speed. The intensity knob keeps the same UX as the legacy mode.
+            #
+            # Use rrpm itself as the load proxy when collective isn't
+            # available — at sim-pause the impulse train silences itself
+            # because rrpm < 5 was already caught above.
+            collective = telem_data.get("CollectivePos")
+            if isinstance(collective, list):
+                collective = collective[0] if collective else None
+            if collective is None:
+                # Fall back to RPM-as-load: spool-up sounds light, on-condition
+                # rotor sounds full. Caps at 1.0 once rrpm exceeds nominal.
+                nominal = max(1.0, getattr(self, "rotor_rpm_nominal", rrpm))
+                collective = min(1.0, max(0.0, float(rrpm) / nominal))
+            else:
+                # Sims report collective in [0, 1] or [0, 100]; normalise.
+                collective = float(collective)
+                if collective > 1.5:
+                    collective /= 100.0
+                collective = max(0.0, min(1.0, collective))
+            load = max(0.05, collective) * self.heli_engine_rumble_intensity
+            effects["rotor_phys_main"].physics(rpm=rrpm, divisions=blade_ct,
+                                                load=load).start()
+            if self.tailrotor_enabled:
+                tail_rpm = telem_data.get("TailRotorRPM")
+                if tail_rpm is None:
+                    tail_rpm = float(rrpm) * float(self.tailrotor_gear_ratio)
+                effects["rotor_phys_tail"].physics(
+                    rpm=tail_rpm, divisions=self.tailrotor_blade_count,
+                    load=load * 0.6).start()
+            else:
+                effects.dispose("rotor_phys_tail")
+            # Make sure legacy voices are off when physics is active.
             effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
             return
 
+        # ---- Legacy synthesis-mode path (continuous sine) ----
         logging.debug(f"Engine Rumble: Blade_Ct={blade_ct}, RPM={rrpm}")
         frequency = float(rrpm) / 45 * blade_ct
-
         median_modulation = 2
         frequency2 = frequency + median_modulation
         if frequency > 0 and eng_rpm > 0:
-            logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
             effects["rotor_rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
             effects["rotor_rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
         else:
             effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
+        # Make sure physics voices are off in synthesis mode.
+        effects.dispose("rotor_phys_main", "rotor_phys_tail")
 
     def check_master_button_press(self, button):
         # print(f"Checking {button} against {master_buttons}")

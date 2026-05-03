@@ -38,7 +38,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from telemffb.hw.shaker_synth import Oscillator, ShakerSynth
+from telemffb.hw.shaker_synth import ImpulseTrainOscillator, Oscillator, ShakerSynth
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,10 @@ EFFECT_FRICTION = 11
 EFFECT_CUSTOM = 12
 EFFECT_DETENT = 13
 EFFECT_SPRING_ADJUSTER = 14
+# Local sentinel: not part of the FFB protocol, used only by the shaker
+# routing in HapticEffect.start() to dispatch to ImpulseTrainOscillator.
+# Mirrored on ffb_rhino.HapticEffect.physics() as a no-op fallback.
+EFFECT_PHYSICS_IMPULSE = 100
 
 # Default frequency used by .constant() (no inherent periodicity, so we map it
 # to a low-rumble carrier).
@@ -84,6 +88,11 @@ SHAKER_EFFECT_WHITELIST = {
     # prop / rotor
     "prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2",
     "rotor_rpm0-1", "rotor_rpm1-1",
+    # physics-driven (phase-locked impulse) voices — see HapticEffect.physics()
+    "rotor_phys_main", "rotor_phys_tail",
+    "prop_phys_1", "prop_phys_2", "prop_phys_3", "prop_phys_4",
+    "cyl_phys_1", "cyl_phys_2", "cyl_phys_3", "cyl_phys_4",
+    "touchdown_vs",
     # ETL
     "etlX", "etlY",
     # surface movements
@@ -118,6 +127,52 @@ SHAKER_EFFECT_PROFILES: dict = {
 }
 
 _DEFAULT_PROFILE = {"kind": "continuous", "ramp_ms": 50.0, "gain": 1.0}
+
+
+# Pulse-shape profiles for physics-driven voices. Looked up by effect name in
+# HapticEffect.start() when the stored effect_type is EFFECT_PHYSICS_IMPULSE.
+# Carrier_hz is the per-pulse oscillation; halfwaves controls pulse duration
+# (1 halfwave at 50 Hz = 10 ms). Tuned so impulses sound like physical thumps,
+# not chirps.
+SHAKER_PHYSICS_PROFILES: dict = {
+    # Helicopter main rotor: slow, deep thump per blade pass.
+    "rotor_phys_main": {"carrier_hz": 38.0, "halfwaves": 1,
+                         "attack_ms": 1.5, "release_ms": 6.0,
+                         "brake_amp": 0.6, "brake_delay_ms": 0.0,
+                         "gain": 1.0, "max_impulse_rate_hz": 80.0},
+    # Tail rotor: shorter, higher carrier — smaller blades, faster spin.
+    "rotor_phys_tail": {"carrier_hz": 70.0, "halfwaves": 1,
+                         "attack_ms": 1.0, "release_ms": 3.0,
+                         "brake_amp": 0.4, "brake_delay_ms": 0.0,
+                         "gain": 0.6, "max_impulse_rate_hz": 220.0},
+    # Propeller blade-pass: a sharper chop than the rotor. Carrier scales
+    # with the perceived "wood vs. metal" feel of the blade.
+    "prop_phys_1": {"carrier_hz": 60.0, "halfwaves": 1,
+                     "attack_ms": 1.0, "release_ms": 4.0,
+                     "brake_amp": 0.5, "brake_delay_ms": 0.0,
+                     "gain": 0.9, "max_impulse_rate_hz": 180.0},
+    # Piston cylinder firing: very short, percussive.
+    "cyl_phys_1": {"carrier_hz": 80.0, "halfwaves": 1,
+                    "attack_ms": 0.5, "release_ms": 2.0,
+                    "brake_amp": 0.3, "brake_delay_ms": 0.0,
+                    "gain": 0.7, "max_impulse_rate_hz": 180.0},
+    # Touchdown impulse — single shot fired by HapticEffect.fire_impulse().
+    "touchdown_vs": {"carrier_hz": 28.0, "halfwaves": 2,
+                      "attack_ms": 2.0, "release_ms": 80.0,
+                      "brake_amp": 0.0, "brake_delay_ms": 0.0,
+                      "gain": 1.0, "max_impulse_rate_hz": 999.0},
+}
+# Multi-engine voices reuse the shape of voice 1.
+for _src, _copies in (("prop_phys_1", ("prop_phys_2", "prop_phys_3", "prop_phys_4")),
+                      ("cyl_phys_1",  ("cyl_phys_2",  "cyl_phys_3",  "cyl_phys_4"))):
+    for _dst in _copies:
+        SHAKER_PHYSICS_PROFILES.setdefault(_dst, dict(SHAKER_PHYSICS_PROFILES[_src]))
+
+
+_PHYSICS_DEFAULT_PROFILE = {"carrier_hz": 50.0, "halfwaves": 1,
+                            "attack_ms": 1.5, "release_ms": 4.0,
+                            "brake_amp": 0.5, "brake_delay_ms": 0.0,
+                            "gain": 1.0, "max_impulse_rate_hz": 180.0}
 
 
 @dataclass(frozen=True)
@@ -333,6 +388,12 @@ class HapticEffect:
         self.effect_type: Optional[int] = None
         self.modulator = None
         self._duration_timer: Optional[threading.Timer] = None
+        # Physics-mode (impulse-train) state. Populated by .physics();
+        # consumed by .start() to drive an ImpulseTrainOscillator.
+        self._phys_rpm: float = 0.0
+        self._phys_divisions: float = 1.0
+        self._phys_load: float = 0.0
+        self._phys_overrides: dict = {}
 
     def __repr__(self) -> str:
         return f"HapticEffect(shaker name={self.name!r}, freq={self.frequency:.1f}, mag={self.magnitude:.3f})"
@@ -363,6 +424,54 @@ class HapticEffect:
         self.direction = float(direction) if not isinstance(direction, type) else 0.0
         self.duration = int(kwargs.get("duration", 0))
         self.effect_type = EFFECT_CONSTANT
+        return self
+
+    def physics(self, rpm: float, divisions: float, load: float = 1.0,
+                **shape_overrides) -> "HapticEffect":
+        """Configure a phase-locked impulse-train voice. ``rpm`` and
+        ``divisions`` (blades / firings per revolution) drive the integrated
+        phase; ``load`` (0..1) scales pulse amplitude. Shape overrides
+        (carrier_hz, halfwaves, attack_ms, release_ms, brake_amp, gain,
+        max_impulse_rate_hz) are merged over the per-effect profile in
+        SHAKER_PHYSICS_PROFILES at .start() time. Chainable.
+        """
+        self._phys_rpm = max(0.0, float(rpm))
+        self._phys_divisions = max(1.0, float(divisions))
+        self._phys_load = max(0.0, min(1.0, float(load)))
+        if shape_overrides:
+            self._phys_overrides = dict(shape_overrides)
+        self.effect_type = EFFECT_PHYSICS_IMPULSE
+        return self
+
+    def fire_impulse(self, magnitude: float, **shape_overrides) -> "HapticEffect":
+        """Fire one shot through the synth's pulse path on this effect's
+        oscillator (created on demand, regular Oscillator). Use for
+        non-periodic transients like touchdown where magnitude is an event
+        scalar. Skips the whitelist check by going through .start() with a
+        synthesised transient profile.
+        """
+        if _synth is None or self.name is None:
+            return self
+        if self.name not in SHAKER_EFFECT_WHITELIST:
+            return self
+        profile = dict(_PHYSICS_DEFAULT_PROFILE)
+        profile.update(SHAKER_PHYSICS_PROFILES.get(self.name, {}))
+        profile.update(shape_overrides)
+        amp = max(0.0, min(1.0, float(magnitude) * profile["gain"]))
+        if amp <= 0.0:
+            return self
+        # Use a regular Oscillator for one-shot — replace any prior
+        # ImpulseTrain instance under this name to keep the contract clean.
+        existing = _synth.peek_oscillator(self.name)
+        if isinstance(existing, ImpulseTrainOscillator):
+            _synth.remove_oscillator(self.name)
+        osc = _synth.get_oscillator(self.name)
+        osc.trigger_pulse(carrier_hz=profile["carrier_hz"],
+                          halfwaves=profile["halfwaves"], amplitude=amp,
+                          attack_ms=profile["attack_ms"],
+                          release_ms=profile["release_ms"],
+                          brake_amp=profile["brake_amp"],
+                          brake_delay_ms=profile["brake_delay_ms"])
         return self
 
     # ------------------------------------------------------------------
@@ -476,6 +585,38 @@ class HapticEffect:
             t.start()
         return self
 
+    def _start_physics(self) -> "HapticEffect":
+        """Drive an ImpulseTrainOscillator under self.name.
+
+        Replaces any previously-registered oscillator of a different type
+        under this name (e.g. a leftover periodic Oscillator from a prior
+        synthesis-mode run when the user toggles modes at runtime).
+        """
+        existing = _synth.peek_oscillator(self.name)
+        if not isinstance(existing, ImpulseTrainOscillator):
+            if existing is not None:
+                _synth.remove_oscillator(self.name)
+            osc = ImpulseTrainOscillator(_synth.samplerate, _synth.blocksize)
+            _synth.add_oscillator(self.name, osc)
+        else:
+            osc = existing
+        profile = dict(_PHYSICS_DEFAULT_PROFILE)
+        profile.update(SHAKER_PHYSICS_PROFILES.get(self.name, {}))
+        profile.update(self._phys_overrides)
+        osc.configure(carrier_hz=profile["carrier_hz"],
+                      halfwaves=profile["halfwaves"],
+                      attack_ms=profile["attack_ms"],
+                      release_ms=profile["release_ms"],
+                      brake_amp=profile["brake_amp"],
+                      brake_delay_ms=profile["brake_delay_ms"],
+                      gain=profile["gain"],
+                      max_impulse_rate_hz=profile["max_impulse_rate_hz"])
+        osc.set_rpm(self._phys_rpm, self._phys_divisions, self._phys_load)
+        logger.debug("Shaker physics name=%r rpm=%.1f div=%.2f load=%.2f -> %.2f Hz",
+                     self.name, self._phys_rpm, self._phys_divisions,
+                     self._phys_load, self._phys_rpm / 60.0 * self._phys_divisions)
+        return self
+
     def start(self, force: bool = False, **kw) -> "HapticEffect":
         if _synth is None:
             logger.warning("HapticEffect.start called before init_shaker; dropping (name=%r)",
@@ -487,6 +628,9 @@ class HapticEffect:
         if self.name not in SHAKER_EFFECT_WHITELIST:
             logger.debug("Shaker start: effect %r not in whitelist; dropping", self.name)
             return self
+
+        if self.effect_type == EFFECT_PHYSICS_IMPULSE:
+            return self._start_physics()
 
         if self.name in EFFECT_LAYERS:
             return self._start_layered(EFFECT_LAYERS[self.name])

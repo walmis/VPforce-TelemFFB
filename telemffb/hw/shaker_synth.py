@@ -369,6 +369,146 @@ class Oscillator:
         return self._current_amp == 0.0 and self._target_amp == 0.0
 
 
+class PhaseAccumulator:
+    """Integrate angular velocity over caller-supplied dt; report integer
+    crossings of the per-revolution division boundary (blade pass, cylinder
+    firing, …).
+
+    State is the fractional phase in cycles (0.0–1.0). Calling .advance()
+    adds ``rpm/60 * divisions_per_rev * dt`` cycles and returns the integer
+    number of crossings that occurred during this dt. Designed for two call
+    sites:
+
+      - audio callback at ~190 Hz: dt = blocksize / samplerate
+      - telemetry tick at 30–60 Hz: dt = wall-clock since last call
+
+    Float64 throughout: at 0.4 Hz impulse rate the per-block increment is
+    ~2e-3 cycles, well above ULP for hours of accumulated phase.
+    """
+
+    def __init__(self) -> None:
+        self._phase = 0.0
+
+    def advance(self, rpm: float, divisions_per_rev: float, dt: float) -> int:
+        if rpm <= 0.0 or divisions_per_rev <= 0.0 or dt <= 0.0:
+            return 0
+        increment = (rpm / 60.0) * divisions_per_rev * dt
+        new_phase = self._phase + increment
+        crossings = int(new_phase) - int(self._phase)
+        # Keep only the fractional part so accumulated phase stays bounded.
+        self._phase = new_phase - int(new_phase)
+        return crossings if crossings > 0 else 0
+
+    def reset(self) -> None:
+        self._phase = 0.0
+
+    @property
+    def phase(self) -> float:
+        return self._phase
+
+
+class ImpulseTrainOscillator:
+    """Phase-locked impulse-train generator: one trigger_pulse per blade-pass /
+    cylinder-firing crossing, driven by RPM rather than a fixed frequency.
+
+    Wraps an inner Oscillator; satisfies the (is_silent, render(n)) contract
+    consumed by ShakerSynth._callback. RPM and load can be updated from any
+    thread (set_rpm); the render loop integrates phase block-by-block and
+    fires trigger_pulse when the integer division-boundary count advances.
+
+    Onset of each pulse is quantized to the audio block (~5 ms at 256/48k),
+    which is well below one period for any usable impulse rate. For impulse
+    rates above max_impulse_rate_hz the engine goes silent — callers should
+    fall back to a bandpass-noise voice when the rate climbs that high.
+    """
+
+    def __init__(self, samplerate: int, blocksize: int = 512,
+                 max_impulse_rate_hz: float = 180.0):
+        self._osc = Oscillator(samplerate, blocksize)
+        self._samplerate = float(samplerate)
+        self._phase = 0.0
+        self._lock = threading.Lock()
+        # Telemetry-driven inputs
+        self._rpm = 0.0
+        self._divisions = 1.0
+        self._load = 0.0
+        # Pulse-shape config (configure() to tune)
+        self._carrier_hz = 50.0
+        self._halfwaves = 1
+        self._attack_ms = 1.5
+        self._release_ms = 3.0
+        self._brake_amp = 0.0
+        self._brake_delay_ms = 0.0
+        self._gain = 1.0
+        self._max_impulse_rate_hz = float(max_impulse_rate_hz)
+
+    def configure(self, *, carrier_hz=None, halfwaves=None, attack_ms=None,
+                  release_ms=None, brake_amp=None, brake_delay_ms=None,
+                  gain=None, max_impulse_rate_hz=None) -> None:
+        with self._lock:
+            if carrier_hz is not None: self._carrier_hz = float(carrier_hz)
+            if halfwaves is not None: self._halfwaves = max(1, int(halfwaves))
+            if attack_ms is not None: self._attack_ms = float(attack_ms)
+            if release_ms is not None: self._release_ms = float(release_ms)
+            if brake_amp is not None: self._brake_amp = float(brake_amp)
+            if brake_delay_ms is not None: self._brake_delay_ms = float(brake_delay_ms)
+            if gain is not None: self._gain = float(gain)
+            if max_impulse_rate_hz is not None:
+                self._max_impulse_rate_hz = float(max_impulse_rate_hz)
+
+    def set_rpm(self, rpm: float, divisions_per_rev: Optional[float] = None,
+                load: Optional[float] = None) -> None:
+        with self._lock:
+            self._rpm = max(0.0, float(rpm))
+            if divisions_per_rev is not None:
+                self._divisions = max(1.0, float(divisions_per_rev))
+            if load is not None:
+                self._load = max(0.0, min(1.0, float(load)))
+
+    def stop(self, ramp_ms: float = 50.0) -> None:
+        with self._lock:
+            self._rpm = 0.0
+        self._osc.stop(ramp_ms=ramp_ms)
+
+    @property
+    def is_silent(self) -> bool:
+        if self._rpm > 0.0:
+            return False
+        return self._osc.is_silent
+
+    def render(self, num_samples: int) -> np.ndarray:
+        with self._lock:
+            rpm = self._rpm
+            divisions = self._divisions
+            load = self._load
+            carrier = self._carrier_hz
+            halfwaves = self._halfwaves
+            attack_ms = self._attack_ms
+            release_ms = self._release_ms
+            brake_amp = self._brake_amp
+            brake_delay_ms = self._brake_delay_ms
+            gain = self._gain
+            cap = self._max_impulse_rate_hz
+
+        if rpm > 0.0 and divisions > 0.0:
+            impulse_hz = rpm / 60.0 * divisions
+            if impulse_hz <= cap:
+                dt = num_samples / self._samplerate
+                increment = impulse_hz * dt
+                new_phase = self._phase + increment
+                crossings = int(new_phase) - int(self._phase)
+                self._phase = new_phase - int(new_phase)
+                if crossings > 0:
+                    amp = max(0.0, min(1.0, load * gain))
+                    if amp > 0.0:
+                        self._osc.trigger_pulse(
+                            carrier_hz=carrier, halfwaves=halfwaves,
+                            amplitude=amp, attack_ms=attack_ms,
+                            release_ms=release_ms, brake_amp=brake_amp,
+                            brake_delay_ms=brake_delay_ms)
+        return self._osc.render(num_samples)
+
+
 class BandpassNoiseGenerator:
     """Band-limited noise generator. Same interface as Oscillator.
 
@@ -769,6 +909,46 @@ def _selftest_pulse(device, samplerate: int) -> None:
         synth.stop()
 
 
+def _selftest_phase_locked(device, samplerate: int) -> None:
+    """Drive an ImpulseTrainOscillator with a synthetic helicopter spool-up:
+    rotor_rpm 0 → 250 over 4 s, then steady at 250, 5 blades. Expect chuffs
+    that ramp into a smooth blade-pass thrum."""
+    print(f"ShakerSynth phase-locked selftest: device={device!r} samplerate={samplerate}")
+    synth = ShakerSynth(samplerate=samplerate, device=device)
+    synth.start()
+    try:
+        osc = ImpulseTrainOscillator(synth.samplerate, synth.blocksize)
+        osc.configure(carrier_hz=38.0, halfwaves=1, attack_ms=1.5,
+                      release_ms=6.0, brake_amp=0.6, gain=1.0)
+        synth.add_oscillator("rotor_phys", osc)
+
+        spool_seconds = 4.0
+        nominal_rpm = 250.0
+        blade_count = 5
+        steps = 80
+        for i in range(steps):
+            frac = i / float(steps - 1)
+            rpm = nominal_rpm * frac
+            # Load tracks RPM/nominal so spool-up sounds light, on-condition rotor full.
+            osc.set_rpm(rpm, blade_count, load=min(1.0, frac + 0.05))
+            time.sleep(spool_seconds / steps)
+
+        print(f"Hold at {nominal_rpm} RPM × {blade_count} = "
+              f"{nominal_rpm/60.0*blade_count:.1f} Hz for 2 s")
+        osc.set_rpm(nominal_rpm, blade_count, load=1.0)
+        time.sleep(2.0)
+
+        print("Spool down to 0 RPM over 1.5 s")
+        for i in range(40):
+            frac = 1.0 - i / 39.0
+            osc.set_rpm(nominal_rpm * frac, blade_count, load=max(0.05, frac))
+            time.sleep(1.5 / 40.0)
+        osc.stop()
+        time.sleep(0.5)
+    finally:
+        synth.stop()
+
+
 def _selftest_noise(device, samplerate: int, center: float = 35.0,
                     bandwidth: float = 20.0, channel_mode: str = "mono",
                     pan: float = 0.0) -> None:
@@ -812,6 +992,9 @@ def main() -> None:
                    help="Run a transient/thomp selftest with L/center/R pan")
     g.add_argument("--selftest-pulse", action="store_true",
                    help="Run a gated halfwave pulse selftest with active brake")
+    g.add_argument("--selftest-phase-locked", action="store_true",
+                   help="Run a phase-locked rotor spool-up selftest "
+                        "(blade-pass impulse train)")
     g.add_argument("--selftest-noise", action="store_true",
                    help="Run a 3-second bandpass-noise selftest")
     p.add_argument("--device", type=str, default=None,
@@ -838,6 +1021,8 @@ def main() -> None:
         _selftest_transient(_parse_device(args.device), args.samplerate)
     elif args.selftest_pulse:
         _selftest_pulse(_parse_device(args.device), args.samplerate)
+    elif args.selftest_phase_locked:
+        _selftest_phase_locked(_parse_device(args.device), args.samplerate)
     elif args.selftest_noise:
         _selftest_noise(_parse_device(args.device), args.samplerate,
                         center=args.center, bandwidth=args.bandwidth,
