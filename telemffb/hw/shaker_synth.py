@@ -417,14 +417,34 @@ class ImpulseTrainOscillator:
     fires trigger_pulse when the integer division-boundary count advances.
 
     Onset of each pulse is quantized to the audio block (~5 ms at 256/48k),
-    which is well below one period for any usable impulse rate. For impulse
-    rates above max_impulse_rate_hz the engine goes silent — callers should
-    fall back to a bandpass-noise voice when the rate climbs that high.
+    which is well below one period for any usable impulse rate.
+
+    Auto-fallback to bandpass noise: above ``max_impulse_rate_hz`` (e.g. a
+    radial engine at high RPM, or a multi-blade rotor near redline) the
+    per-pulse oscillation can no longer be resolved as discrete events.
+    The oscillator transparently switches to a band-limited noise voice
+    centered on the current impulse rate so the tactile feedback continues
+    as a broadband thrum instead of going silent. Hysteresis on the
+    threshold prevents flapping near the boundary; an ~80 ms ramp on each
+    voice produces a click-free crossover.
     """
+
+    # Hysteresis: cross into noise mode at 100% of cap, return to impulse
+    # mode only once the rate falls back to 85% of cap. Range tuned so a
+    # steady cruise RPM near redline doesn't toggle voices each block.
+    _FALLBACK_HIGH_FRAC = 1.00
+    _FALLBACK_LOW_FRAC = 0.85
+    # Default noise bandwidth = 20% of center, with a floor for low rates
+    # so the filter doesn't become a near-pure tone. Override via configure.
+    _NOISE_BW_FRAC = 0.20
+    _NOISE_BW_MIN_HZ = 15.0
+    # Crossfade between voices on mode change (and on mode entry/exit).
+    _CROSSFADE_MS = 80.0
 
     def __init__(self, samplerate: int, blocksize: int = 512,
                  max_impulse_rate_hz: float = 180.0):
         self._osc = Oscillator(samplerate, blocksize)
+        self._noise = BandpassNoiseGenerator(samplerate, blocksize)
         self._samplerate = float(samplerate)
         self._phase = 0.0
         self._lock = threading.Lock()
@@ -441,10 +461,15 @@ class ImpulseTrainOscillator:
         self._brake_delay_ms = 0.0
         self._gain = 1.0
         self._max_impulse_rate_hz = float(max_impulse_rate_hz)
+        # None → auto-compute bandwidth from current center per render call.
+        self._noise_bandwidth_hz: Optional[float] = None
+        # Hysteresis state for the impulse↔noise voice swap.
+        self._fallback_active = False
 
     def configure(self, *, carrier_hz=None, halfwaves=None, attack_ms=None,
                   release_ms=None, brake_amp=None, brake_delay_ms=None,
-                  gain=None, max_impulse_rate_hz=None) -> None:
+                  gain=None, max_impulse_rate_hz=None,
+                  noise_bandwidth_hz=None) -> None:
         with self._lock:
             if carrier_hz is not None: self._carrier_hz = float(carrier_hz)
             if halfwaves is not None: self._halfwaves = max(1, int(halfwaves))
@@ -455,6 +480,9 @@ class ImpulseTrainOscillator:
             if gain is not None: self._gain = float(gain)
             if max_impulse_rate_hz is not None:
                 self._max_impulse_rate_hz = float(max_impulse_rate_hz)
+            if noise_bandwidth_hz is not None:
+                v = float(noise_bandwidth_hz)
+                self._noise_bandwidth_hz = v if v > 0.0 else None
 
     def set_rpm(self, rpm: float, divisions_per_rev: Optional[float] = None,
                 load: Optional[float] = None) -> None:
@@ -468,13 +496,21 @@ class ImpulseTrainOscillator:
     def stop(self, ramp_ms: float = 50.0) -> None:
         with self._lock:
             self._rpm = 0.0
+            self._fallback_active = False
         self._osc.stop(ramp_ms=ramp_ms)
+        self._noise.stop(ramp_ms=ramp_ms)
 
     @property
     def is_silent(self) -> bool:
         if self._rpm > 0.0:
             return False
-        return self._osc.is_silent
+        return self._osc.is_silent and self._noise.is_silent
+
+    @property
+    def fallback_active(self) -> bool:
+        """True while the noise voice is rendering instead of impulses.
+        Exposed for tests and debugging."""
+        return self._fallback_active
 
     def render(self, num_samples: int) -> np.ndarray:
         with self._lock:
@@ -489,24 +525,54 @@ class ImpulseTrainOscillator:
             brake_delay_ms = self._brake_delay_ms
             gain = self._gain
             cap = self._max_impulse_rate_hz
+            bw_override = self._noise_bandwidth_hz
+            fallback_active = self._fallback_active
 
         if rpm > 0.0 and divisions > 0.0:
             impulse_hz = rpm / 60.0 * divisions
-            if impulse_hz <= cap:
-                dt = num_samples / self._samplerate
-                increment = impulse_hz * dt
-                new_phase = self._phase + increment
-                crossings = int(new_phase) - int(self._phase)
-                self._phase = new_phase - int(new_phase)
-                if crossings > 0:
-                    amp = max(0.0, min(1.0, load * gain))
-                    if amp > 0.0:
-                        self._osc.trigger_pulse(
-                            carrier_hz=carrier, halfwaves=halfwaves,
-                            amplitude=amp, attack_ms=attack_ms,
-                            release_ms=release_ms, brake_amp=brake_amp,
-                            brake_delay_ms=brake_delay_ms)
-        return self._osc.render(num_samples)
+            high_thr = cap * self._FALLBACK_HIGH_FRAC
+            low_thr = cap * self._FALLBACK_LOW_FRAC
+            if not fallback_active and impulse_hz >= high_thr:
+                fallback_active = True
+            elif fallback_active and impulse_hz < low_thr:
+                fallback_active = False
+
+            if fallback_active:
+                amp = max(0.0, min(1.0, load * gain))
+                bw = (bw_override if bw_override is not None
+                      else max(self._NOISE_BW_MIN_HZ,
+                               impulse_hz * self._NOISE_BW_FRAC))
+                self._noise.set(center_hz=impulse_hz, bandwidth_hz=bw,
+                                amplitude=amp, ramp_ms=self._CROSSFADE_MS)
+                # Existing transients in _osc decay on their own envelope;
+                # don't fire new pulses while in noise mode.
+            else:
+                if not self._noise.is_silent:
+                    self._noise.stop(ramp_ms=self._CROSSFADE_MS)
+                if impulse_hz <= cap:
+                    dt = num_samples / self._samplerate
+                    increment = impulse_hz * dt
+                    new_phase = self._phase + increment
+                    crossings = int(new_phase) - int(self._phase)
+                    self._phase = new_phase - int(new_phase)
+                    if crossings > 0:
+                        amp = max(0.0, min(1.0, load * gain))
+                        if amp > 0.0:
+                            self._osc.trigger_pulse(
+                                carrier_hz=carrier, halfwaves=halfwaves,
+                                amplitude=amp, attack_ms=attack_ms,
+                                release_ms=release_ms, brake_amp=brake_amp,
+                                brake_delay_ms=brake_delay_ms)
+        else:
+            # rpm = 0 → wind down the noise voice as well.
+            if not self._noise.is_silent:
+                self._noise.stop(ramp_ms=self._CROSSFADE_MS)
+            fallback_active = False
+
+        with self._lock:
+            self._fallback_active = fallback_active
+
+        return self._osc.render(num_samples) + self._noise.render(num_samples)
 
 
 class BandpassNoiseGenerator:
