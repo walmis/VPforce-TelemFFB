@@ -2608,7 +2608,7 @@ class ResultThread(threading.Thread):
 
     def get_error(self):
         """
-        Return error if any, return None if no error occured
+        Return error if any, return None if no error occurred
         """
         self.join()
         return self.error

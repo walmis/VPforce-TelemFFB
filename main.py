@@ -682,7 +682,7 @@ def _setup_async_initialization(dev, dev_serial):
             logging.exception("Unable to get configurator slider values from device")
 
         if G.system_settings.get('enableVPConfStartup', False):
-            logging.info(f'Starting aysnc "startup vpconf" config push: {G.system_settings.get('pathVPConfStartup', '')}')
+            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.get("pathVPConfStartup", "")}')
             G.vpconf_init_pending = True # True flag delays telemetry process until async process completed by upload_vpconf_profile
             try:
                 upload_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
