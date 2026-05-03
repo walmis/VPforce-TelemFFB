@@ -1130,22 +1130,51 @@ class HapticEffect(Destroyable):
     def fire_impulse(self, magnitude: float, **shape_overrides):
         """Rhino fallback for the shaker's one-shot transient. Uses an
         EFFECT_SQUARE pulse at the configured carrier with the magnitude as
-        amplitude. Caller is expected to ``.start()`` afterwards as with any
-        other effect.
+        amplitude. Self-starts so callers can simply do
+        ``effects[name].fire_impulse(amp)`` (mirrors the shaker API).
+
+        Honors the layer config from shaker_effects_default.json: if the
+        effect has layers and none route to ``stick``/``both`` it is skipped
+        (mirror of ``_layer_is_for_shaker`` on the shaker side); otherwise
+        the magnitude is scaled by the strongest stick-routed layer gain so
+        the layer editor's tuning carries through to the stick.
         """
+        try:
+            from telemffb.hw.ffb_shaker import EFFECT_LAYERS
+            layers = EFFECT_LAYERS.get(self.name)
+            if layers is not None:
+                stick_layers = [l for l in layers if l.route in ("stick", "both")]
+                if not stick_layers:
+                    return self
+                magnitude = float(magnitude) * max(l.gain for l in stick_layers)
+        except ImportError:
+            pass
+
         carrier_hz = float(shape_overrides.get("carrier_hz", 30.0))
         direction = float(shape_overrides.get("direction", 0.0))
         magnitude = max(0.0, min(1.0, float(magnitude)))
         # Use SQUARE for the sharper attack typical of an impact pulse.
-        return self.periodic(carrier_hz, magnitude, direction,
-                             effect_type=EFFECT_SQUARE,
-                             duration=int(shape_overrides.get("duration_ms", 80)))
+        self.periodic(carrier_hz, magnitude, direction,
+                      effect_type=EFFECT_SQUARE,
+                      duration=int(shape_overrides.get("duration_ms", 80)))
+        return self.start(force=True)
 
     @property
     def started(self) -> bool:
         return self._h_effect and self._h_effect.started
 
     def start(self, force=False, **kw):
+        # Mirror of _layer_is_for_shaker on the shaker side: an effect whose
+        # layer config exists but routes nothing to stick/both must not play
+        # on the joystick FFB device. Existing effects all include a stick or
+        # both layer, so this only gates new shaker-only effects.
+        try:
+            from telemffb.hw.ffb_shaker import EFFECT_LAYERS
+            layers = EFFECT_LAYERS.get(self.name)
+            if layers is not None and not any(l.route in ("stick", "both") for l in layers):
+                return self
+        except ImportError:
+            pass
 
         if self._h_effect and (not self.started or force):
             caller_frame = inspect.currentframe().f_back

@@ -681,11 +681,12 @@ class AircraftBase(object):
     def ac_update_touchdown_effect(self, telem_data):
         """Generates a g-based force upon landing or as a result of large bumps.
 
-        On the WoW rising edge we additionally fire a one-shot impulse
-        whose magnitude scales with the smoothed vertical speed at the
-        moment of touchdown — gentle landing barely felt, carrier slam at
-        full magnitude. This is independent of the steady G-force-driven
-        constant the legacy path applies while rolling.
+        On per-gear contact rising edges we additionally fire a one-shot
+        impulse whose magnitude scales with the smoothed vertical speed at
+        the moment of touchdown. The main-gear and nose-gear edges are
+        tracked independently so a multi-device setup can route them to
+        spatially distinct outputs (main → shaker, nose → stick) via the
+        layer config in shaker_effects_default.json.
         """
 
         if self.is_collective() or self.is_pedals():
@@ -702,8 +703,8 @@ class AircraftBase(object):
             return
         on_ground = bool(telem_data.get("SimOnGround", 0))
 
-        # VS-driven one-shot on the WoW rising edge. Smoothed VS captures the
-        # actual descent rate at the moment of contact, not the post-touchdown
+        # VS-driven per-gear one-shots. Smoothed VS captures the actual
+        # descent rate at the moment of contact, not the post-touchdown
         # bounce which the LPF would otherwise contaminate the read with.
         if self.touchdown_vs_enabled:
             vs_raw = telem_data.get("VerticalSpeed", 0.0) or 0.0
@@ -712,17 +713,23 @@ class AircraftBase(object):
             except (TypeError, ValueError):
                 vs_raw = 0.0
             vs_smoothed = LPFs.get("touchdown_vs", 15).update(vs_raw)
-            # anything_has_changed returns True on a value transition; for a
-            # bool we get the rising AND the falling edge. We only fire on
-            # the air→ground edge, so guard with on_ground.
-            wow_changed = self.anything_has_changed("touchdown_wow", on_ground)
-            if wow_changed and on_ground:
-                amp = utils.scale_clamp(
-                    abs(vs_smoothed),
-                    (self.touchdown_vs_gentle, self.touchdown_vs_hard),
-                    (self.touchdown_vs_min_amp, self.touchdown_vs_max_amp))
-                logging.info(f"Touchdown impulse: VS={vs_smoothed:.2f} m/s -> amp={amp:.2f}")
-                effects['touchdown_vs'].fire_impulse(amp)
+
+            WoW = telem_data.get("WeightOnWheels", (0, 0, 0))
+            nose_contact = bool(WoW[0] > 0.05)
+            main_contact = bool(WoW[1] > 0.05 or WoW[2] > 0.05)
+
+            amp = utils.scale_clamp(
+                abs(vs_smoothed),
+                (self.touchdown_vs_gentle, self.touchdown_vs_hard),
+                (self.touchdown_vs_min_amp, self.touchdown_vs_max_amp))
+
+            if self.anything_has_changed("touchdown_main_wow", main_contact) and main_contact:
+                logging.info(f"Touchdown impulse (main): VS={vs_smoothed:.2f} m/s -> amp={amp:.2f}")
+                effects['touchdown_vs_main'].fire_impulse(amp)
+
+            if self.anything_has_changed("touchdown_nose_wow", nose_contact) and nose_contact:
+                logging.info(f"Touchdown impulse (nose): VS={vs_smoothed:.2f} m/s -> amp={amp:.2f}")
+                effects['touchdown_vs_nose'].fire_impulse(amp)
 
         if not on_ground:
             effects.dispose("touchdown")

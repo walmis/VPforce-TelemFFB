@@ -32,6 +32,13 @@
       {"freq_factor": 0.4, "gain": 1.00, "route": "shaker", "osc_type": "impulse"},
       {"freq_factor": 2.0, "gain": 0.40, "route": "stick",  "osc_type": "impulse"}
     ]},
+    "touchdown_vs_main": { "layers": [
+      {"freq_factor": 0.4, "gain": 1.00, "route": "shaker", "osc_type": "impulse"},
+      {"freq_factor": 1.0, "gain": 0.20, "route": "stick",  "osc_type": "impulse"}
+    ]},
+    "touchdown_vs_nose": { "layers": [
+      {"freq_factor": 2.0, "gain": 0.40, "route": "stick",  "osc_type": "impulse"}
+    ]},
     "gunfire": { "layers": [
       {"freq_factor": 0.4, "gain": 0.90, "route": "shaker", "osc_type": "impulse"},
       {"freq_factor": 1.0, "gain": 0.50, "route": "stick",  "osc_type": "sine"}
