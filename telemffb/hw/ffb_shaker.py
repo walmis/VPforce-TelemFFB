@@ -74,7 +74,7 @@ CONSTANT_FORCE_FREQUENCY_HZ = 25.0
 # accidentally produce noise on the shaker; they need an explicit opt-in here.
 SHAKER_EFFECT_WHITELIST = {
     # wheel / runway
-    "runway0", "runway1", "runway_bump0", "runway_bump1", "touchdown",
+    "runway0", "runway0_delayed", "runway1", "runway_bump0", "runway_bump1", "touchdown",
     "gearclunk", "nw_shimmy",
     # weapons / countermeasures
     "gunfire", "cm", "payload_rel",
@@ -96,7 +96,7 @@ SHAKER_EFFECT_WHITELIST = {
     "rotor_phys_main", "rotor_phys_tail",
     "prop_phys_1", "prop_phys_2", "prop_phys_3", "prop_phys_4",
     "cyl_phys_1", "cyl_phys_2", "cyl_phys_3", "cyl_phys_4",
-    "touchdown_vs",
+    "touchdown_vs_main", "touchdown_vs_nose",
     # ETL
     "etlX", "etlY",
     # surface movements & clunks
@@ -160,11 +160,18 @@ SHAKER_PHYSICS_PROFILES: dict = {
                     "attack_ms": 0.5, "release_ms": 2.0,
                     "brake_amp": 0.3, "brake_delay_ms": 0.0,
                     "gain": 0.7, "max_impulse_rate_hz": 180.0},
-    # Touchdown impulse — single shot fired by HapticEffect.fire_impulse().
-    "touchdown_vs": {"carrier_hz": 28.0, "halfwaves": 2,
-                      "attack_ms": 2.0, "release_ms": 80.0,
-                      "brake_amp": 0.0, "brake_delay_ms": 0.0,
-                      "gain": 1.0, "max_impulse_rate_hz": 999.0},
+    # Touchdown impulses — per-gear single shots fired by
+    # HapticEffect.fire_impulse() in ac_update_touchdown_effect().
+    # Main-gear and nose-gear share the same pulse shape; the layer config
+    # in shaker_effects_default.json controls which device they sound on.
+    "touchdown_vs_main": {"carrier_hz": 28.0, "halfwaves": 2,
+                          "attack_ms": 2.0, "release_ms": 80.0,
+                          "brake_amp": 0.0, "brake_delay_ms": 0.0,
+                          "gain": 1.0, "max_impulse_rate_hz": 999.0},
+    "touchdown_vs_nose": {"carrier_hz": 28.0, "halfwaves": 2,
+                          "attack_ms": 2.0, "release_ms": 80.0,
+                          "brake_amp": 0.0, "brake_delay_ms": 0.0,
+                          "gain": 1.0, "max_impulse_rate_hz": 999.0},
 }
 # Multi-engine voices reuse the shape of voice 1.
 for _src, _copies in (("prop_phys_1", ("prop_phys_2", "prop_phys_3", "prop_phys_4")),

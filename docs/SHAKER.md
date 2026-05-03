@@ -1,6 +1,6 @@
 # TelemFFB Shaker — Funktionsumfang, Architektur, Limitationen
 
-_Stand: 2026-05-03 — Branch `claude/improve-shaker-effects-eaOIE`, nach der Phase-Locked-Impulse-Iteration (`53f0c5b`), die echte physikalisch-synchrone Rotor-/Prop-/Zylinder-Impulse ergänzt._
+_Stand: 2026-05-03 — Branch `claude/landing-gear-motion-triggers-N7vkG`, nach der Multi-Device-Spatial-Iteration: Touchdown-Impulse pro Fahrwerksgruppe (Haupt → Shaker, Bug → Stick), Runway-Rumble mit Stick-Live + Shaker-delayed (Wheelbase / Bodengeschwindigkeit), und ein RMS-getriebener Coherence-Dimmer, der den Delay auf Gras/Dirt automatisch zurücknimmt._
 
 Diese Datei ist der zentrale Einstieg, wenn jemand verstehen will, **was die
 Shaker-Integration kann, wie sie funktioniert und was sie (noch) nicht kann**.
@@ -553,7 +553,9 @@ Whitelist ist:
 
 ---
 
-## 5. Spatial Positioning (Channel-Routing)
+## 5. Spatial Positioning
+
+### 5.1 Stereo Channel Routing (within Shaker)
 
 `ShakerSynth` hat vier Output-Modi:
 
@@ -578,6 +580,155 @@ Persistiert als `shakerChannelMode` (str) und `shakerPan` (float ∈ [-1, +1])
 im `globl_sys_dict` (siehe `telemffb/utils.py`). Beim Restart der
 Shaker-Child-Instanz werden beide an `ShakerSynth(...)` durchgereicht
 (`main.py:_initialize_device_connection`).
+
+### 5.2 Multi-Device Spatial Routing (Stick ↔ Shaker)
+
+Während §5.1 die Positionierung *innerhalb* des Shakers beschreibt
+(L/R/Pan auf einem Stereo-Output), kümmert sich §5.2 um die Verteilung
+zwischen physisch getrennten Geräten — typisches Setup: VPforce Rhino
+am Sitzrahmen vorne (Hand am Stick) plus Bass-Shaker hinten am
+Sitzlehnen-Bereich. Drei Effekt-Kategorien sind hier räumlich
+spezialisiert:
+
+#### Per-Gear Touchdown Split
+
+Statt eines einzigen `touchdown_vs`-Impulses bei jedem WoW-Übergang
+fahren wir zwei unabhängige Rising-Edge-Detektoren auf der bereits
+gefahrwerksgetrennten WoW-Telemetrie:
+
+```
+WoW = telem_data["WeightOnWheels"]  # [nose, left_main, right_main]
+nose_contact  = WoW[0] > 0.05
+main_contact  = WoW[1] > 0.05 or WoW[2] > 0.05
+```
+
+`anything_has_changed()` liefert auf bool-Werten saubere
+Air→Ground-Edges getrennt pro Fahrwerksgruppe. Pro Edge wird ein
+eigener Effekt mit derselben VS-skalierten Amplitude gefeuert:
+
+| Effekt | Trigger | Layer-Routing (Default) |
+|---|---|---|
+| `touchdown_vs_main` | linkes ODER rechtes Hauptrad bekommt Bodenkontakt | Shaker (gain 1.0) + faint Stick (gain 0.2) |
+| `touchdown_vs_nose` | Bugrad bekommt Bodenkontakt | nur Stick (gain 0.4) |
+
+Bei einer normalen Dreirad-Landung (z. B. F/A-18, A320) feuert zuerst
+der Shaker (Hauptfahrwerk-Aufschlag) und Sekundenbruchteile später
+der Stick (Bugrad senkt sich). Bei Tailwheel-Flugzeugen feuert nur
+der Hauptfahrwerks-Edge, der Bug-Edge bleibt aus. Bei Helis mit
+Kufen feuert ebenfalls nur `touchdown_vs_main`. Der bestehende
+`touchdown`-Effekt (kontinuierliche G-Kraft beim Rollen) bleibt
+unverändert.
+
+VS-Skalierung (`touchdown_vs_gentle`/`_hard`/`_min_amp`/`_max_amp`)
+wird gemeinsam für beide Effekte verwendet. Toggle:
+`touchdown_vs_enabled` in den Settings (unverändert bestehend).
+
+Code: `aircraft_base.py:ac_update_touchdown_effect`. Whitelist + Profile:
+`ffb_shaker.py:SHAKER_EFFECT_WHITELIST`, `SHAKER_PHYSICS_PROFILES`.
+
+#### Wheelbase-Based Runway-Rumble Delay
+
+Der bestehende `runway0`-Effekt (HPF auf `WoW[0]`, Bugrad) wird auf
+zwei zeitversetzte Streams aufgeteilt: Stick spielt live, Shaker
+spielt mit `delay = aircraft_wheelbase / ground_speed` Sekunden
+Verzögerung — modelliert die Zeit, die eine Tarmac-Fuge vom Bug-
+zum Hauptfahrwerk braucht.
+
+Implementation:
+- Pro Aircraft-Instanz ein Ringpuffer (`deque(maxlen=128)`) speichert
+  `(time.perf_counter(), v1)`-Tupel.
+- Lookup mit Linear-Interpolation zwischen den nächsten zwei Samples,
+  damit die 30 Hz-Telemetrie-Quantisierung nicht als 33 ms-Sprünge
+  hörbar wird (`_sample_rumble_buffer_at()`).
+- Speed-Quelle: `GroundSpeed` (MSFS/XPlane) bevorzugt, Fallback `TAS`.
+- Speed-Floor `runway_spatial_min_speed_kt` (Default 5 kt) verhindert
+  absurde Verzögerungen bei Stillstand.
+- Default-Radstand `aircraft_wheelbase = 8.0 m` — überschreibbar als
+  Class-Attribute pro Aircraft (z. B. `Cessna172.aircraft_wheelbase = 1.6`),
+  später auch via XML-Override (Hook in §10).
+
+| Effekt | Layer-Routing (Default) |
+|---|---|
+| `runway0` | nur Stick (live) |
+| `runway0_delayed` | nur Shaker (delayed) |
+| `runway1` | unverändert auf beiden (modelliert Links/Rechts-Asymmetrie der Hauptfahrwerke, ist nicht spatial-relevant für Fugen) |
+
+Praktisch fühlbar: F/A-18 (~5 m) bei 30 kt Taxi → ~0.33 s Versatz;
+A320 (~13 m) bei 80 kt Rollout → ~0.32 s; Cessna 172 (~1.6 m) bei
+20 kt Taxi → ~0.16 s. Bei sehr schnellen Rollouts (>200 kt) schrumpft
+der Versatz auf <100 ms — physikalisch korrekt, kaum noch wahrnehmbar.
+
+Code: `aircraft_base.py:ac_update_runway_rumble`,
+`_sample_rumble_buffer_at`.
+
+#### Surface-Coherence Dimmer
+
+Das Wheelbase-Delay-Modell setzt voraus, dass es *kohärente* Einzel-
+Events gibt (Fugen, Risse, Steinchen), die vom Bug zum Hauptfahrwerk
+durchwandern. Auf Gras/Dirt ist das Bugrad-Signal aber breitbandiges
+Dauerrauschen — die Verzögerung ist mathematisch da, aber wahrnehmungs-
+technisch unsichtbar, weil keine diskreten Anker zum Vergleichen
+existieren.
+
+Lösung: ein zweiter Ringpuffer (`maxlen=30` ≈ 1 s) misst rolling RMS
+der HPF-Magnitude. Daraus wird ein `roughness ∈ [0, 1]` per
+`scale_clamp(rms, (smooth_rms, rough_rms), (0, 1))` abgeleitet:
+
+```
+v1_shaker = roughness * v1_live + (1 - roughness) * v1_delayed
+```
+
+Verhalten:
+- **Glatter Tarmac** (vereinzelte Fugen, RMS < `runway_spatial_smooth_rms = 0.05`):
+  `roughness ≈ 0` → Shaker spielt rein das delayed Signal. Spatial-
+  Illusion voll erhalten.
+- **Gras/Dirt** (Dauerrauschen, RMS > `runway_spatial_rough_rms = 0.20`):
+  `roughness ≈ 1` → Shaker spielt rein das Live-Signal. Stick und
+  Shaker rumpeln in unison; kein zeitlicher Versatz, der eh nicht
+  wahrgenommen würde.
+- **Dazwischen** (z. B. Schotter, RMS ~ 0.10): linearer Übergang,
+  z. B. 36 % live + 64 % delayed.
+
+Vorteil: funktioniert sim-agnostisch (DCS, IL2, BMS, MSFS, X-Plane)
+ohne explizite Surface-Type-Telemetrie. Nutzt nur das, was die
+Aircraft-Suspension-Simulation eh schon ans Tool liefert. Toggle
+implizit über `runway_rumble_enabled` (gleicher Schalter wie heute);
+RMS-Schwellen tunable über class attributes
+`runway_spatial_smooth_rms` / `runway_spatial_rough_rms`.
+
+Code: `aircraft_base.py:ac_update_runway_rumble` (RMS-Block direkt
+nach dem Delay-Lookup), Buffer-Init in `__init__` als
+`_rumble_v1_rms_buffer`.
+
+#### Symmetric Stick-Side Layer Filter
+
+Damit `route="shaker"`-only-Effekte tatsächlich nicht auf dem Stick
+landen, hat die Rhino-Seite jetzt einen spiegelbildlichen Filter
+zum bestehenden `_layer_is_for_shaker()`-Check:
+
+```python
+# in HapticEffect.start() und HapticEffect.fire_impulse() (Rhino):
+layers = EFFECT_LAYERS.get(self.name)
+if layers is not None and not any(l.route in ("stick", "both") for l in layers):
+    return self  # silently skip
+```
+
+Plus: `fire_impulse()` ist jetzt selbst-startend (war's vorher nicht;
+das alte `effects['touchdown_vs'].fire_impulse(amp)` hat auf der
+Rhino-Seite faktisch nie gefeuert) und skaliert die Amplitude mit
+dem stärksten Stick-Routed-Layer-Gain, sodass das Layer-Editor-
+Tuning auch auf der Rhino-Seite ankommt:
+
+```python
+stick_layers = [l for l in layers if l.route in ("stick", "both")]
+magnitude = float(magnitude) * max(l.gain for l in stick_layers)
+```
+
+Code: `ffb_rhino.py:HapticEffect.start`, `HapticEffect.fire_impulse`.
+Existierende Effekte mit Both-Layern (alle 17 im Default-Pack) ändern
+ihr Verhalten nicht; nur die neuen route-singulären Effekte
+(`touchdown_vs_main`, `touchdown_vs_nose`, `runway0`, `runway0_delayed`)
+nutzen die Symmetrie aktiv.
 
 ---
 
@@ -747,6 +898,8 @@ vorhanden. Reset all effects schreibt sie dort wieder herunter.
 | Shaker-Init | `main.py` | `_initialize_device_connection` (Shaker-Branch), Profile-Load + `set_active_profile` nach Layer-Reload |
 | Effekt-Definitionen | `telemffb/sim/aircraft_base.py` | `ac_update_*` Methoden, `effects[name].periodic/.constant/.physics/.fire_impulse/.start/.stop`, `engine_rumble_mode` Feld |
 | Aircraft-Tunables | `defaults.xml` | `engine_rumble_mode`, `prop_blade_count`, `prop_reduction_ratio`, `cylinder_firing_enabled`, `cylinder_count`, `is_4_stroke`, `tailrotor_*`, `touchdown_vs_*` |
+| Multi-Device Spatial Routing | `aircraft_base.py` | `ac_update_touchdown_effect` (per-gear edges → `touchdown_vs_main` / `touchdown_vs_nose`), `ac_update_runway_rumble` (Stick-live + Shaker-delayed via `_rumble_v1_buffer` + `_sample_rumble_buffer_at`, Roughness-Blend via `_rumble_v1_rms_buffer`), Class-Attrs `aircraft_wheelbase`, `runway_spatial_min_speed_kt`, `runway_spatial_smooth_rms`, `runway_spatial_rough_rms` |
+| Symmetric Stick-Side Layer Filter | `ffb_rhino.py` | `HapticEffect.start` und `HapticEffect.fire_impulse` ziehen `EFFECT_LAYERS` aus `ffb_shaker`; skip bei nur shaker-routed Layern, Stick-Gain-Scaling für `fire_impulse` |
 | Tests | `tests/test_phase_locked_impulses.py` | Offline-Tests für `PhaseAccumulator` + `ImpulseTrainOscillator`, läuft via `python -m tests.test_phase_locked_impulses` |
 | Iterations-Pläne | `docs/shaker-mvp/`, `docs/shaker-polish-layers/`, `docs/shaker-cleanups-noise/`, `docs/shaker-envelope-override/` | STEP_*-Specs, PLAN_*.md, `SMOKETEST_RESULTS.md` |
 
@@ -956,14 +1109,29 @@ wird.
 Wenn die Layer-Routing-Iteration bewährt ist, sind folgende Erweiterungen
 naheliegend:
 
-- **Stick-Side Layer-Awareness**: dasselbe `EFFECT_LAYERS`-Schema im
-  Rhino-Backend implementieren. Stick-Layer würden dann symmetrisch
-  gefiltert (`route ∈ {stick, both}`). User könnte dann z. B. `touchdown`
-  am Stick komplett wegnehmen, falls der Shaker den Body-Thump alleine
-  besser liefert.
+- ~~**Stick-Side Layer-Awareness**~~ — **erledigt** in der Multi-Device-
+  Spatial-Iteration (siehe §5.2 „Symmetric Stick-Side Layer Filter").
+  Rhino skipt Effekte ohne Stick/Both-Layer und skaliert
+  `fire_impulse`-Amplitude mit dem Layer-Gain.
 - **Pro-Aircraft-Packs**: `shaker_effects.<aircraft>.json` overlay über
   dem globalen Pack — analog zur bestehenden Per-Aircraft-Profile-Logik
   in `defaults.xml`.
+- **Pro-Aircraft Wheelbase / RMS-Schwellen**: `aircraft_wheelbase`,
+  `runway_spatial_smooth_rms`, `runway_spatial_rough_rms` sind heute
+  Class-Attributes mit konservativen Defaults. Naheliegender Hook: ein
+  XML-Block in `defaults.xml` analog zu den `touchdown_vs_*`-Einträgen,
+  damit z. B. eine A380 (~30 m) oder ein R22 (~2 m) ohne Code-Patch
+  realistisch klingen. Bonus: bei kleinen Helis ggf.
+  `runway_spatial_min_speed_kt` runterdrücken.
+- **MSFS-`SurfaceType`-Direktintegration**: das Tool kennt bereits einen
+  Surface-Type-Enum mit 24 Werten (`SimConnectManager.py:surface_types`),
+  nutzt ihn aber nur für Wasser-Ruder und Steering-Friction
+  (`aircrafts_msfs_xp.py:305,1024`), nicht für Runway-Rumble. Eine
+  per-Surface-Multiplikator-Tabelle (Concrete=1.0, Grass_bumpy=1.6,
+  Ice=0.4, Snow=0.8, …) könnte den RMS-basierten Coherence-Dimmer in
+  MSFS/XPlane direkt mit der Sim-Information füttern, statt sie aus dem
+  Suspension-Verhalten herauszurechnen. DCS/IL2/BMS bleiben weiter beim
+  RMS-only-Pfad.
 - **PROFILES → Layer-Migration**: nach Schema v3 sind alle bisher in
   `SHAKER_EFFECT_PROFILES` getunten Werte (`freq`, `gain`, `kind`,
   `attack_ms`/`decay_ms`/`ramp_ms`) als 1-Layer-Default im Pack

@@ -3856,7 +3856,7 @@
 		<name>touchdown_vs_enabled</name>
 		<displayname>Touchdown Impulse from Vertical Speed</displayname>
 		<prereq>mechanical_group</prereq>
-		<info>Fires a one-shot impulse on the WoW rising edge with magnitude scaled by smoothed VS at touchdown.</info>
+		<info>Fires per-gear impulses on touchdown — main gear → shaker, nose gear → stick — with magnitude scaled by smoothed VS at the moment of contact. Routing is governed by the layer config in shaker_effects.json (effects: touchdown_vs_main, touchdown_vs_nose).</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
