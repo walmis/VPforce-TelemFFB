@@ -1,4 +1,9 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TelemFFB Configuration Schema
+  For full documentation of this file's structure, element types, and field semantics,
+  see: defaults_xml_reference.md
+-->
 <TelemFFB>
 	<defaults>
 		<datatype>group</datatype>
