@@ -75,13 +75,17 @@ CONSTANT_FORCE_FREQUENCY_HZ = 25.0
 SHAKER_EFFECT_WHITELIST = {
     # wheel / runway
     "runway0", "runway1", "runway_bump0", "runway_bump1", "touchdown",
-    "gearclunk",
+    "gearclunk", "nw_shimmy",
     # weapons / countermeasures
     "gunfire", "cm", "payload_rel",
+    "il2_bombs", "il2_rockets", "il2_gunfire",
     # buffeting
-    "buffeting", "buffeting2", "vrs_buffet",
+    "buffeting", "buffeting2", "vrs_buffet", "vrs_buffet2",
+    "il2_buffet", "il2_buffet2",
     "gearbuffet", "gearbuffet2",
     "spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2",
+    # damage / impact feedback
+    "hit", "damage",
     # afterburner / jet
     "ab_rumble_1_1", "ab_rumble_1_2", "ab_rumble_2_1", "ab_rumble_2_2",
     "je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2",
@@ -95,10 +99,10 @@ SHAKER_EFFECT_WHITELIST = {
     "touchdown_vs",
     # ETL
     "etlX", "etlY",
-    # surface movements
+    # surface movements & clunks
     "flapsmovement", "gearmovement", "gearmovement2",
     "speedbrakemovement", "spoilermovement", "spoilermovement2",
-    "canopymovement", "hookmovement",
+    "canopymovement", "canopyclunk", "hookmovement", "clunk",
     # overspeed / aoa
     "overspeedX", "overspeedY", "aoa", "crit_aoa",
     # wind

@@ -90,8 +90,9 @@ SHAKER_EFFECT_WHITELIST = _load_whitelist_from_source()
 
 
 # Effects emitted by aircraft code that intentionally do NOT render on the
-# shaker. Grouped by reason. When in doubt, prefer adding to the audit
-# section so the next maintainer revisits it deliberately.
+# shaker. Grouped by reason; add new entries to the matching section with a
+# one-line comment. If a new effect doesn't fit any existing category, add
+# a new ``# --- ... ---`` group above with a short rationale.
 KNOWN_NON_SHAKER_EFFECTS: frozenset = frozenset({
     # --- Force-feedback only (springs / dampers / friction / inertia) ---
     # No useful audio mapping. Dropped with a debug log on the shaker
@@ -106,9 +107,14 @@ KNOWN_NON_SHAKER_EFFECTS: frozenset = frozenset({
     "dcs_spr_override", "elev_droop",
     "TR Damper",
 
-    # --- Constant-force loading (G-force, deceleration) ---
-    # Sustained force vector, not vibration.
+    # --- Constant-force loading (G-force, deceleration, turbulence) ---
+    # Sustained force vector, not vibration. ``turbulence`` (MSFS/XP) is
+    # ``effects['turbulence'].constant(force, dir).start()`` with a fixed
+    # direction — pure constant force, no vibratory component on a body
+    # shaker. (Compare to whitelisted ``wnd`` which uses
+    # ``RandomDirectionModulator`` and is effectively vibration.)
     "decel", "gforce", "new_gforce",
+    "turbulence",
 
     # --- Stick-only effects ---
     # Stick-shaker is a mechanical stall warning on the control column,
@@ -121,29 +127,6 @@ KNOWN_NON_SHAKER_EFFECTS: frozenset = frozenset({
     # comments or as effect-tester samples.
     "myUniqueName",
     "FI_vibration",
-
-    # --- TODO: Pending audit ---
-    # These effects ARE emitted by aircraft code but are not currently
-    # rendered on the shaker. Each entry below was discovered when this
-    # test was first introduced and accepted as the existing behaviour to
-    # keep the test green. Triage open question: should they be added to
-    # ``SHAKER_EFFECT_WHITELIST`` (with optional default-pack layer) or
-    # promoted into a permanent section above?
-    "canopyclunk",      # body thump on canopy close — shaker candidate
-    "damage",           # damage feedback (RandomDirectionModulator)
-    "hit",              # bullet/cannon hit feedback
-    "nw_shimmy",        # nose-wheel shimmy — shaker candidate
-    "turbulence",       # IL-2/MSFS atmospheric turbulence
-    "il2_buffet", "il2_buffet2",   # IL-2 specific buffeting (sibling of
-                                    # whitelisted ``buffeting`` /
-                                    # ``vrs_buffet``)
-    "vrs_buffet2",      # companion to whitelisted ``vrs_buffet``
-    "il2_bombs",        # IL-2 bomb release
-    "il2_rockets",      # IL-2 rocket release
-    "il2_gunfire",      # IL-2 cannon (literal name; per-weapon variant
-                        # via ``il2_gunfire_<weapon>`` f-string handled
-                        # by prefix coverage below)
-    "clunk",            # generic clunk emitted in ac_handler.py
 })
 
 
