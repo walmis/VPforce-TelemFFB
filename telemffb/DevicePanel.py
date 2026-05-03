@@ -20,8 +20,7 @@ DEVICE_ICONS = {
     "pedals": ":/image/icon_pedals.png",
     "collective": ":/image/icon_collective.png",
     "trimwheel": ":/image/icon_trimwheel.png",
-    # No dedicated shaker icon yet — borrow the collective icon as a placeholder.
-    "shaker": ":/image/icon_collective.png",
+    "shaker": ":/image/icon_shaker.png",
 }
 
 STATUS_COLORS = {
