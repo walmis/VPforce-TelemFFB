@@ -284,6 +284,12 @@ class AircraftBase(object):
     # config). Speed floor avoids absurd delays at near-stationary taxi.
     aircraft_wheelbase: float = 8.0                 # nose-to-main wheelbase in metres
     runway_spatial_min_speed_kt: float = 5.0        # ground-speed floor for delay calc
+    # Rolling-RMS thresholds that govern the smooth-vs-rough blend on the
+    # shaker. Below `_smooth_rms` the shaker reads the fully-delayed front
+    # signal; above `_rough_rms` it reads the live signal (delay collapses
+    # because grass/dirt has no spatially coherent joints to chase).
+    runway_spatial_smooth_rms: float = 0.05
+    runway_spatial_rough_rms: float = 0.20
 
     touchdown_effect_enabled: bool = False
     touchdown_effect_max_force: float = 0.5
@@ -397,6 +403,13 @@ class AircraftBase(object):
         # 30 Hz which covers slow-taxi wheelbase delays even on long
         # aircraft. Each entry is a (perf_counter_seconds, value) tuple.
         self._rumble_v1_buffer: deque = deque(maxlen=128)
+        # Rolling absolute v1 magnitudes used to estimate surface roughness:
+        # smooth tarmac with discrete joints reads as low RMS, grass/dirt
+        # reads as continuous high RMS. The roughness factor is then used
+        # to blend the shaker between purely-delayed (smooth) and
+        # mostly-live (rough) so the spatial illusion is not drowned out
+        # by broadband suspension noise. ~1 s window at 30 Hz telemetry.
+        self._rumble_v1_rms_buffer: deque = deque(maxlen=30)
         self.adv_g_settings_dict: dict = {}
         self.adv_spr_settings_dict: dict = {}
         self.active_deadzone_pct: float = 0.0
@@ -823,6 +836,7 @@ class AircraftBase(object):
 
         now = time.perf_counter()
         self._rumble_v1_buffer.append((now, v1))
+        self._rumble_v1_rms_buffer.append(abs(v1))
 
         # Compute the shaker's delayed copy. Ground speed proxy: explicit
         # GroundSpeed (MSFS/XPlane) when present, else TAS — at typical
@@ -834,15 +848,31 @@ class AircraftBase(object):
         delay_s = self.aircraft_wheelbase / gs_floor
         v1_delayed = self._sample_rumble_buffer_at(now - delay_s)
 
+        # Spatial-coherence dimmer: rolling RMS of the live nose-wheel HPF
+        # tells us whether we're on a surface with discrete joints (low
+        # RMS, spikes) or continuous chatter (high RMS, grass/dirt).
+        # Smooth → trust the delay illusion fully. Rough → fade toward the
+        # live signal so the shaker shakes in unison with the stick rather
+        # than chasing a delayed copy that is perceptually invisible
+        # against the broadband noise floor.
+        rms_buf = self._rumble_v1_rms_buffer
+        rms = math.sqrt(sum(x * x for x in rms_buf) / len(rms_buf)) if rms_buf else 0.0
+        roughness = utils.scale_clamp(
+            rms,
+            (self.runway_spatial_smooth_rms, self.runway_spatial_rough_rms),
+            (0.0, 1.0))
+        v1_shaker = roughness * v1 + (1.0 - roughness) * v1_delayed
+
         # modulate constant effects for X and Y axis
         # connect Y axis to nosewheel, X axis to the side wheels
         tot_weight = sum(WoW)
 
         #if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
         if tot_weight:
-            logging.debug(f"Runway Rumble : v1 = {v1}. v1_delayed = {v1_delayed} (delay={delay_s:.2f}s). v2 = {v2}")
+            logging.debug(f"Runway Rumble : v1 = {v1}. v1_shaker = {v1_shaker} "
+                          f"(delay={delay_s:.2f}s, rms={rms:.3f}, roughness={roughness:.2f}). v2 = {v2}")
             effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
-            effects["runway0_delayed"].constant(v1_delayed, utils.RandomDirectionModulator).start()
+            effects["runway0_delayed"].constant(v1_shaker, utils.RandomDirectionModulator).start()
             effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
         else:
             effects.dispose("runway0", "runway0_delayed", "runway1")
