@@ -300,10 +300,12 @@ class AircraftBase(object):
     engine_rumble_highrpm_intensity: float = 0.06
 
     # Phase-locked impulse synthesis. "physics" fires one trigger_pulse per
-    # blade-pass / cylinder-firing crossing of an integrated phase. "synthesis"
-    # is the legacy continuous-sine path. Physics mode only takes effect on
-    # the shaker backend; the Rhino backend degrades to a periodic at the same
-    # carrier frequency regardless.
+    # blade-pass / cylinder-firing crossing of an integrated phase on the
+    # shaker; "synthesis" is the legacy continuous-sine path. The Rhino
+    # backend degrades to a periodic at the same carrier frequency
+    # (rpm/60 * divisions), but only when the routing pack declares a
+    # ``type:joystick`` layer for the voice — see ``prop_phys_*`` /
+    # ``cyl_phys_*`` / ``rotor_phys_*`` in ``effect_routes_default.json``.
     engine_rumble_mode: str = "physics"
     cylinder_firing_enabled: bool = False  # piston cylinder-firing voice
     cylinder_count: int = 4

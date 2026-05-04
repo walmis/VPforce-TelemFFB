@@ -233,9 +233,12 @@ def _synthesise_layers(name: str,
 
     Heuristics:
     - Physics-train voices (``rotor_phys_*``, ``prop_phys_*``, ``cyl_phys_*``)
-      live entirely on the shaker — the periodic-on-stick fallback in
-      ``ffb_rhino.HapticEffect.physics()`` already handles the FFB side, so
-      the JSON only declares the shaker target.
+      get an impulse layer on the shaker (where the phase-locked impulse
+      synthesis runs) plus a softer sine layer on the joystick. The
+      EffectRouter requires an explicit per-device layer for ``physics()``
+      to produce output — the periodic-on-stick fallback in
+      ``ffb_rhino.HapticEffect.physics()`` only runs if the layer list
+      includes ``type:joystick``.
     - Transient profiles (``kind == "transient"``) are pulse-shaped — both
       a shaker layer (impulse) and a softer joystick layer (impulse).
     - Continuous default — sine on shaker + sine on joystick.
@@ -247,9 +250,16 @@ def _synthesise_layers(name: str,
     physics = physics_profiles.get(name)
 
     if physics is not None:
+        shaker_gain = physics.get("gain", 1.0)
+        # Joystick gain ratio mirrors the prop_rpm0-1 / rotor_rpm0-1 legacy
+        # voices (~0.7-0.8× shaker), with a safety floor for low-amplitude
+        # cylinder-firing trains so they're still felt on the stick.
+        stick_gain = min(0.5, max(0.25, shaker_gain * 0.75))
         return [
-            _layer("type:shaker", physics.get("gain", 1.0),
+            _layer("type:shaker", shaker_gain,
                    freq_factor=1.0, osc_type="impulse"),
+            _layer("type:joystick", stick_gain,
+                   freq_factor=1.0, osc_type="sine"),
         ]
 
     if profile is not None and profile.get("kind") == "transient":
