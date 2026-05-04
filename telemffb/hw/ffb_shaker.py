@@ -591,7 +591,7 @@ class HapticEffect:
                 bw = layer.bandwidth_hz if layer.bandwidth_hz is not None else 20.0
                 osc.set(center_hz=center, bandwidth_hz=bw, amplitude=eff_mag)
             else:
-                logger.warning("Unknown osc_type %r in layer for %s — skipping",
+                logger.warning("Unknown osc_type %r in layer for %s - skipping",
                                layer.osc_type, self.name)
                 continue
             created_names.append(osc_name)
@@ -783,7 +783,7 @@ def _selftest_layered(device, samplerate: int) -> None:
         e = HapticEffect()
         e.name = "je_rumble_1_1"
         e.periodic(40, 0.5, 0).start()
-        logger.info("Layered start issued — expect 20 Hz (layer0) and 80 Hz (layer2) oscillators in synth")
+        logger.info("Layered start issued - expect 20 Hz (layer0) and 80 Hz (layer2) oscillators in synth")
         names = synth.list_oscillator_names()
         logger.info("  oscillators in synth: %s", names)
         assert "je_rumble_1_1__layer0" in names, "layer0 missing"

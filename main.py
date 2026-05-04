@@ -609,7 +609,7 @@ def _initialize_device_connection():
         try:
             from telemffb.hw.ffb_winwing import init_winwing
             init_winwing()
-            logging.info("WinWing SimAppPro bridge enabled (UDP → 127.0.0.1:16536)")
+            logging.info("WinWing SimAppPro bridge enabled (UDP -> 127.0.0.1:16536)")
         except Exception:
             logging.exception("Failed to start WinWing SimAppPro bridge")
 
