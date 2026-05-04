@@ -77,6 +77,42 @@ def use_shaker_backend() -> None:
         if hasattr(mod, 'FFBReport_SetCondition'):
             mod.FFBReport_SetCondition = _S_Cond
 
+
+def use_router_backend() -> None:
+    """Rebind effects.cls to the router-aware HapticEffect facade.
+
+    Called from main.py after the EffectRouter is initialised, but only for
+    FFB device children (joystick / pedals / collective / trimwheel /
+    rudder). The shaker child continues to use ``use_shaker_backend()`` —
+    the router does not own the audio mixing path.
+
+    The mechanism mirrors ``use_shaker_backend``: aircraft_base is imported
+    transitively before G.device_type is set, so we re-bind the effect
+    class at runtime — both here and on the sibling sim modules that
+    captured their own ``HapticEffect`` reference at import time.
+    """
+    import sys
+
+    global HapticEffect, FFBReport_SetCondition
+    from telemffb.routing.ffb_router import (
+        HapticEffect as _R_HapticEffect,
+        FFBReport_SetCondition as _R_Cond,
+    )
+    HapticEffect = _R_HapticEffect
+    FFBReport_SetCondition = _R_Cond
+    effects.cls = _R_HapticEffect
+
+    for mod_name in ('telemffb.sim.aircrafts_msfs_xp',
+                     'telemffb.sim.aircrafts_dcs',
+                     'telemffb.sim.aircrafts_il2'):
+        mod = sys.modules.get(mod_name)
+        if mod is None:
+            continue
+        if hasattr(mod, 'HapticEffect'):
+            mod.HapticEffect = _R_HapticEffect
+        if hasattr(mod, 'FFBReport_SetCondition'):
+            mod.FFBReport_SetCondition = _R_Cond
+
 # Highpass filter dispenser
 HPFs: utils.Dispenser = utils.Dispenser(utils.HighPassFilter)
 

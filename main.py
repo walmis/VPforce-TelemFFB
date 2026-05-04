@@ -313,6 +313,107 @@ def _determine_master_instance_status():
         QMessageBox.critical(None, "Invalid configuration", msg)
         sys.exit(1)
 
+def _setup_routing():
+    """Initialise the multi-device EffectRouter for THIS process.
+
+    Strict opt-in: if [devices].deviceInventory is empty (the default for
+    fresh installs and for users who haven't run the Setup Wizard yet),
+    leave G.effect_router=None and skip the backend swap. The aircraft
+    pipeline then behaves exactly as before — no behavioural drift.
+
+    When an inventory exists, identify the entry corresponding to this
+    process by matching device_type + (optional) USB PID, then build a
+    router seeded with the bundled defaults and any user-saved overrides.
+    The actual backend swap happens in ``_initialize_device_connection``
+    after ``HapticEffect.open()`` has assigned the Rhino device.
+    """
+    from telemffb.device_inventory import (
+        first_of_type, load_inventory_from_ini,
+    )
+    from telemffb.routing import EffectRouter, EffectRoutesPack, load_routes_pack
+
+    inventory_blob = G.system_settings.get("deviceInventory", "")
+    G.devices = load_inventory_from_ini(inventory_blob)
+
+    if not G.devices:
+        # No multi-device setup configured -> stay on legacy code path.
+        G.effect_router = None
+        G.device_id = ""
+        G.device_positions = []
+        return
+
+    # Identify THIS process. Prefer USB-PID match (stable across renames),
+    # fall back to type. Inventory entries with no matching usb_pid still
+    # bind by type — wizard-generated inventories always set a usb_pid.
+    self_dev = None
+    if G.device_usbvidpid:
+        for d in G.devices:
+            if d.usb_pid and d.usb_pid.lower() == G.device_usbvidpid.lower():
+                self_dev = d
+                break
+    if self_dev is None:
+        self_dev = first_of_type(G.devices, G.device_type)
+
+    if self_dev is not None:
+        G.device_id = self_dev.device_id
+        G.device_positions = list(self_dev.positions)
+    else:
+        # Inventory present but no matching entry -> create a synthetic id
+        # so the router still has something to filter against.
+        G.device_id = f"{G.device_type}_unmapped"
+        G.device_positions = []
+        logging.warning(
+            "Routing: no inventory entry matched %s (%s); using id=%r",
+            G.device_type, G.device_usbvidpid, G.device_id,
+        )
+
+    # Load defaults + user overrides into the router.
+    defaults_path = utils.get_resource_path(
+        os.path.join("telemffb", "data", "effect_routes_default.json"),
+        prefer_root=True,
+    )
+    defaults = load_routes_pack(defaults_path) or EffectRoutesPack()
+
+    user_overrides = EffectRoutesPack()
+    if G.userconfig_rootpath:
+        user_path = os.path.join(G.userconfig_rootpath, "effect_routes_user.json")
+        loaded = load_routes_pack(user_path)
+        if loaded is not None:
+            user_overrides = loaded
+
+    G.effect_router = EffectRouter(defaults=defaults, user_overrides=user_overrides)
+    logging.info(
+        "EffectRouter ready: device_id=%r positions=%s known_effects=%d",
+        G.device_id, G.device_positions,
+        len(G.effect_router.known_effect_names()),
+    )
+
+
+def _maybe_show_setup_wizard():
+    """First-run prompt for the multi-device setup wizard.
+
+    Conditions:
+    - Master instance only (children inherit the inventory).
+    - Wizard hasn't been completed yet ([system].setup_wizard_done is false).
+    - The inventory is currently empty.
+    Both conditions are checked by ``SetupWizard.should_offer_wizard()``.
+    """
+    if not G.master_instance:
+        return
+    try:
+        from telemffb.SetupWizard import SetupWizard, should_offer_wizard
+    except Exception:
+        logging.exception("SetupWizard module unavailable; skipping first-run prompt")
+        return
+    if not should_offer_wizard():
+        return
+    try:
+        wiz = SetupWizard(G.main_window)
+        wiz.exec()
+    except Exception:
+        logging.exception("SetupWizard execution failed")
+
+
 def _setup_config_paths():
     """
     Setup configuration file paths based on build type and mode.
@@ -476,6 +577,23 @@ def _initialize_device_connection():
 
         G.device_ident = dev.info.ident
         G.device_connection_status = True
+
+        # Multi-device routing: swap aircraft_base.effects to the router-aware
+        # backend AFTER HapticEffect.open() has assigned the Rhino device, so
+        # the inherited cls.device attribute is already populated. Strict
+        # opt-in: only fires when [devices] inventory is present and resolved.
+        if G.effect_router is not None and G.device_id:
+            from telemffb.sim import aircraft_base
+            from telemffb.routing import ffb_router as _ffb_router
+            aircraft_base.use_router_backend()
+            _ffb_router.init_router(
+                G.effect_router,
+                device_id=G.device_id,
+                device_type=G.device_type,
+                device_positions=G.device_positions,
+            )
+            logging.info("Effect routing active for %s (id=%r)",
+                         G.device_type, G.device_id)
 
     except Exception as e:
         G.device_connection_status = False
@@ -797,6 +915,11 @@ def main():
     # Setup configuration file paths (dev vs production, userconfig locations)
     _setup_config_paths()
 
+    # Load the multi-device routing inventory (no-op when empty -> behaves
+    # exactly like pre-routing builds). Must run AFTER _setup_config_paths
+    # so user-override JSON resolves against the right userconfig_rootpath.
+    _setup_routing()
+
     # if legacy 'userconfig.xml' exists, copy it to 'userconfig_v2' for conversion
     utils.copy_legacy_config_to_new(G.userconfig_path)
 
@@ -917,6 +1040,11 @@ def main():
 
     # Prompt for system settings if no devices are configured
     _check_system_settings_required()
+
+    # First-run multi-device setup wizard. Master-only (children inherit
+    # the inventory via the shared config). Skipped if the inventory is
+    # already populated or the user has explicitly dismissed the wizard.
+    _maybe_show_setup_wizard()
 
     # ============================================================================
     # PHASE 14: Background Initialization

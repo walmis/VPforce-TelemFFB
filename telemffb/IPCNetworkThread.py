@@ -246,6 +246,33 @@ class IPCNetworkThread(QObject, threading.Thread):
 
             except json.JSONDecodeError:
                 pass
+        elif msg.startswith('inventory:'):
+            # Master->slave broadcast of the device inventory. The master
+            # writes config.ini directly, but children inherit their copy
+            # via this message so position/label edits land in real time
+            # rather than waiting for a child restart.
+            payload = msg.removeprefix('inventory:')
+            try:
+                from telemffb.device_inventory import load_inventory_from_ini
+                from telemffb.routing import ffb_router as _ffb_router
+                G.devices = load_inventory_from_ini(payload)
+                # Update THIS process's position tags so router selectors
+                # like ``pos:floor`` re-evaluate. ``device_id`` and
+                # ``device_type`` only change on a type-rebind, which still
+                # needs a process restart — see docs/ROUTING.md.
+                self_dev = next(
+                    (d for d in G.devices if d.device_id == G.device_id),
+                    None,
+                )
+                if self_dev is not None:
+                    G.device_positions = list(self_dev.positions)
+                    if _ffb_router.is_initialised():
+                        _ffb_router._self_device_positions = tuple(
+                            self_dev.positions)
+                logging.info("Received inventory broadcast: %d device(s)",
+                             len(G.devices))
+            except Exception:
+                logging.exception("Failed to apply inventory broadcast")
         elif msg.startswith("LOADCONFIG:"):
             path = msg.removeprefix("LOADCONFIG:")
             load_custom_userconfig(path)
@@ -294,6 +321,20 @@ class IPCNetworkThread(QObject, threading.Thread):
 
     def notify_close_children(self):
         self.send_broadcast_message("MASTER INSTANCE QUIT")
+
+    def broadcast_inventory(self, inventory_json: str) -> None:
+        """Send the (already JSON-encoded) device inventory to all children.
+
+        The master persists the inventory to config.ini and then calls
+        this so child instances learn about position / label edits without
+        a restart. Type / USB-PID changes still need a child restart
+        because the type binding happens once at process start (see
+        ``main._setup_routing``); positions are loose metadata and update
+        cleanly.
+        """
+        if not inventory_json:
+            return
+        self.send_broadcast_message(f"inventory:{inventory_json}")
 
     def send_message(self, message):
         if not self._dstport:
