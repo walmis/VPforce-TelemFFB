@@ -527,7 +527,7 @@ class SetupWizard(QWizard):
                     return True
 
         # Refresh the Devices tab (if present) so the inventory is visible
-        # without a restart for the data layer; routing still needs restart.
+        # without a restart for the data layer.
         if hasattr(G, "main_window") and G.main_window is not None:
             tab = getattr(G.main_window, "device_inventory_tab", None)
             if tab is not None and hasattr(tab, "reload_from_settings"):
@@ -535,6 +535,17 @@ class SetupWizard(QWizard):
                     tab.reload_from_settings()
                 except Exception:
                     logger.exception("Could not refresh DeviceInventoryTab")
+
+        # Live-reload the routes into the running EffectRouter so the
+        # preset overrides take effect without a restart. The inventory
+        # itself still needs a restart to re-evaluate which devices the
+        # router filters for, but the routes update happily.
+        router = getattr(G, "effect_router", None)
+        if router is not None:
+            try:
+                router.reload_user_overrides(_user_routes_path())
+            except Exception:
+                logger.exception("SetupWizard: live router reload failed")
 
         return True
 

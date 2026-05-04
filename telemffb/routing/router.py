@@ -178,6 +178,23 @@ class EffectRouter:
     def known_effect_names(self, *, aircraft_class: Optional[str] = None) -> set[str]:
         return set(self.effective_routes(aircraft_class=aircraft_class).keys())
 
+    def reload_user_overrides(self, path: Optional[str]) -> bool:
+        """Re-read ``effect_routes_user.json`` from disk and swap it in.
+
+        Used by the Effect Routing dialog to apply changes live without a
+        process restart. The defaults pack is left alone — it's bundled
+        and read-only. Returns True on success, False if the file is
+        missing or unreadable (caller can decide to clear overrides).
+        """
+        if not path:
+            self._user = EffectRoutesPack()
+            return False
+        loaded = load_routes_pack(path)
+        if loaded is None:
+            return False
+        self._user = loaded
+        return True
+
     # --- direction helpers (used by ffb_router backend) ---
 
     @staticmethod

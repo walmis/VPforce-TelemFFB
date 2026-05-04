@@ -35,6 +35,16 @@ from telemffb.routing import (
 
 logger = logging.getLogger(__name__)
 
+# Aircraft classes the dialog can patch independently. Class name strings
+# match the Python class names in telemffb/sim/aircraft_base.py and
+# aircrafts_*.py — set by TelemManager via ``EffectRouter.set_aircraft_class``.
+# "" is the global scope (no class filter).
+SCOPE_GLOBAL = ""
+KNOWN_AIRCRAFT_CLASSES = (
+    "JetAircraft", "PropellerAircraft", "TurbopropAircraft",
+    "GliderAircraft", "Helicopter", "HPGHelicopter", "SASHelicopter",
+)
+
 
 def _user_routes_path() -> Optional[str]:
     if not G.userconfig_rootpath:
@@ -222,9 +232,11 @@ class EffectRoutingDialog(QDialog):
 
         self._defaults = self._load_defaults()
         self._user = self._load_user()
+        # ``_working`` is ALWAYS the global merged view. Class scopes read
+        # /write straight to ``_user.aircraft_class_overrides`` so the user
+        # file persists per-class patches losslessly.
         self._working = self._merge_packs(self._defaults, self._user)
-        # Track which (effect, device_id) cells the user has actually
-        # touched, so unchanged cells stay out of the user file.
+        self._scope: str = SCOPE_GLOBAL  # active aircraft-class filter
         self._dirty: dict[tuple[str, str], _CellEditor] = {}
         self._edited_layers: dict[tuple[str, str], RouteLayer] = {}
 
@@ -275,11 +287,26 @@ class EffectRoutingDialog(QDialog):
             "an effect on a device. Toggle the checkbox to enable it; the "
             "slider sets gain (0–200%). <b>Double-click a cell</b> for "
             "frequency, oscillator type, direction policy and impulse "
-            "envelope. Changes apply on next start."
+            "envelope. Apply reloads routing live."
         )
         intro.setWordWrap(True)
         intro.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(intro)
+
+        # Scope selector: global routes vs per-aircraft-class patches.
+        scope_row = QHBoxLayout()
+        scope_row.addWidget(QLabel("Scope:"))
+        self.cb_scope = QComboBox()
+        self.cb_scope.addItem("Global (all aircraft)", userData=SCOPE_GLOBAL)
+        for cls in KNOWN_AIRCRAFT_CLASSES:
+            self.cb_scope.addItem(cls, userData=cls)
+        self.cb_scope.currentIndexChanged.connect(self._on_scope_changed)
+        scope_row.addWidget(self.cb_scope)
+        scope_row.addStretch(1)
+        self.lbl_scope_hint = QLabel("")
+        self.lbl_scope_hint.setStyleSheet("color: #888;")
+        scope_row.addWidget(self.lbl_scope_hint)
+        layout.addLayout(scope_row)
 
         self.table = QTableWidget()
         self.table.verticalHeader().setVisible(True)
@@ -312,9 +339,33 @@ class EffectRoutingDialog(QDialog):
         return [(d.device_id, d.type, list(d.positions))
                 for d in G.devices if d.enabled]
 
+    def _active_routes_dict(self) -> dict[str, EffectRoute]:
+        """Return the routes dict the table currently edits.
+
+        For the global scope this is ``_working.routes`` (defaults + user
+        overrides merged). For a class scope it's the per-class patch
+        living on ``_user.aircraft_class_overrides`` — the table only shows
+        effects that already have a class-level patch; "(not set)" rows are
+        rendered as disabled cells so the user can opt in.
+        """
+        if self._scope == SCOPE_GLOBAL:
+            return self._working.routes
+        return self._user.aircraft_class_overrides.setdefault(self._scope, {})
+
     def _populate_table(self) -> None:
         cols = self._device_columns()
-        effects = sorted(self._working.routes.keys())
+        if self._scope == SCOPE_GLOBAL:
+            effects = sorted(self._working.routes.keys())
+            self.lbl_scope_hint.setText(
+                "Editing global routes — applies to all aircraft.")
+        else:
+            # Class scope: list ALL known effects so the user can opt in
+            # any of them; class patches that already exist are pre-filled.
+            effects = sorted(self._working.routes.keys())
+            n_set = len(self._user.aircraft_class_overrides.get(self._scope, {}))
+            self.lbl_scope_hint.setText(
+                f"Class patch for {self._scope}: {n_set} effect(s) overridden. "
+                f"Effects without a patch fall through to global routing.")
         self.table.clear()
         self.table.setColumnCount(len(cols))
         self.table.setRowCount(len(effects))
@@ -324,10 +375,15 @@ class EffectRoutingDialog(QDialog):
 
         # Cache layers by (effect_name, device_id) for the Apply path.
         self._cell_editors: dict[tuple[int, int], _CellEditor] = {}
+        active_routes = self._active_routes_dict()
         for r, effect_name in enumerate(effects):
-            route = self._working.routes[effect_name]
+            route = active_routes.get(effect_name)
+            if route is None and self._scope == SCOPE_GLOBAL:
+                # Should not happen — _working.routes was just iterated.
+                route = self._working.routes[effect_name]
             for c, (dev_id, dev_type, positions) in enumerate(cols):
-                layer = self._first_layer_for(route, dev_id, dev_type, positions)
+                layer = (self._first_layer_for(route, dev_id, dev_type, positions)
+                         if route is not None else None)
                 editor = _CellEditor(layer)
                 editor.cb.stateChanged.connect(
                     lambda _s, rr=r, cc=c: self._mark_dirty(rr, cc))
@@ -337,6 +393,11 @@ class EffectRoutingDialog(QDialog):
                 self._cell_editors[(r, c)] = editor
 
         self.table.resizeColumnsToContents()
+
+    def _on_scope_changed(self, _idx: int) -> None:
+        new_scope = self.cb_scope.currentData() or SCOPE_GLOBAL
+        self._scope = str(new_scope)
+        self._populate_table()
 
     def _format_header(self, col: tuple[str, str, list[str]]) -> str:
         dev_id, dev_type, positions = col
@@ -363,15 +424,35 @@ class EffectRoutingDialog(QDialog):
         effect_name = self.table.verticalHeaderItem(row).text()
         cols = self._device_columns()
         dev_id, dev_type, positions = cols[col]
-        # Apply the cell-level change to the working copy IN PLACE so a
-        # subsequent doubleclick sees the latest value.
-        route = self._working.routes.get(effect_name)
+
+        # Resolve which dict to mutate. In a class scope, we lazily clone
+        # the global route on first edit so the patch is independent.
+        if self._scope == SCOPE_GLOBAL:
+            target_dict = self._working.routes
+            route = target_dict.get(effect_name)
+        else:
+            target_dict = self._user.aircraft_class_overrides.setdefault(
+                self._scope, {})
+            route = target_dict.get(effect_name)
+            if route is None:
+                # First edit on this effect within the class patch — seed
+                # from the global route so the user starts from sensible
+                # values rather than a blank slate.
+                base = self._working.routes.get(effect_name)
+                base_layers = (
+                    [RouteLayer(**l.to_dict()) for l in base.layers]
+                    if base is not None else []
+                )
+                route = EffectRoute(name=effect_name, layers=base_layers)
+                target_dict[effect_name] = route
+
         if route is None:
             return
+
         layer = self._first_layer_for(route, dev_id, dev_type, positions)
         if layer is None:
-            # Cell had no layer; user enabling it implicitly creates one
-            # targeted by id. Sensible default: type-targeted.
+            # No layer yet for this device — implicitly create an id-targeted
+            # layer so the cell now controls something concrete.
             new = RouteLayer(target=f"id:{dev_id}",
                              enabled=editor.enabled(),
                              gain=editor.gain())
@@ -391,8 +472,18 @@ class EffectRoutingDialog(QDialog):
         effect_name = self.table.verticalHeaderItem(row).text()
         cols = self._device_columns()
         dev_id, dev_type, positions = cols[col]
-        route = self._working.routes.get(effect_name)
+        # Mutate via the active scope so per-class detail edits land in the
+        # right dict (same logic as ``_mark_dirty``).
+        if self._scope == SCOPE_GLOBAL:
+            route = self._working.routes.get(effect_name)
+        else:
+            route = self._user.aircraft_class_overrides.get(
+                self._scope, {}).get(effect_name)
         if route is None:
+            QMessageBox.information(
+                self, "No layer in this scope",
+                "No layer is set for this effect at the current scope. "
+                "Enable the checkbox first to seed one from the global route.")
             return
         layer = self._first_layer_for(route, dev_id, dev_type, positions)
         if layer is None:
@@ -414,7 +505,16 @@ class EffectRoutingDialog(QDialog):
 
     def _on_apply(self) -> None:
         ok = self._save_working_to_user()
-        if ok:
+        if not ok:
+            return
+        live = self._reload_live_router()
+        if live:
+            QMessageBox.information(
+                self, "Saved",
+                "Routing changes saved to effect_routes_user.json and "
+                "applied live to the active EffectRouter.",
+            )
+        else:
             QMessageBox.information(
                 self, "Saved",
                 "Routing changes saved to effect_routes_user.json. "
@@ -423,7 +523,25 @@ class EffectRoutingDialog(QDialog):
 
     def _on_ok(self) -> None:
         if self._save_working_to_user():
+            self._reload_live_router()
             self.accept()
+
+    def _reload_live_router(self) -> bool:
+        """Hot-reload the user overrides into the running EffectRouter.
+
+        Returns True iff there was a router to reload — children that
+        haven't been backend-swapped (G.effect_router is None) just take
+        the new file on their next start, which is fine.
+        """
+        router = getattr(G, "effect_router", None)
+        if router is None:
+            return False
+        path = _user_routes_path()
+        try:
+            return bool(router.reload_user_overrides(path))
+        except Exception:
+            logger.exception("Live router reload failed")
+            return False
 
     def _on_reset_to_default(self) -> None:
         ans = QMessageBox.question(
@@ -443,12 +561,17 @@ class EffectRoutingDialog(QDialog):
                 self, "No userconfig",
                 "Userconfig path is not set; cannot save routing.")
             return False
-        # The user file is the WORKING pack minus anything that exactly
-        # equals the bundled default (avoids bloat and surprise when users
-        # update). Simpler in P3: just save the whole working pack as the
-        # user override; defaults stay read-only.
+        # Build the user file from:
+        # - global routes from ``_working.routes`` (defaults + user merged)
+        # - class overrides from ``_user.aircraft_class_overrides`` (only
+        #   the deltas the user actually edited live here)
         try:
-            self._write_pack_to(path, self._working)
+            pack = EffectRoutesPack(
+                version=4,
+                routes=self._working.routes,
+                aircraft_class_overrides=self._user.aircraft_class_overrides,
+            )
+            self._write_pack_to(path, pack)
             return True
         except Exception:
             logger.exception("Failed to save effect_routes_user.json")
@@ -472,6 +595,7 @@ class EffectRoutingDialog(QDialog):
                     for name, route in routes.items()
                 }
                 for cls, routes in pack.aircraft_class_overrides.items()
+                if routes  # skip empty class buckets
             },
         }
         os.makedirs(os.path.dirname(path), exist_ok=True)

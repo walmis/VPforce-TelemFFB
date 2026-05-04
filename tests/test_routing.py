@@ -310,6 +310,62 @@ class TestRoutesPackLoading(unittest.TestCase):
                 self.assertEqual(new_l.osc_type, leg_l.osc_type)
 
 
+class TestRouterLiveReload(unittest.TestCase):
+    """``EffectRouter.reload_user_overrides`` swaps the user pack in place
+    so the running routing decisions update without re-instantiating the
+    router. Used by the EffectRoutingDialog Apply path.
+    """
+
+    def test_reload_updates_resolution(self):
+        defaults = EffectRoutesPack(routes={
+            "gunfire": EffectRoute("gunfire", [
+                RouteLayer(target="type:joystick", gain=0.5),
+            ]),
+        })
+        router = EffectRouter(defaults=defaults)
+        # Sanity: starts with the default gain.
+        layers = router.resolve("gunfire", device_id="x", device_type="joystick")
+        self.assertEqual(layers[0].gain, 0.5)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "user.json")
+            with open(path, "w") as f:
+                json.dump({"version": 4, "effects": {
+                    "gunfire": {"layers": [
+                        {"target": "type:joystick", "gain": 0.9, "freq_factor": 1.0,
+                         "osc_type": "sine"}
+                    ]}
+                }}, f)
+            ok = router.reload_user_overrides(path)
+        self.assertTrue(ok)
+        layers = router.resolve("gunfire", device_id="x", device_type="joystick")
+        self.assertEqual(layers[0].gain, 0.9)
+
+    def test_reload_missing_file_returns_false(self):
+        router = EffectRouter()
+        self.assertFalse(router.reload_user_overrides("/no/such/file.json"))
+
+    def test_reload_none_path_clears_overrides(self):
+        defaults = EffectRoutesPack(routes={
+            "gunfire": EffectRoute("gunfire", [RouteLayer(target="type:joystick")])
+        })
+        user = EffectRoutesPack(routes={
+            "gunfire": EffectRoute("gunfire", [RouteLayer(target="type:shaker")])
+        })
+        router = EffectRouter(defaults=defaults, user_overrides=user)
+        # Before clear: user override silences joystick.
+        self.assertEqual(
+            router.resolve("gunfire", device_id="x", device_type="joystick"),
+            [],
+        )
+        router.reload_user_overrides(None)
+        # After clear: default route is back.
+        self.assertEqual(
+            len(router.resolve("gunfire", device_id="x", device_type="joystick")),
+            1,
+        )
+
+
 class TestDeviceRoundTrip(unittest.TestCase):
     def test_to_from_dict(self):
         d = Device(
