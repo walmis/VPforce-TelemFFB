@@ -1504,13 +1504,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._shaker_calib_active_name = name
         self._shaker_calib_load_widgets_from_profile(prof)
 
-    def _shaker_calib_save_to_disk(self) -> bool:
+    def _shaker_calib_save_to_disk(self) -> str:
+        """Save profiles to disk. Returns the saved path on success, empty string on failure."""
         path = self._shaker_calib_profiles_io.get_user_profiles_path()
         if not path:
             QMessageBox.warning(
                 self, "Save profile",
                 "Cannot save shaker profiles: user config path not set.")
-            return False
+            return ""
         try:
             self._shaker_calib_profiles_io.save(
                 path, self._shaker_calib_active_name,
@@ -1519,23 +1520,25 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             logging.exception("Failed to save shaker_profiles.json")
             QMessageBox.critical(self, "Save profile",
                                  "Failed to write shaker_profiles.json — see log.")
-            return False
+            return ""
         try:
             from telemffb.hw import ffb_shaker
             ffb_shaker.set_active_profile(
                 self._shaker_calib_profiles[self._shaker_calib_active_name])
         except Exception:
             logging.exception("Failed to set active shaker profile in-process")
-        return True
+        return path
 
     def _on_shaker_calib_profile_save(self):
         name = self._shaker_calib_active_name
         prof = self._shaker_calib_widgets_to_profile(name)
         self._shaker_calib_profiles[name] = prof
-        if self._shaker_calib_save_to_disk():
+        saved_path = self._shaker_calib_save_to_disk()
+        if saved_path:
             QMessageBox.information(
                 self, "Profile saved",
                 f"Profile '{name}' saved.\n"
+                f"File: {saved_path}\n\n"
                 "Restart the shaker child instance to apply.")
 
     def _on_shaker_calib_profile_save_as(self):
@@ -1555,10 +1558,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._shaker_calib_active_name = new_name
         self._shaker_calib_rebuild_profile_combo()
         self._shaker_calib_select_profile_by_name(new_name)
-        if self._shaker_calib_save_to_disk():
+        saved_path = self._shaker_calib_save_to_disk()
+        if saved_path:
             QMessageBox.information(
                 self, "Profile saved",
                 f"Profile '{new_name}' saved.\n"
+                f"File: {saved_path}\n\n"
                 "Restart the shaker child instance to apply.")
 
     def _on_shaker_calib_profile_delete(self):
@@ -1600,10 +1605,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._shaker_calib_active_name = prof.name
         self._shaker_calib_rebuild_profile_combo()
         self._shaker_calib_select_profile_by_name(prof.name)
-        if self._shaker_calib_save_to_disk():
+        saved_path = self._shaker_calib_save_to_disk()
+        if saved_path:
             QMessageBox.information(
                 self, "Calibration Wizard",
                 f"Profile '{prof.name}' saved.\n"
+                f"File: {saved_path}\n\n"
                 "Restart the shaker child instance to apply.")
 
     def _on_shaker_calib_profile_reset(self):
@@ -2386,7 +2393,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         options = QFileDialog.Option(0)
         # options |= QFileDialog.Option.DontUseNativeDialog
         calling_button = self.sender()
-        starting_dir = os.getcwd()
+        starting_dir = G.userconfig_rootpath or os.getcwd()
         if mode == 'startup':
             lbl = self.pathVPConfStartup
         elif mode == 'exit':
