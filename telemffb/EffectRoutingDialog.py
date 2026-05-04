@@ -58,8 +58,12 @@ def _user_routes_path() -> Optional[str]:
 class _CellEditor(QWidget):
     """Small enabled+gain widget used for every (effect, device) cell.
 
-    The widget represents the *first* (Phase-2) layer that targets this
-    device. Multi-layer detail is reachable via doubleclick.
+    The widget represents the *first* layer that targets this device,
+    even if multiple layers are configured to fan out into parallel FFB
+    slots. The detail dialog (doubleclick) edits this same first layer;
+    additional layers can still be added by hand-editing
+    ``effect_routes_user.json`` — the matrix UI for adding extra layers
+    is a follow-up.
     """
 
     GAIN_SLIDER_MAX = 200  # 0–200% in increments of 1

@@ -215,21 +215,34 @@ truth for "which effects render usefully on a body shaker". The router
 on the shaker child still consults the whitelist; the routes file is
 applied on top.
 
-## Limitations (P3 era)
+## Multi-layer fan-out on FFB devices
 
-- **One layer per (effect, device) on FFB devices.** The Rhino has one
-  effect slot per `HapticEffect` instance, so when a routing matrix
-  has multiple layers targeting the same device, the router picks the
-  one with the highest gain. The shaker child supports true multi-layer
-  mixing through the audio synth — its layers fan out to
-  per-layer oscillators in `ShakerSynth`.
-- **Inventory changes need a restart.** `_setup_routing()` matches the
-  USB PID once at startup and binds `G.device_id` / `G.device_positions`
-  for the rest of the process lifetime. Routing-only changes
-  (the JSON file) reload live; inventory shape changes do not.
-- **Master→slave broadcast of inventory changes.** Children read
-  `config.ini` at their own startup; if the master changes the
-  inventory, child instances learn about it on their next launch.
+When two or more layers of an effect resolve for the same device — for
+example a runway layer at 30 Hz forward (0°) and another at 60 Hz
+laterally (270°) on the pedals — the router holds **one Rhino effect
+slot per layer** as an internal composite. ``periodic()`` configures
+each slot independently (with the layer's gain, freq_factor, and
+direction policy applied), and ``start()`` / ``stop()`` / ``destroy()``
+fan out to all of them. Sub-handles are named ``"<effect>__layer<idx>"``
+for log readability and parity with the shaker's audio-side scheme.
+
+The shaker child has its own multi-layer mixing through ``ShakerSynth``
+oscillators; the FFB-side fan-out described here is its FFB equivalent.
+
+## Limitations
+
+- **Type / USB-PID changes need a restart.** ``_setup_routing()``
+  matches the USB PID once at startup and binds ``G.device_id`` /
+  ``G.device_type`` / ``G.device_positions`` for the rest of the process
+  lifetime. Position and label edits in the Devices tab are broadcast
+  live to all instances via the ``inventory:`` IPC message; type rebinds
+  still require a child restart because the type drives which backend
+  (router vs. shaker audio) is wired up at process start.
+- **``DirectionPolicy.FROM_TELEMETRY`` is not implemented.** The enum
+  value is recognised by the router and selectable in the detail
+  dialog, but resolution falls through to ``inherit``. A telemetry-
+  field selector (``"vel_x"`` / ``"aoa_y"`` / …) is the planned
+  follow-up.
 
 ## Testing
 

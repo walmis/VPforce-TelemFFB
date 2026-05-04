@@ -320,5 +320,208 @@ class TestHapticEffectFacade(unittest.TestCase):
         self.assertEqual(args[1], 1.0)
 
 
+@unittest.skipUnless(FACADE_AVAILABLE,
+                     "HapticEffect facade unavailable in this environment "
+                     "(missing usb1/PyQt6/etc.) — runs in real installs")
+class TestHapticEffectMultiLayer(unittest.TestCase):
+    """Multi-layer fan-out — two or more layers targeting the same device
+    must all be configured and started in parallel.
+
+    The composite owns one ``_rhino.HapticEffect`` sub-handle per resolved
+    layer. Each sub-handle's method goes through the same patched
+    ``_rhino.HapticEffect.<method>`` so we can count call totals against
+    the layer count.
+    """
+
+    def setUp(self):
+        self._snapshot = (
+            ffb_router._router,
+            ffb_router._self_device_id,
+            ffb_router._self_device_type,
+            ffb_router._self_device_positions,
+        )
+        from telemffb.hw import ffb_rhino as _rhino
+        self._rhino = _rhino
+        # Patch parent (= sub-handle) methods. Each ``_rhino.HapticEffect``
+        # instance is a sub-handle; its periodic / start / etc. land on
+        # the same mock here.
+        self.p_periodic = mock.patch.object(
+            _rhino.HapticEffect, "periodic", return_value=None).start()
+        self.p_constant = mock.patch.object(
+            _rhino.HapticEffect, "constant", return_value=None).start()
+        self.p_start = mock.patch.object(
+            _rhino.HapticEffect, "start", return_value=None).start()
+        self.p_stop = mock.patch.object(
+            _rhino.HapticEffect, "stop", return_value=None).start()
+        self.p_destroy = mock.patch.object(
+            _rhino.HapticEffect, "destroy", return_value=None).start()
+        self.p_physics = mock.patch.object(
+            _rhino.HapticEffect, "physics", return_value=None).start()
+        self.p_fire_impulse = mock.patch.object(
+            _rhino.HapticEffect, "fire_impulse", return_value=None).start()
+
+    def tearDown(self):
+        mock.patch.stopall()
+        (ffb_router._router,
+         ffb_router._self_device_id,
+         ffb_router._self_device_type,
+         ffb_router._self_device_positions) = self._snapshot
+
+    def _wire(self, *, device_type="joystick", device_id="stick",
+              positions=(), **routes_layers):
+        router = _make_router_with_routes(**routes_layers)
+        ffb_router.init_router(
+            router, device_id=device_id, device_type=device_type,
+            device_positions=positions,
+        )
+
+    def _make(self, name="rumble"):
+        eff = ffb_router.HapticEffect()
+        eff.name = name
+        return eff
+
+    def test_periodic_two_matching_layers_configures_both(self):
+        # Two layers on the same device — both should be written to Rhino.
+        self._wire(rumble=[
+            RouteLayer(target="type:joystick", gain=1.0, freq_factor=1.0),
+            RouteLayer(target="type:joystick", gain=0.5, freq_factor=2.0),
+        ])
+        eff = self._make("rumble")
+        eff.periodic(30.0, 1.0, 0.0)
+        # Two sub-handles -> two periodic writes.
+        self.assertEqual(self.p_periodic.call_count, 2)
+        # First layer: gain=1.0, freq_factor=1.0 -> mag=1.0, freq=30.0
+        # Second layer: gain=0.5, freq_factor=2.0 -> mag=0.5, freq=60.0
+        first_args, _ = self.p_periodic.call_args_list[0]
+        second_args, _ = self.p_periodic.call_args_list[1]
+        self.assertEqual(first_args[0], 30.0)
+        self.assertAlmostEqual(first_args[1], 1.0)
+        self.assertEqual(second_args[0], 60.0)
+        self.assertAlmostEqual(second_args[1], 0.5)
+
+    def test_periodic_layers_with_different_directions(self):
+        # The classic motivating case: two pedals layers with different
+        # fixed directions so a runway rumble pulses both forward (0°)
+        # and laterally (270°).
+        self._wire(
+            device_type="pedals", device_id="pedals_main", positions=("floor",),
+            runway=[
+                RouteLayer(target="type:pedals", gain=0.6, freq_factor=1.0,
+                           direction_policy=DirectionPolicy.FIXED,
+                           direction_value=0.0),
+                RouteLayer(target="type:pedals", gain=0.4, freq_factor=1.5,
+                           direction_policy=DirectionPolicy.FIXED,
+                           direction_value=270.0),
+            ],
+        )
+        eff = self._make("runway")
+        eff.periodic(40.0, 1.0, 90.0)  # call-site direction is ignored
+        self.assertEqual(self.p_periodic.call_count, 2)
+        directions = [self.p_periodic.call_args_list[i][0][2]
+                      for i in (0, 1)]
+        self.assertEqual(set(directions), {0.0, 270.0})
+
+    def test_layer_with_non_matching_target_is_skipped(self):
+        # Layers that don't match this device (e.g. a shaker layer on a
+        # joystick process) must NOT consume a sub-handle slot.
+        self._wire(rumble=[
+            RouteLayer(target="type:shaker",   gain=1.0),    # filtered out
+            RouteLayer(target="type:joystick", gain=0.7),    # kept
+        ])
+        eff = self._make("rumble")
+        eff.periodic(50.0, 1.0, 0.0)
+        self.assertEqual(self.p_periodic.call_count, 1)
+        args, _ = self.p_periodic.call_args
+        self.assertAlmostEqual(args[1], 0.7)  # the joystick layer's gain
+
+    def test_start_fans_out_to_all_sub_handles(self):
+        self._wire(rumble=[
+            RouteLayer(target="type:joystick", gain=1.0),
+            RouteLayer(target="type:joystick", gain=0.6),
+            RouteLayer(target="type:joystick", gain=0.3),
+        ])
+        eff = self._make("rumble")
+        eff.periodic(30.0, 1.0, 0.0)
+        eff.start()
+        self.assertEqual(self.p_start.call_count, 3)
+
+    def test_stop_fans_out_to_all_sub_handles(self):
+        self._wire(rumble=[
+            RouteLayer(target="type:joystick", gain=1.0),
+            RouteLayer(target="type:joystick", gain=0.6),
+        ])
+        eff = self._make("rumble")
+        eff.periodic(30.0, 1.0, 0.0)
+        eff.stop()
+        self.assertEqual(self.p_stop.call_count, 2)
+
+    def test_destroy_clears_sub_handles(self):
+        self._wire(rumble=[
+            RouteLayer(target="type:joystick", gain=1.0),
+            RouteLayer(target="type:joystick", gain=0.6),
+        ])
+        eff = self._make("rumble")
+        eff.periodic(30.0, 1.0, 0.0)
+        # Two sub-handles before destroy.
+        self.assertEqual(len(eff._sub_handles), 2)
+        eff.destroy()
+        # All destroyed and the list is cleared.
+        self.assertEqual(self.p_destroy.call_count, 2)
+        self.assertEqual(eff._sub_handles, [])
+        self.assertFalse(eff._is_resolved)
+
+    def test_physics_dispatches_per_layer(self):
+        self._wire(rotor_phys_main=[
+            RouteLayer(target="type:joystick", gain=1.0),
+            RouteLayer(target="type:joystick", gain=0.4),
+        ])
+        eff = self._make("rotor_phys_main")
+        eff.physics(rpm=300, divisions=2, load=1.0)
+        self.assertEqual(self.p_physics.call_count, 2)
+        # Loads: 1.0 and 0.4 (load * gain).
+        loads = sorted(
+            self.p_physics.call_args_list[i][0][2] for i in (0, 1))
+        self.assertAlmostEqual(loads[0], 0.4)
+        self.assertAlmostEqual(loads[1], 1.0)
+
+    def test_fire_impulse_dispatches_per_layer(self):
+        self._wire(gearclunk=[
+            RouteLayer(target="type:joystick", gain=1.0,
+                       direction_policy=DirectionPolicy.FIXED,
+                       direction_value=0.0),
+            RouteLayer(target="type:joystick", gain=0.6,
+                       direction_policy=DirectionPolicy.FIXED,
+                       direction_value=180.0),
+        ])
+        eff = self._make("gearclunk")
+        eff.fire_impulse(1.0)
+        self.assertEqual(self.p_fire_impulse.call_count, 2)
+        # Magnitudes scaled by per-layer gain; directions per-layer fixed.
+        mags = sorted(
+            self.p_fire_impulse.call_args_list[i][0][0] for i in (0, 1))
+        dirs = sorted(
+            self.p_fire_impulse.call_args_list[i][1]["direction"]
+            for i in (0, 1))
+        self.assertAlmostEqual(mags[0], 0.6)
+        self.assertAlmostEqual(mags[1], 1.0)
+        self.assertEqual(dirs, [0.0, 180.0])
+
+    def test_resize_shrinks_sub_handles_on_re_resolve(self):
+        # First resolve: two layers. Second resolve (after a routing
+        # reload that drops one): the surplus sub-handle is destroyed.
+        self._wire(rumble=[
+            RouteLayer(target="type:joystick", gain=1.0),
+            RouteLayer(target="type:joystick", gain=0.5),
+        ])
+        eff = self._make("rumble")
+        eff.periodic(30.0, 1.0, 0.0)
+        self.assertEqual(len(eff._sub_handles), 2)
+        # Reload routing with one layer instead of two.
+        self._wire(rumble=[RouteLayer(target="type:joystick", gain=1.0)])
+        eff.periodic(30.0, 1.0, 0.0)
+        self.assertEqual(len(eff._sub_handles), 1)
+        self.assertGreaterEqual(self.p_destroy.call_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
