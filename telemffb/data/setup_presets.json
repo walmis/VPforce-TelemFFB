@@ -31,7 +31,8 @@
         {"device_id": "stick_main", "type": "joystick", "positions": ["desk", "center"], "label": "VPForce Stick"}
       ],
       "route_overrides": {
-        "runway0_delayed": {"layers": []},
+        "runway_carrier_delayed": {"layers": []},
+        "runway_impulse_delayed": {"layers": []},
         "ab_rumble_1_1":   {"layers": [
           {"target": "type:joystick", "gain": 0.85, "freq_factor": 1.0, "osc_type": "sine"}
         ]},
@@ -50,11 +51,16 @@
         {"device_id": "collective_left",  "type": "collective", "positions": ["left"],            "label": "VPForce Collective"}
       ],
       "route_overrides": {
-        "runway0":         {"layers": [
+        "runway_carrier":         {"layers": [
           {"target": "type:pedals",   "gain": 0.6, "freq_factor": 1.5, "osc_type": "sine",
            "direction_policy": "fixed", "direction_value": 270.0}
         ]},
-        "runway0_delayed": {"layers": []},
+        "runway_carrier_delayed": {"layers": []},
+        "runway_impulse":         {"layers": [
+          {"target": "type:pedals",   "gain": 0.6, "freq_factor": 1.0, "osc_type": "impulse",
+           "direction_policy": "fixed", "direction_value": 270.0}
+        ]},
+        "runway_impulse_delayed": {"layers": []},
         "touchdown":       {"layers": [
           {"target": "type:collective", "gain": 0.8, "freq_factor": 0.4, "osc_type": "impulse"},
           {"target": "type:pedals",     "gain": 0.5, "freq_factor": 0.4, "osc_type": "impulse"}
@@ -78,13 +84,21 @@
         {"device_id": "shaker_seat",  "type": "shaker",   "positions": ["seat", "center"], "label": "Bass Shaker"}
       ],
       "route_overrides": {
-        "runway0":         {"layers": [
+        "runway_carrier":         {"layers": [
           {"target": "type:rudder",   "gain": 0.5, "freq_factor": 1.5, "osc_type": "sine",
            "direction_policy": "fixed", "direction_value": 0.0},
           {"target": "type:joystick", "gain": 0.3, "freq_factor": 1.5, "osc_type": "sine"}
         ]},
-        "runway0_delayed": {"layers": [
+        "runway_carrier_delayed": {"layers": [
           {"target": "type:shaker", "gain": 0.8, "freq_factor": 0.6, "osc_type": "sine"}
+        ]},
+        "runway_impulse":         {"layers": [
+          {"target": "type:rudder",   "gain": 0.5, "freq_factor": 1.0, "osc_type": "impulse",
+           "direction_policy": "fixed", "direction_value": 0.0},
+          {"target": "type:joystick", "gain": 0.3, "freq_factor": 1.0, "osc_type": "impulse"}
+        ]},
+        "runway_impulse_delayed": {"layers": [
+          {"target": "type:shaker", "gain": 0.9, "freq_factor": 1.0, "osc_type": "impulse"}
         ]},
         "gearmovement":    {"layers": [
           {"target": "type:shaker",   "gain": 0.7, "freq_factor": 0.6, "osc_type": "impulse"},
@@ -113,9 +127,17 @@
           {"target": "id:shaker_seat", "gain": 0.7, "freq_factor": 0.5, "osc_type": "impulse"},
           {"target": "type:joystick",  "gain": 0.45, "freq_factor": 1.0, "osc_type": "sine"}
         ]},
-        "runway0": {"layers": [
-          {"target": "id:shaker_pedals", "gain": 0.6, "freq_factor": 1.5, "osc_type": "sine"},
+        "runway_carrier": {"layers": [
           {"target": "type:joystick",    "gain": 0.3, "freq_factor": 1.5, "osc_type": "sine"}
+        ]},
+        "runway_carrier_delayed": {"layers": [
+          {"target": "id:shaker_pedals", "gain": 0.6, "freq_factor": 1.5, "osc_type": "sine"}
+        ]},
+        "runway_impulse": {"layers": [
+          {"target": "type:joystick",    "gain": 0.4, "freq_factor": 1.0, "osc_type": "impulse"}
+        ]},
+        "runway_impulse_delayed": {"layers": [
+          {"target": "id:shaker_pedals", "gain": 0.9, "freq_factor": 1.0, "osc_type": "impulse"}
         ]},
         "gearmovement": {"layers": [
           {"target": "id:shaker_pedals", "gain": 0.7, "freq_factor": 0.6, "osc_type": "impulse"},

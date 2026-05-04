@@ -151,9 +151,9 @@ SKIP_EFFECTS = frozenset({"__effect_tester__"})
 
 CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("wheel / runway", (
-        "runway0", "runway0_delayed", "runway1",
-        "runway_bump0", "runway_bump1", "touchdown",
-        "touchdown_vs_main", "touchdown_vs_nose",
+        "runway_carrier", "runway_carrier_delayed", "runway1",
+        "runway_impulse", "runway_impulse_delayed",
+        "touchdown", "touchdown_vs_main", "touchdown_vs_nose",
         "gearclunk", "nw_shimmy",
     )),
     ("weapons / countermeasures", (

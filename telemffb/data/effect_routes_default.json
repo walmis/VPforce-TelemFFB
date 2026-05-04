@@ -11,22 +11,22 @@
     "'id:<device_id>' (specific device), 'pos:<tag>'."
   ],
   "effects": {
-    "runway0": {
+    "runway_carrier": {
       "layers": [
         {
-          "freq_factor": 1.5,
-          "gain": 0.4,
           "target": "type:joystick",
+          "gain": 0.5,
+          "freq_factor": 1.0,
           "osc_type": "sine"
         }
       ]
     },
-    "runway0_delayed": {
+    "runway_carrier_delayed": {
       "layers": [
         {
-          "freq_factor": 0.6,
-          "gain": 0.8,
           "target": "type:shaker",
+          "gain": 0.8,
+          "freq_factor": 0.6,
           "osc_type": "sine"
         }
       ]
@@ -47,39 +47,27 @@
         }
       ]
     },
-    "runway_bump0": {
+    "runway_impulse": {
       "layers": [
         {
-          "target": "type:shaker",
-          "gain": 0.9,
+          "target": "type:joystick",
+          "gain": 0.5,
           "freq_factor": 1.0,
           "osc_type": "impulse",
           "attack_ms": 2.0,
-          "decay_ms": 70.0
-        },
-        {
-          "target": "type:joystick",
-          "gain": 0.45,
-          "freq_factor": 1.5,
-          "osc_type": "impulse"
+          "decay_ms": 80.0
         }
       ]
     },
-    "runway_bump1": {
+    "runway_impulse_delayed": {
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.9,
+          "gain": 0.95,
           "freq_factor": 1.0,
           "osc_type": "impulse",
           "attack_ms": 2.0,
-          "decay_ms": 130.0
-        },
-        {
-          "target": "type:joystick",
-          "gain": 0.45,
-          "freq_factor": 1.5,
-          "osc_type": "impulse"
+          "decay_ms": 80.0
         }
       ]
     },
@@ -747,7 +735,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.9,
+          "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }
@@ -757,7 +745,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.9,
+          "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }
@@ -767,7 +755,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.9,
+          "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }
@@ -777,7 +765,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.9,
+          "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }
@@ -787,7 +775,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.7,
+          "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }
@@ -797,7 +785,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.7,
+          "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }
@@ -807,7 +795,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.7,
+          "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }
@@ -817,7 +805,7 @@
       "layers": [
         {
           "target": "type:shaker",
-          "gain": 0.7,
+          "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
         }

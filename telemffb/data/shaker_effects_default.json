@@ -24,11 +24,19 @@
       {"freq_factor": 0.4, "gain": 0.90, "route": "shaker", "osc_type": "sine"},
       {"freq_factor": 1.0, "gain": 0.50, "route": "stick",  "osc_type": "sine"}
     ]},
-    "runway0": { "layers": [
-      {"freq_factor": 1.5, "gain": 0.40, "route": "stick",  "osc_type": "sine"}
+    "runway_carrier": { "layers": [
+      {"freq_factor": 1.0, "gain": 0.50, "route": "stick",  "osc_type": "sine"}
     ]},
-    "runway0_delayed": { "layers": [
+    "runway_carrier_delayed": { "layers": [
       {"freq_factor": 0.6, "gain": 0.80, "route": "shaker", "osc_type": "sine"}
+    ]},
+    "runway_impulse": { "layers": [
+      {"freq_factor": 1.0, "gain": 0.50, "route": "stick",  "osc_type": "impulse",
+       "attack_ms": 2.0, "decay_ms": 80.0}
+    ]},
+    "runway_impulse_delayed": { "layers": [
+      {"freq_factor": 1.0, "gain": 0.95, "route": "shaker", "osc_type": "impulse",
+       "attack_ms": 2.0, "decay_ms": 80.0}
     ]},
     "touchdown": { "layers": [
       {"freq_factor": 0.4, "gain": 1.00, "route": "shaker", "osc_type": "impulse"},

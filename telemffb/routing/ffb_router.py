@@ -16,9 +16,9 @@ Design notes
   mixing that this router does not replace.
 - True multi-layer FFB output: every layer that resolves for the current
   device gets its own ``_rhino.HapticEffect`` sub-handle. Two layers
-  targeting the same device (e.g. one ``runway0`` layer at 30 Hz forward,
-  another at 60 Hz sideways on pedals) both write to the Rhino in
-  parallel. The composite holds the list of sub-handles internally; each
+  targeting the same device (e.g. one ``runway_carrier`` layer at 30 Hz
+  forward, another at 60 Hz sideways on pedals) both write to the Rhino
+  in parallel. The composite holds the list of sub-handles internally; each
   sub-handle is named ``"<effect>__layer<idx>"`` for log readability and
   parity with the shaker side.
 - ``physics()`` and ``fire_impulse()`` are dispatched per layer too, so

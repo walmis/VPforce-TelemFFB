@@ -74,7 +74,16 @@ CONSTANT_FORCE_FREQUENCY_HZ = 25.0
 # accidentally produce noise on the shaker; they need an explicit opt-in here.
 SHAKER_EFFECT_WHITELIST = {
     # wheel / runway
-    "runway0", "runway0_delayed", "runway1", "runway_bump0", "runway_bump1", "touchdown",
+    # ``runway_carrier`` (live, stick) + ``runway_carrier_delayed`` (rear,
+    # shaker, wheelbase-shifted) carry the continuous taxi texture; the
+    # corresponding ``runway_impulse`` / ``runway_impulse_delayed`` voices
+    # fire one-shot transient pulses on detected nose-wheel HPF peaks (joints,
+    # bumps). Splitting continuous tone from discrete transients lets the
+    # shaker keep playing engine rumble without masking ground feel: the
+    # brain separates a steady mid-frequency carrier from a sharp low-freq
+    # thump even when both fire on the same device.
+    "runway_carrier", "runway_carrier_delayed", "runway1",
+    "runway_impulse", "runway_impulse_delayed", "touchdown",
     "gearclunk", "nw_shimmy",
     # weapons / countermeasures
     "gunfire", "cm", "payload_rel",
@@ -120,10 +129,6 @@ SHAKER_EFFECT_WHITELIST = {
 SHAKER_EFFECT_PROFILES: dict = {
     "gearclunk":    {"kind": "transient", "freq": 55.0, "gain": 1.0,
                      "attack_ms": 3.0, "decay_ms": 110.0},
-    "runway_bump0": {"kind": "transient", "freq": 50.0, "gain": 0.9,
-                     "attack_ms": 2.0, "decay_ms": 70.0},
-    "runway_bump1": {"kind": "transient", "freq": 35.0, "gain": 0.9,
-                     "attack_ms": 2.0, "decay_ms": 130.0},
     "payload_rel":  {"kind": "transient", "freq": 40.0, "gain": 1.0,
                      "attack_ms": 3.0, "decay_ms": 200.0},
     "buffeting2":   {"kind": "continuous", "ramp_ms": 15.0, "gain": 1.1},
@@ -150,16 +155,35 @@ SHAKER_PHYSICS_PROFILES: dict = {
                          "brake_amp": 0.4, "brake_delay_ms": 0.0,
                          "gain": 0.6, "max_impulse_rate_hz": 220.0},
     # Propeller blade-pass: a sharper chop than the rotor. Carrier scales
-    # with the perceived "wood vs. metal" feel of the blade.
+    # with the perceived "wood vs. metal" feel of the blade. Gain held at
+    # 0.55 (with up to four voices summing) so engine rumble shares the
+    # shaker's headroom budget with runway impulses rather than dominating.
     "prop_phys_1": {"carrier_hz": 60.0, "halfwaves": 1,
                      "attack_ms": 1.0, "release_ms": 4.0,
                      "brake_amp": 0.5, "brake_delay_ms": 0.0,
-                     "gain": 0.9, "max_impulse_rate_hz": 180.0},
-    # Piston cylinder firing: very short, percussive.
+                     "gain": 0.55, "max_impulse_rate_hz": 180.0},
+    # Piston cylinder firing: very short, percussive. Gain reduced to leave
+    # spectral / amplitude room for low-frequency runway impulses to cut
+    # through (see runway_impulse below).
     "cyl_phys_1": {"carrier_hz": 80.0, "halfwaves": 1,
                     "attack_ms": 0.5, "release_ms": 2.0,
                     "brake_amp": 0.3, "brake_delay_ms": 0.0,
-                    "gain": 0.7, "max_impulse_rate_hz": 180.0},
+                    "gain": 0.4, "max_impulse_rate_hz": 180.0},
+    # Runway joint / bump: deep low-frequency thump fired by the
+    # nose-wheel HPF peak detector in ac_update_runway_rumble. Carrier sits
+    # well below the 60-80 Hz prop / cylinder band so the bump reads as a
+    # distinct percussive event even when engine voices play concurrently.
+    # ``runway_impulse`` is the live (front, stick) variant;
+    # ``runway_impulse_delayed`` is the wheelbase-shifted shaker variant —
+    # same pulse shape, different fire times.
+    "runway_impulse": {"carrier_hz": 28.0, "halfwaves": 1,
+                        "attack_ms": 2.0, "release_ms": 80.0,
+                        "brake_amp": 0.0, "brake_delay_ms": 0.0,
+                        "gain": 0.95, "max_impulse_rate_hz": 30.0},
+    "runway_impulse_delayed": {"carrier_hz": 28.0, "halfwaves": 1,
+                                "attack_ms": 2.0, "release_ms": 80.0,
+                                "brake_amp": 0.0, "brake_delay_ms": 0.0,
+                                "gain": 0.95, "max_impulse_rate_hz": 30.0},
     # Touchdown impulses — per-gear single shots fired by
     # HapticEffect.fire_impulse() in ac_update_touchdown_effect().
     # Main-gear and nose-gear share the same pulse shape; the layer config
