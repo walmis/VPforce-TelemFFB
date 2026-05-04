@@ -2421,6 +2421,11 @@ class AircraftBase(object):
         self.ac_update_canopy(telem_data)
         self.ac_update_spoilers(telem_data)
 
+        # Forward telemetry to WinWing SimAppPro if enabled
+        from telemffb.hw import ffb_winwing
+        if ffb_winwing.is_initialised():
+            ffb_winwing.get_sink().update(telem_data)
+
     # Helper methods for code reuse
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""
