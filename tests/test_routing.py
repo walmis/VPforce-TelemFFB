@@ -273,9 +273,13 @@ class TestRoutesPackLoading(unittest.TestCase):
         pack = load_routes_pack(str(DEFAULT_ROUTES_PATH))
         self.assertIsNotNone(pack)
         self.assertEqual(pack.version, 4)
-        # Sanity-check: the migrated file has 20 effects and gunfire is one.
-        self.assertEqual(len(pack.routes), 20)
+        # Bundled default covers the whole shaker whitelist (~70 effects);
+        # the exact count fluctuates with whitelist additions, so just
+        # assert "lots of effects" + a few specific known names.
+        self.assertGreater(len(pack.routes), 50)
         self.assertIn("gunfire", pack.routes)
+        self.assertIn("runway0", pack.routes)
+        self.assertIn("rotor_phys_main", pack.routes)
         # Layer targets are the new selector strings.
         gunfire = pack.routes["gunfire"]
         targets = {l.target for l in gunfire.layers}
@@ -285,24 +289,32 @@ class TestRoutesPackLoading(unittest.TestCase):
         # The same loader handles v1 files (with ``route``).
         pack = load_routes_pack(str(LEGACY_SHAKER_PATH))
         self.assertIsNotNone(pack)
-        # v1: fields converted, length matches.
+        # Legacy file has the original hand-tuned 20.
         self.assertEqual(len(pack.routes), 20)
         # 'route: shaker' -> 'target: type:shaker'.
         gunfire = pack.routes["gunfire"]
         targets = {l.target for l in gunfire.layers}
         self.assertEqual(targets, {"type:shaker", "type:joystick"})
 
-    def test_load_legacy_yields_same_result_as_default(self):
-        # Migrating shaker_effects_default.json should produce the same
-        # logical pack as the hand-crafted effect_routes_default.json.
+    def test_legacy_routes_preserved_in_bundled_default(self):
+        # The bundled default is a superset of the legacy file: every
+        # hand-tuned effect from the v1 shaker_effects_default.json must
+        # appear in effect_routes_default.json with identical layers
+        # (within float tolerance). New effects added by the migration
+        # script live alongside, but never overwrite.
         legacy = load_routes_pack(str(LEGACY_SHAKER_PATH))
         new = load_routes_pack(str(DEFAULT_ROUTES_PATH))
-        self.assertEqual(set(legacy.routes), set(new.routes))
-        for name, route in new.routes.items():
+        # All legacy keys must still be present.
+        missing = set(legacy.routes) - set(new.routes)
+        self.assertFalse(missing,
+                         f"hand-tuned effects lost in migration: {missing}")
+        # And their layers must match exactly.
+        for name in legacy.routes:
             legacy_route = legacy.routes[name]
-            self.assertEqual(len(route.layers), len(legacy_route.layers),
+            new_route = new.routes[name]
+            self.assertEqual(len(legacy_route.layers), len(new_route.layers),
                              f"layer count differs for {name!r}")
-            for new_l, leg_l in zip(route.layers, legacy_route.layers):
+            for new_l, leg_l in zip(new_route.layers, legacy_route.layers):
                 self.assertEqual(new_l.target, leg_l.target,
                                  f"target differs for {name!r}")
                 self.assertAlmostEqual(new_l.gain, leg_l.gain)
