@@ -718,6 +718,12 @@
           "gain": 1.0,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.5,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -728,6 +734,12 @@
           "gain": 0.6,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.3,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -738,6 +750,12 @@
           "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.4,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -748,6 +766,12 @@
           "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.4,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -758,6 +782,12 @@
           "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.4,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -768,6 +798,12 @@
           "gain": 0.55,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.4,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -778,6 +814,12 @@
           "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.25,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -788,6 +830,12 @@
           "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.25,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -798,6 +846,12 @@
           "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.25,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
@@ -808,6 +862,12 @@
           "gain": 0.4,
           "freq_factor": 1.0,
           "osc_type": "impulse"
+        },
+        {
+          "target": "type:joystick",
+          "gain": 0.25,
+          "freq_factor": 1.0,
+          "osc_type": "sine"
         }
       ]
     },
