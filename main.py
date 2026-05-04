@@ -602,6 +602,17 @@ def _initialize_device_connection():
                           f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\n"
                           "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
 
+    # WinWing SimAppPro bridge — only on the master instance, always opt-in
+    # via the 'winwingSimAppPro' setting.  Fire-and-forget UDP so it never
+    # blocks startup even when SimAppPro is not running.
+    if G.device_type not in ("shaker",) and G.system_settings.get("winwingSimAppPro", False):
+        try:
+            from telemffb.hw.ffb_winwing import init_winwing
+            init_winwing()
+            logging.info("WinWing SimAppPro bridge enabled (UDP → 127.0.0.1:16536)")
+        except Exception:
+            logging.exception("Failed to start WinWing SimAppPro bridge")
+
     return dev, dev_serial, dev_firmware_version
 
 def _enumerate_and_log_devices():

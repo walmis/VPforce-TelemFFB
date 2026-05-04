@@ -393,7 +393,80 @@ class _PresetPage(QWizardPage):
         return True
 
 
-# --- page 5: summary -----------------------------------------------------
+# --- page 5: WinWing optional accessory ----------------------------------
+
+class _WinWingPage(QWizardPage):
+    """Optional page: detect SimAppPro and offer to enable the UDP bridge."""
+
+    def __init__(self, parent: "SetupWizard"):
+        super().__init__(parent)
+        self._w = parent
+        self.setTitle("WinWing Handles (optional)")
+        self.setSubTitle(
+            "If you have WinWing Orion 2 F-15EX / F-16 handles with vibration "
+            "motors, TelemFFB can forward live telemetry to SimAppPro so the "
+            "handles vibrate alongside your primary FFB device."
+        )
+
+        layout = QVBoxLayout(self)
+
+        self._status_label = QLabel("Checking for SimAppPro…")
+        layout.addWidget(self._status_label)
+
+        self._cb = QCheckBox("Enable WinWing SimAppPro UDP bridge")
+        self._cb.setChecked(bool(G.system_settings and
+                                 G.system_settings.get("winwingSimAppPro", False)))
+        layout.addWidget(self._cb)
+
+        note = QLabel(
+            "<i>Requires WinWing SimAppPro to be running. "
+            "You can also enable / disable this later under "
+            "Settings → System Settings → WinWing.</i>"
+        )
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        layout.addStretch()
+
+    def initializePage(self) -> None:
+        running = self._probe_simapppro()
+        if running:
+            self._status_label.setText(
+                "SimAppPro detected — port 16536 is active."
+            )
+            self._status_label.setStyleSheet("color: green;")
+            self._cb.setEnabled(True)
+        else:
+            self._status_label.setText(
+                "SimAppPro not detected (port 16536 not responding). "
+                "You can still enable the bridge; it will activate "
+                "automatically when SimAppPro is running."
+            )
+            self._status_label.setStyleSheet("color: #888;")
+            self._cb.setEnabled(True)
+
+    def validatePage(self) -> bool:
+        if G.system_settings:
+            G.system_settings.setValue("winwingSimAppPro", self._cb.isChecked())
+        return True
+
+    @staticmethod
+    def _probe_simapppro() -> bool:
+        import socket as _socket
+        try:
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM) as s:
+                s.settimeout(0.5)
+                s.sendto(b'{"func":"net","msg":"ready"}', ("127.0.0.1", 16536))
+            import subprocess
+            out = subprocess.check_output(
+                ["netstat", "-ano"], text=True, timeout=3,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            return ":16536 " in out
+        except Exception:
+            return False
+
+
+# --- page 6: summary -----------------------------------------------------
 
 class _SummaryPage(QWizardPage):
     def __init__(self, parent: "SetupWizard"):
@@ -430,6 +503,12 @@ class _SummaryPage(QWizardPage):
             body += f"<p>{n} effect route(s) will be added to your user overrides.</p>"
         else:
             body += ("<h3>Preset</h3><p><i>None — bundled defaults apply.</i></p>")
+        ww_on = bool(G.system_settings and
+                     G.system_settings.get("winwingSimAppPro", False))
+        body += (
+            f"<h3>WinWing SimAppPro bridge</h3>"
+            f"<p>{'<b>Enabled</b> — telemetry will be forwarded to SimAppPro on port 16536.' if ww_on else '<i>Disabled.</i>'}</p>"
+        )
         body += ("<hr><p><b>On Finish:</b> writes "
                  "<code>[devices].deviceInventory</code> in config.ini and, "
                  "if a preset is selected, <code>effect_routes_user.json</code> "
@@ -456,6 +535,7 @@ class SetupWizard(QWizard):
         self.addPage(_TypePage(self))
         self.addPage(_PositionPage(self))
         self.addPage(_PresetPage(self))
+        self.addPage(_WinWingPage(self))
         self.addPage(_SummaryPage(self))
 
     def accept(self) -> None:

@@ -189,6 +189,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.themeButtonGroup.setId(self.rb_SystemTheme, 2)
 
         self._setup_shaker_tab()
+        self._setup_winwing_tab()
 
         self.load_settings()
 
@@ -398,6 +399,168 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         outer.addStretch(1)
 
         self.tabWidget.addTab(self.tab_Shaker, "Shaker")
+
+    # ------------------------------------------------------------------
+    # WinWing SimAppPro tab
+    # ------------------------------------------------------------------
+
+    _WINWING_TEST_BUTTON_TEXT = "Test vibration (3 s)"
+
+    def _setup_winwing_tab(self):
+        """Add a WinWing SimAppPro bridge tab."""
+        from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
+                                     QFormLayout, QLabel, QCheckBox,
+                                     QPushButton)
+
+        self.tab_WinWing = QWidget()
+        self.tab_WinWing.setObjectName("tab_WinWing")
+        outer = QVBoxLayout(self.tab_WinWing)
+
+        intro = QLabel(
+            "Forward flight telemetry to <b>WinWing SimAppPro</b> so that "
+            "vibration motors in WinWing handles (e.g. F-15EX L/R) vibrate "
+            "in sync with AoA buffet, gear deployment, landings, cannon fire, "
+            "and speed brakes — parallel to the VPForce FFB.<br><br>"
+            "SimAppPro must be running. Changing this setting requires a "
+            "TelemFFB restart.")
+        intro.setWordWrap(True)
+        outer.addWidget(intro)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight |
+                               Qt.AlignmentFlag.AlignVCenter)
+        outer.addLayout(form)
+
+        # Enable checkbox
+        self.cb_winwing_simapppro = QCheckBox()
+        self.cb_winwing_simapppro.setToolTip(
+            "When checked, TelemFFB sends live flight data to SimAppPro via UDP.\n"
+            "SimAppPro translates this into vibration commands for your WinWing handles.")
+        form.addRow("Enable SimAppPro bridge:", self.cb_winwing_simapppro)
+
+        # Status row
+        self._winwing_status_label = QLabel("—")
+        form.addRow("SimAppPro status:", self._winwing_status_label)
+
+        self.cb_winwing_simapppro.stateChanged.connect(self._winwing_refresh_status)
+
+        # Test button
+        self.winwing_test_button = QPushButton(self._WINWING_TEST_BUTTON_TEXT)
+        self.winwing_test_button.setToolTip(
+            "Sends a short test sequence (touchdown → cannon fire → stall buffet) "
+            "directly to SimAppPro so you can verify that the handles vibrate.\n"
+            "SimAppPro must be running. The bridge does not need to be enabled.")
+        self.winwing_test_button.clicked.connect(self._winwing_test_clicked)
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.winwing_test_button)
+        btn_row.addStretch(1)
+        outer.addLayout(btn_row)
+
+        outer.addStretch(1)
+        self.tabWidget.addTab(self.tab_WinWing, "WinWing")
+
+        # Populate status immediately
+        self._winwing_refresh_status()
+
+    def _winwing_refresh_status(self):
+        """Update the SimAppPro status label by probing UDP port 16536."""
+        import socket
+        running = False
+        try:
+            # Check if anything is listening on 16536 (works on Windows)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0)
+            # bind to ephemeral port and connect — works without sending data
+            s.bind(("", 0))
+            s.close()
+
+            import subprocess
+            out = subprocess.check_output(
+                ["netstat", "-ano"], text=True, timeout=2,
+                creationflags=0x08000000)  # CREATE_NO_WINDOW
+            running = ":16536 " in out
+        except Exception:
+            pass
+
+        if running:
+            self._winwing_status_label.setText(
+                "<span style='color:green'>SimAppPro is running (port 16536)</span>")
+            self.winwing_test_button.setEnabled(True)
+        else:
+            self._winwing_status_label.setText(
+                "<span style='color:red'>SimAppPro not detected</span>")
+            self.winwing_test_button.setEnabled(False)
+
+    def _winwing_test_clicked(self):
+        """Send a 3-second test sequence to SimAppPro on a daemon thread."""
+        import threading
+        from PyQt6.QtCore import QTimer
+
+        self.winwing_test_button.setEnabled(False)
+        self.winwing_test_button.setText("Testing…")
+
+        def _run():
+            import time
+            from telemffb.hw.ffb_winwing import WinWingSink
+
+            sink = WinWingSink()
+            sink.start()
+            try:
+                base = {
+                    "N": "FA-18C_hornet",
+                    "TAS": 80.0,
+                    "AoA": 2.0,
+                    "gear_value": 0.0,
+                    "speedbrakes_value": 0.0,
+                    "ACCs": (1.0, 0.0, 0.0),
+                    "VerticalSpeed": 0.0,
+                    "WeightOnWheels": (0, 0, 0),
+                    "Gun": 0,
+                }
+
+                # Phase 1 — touchdown thump (~0.0 s)
+                # First send one frame with WoW=all-zeros so gearRod values start
+                # at 0, then switch to wheels-down so the 0→1 transition fires
+                # isGearTouchGround in SimAppPro.
+                sink.update(base)           # establishes gearRod oldValue = 0
+                time.sleep(0.1)
+                touchdown = dict(base)
+                touchdown["WeightOnWheels"] = (0, 1, 1)
+                touchdown["VerticalSpeed"] = -3.0
+                for _ in range(24):         # remainder of 2.5 s @ 100 ms
+                    sink.update(touchdown)
+                    time.sleep(0.1)
+
+                # Phase 2 — cannon burst (~2.5 s, lasts 0.25 s)
+                # cannonShellsCount decrements while Gun=1, triggering
+                # isFireCannonShells in SimAppPro on each decrement.
+                gun = dict(base, Gun=1, TAS=200.0, AoA=5.0)
+                for _ in range(5):
+                    sink.update(gun)
+                    time.sleep(0.05)
+
+                # Phase 3 — speedbrakes open at speed (~2.8 s)
+                # Tests the enabled Leaf_speedbrakes continuous effect.
+                brakes = dict(base, TAS=200.0, speedbrakes_value=0.8)
+                for _ in range(6):
+                    sink.update(brakes)
+                    time.sleep(0.1)
+
+            except Exception:
+                logging.exception("WinWing vibration test failed")
+            finally:
+                sink.stop()
+
+        threading.Thread(target=_run, daemon=True).start()
+        QTimer.singleShot(3500, self._winwing_test_finished)
+
+    def _winwing_test_finished(self):
+        self._winwing_refresh_status()   # re-checks running state before re-enable
+        self.winwing_test_button.setText(self._WINWING_TEST_BUTTON_TEXT)
+
+    def _load_winwing_settings(self, settings_dict):
+        self.cb_winwing_simapppro.setChecked(
+            bool(settings_dict.get("winwingSimAppPro", False)))
 
     # ------------------------------------------------------------------
     # Effect layers subsection
@@ -2161,6 +2324,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'shakerChannelMode': self.shaker_channel_combo.currentData() or 'mono',
             'shakerPan': self.shaker_pan_slider.value() / 100.0,
             'shakerProfile': self._shaker_calib_active_name or 'Generic',
+            'winwingSimAppPro': self.cb_winwing_simapppro.isChecked(),
         }
 
         instance_settings_dict = {
@@ -2345,6 +2509,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
 
         self._load_shaker_settings(settings_dict)
+        self._load_winwing_settings(settings_dict)
 
         self.enableVPConfStartup.setChecked(settings_dict.get('enableVPConfStartup', False))
         self.pathVPConfStartup.setText(settings_dict.get('pathVPConfStartup', ''))
