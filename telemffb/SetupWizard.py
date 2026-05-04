@@ -34,8 +34,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGridLayout,
     QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QMessageBox, QTextEdit, QVBoxLayout, QWidget,
-    QWizard, QWizardPage,
+    QListWidgetItem, QMessageBox, QPushButton, QTextEdit, QVBoxLayout,
+    QWidget, QWizard, QWizardPage,
 )
 
 import telemffb.globals as G
@@ -158,8 +158,11 @@ class _WelcomePage(QWizardPage):
 
     def initializePage(self) -> None:
         # Re-enumerate every time the page is shown so reconnects are picked up.
+        # Preserve any manually-added devices (no usb_pid) the user has already
+        # entered on the next page — re-enumerating shouldn't wipe their work.
         detected = _enumerate_rhinos()
-        self._w.detected = detected
+        manual = [d for d in self._w.detected if not d.usb_pid]
+        self._w.detected = detected + manual
         if detected:
             lines = [f"<b>Detected {len(detected)} device(s):</b>", "<ul>"]
             for d in detected:
@@ -184,7 +187,8 @@ class _TypePage(QWizardPage):
         self.setTitle("Device Types")
         self.setSubTitle(
             "Pick what each device represents. Auto-guesses come from the "
-            "USB product string.")
+            "USB product string. Use \"Add device\" to describe a shaker / "
+            "transducer that isn't enumerated as a Rhino on USB.")
         self._layout = QVBoxLayout(self)
         self._scroll_holder = QWidget()
         self._grid = QGridLayout(self._scroll_holder)
@@ -192,10 +196,23 @@ class _TypePage(QWizardPage):
         self._grid.addWidget(QLabel("<b>Type</b>"), 0, 1)
         self._grid.addWidget(QLabel("<b>Label</b>"), 0, 2)
         self._layout.addWidget(self._scroll_holder)
+
+        btn_row = QHBoxLayout()
+        self._btn_add = QPushButton("Add device")
+        self._btn_add.setToolTip(
+            "Add a device that wasn't detected on USB (e.g. a shaker driven "
+            "by a separate amp/controller).")
+        self._btn_add.clicked.connect(self._add_manual_device)
+        btn_row.addWidget(self._btn_add)
+        btn_row.addStretch(1)
+        self._layout.addLayout(btn_row)
         self._layout.addStretch(1)
 
     def initializePage(self) -> None:
-        # Drop any prior rows from a previous wizard run.
+        self._render_rows()
+
+    def _render_rows(self) -> None:
+        # Drop any prior rows from a previous wizard run, keeping the header.
         for i in reversed(range(self._grid.count())):
             item = self._grid.itemAt(i)
             if item and item.widget() and self._grid.getItemPosition(i)[0] > 0:
@@ -204,25 +221,54 @@ class _TypePage(QWizardPage):
                 w.deleteLater()
         self._rows.clear()
         for r, dev in enumerate(self._w.detected, start=1):
-            lbl_pid = QLabel(dev.usb_pid)
+            lbl_pid = QLabel(dev.usb_pid or "(manual)")
             self._grid.addWidget(lbl_pid, r, 0)
             cb = QComboBox()
             cb.addItems(KNOWN_DEVICE_TYPES)
             cb.setCurrentText(dev.type)
             self._grid.addWidget(cb, r, 1)
             le = QLineEdit(dev.label)
+            le.setPlaceholderText("Friendly name (optional)")
             self._grid.addWidget(le, r, 2)
+            btn_remove = QPushButton("Remove")
+            btn_remove.clicked.connect(
+                lambda _checked, d=dev: self._remove_device(d))
+            self._grid.addWidget(btn_remove, r, 3)
             self._rows.append((dev, cb, le))
         if not self._w.detected:
             self._grid.addWidget(
-                QLabel("<i>No devices detected. The wizard will create an "
-                       "empty inventory; you can edit it later in the "
-                       "Devices tab.</i>"), 1, 0, 1, 3)
+                QLabel("<i>No devices detected. Click \"Add device\" below "
+                       "to describe your hardware manually.</i>"),
+                1, 0, 1, 4)
 
-    def validatePage(self) -> bool:
+    def _commit_row_edits(self) -> None:
         for dev, cb, le in self._rows:
             dev.type = cb.currentText()
             dev.label = le.text().strip()
+
+    def _add_manual_device(self) -> None:
+        # Persist the user's in-progress edits before tearing down the rows.
+        self._commit_row_edits()
+        # Default to "shaker" — manual entries exist precisely because the
+        # device isn't enumerated as a Rhino, and the most common case in
+        # this fork is a transducer/shaker driven outside FFBRhino.
+        new = _DetectedDevice(usb_pid="", product_string="")
+        new.type = "shaker"
+        new.label = "Shaker"
+        self._w.detected.append(new)
+        self._render_rows()
+
+    def _remove_device(self, dev: _DetectedDevice) -> None:
+        self._commit_row_edits()
+        try:
+            self._w.detected.remove(dev)
+        except ValueError:
+            return
+        self._render_rows()
+
+    def validatePage(self) -> bool:
+        self._commit_row_edits()
+        for dev in self._w.detected:
             # Synthesize a stable id once, on first validation.
             if not dev.device_id:
                 base = dev.type
@@ -445,6 +491,19 @@ class SetupWizard(QWizard):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("TelemFFB — Multi-Device Setup")
+        # ModernStyle uses Qt-rendered chrome that respects the application
+        # palette. The default AeroStyle on Windows forces a white page
+        # background, which collides with TelemFFB's dark-mode palette
+        # (light-grey QLabel text → invisible on white).
+        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
+        # Belt-and-braces: explicitly bind label/text colors to the palette
+        # so any leftover white-background regions still render readable text.
+        self.setStyleSheet(
+            "QWizardPage { background-color: palette(window); } "
+            "QWizardPage QLabel { color: palette(window-text); } "
+            "QWizard > QWidget { background-color: palette(window); } "
+            "QWizard QLabel { color: palette(window-text); }"
+        )
         self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage, True)
         self.setMinimumSize(720, 540)
 
