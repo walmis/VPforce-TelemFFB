@@ -29,6 +29,12 @@ Note:  Not all features are listed here, not all features are supported in all s
 - Engine rumble for Jet Aircraft
 - Afterburner rumble
 - Engine rumble for Helicopters
+- **Configurable multi-device effect routing**: declare your physical
+  setup (e.g. *VPForce Rudder up front + Stick on the right + Bass shaker
+  under the seat*, or *Stick + Pedals + Collective without shaker*) and
+  decide per effect which device plays it, with what gain and direction.
+  Includes a first-run setup wizard, ready-made presets, and a per-effect
+  routing matrix dialog. See [`docs/ROUTING.md`](docs/ROUTING.md).
 
 ## FFB Device Support
 As is, TelemFFB supports only the VPforce Rhino FFB Joystick base, or DIY devices which are using the kits (motor + control board) that are available from VPforce.
@@ -107,6 +113,17 @@ The primary aircraft in BMS (F16) is fly-by-wire, and as such does not have "for
 <br>
 Note that the documentation may be in-flux between 'wip' releases and may show features that are not yet released.
 
+In-tree documentation:
+- [`docs/ROUTING.md`](docs/ROUTING.md) — multi-device effect routing
+  (data model, selectors, direction policies, the user flow through the
+  setup wizard / Devices tab / Effect Routing dialog, file locations,
+  migration of older `shaker_effects.json`).
+- [`docs/SHAKER.md`](docs/SHAKER.md) — bass-shaker integration deep dive
+  (audio synthesis, calibration, phase-locked impulse trains, layer
+  routing on the audio side).
+- [`CHANGELOG.md`](CHANGELOG.md) — release notes for the multi-device
+  routing branch.
+
 ## Installing and running (EXE distribution)
 
 ### Downloading
@@ -180,3 +197,11 @@ For example to create an effect that plays a "bump" when a gun round is fired:
             effects["cm"].periodic(10, self.gun_vibration_intensity, 45, duration=50).start()
 ```
 There is no need to create and manage the effect objects. All is done automatically when accessing the effects[] object.
+
+When the multi-device router is active (a `[devices]` inventory exists
+in `config.ini`), the same `effects["cm"].periodic(...).start()` call
+transparently fans out to every device + layer that the routing matrix
+declared for it — including parallel layers on the same device with
+different directions. Aircraft modules don't need to know which devices
+exist; that's the routing engine's job. See
+[`docs/ROUTING.md`](docs/ROUTING.md) for the data model.
