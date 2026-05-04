@@ -134,6 +134,54 @@ EFFECT_SAWTOOTHUP = 6
 EFFECT_SAWTOOTHDOWN = 7
 
 
+class _RunwayPeakDetector:
+    """Edge-triggered peak detector for the nose-wheel HPF stream.
+
+    Fires once per discrete bump: arms when ``|sample| >= threshold``,
+    tracks the running maximum until the signal falls below
+    ``threshold * release_ratio``, then emits the captured peak amplitude
+    on release. ``refractory_s`` blocks re-arm immediately after a fire so
+    a single bump produces a single thump.
+
+    The output is a deterministic function of the input sample stream and
+    perf_counter timestamps — same telemetry sequence yields the same fires.
+    Critical for muscle memory: the user's brain learns "joint at this
+    speed = thump of this amplitude" and the haptic side honours that
+    consistently.
+    """
+    __slots__ = ("threshold", "release_ratio", "refractory_s",
+                 "_armed", "_peak", "_last_fire_t")
+
+    def __init__(self, threshold: float = 0.12,
+                 release_ratio: float = 0.5,
+                 refractory_s: float = 0.10):
+        self.threshold = threshold
+        self.release_ratio = release_ratio
+        self.refractory_s = refractory_s
+        self._armed = False
+        self._peak = 0.0
+        self._last_fire_t = -1e9
+
+    def update(self, sample: float, now: float):
+        """Feed one sample; return the peak amplitude if a bump just fired,
+        else ``None``."""
+        a = abs(sample)
+        if not self._armed:
+            if a >= self.threshold and (now - self._last_fire_t) >= self.refractory_s:
+                self._armed = True
+                self._peak = a
+            return None
+        if a > self._peak:
+            self._peak = a
+        if a < self.threshold * self.release_ratio:
+            fire_amp = self._peak
+            self._armed = False
+            self._peak = 0.0
+            self._last_fire_t = now
+            return fire_amp
+        return None
+
+
 class AircraftBase(object):
     rotor_blade_count = 2
 
@@ -446,6 +494,13 @@ class AircraftBase(object):
         # mostly-live (rough) so the spatial illusion is not drowned out
         # by broadband suspension noise. ~1 s window at 30 Hz telemetry.
         self._rumble_v1_rms_buffer: deque = deque(maxlen=30)
+        # Independent peak detectors per channel: front (live HPF, stick) vs
+        # rear (delayed HPF, shaker). Each fires a one-shot ``runway_impulse``
+        # / ``runway_impulse_delayed`` when its own stream peaks, so a single
+        # runway joint reads as front-thump-then-rear-thump with the
+        # wheelbase / ground-speed delay between them.
+        self._runway_peak_front = _RunwayPeakDetector()
+        self._runway_peak_rear = _RunwayPeakDetector()
         self.adv_g_settings_dict: dict = {}
         self.adv_spr_settings_dict: dict = {}
         self.active_deadzone_pct: float = 0.0
@@ -803,15 +858,25 @@ class AircraftBase(object):
         effects['touchdown'].constant(force, 180).start()
 
     def bms_taxi_bumps(self, telem_data):
-        """Generates a bump effect in response to bumpIntensity telemetry for Falcon BMS simulator"""
+        """Falcon BMS bump effect from the ``BumpIntensity`` telemetry value.
+
+        BMS does not expose nose-wheel weight-on-wheels or ground-speed
+        coherent enough for the wheelbase delay scheme used in
+        ``ac_update_runway_rumble`` — it only emits a single per-bump
+        intensity scalar. We fire both ``runway_impulse`` (stick) and
+        ``runway_impulse_delayed`` (shaker) simultaneously so the bump still
+        reads as bilateral; the front→rear illusion is a no-op here.
+        """
         if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
-            effects.dispose("runway_bump0", "runway_bump1")
+            effects.dispose("runway_impulse", "runway_impulse_delayed")
             return
         bump = telem_data.get("BumpIntensity")
         if bump and self.anything_has_changed("BumpIntensity", bump):
             intensity = utils.clamp(bump * self.runway_rumble_intensity, 0, 1)
-            effects['runway_bump0'].periodic(15, intensity * .75, direction=0, effect_type=EFFECT_SQUARE, duration=80).start()
-            effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
+            effects['runway_impulse'].fire_impulse(
+                intensity, carrier_hz=28.0, duration_ms=80)
+            effects['runway_impulse_delayed'].fire_impulse(
+                intensity, carrier_hz=28.0, duration_ms=80)
 
 
     def _sample_rumble_buffer_at(self, target_t: float) -> float:
@@ -842,14 +907,31 @@ class AircraftBase(object):
         return 0.0
 
     def ac_update_runway_rumble(self, telem_data):
-        """Add wheel based rumble effects for immersion.
+        """Wheel rumble: continuous low-freq carrier + discrete bump impulses.
 
-        Generates bumps/etc on touchdown, rolling, field landing etc. The
-        nose-wheel HPF stream is rendered to two effects: ``runway0``
-        (live, stick-routed) and ``runway0_delayed`` (shaker-routed,
-        time-shifted by wheelbase / ground-speed) so a runway joint
-        propagates front→rear in the user's haptic field. ``runway1``
-        (left/right main asymmetry) is unaffected by the spatial split.
+        Two perceptually distinct streams derived from the nose-wheel HPF:
+
+        - ``runway_carrier`` (live, stick) and ``runway_carrier_delayed``
+          (rear, shaker, wheelbase/ground-speed-shifted) — smoothed |HPF|
+          driving a steady low-frequency rumble. Sits well below the engine
+          blade-pass band (60-80 Hz) so it doesn't compete spectrally with
+          the prop voices on the shaker.
+        - ``runway_impulse`` (live, stick) and ``runway_impulse_delayed``
+          (rear, shaker) — per-bump one-shots fired by an edge-triggered
+          peak detector on each channel's HPF stream. Sharp transients
+          punch through any continuous tone the device is already playing,
+          so a runway joint still reads as a clear thump even at full
+          engine power.
+
+        Each effect's intensity is a deterministic function of its own
+        telemetry stream: the carrier amplitude is an EMA of |HPF|, the
+        impulse amplitude is the captured peak. No cross-effect ducking,
+        no priority — the same telemetry sequence always produces the same
+        haptic output, so the user can develop muscle memory for what each
+        feel means.
+
+        ``runway1`` (left/right main asymmetry) is unaffected and continues
+        to render a constant force perpendicular to the front/rear axis.
         """
         if self._sim_is_bms():
             # Fake it since BMS does not have weight on wheels - only has 'bumps' telemetry
@@ -858,7 +940,9 @@ class AircraftBase(object):
 
         if self.is_collective(): return
         if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
-            effects.dispose("runway0", "runway0_delayed", "runway1")
+            effects.dispose("runway_carrier", "runway_carrier_delayed",
+                            "runway_impulse", "runway_impulse_delayed",
+                            "runway1")
             return
 
         WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # nose, left, right - wheels
@@ -890,28 +974,50 @@ class AircraftBase(object):
         # Smooth → trust the delay illusion fully. Rough → fade toward the
         # live signal so the shaker shakes in unison with the stick rather
         # than chasing a delayed copy that is perceptually invisible
-        # against the broadband noise floor.
+        # against the broadband noise floor. Applied to both the carrier
+        # and the impulse-source streams so the front→rear illusion is
+        # coherent across the two voice families.
         rms_buf = self._rumble_v1_rms_buffer
         rms = math.sqrt(sum(x * x for x in rms_buf) / len(rms_buf)) if rms_buf else 0.0
         roughness = utils.scale_clamp(
             rms,
             (self.runway_spatial_smooth_rms, self.runway_spatial_rough_rms),
             (0.0, 1.0))
-        v1_shaker = roughness * v1 + (1.0 - roughness) * v1_delayed
+        v1_rear = roughness * v1 + (1.0 - roughness) * v1_delayed
 
-        # modulate constant effects for X and Y axis
-        # connect Y axis to nosewheel, X axis to the side wheels
         tot_weight = sum(WoW)
 
-        #if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
         if tot_weight:
-            logging.debug(f"Runway Rumble : v1 = {v1}. v1_shaker = {v1_shaker} "
-                          f"(delay={delay_s:.2f}s, rms={rms:.3f}, roughness={roughness:.2f}). v2 = {v2}")
-            effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
-            effects["runway0_delayed"].constant(v1_shaker, utils.RandomDirectionModulator).start()
+            # Continuous carriers — EMA-smoothed |HPF|. 8 Hz cutoff gives a
+            # ~120 ms response so the rumble texture tracks surface change
+            # without flickering on individual samples.
+            mag_front = LPFs.get("runway_carrier_front", 8).update(abs(v1))
+            mag_rear = LPFs.get("runway_carrier_rear", 8).update(abs(v1_rear))
+            effects["runway_carrier"].constant(
+                mag_front, utils.RandomDirectionModulator).start()
+            effects["runway_carrier_delayed"].constant(
+                mag_rear, utils.RandomDirectionModulator).start()
+
+            # Discrete impulses — one fire per bump on each channel.
+            front_amp = self._runway_peak_front.update(v1, now)
+            if front_amp is not None:
+                effects['runway_impulse'].fire_impulse(
+                    front_amp, carrier_hz=28.0, duration_ms=80)
+            rear_amp = self._runway_peak_rear.update(v1_rear, now)
+            if rear_amp is not None:
+                effects['runway_impulse_delayed'].fire_impulse(
+                    rear_amp, carrier_hz=28.0, duration_ms=80)
+
+            # Side-asymmetry rumble (orthogonal to front/rear).
             effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
+
+            logging.debug(
+                f"Runway: v1={v1:.3f} v1_rear={v1_rear:.3f} "
+                f"carrier_front={mag_front:.3f} carrier_rear={mag_rear:.3f} "
+                f"(delay={delay_s:.2f}s, rms={rms:.3f}, roughness={roughness:.2f}). v2={v2:.3f}")
         else:
-            effects.dispose("runway0", "runway0_delayed", "runway1")
+            effects.dispose("runway_carrier", "runway_carrier_delayed",
+                            "runway1")
 
     def _ac_run_new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.

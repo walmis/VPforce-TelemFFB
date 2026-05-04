@@ -278,7 +278,8 @@ class TestRoutesPackLoading(unittest.TestCase):
         # assert "lots of effects" + a few specific known names.
         self.assertGreater(len(pack.routes), 50)
         self.assertIn("gunfire", pack.routes)
-        self.assertIn("runway0", pack.routes)
+        self.assertIn("runway_carrier", pack.routes)
+        self.assertIn("runway_impulse", pack.routes)
         self.assertIn("rotor_phys_main", pack.routes)
         # Layer targets are the new selector strings.
         gunfire = pack.routes["gunfire"]
@@ -289,8 +290,11 @@ class TestRoutesPackLoading(unittest.TestCase):
         # The same loader handles v1 files (with ``route``).
         pack = load_routes_pack(str(LEGACY_SHAKER_PATH))
         self.assertIsNotNone(pack)
-        # Legacy file has the original hand-tuned 20.
-        self.assertEqual(len(pack.routes), 20)
+        # Legacy file has 22 hand-tuned entries (the original 18 plus the
+        # four runway_carrier / runway_impulse front+rear voices that
+        # replaced runway0 / runway0_delayed when the rumble was redesigned
+        # for engine-vs-runway perceptual separation).
+        self.assertEqual(len(pack.routes), 22)
         # 'route: shaker' -> 'target: type:shaker'.
         gunfire = pack.routes["gunfire"]
         targets = {l.target for l in gunfire.layers}
