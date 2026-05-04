@@ -467,6 +467,15 @@ class DeviceInventoryTab(QWidget):
         # Keep the in-memory mirror in sync; routing reads G.devices on
         # startup but the EffectRoutingDialog reads it live.
         G.devices = list(self._devices)
+        # Master broadcasts the new inventory to children so they update
+        # their G.devices / G.device_positions live. Children that aren't
+        # connected yet will read it from config.ini on their next start.
+        ipc = getattr(G, "ipc_instance", None)
+        if ipc is not None and getattr(G, "master_instance", False):
+            try:
+                ipc.broadcast_inventory(blob)
+            except Exception:
+                logger.exception("Failed to broadcast inventory to children")
         self._update_status()
         self.inventoryChanged.emit()
 

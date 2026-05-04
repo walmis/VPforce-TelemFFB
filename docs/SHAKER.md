@@ -1,6 +1,18 @@
 # TelemFFB Shaker — Funktionsumfang, Architektur, Limitationen
 
-_Stand: 2026-05-03 — Branch `claude/landing-gear-motion-triggers-N7vkG`, nach der Multi-Device-Spatial-Iteration: Touchdown-Impulse pro Fahrwerksgruppe (Haupt → Shaker, Bug → Stick), Runway-Rumble mit Stick-Live + Shaker-delayed (Wheelbase / Bodengeschwindigkeit), und ein RMS-getriebener Coherence-Dimmer, der den Delay auf Gras/Dirt automatisch zurücknimmt._
+_Stand: 2026-05-04 — Branch `claude/configurable-haptic-effects-V7HYh`,
+nach der Generalisierung des Shaker-Layer-Systems zu einer geräte-agnostischen
+Routing-Engine ([docs/ROUTING.md](ROUTING.md)). Die in §4.2 hier
+beschriebenen `EFFECT_LAYERS` mit dem dreiwertigen `route`-Feld
+(`shaker`/`stick`/`both`) sind jetzt ein Spezialfall des allgemeinen
+`target`-Selektors (`type:shaker`, `type:joystick`, `id:<dev>`,
+`pos:<tag>`); Pedals, Collective, Trimwheel und Rudder lassen sich
+genauso adressieren. Der Shaker-Pfad in `ffb_shaker.py` ist unverändert,
+weil er die Audio-Mixing-Pipeline besitzt — die Routing-Engine ergänzt
+ihn auf den FFB-Geräten und nutzt dieselbe Layer-Struktur als
+Datenmodell. Vorhergehender Stand: 2026-05-03, Multi-Device-Spatial-Iteration
+(Touchdown-Impulse pro Fahrwerksgruppe, Runway-Rumble mit Stick-Live +
+Shaker-delayed, RMS-getriebener Coherence-Dimmer für Gras/Dirt)._
 
 Diese Datei ist der zentrale Einstieg, wenn jemand verstehen will, **was die
 Shaker-Integration kann, wie sie funktioniert und was sie (noch) nicht kann**.
@@ -462,6 +474,17 @@ hinzukommende Effekte aus `aircraft_base.py` machen also nicht
 versehentlich Geräusch.
 
 ### 4.2 EFFECT_LAYERS — Layered Routing (Polish-Phase)
+
+> **Hinweis (2026-05-04):** Dieses Layer-System wurde zur allgemeinen
+> Routing-Engine in [`docs/ROUTING.md`](ROUTING.md) generalisiert. Das
+> dreiwertige `route`-Feld (`shaker` / `stick` / `both`) bleibt für die
+> Shaker-Audio-Pipeline der Single Source of Truth, ist aber jetzt ein
+> Spezialfall des `target:`-Selektors aus der neuen Engine: Loader und
+> JSON-Generator (`scripts/migrate_shaker_to_routes.py`) konvertieren
+> automatisch. FFB-Geräte (Stick, Pedals, Collective, Trimwheel, Rudder)
+> lesen dieselbe Layer-Struktur und filtern via `EffectRouter`. Der
+> nachfolgende Text beschreibt den Shaker-Audio-Pfad weiter — er ist
+> unverändert.
 
 Der zentrale Mechanismus aus der Polish-Iteration. Jeder Effekt kann als
 **Liste von Layern** definiert werden:

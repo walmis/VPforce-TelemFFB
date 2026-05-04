@@ -510,6 +510,16 @@ class SetupWizard(QWizard):
             return False
         G.devices = devices
 
+        # Broadcast to any already-running child instances so they pick
+        # up the inventory without a restart. Children launched after
+        # this point will read it from config.ini directly.
+        ipc = getattr(G, "ipc_instance", None)
+        if ipc is not None and getattr(G, "master_instance", False):
+            try:
+                ipc.broadcast_inventory(encode_inventory_for_ini(devices))
+            except Exception:
+                logger.exception("SetupWizard: inventory broadcast failed")
+
         # Save preset route_overrides to effect_routes_user.json.
         if self.selected_preset:
             overrides = self.selected_preset.get("route_overrides", {})

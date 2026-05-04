@@ -20,11 +20,12 @@ import os
 from typing import List, Optional
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
-    QFormLayout, QFrame, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
-    QPushButton, QSlider, QTableWidget, QTableWidgetItem, QVBoxLayout,
-    QWidget,
+    QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView, QLabel,
+    QMenu, QMessageBox, QPushButton, QSlider, QTableWidget,
+    QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 import telemffb.globals as G
@@ -108,10 +109,11 @@ class EffectDetailDialog(QDialog):
     """
 
     def __init__(self, effect_name: str, device_label: str, layer: RouteLayer,
-                 parent=None):
+                 *, default_layer: Optional[RouteLayer] = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"{effect_name} → {device_label}")
         self._layer = layer
+        self._default_layer = default_layer
         layout = QVBoxLayout(self)
 
         form = QFormLayout()
@@ -196,7 +198,43 @@ class EffectDetailDialog(QDialog):
         )
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
+        # Reset-to-bundled-default button is only shown when the caller can
+        # supply the bundled-default layer to compare against. Skipped for
+        # synthetic / user-created layers (no default to revert to).
+        if self._default_layer is not None:
+            self.btn_reset = QPushButton("Reset to default")
+            self.btn_reset.setToolTip(
+                "Discard edits to this layer and restore the bundled "
+                "default values from effect_routes_default.json.")
+            self.btn_reset.clicked.connect(self._reset_fields_to_default)
+            bb.addButton(self.btn_reset,
+                         QDialogButtonBox.ButtonRole.ResetRole)
         layout.addWidget(bb)
+
+    def _reset_fields_to_default(self) -> None:
+        """Repopulate the form widgets from ``self._default_layer``.
+
+        The actual mutation of the working layer happens on accept via
+        ``apply_to``; this only refreshes the UI so the user can see the
+        defaults before committing them.
+        """
+        if self._default_layer is None:
+            return
+        d = self._default_layer
+        self.cb_enabled.setChecked(d.enabled)
+        self.sp_gain.setValue(d.gain)
+        self.sp_freq.setValue(d.freq_factor)
+        if d.osc_type in ("sine", "impulse", "bandpass_noise", "passthrough"):
+            self.cb_osc.setCurrentText(d.osc_type)
+        if d.direction_policy in DirectionPolicy.ALL:
+            self.cb_dir.setCurrentText(d.direction_policy)
+        self.sp_dir_value.setValue(
+            d.direction_value if d.direction_value is not None else 0.0)
+        self.sp_dir_value.setEnabled(d.direction_policy == DirectionPolicy.FIXED)
+        self.sp_center.setValue(d.center_hz if d.center_hz else 0.0)
+        self.sp_bw.setValue(d.bandwidth_hz if d.bandwidth_hz else 0.0)
+        self.sp_atk.setValue(d.attack_ms if d.attack_ms else 0.0)
+        self.sp_dec.setValue(d.decay_ms if d.decay_ms else 0.0)
 
     def apply_to(self, layer: RouteLayer) -> None:
         """Mutate ``layer`` with the dialog values."""
@@ -303,6 +341,20 @@ class EffectRoutingDialog(QDialog):
         self.cb_scope.currentIndexChanged.connect(self._on_scope_changed)
         scope_row.addWidget(self.cb_scope)
         scope_row.addStretch(1)
+        # Import / Export of the routes file. Useful for sharing tunings
+        # across machines or with the community.
+        self.btn_export = QPushButton("Export…")
+        self.btn_export.setToolTip(
+            "Save the current routing pack (defaults + user overrides + "
+            "class patches) to a JSON file you can share or back up.")
+        self.btn_export.clicked.connect(self._on_export)
+        scope_row.addWidget(self.btn_export)
+        self.btn_import = QPushButton("Import…")
+        self.btn_import.setToolTip(
+            "Load a routing pack from a JSON file. Replaces the working "
+            "view; press Apply to make it permanent.")
+        self.btn_import.clicked.connect(self._on_import)
+        scope_row.addWidget(self.btn_import)
         self.lbl_scope_hint = QLabel("")
         self.lbl_scope_hint.setStyleSheet("color: #888;")
         scope_row.addWidget(self.lbl_scope_hint)
@@ -313,6 +365,11 @@ class EffectRoutingDialog(QDialog):
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents,
         )
+        # Context menu on the effect-name (vertical header) for whole-row
+        # operations like "reset this effect to bundled defaults".
+        v_header = self.table.verticalHeader()
+        v_header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        v_header.customContextMenuRequested.connect(self._on_row_context_menu)
         self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
         layout.addWidget(self.table, stretch=1)
 
@@ -492,7 +549,16 @@ class EffectRoutingDialog(QDialog):
                 "No layer is currently routed to this device. Enable the "
                 "checkbox first to create one.")
             return
-        dlg = EffectDetailDialog(effect_name, dev_id, layer, parent=self)
+        # Find the matching layer in the bundled defaults so the detail
+        # dialog can offer a "Reset to default" button. None when the
+        # bundled defaults have no layer for this effect+device.
+        default_layer: Optional[RouteLayer] = None
+        default_route = self._defaults.routes.get(effect_name)
+        if default_route is not None:
+            default_layer = self._first_layer_for(
+                default_route, dev_id, dev_type, positions)
+        dlg = EffectDetailDialog(effect_name, dev_id, layer,
+                                 default_layer=default_layer, parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             dlg.apply_to(layer)
             # Re-read magnitude/enabled into the cell so the matrix shows
@@ -500,6 +566,62 @@ class EffectRoutingDialog(QDialog):
             editor.cb.setChecked(layer.enabled)
             editor.sl.setValue(int(round(layer.gain * 100)))
             self._edited_layers[(effect_name, dev_id)] = layer
+
+    # --- per-row context menu ---
+
+    def _on_row_context_menu(self, pos) -> None:
+        """Right-click on the effect-name header opens a per-row menu.
+
+        Currently exposes "Reset this effect to bundled defaults" which
+        replaces the whole row's layer set with the corresponding entry
+        from ``effect_routes_default.json``. Useful when a user wants to
+        undo experimentation without resetting the entire matrix.
+        """
+        v_header = self.table.verticalHeader()
+        row = v_header.logicalIndexAt(pos)
+        if row < 0 or row >= self.table.rowCount():
+            return
+        item = self.table.verticalHeaderItem(row)
+        if item is None:
+            return
+        effect_name = item.text()
+        menu = QMenu(self)
+        reset_act = QAction(f"Reset '{effect_name}' to bundled default", self)
+        # Disable the action when there is nothing to reset to (e.g. a
+        # user-added effect that has no entry in defaults).
+        reset_act.setEnabled(effect_name in self._defaults.routes)
+        reset_act.triggered.connect(
+            lambda: self._reset_effect_to_default(effect_name))
+        menu.addAction(reset_act)
+        menu.exec(v_header.mapToGlobal(pos))
+
+    def _reset_effect_to_default(self, effect_name: str) -> None:
+        """Restore one effect's layers from the bundled defaults.
+
+        Operates on the active scope:
+        - Global: replaces ``_working.routes[effect_name]`` with a fresh
+          deep-copy of the bundled default route.
+        - Class scope: removes the per-class patch for this effect, so it
+          falls through to the global routing again.
+        """
+        default_route = self._defaults.routes.get(effect_name)
+        if default_route is None:
+            return
+        if self._scope == SCOPE_GLOBAL:
+            self._working.routes[effect_name] = EffectRoute(
+                name=effect_name,
+                layers=[RouteLayer(**l.to_dict()) for l in default_route.layers],
+            )
+        else:
+            patch = self._user.aircraft_class_overrides.get(self._scope, {})
+            patch.pop(effect_name, None)
+            if not patch:
+                self._user.aircraft_class_overrides.pop(self._scope, None)
+        # Drop any pending in-memory edits on this effect.
+        self._edited_layers = {
+            k: v for k, v in self._edited_layers.items() if k[0] != effect_name
+        }
+        self._populate_table()
 
     # --- apply / save ---
 
@@ -553,6 +675,69 @@ class EffectRoutingDialog(QDialog):
         self._working = self._merge_packs(self._defaults, self._user)
         self._edited_layers.clear()
         self._populate_table()
+
+    # --- import / export ---
+
+    def _on_export(self) -> None:
+        """Write the current working pack to a user-chosen path.
+
+        Always exports the FULL working view (defaults + user overrides +
+        class patches), so the file is self-contained — a recipient who
+        imports it gets the same routing without needing the bundled
+        defaults to be byte-equal.
+        """
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export routing pack", "effect_routes_export.json",
+            "JSON files (*.json);;All files (*)")
+        if not path:
+            return
+        pack = EffectRoutesPack(
+            version=4,
+            routes=self._working.routes,
+            aircraft_class_overrides=self._user.aircraft_class_overrides,
+        )
+        try:
+            self._write_pack_to(path, pack)
+            QMessageBox.information(
+                self, "Exported", f"Wrote routing pack to:\n{path}")
+        except Exception:
+            logger.exception("Export failed")
+            QMessageBox.critical(self, "Export failed",
+                                 "Could not write the file. See log.")
+
+    def _on_import(self) -> None:
+        """Load a routing pack from a user-chosen path into the working view.
+
+        Does NOT save automatically — the user must press Apply or OK to
+        commit. This lets people preview a shared pack before adopting it.
+        Importing is non-destructive on cancel and refuses files that
+        don't parse as a v4 routes pack.
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import routing pack", "",
+            "JSON files (*.json);;All files (*)")
+        if not path:
+            return
+        loaded = load_routes_pack(path)
+        if loaded is None:
+            QMessageBox.warning(
+                self, "Import failed",
+                "File could not be parsed as a routes pack.")
+            return
+        # Treat the imported file as a complete user override: its
+        # ``effects`` map becomes the new user routes, its
+        # ``aircraft_class_overrides`` replaces the current per-class
+        # patches. The bundled defaults are unchanged.
+        self._user = loaded
+        self._working = self._merge_packs(self._defaults, self._user)
+        self._edited_layers.clear()
+        self._populate_table()
+        QMessageBox.information(
+            self, "Imported",
+            f"Loaded {len(loaded.routes)} effect(s) and "
+            f"{len(loaded.aircraft_class_overrides)} class patch(es) "
+            "from the file.\n\nReview the matrix and press Apply to "
+            "save and reload routing live.")
 
     def _save_working_to_user(self) -> bool:
         path = _user_routes_path()
