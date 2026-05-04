@@ -344,6 +344,10 @@ class MainWindow(QMainWindow):
         self.support_action.triggered.connect(lambda: utils.create_support_bundle(G.userconfig_rootpath))
         help_menu.addAction(self.support_action)
 
+        setup_wizard_action = QAction("Multi-Device Setup Wizard...", self)
+        setup_wizard_action.triggered.connect(self.open_setup_wizard)
+        help_menu.addAction(setup_wizard_action)
+
         # Create a line beneath the menu bar
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
@@ -1912,6 +1916,18 @@ class MainWindow(QMainWindow):
             return
         dlg = EffectRoutingDialog(self)
         dlg.exec()
+
+    def open_setup_wizard(self):
+        """Launch the multi-device setup wizard (modal)."""
+        try:
+            from telemffb.SetupWizard import SetupWizard
+        except Exception:
+            logging.exception("Could not load SetupWizard")
+            QMessageBox.warning(self, "Setup Wizard",
+                                "Setup wizard failed to load. See log for details.")
+            return
+        wiz = SetupWizard(self)
+        wiz.exec()
 
 
 

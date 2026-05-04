@@ -389,6 +389,31 @@ def _setup_routing():
     )
 
 
+def _maybe_show_setup_wizard():
+    """First-run prompt for the multi-device setup wizard.
+
+    Conditions:
+    - Master instance only (children inherit the inventory).
+    - Wizard hasn't been completed yet ([system].setup_wizard_done is false).
+    - The inventory is currently empty.
+    Both conditions are checked by ``SetupWizard.should_offer_wizard()``.
+    """
+    if not G.master_instance:
+        return
+    try:
+        from telemffb.SetupWizard import SetupWizard, should_offer_wizard
+    except Exception:
+        logging.exception("SetupWizard module unavailable; skipping first-run prompt")
+        return
+    if not should_offer_wizard():
+        return
+    try:
+        wiz = SetupWizard(G.main_window)
+        wiz.exec()
+    except Exception:
+        logging.exception("SetupWizard execution failed")
+
+
 def _setup_config_paths():
     """
     Setup configuration file paths based on build type and mode.
@@ -1015,6 +1040,11 @@ def main():
 
     # Prompt for system settings if no devices are configured
     _check_system_settings_required()
+
+    # First-run multi-device setup wizard. Master-only (children inherit
+    # the inventory via the shared config). Skipped if the inventory is
+    # already populated or the user has explicitly dismissed the wizard.
+    _maybe_show_setup_wizard()
 
     # ============================================================================
     # PHASE 14: Background Initialization
