@@ -246,6 +246,10 @@ class MainWindow(QMainWindow):
         effect_tester_action.triggered.connect(self.open_effect_tester)
         utilities_menu.addAction(effect_tester_action)
 
+        effect_routing_action = QAction('Effect Routing...', self)
+        effect_routing_action.triggered.connect(self.open_effect_routing)
+        utilities_menu.addAction(effect_routing_action)
+
         self.update_action = QAction('Install Latest TelemFFB', self)
         self.update_action.triggered.connect(self.update_from_menu)
         if not G.release_version:
@@ -796,6 +800,16 @@ class MainWindow(QMainWindow):
         settings_widget.setLayout(self.settings_layout)
         self.settings_area.setWidget(settings_widget)
         self.tab_widget.addTab(self.settings_area, "Settings")
+
+
+        """ Devices tab — multi-device routing inventory """
+        try:
+            from telemffb.DeviceInventoryTab import DeviceInventoryTab
+            self.device_inventory_tab = DeviceInventoryTab(self)
+            self.tab_widget.addTab(self.device_inventory_tab, "Devices")
+        except Exception:
+            logging.exception("Could not initialise Devices tab")
+            self.device_inventory_tab = None
 
 
         """ Create the Hide tab and set its properties """
@@ -1886,6 +1900,18 @@ class MainWindow(QMainWindow):
         dlg = EffectTestDialog(self)
         dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dlg.show()
+
+    def open_effect_routing(self):
+        """Open the per-effect routing matrix editor (modal)."""
+        try:
+            from telemffb.EffectRoutingDialog import EffectRoutingDialog
+        except Exception:
+            logging.exception("Could not load Effect Routing dialog")
+            QMessageBox.warning(self, "Effect Routing",
+                                "Routing UI failed to load. See log for details.")
+            return
+        dlg = EffectRoutingDialog(self)
+        dlg.exec()
 
 
 
