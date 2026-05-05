@@ -321,17 +321,28 @@ def _build_haptic_effect_class():
             return self
 
         # --- start / stop / destroy fan-out ---
+        #
+        # Each method delegates to ``super()`` only when the inherited
+        # ``_h_effect`` slot is populated. Force-only effects (spring /
+        # damper / inertia / friction / setCondition) bypass routing and
+        # populate that slot via their inherited builders; routed
+        # oscillator effects never touch it. Gating on ``_h_effect`` keeps
+        # routed-only no-match cases silent while letting force-only
+        # effects actually start / stop / destroy on the device.
 
         def start(self, force: bool = False, **kw):
-            if not self._is_resolved or not self._sub_handles:
-                return self
-            for sub in self._sub_handles:
-                sub.start(force=force, **kw)
+            if self._is_resolved and self._sub_handles:
+                for sub in self._sub_handles:
+                    sub.start(force=force, **kw)
+            if self._h_effect is not None:
+                super().start(force=force, **kw)
             return self
 
         def stop(self, destroy_after: int = 10000):
             for sub in self._sub_handles:
                 sub.stop(destroy_after=destroy_after)
+            if self._h_effect is not None:
+                super().stop(destroy_after=destroy_after)
             return self
 
         def destroy(self):
@@ -344,20 +355,25 @@ def _build_haptic_effect_class():
             self._sub_handles.clear()
             self._sub_layers.clear()
             self._is_resolved = False
+            if self._h_effect is not None:
+                super().destroy()
 
         @property
         def started(self) -> bool:
-            return any(getattr(sub, "started", False)
-                       for sub in self._sub_handles)
+            if any(getattr(sub, "started", False)
+                   for sub in self._sub_handles):
+                return True
+            return bool(self._h_effect) and self._h_effect.started
 
         @property
         def id(self):
             # Mirror ffb_rhino: returns the Rhino effect-block id of the
-            # FIRST sub-handle, or None if the composite has no slots
-            # configured. Code that displays this typically tolerates None.
-            if not self._sub_handles:
-                return None
-            return self._sub_handles[0].id
+            # FIRST sub-handle, or — for force-only effects that use the
+            # inherited slot — the parent's effect id. Code that displays
+            # this typically tolerates None.
+            if self._sub_handles:
+                return self._sub_handles[0].id
+            return self._h_effect.effect_id if self._h_effect else None
 
     return _RoutedHapticEffect, _rhino.FFBReport_SetCondition
 
