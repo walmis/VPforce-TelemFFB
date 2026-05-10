@@ -51,6 +51,8 @@ class NetworkThread(threading.Thread):
                 data, sender = s.recvfrom(65535)
                 if self._telem_parser is not None:
                     data = self._telem_parser.process_packet(data)
+                    if data is None:
+                        continue
 
                 self._telem.submit_frame(data)
             except ConnectionResetError:

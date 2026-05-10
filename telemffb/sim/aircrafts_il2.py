@@ -119,7 +119,7 @@ class Aircraft(AircraftBase):
     il2_enable_buffet = 0  # not yet impelemnted
     il2_buffeting_factor: float  = 1.0
     il2_dynamic_gunfire_mode = False
-    stop_state = False
+    #stop_state = False
 
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
@@ -243,14 +243,14 @@ class Aircraft(AircraftBase):
         :param new_data: New telemetry data
         :type new_data: dict
         """
-        if telem_data.SimPaused or telem_data.MPMenu or not telem_data.Focus:
-            if not self.stop_state:
-                self.on_timeout()
-            self.stop_state = True
-            G.telem_manager.telemetryTimeout.emit(True)
-            return
-        
-        self.stop_state = False
+        # if telem_data.SimPaused or telem_data.MPMenu or not telem_data.Focus:
+        #     if not self.stop_state:
+        #         self.on_timeout()
+        #     self.stop_state = True
+        #     G.telem_manager.telemetryTimeout.emit(True)
+        #     return
+        #
+        # self.stop_state = False
 
         if telem_data.AircraftClass == "unknown":
             telem_data.AircraftClass = "GenericAircraft" #inject aircraft class into telemetry

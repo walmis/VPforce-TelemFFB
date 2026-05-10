@@ -213,6 +213,8 @@ class IL2TelemParser(TelemParserBase):
         self._changes = {}
         self._change_counter = {}
         self.last_paused_data: list = []
+        self._stale_count: int = 0
+        self._il2_stop_state: bool = False
         self.telem_data = {"src": "IL2", "N": "", "AircraftClass": "unknown"}
 
         self.state = StateDataStructure()
@@ -287,16 +289,30 @@ class IL2TelemParser(TelemParserBase):
 
         # create structure of the most real-time data to determine if updated telemetry is flowing.  If not, consider
         # the sim paused.  This avoids effects continuing to play when in multiplayer map or after crash since IL-2 never stops sending
-        # stale frames.
-        paused_data = [self.state.acceleration_Gs, self.state.above_ground_level_metres,self.state.rpm, self.rot_accel, self.rot_velocity]
+        # stale frames.  Require 5 consecutive identical frames to avoid false positives during steady flight.
+        paused_data = [
+            list(self.state.acceleration_Gs),
+            self.state.above_ground_level_metres,
+            list(self.state.rpm),
+        ]
         if paused_data == self.last_paused_data:
-            self.telem_data['MPMenu'] = True
+            self._stale_count += 1
         else:
-            self.telem_data['MPMenu'] = False
+            self._stale_count = 0
+        self.telem_data['MPMenu'] = (self._stale_count >= 5)
         self.last_paused_data = paused_data
 
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in self.telem_data.items()]), "utf-8")
-        return packet
+
+        # When MPMenu or focus-loss is detected, stop submitting frames so TelemManager
+        # times out naturally (same pattern as SimConnectManager for MSFS pause states).
+        should_stop = self.telem_data.get('MPMenu', False) or not self.telem_data.get('Focus', 1)
+        if should_stop:
+            self._il2_stop_state = True
+            return None
+        else:
+            self._il2_stop_state = False
+            return packet
 
     def decode_motion(self, data : BinaryDataReader):
         tick = data.get_uint32()
