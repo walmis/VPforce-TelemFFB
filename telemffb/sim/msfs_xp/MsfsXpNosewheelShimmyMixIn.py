@@ -16,6 +16,18 @@ class MsfsXpNosewheelShimmyMixIn(AircraftEffectUtilsBase):
     #end of user parameters
 
     def msfs_update_nosewheel_shimmy(self, telem_data: BaseTelemetryData):
+        """Apply nosewheel shimmy vibration to pedals during heavy braking (MSFS only).
+
+        Telemetry:
+            Read: IsTaildragger  - bool; effect skipped entirely for taildragger aircraft
+                  Brakes         - Union[List[float], Tuple[float,...]] ([left, right], 0.0–1.0);
+                                    average of both axes drives shimmy intensity
+                  SimOnGround    - int (0 or 1); effect suppressed when airborne (0)
+                  WeightOnWheels - List[float] (compression 0.0–1.0); summed; must be
+                                    non-zero to play
+                  GroundSpeed    - float (m/s, ≥ 0); scales shimmy frequency between
+                                    freq_lo (8 Hz) and freq_hi (16 Hz)
+        """
         if not self._sim_is_msfs(): return
         if not self.is_pedals(): return
         if not self.nosewheel_shimmy: return

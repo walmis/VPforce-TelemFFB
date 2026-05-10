@@ -36,6 +36,16 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         self._engine_rumble_last = None
 
     def ac_update_piston_engine_rumble(self, telem_data: BaseTelemetryData):
+        """Apply piston/propeller engine rumble based on RPM.
+
+        Telemetry:
+            Read (MSFS/XPLANE): PropRPM   - Union[float, List[float]] (RPM, ≥ 0);
+                                             list max taken for multi-engine aircraft;
+                                             effect suppressed below 5 RPM
+            Read (DCS):         ActualRPM - Union[float, List[float]] (RPM, ≥ 0);
+                                             absolute RPM (not percentage)
+            Read (IL2):         RPM       - Union[float, List[float]] (RPM, ≥ 0)
+        """
         if not self.engine_prop_rumble_enabled:
             self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
             return
@@ -106,6 +116,14 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         return interpolated_intensity
 
     def ac_update_jet_engine_rumble(self, telem_data: BaseTelemetryData):
+        """Apply jet engine rumble scaled by engine power.
+
+        Telemetry:
+            Read (XPLANE): EngPCT - Union[float, List[float]] (%, 0–100); engine power
+                                     percentage; list max taken; effect suppressed at 0
+            Read (others): EngRPM - Union[float, List[float]] (% of max RPM, 0–100);
+                                     list max taken; used to scale frequency and intensity
+        """
         if not self.engine_jet_rumble_enabled or not self.jet_engine_rumble_intensity > 0:
             self.effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
             return
@@ -143,6 +161,13 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
     def ac_update_ab_effect(self, telem_data: BaseTelemetryData):
+        """Apply afterburner rumble effect.
+
+        Telemetry:
+            Read: Afterburner - Union[float, List[float]] (bool-like 0 or 1, or 0.0–1.0
+                                 scaled for BMS); MSFS = per-engine bool; list max taken;
+                                 effect plays only when non-zero
+        """
         if not self.afterburner_effect_intensity or not self.afterburner_effect_enabled:
             self.effects.dispose("ab_rumble_1_1", "ab_rumble_2_1")
             return

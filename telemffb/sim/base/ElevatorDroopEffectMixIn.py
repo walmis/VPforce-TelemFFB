@@ -11,6 +11,12 @@ class ElevatorDroopEffectMixIn(AircraftEffectUtilsBase):
 
     '''Mixin for elevator droop effect.'''
     def ac_override_elevator_droop(self, telem_data: BaseTelemetryData):
+        """Apply elevator droop constant force when below 20 kt (simulates gravity-droop at low speed).
+
+        Telemetry:
+            Read: TAS - float (m/s, ≥ 0); true airspeed; force linearly scales from
+                         elevator_droop_force at 0 m/s down to 0 at 20 kt (~10.3 m/s)
+        """
         if not self.is_joystick():
             return
         if not self.elevator_droop_enabled or not self.elevator_droop_force:

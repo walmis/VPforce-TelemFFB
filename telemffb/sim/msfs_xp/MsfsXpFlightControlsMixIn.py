@@ -283,7 +283,21 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         """This function is not used in MSFS/X-Plane mixin."""
 
     def _calculate_airspeeds(self, telem_data: BaseTelemetryData, incidence_vec):
-        """Calculate and store airspeed values in telemetry data."""
+        """Calculate and store airspeed values in telemetry data.
+
+        Telemetry:
+            Read:    IAS     - float (m/s, ≥ 0); indicated airspeed; used as the working airspeed
+                     AccBody - List[float] ([x, y, z] in g); body-frame acceleration;
+                               each element multiplied by 9.80665 to produce AccBody_ms
+            Written: TAS         - OVERWRITTEN with IAS value (see TODO note in source)
+                     TAS_kt      - float (kt); IAS converted to knots
+                     IAS_kt      - float (kt); IAS in knots
+                     AccBody_ms  - List[float] (m/s²); AccBody scaled from g to m/s²
+
+        Note: telem_data.TAS (true airspeed) is read from the sim but immediately
+              discarded and replaced with the IAS value. All downstream calculations
+              that reference TAS are therefore using IAS. See the TODO comment in source.
+        """
         # TODO: MSFS provides AIRSPEED TRUE via telem_data.TAS but it is discarded here.
         # IAS is used instead (and written back into TAS), which underestimates propwash
         # by ~17% at 10,000 ft (TAS ≈ 1.17×IAS there). The actuator-disc formula below
@@ -319,6 +333,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             - slip_angle is the lateral slip angle in radians,
             - aoa is the angle-of-attack in degrees (negative sign preserved
               to match existing code behaviour).
+
+        Telemetry:
+            Read:    RudderDefl - float (degrees); rudder surface deflection; negated for XPLANE
+            Written: SideSlip   - float (degrees); computed side-slip angle
+                     AoA        - float (degrees, typically negative nose-up); computed AoA
         """
         rudder_angle = telem_data.RudderDefl * rad
         if self._sim_is_xplane():
@@ -351,6 +370,14 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         -------
         float
             The computed propeller-induced air velocity (m/s).
+
+        Telemetry:
+            Read:    PropThrust  - Union[float, List[float]] (N, ≥ 0 after clamp); propeller thrust;
+                                    list max taken; negative values clamped to 0
+                     AirDensity  - float (kg/m³); ambient air density; used in actuator-disc formula
+            Written: _prop_thrust   (float, N; clamped thrust value used in calculation)
+                     _elevator_aoa  (float, degrees; AoA seen by elevator including prop-wash)
+                     _prop_air_vel  (float, m/s; resultant propeller airflow velocity)
         """
         _prop_thrust = telem_data.PropThrust or 0
         if isinstance(_prop_thrust, list):
@@ -389,6 +416,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             (_elev_dyn_pressure, _dyn_pressure, _rud_dyn_pressure)
             All values are scaled by the internal dynamic pressure scale
             (`self.__dyn_pressure_scale`).
+
+        Telemetry:
+            Read:    DynPressure  - float (Pa, ≥ 0); freestream dynamic pressure
+                     AirDensity   - float (kg/m³); ambient air density; used for prop-wash mixing
+            Written: _elev_dyn_pressure (float; scaled elevator dynamic pressure after prop-wash mix)
         """
         _elev_dyn_pressure = (
             utils.mix(
@@ -432,6 +464,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         tuple
             (vne, Q_gain) where vne is the computed Vne in m/s and Q_gain is a
             normalization factor applied to dynamic pressure values.
+
+        Telemetry:
+            Read (MSFS):   DesignSpeed - Tuple[float, float, float] (m/s); (vc, vs0, vs1);
+                                          vc used to estimate Vne (Tvne = vc × 1.4)
+            Read (XPLANE): Vne         - float (m/s); never-exceed speed; used directly
+                           Vso         - float (m/s); stall speed; NOT USED in calculations
+            Written: Vc_kt       (float, kt; MSFS cruise speed in knots)
+                     Vne_ms_calc (float, m/s; computed Vne before vne_override applied)
+                     Vne_kt      (float, kt; effective Vne used in calculations)
+                     Qvne        (float; scaled dynamic pressure at Vne)
+                     Qvc_gain    (float; gain factor = 1/Qvne)
+
+        Note: Vso (XPLANE) is fetched but not used in any downstream computation.
         """
         if telem_data.src == "XPLANE":
             vne = telem_data.Vne
@@ -486,6 +531,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         -------
         tuple
             (elevator_coeff, aileron_coeff, rudder_coeff, elevator_droop_term)
+
+        Telemetry:
+            Read:    (all inputs are pre-computed; no direct telem_data reads)
+            Written: _elevator_droop_term (debug: gravity droop bias term)
+                     _elev_coeff          (debug: final elevator spring coefficient)
+                     _aile_coeff          (debug: final aileron spring coefficient)
+                     _rud_coeff           (debug: final rudder spring coefficient)
         """
         # Elevator droop effect
         _elevator_droop_term = self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
@@ -544,6 +596,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         -------
         float
             The computed G-term used as a constant pitch bias in the FFB model.
+
+        Telemetry:
+            Read:    AccBody[1] - float (g); vertical (lateral in body-frame) acceleration;
+                                   index [1] scaled by normalized stick Y position
+            Written: _G_term    (float; pitch bias term sent to control_weight effect)
         """
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
 
@@ -578,6 +635,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         float
             A clamped rudder force in the range [-1, 1] that may be time-damped
             by an internal dampener.
+
+        Telemetry:
+            Read: IAS - float (m/s, ≥ 0); indicated airspeed; linearly scales rudder force
+                         from 0 at standstill to full at Vne via speed_factor
         """
         rud = (slip_angle - rudder_angle) * _dyn_pressure * _slip_gain
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
@@ -614,6 +675,15 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             where physical offsets are integer device offsets (0..4096) and
             virtual offsets are normalized [-1..1] values applied to virtual
             stick commands.
+
+        Telemetry:
+            Read: ElevTrimPct      - float (–1.0 to 1.0); normalized elevator trim pct;
+                                      Y-axis spring center offset
+                  AileronTrimPct   - float (–1.0 to 1.0); normalized aileron trim pct;
+                                      X-axis spring center offset
+            Read (MSFS, AP active): AileronDeflPctLR - List[float] ([left, right], –1.0 to 1.0);
+                                                         aileron surface deflection; index [0] used
+            Read (XPLANE, AP active): APRollServo    - float (–1.0 to 1.0); AP roll servo position
         """
         if not (self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control):
             return 0, 0, 0, 0
@@ -691,7 +761,15 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self._send_msfs_axis_value(y_var, y_pos, y_range, y_scale)
 
     def _calculate_aoa_offset(self, telem_data: BaseTelemetryData, _aoa, force_trim_y_offset, phys_stick_y_offs, IAS, vne):
-        """Calculate Y offset for AoA effect."""
+        """Calculate Y spring offset incorporating AoA, trim, and speed.
+
+        Telemetry:
+            Read: ElevDeflPct      - float (–1.0 to 1.0); elevator deflection as normalized pct;
+                                      AoA offset path skipped when zero
+                  ElevDefl         - float (degrees); elevator surface deflection in degrees;
+                                      tot = ElevDefl / ElevDeflPct gives total range
+                  WeightOnWheels   - List[float] (0.0–1.0 per wheel); max() > 0 skips AoA offset
+        """
         if (
             self.aoa_effect_enabled
             and (telem_data.ElevDeflPct or 0) != 0
@@ -711,7 +789,15 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         return y_offs
 
     def _calculate_joystick_spring_coefficients(self, telem_data: BaseTelemetryData, elevator_coeff, aileron_coeff, base_elev_coeff, base_ailer_coeff):
-        """Calculate spring coefficients for joystick axes."""
+        """Calculate and clamp spring coefficients for joystick axes.
+
+        Telemetry:
+            Read:    (no direct telem_data reads; all inputs are pre-computed)
+            Written: _pct_max_e (debug: elevator coeff as fraction of max)
+                     _ec        (debug: final elevator spring coefficient in device units)
+                     _pct_max_a (debug: aileron coeff as fraction of max)
+                     _ac        (debug: final aileron spring coefficient in device units)
+        """
         max_coeff_y = int(4096 * self.max_elevator_coeff)
         realtime_coeff_y = int(4096 * elevator_coeff)
         ec = int(utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 4096), (base_elev_coeff, max_coeff_y)))
@@ -786,7 +872,12 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self._spring_handle.start()
 
     def _calculate_rudder_trim_offsets(self, telem_data: BaseTelemetryData):
-        """Calculate trim following offsets for rudder pedals."""
+        """Calculate trim-following offsets for rudder pedals.
+
+        Telemetry:
+            Read: RudderTrimPct - float (–1.0 to 1.0); normalized rudder trim pct;
+                                   drives X-axis spring center offset
+        """
         if not (self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control):
             return 0, 0
 
@@ -798,7 +889,14 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         return phys_rudder_x_offs, virtual_rudder_x_offs
 
     def _calculate_rudder_spring_coefficient(self, telem_data: BaseTelemetryData, rudder_coeff, base_rudder_coeff):
-        """Calculate spring coefficient for rudder pedals."""
+        """Calculate and clamp spring coefficient for rudder pedals.
+
+        Telemetry:
+            Read (ADVANCED spring mode only): IAS - float (m/s, ≥ 0); indicated airspeed;
+                                                      used to look up gains from adv_spr_gains table
+            Written: _pct_max_r (float, 0.0–1.0; rudder coeff as fraction of max)
+                     _rc        (int, 0–4096; final rudder spring coefficient in device units)
+        """
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
             if not self.adv_spr_gains:
                 self.flag_error("Please open and configure the advanced spring gain settings")
@@ -902,11 +1000,49 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     
 
     def msfs_update_flight_controls(self, telem_data: BaseTelemetryData):
-        """
-        Main method for updating flight controls. 
+        """Main method for updating flight controls.
         Calculations loosely based on FlightGear FFB:
         https://wiki.flightgear.org/Force_feedback
         https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
+
+        Telemetry (top-level reads; see individual helper docstrings for detail):
+            Read (MSFS):   APMaster         - autopilot engaged state
+            Read (XPLANE): APServos         - autopilot servo engaged state
+            Read: FFBType        - device type ("joystick", "pedals", "collective")
+                  ACisFBW        - routes to FBW path when True
+                  AircraftClass  - aborts for helicopters
+                  Incidence      - 3-element body-frame incidence vector → AoA/slip
+                  IAS            - indicated airspeed (m/s)
+                  AccBody        - body-frame acceleration vector (Gs)
+                  DynPressure    - freestream dynamic pressure (Pa)
+                  AirDensity     - ambient air density (kg/m³)
+                  PropThrust     - propeller thrust (N); 0 for jets/gliders
+                  RudderDefl     - rudder surface deflection (degrees)
+                  G              - vertical G load (scalar)
+            Read (MSFS):   DesignSpeed      - (vc, vs0, vs1) design speed tuple
+            Read (XPLANE): Vne, Vso         - Vne direct; Vso fetched but NOT used
+            Read (joystick, trim-following):
+                  ElevTrimPct, AileronTrimPct  - trim offsets for spring center
+                  AileronDeflPctLR [MSFS AP]   - aileron surface position for AP follow
+                  APRollServo [XPLANE AP]       - AP roll servo position for AP follow
+            Read (joystick, AoA offset):
+                  ElevDeflPct, ElevDefl        - elevator deflection for AoA path
+                  WeightOnWheels               - suppresses AoA offset when on ground
+            Read (pedals, trim-following):
+                  RudderTrimPct                - rudder trim offset for spring center
+            Read (pedals, ADVANCED spring):
+                  IAS                          - for adv_spr_gains lookup
+            Read (steering friction, when enabled):
+                  SimOnGround, WeightOnWheels[0], GroundSpeed, WaterRudderExt,
+                  SurfaceType, CenterSteerAnglePct
+            Read (controls lock, when enabled):
+                  ControlsLock                 - custom simvar for controls-locked state
+            Written (debug): TAS, TAS_kt, IAS_kt, AccBody_ms, SideSlip, AoA,
+                     _prop_thrust, _elevator_aoa, _prop_air_vel, _elev_dyn_pressure,
+                     Vc_kt, Vne_ms_calc, Vne_kt, Qvne, Qvc_gain, _slip_gain,
+                     _elevator_droop_term, _elev_coeff, _aile_coeff, _rud_coeff,
+                     _G_term, _pct_max_e, _ec, _pct_max_a, _ac, _pct_max_r, _rc,
+                     phys_x, phys_y, _controls_locked
         """
         self._spring_handle.name = "dynamic_spring"
         

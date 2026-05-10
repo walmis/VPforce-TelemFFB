@@ -24,6 +24,18 @@ class WeaponsEffectMixIn(AircraftEffectUtilsBase):
     # end of user parameters
 
     def ac_update_cm_weapons(self, telem):
+        """Apply gun, weapon release, and countermeasure haptic effects.
+
+        Telemetry:
+            Read: PayloadInfo - varies (int station count, list, or string); payload state;
+                                 any change triggers the weapon release effect
+                  Gun         - Union[bool, int, float] (0 or 1); gun firing state;
+                                 any change triggers the gunfire effect
+                  Flares      - Union[int, float] (count, ≥ 0); flare count/state;
+                                 change combined with Chaff change triggers CM effect
+                  Chaff       - Union[int, float] (count, ≥ 0); chaff count/state;
+                                 change combined with Flares change triggers CM effect
+        """
         payload = telem.PayloadInfo
         gun = telem.Gun
         flares = telem.Flares

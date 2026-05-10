@@ -91,6 +91,13 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             self.effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
 
     def ac_update_flaps(self, telem_data: BaseTelemetryData):
+        """Play motion haptic when flap position changes.
+
+        Telemetry:
+            Read: Flaps       - Union[float, List[float]] (0.0–1.0); flap deployment;
+                                 list max taken; primary source
+                  flaps_value - float (0.0–1.0); fallback when Flaps is None
+        """
         flapspos = telem_data.Flaps
         if flapspos is None:
             flapspos = telem_data.flaps_value
@@ -107,8 +114,15 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             self.effects["flapsmovement"].stop(destroy_after=5000)
 
     def ac_update_runway_rumble(self, telem_data: BaseTelemetryData):
-        """Add wheel based rumble effects for immersion
-        Generates bumps/etc on touchdown, rolling, field landing etc
+        """Add wheel-based rumble effects for immersion.
+        Generates bumps/etc on touchdown, rolling, field landing etc.
+
+        Telemetry:
+            Read: WeightOnWheels - List[float] ([center, left, right], compression 0.0–1.0);
+                                   [0] drives center-wheel HPF (Y axis), [1]–[2] difference
+                                   drives side-wheel HPF (X axis)
+            Read (BMS only): BumpIntensity - float (0.0–1.0); direct bump impulse from sim;
+                                              replaces WeightOnWheels path for BMS
         """
         if self._sim_is_bms():
             # Fake it since BMS does not have weight on wheels - only has 'bumps' telemetry
@@ -144,7 +158,15 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             self.effects.dispose("runway0", "runway1")
 
     def ac_update_touchdown_effect(self, telem_data: BaseTelemetryData):
-        """Generates a g-based force upon landing or as a result of large bumps"""
+        """Generates a G-based forward force upon landing or large bump.
+
+        Telemetry:
+            Read (MSFS/XPLANE): AccBody[1] - float (g); vertical body-frame acceleration;
+                                              index [1] taken directly
+            Read (DCS/IL2/BMS): ACCs[1]    - float (g); vertical G with 1 g level-flight bias;
+                                              index [1] minus 1.0 gives net vertical G
+            Read: SimOnGround  - int (0 or 1); effect active only when on the ground (1)
+        """
 
         max_force = self.touchdown_effect_max_force
         max_g = self.touchdown_effect_max_gs
@@ -170,6 +192,12 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         self.effects['touchdown'].constant(force, 180).start()
 
     def ac_update_canopy(self, telem_data: BaseTelemetryData):
+        """Play motion haptic when canopy position changes.
+
+        Telemetry:
+            Read: Canopy       - float (0.0=closed, 1.0=open); canopy deployment; primary source
+                  canopy_value - float (0.0–1.0); fallback when Canopy is None
+        """
         canopypos = telem_data.Canopy
         if canopypos is None:
             canopypos = telem_data.canopy_value
@@ -185,6 +213,21 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             self.effects["canopymovement"].stop(destroy_after=5000)
 
     def ac_update_landing_gear(self, telem_data: BaseTelemetryData):
+        """Play gear motion haptic and gear-down buffet.
+
+        Telemetry:
+            Read: gear_value      - float (0.0=up, 1.0=down); primary gear position
+                  GearPos         - float (0.0–1.0); fallback when gear_value is None
+            Read (MSFS/XPLANE): RetractableGear - Union[bool, int, List] (0 or 1); if False/0
+                                                   skips motion (fixed gear aircraft)
+                                Gear            - List[float] (0.0–1.0 per gear); MSFS/XP gear
+                                                   deployment list; max taken
+            Read: IAS             - float (m/s, ≥ 0); indicated airspeed for buffet scaling;
+                                     primary airspeed source
+                  TAS             - float (m/s, ≥ 0); true airspeed; fallback when IAS is None
+            Read (XPLANE): Vle   - float (m/s); max gear-extended speed; sets gear buffet
+                                    speed thresholds (low = 0.9 × Vle, high = 1.17 × Vle)
+        """
         gearpos = telem_data.gear_value if telem_data.gear_value is not None else telem_data.GearPos
         if isinstance(gearpos, list):
             gearpos = max(gearpos)
@@ -228,6 +271,16 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             self.effects.dispose("gearbuffet", "gearbuffet2")
 
     def ac_update_speed_brakes(self, telem_data: BaseTelemetryData):
+        """Play speedbrake motion haptic and buffet.
+
+        Telemetry:
+            Read: AircraftClass    - str; skips effect entirely for 'Helicopter'
+                  SpeedbrakePos    - float (0.0–1.0); speedbrake deployment; primary source
+                  speedbrakes_value - float (0.0–1.0); fallback when SpeedbrakePos is None
+                  IAS              - float (m/s, ≥ 0); indicated airspeed for buffet scaling;
+                                      primary airspeed source
+                  TAS              - float (m/s, ≥ 0); true airspeed; fallback when IAS is None
+        """
         if (self._telem_data.AircraftClass or "GenericAircraft") == 'Helicopter':
             return
 
@@ -266,6 +319,16 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         self._create_buffeting_effect(temp_telem, config)
 
     def ac_update_spoilers(self, telem_data: BaseTelemetryData):
+        """Play spoiler motion haptic and buffet.
+
+        Telemetry:
+            Read: AircraftClass - str; skips effect entirely for 'Helicopter'
+                  Spoilers      - Union[float, List[float]] (0.0–1.0); spoiler deployment;
+                                   list-averaged; effect suppressed when 0 or None
+                  IAS           - float (m/s, ≥ 0); indicated airspeed; primary airspeed source
+                  TAS           - float (m/s, ≥ 0); true airspeed; fallback when IAS is None;
+                                   drives tas_intensity scaling relative to spoiler speed thresholds
+        """
         if (self._telem_data.AircraftClass or "GenericAircraft") == 'Helicopter':
             return
 
@@ -307,6 +370,11 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
                 self.effects[effect].stop(1000)
 
     def ac_update_tailhook_effect(self, telem_data: BaseTelemetryData):
+        """Play tailhook motion haptic when hook position changes.
+
+        Telemetry:
+            Read: TailHook - float (0.0=retracted, 1.0=extended); hook deployment position
+        """
         hook = telem_data.TailHook
         if hook is None: return
         if not self.is_joystick(): return
@@ -326,6 +394,11 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             self.effects.dispose("hookmovement")
 
     def ac_update_fuelboom_effect(self, telem_data: BaseTelemetryData):
+        """Play fuel boom motion haptic when boom position changes.
+
+        Telemetry:
+            Read: FuelBoom - float (0.0=retracted, 1.0=extended); refueling boom deployment
+        """
         config = {
             'telem_key': 'FuelBoom',
             'change_key': 'fuelboom_value',
@@ -342,6 +415,12 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         self._create_motion_effect(telem_data, config)
 
     def ac_update_wingfold_effect(self, telem_data: BaseTelemetryData):
+        """Play wing fold motion haptic when fold position changes (ground only).
+
+        Telemetry:
+            Read: WingFold    - float (0.0=unfolded, 1.0=folded); wing fold deployment
+                  SimOnGround - int (0 or 1); effect suppressed when airborne (0)
+        """
         config = {
             'telem_key': 'WingFold',
             'change_key': 'wingfold_value',

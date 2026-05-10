@@ -59,6 +59,20 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
     ########################################
 
     def ac_calc_etl_effect(self, telem_data: BaseTelemetryData, blade_ct=None):
+        """Apply ETL (Effective Translational Lift) and rotor overspeed shake effects.
+
+        Telemetry:
+            Read: N              - str; aircraft model name; used to special-case
+                                    UH-60L WoW logic (tailwheel always positive)
+                  TAS            - float (m/s, ≥ 0); true airspeed; compared against
+                                    etl_start/stop_speed and overspeed_shake_start
+                  WeightOnWheels - List[float] ([nose/left, left/right, right/tail],
+                                    compression 0.0–1.0); sum > 0 suppresses effect
+            Read (XPLANE): PropRPM  - Union[float, List[float]] (RPM); index [0] taken;
+                                       used to compute etl_shake_frequency
+            Read (others): RotorRPM - Union[float, List[float]] (RPM); list max taken;
+                                       used to compute etl_shake_frequency
+        """
         #  rotor = 245
         mod = telem_data.N
         tas = telem_data.TAS or 0
@@ -116,6 +130,19 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             self.effects.dispose("overspeedX", "overspeedY")
 
     def ac_update_vrs_effect(self, telem_data: BaseTelemetryData):
+        """Apply Vortex Ring State buffet when descending slowly with low forward speed.
+
+        Telemetry:
+            Read: VerticalSpeed    - float (m/s); positive = climb, negative = descent;
+                                      effect only active when VS < 0 (descending) and
+                                      |VS| ≥ vrs_vs_onset
+                  TAS              - float (m/s, ≥ 0); true airspeed; effect suppressed
+                                      when spd > vrs_threshold_speed
+                  WeightOnWheels   - List[float] (compression 0.0–1.0); max() > 0
+                                      suppresses effect (on ground)
+            Read (DCS only): TAS   - adj_TAS = TAS − |VerticalSpeed| used as spd proxy
+            Written (DCS only): _adj_TAS (float, m/s; adjusted TAS for DCS path)
+        """
         vs = telem_data.VerticalSpeed or 0
         if self._sim_is_dcs():
             # spd = abs(telem_data.VlctVectors[0])
@@ -147,6 +174,21 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             self.effects.dispose("vrs_buffet", "vrs_buffet2")
 
     def ac_update_heli_engine_rumble(self, telem_data: BaseTelemetryData, blade_ct=None):
+        """Apply rotor/engine rumble for helicopters.
+
+        Telemetry:
+            Read (XPLANE): PropRPM  - Union[float, List[float]] (RPM, ≥ 0); index [0] taken;
+                                       used to derive rumble frequency
+            Read (others): RotorRPM - Union[float, List[float]] (RPM, ≥ 0); list max taken;
+                                       used to derive rumble frequency; effect suppressed below 5 RPM
+            Read: N      - str; aircraft model name; NOT USED in calculation
+                  TAS    - float (m/s, ≥ 0); true airspeed; NOT USED in calculation
+                  EngRPM - Union[float, List[float]] (RPM, ≥ 0); list max taken;
+                            rumble suppressed when zero
+
+        Note: N and TAS are fetched into local variables but neither influences
+              the effect output in the current implementation.
+        """
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
             self.effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
             return
@@ -191,8 +233,17 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             self.effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
 
     def ac_collective_force_trim_override(self, telem_data: BaseTelemetryData, spring):
-        """
-        Generic effect enabling spring force and hardware trim for collective axis.
+        """Generic effect enabling spring force and hardware trim for collective axis.
+
+        Telemetry:
+            Read:    WeightOnWheels - List[float] ([nose/left, left/right, right/tail],
+                                      compression 0.0–1.0); summed; informational only —
+                                      does not currently gate the effect
+                     ForceTrimSW    - bool; cockpit force-trim switch state; when False
+                                      the spring follows the stick position without locking
+            Written: _coll_ft_dt      (float, s; frame delta time)
+                     _coll_ft_step    (float; trim step size in device units/frame)
+                     _coll_ft_trim_pos (int, –4096 to 4096; current trim offset in device units)
         """
 
         if not self.is_collective():

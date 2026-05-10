@@ -36,6 +36,13 @@ class AoAEffectsMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         self.smoother = utils.Smoother()
 
     def ac_update_aoa_reduction_force_effect(self, telem_data: BaseTelemetryData):
+        """Apply stall-protection push-forward force as AoA approaches critical.
+
+        Telemetry:
+            Read: AoA - float (degrees); angle of attack; 8-sample running average
+                        compared against critical_aoa_start/max thresholds
+                  TAS - float (m/s, ≥ 0); true airspeed; effect suppressed below 10 m/s
+        """
         if not self.aoa_reduction_effect_enabled:
             return
         if self._should_skip_joystick_effect():
@@ -64,6 +71,16 @@ class AoAEffectsMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         return
 
     def ac_update_aoa_effect(self, telem_data: BaseTelemetryData, minspeed=50*kmh2ms, maxspeed=140*kmh2ms):
+        """Apply constant force proportional to AoA for aerodynamic feel on joystick.
+
+        Telemetry:
+            Read:    AoA      - float (degrees); angle of attack; positive = nose up;
+                                 magnitude drives force, sign sets direction (0° or 180°)
+                     TAS      - float (m/s, ≥ 0); true airspeed; speed_factor scales
+                                 from 0 at minspeed to 1.0 at maxspeed
+                     ACisFBW  - bool; True suppresses effect for fly-by-wire aircraft
+            Written: aoa_pull (float, 0.0–max_aoa_cf_force; force magnitude sent to effect)
+        """
         if not self.aoa_effect_enabled:
             return
         if not self.is_joystick():

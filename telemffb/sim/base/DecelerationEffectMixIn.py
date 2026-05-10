@@ -29,6 +29,22 @@ class DecelerationEffectMixIn(AircraftEffectUtilsBase):
         self.last_y_gs = 0
 
     def ac_update_decel_effect(self, telem_data: BaseTelemetryData):
+        """Apply forward (deceleration) constant force to joystick.
+
+        Telemetry:
+            Read (all paths):  WeightOnWheels - List[float] ([nose, left, right], compression
+                                                0.0–1.0); summed; selects airborne vs ground mode
+                               TAS            - float (m/s, ≥ 0); true airspeed; effect
+                                                suppressed when zero; DCS airborne path
+                                                uses rate-of-change to derive accel_g
+            Read (MSFS):       AccBody[2]     - float (g); longitudinal body-frame acceleration
+            Read (XPLANE):     Gaxil          - float (g); axial G; negated for sign convention
+            Read (DCS/IL2/BMS on ground): ACCs[0] - float (g); lateral G vector component
+            Read (DCS airborne only):     speedbrakes_value - float (0.0–1.0); scales
+                                           airborne decel force magnitude
+            Written: decel_g        (float, g; instantaneous decel G, DCS airborne path only)
+                     decel_g_smooth (float, g; 8-sample smoothed decel G)
+        """
         if not self.deceleration_effect_enable or not self.is_joystick():
             self.effects.dispose("decel")
             return

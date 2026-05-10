@@ -19,6 +19,19 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
         self.friction_effect_overridden = False
 
     def msfs_update_steering_friction_effect(self, telem_data: BaseTelemetryData):
+        """Override pedal friction with speed-dependent ground steering friction (MSFS only).
+
+        Telemetry:
+            Read: SimOnGround       - int (0 or 1); effect active only when on the ground (1)
+                  WeightOnWheels[0] - float (compression 0.0–1.0); center/nose wheel only;
+                                       must be non-zero (or SurfaceType="Water") to apply
+                  GroundSpeed       - float (m/s, ≥ 0); scales friction inversely via
+                                       expo curve (0 m/s → max friction, ~20 m/s → min)
+                  WaterRudderExt    - float (0.0–1.0); water rudder extension %;
+                                       scales friction when surface is Water
+                  SurfaceType       - str; "Water" enables the water-rudder friction path
+            Written: _pct_steer_f  (float, 0.0–1.0; fraction of usable friction range applied)
+        """
         if not self._sim_is_msfs(): return
         if not self.is_pedals(): return
 

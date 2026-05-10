@@ -21,7 +21,18 @@ class HydraulicLossMixIn(FFBForcesMixIn):
         self.friction_coeff: int = 0
 
     def ac_update_hydraulic_loss_effect(self, telem_data: BaseTelemetryData):
-
+        """Apply hydraulic-loss damper/inertia/friction overrides.
+        Telemetry:
+            Read:    HydSys   - Union[bool, int, float, List[float]]; hydraulic system state.
+                                 MSFS: integrity percent (0.0–1.0); bool: True=OK/False=failed;
+                                 list: per-system values (0.0–1.0); "n/a" = not subscribed.
+                     HydPress - Union[float, List[float]] (psi, ≥ 0); hydraulic pressure.
+                                 Default .get() value is 1 (non-zero) when absent.
+                                 Only used in DCS bool path to disambiguate HydSys=True
+                                 with zero pressure (i.e. fluid present but no pressure).
+            Written: _hyd_factor           (debug: current hydraulic factor 0.0–1.0)
+                     _hydraulic_factor_test (debug: same, written for bool-typed HydSys only)
+        """
         telem_data._hyd_factor = self.hydraulic_factor
 
         if not self.enable_hydraulic_loss_effect:

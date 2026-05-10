@@ -27,7 +27,12 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
         self.friction_effect_overridden: bool = False
 
     def ac_update_ffb_forces(self, telem_data: BaseTelemetryData):
-        """Update explicit override FFB effects (damper, inertia, friction)."""
+        """Update explicit override FFB effects (damper, inertia, friction).
+
+        Telemetry:
+            None - no telem_data keys are read; effect parameters come entirely
+                   from instance configuration (damper_force, inertia_force, friction_force).
+        """
         # Damper
         if self.enable_damper_ovd:
             if self.anything_has_changed('damper_value', self.damper_force) or not self.effects['damper'].started:

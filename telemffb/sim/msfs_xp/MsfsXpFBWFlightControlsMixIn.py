@@ -70,6 +70,44 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
 
     def update_fbw_flight_controls(self, telem_data: BaseTelemetryData, ap=False):
+        """Drive FBW/AP spring offsets and send axis values to the simulator.
+
+        Telemetry:
+            Read: FFBType          - str; device type ("joystick" or "pedals")
+            Read (MSFS):   APMaster  - Union[bool, int] (0 or 1); autopilot engaged state
+            Read (XPLANE): APServos  - Union[bool, int] (0 or 1); autopilot servo state
+
+            Read (joystick, trim-following):
+                  ElevTrimPct      - float (–1.0 to 1.0); elevator trim pct;
+                                     Y spring center offset and virtual stick offset
+                  AileronTrimPct   - float (–1.0 to 1.0); aileron trim pct;
+                                     X spring center offset and virtual stick offset
+            Read (joystick, MSFS AP follow):
+                  AileronDeflPctLR - List[float] ([left, right], –1.0 to 1.0);
+                                     aileron surface deflection; index [0] for AP X follow
+                  ElevDeflPct      - float (–1.0 to 1.0); elevator deflection pct;
+                                     FETCHED but immediately overwritten by ElevTrimPct —
+                                     NOT USED in any calculation
+                  ElevTrimPct      - (second read) float (–1.0 to 1.0); elevator trim for AP Y follow
+            Read (joystick, XPLANE AP follow):
+                  APRollServo      - float (–1.0 to 1.0); AP roll servo position for X follow
+                  APPitchServo     - float (–1.0 to 1.0); AP pitch servo position for Y follow
+            Read (pedals, trim-following):
+                  RudderTrimPct    - float (–1.0 to 1.0); rudder trim pct; X spring center offset
+            Read (pedals, MSFS AP follow):
+                  RudderDeflPct    - float (–1.0 to 1.0); rudder surface deflection for AP X follow
+            Read (pedals, XPLANE AP follow):
+                  APYawServo       - float (–1.0 to 1.0); AP yaw servo position for X follow
+            Written: phys_x_aileron   (float; raw aileron deflection read from sim)
+                     phys_x_send_flag (bool; whether X axis value was sent to sim)
+                     phys_y_send_flag (bool; whether Y axis value was sent to sim)
+                     phys_x, phys_y   (float, –1.0 to 1.0; raw device axis positions)
+                     phys_x_pos, phys_y_pos (float/int; scaled positions sent to sim)
+
+        Note: ElevDeflPct is read on the joystick/MSFS/AP path (line ~111) but the
+              variable is unconditionally overwritten by ElevTrimPct two lines later.
+              ElevDeflPct has no effect on any output.
+        """
         ap_send_flag_x = True
         ap_send_flag_y = True
         ffb_type = telem_data.FFBType or "joystick"

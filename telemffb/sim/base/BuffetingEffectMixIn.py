@@ -19,6 +19,12 @@ class BuffetingEffectMixIn(AircraftEffectUtilsBase):
         :type speed: float
         :return: Tuple (freq_hz, magnitude)
         :rtype: tuple
+
+        Telemetry:
+            Read (MSFS):   StallAoA  - float (degrees, typically 10–25°); stall AoA
+                                        from STALL ALPHA SimVar; onset = StallAoA × 1.10
+            Read (XPLANE): WarnAlpha - float (degrees); warning alpha threshold;
+                                        onset = WarnAlpha; stall = WarnAlpha × 1.25
         """
         stall_buffet_threshold_percent = 110
 
@@ -42,6 +48,30 @@ class BuffetingEffectMixIn(AircraftEffectUtilsBase):
         return (self.aoa_buffet_freq, airflow_factor * buffeting_factor * self.buffeting_intensity)
 
     def ac_update_buffeting(self, telem_data: BaseTelemetryData):
+        """Update stall/AoA buffeting effect.
+
+        Telemetry:
+            Read:    AoA            - float (degrees); angle of attack; compared against
+                                       dynamic buffet/stall thresholds
+                     TAS            - float (m/s, ≥ 0); true airspeed; scales buffet
+                                       magnitude via airflow_factor (full at 75 kt)
+                     StallAoA       - float (degrees, typically 10–25°); when present,
+                                       dynamically sets onset (StallAoA × 0.5) and stall
+                                       thresholds; flap position can add up to +20%
+                     Flaps          - Union[float, List[float]] (0.0–1.0 per surface);
+                                       list-averaged then scaled ×0.2 to adjust threshold
+                     WeightOnWheels - List[float] ([nose, left, right], compression 0.0–1.0);
+                                       max() > 0 suppresses effect (on ground)
+                     DesignSpeed    - Tuple[float, float, float] (m/s): (Vc, Vs0, Vs1);
+                                       FETCHED AND DESTRUCTURED BUT ALL VALUES UNUSED —
+                                       the max_airflow_speed=vc override is commented out
+            Written: _pct_max_stall_buffet (float, 0.0–1.0; fraction of peak buffet magnitude)
+                     _buffeting            (float, 0.0–buffeting_intensity; raw magnitude)
+
+        Note: DesignSpeed is fetched and destructured into vc/vs0/vs1 inside an 'if ds:' block,
+              but the resulting variables are never consumed (the max_airflow_speed override is
+              commented out). This read has no effect on the output.
+        """
         if not self.buffeting_intensity or not self.aoa_buffeting_enabled:
             return
 

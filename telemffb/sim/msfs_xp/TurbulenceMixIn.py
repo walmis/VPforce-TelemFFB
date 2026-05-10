@@ -25,6 +25,14 @@ class TurbulenceMixIn(AircraftEffectUtilsBase):
         self.turbulence_modulator = TurbulenceModulator()
 
     def update_turbulence(self):
+        """Apply atmospheric turbulence constant force to joystick (pitch/roll) or pedals (yaw).
+
+        Telemetry:
+            Read: RelWind - List[float] (m/s); body-frame relative wind [lateral(stbd+),
+                             vertical(up+), longitudinal(fwd+)];
+                             [0] lateral → roll force, [1] vertical → pitch force,
+                             [2] longitudinal → yaw force
+        """
         if self.turbulence_effect_enable:
             try:
                 # MSFS / X-Plane body frame: [0]=lateral, [1]=vertical, [2]=longitudinal

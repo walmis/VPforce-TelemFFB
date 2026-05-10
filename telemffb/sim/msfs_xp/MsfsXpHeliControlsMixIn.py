@@ -42,6 +42,11 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
         Returns True if still initializing (caller should return early),
         False once the physical stick has reached the target position.
+
+        Telemetry:
+            Read: SimOnGround - int (0 or 1); when on ground (1) and trim reset complete,
+                                spring centers to 0; otherwise restores last saved device position
+            Written: phys_x, phys_y (float, –1.0 to 1.0; current physical stick position)
         """
         if self.cyclic_spring_init:
             return False
@@ -274,6 +279,27 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         self._simconnect.send_event_to_msfs(yvar, ypos)
 
     def msfs_update_heli_controls(self, telem_data: BaseTelemetryData):
+        """Drive cyclic spring (force-trim or center-spring) and send cyclic axis to simulator.
+
+        Telemetry:
+            Read: FFBType            - str; device type; only "joystick" path is handled here
+            Read (MSFS):   APMaster  - Union[bool, int] (0 or 1); autopilot engaged state
+            Read (XPLANE): APServos  - Union[bool, int] (0 or 1); autopilot servo state
+            Read: ForceTrimSW        - bool; cockpit force-trim switch state; only subscribed
+                                       when custom_ft_sw_var_enabled is True; defaults to True
+            Read (via _initialize_cyclic_if_needed): SimOnGround - int (0 or 1)
+            Read (via _update_cyclic_trim, when trim_following):
+                  ForceTrimSW          - bool; suppresses trim offset updates when False
+            Read (MSFS trim-following): CyclicTrimX - float (percent, –100 to 100);
+                                                        lateral cyclic trim position
+                                         CyclicTrimY - float (percent, –100 to 100);
+                                                        longitudinal cyclic trim position
+            Read (XPLANE trim-following): AileronTrimPct - float (–1.0 to 1.0); roll trim pct
+                                           ElevTrimPct   - float (–1.0 to 1.0); pitch trim pct
+            Written: phys_x, phys_y  (float, –1.0 to 1.0; current physical stick position)
+                     StickXY         ([float, float]; stick [x, y] at trim engage)
+                     StickXY_offset  ([float, float]; cyclic center [x, y] at trim engage)
+        """
         if self.is_trimwheel(): return
 
         ffb_type = telem_data.FFBType or "joystick"

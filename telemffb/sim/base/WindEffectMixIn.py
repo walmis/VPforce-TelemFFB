@@ -24,6 +24,13 @@ class WindEffectMixIn(AircraftEffectUtilsBase):
         self.__wind_lpf = utils.LowPassFilter(15)
 
     def ac_update_wind_effect(self, telem_data: BaseTelemetryData):
+        """Apply constant force proportional to instantaneous wind gust speed.
+
+        Telemetry:
+            Read: Wind - Tuple[float, float, float] (m/s); [x, y, z] wind velocity vector;
+                          vector magnitude is HPF/LPF-filtered and scaled by
+                          wind_effect_scaling to produce effect intensity
+        """
         if not self.is_joystick():
             return
         if not self.wind_effect_enabled:

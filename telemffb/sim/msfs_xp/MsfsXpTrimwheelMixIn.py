@@ -36,6 +36,32 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
     
 
     def msfs_update_trimwheel(self, telem_data: BaseTelemetryData):
+        """Drive trimwheel spring position from sim elevator trim and send axis to sim.
+
+        Telemetry:
+            Read (MSFS):   APMaster       - Union[bool, int] (0 or 1); autopilot engaged state
+            Read (XPLANE): APServos       - Union[bool, int] (0 or 1); autopilot servo state
+            Read: ElevTrim         - float (degrees); raw elevator trim angle; non-axis mode only
+                  ElevTrimMax      - float (degrees); upper trim travel limit; primary source
+                  ElevTrimUpLmt    - float (degrees); fallback upper trim limit
+                  ElevTrimMin      - float (degrees); lower trim travel limit; primary source
+                  ElevTrimDnLmt    - float (degrees); fallback lower trim limit
+                  ElevTrimNeutral  - float (degrees); neutral trim position; NOT USED in any
+                                     active code path (non-axis path always raises ValueError)
+                  ElevTrimPct      - float (–1.0 to 1.0); normalized elevator trim pct;
+                                     used in axis mode and for spring initialization
+            Written: trimwheel_pos_calc (float, –1.0 to 1.0; scaled trimwheel position)
+                     phys_y             (float, –1.0 to 1.0; raw physical Y axis position)
+                     _tw_cpO_y          (float; spring center offset, normalized)
+                     _tw_phys_y_pos     (float, –1.0 to 1.0; physical Y before scaling)
+                     _tw_phys_y_pos_neg (float; negated physical Y)
+                     _tw_pos_y_pos      (int or float; scaled position sent to MSFS)
+                     TRIM_DELTA         (float; delta between physical and trim positions)
+                     _tw_last           (int or float; last position sent to sim)
+
+        Note: ElevTrimNeutral is fetched but the non-axis code path is unreachable
+              (the else branch raises ValueError), so it is effectively unused.
+        """
         if not self.is_trimwheel():
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:

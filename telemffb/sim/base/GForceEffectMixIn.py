@@ -115,7 +115,19 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
         self.ac_update_gforce_effect(telem_data)
 
     def _get_gs_data(self, telem_data: BaseTelemetryData) -> tuple:
-        """Get G-force data based on simulator type."""
+        """Get G-force data based on simulator type.
+
+        Telemetry:
+            Read (MSFS/XPLANE):
+                G       - float (g); vertical G load; 1.0 = 1 g level flight,
+                          negative in inverted flight
+                AccBody - List[float] ([x, y, z] in g); body-frame acceleration;
+                          index [2] (longitudinal/lateral) used as y_gs for
+                          cross-coupling; index [2] sign convention: + = forward
+            Read (DCS/IL2/BMS):
+                ACCs    - List[float] ([x, y, z] in g); index [1] = normal G (gs),
+                          index [0] = lateral/longitudinal G (y_gs)
+        """
         if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
             accs = telem_data.ACCs
             if not accs:
@@ -145,6 +157,15 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
 
         Args:
             telem_data: Telemetry data containing acceleration information
+
+        Telemetry:
+            Read (via _get_gs_data, MSFS/XPLANE):
+                G       - float (g); vertical G load (see _get_gs_data)
+                AccBody - List[float] ([x, y, z] in g); index [2] as lateral G
+            Written: g_factor_raw  (float, 0.0–1.0; raw G factor before deflection scaling)
+                     g_deflection  (float, 0.0–1.0; stick deflection factor)
+                     g_y           (float, -1.0–1.0; raw stick Y position)
+                     g_factor      (float, 0.0–1.0; final G factor applied to effect)
         """
         if (
             self._should_skip_joystick_effect()
@@ -222,6 +243,16 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
         return self.gforce_effect_adv_curve.get("mode", "constant") if self.gforce_effect_adv_curve else "constant"
            
     def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr=False):
+        """Dispatch to the configured G-force effect mode (DISABLED/LEGACY/ADVANCED/NEW).
+
+        Telemetry:
+            Read (via _get_gs_data, MSFS/XPLANE):
+                G       - float (g); vertical G load
+                AccBody - List[float] ([x, y, z] in g); index [2] as lateral G
+            Written (NEW mode, via _ac_run_new_gforce_effect):
+                g_factor_raw (float, 0.0–1.0), g_deflection (float, 0.0–1.0),
+                g_y (float, -1.0–1.0), g_factor (float, 0.0–1.0)
+        """
         if not self.is_joystick():
             return
         
