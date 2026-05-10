@@ -336,20 +336,20 @@ class IL2TelemParser(TelemParserBase):
         else:
             self.telem_data["SimPaused"] = 0
 
-        try:
-            focus_window = get_focus_window.getActiveWindow().title
-        except:
-            focus_window = "unknown"
-        if G.system_settings.get('focus_pauseIL2', True):
-            if "Il-2" in focus_window:
-                self.telem_data["Focus"] = 1
-                self.telem_data["SimPaused"] = 0
-            else:
-                self.telem_data["Focus"] = 0
-                self.telem_data["SimPaused"] = 1
-        else:
-            self.telem_data["Focus"] = 1
-            self.telem_data["SimPaused"] = 0
+        # try:
+        #     focus_window = get_focus_window.getActiveWindow().title
+        # except:
+        #     focus_window = "unknown"
+        # if G.system_settings.get('focus_pauseIL2', True):
+        #     if "Il-2" in focus_window:
+        #         self.telem_data["Focus"] = 1
+        #         self.telem_data["SimPaused"] = 0
+        #     else:
+        #         self.telem_data["Focus"] = 0
+        #         self.telem_data["SimPaused"] = 1
+        # else:
+        #     self.telem_data["Focus"] = 1
+        #     self.telem_data["SimPaused"] = 0
 
         dbg(1,f"telem tick {tick} size {packet_size}")
 

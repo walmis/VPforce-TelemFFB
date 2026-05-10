@@ -50,10 +50,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.addButton(self.rb_master_c, id=3)
         self.master_button_group.addButton(self.rb_master_t, id=4)
 
+        # depreciate this option
+        self.focus_pauseIL2.setChecked(False)
+        self.focus_pauseIL2.setVisible(False)
+
         # Add tooltips
         self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
         self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
-        self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
+        # self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
         self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
         self.lab_pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
         self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
@@ -963,7 +967,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.validateIL2.setChecked(settings_dict.get('validateIL2', True))
 
-        self.focus_pauseIL2.setChecked(settings_dict.get('focus_pauseIL2', True))
+        self.focus_pauseIL2.setChecked(settings_dict.get('focus_pauseIL2', False))
 
         self.pathIL2.setText(settings_dict.get('pathIL2', 'C:/Program Files/IL-2 Sturmovik Great Battles'))
 
