@@ -3535,7 +3535,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<value>false</value>
+		<value>true</value>
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
@@ -6974,6 +6974,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>aoa_effect_enabled</name>
+			<type>!TaogH500Helicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
 			<type>!FlyInsideHelicopter</type>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -7234,6 +7240,20 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>controls_lock_enable</name>
+			<type>TaogH500Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>TaogH500Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
 			<type>Helicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
@@ -7354,6 +7374,27 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var_enabled</name>
+			<type>CowanSimHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>CowanSimHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>CowanSimHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
 			<type>FlyInsideHelicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
@@ -7396,21 +7437,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var_enabled</name>
-			<type>CowanSimHelicopter</type>
+			<type>TaogH500Helicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var_enabled</name>
-			<type>CowanSimHelicopter</type>
+			<type>TaogH500Helicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var_enabled</name>
-			<type>CowanSimHelicopter</type>
+			<type>TaogH500Helicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
@@ -7626,14 +7667,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>engine_jet_rumble_enabled</name>
-			<type>Helicopter</type>
+			<type>CowanSimHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>engine_jet_rumble_enabled</name>
-			<type>CowanSimHelicopter</type>
+			<type>TaogH500Helicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>engine_jet_rumble_enabled</name>
+			<type>Helicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -7676,13 +7724,6 @@
 		<classdefaults_MSFS>
 			<name>engine_rotor_rumble_enabled</name>
 			<type>Helicopter</type>
-			<value>true</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>engine_rotor_rumble_enabled</name>
-			<type>CowanSimHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8012,7 +8053,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>force_trim_reset_button</name>
-			<type>GliderAircraft</type>
+			<type>TaogH500Helicopter</type>
 			<value>0</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -8026,7 +8067,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>force_trim_reset_button</name>
-			<type>Helicopter</type>
+			<type>GliderAircraft</type>
 			<value>0</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -8035,6 +8076,13 @@
 			<name>force_trim_reset_button</name>
 			<type>Helicopter</type>
 			<value>0</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_reset_button</name>
+			<type>Helicopter</type>
+			<value>s</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
 		</classdefaults_MSFS>
@@ -8143,7 +8191,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>jet_engine_rumble_intensity</name>
-			<type>Helicopter</type>
+			<type>TaogH500Helicopter</type>
 			<value>0.01</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8151,6 +8199,13 @@
 		<classdefaults_MSFS>
 			<name>jet_engine_rumble_intensity</name>
 			<type>CowanSimHelicopter</type>
+			<value>0.01</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>jet_engine_rumble_intensity</name>
+			<type>Helicopter</type>
 			<value>0.01</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8577,6 +8632,14 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>overspeed_shake_start</name>
+			<type>TaogH500Helicopter</type>
+			<value>120</value>
+			<unit>kt</unit>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>overspeed_shake_start</name>
 			<type>CowanSimHelicopter</type>
 			<value>120</value>
 			<unit>kt</unit>
@@ -8728,14 +8791,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>rotor_blade_count</name>
-			<type>Helicopter</type>
-			<value>2</value>
+			<type>TaogH500Helicopter</type>
+			<value>4</value>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>rotor_blade_count</name>
 			<type>CowanSimHelicopter</type>
+			<value>2</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>rotor_blade_count</name>
+			<type>Helicopter</type>
 			<value>2</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -9096,12 +9166,6 @@
 			<type>!TaogH500Helicopter</type>
 			<sim>MSFS</sim>
 			<device>trimwheel</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>touchdown_effect_enabled</name>
-			<type>!FlyInsideHelicopter</type>
-			<sim>MSFS</sim>
-			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>trim_following</name>
@@ -11613,12 +11677,6 @@
 			<device>joystick</device>
 		</classdefaults_BMS>
 	<classdefaults_any>
-		<name>aoa_buffeting_enabled</name>
-		<type>!CowanSimHelicopter</type>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
 		<name>adv_spr_override_enabled</name>
 		<type>!CowanSimHelicopter</type>
 		<sim>any</sim>
@@ -11630,36 +11688,18 @@
 			<sim>any</sim>
 			<device>any</device>
 		</classdefaults_any>
-	<classdefaults_any>
-		<name>aoa_buffeting_enabled</name>
-		<type>!Helicopter</type>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
 		<classdefaults_any>
 			<name>adv_spr_override_enabled</name>
 			<type>!HPGHelicopter</type>
 			<sim>any</sim>
 			<device>any</device>
 		</classdefaults_any>
-	<classdefaults_any>
-		<name>aoa_buffeting_enabled</name>
-		<type>!HPGHelicopter</type>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
 		<classdefaults_any>
 			<name>adv_spr_override_enabled</name>
 			<type>!SASHelicopter</type>
 			<sim>any</sim>
 			<device>any</device>
 		</classdefaults_any>
-	<classdefaults_any>
-		<name>aoa_buffeting_enabled</name>
-		<type>!SASHelicopter</type>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
 	<classdefaults_any>
 		<name>afterburner_effect_enabled</name>
 		<type>AllSettings</type>
@@ -11695,6 +11735,36 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
+	<classdefaults_any>
+		<name>aoa_buffeting_enabled</name>
+		<type>!CowanSimHelicopter</type>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>aoa_buffeting_enabled</name>
+		<type>!TaogH500Helicopter</type>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>aoa_buffeting_enabled</name>
+		<type>!Helicopter</type>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>aoa_buffeting_enabled</name>
+		<type>!HPGHelicopter</type>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>aoa_buffeting_enabled</name>
+		<type>!SASHelicopter</type>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
 	<classdefaults_any>
 		<name>aoa_buffeting_enabled</name>
 		<type>AllSettings</type>
@@ -11871,12 +11941,33 @@
 		<device>any</device>
 		</classdefaults_any>
 	<classdefaults_any>
+		<name>engine_jet_rumble_enabled</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
 		<name>engine_prop_rumble_enabled</name>
 		<type>AllSettings</type>
 		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
+	<classdefaults_any>
+		<name>engine_prop_rumble_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>engine_prop_rumble_enabled</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
 	<classdefaults_any>
 		<name>engine_rotor_rumble_enabled</name>
 		<type>AllSettings</type>
@@ -11969,6 +12060,34 @@
 		<device>any</device>
 		</classdefaults_any>
 	<classdefaults_any>
+		<name>flaps_motion_effect_enabled</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>flaps_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>flaps_motion_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>flaps_motion_effect_enabled</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
 		<name>flaps_motion_intensity</name>
 		<type>AllSettings</type>
 		<value>0.15</value>
@@ -12010,6 +12129,54 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
+	<classdefaults_any>
+		<name>gear_buffet_speed_high</name>
+		<type>JetAircraft</type>
+		<value>275</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>gear_buffet_speed_high</name>
+		<type>PropellerAircraft</type>
+		<value>150</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>gear_buffet_speed_high</name>
+		<type>TurbopropAircraft</type>
+		<value>210</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>gear_buffet_speed_low</name>
+		<type>JetAircraft</type>
+		<value>190</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>gear_buffet_speed_low</name>
+		<type>PropellerAircraft</type>
+		<value>100</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>gear_buffet_speed_low</name>
+		<type>TurbopropAircraft</type>
+		<value>160</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
 	<classdefaults_any>
 		<name>gear_motion_effect_enabled</name>
 		<type>AllSettings</type>
@@ -12242,12 +12409,54 @@
 		<device>any</device>
 		</classdefaults_any>
 	<classdefaults_any>
+		<name>overspeed_effect_enable</name>
+		<type>CowanSimHelicopter</type>
+		<value>True</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>overspeed_effect_enable</name>
+		<type>Helicopter</type>
+		<value>True</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>overspeed_effect_enable</name>
+		<type>TaogH500Helicopter</type>
+		<value>True</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
 		<name>overspeed_shake_intensity</name>
 		<type>AllSettings</type>
 		<value>0.5</value>
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
+	<classdefaults_any>
+		<name>overspeed_shake_intensity</name>
+		<type>CowanSimHelicopter</type>
+		<value>0.2</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>overspeed_shake_intensity</name>
+		<type>Helicopter</type>
+		<value>0.2</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>overspeed_shake_intensity</name>
+		<type>TaogH500Helicopter</type>
+		<value>0.2</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
 	<classdefaults_any>
 		<name>overspeed_shake_start</name>
 		<type>AllSettings</type>
@@ -12417,12 +12626,166 @@
 		<device>pedals</device>
 	</classdefaults_any>
 	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>CowanSimHelicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>CowanSimHelicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>Helicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+		</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>HPGHelicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>HPGHelicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>SASHelicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>SASHelicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>telemffb_controls_axes</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
 		<name>trim_following</name>
 		<type>AllSettings</type>
 		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
+	<classdefaults_any>
+		<name>type</name>
+		<type>JetAircraft</type>
+		<value>JetAircraft</value>
+		<sim>any</sim>
+		<device>joystick</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>type</name>
+		<type>JetAircraft</type>
+		<value>JetAircraft</value>
+		<sim>any</sim>
+		<device>pedals</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>type</name>
+		<type>JetAircraft</type>
+		<value>JetAircraft</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>type</name>
+		<type>PropellerAircraft</type>
+		<value>PropellerAircraft</value>
+		<sim>any</sim>
+		<device>joystick</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>type</name>
+		<type>PropellerAircraft</type>
+		<value>PropellerAircraft</value>
+		<sim>any</sim>
+		<device>pedals</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>type</name>
+		<type>PropellerAircraft</type>
+		<value>PropellerAircraft</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults_any>
 	<classdefaults_any>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>AllSettings</type>
@@ -12459,12 +12822,142 @@
 		<device>any</device>
 		</classdefaults_any>
 	<classdefaults_any>
+		<name>vrs_effect_enable</name>
+		<type>CowanSimHelicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_effect_enable</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_effect_enable</name>
+		<type>TaogH500Helicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
 		<name>vrs_effect_intensity</name>
 		<type>AllSettings</type>
 		<value>0.12</value>
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_effect_intensity</name>
+		<type>CowanSimHelicopter</type>
+		<value>0.12</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_effect_intensity</name>
+		<type>Helicopter</type>
+		<value>0.12</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_effect_intensity</name>
+		<type>TaogH500Helicopter</type>
+		<value>0.12</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_threshold_speed</name>
+		<type>CowanSimHelicopter</type>
+		<value>20</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_threshold_speed</name>
+		<type>Helicopter</type>
+		<value>20</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_threshold_speed</name>
+		<type>TaogH500Helicopter</type>
+		<value>20</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_max</name>
+		<type>CowanSimHelicopter</type>
+		<value>500</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_max</name>
+		<type>Helicopter</type>
+		<value>500</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_max</name>
+		<type>SASHelicopter</type>
+		<value>500</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_max</name>
+		<type>TaogH500Helicopter</type>
+		<value>500</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_onset</name>
+		<type>CowanSimHelicopter</type>
+		<value>350</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_onset</name>
+		<type>Helicopter</type>
+		<value>350</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_onset</name>
+		<type>SASHelicopter</type>
+		<value>350</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
+	<classdefaults_any>
+		<name>vrs_vs_onset</name>
+		<type>TaogH500Helicopter</type>
+		<value>350</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults_any>
 	<classdefaults_any>
 		<name>weapon_effect_direction</name>
 		<type>AllSettings</type>
@@ -12500,377 +12993,6 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
-	<classdefaults_any>
-		<name>flaps_motion_effect_enabled</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>overspeed_effect_enable</name>
-		<type>CowanSimHelicopter</type>
-		<value>True</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>overspeed_shake_intensity</name>
-		<type>CowanSimHelicopter</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>CowanSimHelicopter</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>CowanSimHelicopter</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_effect_enable</name>
-		<type>CowanSimHelicopter</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_effect_intensity</name>
-		<type>CowanSimHelicopter</type>
-		<value>0.12</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_threshold_speed</name>
-		<type>CowanSimHelicopter</type>
-		<value>20</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_vs_max</name>
-		<type>CowanSimHelicopter</type>
-		<value>500</value>
-		<unit>fpm</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_vs_onset</name>
-		<type>CowanSimHelicopter</type>
-		<value>350</value>
-		<unit>fpm</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>overspeed_effect_enable</name>
-		<type>Helicopter</type>
-		<value>True</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>overspeed_shake_intensity</name>
-		<type>Helicopter</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>Helicopter</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>Helicopter</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-		</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_effect_enable</name>
-		<type>Helicopter</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_effect_intensity</name>
-		<type>Helicopter</type>
-		<value>0.12</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_threshold_speed</name>
-		<type>Helicopter</type>
-		<value>20</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_vs_max</name>
-		<type>Helicopter</type>
-		<value>500</value>
-		<unit>fpm</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_vs_onset</name>
-		<type>Helicopter</type>
-		<value>350</value>
-		<unit>fpm</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>HPGHelicopter</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>HPGHelicopter</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>engine_jet_rumble_enabled</name>
-		<type>JetAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>flaps_motion_effect_enabled</name>
-		<type>JetAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>gear_buffet_speed_high</name>
-		<type>JetAircraft</type>
-		<value>275</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>gear_buffet_speed_low</name>
-		<type>JetAircraft</type>
-		<value>190</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>JetAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>type</name>
-		<type>JetAircraft</type>
-		<value>JetAircraft</value>
-		<sim>any</sim>
-		<device>joystick</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>type</name>
-		<type>JetAircraft</type>
-		<value>JetAircraft</value>
-		<sim>any</sim>
-		<device>pedals</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>type</name>
-		<type>JetAircraft</type>
-		<value>JetAircraft</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>engine_prop_rumble_enabled</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>flaps_motion_effect_enabled</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>gear_buffet_speed_high</name>
-		<type>PropellerAircraft</type>
-		<value>150</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>gear_buffet_speed_low</name>
-		<type>PropellerAircraft</type>
-		<value>100</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>type</name>
-		<type>PropellerAircraft</type>
-		<value>PropellerAircraft</value>
-		<sim>any</sim>
-		<device>joystick</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>type</name>
-		<type>PropellerAircraft</type>
-		<value>PropellerAircraft</value>
-		<sim>any</sim>
-		<device>pedals</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>type</name>
-		<type>PropellerAircraft</type>
-		<value>PropellerAircraft</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>SASHelicopter</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>SASHelicopter</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_vs_max</name>
-		<type>SASHelicopter</type>
-		<value>500</value>
-		<unit>fpm</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>vrs_vs_onset</name>
-		<type>SASHelicopter</type>
-		<value>350</value>
-		<unit>fpm</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>engine_prop_rumble_enabled</name>
-		<type>TurbopropAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>flaps_motion_effect_enabled</name>
-		<type>TurbopropAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>gear_buffet_speed_high</name>
-		<type>TurbopropAircraft</type>
-		<value>210</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>gear_buffet_speed_low</name>
-		<type>TurbopropAircraft</type>
-		<value>160</value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>TurbopropAircraft</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>collective</device>
-	</classdefaults_any>
-	<classdefaults_any>
-		<name>telemffb_controls_axes</name>
-		<type>TurbopropAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>trimwheel</device>
-	</classdefaults_any>
 	<models>
 		<name>type</name>
 		<model>allsettings</model>
