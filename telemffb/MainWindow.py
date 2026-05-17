@@ -33,7 +33,7 @@ from datetime import datetime
 from typing import override
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSlot
+from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
                          QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut, QFontDatabase, QFont)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
@@ -64,7 +64,8 @@ from telemffb.ProfileManager import ProfileManagerDialog, NewProfileDialog
 from telemffb.utils import exit_application, HiDpiPixmap
 
 class MainWindow(QMainWindow):
-    
+    version_check_complete = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.tray_icon = QSystemTrayIcon(self)
@@ -77,6 +78,8 @@ class MainWindow(QMainWindow):
         self.show_simvars = False
         self.latest_version = None
         self._update_available = None
+        self._version_check_resolved = False
+        self._version_check_dialog = None
         self.show_new_craft_button = False
         self.profile_mgr_dialog = None
         self.all_offline_models = []
@@ -1383,7 +1386,29 @@ class MainWindow(QMainWindow):
             elif check_instance("collective"):
                 self.change_config_scope(3)
 
+    def on_version_check_cancelled(self):
+        """Called when the user clicks Skip on the version check progress dialog."""
+        if self._version_check_dialog is not None:
+            self._version_check_dialog = None
+        # Disconnect thread callbacks so a late result doesn't double-resolve.
+        for worker in utils.FetchLatestVersion.workers:
+            try:
+                worker.version_result_signal.disconnect(self.update_version_result)
+                worker.error_signal.disconnect(self.on_version_check_error)
+            except Exception:
+                pass
+        self._emit_version_check_complete()
+
     def update_version_result(self, vers, url):
+        # Disconnect the canceled handler before perform_update runs its own
+        # QMessageBox inner event loops — QProgressDialog.closeEvent emits canceled,
+        # and any modal dialog processing can trigger it spuriously.
+        if self._version_check_dialog is not None:
+            try:
+                self._version_check_dialog.canceled.disconnect(self.on_version_check_cancelled)
+            except Exception:
+                pass
+
         self.latest_version = vers
 
         is_exe = getattr(sys, 'frozen', False)
@@ -1403,12 +1428,11 @@ class MainWindow(QMainWindow):
 
         elif vers == 'needsupdate':
             self.version_label.setText('Version Status: <b>Out of Date Source - Git pull needed</b>')
-        
+
         elif vers == 'dirty':
             self.version_label.setText('Version Status: <b>Development - Modified Source</b>')
 
         else:
-            # print(_update_available)
             self._update_available = True
             logging.info(f"<<<<Update available - new version={vers}>>>>")
 
@@ -1418,7 +1442,33 @@ class MainWindow(QMainWindow):
             self.version_label.setToolTip(url)
             self.version_label.setText(f'Version Status: {status_text}')
 
-        self.perform_update(auto=True)
+        # If the user accepts the update, perform_update launches the updater and
+        # schedules app exit — sim listeners don't need to start in that case.
+        # For every other outcome (up to date, dev, error, declined) emit the signal.
+        if not self.perform_update(auto=True):
+            self._emit_version_check_complete()
+
+        # Hide (not close) the dialog so closeEvent/canceled are not emitted.
+        if self._version_check_dialog is not None:
+            self._version_check_dialog.hide()
+            self._version_check_dialog = None
+
+    def on_version_check_error(self, error_message):
+        if self._version_check_dialog is not None:
+            try:
+                self._version_check_dialog.canceled.disconnect(self.on_version_check_cancelled)
+            except Exception:
+                pass
+            self._version_check_dialog.hide()
+            self._version_check_dialog = None
+        logging.error("Error checking for version update: %s", error_message)
+        self._emit_version_check_complete()
+
+    def _emit_version_check_complete(self):
+        """Emit version_check_complete exactly once, regardless of how many paths resolve."""
+        if not self._version_check_resolved:
+            self._version_check_resolved = True
+            self.version_check_complete.emit()
 
     def change_config_scope(self, _arg):
         if isinstance(_arg, str):
@@ -2393,8 +2443,7 @@ class MainWindow(QMainWindow):
                     for child_widget in self.findChildren(QMessageBox):
                         child_widget.reject()
                     QTimer.singleShot(250, exit_application)
-                else:
-                    return True
+                return True
 
         return False
 

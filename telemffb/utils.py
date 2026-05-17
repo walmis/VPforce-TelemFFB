@@ -2722,7 +2722,7 @@ class FetchLatestVersion(QThread):
                 logging.info("Running from source with locally modified files, skipping version check")
             else:
                 try:
-                    latest = fetch_json_url(send_url)
+                    latest = fetch_json_url(send_url, timeout=10)
                     latest_version = latest["version"]
                     latest_url = url + latest["filename"]
                 except Exception as e:

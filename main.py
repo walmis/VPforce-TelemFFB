@@ -62,7 +62,7 @@ from typing import List, Optional
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import QCoreApplication, Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
+from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit, QProgressDialog
 
 
 import resources
@@ -642,9 +642,26 @@ def _handle_window_display(headless_mode):
 
 def _check_version_update():
     """Check for version updates if not release or dev build."""
-    if not G.release_version and not G.dev_build:
-        utils.FetchLatestVersion(G.main_window.update_version_result,
-                                lambda error_message: logging.error("Error in thread: %s", error_message))
+    if G.master_instance and not G.release_version and not G.dev_build:
+        logging.info("Checking for version updates...")
+        dlg = QProgressDialog("Checking for updates...", "Skip", 0, 0, G.main_window)
+        dlg.setWindowTitle("TelemFFB")
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        dlg.show()
+
+        worker = utils.FetchLatestVersion(
+            G.main_window.update_version_result,
+            G.main_window.on_version_check_error
+        )
+
+        G.main_window._version_check_dialog = dlg
+        dlg.canceled.connect(G.main_window.on_version_check_cancelled)
+    else:
+        # Version checking is disabled; emit immediately so sim listeners can start.
+        G.main_window._emit_version_check_complete()
 
 def _check_system_settings_required():
     """Check if system settings dialog should be opened."""
@@ -946,6 +963,10 @@ def main():
     # Show main window based on configuration (minimized, tray, normal)
     _handle_window_display(headless_mode)
 
+    # Sim listeners start only after version check resolves (or is skipped),
+    # preventing plugin dialogs from racing with the app-update prompt.
+    G.main_window.version_check_complete.connect(G.sim_listeners.start_all)
+
     # Check for version updates in background (non-release builds)
     _check_version_update()
 
@@ -965,8 +986,7 @@ def main():
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop
     # ============================================================================
-    # Start all simulation listeners to begin telemetry processing
-    G.sim_listeners.start_all()
+    # replaced by G.main_window.version_check_complete.connect(G.sim_listeners.start_all) above
 
     # Enter Qt application event loop - application runs until user exits
     app.exec()
