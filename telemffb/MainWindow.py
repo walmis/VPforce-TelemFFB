@@ -372,7 +372,7 @@ class MainWindow(QMainWindow):
 
         """ Create Status Panel """
 
-        self.status_container = AppStatusWidget(master_instance=G.master_instance)
+        self.status_container = AppStatusWidget(master_instance=G.master_instance, parent=self)
         status_group = QGroupBox("Application Status")
         status_layout = QVBoxLayout(status_group)
         status_layout.setContentsMargins(10, 18, 10, 8)

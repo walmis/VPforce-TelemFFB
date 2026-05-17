@@ -35,9 +35,12 @@ import sys
 
 import socket
 import time
+import traceback
+import urllib.error
+import urllib.request
+import uuid
 import zlib
 import subprocess
-import urllib.request
 import json
 import ssl
 import xml.etree.ElementTree as ET
@@ -447,6 +450,82 @@ def prune_log_files(path, number, unit):
                 os.remove(os.path.join(path, filename))
                 logging.info(f'Deleting log archive: {filename} as it has exceeded the pruning threshold of {num_days} Days')
 
+
+def create_ssl_context():
+    return ssl._create_unverified_context()
+
+
+def _decode_http_response(response):
+    return response.read().decode("utf-8", errors="replace")
+
+
+def open_url(url, data=None, headers=None, timeout=30, method=None):
+    request = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    return urllib.request.urlopen(request, context=create_ssl_context(), timeout=timeout)
+
+
+def fetch_json_url(url, timeout=30):
+    with open_url(url, timeout=timeout) as response:
+        return json.loads(_decode_http_response(response))
+
+
+def _encode_multipart_formdata(fields=None, files=None):
+    boundary = f"----TelemFFBBoundary{uuid.uuid4().hex}"
+    body = bytearray()
+
+    for name, value in fields or []:
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"))
+        if isinstance(value, bytes):
+            body.extend(value)
+        else:
+            body.extend(str(value).encode("utf-8"))
+        body.extend(b"\r\n")
+
+    for name, filename, content, content_type in files or []:
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode("utf-8")
+        )
+        body.extend(f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"))
+        body.extend(content)
+        body.extend(b"\r\n")
+
+    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+    return bytes(body), f"multipart/form-data; boundary={boundary}"
+
+
+def post_multipart_url(url, files, fields=None, timeout=30):
+    data, content_type = _encode_multipart_formdata(fields=fields, files=files)
+    headers = {
+        "Content-Type": content_type,
+        "Content-Length": str(len(data)),
+        "Accept": "application/json",
+    }
+    with open_url(url, data=data, headers=headers, timeout=timeout, method="POST") as response:
+        return response.status, _decode_http_response(response)
+
+
+def classify_http_exception(exc):
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            text = _decode_http_response(exc)
+        except Exception:
+            text = str(exc)
+        return {"status_code": exc.code, "text": text}
+
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return {"error": "timeout"}
+
+    reason = getattr(exc, "reason", None)
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return {"error": "timeout"}
+
+    if isinstance(exc, urllib.error.URLError):
+        return {"error": "connection"}
+
+    return {"error": str(exc), "traceback": traceback.format_exc()}
+
 # def set_reg(name, value):
 #     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
 #     try:
@@ -654,44 +733,27 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
             self.exceptions_list = exceptions_list
 
         def run(self):
-            # Do imports here to avoid importing requests in main thread unnecessarily
             try:
-                import requests
-
                 # Create bundle in memory
                 bundle = create_support_bundle_data(self.userconfig_rootpath, self.exceptions_list)
 
-                resp = requests.post(
+                status_code, response_text = post_multipart_url(
                     self.api_url,
-                    files={'bundle': ('support_bundle.zip', bundle, 'application/zip')},
+                    files=[('bundle', 'support_bundle.zip', bundle, 'application/zip')],
                     timeout=30,
                 )
 
-                if resp.status_code == 200:
+                if status_code == 200:
                     try:
-                        payload = resp.json()
+                        payload = json.loads(response_text) if response_text else {'challenge_url': None}
                     except Exception:
                         payload = {'challenge_url': None}
                     self.finished.emit(True, payload)
                 else:
-                    self.finished.emit(False, {'status_code': resp.status_code, 'text': resp.text})
+                    self.finished.emit(False, {'status_code': status_code, 'text': response_text})
 
             except Exception as e:
-                # Classify common requests errors if requests is available
-                try:
-                    import traceback as _tb
-                    import requests as _requests
-                    if isinstance(e, _requests.exceptions.ConnectionError):
-                        self.finished.emit(False, {'error': 'connection'})
-                        return
-                    if isinstance(e, _requests.exceptions.Timeout):
-                        self.finished.emit(False, {'error': 'timeout'})
-                        return
-                    # Other requests-related exception
-                    self.finished.emit(False, {'error': str(e), 'traceback': _tb.format_exc()})
-                except Exception:
-                    import traceback as _tb
-                    self.finished.emit(False, {'error': str(e), 'traceback': _tb.format_exc()})
+                self.finished.emit(False, classify_http_exception(e))
 
     # Build API URL and capture userconfig path now
     userconfig_rootpath = G.userconfig_rootpath
@@ -2649,8 +2711,6 @@ class FetchLatestVersion(QThread):
 
     def run(self):
         try:
-            ctx = ssl._create_unverified_context()
-
             current_version = get_version()
             latest_version = None
             latest_url = None
@@ -2662,10 +2722,9 @@ class FetchLatestVersion(QThread):
                 logging.info("Running from source with locally modified files, skipping version check")
             else:
                 try:
-                    with urllib.request.urlopen(send_url, context=ctx, ) as req:
-                        latest = json.loads(req.read().decode())
-                        latest_version = latest["version"]
-                        latest_url = url + latest["filename"]
+                    latest = fetch_json_url(send_url)
+                    latest_version = latest["version"]
+                    latest_url = url + latest["filename"]
                 except Exception as e:
                     logging.exception(f"Error checking latest version status: {url}")
                     self.error_signal.emit(str(e))

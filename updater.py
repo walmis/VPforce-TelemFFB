@@ -22,6 +22,7 @@ import logging
 import shutil
 import ssl
 import tempfile
+import urllib.error
 import urllib.request
 import traceback
 
@@ -66,6 +67,21 @@ if args.debugzip is not None:
 
 
 g_folder_contents = os.listdir(g_application_path)
+
+
+def create_ssl_context():
+    return ssl._create_unverified_context()
+
+
+def open_url(url, timeout=30):
+    return urllib.request.urlopen(url, context=create_ssl_context(), timeout=timeout)
+
+
+def fetch_json_url(url, timeout=30):
+    with open_url(url, timeout=timeout) as req:
+        return json.loads(req.read().decode())
+
+
 def fetch_latest_version():
     global g_url_is_good
 
@@ -77,10 +93,9 @@ def fetch_latest_version():
     send_url = url + file
 
     try:
-        with urllib.request.urlopen(send_url, context=ssl._create_unverified_context()) as req:
-            latest = json.loads(req.read().decode())
-            latest_version = latest["version"]
-            latest_url = url + latest["filename"]
+        latest = fetch_json_url(send_url)
+        latest_version = latest["version"]
+        latest_url = url + latest["filename"]
     except Exception as e:
         logging.exception(f"Error checking latest version status: {url}\n{e}")
         g_url_is_good = e
@@ -110,7 +125,7 @@ class Downloader(QThread):
     def download(self):
         if args.debugzip is None:
             try:
-                resp = urllib.request.urlopen(self.url, context=ssl._create_unverified_context())
+                resp = open_url(self.url)
                 total_size = int(resp.headers.get('Content-Length'))
             except:
                 QMessageBox.critical(None, "Error downloading latest version info",

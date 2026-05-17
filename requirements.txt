@@ -5,7 +5,6 @@ pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.
 stransi
 libusb1
 pygetwindow
-requests
 numpy==2.3.0
 akima
 
