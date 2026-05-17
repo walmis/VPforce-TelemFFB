@@ -244,12 +244,15 @@ class AppStatusWidget(QWidget):
             }
         """)
 
-        # Stacked message layout
-        self.message_stack = QStackedLayout()
-        self.message_stack.addWidget(QLabel(''))  # Index 0
+        # Host the stacked layout in a real child widget so placeholder pages are never
+        # created as transient top-level windows during construction.
+        self.message_container = QWidget(self)
+        self.message_stack = QStackedLayout(self.message_container)
+        self.message_placeholder = QWidget(self.message_container)
+        self.message_stack.addWidget(self.message_placeholder)  # Index 0
         self.message_stack.addWidget(self.notification_label)  # Index 1
         self.message_stack.addWidget(self.offline_label)  # Index 2
-        self.message_stack.setCurrentIndex(-1)
+        self.message_stack.setCurrentIndex(0)
 
         # Layout content
         grid.addWidget(sim_status_header, row, 0, alignment=label_align)
@@ -286,7 +289,7 @@ class AppStatusWidget(QWidget):
         grid.addWidget(self.active_configurator_label, row, 1, alignment=value_align)
         row += 1
 
-        grid.addLayout(self.message_stack, row, 0, 1, 2)
+        grid.addWidget(self.message_container, row, 0, 1, 2)
 
         if not master_instance:
             self.cb_selectProfileCombo.setDisabled(True)
