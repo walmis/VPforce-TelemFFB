@@ -642,7 +642,7 @@ def _handle_window_display(headless_mode):
 
 def _check_version_update():
     """Check for version updates if not release or dev build."""
-    if G.master_instance and not G.release_version and not G.dev_build:
+    if G.master_instance and not G.release_version and not G.dev_build and getattr(sys, 'frozen', False):
         logging.info("Checking for version updates...")
         dlg = QProgressDialog("Checking for updates...", "Skip", 0, 0, G.main_window)
         dlg.setWindowTitle("TelemFFB")
