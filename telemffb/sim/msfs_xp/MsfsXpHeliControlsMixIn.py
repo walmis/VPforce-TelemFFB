@@ -353,7 +353,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if not self.trim_following:
             return
 
-        if not telem_data.get('ForceTrimSW', True):  # non-zero default: keep .get()
+        if self.custom_ft_sw_var_enabled and not telem_data.get('ForceTrimSW', True):  # non-zero default: keep .get()
             self.cyclic_physical_trim_x_offs = 0
             self.cyclic_physical_trim_y_offs = 0
             self.cyclic_virtual_trim_x_offs = 0
