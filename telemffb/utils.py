@@ -2039,6 +2039,23 @@ def get_dcs_variant():
     return None
 
 
+def _check_dcrealistic_autostart(export_data, export_lua_path, window):
+    """Warn if DCRealistic autostart is active in Export.lua (known to break FFB spring effects in DCS)."""
+    for line in export_data.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("--"):
+            continue
+        if "DCREALISTIC_AUTOSTART" in stripped:
+            logging.error(
+                f"The DCRealistic autostart feature is enabled in:\n{export_lua_path}\n\n"
+                "This is known to cause FFB spring effects to fail on aircraft load in DCS.\n\n"
+                "If you experience issues with the spring effect not starting after loading into "
+                "an aircraft in DCS, disable the DCRealistic autostart option in the DCRealistic "
+                "settings.\n\n"
+                "This is a warning and does not affect the operation of TelemFFB."
+            )
+
+
 def _prepare_dcs_export_context():
     import telemffb.winpaths as winpaths
 
@@ -2107,6 +2124,8 @@ def install_dcs_export_module_lua(window):
         except FileNotFoundError:
             export_data = ""
             logging.info(f"DCS Export Installer: No Export.lua found at {export_lua_path}; will create if needed")
+
+        _check_dcrealistic_autostart(export_data, export_lua_path, window)
 
         updated = False
 
@@ -2255,6 +2274,8 @@ def install_dcs_export_module_dll(window):
         except FileNotFoundError:
             export_data = ""
             logging.info(f"DCS Export Installer: No Export.lua found at {export_lua_path}; will create if needed")
+
+        _check_dcrealistic_autostart(export_data, export_lua_path, window)
 
         updated = False
 
