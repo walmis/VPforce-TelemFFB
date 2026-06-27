@@ -60,6 +60,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
         self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
         self.lab_pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
+        self.pathIL2_K.setToolTip('The root path where IL-2 Korea is installed')
+        self.lab_pathIL2_2.setToolTip('The root path where IL-2 Korea is installed')
         self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
         self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
         self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
@@ -93,7 +95,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.setTabIcon(self.XPLANE_TAB, self.XPLANE_ICON_DISABLED)
 
         # IL2
-        IL2_PIXMAP = HiDpiPixmap(':/image/icon_IL2.png')
+        IL2_PIXMAP = HiDpiPixmap(':/image/icon_IL2.png') if G.useDarkMode else HiDpiPixmap(':/image/icon_IL2_lm.png')
         self.IL2_ICON_ENABLED, self.IL2_ICON_DISABLED = self.make_icons(IL2_PIXMAP, style)
         self.IL2_TAB = self.simTabWidget.indexOf(self.tab_IL2)
         self.simTabWidget.setTabText(self.IL2_TAB, "")
@@ -162,6 +164,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableBMS.stateChanged.connect(self.toggle_bms_widgets)
         self.browseXPLANE.clicked.connect(self.select_xplane_directory)
         self.browseIL2.clicked.connect(self.select_il2_directory)
+        self.browseIL2_K.clicked.connect(self.select_il2_directory)
         self.buttonBox.accepted.connect(self.save_settings)
         self.resetButton.clicked.connect(self.reset_settings)
         self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
@@ -171,6 +174,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
         self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
+
+        self.validateIL2.clicked.connect(self.toggle_il2_path)
+        self.validateIL2_K.clicked.connect(self.toggle_il2_path)
+
         for button in self.buttonBox.buttons():
             button.setMinimumWidth(60)
 
@@ -178,12 +185,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.buttonChildSettings.setVisible(False)
 
         # Set initial state
-        self.toggle_log_prune_widgets()
-        self.toggle_dcs_widgets()
-        self.toggle_il2_widgets()
-        self.toggle_xplane_widgets()
-        self.toggle_msfs_widgets()
-        self.toggle_al_widgets()
+        # self.toggle_log_prune_widgets()
+        # self.toggle_dcs_widgets()
+        # self.toggle_il2_widgets()
+        # self.toggle_xplane_widgets()
+        # self.toggle_msfs_widgets()
+        # self.toggle_al_widgets()
+
         self.parent_window = parent
         # Load settings from the registry and update widget states
         self.current_al_dict = {}
@@ -195,6 +203,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.themeButtonGroup.setId(self.rb_SystemTheme, 2)
 
         self.load_settings()
+
+        self.toggle_log_prune_widgets()
+        self.toggle_dcs_widgets()
+        self.toggle_il2_widgets()
+        self.toggle_xplane_widgets()
+        self.toggle_msfs_widgets()
+        self.toggle_al_widgets()
 
         int_validator = QIntValidator()
         self.tb_logPrune.setValidator(int_validator)
@@ -674,6 +689,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.portIL2.setEnabled(il2_enabled)
         icon = self.IL2_ICON_ENABLED if il2_enabled else self.IL2_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.IL2_TAB, icon)
+        self.lab_pathIL2_2.setEnabled(il2_enabled)
+        self.pathIL2_K.setEnabled(il2_enabled)
+        self.browseIL2_K.setEnabled(il2_enabled)
+        self.validateIL2_K.setEnabled(il2_enabled)
+        self.lab_IL2_S.setEnabled(il2_enabled)
+        self.lab_IL2_K.setEnabled(il2_enabled)
+
+        self.browseIL2.setEnabled(self.validateIL2.isChecked())
+        self.pathIL2.setEnabled(self.validateIL2.isChecked())
+        self.browseIL2_K.setEnabled(self.validateIL2_K.isChecked())
+        self.pathIL2_K.setEnabled(self.validateIL2_K.isChecked())
+
+
+    def toggle_il2_path(self):
+        auto_config = self.validateIL2.isChecked() if self.sender() == self.validateIL2 else self.validateIL2_K.isChecked()
+        if self.sender() == self.validateIL2:
+            self.browseIL2.setEnabled(auto_config)
+            self.pathIL2.setEnabled(auto_config)
+        else:
+            self.browseIL2_K.setEnabled(auto_config)
+            self.pathIL2_K.setEnabled(auto_config)
 
     def toggle_bms_widgets(self):
         bms_enabled = self.enableBMS.isChecked()
@@ -696,7 +732,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Open a directory dialog and set the result in the pathIL2 QLineEdit
         directory = QFileDialog.getExistingDirectory(self, "Select IL-2 Install Path", "")
         if directory:
-            self.pathIL2.setText(directory)
+            if self.sender() == self.browseIL2:
+                self.pathIL2.setText(directory)
+            elif self.sender() == self.browseIL2_K:
+                self.pathIL2_K.setText(directory)
 
     def toggle_launchmode_cbs(self):
         """
@@ -729,6 +768,21 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_headless_t.setChecked(False)
                 self.cb_startToTray.setChecked(False)
         logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
+
+    def validate_il2_path(self):
+        if self.validateIL2.isChecked():
+            file_path = os.path.join(self.pathIL2.text(), "data\\startup.cfg")
+            if not os.path.exists(file_path):
+                QMessageBox.warning(self, "Config Error",
+                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n\\data\\startup.cfg not found at path")
+                return False
+        if self.validateIL2_K.isChecked():
+            file_path = os.path.join(self.pathIL2_K.text(), "game\\data\\startup.cfg")
+            if not os.path.exists(file_path):
+                QMessageBox.warning(self, "Config Error",
+                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n\\game\\data\\startup.cfg not found at path")
+                return False
+        return True
 
     def validate_settings(self):
         master = self.master_button_group.checkedId()
@@ -780,6 +834,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 return False
             if not validate_vpconf_profile(self.pathVPConfExit.text(), G.device_usbpid, G.device_type):
                 return False
+
+        if self.enableIL2.isChecked():
+            if not self.validate_il2_path():
+                return False
         return True
 
     def save_settings(self):
@@ -798,9 +856,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "pathXPLANE": self.pathXPLANE.text(),
             "enableIL2": self.enableIL2.isChecked(),
             "validateIL2": self.validateIL2.isChecked(),
+            "validateIL2_K": self.validateIL2_K.isChecked(),
             "focus_pauseIL2": self.focus_pauseIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
             "portIL2": str(self.portIL2.text()),
+            "pathIL2_K": self.pathIL2_K.text(),
             'enableBMS': self.enableBMS.isChecked(),
             'masterInstance': self.master_button_group.checkedId(),
             'autolaunchMaster': self.cb_al_enable.isChecked(),
@@ -965,11 +1025,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableIL2.setChecked(settings_dict.get('enableIL2', False))
         self.toggle_il2_widgets()
 
-        self.validateIL2.setChecked(settings_dict.get('validateIL2', True))
+        self.validateIL2.setChecked(settings_dict.get('validateIL2', False))
+        self.validateIL2_K.setChecked(settings_dict.get('validateIL2_K', False))
 
         self.focus_pauseIL2.setChecked(settings_dict.get('focus_pauseIL2', False))
 
         self.pathIL2.setText(settings_dict.get('pathIL2', 'C:/Program Files/IL-2 Sturmovik Great Battles'))
+        self.pathIL2_K.setText(settings_dict.get('pathIL2_K', ''))
 
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
 

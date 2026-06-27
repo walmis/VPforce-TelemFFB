@@ -18,6 +18,7 @@
 
 
 import logging
+import os
 from typing import List, Optional, override
 
 from PyQt6 import QtCore
@@ -106,9 +107,14 @@ class SimIL2(SimTelemListener):
 
     @override
     def validate(self):
-        il2_path = G.system_settings.get('pathIL2')
-        logging.info("Validating IL2 Config")
-        utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
+        if G.system_settings.get('validateIL2'):
+            il2_path = os.path.join(G.system_settings.get('pathIL2'), 'data\\startup.cfg')
+            logging.info("Validating IL2 Sturmovik Telemetry Config")
+            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
+        if G.system_settings.get('validateIL2_K'):
+            il2_path = os.path.join(G.system_settings.get('pathIL2_K'), 'game\\data\\startup.cfg')
+            logging.info("Validating IL2 Korea Telemetry Config")
+            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
 
     @override
     def stop(self):

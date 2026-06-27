@@ -15,6 +15,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import hashlib
+import html
 import inspect
 from datetime import datetime, timedelta
 import math
@@ -1734,12 +1735,44 @@ class Teleplot:
 teleplot = Teleplot()
 
 
-def analyze_il2_config(path, port=34385, window=None):
+def _il2_config_diff_table(section_name, existing: dict, proposed: dict) -> str:
+    # existing is None when the section was missing entirely from startup.cfg
+    keys = list(proposed.keys())
+    if existing:
+        keys += [k for k in existing.keys() if k not in keys]
+
+    rows = ""
+    for k in keys:
+        old_v = existing.get(k, "<i>(missing)</i>") if existing else "<i>(missing)</i>"
+        new_v = html.escape(str(proposed.get(k, "-")))
+        old_v = old_v if old_v.startswith("<i>") else html.escape(str(old_v))
+        changed = existing is None or k not in existing or existing.get(k) != proposed.get(k)
+        style = "color:#e08a2b; font-weight:bold;" if changed else ""
+        rows += (
+            f"<tr><td style='padding:2px 8px;'>{html.escape(k)}</td>"
+            f"<td style='padding:2px 8px;'>{old_v}</td>"
+            f"<td style='padding:2px 8px;{style}'>&rarr;&nbsp;{new_v}</td></tr>"
+        )
+
+    return f"""
+    <p style='margin-top:10px; margin-bottom:2px;'><b>'{section_name}'</b></p>
+    <table cellspacing='0' style='font-family:Consolas,monospace; font-size:9.5pt;'>
+        <tr><th align='left' style='padding:2px 8px;'>Key</th>
+            <th align='left' style='padding:2px 8px;'>Existing</th>
+            <th align='left' style='padding:2px 8px;'>Proposed</th></tr>
+        {rows}
+    </table>
+    """
+
+
+def analyze_il2_config(file_path, port=34385, window=None):
     config_data = defaultdict(dict)
-    file_path = os.path.join(path, "data\\startup.cfg")
+
+    # file_path = os.path.join(path, "data\\startup.cfg")
+    # file_path_k = os.path.join(path, "game\\data\\startup.cfg")
     if not os.path.exists(file_path):
         QMessageBox.warning(window, "TelemFFB IL-2 Config Check",
-                            f"Unable to find Il-2 configuration file at: {path}\n\nPlease verify the installed path and update the TelemFFB configuration file")
+                            f"Unable to find Il-2 configuration file at: <{path}>\n\nPlease verify the installed path and update the IL2 system settings")
         return
     current_section = None
     ref_addr = '127.255.255.255'
@@ -1879,23 +1912,20 @@ def analyze_il2_config(path, port=34385, window=None):
 
         if not telem_match or not motion_match:
             pop = f"""
-            The telemetry and/or motion device configuration in the IL-2 startup.cfg is missing or incorrect and may prohibit TelemFFB from receiving data
-    
-            Would you like to automatically adjust the configuration per the following?
+            <p>The telemetry and/or motion device configuration in the IL-2 <b>startup.cfg</b>
+            is missing or incorrect and may prohibit TelemFFB from receiving data.</p>
+            <p style='font-family:Consolas,monospace; font-size:9pt;'>File = {html.escape(file_path)}</p>
+            <p>Would you like to automatically adjust the configuration per the following?</p>
             """
 
             if not telem_match or not telem_exists:
-                pop = pop + f"""
-                Existing \'telemetrydevice\': {telem_config}
-                Proposed \'telemetrydevice\': {telem_proposed}
-                """
+                pop += _il2_config_diff_table('telemetrydevice', telem_config, telem_proposed)
 
             if not motion_match or not motion_exists:
-                pop = pop + f"""
-                Existing \'motiondevice\': {motion_config}
-                Proposed \'motiondevice\': {motion_proposed}
-                """
-            pop = pop + "\n\n***** - Please ensure Il-2 is not running before selecting 'Yes' - *****"
+                pop += _il2_config_diff_table('motiondevice', motion_config, motion_proposed)
+
+            pop += "<p style='color:#d9534f; font-weight:bold; margin-top:12px;'>Please ensure IL-2 is not running before selecting 'Yes'</p>"
+        telem_message.setTextFormat(Qt.TextFormat.RichText)
         telem_message.setText(pop)
         ans = telem_message.exec()
         if ans == QMessageBox.StandardButton.Yes:

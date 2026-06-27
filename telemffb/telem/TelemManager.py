@@ -667,7 +667,7 @@ class TelemManager(QObject, threading.Thread):
     # Matching in _check_sim_process() is case-insensitive via psutil.process_iter().
     _SIM_PROCESS_NAMES: dict = {
         'DCS':    ['DCS.exe', 'DCS'],
-        'IL2':    ['IL-2.exe', 'IL-2'],
+        'IL2':    ['IL-2.exe', 'IL-2', 'IL2Series.exe'],
         'MSFS':   ['FlightSimulator.exe', 'FlightSimulator2024.exe'],
         'BMS':    ['Falcon BMS.exe', 'falcon'],
         'XPLANE': ['X-Plane.exe', 'X-Plane-x86_64', 'X-Plane'],

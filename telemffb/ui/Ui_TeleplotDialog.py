@@ -96,7 +96,7 @@ class Ui_TeleplotDialog(object):
         self.pb_Select.setText(_translate("TeleplotDialog", "Select..."))
         self.label_4.setText(_translate("TeleplotDialog", "List:"))
         self.label.setText(_translate("TeleplotDialog", "Click to open a browser to: <a href=\"https://teleplot.fr/\">teleplot.fr</a>"))
-        self.label_5.setText(_translate("TeleplotDialog", "To stop sending teleplot data, uncheck \n"
+        self.label_5.setText(_translate("TeleplotDialog", "To stop sending teleplot data, uncheck\n"
 "Transmit or clear the boxes and click Save"))
         self.cb_send.setText(_translate("TeleplotDialog", "Transmit to teleplot.fr"))
         self.pb_clear.setText(_translate("TeleplotDialog", "Clear"))
