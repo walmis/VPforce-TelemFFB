@@ -160,6 +160,12 @@ class EventType(IntEnum):
     Event14 = 14
 
 
+class ForceType(IntEnum):
+    Spring = 0
+    Const = 1
+    Damper = 2
+
+
 class StateDataStructure:
     tick: int = 0
     paused: int = 0
@@ -210,6 +216,7 @@ class IL2TelemParser(TelemParserBase):
         self.seat_data: list = []
         self.unknown_states: dict = {}
         self._unknown_state_warned: set = set()
+        self.ffb_records: list = []
 
         self.acceleration_Gs: list = []
         self.acc_vectors: list = []
@@ -241,6 +248,10 @@ class IL2TelemParser(TelemParserBase):
         elif packet_header == 0x494C0100:
             ## Motion telemetry (aircraft orientation, rotational vectors, etc) have a different header signature
             self.decode_motion(data)
+
+        elif packet_header == 0x494D0100:
+            ## FFB device packet (IL-2 Korea) - raw per-axis force commands (spring/const/damper)
+            self.decode_ffb(data)
 
         else:
             logging.error(f'Unknown packet type:  Header=0x{packet_header:X}')
@@ -298,6 +309,12 @@ class IL2TelemParser(TelemParserBase):
         self.telem_data['rot_accel'] = self.rot_accel
         for state_type, values in self.unknown_states.items():
             self.telem_data[f'unknown_state_{state_type}'] = values
+        if G.il2_ffb_device_ordinal is not None:
+            self.telem_data['FFBOrdinal'] = G.il2_ffb_device_ordinal
+            self.telem_data['FFBRecords'] = [r for r in self.ffb_records if r['dev'] == G.il2_ffb_device_ordinal]
+        else:
+            # ordinal not resolved (not IL-2 Korea, or not yet resolved) - expose unfiltered records
+            self.telem_data['FFBRecords'] = self.ffb_records
 
         # create structure of the most real-time data to determine if updated telemetry is flowing.  If not, consider
         # the sim paused.  This avoids effects continuing to play when in multiplayer map or after crash since IL-2 never stops sending
@@ -335,6 +352,36 @@ class IL2TelemParser(TelemParserBase):
         self.rot_accel = data.get_vector3f()
 
         dbg(1,"acc", self.acc_vectors)
+
+    def decode_ffb(self, data: BinaryDataReader):
+        tick = data.get_uint32()
+        n_records = data.get_uint32()
+
+        records = []
+        for _ in range(n_records):
+            axis = data.get_uint8()
+            dev_no = data.get_uint8()
+            force_type_raw = data.get_uint8()
+            try:
+                force_type = ForceType(force_type_raw)
+            except ValueError:
+                force_type = force_type_raw
+            pos = data.get_float()
+            force = data.get_float()
+            amp = data.get_float()
+            freq = data.get_float()
+            records.append({
+                'axis': axis,
+                'dev': dev_no,
+                'type': force_type,
+                'pos': pos,
+                'force': force,
+                'amp': amp,
+                'freq': freq,
+            })
+
+        dbg(1, "FFB records", records)
+        self.ffb_records = records
 
     def decode_telem(self, data: BinaryDataReader):
         packet_size = data.get_uint16()

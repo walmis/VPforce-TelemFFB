@@ -1765,6 +1765,38 @@ def _il2_config_diff_table(section_name, existing: dict, proposed: dict) -> str:
     """
 
 
+def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
+    """
+    Look up this device's DirectInput-style attach ordinal from IL-2 Korea's
+    'known.devices.json', for matching the 'devNo' field in FFB telemetry records.
+
+    known.devices.json entries carry an 'ident' field formatted as '<vid>_<pid>' (lowercase
+    hex, no separators) and a 'lastAttachedId' which reflects the device's enumeration order -
+    this is distinct from 'deviceId', which is the user-facing control-mapping slot in IL-2.
+
+    Returns None if the file is missing, malformed, or no entry matches the given VID/PID.
+    """
+    known_devices_path = os.path.join(il2_korea_path, 'game\\data\\Input\\known.devices.json')
+    if not os.path.exists(known_devices_path):
+        logging.warning(f"IL2 Korea known.devices.json not found at: {known_devices_path}")
+        return None
+
+    try:
+        with open(known_devices_path, 'r', encoding='utf-8') as f:
+            known_devices = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logging.warning(f"Unable to read IL2 Korea known.devices.json: {e}")
+        return None
+
+    target_ident = f"{vendor_id:04x}_{product_id:04x}"
+    for guid, entry in known_devices.get('knownDevices', {}).items():
+        if entry.get('ident') == target_ident:
+            return entry.get('lastAttachedId')
+
+    logging.warning(f"No matching entry for device {target_ident} in IL2 Korea known.devices.json")
+    return None
+
+
 def analyze_il2_config(file_path, port=34385, window=None):
     config_data = defaultdict(dict)
 

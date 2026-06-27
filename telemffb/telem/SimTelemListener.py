@@ -105,6 +105,11 @@ class SimIL2(SimTelemListener):
         self.telem.start()
         self.started = True
 
+        if G.system_settings.get('validateIL2_K') and G.device_info:
+            G.il2_ffb_device_ordinal = utils.resolve_il2_ffb_device_ordinal(
+                G.system_settings.get('pathIL2_K'), G.device_info.vendor_id, G.device_info.product_id
+            )
+
     @override
     def validate(self):
         if G.system_settings.get('validateIL2'):
