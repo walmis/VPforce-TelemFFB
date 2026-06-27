@@ -129,17 +129,19 @@ class BinaryDataReader:
 class StateType(IntEnum):
     RPM = 0
     ManifoldPressure = 1
-    Val2 = 2
-    Val3 = 3
+    EngineShakeFrequency = 2
+    EngineShakeAmplitude = 3
     LandingGearPosition = 4
     LandingGearPressure = 5
     IndicatedAirspeed = 6
-    Val7 = 7
+    AOA = 7
     Acceleration = 8
     StallBuffet = 9
     AGL = 10
     FlapsPosition = 11
     AirBrakePosition = 12
+    AOS = 13
+    VerticalSpeed = 14
 
 class EventType(IntEnum):
     VehicleName = 0
@@ -164,13 +166,15 @@ class StateDataStructure:
     engine_count: int = 0
     rpm: list = [0.0]
     intake_manifold_pressure_pa: list[float] = []
-    val2: list[float] = []
-    val3: float = 0.0
+    engine_shake_frequency: list[float] = []
+    engine_shake_amplitude: list[float] = []
     landing_gear_count: int = 0
     landing_gear_position: list[float] = [1,1,1]
     landing_gear_pressure: list[float] = [0,0,0]
     indicated_air_speed_metres_second: float = 0.0
-    val7: float = 0.0
+    angle_of_attack_rad: float = 0.0
+    angle_of_sideslip_rad: float = 0.0
+    vertical_speed_metres_second: float = 0.0
     acceleration: list[float] = [0,0,0]
     acceleration_Gs: list[float] = [0,0,0]
     stall_buffet_frequency: float = 0.0
@@ -204,6 +208,8 @@ class IL2TelemParser(TelemParserBase):
         self.ev_damage_data: list = []
         self.damage_events: int = 0
         self.seat_data: list = []
+        self.unknown_states: dict = {}
+        self._unknown_state_warned: set = set()
 
         self.acceleration_Gs: list = []
         self.acc_vectors: list = []
@@ -277,15 +283,21 @@ class IL2TelemParser(TelemParserBase):
         self.telem_data["Hits"] = self.hit_events
         self.telem_data["Damage"] = self.damage_events
         self.telem_data["SeatData"] = self.seat_data
-        self.telem_data['unknown_data_2'] = list(self.state.val2)
-        self.telem_data['unknown_data_3'] = self.state.val3
+        self.telem_data['EngineShakeFrequency'] = list(self.state.engine_shake_frequency)
+        self.telem_data['EngineShakeAmplitude'] = list(self.state.engine_shake_amplitude)
+        self.telem_data['AOA_rad'] = self.state.angle_of_attack_rad
+        self.telem_data['AOS_rad'] = self.state.angle_of_sideslip_rad
+        self.telem_data['AOA'] = self.state.angle_of_attack_rad * conv.rad2deg
+        self.telem_data['AOS'] = self.state.angle_of_sideslip_rad * conv.rad2deg
+        self.telem_data['VerticalSpeed'] = self.state.vertical_speed_metres_second
         self.telem_data['unknown_evt_6'] = self.ev6_data
-        self.telem_data['unknown_data_7'] = self.state.val7
         self.telem_data['unknown_evt_13'] = self.ev13_data
         self.telem_data['unknown_evt_14'] = self.ev14_data
         self.telem_data['acc_vectors'] = self.acc_vectors
         self.telem_data['rot_velocity'] = self.rot_velocity
         self.telem_data['rot_accel'] = self.rot_accel
+        for state_type, values in self.unknown_states.items():
+            self.telem_data[f'unknown_state_{state_type}'] = values
 
         # create structure of the most real-time data to determine if updated telemetry is flowing.  If not, consider
         # the sim paused.  This avoids effects continuing to play when in multiplayer map or after crash since IL-2 never stops sending
@@ -366,7 +378,8 @@ class IL2TelemParser(TelemParserBase):
             state_type = data.get_uint16()
             state_length = data.get_uint8()
 
-            dbg(1,StateType(state_type), "len",  state_length)
+            state_type_name = StateType(state_type) if state_type in StateType._value2member_map_ else f"Unknown({state_type})"
+            dbg(1, state_type_name, "len", state_length)
             
             get_state_floats = lambda: [data.get_float() for i in range(0, state_length)]
 
@@ -377,11 +390,11 @@ class IL2TelemParser(TelemParserBase):
             elif state_type == StateType.ManifoldPressure:
                 self.state.intake_manifold_pressure_pa = get_state_floats()
 
-            elif state_type == StateType.Val2:
-                self.state.val2 = get_state_floats()
+            elif state_type == StateType.EngineShakeFrequency:
+                self.state.engine_shake_frequency = get_state_floats()
 
-            elif state_type == StateType.Val3:
-                self.state.val3 = get_state_floats()
+            elif state_type == StateType.EngineShakeAmplitude:
+                self.state.engine_shake_amplitude = get_state_floats()
 
             elif state_type == StateType.LandingGearPosition:
                 self.state.landing_gear_count = state_length
@@ -394,8 +407,8 @@ class IL2TelemParser(TelemParserBase):
             elif state_type == StateType.IndicatedAirspeed:
                 self.state.indicated_air_speed_metres_second = data.get_float()
 
-            elif state_type == StateType.Val7:
-                self.state.val7 = data.get_float()
+            elif state_type == StateType.AOA:
+                self.state.angle_of_attack_rad = data.get_float()
 
             elif state_type == StateType.Acceleration:
                 self.state.acceleration = get_state_floats()
@@ -414,8 +427,17 @@ class IL2TelemParser(TelemParserBase):
             elif state_type == StateType.AirBrakePosition:
                 self.state.air_brake_position = data.get_float()
 
+            elif state_type == StateType.AOS:
+                self.state.angle_of_sideslip_rad = data.get_float()
+
+            elif state_type == StateType.VerticalSpeed:
+                self.state.vertical_speed_metres_second = data.get_float()
+
             else:
-                logging.error(f"Unknown state type: {state_type}")
+                if state_type not in self._unknown_state_warned:
+                    logging.warning(f"Unknown state type: {state_type}, storing as unknown_state_{state_type}")
+                    self._unknown_state_warned.add(state_type)
+                self.unknown_states[state_type] = get_state_floats()
 
         b = data.get_uint8()
         dbg(1,"last byte", b)

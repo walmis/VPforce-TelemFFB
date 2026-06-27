@@ -3,6 +3,8 @@ import math
 deg = 180 / math.pi
 slugft3 = 0.00194032  # SI to slugft3
 rad = 0.0174532925
+rad2deg = 180 / math.pi  # multiply radians by this to get degrees
+deg2rad = math.pi / 180  # multiply degrees by this to get radians
 ft = 3.28084  # m to ft (multiply meters by this to get feet)
 
 # Velocity conversions
