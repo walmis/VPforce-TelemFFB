@@ -81,6 +81,12 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
     new_gforce_effect_deflection_factor_neg = 1.0
     # end of user parameters
 
+    # Absolute sanity ceiling on vertical G (gs) - a sustained reading beyond this is
+    # physically implausible and indicates corrupt/crash telemetry rather than a real
+    # maneuver. Independent of _is_telemetry_spike, which only catches the initial frame-
+    # over-frame jump and stops firing once a bad value settles into a new "steady" state.
+    gforce_absolute_gs_ceiling = 15.0
+
     def __init__(self):
         super().__init__()
         self.__firmware_supported = None
@@ -131,22 +137,24 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
         if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
             accs = telem_data.ACCs
             if not accs:
-                return None, None, None
+                return None, None, None, None
             gs = accs[1]
             y_gs = accs[0]
             last_accs = self._last_telem_data.ACCs or [0, 0, 0]
+            last_gs = last_accs[1]
             last_y_gs = last_accs[0]
         elif self._sim_is("MSFS") or self._sim_is('XPLANE'):
             gs = telem_data.G
             acc_body = telem_data.AccBody
             if not acc_body:
-                return None, None, None
+                return None, None, None, None
             y_gs = acc_body[2]
             last_acc_body = self._last_telem_data.AccBody or [0, 0, 0]
+            last_gs = self._last_telem_data.G or 0
             last_y_gs = last_acc_body[2]
         else:
-            return None, None, None
-        return gs, y_gs, last_y_gs
+            return None, None, None, None
+        return gs, y_gs, last_gs, last_y_gs
 
     def _ac_run_new_gforce_effect(self, telem_data: BaseTelemetryData):
         """Apply new G-force effects based on aircraft acceleration.
@@ -182,11 +190,15 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
         gmax = self.new_gforce_max_gs
         gmax_neg = self.new_gforce_max_gs_neg
 
-        gs, y_gs, last_y_gs = self._get_gs_data(telem_data)
+        gs, y_gs, last_gs, last_y_gs = self._get_gs_data(telem_data)
         if gs is None:
             return
 
-        if self._is_telemetry_spike(y_gs, last_y_gs):
+        if (self._is_telemetry_spike(gs, last_gs)
+                or self._is_telemetry_spike(y_gs, last_y_gs)
+                or abs(gs) > self.gforce_absolute_gs_ceiling):
+            logging.warning(f"[new_gforce] Rejected telemetry spike/ceiling: gs={gs} last_gs={last_gs} "
+                             f"y_gs={y_gs} last_y_gs={last_y_gs} ceiling={self.gforce_absolute_gs_ceiling}")
             self.effects.dispose("new_gforce")
             return
 
@@ -278,11 +290,15 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
             self.__gforce_dispose_all()
             return
 
-        gs, y_gs, last_y_gs = self._get_gs_data(telem_data)
+        gs, y_gs, last_gs, last_y_gs = self._get_gs_data(telem_data)
         if gs is None:
             return
 
-        if self._is_telemetry_spike(y_gs, last_y_gs):
+        if (self._is_telemetry_spike(gs, last_gs)
+                or self._is_telemetry_spike(y_gs, last_y_gs)
+                or abs(gs) > self.gforce_absolute_gs_ceiling):
+            logging.warning(f"[gforce] Rejected telemetry spike/ceiling: gs={gs} last_gs={last_gs} "
+                             f"y_gs={y_gs} last_y_gs={last_y_gs} ceiling={self.gforce_absolute_gs_ceiling}")
             self.__gforce_dispose_all()
             return
 
