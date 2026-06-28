@@ -1,7 +1,7 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  April 2026
+##  June 2026 - Draft
 ############################################
 ## Platform
 - Exception tracking and reporting system
@@ -14,30 +14,47 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - UI: Fix cyclic spring gain not displaying in settings panel
 - Fix error condition on app exit and SimConnect session halt
 - Fix error handling when launching VPforce Configurator from the app
+- In-app updater rewritten for reliability: per-phase progress (download/backup/extract), live status log, and auto-close-and-launch option
+- Fix crash when telemetry startup is interrupted by a plugin update prompt
+- TelemFFB now detects when a sim process exits and automatically resets telemetry listeners and UI state
 
 ## XPlane
-- X-Trident AW109 special implementation
+- Updated plugin adhering to new stricter coding requirements
+- X-Trident AW109 special implementation - WIP Implementation
   - Full AFCS integration: cyclic trim rate control, force trim release, and autopilot cyclic following with per-axis deadzone tuning
-  - Pedal/rudder trim integration with fine and coarse trim controls
+  - Pedal/rudder trim integration
   - Collective spring gain and force trim release
-  - Correctly honors collective spring gain setting
 - X-Plane plugin: Added dataref write and command write support for expanded aircraft control
+- New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with MSFS)
 
 ## MSFS
 - Control lock feature added for Fixed wing and Helicopter aircraft:
-  - Saab 340, PC-6 Porter, Wilga, Beechcraft A36 Bonanza, Beechcraft B58 Baron, A2A Comanche PA-24
+  - Saab 340, PC-6 Porter, Wilga, Beechcraft A36 Bonanza, Beechcraft B58 Baron, A2A Comanche PA-24, Cessna 414, Beechcraft Duke
   - Taog H500
 - Taog H500/OH6 special implementation with optimized spring and trim configuration
 - CowanSim S76: Updated default profile; added option to disable ROTOR TRIM RESET command
 - FlyInsideHeli: Engine vibrations now mapped to pedals and collective axes
+- New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)
+- HPG Pedals: Added force trim button option
+- HPG Collective: Sends axis position while vertical mode is active to avoid an axis snap when disengaging the autopilot
+- Fix: restored CowanSim and Taog H500 helicopter features that had been inadvertently dropped
+- Fix heli trim following issue (MSFS/X-Plane)
 
 
 ## DCS
 - Export DLL updates
   - Added C-130 Hercules
   - Added AH-6 / MH-6 Little Bird
+  - Added F100D
   - Fixed rudder control surface telemetry
 - DCS start/stop event handling: TelemFFB UI now responds earlier when the DCS export module loads or unloads
+
+## IL2
+- IL-2 Korea support: automatic telemetry/UDP configuration, new System Settings UI, and game process detection
+  - KNOWN ISSUE:  IL-2 Korea is not outputting any engine RPM info, therefore the engine rumble effects are non-functional
+- Decode additional IL-2 Korea telemetry channels: angle of sideslip (AOS) and vertical speed
+- New: forward raw IL-2 telemetry, motion, and FFB UDP streams to one or more external IP/port destinations, with each destination independently choosing which stream(s) to receive (System Settings > IL2)
+- Fix telemetry pause/flicker during multiplayer menus; removed unreliable window-focus-based pause detection
 
 ## Effects
 - New envelope and detent effect support in HapticEffect
