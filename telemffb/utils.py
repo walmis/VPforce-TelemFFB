@@ -1048,6 +1048,8 @@ class SystemSettings(QSettings):
         'validateDCS': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
         'portIL2': 34385,
+        'il2_fwd_enable': False,
+        'il2_fwd_destinations': '[]',
         'enableBMS': False,
         'masterInstance': 1,
         'autolaunchMaster': False,

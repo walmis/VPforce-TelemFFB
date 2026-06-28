@@ -27,6 +27,7 @@ import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.telem.IL2Manager import IL2TelemParser
 from telemffb.telem.NetworkThread import NetworkThread
+from telemffb.telem.UDPForwarder import IL2PacketForwarder
 from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.DcsIpcThread import DcsIpcThread
@@ -86,13 +87,15 @@ class SimTelemListener(QtCore.QObject):
 class SimIL2(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("IL2")
+        self._forwarder = IL2PacketForwarder()
 
     @override
     def start(self):
         if not self.is_enabled:
             return
 
-        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp, telem_parser=IL2TelemParser())
+        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp, telem_parser=IL2TelemParser(),
+                                    raw_packet_hook=self._forwarder.forward)
 
         if self.do_validate() is False:
             logging.warning(
@@ -128,6 +131,7 @@ class SimIL2(SimTelemListener):
             self.telem.quit()
             self.telem = None
             self.started = False
+        self._forwarder.close()
 
 
 class SimBMS(SimTelemListener):

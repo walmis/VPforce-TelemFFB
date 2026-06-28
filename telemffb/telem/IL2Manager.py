@@ -311,7 +311,9 @@ class IL2TelemParser(TelemParserBase):
             self.telem_data[f'unknown_state_{state_type}'] = values
         if G.il2_ffb_device_ordinal is not None:
             self.telem_data['FFBOrdinal'] = G.il2_ffb_device_ordinal
-            self.telem_data['FFBRecords'] = [r for r in self.ffb_records if r['dev'] == G.il2_ffb_device_ordinal]
+            my_records = [r for r in self.ffb_records if r['dev'] == G.il2_ffb_device_ordinal]
+            self.telem_data['FFBRecords'] = my_records
+            self.telem_data['FFBRecordsCount'] = len(my_records) if my_records else 0
         else:
             # ordinal not resolved (not IL-2 Korea, or not yet resolved) - expose unfiltered records
             self.telem_data['FFBRecords'] = self.ffb_records

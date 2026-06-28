@@ -17,14 +17,15 @@
 #
 
 
+import ipaddress
 import json
 import logging
 import os
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIntValidator, QIcon, QPixmap
-from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption
+from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
+from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption
 
 from . import globals as G
 from . import utils
@@ -177,6 +178,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.validateIL2.clicked.connect(self.toggle_il2_path)
         self.validateIL2_K.clicked.connect(self.toggle_il2_path)
+
+        self.il2_fwd_model = QStandardItemModel(0, 5, self)
+        self.il2_fwd_model.setHorizontalHeaderLabels(["IP", "Port", "Telem", "Motion", "FFB"])
+        self.il2_fwd_table.setModel(self.il2_fwd_model)
+        self.il2_fwd_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.il2_fwd_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.il2_fwd_table.horizontalHeader().setStretchLastSection(True)
+        self.pb_add_dest.clicked.connect(self.add_il2_fwd_dest)
+        self.pb_delete_dest.clicked.connect(self.delete_il2_fwd_dest)
+        self.il2_fwd_table.selectionModel().selectionChanged.connect(self.update_il2_fwd_delete_enabled)
+        self.udp_ip.textChanged.connect(self.update_il2_fwd_add_enabled)
+        self.udp_port.textChanged.connect(self.update_il2_fwd_add_enabled)
+        self.cb_telem.stateChanged.connect(self.update_il2_fwd_add_enabled)
+        self.cb_motion.stateChanged.connect(self.update_il2_fwd_add_enabled)
+        self.cb_ffb.stateChanged.connect(self.update_il2_fwd_add_enabled)
+        self.il2_fwd_enable.stateChanged.connect(self.toggle_il2_fwd_widgets)
 
         for button in self.buttonBox.buttons():
             button.setMinimumWidth(60)
@@ -784,6 +801,85 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 return False
         return True
 
+    def _add_il2_fwd_row(self, addr, port, telem, motion, ffb):
+        ip_item = QStandardItem(str(addr))
+        port_item = QStandardItem(str(port))
+        telem_item = QStandardItem("Yes" if telem else "No")
+        motion_item = QStandardItem("Yes" if motion else "No")
+        ffb_item = QStandardItem("Yes" if ffb else "No")
+        for item, value in ((telem_item, bool(telem)), (motion_item, bool(motion)), (ffb_item, bool(ffb))):
+            item.setData(value, Qt.ItemDataRole.UserRole)
+        for item in (ip_item, port_item, telem_item, motion_item, ffb_item):
+            item.setEditable(False)
+        self.il2_fwd_model.appendRow([ip_item, port_item, telem_item, motion_item, ffb_item])
+
+    def add_il2_fwd_dest(self):
+        addr = self.udp_ip.text().strip()
+        port = self.udp_port.text().strip()
+        telem = self.cb_telem.isChecked()
+        motion = self.cb_motion.isChecked()
+        ffb = self.cb_ffb.isChecked()
+
+        self._add_il2_fwd_row(addr, port, telem, motion, ffb)
+
+    def delete_il2_fwd_dest(self):
+        selected_rows = sorted({idx.row() for idx in self.il2_fwd_table.selectionModel().selectedRows()}, reverse=True)
+        for row in selected_rows:
+            self.il2_fwd_model.removeRow(row)
+
+    def _il2_fwd_ip_is_valid(self) -> bool:
+        try:
+            ipaddress.ip_address(self.udp_ip.text().strip())
+            return True
+        except ValueError:
+            return False
+
+    def _il2_fwd_port_is_valid(self) -> bool:
+        port = self.udp_port.text().strip()
+        return port.isdigit() and 1 <= int(port) <= 65535
+
+    def update_il2_fwd_add_enabled(self):
+        valid = (
+            self.il2_fwd_enable.isChecked()
+            and self._il2_fwd_ip_is_valid()
+            and self._il2_fwd_port_is_valid()
+            and (self.cb_telem.isChecked() or self.cb_motion.isChecked() or self.cb_ffb.isChecked())
+        )
+        self.pb_add_dest.setEnabled(valid)
+
+    def update_il2_fwd_delete_enabled(self):
+        has_selection = bool(self.il2_fwd_table.selectionModel().selectedRows())
+        self.pb_delete_dest.setEnabled(self.il2_fwd_enable.isChecked() and has_selection)
+
+    def toggle_il2_fwd_widgets(self):
+        enabled = self.il2_fwd_enable.isChecked()
+        for widget in (self.udp_ip, self.udp_port, self.cb_telem, self.cb_motion, self.cb_ffb, self.il2_fwd_table):
+            widget.setEnabled(enabled)
+        self.update_il2_fwd_add_enabled()
+        self.update_il2_fwd_delete_enabled()
+
+    def get_il2_fwd_destinations(self):
+        destinations = []
+        for row in range(self.il2_fwd_model.rowCount()):
+            addr = self.il2_fwd_model.item(row, 0).text()
+            port = self.il2_fwd_model.item(row, 1).text()
+            telem = self.il2_fwd_model.item(row, 2).data(Qt.ItemDataRole.UserRole)
+            motion = self.il2_fwd_model.item(row, 3).data(Qt.ItemDataRole.UserRole)
+            ffb = self.il2_fwd_model.item(row, 4).data(Qt.ItemDataRole.UserRole)
+            destinations.append({"addr": addr, "port": port, "telem": bool(telem), "motion": bool(motion), "ffb": bool(ffb)})
+        return destinations
+
+    def load_il2_fwd_destinations(self, destinations_json):
+        self.il2_fwd_model.removeRows(0, self.il2_fwd_model.rowCount())
+        try:
+            destinations = json.loads(destinations_json) if destinations_json else []
+        except (TypeError, ValueError):
+            logging.exception("Failed to parse il2_fwd_destinations setting")
+            destinations = []
+        for dest in destinations:
+            self._add_il2_fwd_row(dest.get('addr', ''), dest.get('port', ''), dest.get('telem', False),
+                                   dest.get('motion', False), dest.get('ffb', False))
+
     def validate_settings(self):
         master = self.master_button_group.checkedId()
         match master:
@@ -838,6 +934,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if self.enableIL2.isChecked():
             if not self.validate_il2_path():
                 return False
+
+        if self.il2_fwd_enable.isChecked() and self.il2_fwd_model.rowCount() == 0:
+            QMessageBox.warning(self, "Config Error",
+                                 "IL2 Telemetry Forwarding is enabled but no destinations have been added.\n\n"
+                                 "Please add at least one destination or disable forwarding.")
+            return False
         return True
 
     def save_settings(self):
@@ -861,6 +963,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "pathIL2": self.pathIL2.text(),
             "portIL2": str(self.portIL2.text()),
             "pathIL2_K": self.pathIL2_K.text(),
+            "il2_fwd_enable": self.il2_fwd_enable.isChecked(),
+            "il2_fwd_destinations": json.dumps(self.get_il2_fwd_destinations()),
             'enableBMS': self.enableBMS.isChecked(),
             'masterInstance': self.master_button_group.checkedId(),
             'autolaunchMaster': self.cb_al_enable.isChecked(),
@@ -930,14 +1034,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if self.current_al_dict != saved_al_dict:
             QMessageBox.information(self, "Restart Required", "The Auto-Launch or Master Device settings have changed.  Please restart TelemFFB.")
 
+        if not self.validate_settings():
+            return
+
         for k,v in global_settings_dict.items():
             G.system_settings.setValue(f"{k}", v)
 
         for k,v in instance_settings_dict.items():
             G.system_settings.setValue(f"{G.device_type}/{k}", v)
-
-        if not self.validate_settings():
-            return
 
         # Persist any pending devpath selections that were changed while the dialog was open
         try:
@@ -1032,6 +1136,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.pathIL2.setText(settings_dict.get('pathIL2', 'C:/Program Files/IL-2 Sturmovik Great Battles'))
         self.pathIL2_K.setText(settings_dict.get('pathIL2_K', ''))
+        self.il2_fwd_enable.setChecked(settings_dict.get('il2_fwd_enable', False))
+        self.load_il2_fwd_destinations(settings_dict.get('il2_fwd_destinations', '[]'))
+        self.toggle_il2_fwd_widgets()
 
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
 
