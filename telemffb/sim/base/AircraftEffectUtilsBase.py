@@ -50,8 +50,8 @@ class AircraftEffectUtilsBase(object):
         if check_master:
             return self.check_master_button_press(button)
         else:
-            input_data = HapticEffect.device.get_input()
-            return input_data.isButtonPressed(button)
+            input_data = self._get_device_report()
+            return input_data is not None and input_data.isButtonPressed(button)
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
@@ -309,7 +309,20 @@ class AircraftEffectUtilsBase(object):
         device = HapticEffect.device
         if device is None:
             return 0.0, 0.0
-        return device.get_input().axisXY()
+        input_data = device.get_input()
+        if input_data is None:
+            return 0.0, 0.0
+        return input_data.axisXY()
+
+    @staticmethod
+    def _get_device_CP_XY() -> tuple[float, float]:
+        device = HapticEffect.device
+        if device is None:
+            return 0.0, 0.0
+        input_data = device.get_input()
+        if input_data is None:
+            return 0.0, 0.0
+        return input_data.CP_XY()
 
     @staticmethod
     def _get_device_raw_axes() -> tuple[float, float]:
@@ -317,6 +330,8 @@ class AircraftEffectUtilsBase(object):
         if device is None:
             return 0.0, 0.0
         input_data = device.get_input()
+        if input_data is None:
+            return 0.0, 0.0
         if device.supports_axis_override():
             return input_data.rawAxisXY()
         return input_data.axisXY()
@@ -333,7 +348,10 @@ class AircraftEffectUtilsBase(object):
         device = HapticEffect.device
         if device is None:
             return 0.0, 0.0
-        return device.get_input().forceXY()
+        input_data = device.get_input()
+        if input_data is None:
+            return 0.0, 0.0
+        return input_data.forceXY()
     
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""

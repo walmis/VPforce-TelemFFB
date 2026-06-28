@@ -43,7 +43,7 @@ import time
 from typing import override
 
 from telemffb import utils
-from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
+from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN)
 from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.SettingsManager import SpringModeEnum
@@ -202,9 +202,7 @@ class Aircraft(AircraftBase, DCSCommands):
         :param new_data: New telemetry data
         :type new_data: dict
         """
-        input_data = HapticEffect.device.get_input()
-
-        cpx, cpy = input_data.CP_XY()
+        cpx, cpy = self._get_device_CP_XY()
         telem_data.CP_XY = f"{cpx}, {cpy}"
 
         try:
@@ -298,7 +296,6 @@ class Aircraft(AircraftBase, DCSCommands):
             self.spring.start(override=True)
             return
 
-        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = self._get_device_axes()
 
         if not self.collective_init:
@@ -486,8 +483,8 @@ class Aircraft(AircraftBase, DCSCommands):
                 self.cp_spr_override_active = False
                 return
 
-            input_data = HapticEffect.device.get_input()
-            override_pressed = input_data.isButtonPressed(self.cp_spr_override_button)
+            input_data = self._get_device_report()
+            override_pressed = input_data is not None and input_data.isButtonPressed(self.cp_spr_override_button)
 
             if not override_pressed:
                 self.effects['cp_ovd_spring'].stop()
@@ -518,9 +515,9 @@ class Aircraft(AircraftBase, DCSCommands):
         self.telem_data._ovrd_spr_dt = dt
 
         if self.override_spring_ft_enabled:
-            input_data = HapticEffect.device.get_input()
+            input_data = self._get_device_report()
             x, y = self._get_device_axes()
-            current_buttons = input_data.getPressedButtons()
+            current_buttons = input_data.getPressedButtons() if input_data is not None else []
             # print(f"BUTTONS:>{current_buttons}<")
             # decide what to do depending on which button is pressed
             if self.override_spring_trim_release and self.override_spring_trim_release in current_buttons:
@@ -679,8 +676,8 @@ class Helicopter(Aircraft):
             self.flag_error('Please configure the trim-release button.  It must match that which is bound as trim release in the sim.')
             return
 
-        input_data = HapticEffect.device.get_input()
-        force_trim_pressed = input_data.isButtonPressed(self.dcs_tr_button)
+        input_data = self._get_device_report()
+        force_trim_pressed = input_data is not None and input_data.isButtonPressed(self.dcs_tr_button)
 
         if force_trim_pressed:
             x, y = self._get_device_axes()
