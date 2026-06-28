@@ -1622,6 +1622,7 @@
 		<value>true</value>
 	</defaults>
 	<defaults>
+		<debug_only>true</debug_only>
 		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
