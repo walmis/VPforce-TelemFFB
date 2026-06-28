@@ -1154,6 +1154,10 @@ def read_xml_file(the_sim, instance_device=''):
         info = (f"{info_elem.text}") if info_elem is not None else ""
         prereq_elem = defaults_elem.find('prereq')
         prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
+        debug_only_elem = defaults_elem.find('debug_only')
+        debug_only = debug_only_elem is not None and debug_only_elem.text.strip().lower() == 'true'
+        if debug_only and not G.system_settings.get('debug', False):
+            continue
         sliderfactor_elem = defaults_elem.find('sliderfactor')
         sliderfactor = (f"{sliderfactor_elem.text}") if sliderfactor_elem is not None else "1"
         device_elem = defaults_elem.find('any')

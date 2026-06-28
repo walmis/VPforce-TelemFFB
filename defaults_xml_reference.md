@@ -72,6 +72,7 @@ and per-sim `validvalues` lists are handled.
 | `grouping` | No | Label of the UI group under which this setting appears. |
 | `parentgroup` | No | Organizational label used for XML-internal tracking. Does not affect UI rendering. |
 | `prereq` | No | Conditional visibility rule. See [The `prereq` Field](#the-prereq-field). |
+| `debug_only` | No | If `true`, the setting is only parsed/shown when the app is in debug mode (`G.system_settings.get('debug', False)`). See [The `debug_only` Field](#the-debug_only-field). |
 | `order` | Yes | Float; controls row position and layout behavior. See [The `order` Field](#the-order-field). |
 | `unit` | No | If present, adds a unit dropdown next to the value field. Supported unit groups: speed (`m/s`, `ft/s`, `km/h`, `kts`, `mph`) and length (`m`, `ft`, `km`, `mi`, `nm`). Switching units auto-converts the stored value. |
 | `sliderfactor` | No | Scaling factor between slider position and stored value. Required for slider-based datatypes. See [Datatypes](#datatypes). |
@@ -441,6 +442,28 @@ prereq = setting_name.VALUE1.VALUE2...
 Visibility is resolved recursively up the ancestor chain. A setting is visible only if:
 1. Its own `prereq` condition is satisfied, **and**
 2. Its parent (the setting named in `prereq`) is itself visible and expanded in the UI.
+
+---
+
+## The `debug_only` Field
+
+The `debug_only` field gates a setting behind the app's debug mode, independent of `prereq`.
+
+### Syntax
+
+```
+debug_only = true
+```
+
+- `debug_only=true` — the entry is dropped entirely while parsing `defaults.xml`
+  (`read_xml_file()` in `xmlutils.py`) unless `G.system_settings.get('debug', False)` is true.
+  When debug mode is off, the setting never reaches `SettingsLayout.py` — it behaves as if it
+  doesn't exist in the XML at all, rather than being shown disabled.
+- Omitted (or anything other than `true`) — the setting is evaluated normally, with no
+  dependency on debug mode.
+
+`debug_only` can be combined with `prereq` on the same entry; both conditions must be
+satisfied for the setting to appear.
 
 ---
 
