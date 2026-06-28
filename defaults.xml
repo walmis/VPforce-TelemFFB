@@ -13179,6 +13179,64 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>cm_vibration_intensity</name>
+		<model>AH-6J</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>AH-6J</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>AH-6J</model>
+		<value>15</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>AH-6J</model>
+		<value>24</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>AH-6J</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>AH-6J</model>
+		<value>5</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AH-6J</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>AH-6J</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>aircraft_vne_speed</name>
 		<model>AJS37</model>
 		<value>810</value>
@@ -13359,6 +13417,36 @@
 		<name>type</name>
 		<model>CH-47F</model>
 		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aircraft_vne_speed</name>
+		<model>F-100D</model>
+		<value>765</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aircraft_vs_speed</name>
+		<model>F-100D</model>
+		<value>135</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-100D</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-100D</model>
+		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
 	</models>
@@ -14049,6 +14137,64 @@
 		<name>runway_rumble_intensity</name>
 		<model>MB-399.*</model>
 		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>MH-6J</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>MH-6J</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>MH-6J</model>
+		<value>15</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>MH-6J</model>
+		<value>24</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>MH-6J</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>MH-6J</model>
+		<value>5</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>MH-6J</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>MH-6J</model>
+		<value>0.12</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</models>
