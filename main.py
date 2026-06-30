@@ -41,6 +41,36 @@ Application Flow:
 import sys
 # import faulthandler
 # faulthandler.enable()
+
+# When running from source, the local ./simconnect/ folder (which only holds
+# SimConnect.dll and scvars*.json for PyInstaller bundling) is picked up by
+# Python as a namespace package and shadows the installed pysimconnect regular
+# package, leaving `from simconnect import *` empty. Pre-load the real package
+# from site-packages so all later imports see it.
+def _bootstrap_simconnect():
+    import os
+    import importlib.util
+    if 'simconnect' in sys.modules and getattr(sys.modules['simconnect'], '__file__', None):
+        return
+    here = os.path.dirname(os.path.abspath(__file__))
+    local = os.path.normcase(os.path.join(here, 'simconnect'))
+    for entry in sys.path:
+        if not entry:
+            entry = os.getcwd()
+        candidate = os.path.normcase(os.path.join(entry, 'simconnect'))
+        if candidate == local:
+            continue
+        init_py = os.path.join(entry, 'simconnect', '__init__.py')
+        if os.path.isfile(init_py):
+            spec = importlib.util.spec_from_file_location(
+                'simconnect', init_py,
+                submodule_search_locations=[os.path.dirname(init_py)])
+            module = importlib.util.module_from_spec(spec)
+            sys.modules['simconnect'] = module
+            spec.loader.exec_module(module)
+            return
+_bootstrap_simconnect()
+
 from PyQt6.QtGui import QIcon, QColor, QFont
 
 from telemffb.CmdLineArgs import CmdLineArgs
@@ -103,6 +133,7 @@ def _launch_children():
         utils.check_launch_instance("pedals", master_port)
         utils.check_launch_instance("collective", master_port)
         utils.check_launch_instance("trimwheel", master_port)
+        utils.check_launch_instance("shaker", master_port)
 
     except Exception:
         logging.exception("Error during Auto-Launch sequence")
@@ -145,13 +176,13 @@ def _setup_device_configuration():
     3. Set global device variables for use throughout application
     """
     if G.args.device is None:
-        dev_mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
+        dev_mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel", 5: "shaker"}
         master_rb = G.system_settings.masterInstance
         devname = dev_mapping.get(master_rb, "joystick")
-            
+
         G.device_usbpid = '2055'
         G.device_type = 'joystick'
-        
+
         devpath = G.system_settings.get(f'devpath_{devname}', None)
         if devpath:
             G.device_devpath = devpath
@@ -270,13 +301,123 @@ def _determine_master_instance_status():
         'joystick': 1,
         'pedals': 2,
         'collective': 3,
-        'trimwheel': 4
+        'trimwheel': 4,
+        'shaker': 5,
     }
     master_index = G.system_settings.get('masterInstance', 1)
     if index_dict[G.device_type] == master_index:
         G.master_instance = True
     else:
         G.master_instance = False
+
+    if G.device_type == 'shaker' and G.master_instance:
+        msg = ("Shaker device cannot run as the master instance. "
+               "Configure a non-shaker device (joystick / pedals / collective / trimwheel) "
+               "as the master in System Settings.")
+        logging.error(msg)
+        QMessageBox.critical(None, "Invalid configuration", msg)
+        sys.exit(1)
+
+def _setup_routing():
+    """Initialise the multi-device EffectRouter for THIS process.
+
+    Strict opt-in: if [devices].deviceInventory is empty (the default for
+    fresh installs and for users who haven't run the Setup Wizard yet),
+    leave G.effect_router=None and skip the backend swap. The aircraft
+    pipeline then behaves exactly as before — no behavioural drift.
+
+    When an inventory exists, identify the entry corresponding to this
+    process by matching device_type + (optional) USB PID, then build a
+    router seeded with the bundled defaults and any user-saved overrides.
+    The actual backend swap happens in ``_initialize_device_connection``
+    after ``HapticEffect.open()`` has assigned the Rhino device.
+    """
+    from telemffb.device_inventory import (
+        first_of_type, load_inventory_from_ini,
+    )
+    from telemffb.routing import EffectRouter, EffectRoutesPack, load_routes_pack
+
+    inventory_blob = G.system_settings.get("deviceInventory", "")
+    G.devices = load_inventory_from_ini(inventory_blob)
+
+    if not G.devices:
+        # No multi-device setup configured -> stay on legacy code path.
+        G.effect_router = None
+        G.device_id = ""
+        G.device_positions = []
+        return
+
+    # Identify THIS process. Prefer USB-PID match (stable across renames),
+    # fall back to type. Inventory entries with no matching usb_pid still
+    # bind by type — wizard-generated inventories always set a usb_pid.
+    self_dev = None
+    if G.device_usbvidpid:
+        for d in G.devices:
+            if d.usb_pid and d.usb_pid.lower() == G.device_usbvidpid.lower():
+                self_dev = d
+                break
+    if self_dev is None:
+        self_dev = first_of_type(G.devices, G.device_type)
+
+    if self_dev is not None:
+        G.device_id = self_dev.device_id
+        G.device_positions = list(self_dev.positions)
+    else:
+        # Inventory present but no matching entry -> create a synthetic id
+        # so the router still has something to filter against.
+        G.device_id = f"{G.device_type}_unmapped"
+        G.device_positions = []
+        logging.warning(
+            "Routing: no inventory entry matched %s (%s); using id=%r",
+            G.device_type, G.device_usbvidpid, G.device_id,
+        )
+
+    # Load defaults + user overrides into the router.
+    defaults_path = utils.get_resource_path(
+        os.path.join("telemffb", "data", "effect_routes_default.json"),
+        prefer_root=True,
+    )
+    defaults = load_routes_pack(defaults_path) or EffectRoutesPack()
+
+    user_overrides = EffectRoutesPack()
+    if G.userconfig_rootpath:
+        user_path = os.path.join(G.userconfig_rootpath, "effect_routes_user.json")
+        loaded = load_routes_pack(user_path)
+        if loaded is not None:
+            user_overrides = loaded
+
+    G.effect_router = EffectRouter(defaults=defaults, user_overrides=user_overrides)
+    logging.info(
+        "EffectRouter ready: device_id=%r positions=%s known_effects=%d",
+        G.device_id, G.device_positions,
+        len(G.effect_router.known_effect_names()),
+    )
+
+
+def _maybe_show_setup_wizard():
+    """First-run prompt for the multi-device setup wizard.
+
+    Conditions:
+    - Master instance only (children inherit the inventory).
+    - Wizard hasn't been completed yet ([system].setup_wizard_done is false).
+    - The inventory is currently empty.
+    Both conditions are checked by ``SetupWizard.should_offer_wizard()``.
+    """
+    if not G.master_instance:
+        return
+    try:
+        from telemffb.SetupWizard import SetupWizard, should_offer_wizard
+    except Exception:
+        logging.exception("SetupWizard module unavailable; skipping first-run prompt")
+        return
+    if not should_offer_wizard():
+        return
+    try:
+        wiz = SetupWizard(G.main_window)
+        wiz.exec()
+    except Exception:
+        logging.exception("SetupWizard execution failed")
+
 
 def _setup_config_paths():
     """
@@ -342,10 +483,88 @@ def _initialize_device_connection():
     dev_firmware_version = 'ERROR'
     dev = None
 
-    # try:
-    #     vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
-    # except Exception:
-    #     return dev, dev_serial, dev_firmware_version
+if G.device_type == 'shaker':
+        try:
+            from telemffb.hw.shaker_synth import ShakerSynth
+            from telemffb.hw.ffb_shaker import init_shaker
+            from telemffb.sim import aircraft_base
+            device_name = G.system_settings.get('shakerDevice', None) or None
+            gain = float(G.system_settings.get('shakerGain', 1.0))
+            channel_mode = G.system_settings.get('shakerChannelMode', 'mono') or 'mono'
+            try:
+                pan = float(G.system_settings.get('shakerPan', 0.0))
+            except (TypeError, ValueError):
+                pan = 0.0
+            synth = ShakerSynth(device=device_name, master_gain=gain,
+                                channel_mode=channel_mode, pan=pan)
+            synth.start()
+            init_shaker(synth)
+            G.shaker_synth = synth
+            aircraft_base.use_shaker_backend()
+            from telemffb.hw import ffb_shaker as _ffb_shaker
+            from telemffb.hw.shaker_layers_io import get_shaker_effects_path, get_default_pack_path
+            user_path = get_shaker_effects_path()
+            if user_path and not os.path.exists(user_path):
+                default_path = get_default_pack_path()
+                if default_path and os.path.exists(default_path):
+                    try:
+                        os.makedirs(os.path.dirname(user_path), exist_ok=True)
+                        shutil.copyfile(default_path, user_path)
+                        logging.info("Initialised %s from bundled defaults", user_path)
+                    except Exception:
+                        logging.exception("Could not seed user shaker_effects.json from bundle")
+            _ffb_shaker.reload_layers()
+            logging.info("Shaker effects: %d effects with custom layers",
+                         len(_ffb_shaker.EFFECT_LAYERS))
+
+            # Load shaker calibration profile pack and pick the active one.
+            from telemffb.hw import shaker_profiles_io
+            from telemffb.hw.shaker_profile import DEFAULT_PROFILE
+            profiles_user_path = shaker_profiles_io.get_user_profiles_path()
+            if profiles_user_path and not os.path.exists(profiles_user_path):
+                profiles_default_path = shaker_profiles_io.get_default_pack_path()
+                if profiles_default_path and os.path.exists(profiles_default_path):
+                    try:
+                        os.makedirs(os.path.dirname(profiles_user_path), exist_ok=True)
+                        shutil.copyfile(profiles_default_path, profiles_user_path)
+                        logging.info("Initialised %s from bundled defaults",
+                                     profiles_user_path)
+                    except Exception:
+                        logging.exception(
+                            "Could not seed user shaker_profiles.json from bundle")
+            file_active, profiles = (None, {})
+            if profiles_user_path:
+                file_active, profiles = shaker_profiles_io.load(profiles_user_path)
+            if not profiles:
+                bundled = shaker_profiles_io.get_default_pack_path()
+                if bundled and os.path.exists(bundled):
+                    file_active, profiles = shaker_profiles_io.load(bundled)
+            active_name = (G.system_settings.get('shakerProfile')
+                           or file_active or 'Generic')
+            active_profile = profiles.get(active_name)
+            if active_profile is None and profiles:
+                active_profile = next(iter(profiles.values()))
+            if active_profile is None:
+                active_profile = DEFAULT_PROFILE
+            _ffb_shaker.set_active_profile(active_profile)
+            G.shaker_active_profile = active_profile
+            logging.info("Shaker calibration profile: %r (loaded %d profiles)",
+                         active_profile.name, len(profiles))
+            G.device_connection_status = True
+            logging.info(f"Shaker device initialised (output={device_name!r}, gain={gain})")
+        except Exception as e:
+            G.device_connection_status = False
+            logging.exception("Failed to initialise shaker audio device")
+            QMessageBox.warning(None, "Shaker initialisation failed",
+                              f"Unable to start audio output for shaker device.\n"
+                              f"Error: {e}\n\n"
+                              "Open System Settings and verify the Shaker output device.")
+        return dev, dev_serial, dev_firmware_version
+
+    try:
+        vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
+    except Exception:
+        return dev, dev_serial, dev_firmware_version
 
     devs = _enumerate_and_log_devices()
 
@@ -377,12 +596,40 @@ def _initialize_device_connection():
         G.device_ident = dev.info.ident
         G.device_connection_status = True
 
+        # Multi-device routing: swap aircraft_base.effects to the router-aware
+        # backend AFTER HapticEffect.open() has assigned the Rhino device, so
+        # the inherited cls.device attribute is already populated. Strict
+        # opt-in: only fires when [devices] inventory is present and resolved.
+        if G.effect_router is not None and G.device_id:
+            from telemffb.sim import aircraft_base
+            from telemffb.routing import ffb_router as _ffb_router
+            aircraft_base.use_router_backend()
+            _ffb_router.init_router(
+                G.effect_router,
+                device_id=G.device_id,
+                device_type=G.device_type,
+                device_positions=G.device_positions,
+            )
+            logging.info("Effect routing active for %s (id=%r)",
+                         G.device_type, G.device_id)
+
     except Exception as e:
         G.device_connection_status = False
         logging.exception("Exception")
         QMessageBox.warning(None, "Cannot connect to Rhino",
                           f"Unable to open device: {G.device_type}\nError: {e}\n\n"
                           "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
+
+    # WinWing SimAppPro bridge — only on the master instance, always opt-in
+    # via the 'winwingSimAppPro' setting.  Fire-and-forget UDP so it never
+    # blocks startup even when SimAppPro is not running.
+    if G.device_type not in ("shaker",) and G.system_settings.get("winwingSimAppPro", False):
+        try:
+            from telemffb.hw.ffb_winwing import init_winwing
+            init_winwing()
+            logging.info("WinWing SimAppPro bridge enabled (UDP -> 127.0.0.1:16536)")
+        except Exception:
+            logging.exception("Failed to start WinWing SimAppPro bridge")
 
     return dev, dev_serial, dev_firmware_version
 
@@ -680,6 +927,10 @@ def _check_system_settings_required():
 
 def _setup_async_initialization(dev : FFBRhino, dev_serial):
     """Setup background initialization that doesn't block main window appearance."""
+    # Shaker child has no Rhino device — no configurator gains / vpconf to push.
+    if dev is None:
+        return
+
     @utils.threaded()
     def init_async():
         try:
@@ -688,7 +939,7 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
-        if G.system_settings.enableVPConfStartup:
+if G.system_settings.enableVPConfStartup:
             logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
             try:
                 upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
@@ -849,6 +1100,11 @@ def main():
     # Setup configuration file paths (dev vs production, userconfig locations)
     _setup_config_paths()
 
+    # Load the multi-device routing inventory (no-op when empty -> behaves
+    # exactly like pre-routing builds). Must run AFTER _setup_config_paths
+    # so user-override JSON resolves against the right userconfig_rootpath.
+    _setup_routing()
+
     # if legacy 'userconfig.xml' exists, copy it to 'userconfig_v2' for conversion
     utils.copy_legacy_config_to_new(G.userconfig_path)
 
@@ -976,6 +1232,11 @@ def main():
 
     # Prompt for system settings if no devices are configured
     _check_system_settings_required()
+
+    # First-run multi-device setup wizard. Master-only (children inherit
+    # the inventory via the shared config). Skipped if the inventory is
+    # already populated or the user has explicitly dismissed the wizard.
+    _maybe_show_setup_wizard()
 
     # ============================================================================
     # PHASE 14: Background Initialization

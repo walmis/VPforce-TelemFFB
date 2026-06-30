@@ -60,8 +60,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - New envelope and detent effect support in HapticEffect
   - Attack envelope on constant force effects — reduces the risk of jarring axis slam on initial activation
 
-############################################
-##  October 29, 2025
+##############################################  October 29, 2025
 ############################################
 ## Platform
 - Fix hard crash when TelemFFB started with no device connected

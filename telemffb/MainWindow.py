@@ -138,6 +138,12 @@ class MainWindow(QMainWindow):
             case 'trimwheel':
                 x_pos = 40
                 y_pos = 30
+            case 'shaker':
+                x_pos = 200
+                y_pos = 160
+            case _:
+                x_pos = 100
+                y_pos = 100
 
         self.setGeometry(x_pos, y_pos, 530, 700)
 
@@ -202,6 +208,12 @@ class MainWindow(QMainWindow):
                 case 'trimwheel':
                     x_pos = 40
                     y_pos = 30
+                case 'shaker':
+                    x_pos = 200
+                    y_pos = 160
+                case _:
+                    x_pos = 100
+                    y_pos = 100
             self.setGeometry(x_pos, y_pos, 530, 700)
 
         reset_geometry.triggered.connect(do_reset_window_size)
@@ -234,6 +246,14 @@ class MainWindow(QMainWindow):
         reset_action = QAction('Reset All Effects', self)
         reset_action.triggered.connect(self.reset_all_effects)
         utilities_menu.addAction(reset_action)
+
+        effect_tester_action = QAction('Effect Tester...', self)
+        effect_tester_action.triggered.connect(self.open_effect_tester)
+        utilities_menu.addAction(effect_tester_action)
+
+        effect_routing_action = QAction('Effect Routing...', self)
+        effect_routing_action.triggered.connect(self.open_effect_routing)
+        utilities_menu.addAction(effect_routing_action)
 
         self.update_action = QAction('Install Latest TelemFFB', self)
         self.update_action.triggered.connect(self.update_from_menu)
@@ -334,6 +354,10 @@ class MainWindow(QMainWindow):
         self.support_action = QAction("Create support bundle", self)
         self.support_action.triggered.connect(lambda: utils.create_support_bundle(G.userconfig_rootpath))
         help_menu.addAction(self.support_action)
+
+        setup_wizard_action = QAction("Multi-Device Setup Wizard...", self)
+        setup_wizard_action.triggered.connect(self.open_setup_wizard)
+        help_menu.addAction(setup_wizard_action)
 
         # Create a line beneath the menu bar
         line = QFrame()
@@ -793,6 +817,16 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.settings_area, "Settings")
 
 
+        """ Devices tab — multi-device routing inventory """
+        try:
+            from telemffb.DeviceInventoryTab import DeviceInventoryTab
+            self.device_inventory_tab = DeviceInventoryTab(self)
+            self.tab_widget.addTab(self.device_inventory_tab, "Devices")
+        except Exception:
+            logging.exception("Could not initialise Devices tab")
+            self.device_inventory_tab = None
+
+
         """ Create the Hide tab and set its properties """
 
         self.tab_widget.addTab(QWidget(), "Hide")
@@ -1059,7 +1093,7 @@ class MainWindow(QMainWindow):
         if G.launched_instances:
             show_menu = QMenu("Instances", self)
             show_child_window_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
+            for d in ["joystick", "pedals", "collective", 'trimwheel', 'shaker']:
                 if d in G.launched_instances:
                     def do_show_child_window(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW WINDOW:{child}')
@@ -1121,7 +1155,7 @@ class MainWindow(QMainWindow):
             self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
 
             self.log_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
+            for d in ["joystick", "pedals", "collective", 'trimwheel', 'shaker']:
                 if d in G.launched_instances:
                     def do_show_child_log(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
@@ -1476,6 +1510,9 @@ class MainWindow(QMainWindow):
             elif 'pedals' in _arg: arg = 2
             elif 'collective' in _arg: arg = 3
             elif 'trimwheel' in _arg: arg = 4
+            elif 'shaker' in _arg: arg = 5
+            else:
+                return
         else:
             arg = _arg
 
@@ -1483,7 +1520,8 @@ class MainWindow(QMainWindow):
             1 : "joystick",
             2 : "pedals",
             3 : "collective",
-            4 : "trimwheel"
+            4 : "trimwheel",
+            5 : "shaker",
         }
 
         xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
@@ -1904,7 +1942,13 @@ class MainWindow(QMainWindow):
             case 'trimwheel':
                 x_pos = 10
                 y_pos = 40
-                
+            case 'shaker':
+                x_pos = 210
+                y_pos = 160
+            case _:
+                x_pos = 100
+                y_pos = 100
+
         self.setGeometry(x_pos, y_pos, 530, 700)
 
     def open_system_settings_dialog(self):
@@ -1938,6 +1982,37 @@ class MainWindow(QMainWindow):
                 HapticEffect.device.reset_effects()
             except Exception:
                 pass
+
+    def open_effect_tester(self):
+        """Open the interactive effect-tester dialog (non-modal)."""
+        from telemffb.EffectTestDialog import EffectTestDialog
+        dlg = EffectTestDialog(self)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dlg.show()
+
+    def open_effect_routing(self):
+        """Open the per-effect routing matrix editor (modal)."""
+        try:
+            from telemffb.EffectRoutingDialog import EffectRoutingDialog
+        except Exception:
+            logging.exception("Could not load Effect Routing dialog")
+            QMessageBox.warning(self, "Effect Routing",
+                                "Routing UI failed to load. See log for details.")
+            return
+        dlg = EffectRoutingDialog(self)
+        dlg.exec()
+
+    def open_setup_wizard(self):
+        """Launch the multi-device setup wizard (modal)."""
+        try:
+            from telemffb.SetupWizard import SetupWizard
+        except Exception:
+            logging.exception("Could not load SetupWizard")
+            QMessageBox.warning(self, "Setup Wizard",
+                                "Setup wizard failed to load. See log for details.")
+            return
+        wiz = SetupWizard(self)
+        wiz.exec()
 
 
 

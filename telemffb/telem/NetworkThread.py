@@ -51,7 +51,7 @@ class NetworkThread(threading.Thread):
                 data: bytes
                 sender: Tuple[str, int]
                 data, sender = s.recvfrom(65535)
-                if self._raw_packet_hook is not None:
+if self._raw_packet_hook is not None:
                     try:
                         self._raw_packet_hook(data)
                     except Exception:

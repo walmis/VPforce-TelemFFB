@@ -1,0 +1,59 @@
+# TelemFFB Shaker MVP — Plan
+
+## Status legend
+- [ ] not started
+- [~] in progress
+- [x] done
+- [!] blocked / needs design change
+
+## Phases
+- [x] STEP_00 — Bootstrap planning artifacts
+- [x] STEP_01 — Audio synth core (`telemffb/hw/shaker_synth.py`)
+- [x] STEP_02 — HapticEffect facade (`telemffb/hw/ffb_shaker.py`)
+- [x] STEP_03 — Device-type integration (`--type shaker` launchable)
+- [x] STEP_04 — Effect routing whitelist
+- [x] STEP_05 — Soundcard selection UI in System Settings
+- [ ] STEP_06 — MSFS smoke test
+- [ ] STEP_07 — Docs & known limitations
+
+## Working agreement (short form)
+- Implement one STEP, satisfy its acceptance criteria, **stop and request human review**, await explicit approval before starting the next STEP.
+- All changes must be additive — joystick / pedals / collective / trimwheel paths must keep working unchanged when `G.device_type != 'shaker'`.
+- New files get the GPL v3 header copied verbatim from existing `telemffb/hw/ffb_rhino.py`.
+- New runtime dependency: `sounddevice` only (update `requirements.txt` in STEP_01).
+- Use `logging` (no `print()`) in shipped code; the standalone selftest may print.
+- Tick the relevant checkbox above and append a one-line note under "Notes / Deferred" after each step.
+- If a STEP's design proves wrong during implementation, update the corresponding `STEP_NN_*.md` first, surface the change in the reply, ask for human signoff, and only then implement.
+
+## Reference notes from initial code inspection (verified against tree)
+- `main.py:147`  →  `mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}` — extend with `5: "shaker"`.
+- `main.py:264`  →  `index_dict = { ... }` — extend with `'shaker': 5`.
+- `main.py:348`  →  `dev = HapticEffect.open(vid_pid[0], vid_pid[1])` — wrap so shaker branch initialises `ShakerSynth` instead of opening Rhino HID.
+- `telemffb/CmdLineArgs.py:118`  →  `--type` help text — add `shaker`.
+- `telemffb/sim/aircraft_base.py:29-31`  →  `from telemffb.hw.ffb_rhino import ...` — replace with conditional binding on `G.device_type`.
+- `telemffb/sim/aircraft_base.py:38`  →  `effects: utils.Dispenser = utils.Dispenser(HapticEffect)` — same import switches HapticEffect to the shaker facade when device is shaker.
+- `telemffb/sim/aircraft_base.py:491,499,507,515`  →  `is_joystick`, `is_pedals`, `is_collective`, `is_trimwheel` — add `is_shaker` near these.
+- `telemffb/hw/ffb_rhino.py:996`  →  `class HapticEffect(Destroyable):` — surface to mirror in `ffb_shaker.py`.
+- `telemffb/utils.py:1099-1110`  →  `class Dispenser` already sets `v.name = name` on creation; STEP_04 can rely on that without modifying Dispenser.
+- `telemffb/globals.py:64`  →  `device_type : str = ""` — add `shaker_synth: 'ShakerSynth | None' = None` near here in STEP_03.
+- `telemffb/SystemSettingsDialog.py` (and `telemffb/ui/Ui_SystemDialog.py`) — Qt-Designer-generated UI plus wrapper. The Shaker section in STEP_05 must be added in both, or in the wrapper alone if widgets are added programmatically.
+
+## Side-task — interactive effect tester (not part of STEP_NN sequence)
+Added a non-modal `EffectTestDialog` reachable from MainWindow → Utilities → "Effect Tester...". Plays a single tunable effect (sine / square / triangle / sawtooth-up/down / constant) with sliders for frequency / magnitude / direction, plus a continuous-vs-fixed-duration toggle and a "Live update while playing" checkbox so slider drags re-tune the running effect. Backed by `aircraft_base.effects[__effect_tester__]`, so it dispatches to whichever `HapticEffect` is bound (Rhino on joystick / pedals / collective / trimwheel; the shaker facade on a shaker child). The reserved name `"__effect_tester__"` is on the shaker whitelist so the tester is allowed to drive the shaker. Cleanup on dialog close stops the effect, calls destroy, and disposes the dispenser entry. New file: `telemffb/EffectTestDialog.py` (~250 lines, GPL header). Wiring: one menu action in `telemffb/MainWindow.py`. Smoke-tested under `QT_QPA_PLATFORM=offscreen` with a stubbed aircraft_base: defaults, Constant-disables-freq, play creates oscillator, live magnitude update reflects on the oscillator, timed duration flips `_is_playing` off via QTimer, all six effect types play+stop, and close cleans the oscillator out of the synth.
+
+## Notes / Deferred
+- (STEP_00) Confirmed `Dispenser.get` at `telemffb/utils.py:1108` already assigns `v.name = name` — STEP_04 will not need a Dispenser fix; just rely on the existing behaviour.
+- (STEP_00) `aircraft_base.py:30` also imports `EFFECT_SPRING/DAMPER/INERTIA/FRICTION/SPRING_ADJUSTER`; line 31 imports `EFFECT_SAWTOOTHUP/DOWN`. The conditional import block in STEP_03 must re-export ALL of those symbols from `ffb_shaker.py` (already listed in the STEP_02 surface).
+- (STEP_00) `main.py:348` is the Rhino HID open; the shaker branch in STEP_03 wraps **this** call site (not a higher-level one).
+- (STEP_01) `shaker_synth.py` preallocates **all** working buffers (mix, per-oscillator output, indices, phase, sine, amplitude envelope) at construction; `_ensure_capacity` only fires if a render call requests more samples than the configured blocksize. Audio callback path holds a single `threading.Lock` for the whole iteration — set/stop calls are infrequent vs. the audio thread, so contention is negligible.
+- (STEP_01) `requirements.txt` now lists `sounddevice`. CLI verified: `--help`, `--list-devices` (returns empty list cleanly when host has no audio devices). Oscillator math sanity-checked against expected sine values for a 30 Hz / 480-sample render — peaks land where phase analysis predicts.
+- (STEP_02) Whitelist filtering is **deferred to STEP_04 by design** (per the STEP doc). STEP_02's `start()` calls into the synth unconditionally — STEP_04 will add the `if self.name not in SHAKER_EFFECT_WHITELIST: return self` guard.
+- (STEP_02) `start()` and `stop()` consolidate the lookup-or-create + osc.set/stop into a single `_synth._lock` acquisition, avoiding a tiny window where the audio thread could observe partially-updated oscillator state.
+- (STEP_02) Verified all 14 `EFFECT_*` constants in `ffb_shaker.py` match `ffb_rhino.py` value-for-value (parsed regex out of the source so the test doesn't require libusb). Behavioural smoke test exercises `.periodic`, `.constant`, `.start`, `.stop`, `.destroy`, `.started`, `duration` timer, force-only no-ops, and the no-synth-bound graceful drop.
+- (STEP_03) **Design deviation from STEP doc, taken from the brief's own contingency:** the static `if G.device_type == 'shaker': ...` conditional at `aircraft_base.py:29-31` does not work because `aircraft_base` is imported transitively from `main.py`'s top-level imports (via `MainWindow`), which runs before `main()` sets `G.device_type`. We instead keep the static `from ffb_rhino import ...` and add a `use_shaker_backend()` rebind that `main.py` calls inside the shaker branch of `_initialize_device_connection()`, before any effect is created (effects are lazy via `Dispenser.get`). `STEP_03_device_type.md` updated with the rationale and the concrete change.
+- (STEP_03) Master-instance check added in `_determine_master_instance_status`: if `device_type == 'shaker'` and `master_instance` would be True (i.e. user configured shaker as master in System Settings), log error + `QMessageBox.critical` + `sys.exit(1)`.
+- (STEP_03) Confidence is bounded by what runs in this Linux container: all six modified files compile clean under py3.12; the `Dispenser`-rebind pattern was verified in isolation; full launch verification (`python main.py --type shaker --child --masterport <port>`) needs Windows + sounddevice + Rhino hardware on the dev machine.
+- (STEP_04) Whitelist set has 46 entries (spec listed exact names; all imported verbatim). `start()` guards on whitelist membership immediately after the synth-bound and name-set guards, before any synth lock is acquired. Dropped names log at debug level. All four acceptance scenarios verified: non-whitelisted name silent-drops with no oscillator created; `runway0.constant().start()` produces 25 Hz; `gunfire.periodic(..., duration=200).start()` plays a 200 ms 80 Hz burst then ramps to 0; whitelist is a public, mutable module-level set so future names can be added without other changes.
+- (STEP_05) New "Shaker" tab added programmatically in `SystemSettingsDialog.__init__` so the Qt-Designer-generated `Ui_SystemDialog.py` does not need to be touched. Three controls: device QComboBox (populated from `ShakerSynth.list_output_devices()`, item 0 = "(System default)" with userData=`""`), master gain QDoubleSpinBox (range 0.0–2.0, step 0.05, default 1.0), test QPushButton (plays 2 s of 35 Hz @ 0.5 on a daemon thread, button re-enables via `QTimer.singleShot(2500, ...)`).
+- (STEP_05) Persistence: `'shakerDevice'` (string) and `'shakerGain'` (float) added to the global settings dict in `save_settings`, restored by a new `_load_shaker_settings` helper that uses exact-name-then-substring matching (mirrors `ShakerSynth._resolve_device`). Defaults `''` / `1.0` added to `SystemSettings.globl_sys_dict` for the reset-settings flow. `main.py`'s shaker branch normalises the empty-string device name to `None` so passing it to `ShakerSynth(device=...)` selects the system default.
+- (STEP_05) If the audio backend (sounddevice / PortAudio) cannot be imported, the tab still opens but combo + test button are disabled and the test button has an explanatory tooltip. Verified the widget structure end-to-end with `QT_QPA_PLATFORM=offscreen`: combo populates, gain spinbox honours the configured range/step, save→load round-trip preserves both fields including string-coerced gain values from QSettings storage.

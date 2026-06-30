@@ -6,3 +6,4 @@ __pycache__
 *.exe
 *dist
 /pyenv
+.claude

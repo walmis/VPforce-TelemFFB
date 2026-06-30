@@ -3827,6 +3827,227 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
+		<datatype>enumlist</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150</order>
+		<name>engine_rumble_mode</name>
+		<displayname>Engine Rumble Mode</displayname>
+		<prereq>mechanical_group</prereq>
+		<info>physics: phase-locked impulse per blade-pass / cylinder firing (shaker only). synthesis: legacy continuous sine.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>physics,synthesis</validvalues>
+		<value>physics</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>int</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.1</order>
+		<name>prop_blade_count</name>
+		<displayname>Propeller Blade Count</displayname>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<info>Number of propeller blades; drives the impulse rate in physics mode.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>2,3,4,5,6,7,8</validvalues>
+		<value>2</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>float</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.2</order>
+		<name>prop_reduction_ratio</name>
+		<displayname>Propeller Reduction Ratio</displayname>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<info>Prop RPM = engine RPM × ratio. 1.0 for direct drive; geared engines typically 0.5–0.7.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>1.0</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.3</order>
+		<name>cylinder_firing_enabled</name>
+		<displayname>Piston Cylinder-Firing Pulses</displayname>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<info>Adds a per-cylinder-firing impulse on top of prop blade-pass. Best on big slow piston engines (V12, radials at low RPM).</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>int</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.4</order>
+		<name>cylinder_count</name>
+		<displayname>Cylinder Count</displayname>
+		<prereq>cylinder_firing_enabled</prereq>
+		<info>Number of cylinders per engine.</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>1,2,3,4,5,6,7,8,9,10,12,14,18</validvalues>
+		<value>4</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.5</order>
+		<name>is_4_stroke</name>
+		<displayname>4-Stroke Engine</displayname>
+		<prereq>cylinder_firing_enabled</prereq>
+		<info>4-stroke fires once per 2 revolutions per cylinder; 2-stroke fires every revolution.</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.6</order>
+		<name>tailrotor_enabled</name>
+		<displayname>Tail-Rotor Impulse Voice</displayname>
+		<prereq>engine_rotor_rumble_enabled</prereq>
+		<info>Adds a separate physics-mode voice for the tail rotor.</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>int</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.7</order>
+		<name>tailrotor_blade_count</name>
+		<displayname>Tail-Rotor Blade Count</displayname>
+		<prereq>tailrotor_enabled</prereq>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>2,3,4,5,6</validvalues>
+		<value>2</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>float</datatype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40150.8</order>
+		<name>tailrotor_gear_ratio</name>
+		<displayname>Tail-Rotor Gear Ratio</displayname>
+		<prereq>tailrotor_enabled</prereq>
+		<info>Tail-rotor RPM = main-rotor RPM × ratio. Typical helicopters: 4.0–6.0.</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>4.5</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Touchdown</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40160</order>
+		<name>touchdown_vs_enabled</name>
+		<displayname>Touchdown Impulse from Vertical Speed</displayname>
+		<prereq>mechanical_group</prereq>
+		<info>Fires per-gear impulses on touchdown — main gear → shaker, nose gear → stick — with magnitude scaled by smoothed VS at the moment of contact. Routing is governed by the layer config in shaker_effects.json (effects: touchdown_vs_main, touchdown_vs_nose).</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>float</datatype>
+		<grouping>Touchdown</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40160.1</order>
+		<name>touchdown_vs_gentle</name>
+		<displayname>Gentle Landing VS (m/s)</displayname>
+		<prereq>touchdown_vs_enabled</prereq>
+		<info>Below this VS the impulse is at minimum amplitude.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>0.5</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>float</datatype>
+		<grouping>Touchdown</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40160.2</order>
+		<name>touchdown_vs_hard</name>
+		<displayname>Hard Landing VS (m/s)</displayname>
+		<prereq>touchdown_vs_enabled</prereq>
+		<info>At this VS the impulse is at maximum amplitude.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>4.0</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
 		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
@@ -6301,7 +6522,7 @@
 			<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>elevator_droop_enabled</name>
+<name>elevator_droop_enabled</name>
 			<type>JetAircraft</type>
 			<value>false</value>
 			<sim>DCS</sim>
@@ -6960,6 +7181,119 @@
 			<value>0.25</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+<name>aoa_effect_enabled</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_spring_gain</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_tr_damper</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_release</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_reset</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_trim_down</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_trim_up</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_trim_rate</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>deceleration_effect_enable</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>deceleration_effect_enable</name>
+			<type>HPGHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>deceleration_effect_enable</name>
+			<type>SASHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>deceleration_effect_enable</name>
+			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>deceleration_effect_enable</name>
+			<type>CowanSimHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>aoa_buffeting_enabled</name>
@@ -9870,6 +10204,12 @@
 			<device>joystick</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
+			<name>aoa_effect_enabled</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
 			<name>aoa_reduction_effect_enabled</name>
 			<type>JetAircraft</type>
 			<value>false</value>
@@ -9991,7 +10331,7 @@
 			<device>joystick</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
-			<name>cyclic_spring_gain</name>
+<name>cyclic_spring_gain</name>
 			<type>XAW109Helicopter</type>
 			<value>0.6</value>
 			<sim>XPLANE</sim>
@@ -10005,7 +10345,7 @@
 			<device>any</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
-			<name>deceleration_effect_enable</name>
+<name>deceleration_effect_enable</name>
 			<type>XAW109Helicopter</type>
 			<value>false</value>
 			<sim>XPLANE</sim>

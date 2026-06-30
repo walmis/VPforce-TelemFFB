@@ -34,6 +34,14 @@ import select
 import logging
 import sys
 
+try:
+    import winreg
+except ImportError:
+    # winreg is Windows-only; allow this module to import on Linux/macOS for
+    # offline tests of platform-agnostic helpers (filters, scaling, etc.).
+    # The two callers that actually use winreg are wrapped to fail loudly if
+    # invoked on a non-Windows host.
+    winreg = None
 import socket
 import time
 import traceback
@@ -1056,13 +1064,22 @@ class SystemSettings(QSettings):
         'autolaunchJoystick': False,
         'autolaunchPedals': False,
         'autolaunchCollective': False,
+        'autolaunchShaker': False,
         'startMinJoystick': False,
         'startMinPedals': False,
         'startMinCollective': False,
+        'startMinShaker': False,
         'startHeadlessJoystick': False,
         'startHeadlessPedals': False,
         'startHeadlessCollective': False,
+        'startHeadlessShaker': False,
+        'pidShaker': '2059',  # synthetic ID; not a real USB PID. Used for IPC port + settings namespace.
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
+        'shakerDevice': '',  # bass-shaker output device name; '' = system default
+        'shakerGain': 1.0,
+        'shakerChannelMode': 'mono',  # one of: 'mono', 'left', 'right', 'pan'
+        'shakerPan': 0.0,             # [-1, +1]; only used when shakerChannelMode == 'pan'
+        'shakerProfile': 'Generic',   # active ShakerProfile name in shaker_profiles.json
     }
 
     @property
@@ -1608,6 +1625,11 @@ class Dampener(Derivative):
         derivative = -super().update(value) * self.k
         value += derivative
         return value
+
+
+# PhaseAccumulator lives in telemffb.hw.shaker_synth (its only consumer).
+# Re-exported here so external code can keep importing from utils.
+from telemffb.hw.shaker_synth import PhaseAccumulator  # noqa: E402,F401
 
 
 class DirectionModulator:
@@ -3414,7 +3436,7 @@ class ResultThread(threading.Thread):
 
     def get_error(self):
         """
-        Return error if any, return None if no error occured
+        Return error if any, return None if no error occurred
         """
         self.join()
         return self.error
