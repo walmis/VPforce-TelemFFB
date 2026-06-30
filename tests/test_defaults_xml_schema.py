@@ -371,7 +371,6 @@ class TestClassDefaultsConsistency:
                     f"<{tag}> has invalid device='{dev}'"
                 )
 
-    @pytest.mark.xfail(reason="defaults.xml contains typo 'JetrAircraft' instead of 'JetAircraft' in classdefaults_BMS")
     def test_type_refs_registered_class_or_negation_or_allsettings(self, defaults_root):
         """Build sim -> {classes} map and verify each classdefault references a valid class."""
         sim_classes: dict[str, set[str]] = {}
@@ -382,7 +381,13 @@ class TestClassDefaultsConsistency:
 
         for tag in _all_classdefault_tags(defaults_root):
             parent_sim = tag.replace("classdefaults_", "")
-            allowed = sim_classes.get(parent_sim, set()) | {"AllSettings"}
+            # classdefaults_any can reference classes from *any* sim
+            if parent_sim == "any":
+                allowed: set[str] = {"AllSettings"}
+                for cs in sim_classes.values():
+                    allowed |= cs
+            else:
+                allowed = sim_classes.get(parent_sim, set()) | {"AllSettings"}
             for elem in defaults_root.findall(f".//{tag}"):
                 typ = elem.findtext("type", "")
                 if typ.startswith("!"):
