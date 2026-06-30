@@ -359,6 +359,26 @@ effect.stop()  # Frees device resource
 - When ready, push the branch and open a pull request into `main`. Keep PRs small and focused on one concern.
 - Never force-push to `main`. Avoid `--no-verify` or `--no-gpg-sign`.
 
+### Commit Message Format
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) with a scope:
+
+```
+type(scope): subject
+
+Body paragraph(s) explaining what changed and why. Reference specific files,
+parameters, or telemetry variables. Note caveats, TODOs, or known limitations.
+```
+
+**Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+
+**Scopes**: module or component name, e.g. `msfs-xp`, `flight-controls`, `conversions`, `telem`, `hw`, `ui`, `xml`
+
+**Examples**:
+- `refactor(msfs-xp): extract turbulence effect into TurbulenceMixIn` — body lists moved params, methods, and notes "no behaviour change"
+- `docs(flight-controls): add physics audit TODOs to MsfsXpFlightControlsMixIn` — body lists affected methods with specific caveats
+- `fix(conversions): add TODO for incorrect vsound constant and add rho0 alias` — body states impact (~27% gain error), rationale for leaving as-is, and secondary changes
+
 ---
 
 ## Questions to Ask When Reviewing Code
