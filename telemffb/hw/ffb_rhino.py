@@ -1755,8 +1755,19 @@ class HapticEffect(Destroyable):
             self._h_effect = None
 
     def __del__(self):
-        """Destructor helper to ensure resources are freed."""
-        self.destroy()
+        """Destructor helper to ensure resources are freed.
+        
+        Checks _h_effect directly rather than calling destroy() to avoid
+        issues with mocking and to prevent double-destroy when explicit
+        destroy() has already been called and set _h_effect to None.
+        """
+        if getattr(self, '_h_effect', None) is None:
+            return
+        try:
+            self._h_effect.destroy()
+            self._h_effect = None
+        except Exception:
+            pass
 
 # unit test
 if __name__ == "__main__":

@@ -349,6 +349,8 @@ def _build_haptic_effect_class():
             for sub in self._sub_handles:
                 try:
                     sub.destroy()
+                    # Null out _h_effect so __del__ doesn't double-destroy
+                    sub._h_effect = None
                 except Exception:
                     logger.exception(
                         "Failed to destroy sub-handle for %r", self.name)

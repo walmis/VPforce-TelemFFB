@@ -511,8 +511,8 @@ class AircraftBase(
         self._name = name
         self._changes = {}
         self._change_counter = {}
-        self._telem_data = {}
-        self._last_telem_data = {}
+        self._telem_data = BaseTelemetryData()
+        self._last_telem_data = BaseTelemetryData()
         self._ipc_telem = {}
         # Per-instance ring buffer for nose-wheel HPF magnitude history,
         # consumed by ac_update_runway_rumble to render the shaker's
