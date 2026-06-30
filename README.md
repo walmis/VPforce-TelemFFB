@@ -115,6 +115,42 @@ git reset --hard origin/master
 git pull
 ```
 
+## MCP Telemetry Analysis Server (Developer)
+
+TelemFFB includes an optional [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes live telemetry, configuration state, and FFB effect state for AI-assisted analysis. This lets an LLM inspect what's happening in real time — current aircraft state, historical signal windows, active FFB effects — and reason about tuning suggestions.
+
+The MCP server is a **developer-only** feature and is not included in production builds.
+
+**Setup:**
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+When the `mcp` package is installed, TelemFFB automatically starts the MCP server on the master instance at `http://127.0.0.1:8089/mcp` (streamable HTTP transport). Without the package, the app runs normally with no impact.
+
+**Available MCP tools:**
+
+| Tool | Description |
+|------|-------------|
+| `get_current_state` | Snapshot of sim, aircraft, device type, and latest telemetry frame |
+| `get_telemetry_window` | Bounded historical window for selected signals (up to 300s) |
+| `list_available_signals` | Discover which fields the current sim/aircraft provides |
+| `explain_signal` | Documentation and metadata for any telemetry signal |
+| `get_effect_state` | Current FFB effect state — active effects, MixIn attributes |
+
+**Example MCP client config** (e.g. for Claude Desktop or VS Code Copilot):
+
+```json
+{
+  "mcpServers": {
+    "telemffb": {
+      "url": "http://127.0.0.1:8089/mcp"
+    }
+  }
+}
+```
+
 ## Contributing and Development
 
 Pull requests and issues are welcome on the [GitHub page](https://github.com/walmis/VPforce-TelemFFB).

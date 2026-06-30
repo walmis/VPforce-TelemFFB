@@ -934,6 +934,16 @@ def main():
     G.telem_manager = TelemManager()
     G.telem_manager.start()
 
+    # Initialize telemetry tap (always) and MCP server (master instance, dev-only)
+    from telemffb.analysis.telemetry_tap import TelemetryTap
+    G.telemetry_tap = TelemetryTap()
+    if G.master_instance:
+        try:
+            from telemffb.mcp.server import start_mcp_server
+            start_mcp_server()
+        except Exception:
+            logging.exception("Failed to start MCP server (non-fatal)")
+
     # Initialize simulation listener manager for multiple sim support
     G.sim_listeners = SimListenerManager()
 

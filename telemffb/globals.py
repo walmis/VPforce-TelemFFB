@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from telemffb.ExceptionTracker import ExceptionTracker
     from .hw.ffb_rhino import DeviceInfo
     from telemffb.hw.ffb_rhino import FFBReport_Get_Gains_Feature_Data
+    from telemffb.analysis.telemetry_tap import TelemetryTap
 
 DeviceTypeLiteral = Literal["joystick", "pedals", "collective", "trimwheel"]
 
@@ -152,3 +153,6 @@ exception_tracker : 'ExceptionTracker'
 
 effects : 'Dispenser'  
 """Haptic effects dispenser, used to manage and access haptic effects by name"""
+
+telemetry_tap : 'TelemetryTap'
+"""Telemetry tap for MCP analysis server ring buffer"""

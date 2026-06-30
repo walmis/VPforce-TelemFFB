@@ -274,6 +274,7 @@ class TelemManager(QObject, threading.Thread):
         self._handle_aircraft_changes(aircraft_info, parsed_data)
         self._handle_config_changes(aircraft_info)
         self._process_current_aircraft_telemetry(parsed_data)
+        self._capture_telemetry_tap(parsed_data)
         self._handle_ipc_and_plotting(parsed_data)
         self._emit_telemetry(parsed_data)
         if not self._first_frame_from_sim:
@@ -380,6 +381,9 @@ class TelemManager(QObject, threading.Thread):
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                 self._initialize_new_aircraft(aircraft_info, telem_data)
             self.currentAircraftName = aircraft_name
+            tap = getattr(G, 'telemetry_tap', None)
+            if tap:
+                tap.on_aircraft_change(aircraft_name)
 
     def _initialize_new_aircraft(self, aircraft_info: AircraftInfo, telem_data: BaseTelemetryData):
         """Initialize a new aircraft when it changes."""
@@ -555,6 +559,12 @@ class TelemManager(QObject, threading.Thread):
             except Exception:
                 logging.exception(".on_telemetry Exception")
 
+    def _capture_telemetry_tap(self, telem_data: BaseTelemetryData):
+        """Capture telemetry frame into the analysis ring buffer."""
+        tap = getattr(G, 'telemetry_tap', None)
+        if tap:
+            tap.capture(telem_data)
+
     def _handle_ipc_and_plotting(self, telem_data: BaseTelemetryData):
         """Handle IPC telemetry sending and plotting."""
         # Send locally generated telemetry to master
@@ -660,6 +670,9 @@ class TelemManager(QObject, threading.Thread):
             self.telemetryTimeout.emit(True)
             self.timed_out = True
             G.settings_mgr.timed_out = True
+            tap = getattr(G, 'telemetry_tap', None)
+            if tap:
+                tap.on_timeout()
 
     # Mapping from the telemetry 'src' tag to the list of known OS process names for
     # that sim.  Multiple names per entry cover platform variants (Windows .exe vs.
