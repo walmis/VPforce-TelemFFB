@@ -4,6 +4,7 @@ Handles loading defaults.xml and userconfig_v2.xml with OS-level file
 locking via :class:`namedmutex.FileLock`, and writing back consolidated
 userconfig.
 """
+import io
 import logging
 import os
 import time
@@ -89,14 +90,20 @@ class XmlStore:
 def try_parse(file_path: str, max_attempts: int = 3, delay: float = 0.1) -> Optional[ET.ElementTree]:
     """Parse XML with retry on ParseError (multi-instance file locking).
 
-    Acquires a **shared** (read) lock so multiple processes can read
-    concurrently while writers block until all readers finish.
+    Acquires a **shared** (read) lock only while reading raw bytes from disk
+    so the critical section is as short as possible.  Parsing happens in-memory
+    after the lock is released — if another writer modified the file between our
+    read and parse, we catch ``ParseError`` and retry from scratch.
     """
     attempt = 0
     while attempt < max_attempts:
         try:
+            # Read raw bytes under shared lock (fast I/O only)
             with FileLock(file_path, shared=True):
-                return ET.parse(file_path)
+                with open(file_path, "rb") as f:
+                    data = f.read()
+            # Parse in-memory without holding the lock (ET.parse patched in tests)
+            return ET.parse(io.BytesIO(data))
         except ET.ParseError:
             attempt += 1
             time.sleep(delay)
