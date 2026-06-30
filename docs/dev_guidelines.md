@@ -78,3 +78,13 @@ In the telemetry hot path, never let an exception propagate — it kills the pro
 ## Style
 
 Follow PEP 8. Write docstrings in reStructuredText format. Use type hints where they help readability. Prefer `typing.Optional` and `typing.Literal["joystick", "pedals", "collective", "trimwheel"]` for device types.
+
+### Imports
+
+Imports go at the top of the file, just after any module comments and docstrings, and before module globals and constants. Group them in the standard order:
+
+1. Standard library imports
+2. Third-party imports
+3. Local application imports
+
+This rule may only be broken to avoid circular imports — and even then, the circular dependency should be fixed upstream rather than worked around.
