@@ -86,7 +86,14 @@ class MockFFBDevice:
         return MockConditionEffect()
 
     def supports_axis_override(self):
-        return True
+        import telemffb.globals as G
+        import re
+        if G.device_firmware_version is None:
+            return False
+        # v1.0.18b14 -> 101814, v1.0.18 -> 1018
+        # Use numeric comparison to ensure beta versions (>1018) pass
+        ver = int(re.sub(r'\D', '', G.device_firmware_version))
+        return ver > 1018
 
     def send_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
         self.axis_override_commands.append(
