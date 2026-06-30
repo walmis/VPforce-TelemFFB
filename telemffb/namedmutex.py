@@ -16,117 +16,291 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""Cross-platform named mutex / file locking.
 
-"""Named mutex handling (for Win32).
+* **Windows** — ``NamedMutex`` wraps Win32 ``CreateMutexW`` / ``WaitForSingleObject``.
+* **Linux / Unix** — ``FileLock`` uses ``fcntl.flock()`` for advisory file locking.
 
-See README.md or https://github.com/benhoyt/namedmutex for a bit more
-documentation.
+Both expose a uniform context-manager API::
 
-This code is released under the new BSD 3-clause license:
-http://opensource.org/licenses/BSD-3-Clause
+    with FileLock('/path/to/file.xml'):
+        # exclusive access here
 
+Original ``NamedMutex`` code released under the BSD 3-clause license
+(see https://github.com/benhoyt/namedmutex).
 """
 
 import ctypes
-from ctypes import wintypes
+import hashlib
+import os
+import sys
+import time
+from typing import Optional
 
-# Create ctypes wrapper for Win32 functions we need, with correct argument/return types
-_CreateMutex = ctypes.windll.kernel32.CreateMutexW
-_CreateMutex.argtypes = [wintypes.LPCVOID, wintypes.BOOL, wintypes.LPCWSTR]
-_CreateMutex.restype = wintypes.HANDLE
+# ── Platform detection ────────────────────────────────────────────────
 
-_WaitForSingleObject = ctypes.windll.kernel32.WaitForSingleObject
-_WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-_WaitForSingleObject.restype = wintypes.DWORD
-
-_ReleaseMutex = ctypes.windll.kernel32.ReleaseMutex
-_ReleaseMutex.argtypes = [wintypes.HANDLE]
-_ReleaseMutex.restype = wintypes.BOOL
-
-_CloseHandle = ctypes.windll.kernel32.CloseHandle
-_CloseHandle.argtypes = [wintypes.HANDLE]
-_CloseHandle.restype = wintypes.BOOL
+if sys.platform == "win32":
+    _IS_WINDOWS = True
+else:
+    _IS_WINDOWS = False
 
 
-class NamedMutex(object):
-    """A named, system-wide mutex that can be acquired and released."""
+# ── Windows primitives ────────────────────────────────────────────────
 
-    def __init__(self, name, acquired=False, timeout=None):
-        """Create named mutex with given name, also acquiring mutex if acquired is True.
-        Mutex names are case sensitive, and a filename (with backslashes in it) is not a
-        valid mutex name. Raises WindowsError on error.
+if _IS_WINDOWS:
+    from ctypes import wintypes
 
-        """
+    _CreateMutex = ctypes.windll.kernel32.CreateMutexW  # type: ignore[union-attr]
+    _CreateMutex.argtypes = [wintypes.LPCVOID, wintypes.BOOL, wintypes.LPCWSTR]  # type: ignore[name-defined]
+    _CreateMutex.restype = wintypes.HANDLE  # type: ignore[name-defined]
+
+    _WaitForSingleObject = ctypes.windll.kernel32.WaitForSingleObject  # type: ignore[union-attr]
+    _WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]  # type: ignore[name-defined]
+    _WaitForSingleObject.restype = wintypes.DWORD  # type: ignore[name-defined]
+
+    _ReleaseMutex = ctypes.windll.kernel32.ReleaseMutex  # type: ignore[union-attr]
+    _ReleaseMutex.argtypes = [wintypes.HANDLE]  # type: ignore[name-defined]
+    _ReleaseMutex.restype = wintypes.BOOL  # type: ignore[name-defined]
+
+    _CloseHandle = ctypes.windll.kernel32.CloseHandle  # type: ignore[union-attr]
+    _CloseHandle.argtypes = [wintypes.HANDLE]  # type: ignore[name-defined]
+    _CloseHandle.restype = wintypes.BOOL  # type: ignore[name-defined]
+
+
+class NamedMutex:
+    """A named, system-wide Win32 mutex.
+
+    Raises :exc:`RuntimeError` on non-Windows platforms.
+    """
+
+    def __init__(self, name: str, acquired: bool = False, timeout: Optional[float] = None) -> None:
+        if not _IS_WINDOWS:
+            raise RuntimeError("NamedMutex requires Windows")
         self.name = name
         self.acquired = acquired
-        ret = _CreateMutex(None, False, name)
+        ret = _CreateMutex(None, False, name)  # type: ignore[possibly-undefined]
         if not ret:
             raise ctypes.WinError()
         self.handle = ret
         if acquired:
             self.acquire(timeout=timeout)
 
-    def acquire(self, timeout=None):
-        """Acquire ownership of the mutex, returning True if acquired. If a timeout
-        is specified, it will wait a maximum of timeout seconds to acquire the mutex,
-        returning True if acquired, False on timeout. Raises WindowsError on error.
+    def acquire(self, timeout: Optional[float] = None) -> bool:
+        """Acquire ownership of the mutex.
 
+        Returns ``True`` on success, ``False`` on timeout.
+        Raises :exc:`OSError` on other errors.
         """
         if timeout is None:
-            # Wait forever (INFINITE)
-            timeout = 0xFFFFFFFF
+            timeout_ms = 0xFFFFFFFF  # INFINITE
         else:
-            timeout = int(round(timeout * 1000))
-        ret = _WaitForSingleObject(self.handle, timeout)
+            timeout_ms = int(round(timeout * 1000))
+        ret = _WaitForSingleObject(self.handle, timeout_ms)  # type: ignore[possibly-undefined]
         if ret in (0, 0x80):
-            # Note that this doesn't distinguish between normally acquired (0) and
-            # acquired due to another owning process terminating without releasing (0x80)
             self.acquired = True
             return True
         elif ret == 0x102:
-            # Timeout
             self.acquired = False
             return False
         else:
-            # Waiting failed
             raise ctypes.WinError()
 
-    def release(self):
-        """Relase an acquired mutex. Raises WindowsError on error."""
-        ret = _ReleaseMutex(self.handle)
+    def release(self) -> None:
+        """Release an acquired mutex."""
+        ret = _ReleaseMutex(self.handle)  # type: ignore[possibly-undefined]
         if not ret:
             raise ctypes.WinError()
         self.acquired = False
 
-    def close(self):
-        """Close the mutex and release the handle."""
+    def close(self) -> None:
+        """Close the mutex handle."""
         if self.handle is None:
-            # Already closed
             return
-        ret = _CloseHandle(self.handle)
+        ret = _CloseHandle(self.handle)  # type: ignore[possibly-undefined]
         if not ret:
             raise ctypes.WinError()
         self.handle = None
 
     __del__ = close
 
-    def __repr__(self):
-        """Return the Python representation of this mutex."""
+    def __repr__(self) -> str:
         return '{0}({1!r}, acquired={2})'.format(
             self.__class__.__name__, self.name, self.acquired)
 
     __str__ = __repr__
 
-    # Make it a context manager so it can be used with the "with" statement
-    def __enter__(self):
+    # Context manager
+    def __enter__(self) -> "NamedMutex":
         self.acquire()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.release()
 
 
+# ── Cross-platform FileLock ───────────────────────────────────────────
+
+class FileLock:
+    """Cross-platform file-level lock using a named mutex per file path.
+
+    * **Windows**: backed by a Win32 named mutex (SHA-256 hashed path).
+      Reader-writer distinction is not supported — all locks are exclusive.
+    * **Linux / Unix**: backed by ``fcntl.flock()`` on a companion .lock file.
+      Shared (read) and exclusive (write) modes are fully supported.
+
+    Example::
+
+        # Exclusive lock (write)
+        with FileLock('/path/to/userconfig_v2.xml'):
+            tree = ET.parse(path)
+            # ... modify ...
+            tree.write(path)
+
+        # Shared lock (read) — allows concurrent readers
+        with FileLock('/path/to/userconfig_v2.xml', shared=True):
+            tree = ET.parse(path)  # safe from mid-write corruption
+
+    The lock is released automatically on exit or exception.
+
+    Args:
+        file_path: Path to the file to protect.
+        timeout: Maximum seconds to wait for the lock.  ``None`` waits
+            indefinitely.  On timeout the context manager raises
+            :class:`TimeoutError`.
+        shared: If ``True``, acquire a shared (read) lock on POSIX platforms.
+            Multiple processes may hold shared locks concurrently; an
+            exclusive (write) lock blocks until all shared locks are released.
+            On Windows this flag is ignored (always exclusive).
+
+    Raises:
+        TimeoutError: If *timeout* elapsed before the lock was acquired.
+        OSError: If the underlying OS call fails.
+    """
+
+    _MUTEX_PREFIX = "telemffb_xml_"
+
+    def __init__(self, file_path: str, timeout: Optional[float] = 5.0, *, shared: bool = False) -> None:
+        self.file_path = os.path.abspath(file_path)
+        self.timeout = timeout
+        self.shared = shared
+        self._locked = False
+
+        if _IS_WINDOWS:
+            self._mutex: Optional[NamedMutex] = None
+        else:
+            import fcntl  # noqa: F811
+            self._fd: Optional[int] = None
+            self._fcntl = fcntl
+
+    # ── internal helpers ─────────────────────────────────────────
+
+    @classmethod
+    def _safe_name(cls, file_path: str) -> str:
+        """Derive a valid Win32 mutex name from any file path."""
+        digest = hashlib.sha256(file_path.encode("utf-8")).hexdigest()[:16]
+        return f"{cls._MUTEX_PREFIX}{digest}"
+
+    # ── Windows implementation ──────────────────────────────────
+
+    def _acquire_win(self) -> bool:
+        self._mutex = NamedMutex(self._safe_name(self.file_path))
+        ok = self._mutex.acquire(timeout=self.timeout)
+        if not ok:
+            self._mutex.close()
+            self._mutex = None
+        return ok
+
+    def _release_win(self) -> None:
+        if self._mutex is not None:
+            try:
+                self._mutex.release()
+            finally:
+                self._mutex.close()
+                self._mutex = None
+
+    # ── POSIX implementation ─────────────────────────────────────
+
+    def _lock_path(self) -> str:
+        """Return the companion .lock file path."""
+        return self.file_path + ".lock"
+
+    def _acquire_posix(self) -> bool:
+        lock_path = self._lock_path()
+        self._fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+        flag = self._fcntl.LOCK_SH if self.shared else self._fcntl.LOCK_EX
+        deadline = time.monotonic() + self.timeout if self.timeout is not None else None
+        while True:
+            try:
+                self._fcntl.flock(self._fd, flag | self._fcntl.LOCK_NB)
+                return True
+            except (IOError, OSError):
+                if deadline is not None and time.monotonic() >= deadline:
+                    os.close(self._fd)
+                    self._fd = None
+                    return False
+                time.sleep(0.05)
+
+    def _release_posix(self) -> None:
+        if self._fd is not None:
+            try:
+                self._fcntl.flock(self._fd, self._fcntl.LOCK_UN)
+            finally:
+                os.close(self._fd)
+                self._fd = None
+            # Clean up lock file
+            try:
+                os.unlink(self._lock_path())
+            except OSError:
+                pass
+
+    # ── public API ──────────────────────────────────────────────
+
+    def acquire(self) -> bool:
+        """Acquire the file lock, blocking up to *timeout* seconds.
+
+        Returns ``True`` on success, ``False`` on timeout.
+        """
+        if self._locked:
+            return True  # already held by this thread/process
+        if _IS_WINDOWS:
+            ok = self._acquire_win()
+        else:
+            ok = self._acquire_posix()
+        if ok:
+            self._locked = True
+        return ok
+
+    def release(self) -> None:
+        """Release the file lock."""
+        if not self._locked:
+            return
+        if _IS_WINDOWS:
+            self._release_win()
+        else:
+            self._release_posix()
+        self._locked = False
+
+    # ── context manager ─────────────────────────────────────────
+
+    def __enter__(self) -> "FileLock":
+        if not self.acquire():
+            raise TimeoutError(
+                f"Could not acquire lock for {self.file_path!r} "
+                f"within {self.timeout}s"
+            )
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.release()
+        return None
+
+
+# ── CLI smoke test ────────────────────────────────────────────────────
+
 if __name__ == '__main__':
-    # Just test that acquire and release work.
-    with NamedMutex('test_mutex_123'):
-        pass
+    if _IS_WINDOWS:
+        with NamedMutex('test_mutex_123'):
+            print("NamedMutex acquired & released OK")
+    else:
+        with FileLock('/tmp/test_filelock.txt'):
+            print("FileLock (POSIX) acquired & released OK")

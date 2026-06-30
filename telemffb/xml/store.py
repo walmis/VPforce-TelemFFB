@@ -1,12 +1,16 @@
 """XmlStore — XML file I/O, parsing, and tree management.
 
-Handles loading defaults.xml and userconfig_v2.xml, retrying on parse errors
-for multi-instance file locking, and writing back consolidated userconfig.
+Handles loading defaults.xml and userconfig_v2.xml with OS-level file
+locking via :class:`namedmutex.FileLock`, and writing back consolidated
+userconfig.
 """
 import logging
+import os
 import time
 import xml.etree.ElementTree as ET
 from typing import Optional
+
+from telemffb.namedmutex import FileLock
 
 
 class XmlStore:
@@ -38,20 +42,28 @@ class XmlStore:
     auto_defaults_root = defaults_root
 
     def update_roots(self) -> None:
-        """Re-parse both XML files into in-memory trees."""
+        """Re-parse both XML files into in-memory trees under shared locks."""
+        # try_parse() acquires its own shared (read) lock per file.
+        # Shared locks allow concurrent readers; writers block until all
+        # readers finish, preventing mid-read corruption.
         self._user_tree = try_parse(self.userconfig_path)
-        self._user_root = self._user_tree.getroot() if self._user_tree is not None else None
+        self._user_root = (
+            self._user_tree.getroot() if self._user_tree is not None else None
+        )
         defaults_tree = try_parse(self.defaults_path)
-        self._defaults_root = defaults_tree.getroot() if defaults_tree is not None else None
+        self._defaults_root = (
+            defaults_tree.getroot() if defaults_tree is not None else None
+        )
 
     def write_userconfig(self, tree: Optional[ET.ElementTree] = None) -> None:
-        """Write userconfig after consolidation and dedup."""
+        """Write userconfig after consolidation and dedup, under a file lock."""
         if tree is None:
             tree = self._user_tree
-        consolidate_sort_and_write(tree, self.userconfig_path)
+        with FileLock(self.userconfig_path):
+            consolidate_sort_and_write(tree, self.userconfig_path)
 
     def really_write_userconfig(self, tree: Optional[ET.ElementTree] = None) -> None:
-        """Direct write without consolidation."""
+        """Direct write without consolidation, under a file lock."""
         if tree is None:
             tree = self._user_tree
         if tree is None:
@@ -59,10 +71,14 @@ class XmlStore:
         root = tree.getroot()
         assert root is not None
         ET.indent(root, " ")
-        tree.write(self.userconfig_path, "utf-8")
+        with FileLock(self.userconfig_path):
+            tree.write(self.userconfig_path, "utf-8")
 
     def consolidated_tree(self, tree: Optional[ET.ElementTree] = None) -> Optional[ET.ElementTree]:
-        """Return a deduplicated/sorted copy of the tree without writing."""
+        """Return a deduplicated/sorted copy of the tree without writing.
+
+        No lock needed — this is a read-only transform that doesn't touch disk.
+        """
         if tree is None:
             tree = self._user_tree
         if tree is None:
@@ -71,11 +87,16 @@ class XmlStore:
 
 
 def try_parse(file_path: str, max_attempts: int = 3, delay: float = 0.1) -> Optional[ET.ElementTree]:
-    """Parse XML with retry on ParseError (multi-instance file locking)."""
+    """Parse XML with retry on ParseError (multi-instance file locking).
+
+    Acquires a **shared** (read) lock so multiple processes can read
+    concurrently while writers block until all readers finish.
+    """
     attempt = 0
     while attempt < max_attempts:
         try:
-            return ET.parse(file_path)
+            with FileLock(file_path, shared=True):
+                return ET.parse(file_path)
         except ET.ParseError:
             attempt += 1
             time.sleep(delay)
@@ -93,6 +114,9 @@ def consolidate_sort_and_write(
     - Ensures one <profileMappings> per (sim, cls, model)
     - Ensures <models> entries are byte-unique
     - Sorts each section by its natural key
+
+    Caller must hold a :class:`FileLock` on *path* before invoking when
+    ``ret=False`` (i.e. when actually writing to disk).
     """
     if tree is None:
         return None
@@ -142,8 +166,19 @@ def consolidate_sort_and_write(
         return tree
     ET.indent(root, " ")
     if path is not None:
-        tree.write(path, "utf-8")
+        _atomic_write(tree, path)
     return None
+
+
+def _atomic_write(tree: ET.ElementTree, path: str) -> None:
+    """Write *tree* to *path* via a temp file + rename for crash safety.
+
+    Prevents partially-written files if the process crashes mid-write.
+    """
+    dir_name = os.path.dirname(path) or '.'
+    tmp_path = path + ".tmp"
+    tree.write(tmp_path, "utf-8")
+    os.replace(tmp_path, path)
 
 
 def _reinsert(root: ET.Element, elements: list[ET.Element], key_fields: tuple[str, ...]) -> None:
