@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSi
 
 from . import globals as G
 from . import utils
-from. import xmlutils
+from . import xmlutils
 from .ui.Ui_NewAircraftWizard import Ui_NewAircraftWizard
 
 class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):

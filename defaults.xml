@@ -6437,7 +6437,7 @@
 		</classdefaults_DCS>
 		<classdefaults_DCS>
 			<name>aoa_effect_enabled</name>
-			<type>JetrAircraft</type>
+			<type>JetAircraft</type>
 			<value>false</value>
 			<sim>DCS</sim>
 			<device>joystick</device>
@@ -7358,7 +7358,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>aoa_effect_enabled</name>
-			<type>JetrAircraft</type>
+			<type>JetAircraft</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -7393,35 +7393,35 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>trimwheel</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>trimwheel</device>
@@ -7561,14 +7561,14 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>controls_lock_enable</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>controls_lock_enable</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
@@ -8575,7 +8575,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>joystick_ap_x_follow_deadzone</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>0.05</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -8603,7 +8603,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>joystick_ap_y_follow_deadzone</name>
-			<type>GilderAircraft</type>
+			<type>GliderAircraft</type>
 			<value>0.05</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -10184,7 +10184,7 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>aoa_effect_enabled</name>
-			<type>JetrAircraft</type>
+			<type>JetAircraft</type>
 			<value>false</value>
 			<sim>XPLANE</sim>
 			<device>joystick</device>
@@ -11808,7 +11808,7 @@
 		</classdefaults_BMS>
 		<classdefaults_BMS>
 			<name>aoa_effect_enabled</name>
-			<type>JetrAircraft</type>
+			<type>JetAircraft</type>
 			<value>false</value>
 			<sim>BMS</sim>
 			<device>joystick</device>

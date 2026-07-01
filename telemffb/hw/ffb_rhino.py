@@ -35,17 +35,16 @@ from typing import List, Optional, Self, override
 import usb1
 from PyQt6.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
 
-from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
-
 paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
 for p in paths:
     try:
        ctypes.cdll.LoadLibrary(p)
        break
     except:
-        pass 
+        pass
 
 import telemffb.hw.hid as hid
+from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
 
 USB_REQTYPE_DEVICE_TO_HOST = 0x80
 USB_REQTYPE_VENDOR = 0x40

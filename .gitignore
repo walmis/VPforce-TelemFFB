@@ -1,6 +1,7 @@
 dist
 build
 __pycache__
+.venv
 /xplane-plugin/.vs/
 /xplane-plugin/Debug/
 *.exe

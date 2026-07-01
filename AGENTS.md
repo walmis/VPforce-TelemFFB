@@ -7,6 +7,8 @@ TelemFFB is a Python/PyQt6 desktop application that generates force feedback (FF
 
 **License**: GPL v3
 
+> **Before doing any substantial work, read `docs/dev_guidelines.md` for project-specific coding conventions.**
+
 ---
 
 ## Architecture: The Big Picture
