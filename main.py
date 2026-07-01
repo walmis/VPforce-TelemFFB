@@ -483,84 +483,84 @@ def _initialize_device_connection():
     dev_firmware_version = 'ERROR'
     dev = None
 
-if G.device_type == 'shaker':
-        try:
-            from telemffb.hw.shaker_synth import ShakerSynth
-            from telemffb.hw.ffb_shaker import init_shaker
-            from telemffb.sim import aircraft_base
-            device_name = G.system_settings.get('shakerDevice', None) or None
-            gain = float(G.system_settings.get('shakerGain', 1.0))
-            channel_mode = G.system_settings.get('shakerChannelMode', 'mono') or 'mono'
+    if G.device_type == 'shaker':
             try:
-                pan = float(G.system_settings.get('shakerPan', 0.0))
-            except (TypeError, ValueError):
-                pan = 0.0
-            synth = ShakerSynth(device=device_name, master_gain=gain,
-                                channel_mode=channel_mode, pan=pan)
-            synth.start()
-            init_shaker(synth)
-            G.shaker_synth = synth
-            aircraft_base.use_shaker_backend()
-            from telemffb.hw import ffb_shaker as _ffb_shaker
-            from telemffb.hw.shaker_layers_io import get_shaker_effects_path, get_default_pack_path
-            user_path = get_shaker_effects_path()
-            if user_path and not os.path.exists(user_path):
-                default_path = get_default_pack_path()
-                if default_path and os.path.exists(default_path):
-                    try:
-                        os.makedirs(os.path.dirname(user_path), exist_ok=True)
-                        shutil.copyfile(default_path, user_path)
-                        logging.info("Initialised %s from bundled defaults", user_path)
-                    except Exception:
-                        logging.exception("Could not seed user shaker_effects.json from bundle")
-            _ffb_shaker.reload_layers()
-            logging.info("Shaker effects: %d effects with custom layers",
-                         len(_ffb_shaker.EFFECT_LAYERS))
-
-            # Load shaker calibration profile pack and pick the active one.
-            from telemffb.hw import shaker_profiles_io
-            from telemffb.hw.shaker_profile import DEFAULT_PROFILE
-            profiles_user_path = shaker_profiles_io.get_user_profiles_path()
-            if profiles_user_path and not os.path.exists(profiles_user_path):
-                profiles_default_path = shaker_profiles_io.get_default_pack_path()
-                if profiles_default_path and os.path.exists(profiles_default_path):
-                    try:
-                        os.makedirs(os.path.dirname(profiles_user_path), exist_ok=True)
-                        shutil.copyfile(profiles_default_path, profiles_user_path)
-                        logging.info("Initialised %s from bundled defaults",
-                                     profiles_user_path)
-                    except Exception:
-                        logging.exception(
-                            "Could not seed user shaker_profiles.json from bundle")
-            file_active, profiles = (None, {})
-            if profiles_user_path:
-                file_active, profiles = shaker_profiles_io.load(profiles_user_path)
-            if not profiles:
-                bundled = shaker_profiles_io.get_default_pack_path()
-                if bundled and os.path.exists(bundled):
-                    file_active, profiles = shaker_profiles_io.load(bundled)
-            active_name = (G.system_settings.get('shakerProfile')
-                           or file_active or 'Generic')
-            active_profile = profiles.get(active_name)
-            if active_profile is None and profiles:
-                active_profile = next(iter(profiles.values()))
-            if active_profile is None:
-                active_profile = DEFAULT_PROFILE
-            _ffb_shaker.set_active_profile(active_profile)
-            G.shaker_active_profile = active_profile
-            logging.info("Shaker calibration profile: %r (loaded %d profiles)",
-                         active_profile.name, len(profiles))
-            G.device_connection_status = True
-            logging.info(f"Shaker device initialised (output={device_name!r}, gain={gain})")
-        except Exception as e:
-            G.device_connection_status = False
-            logging.exception("Failed to initialise shaker audio device")
-            QMessageBox.warning(None, "Shaker initialisation failed",
-                              f"Unable to start audio output for shaker device.\n"
-                              f"Error: {e}\n\n"
-                              "Open System Settings and verify the Shaker output device.")
-        return dev, dev_serial, dev_firmware_version
-
+                from telemffb.hw.shaker_synth import ShakerSynth
+                from telemffb.hw.ffb_shaker import init_shaker
+                from telemffb.sim import aircraft_base
+                device_name = G.system_settings.get('shakerDevice', None) or None
+                gain = float(G.system_settings.get('shakerGain', 1.0))
+                channel_mode = G.system_settings.get('shakerChannelMode', 'mono') or 'mono'
+                try:
+                    pan = float(G.system_settings.get('shakerPan', 0.0))
+                except (TypeError, ValueError):
+                    pan = 0.0
+                synth = ShakerSynth(device=device_name, master_gain=gain,
+                                    channel_mode=channel_mode, pan=pan)
+                synth.start()
+                init_shaker(synth)
+                G.shaker_synth = synth
+                aircraft_base.use_shaker_backend()
+                from telemffb.hw import ffb_shaker as _ffb_shaker
+                from telemffb.hw.shaker_layers_io import get_shaker_effects_path, get_default_pack_path
+                user_path = get_shaker_effects_path()
+                if user_path and not os.path.exists(user_path):
+                    default_path = get_default_pack_path()
+                    if default_path and os.path.exists(default_path):
+                        try:
+                            os.makedirs(os.path.dirname(user_path), exist_ok=True)
+                            shutil.copyfile(default_path, user_path)
+                            logging.info("Initialised %s from bundled defaults", user_path)
+                        except Exception:
+                            logging.exception("Could not seed user shaker_effects.json from bundle")
+                _ffb_shaker.reload_layers()
+                logging.info("Shaker effects: %d effects with custom layers",
+                             len(_ffb_shaker.EFFECT_LAYERS))
+    
+                # Load shaker calibration profile pack and pick the active one.
+                from telemffb.hw import shaker_profiles_io
+                from telemffb.hw.shaker_profile import DEFAULT_PROFILE
+                profiles_user_path = shaker_profiles_io.get_user_profiles_path()
+                if profiles_user_path and not os.path.exists(profiles_user_path):
+                    profiles_default_path = shaker_profiles_io.get_default_pack_path()
+                    if profiles_default_path and os.path.exists(profiles_default_path):
+                        try:
+                            os.makedirs(os.path.dirname(profiles_user_path), exist_ok=True)
+                            shutil.copyfile(profiles_default_path, profiles_user_path)
+                            logging.info("Initialised %s from bundled defaults",
+                                         profiles_user_path)
+                        except Exception:
+                            logging.exception(
+                                "Could not seed user shaker_profiles.json from bundle")
+                file_active, profiles = (None, {})
+                if profiles_user_path:
+                    file_active, profiles = shaker_profiles_io.load(profiles_user_path)
+                if not profiles:
+                    bundled = shaker_profiles_io.get_default_pack_path()
+                    if bundled and os.path.exists(bundled):
+                        file_active, profiles = shaker_profiles_io.load(bundled)
+                active_name = (G.system_settings.get('shakerProfile')
+                               or file_active or 'Generic')
+                active_profile = profiles.get(active_name)
+                if active_profile is None and profiles:
+                    active_profile = next(iter(profiles.values()))
+                if active_profile is None:
+                    active_profile = DEFAULT_PROFILE
+                _ffb_shaker.set_active_profile(active_profile)
+                G.shaker_active_profile = active_profile
+                logging.info("Shaker calibration profile: %r (loaded %d profiles)",
+                             active_profile.name, len(profiles))
+                G.device_connection_status = True
+                logging.info(f"Shaker device initialised (output={device_name!r}, gain={gain})")
+            except Exception as e:
+                G.device_connection_status = False
+                logging.exception("Failed to initialise shaker audio device")
+                QMessageBox.warning(None, "Shaker initialisation failed",
+                                  f"Unable to start audio output for shaker device.\n"
+                                  f"Error: {e}\n\n"
+                                  "Open System Settings and verify the Shaker output device.")
+            return dev, dev_serial, dev_firmware_version
+    
     try:
         vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
     except Exception:
@@ -939,7 +939,7 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
-if G.system_settings.enableVPConfStartup:
+        if G.system_settings.enableVPConfStartup:
             logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
             try:
                 upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
