@@ -48,6 +48,7 @@ import json
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.util import conversions as conv
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+perftracker = utils.PerformanceTracker()
 
 # unit conversions (to m/s)
 knots = conv.kt2ms
@@ -262,7 +263,7 @@ class Aircraft(AircraftBase):
         # call Base class handler
         super().on_telemetry(telem_data)
         # self._update_focus_loss(telem_data)
-
+        self.il2_override_spring()
         if self.damage_effect_intensity > 0:
             self.il2_update_damage(telem_data)
 
@@ -325,7 +326,103 @@ class Aircraft(AircraftBase):
 
         return sps, rfac
 
-                   
+    def il2_override_spring(self):
+        if not self.is_joystick(): return
+        if not self.spring_mode_is(SpringModeEnum.CUSTOM):
+            # If feature disabled, ensure spring is stopped and abort
+            self.effects['il2_spr_override'].stop()
+            return
+
+        spring = self.effects['il2_spr_override'].spring()
+
+        dt = perftracker.get_time_delta('override_spring_perf')
+        self.telem_data._ovrd_spr_dt = dt
+
+        if self.override_spring_ft_enabled:
+            input_data = self._get_device_report()
+            x, y = self._get_device_axes()
+            current_buttons = input_data.getPressedButtons() if input_data is not None else []
+            # print(f"BUTTONS:>{current_buttons}<")
+            # decide what to do depending on which button is pressed
+            # if self.override_spring_trim_release and self.override_spring_trim_release in current_buttons:
+            #     # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
+            #     # as it is moved while spring force is enabled.
+            #     # return from method so default spring gains do not get applied at the end of the method
+            #     gain = int(self.override_spring_tr_damper * 4096)
+            #     self.spring_x.set_coefficient(gain)
+            #     self.spring_y.set_coefficient(gain)
+            #
+            #     self.override_spring_cp0_x = round(x * 4096)
+            #     self.spring_x.set_offset(self.override_spring_cp0_x)
+            #
+            #     self.override_spring_cp0_y = round(y * 4096)
+            #     self.spring_y.set_offset(self.override_spring_cp0_y)
+            #     spring.setCondition(self.spring_x)
+            #     spring.setCondition(self.spring_y)
+            #     spring.start(override=True)
+            #     return
+
+            # elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
+            #     # if trim reset button pressed, set offsets back to 0
+            #     # print("TRIM RESET")
+            #     self.spring_x.cpOffset = self.override_spring_cp0_x = 0
+            #     self.spring_y.cpOffset = self.override_spring_cp0_y = 0
+            #     spring.setCondition(self.spring_x)
+            #     spring.setCondition(self.spring_y)
+
+            # calculate step size based on configured rate and delta time
+            trim_step_size = self.override_spring_trim_rate * dt
+
+            self.telem_data._ovrd_spr_step = trim_step_size
+
+            # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
+            # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
+            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM DOWN")
+                if self.override_spring_cp0_y - trim_step_size < -4096:
+                    self.override_spring_cp0_y = -4096
+                else:
+                    self.override_spring_cp0_y -= trim_step_size
+                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM UP")
+                if self.override_spring_cp0_y + trim_step_size > 4096:
+                    self.override_spring_cp0_y = 4096
+                else:
+                    self.override_spring_cp0_y += trim_step_size
+                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+
+            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM LEFT")
+                if self.override_spring_cp0_x - trim_step_size < -4096:
+                    self.override_spring_cp0_x = -4096
+                else:
+                    self.override_spring_cp0_x -= trim_step_size
+                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM RIGHT")
+                if self.override_spring_cp0_x + trim_step_size > 4096:
+                    self.override_spring_cp0_x = 4096
+                else:
+                    self.override_spring_cp0_x += trim_step_size
+                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+
+        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
+
+        # If trim release is not pressed, set spring gain based on user setting and start spring override
+        self.spring_x.set_coefficient(self.override_spring_gain)
+        self.spring_y.set_coefficient(self.override_spring_gain)
+
+        spring.setCondition(self.spring_x)
+        spring.setCondition(self.spring_y)
+        # ensure spring is started with override = true
+        spring.start(override=True)
+
+
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""
 

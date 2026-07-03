@@ -547,6 +547,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -561,6 +562,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -575,6 +577,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -590,6 +593,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -605,6 +609,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>d_int</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -637,12 +642,13 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>float</datatype>
 		<grouping>Sim Options</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>800.2</order>
 		<name>override_spring_gain</name>
-		<displayname>Override DCS Spring Gain</displayname>
+		<displayname>Override Spring Gain</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -652,6 +658,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>bool</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -711,6 +718,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -725,6 +733,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -739,6 +748,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -753,6 +763,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -767,6 +778,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>d_int</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
