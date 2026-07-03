@@ -1,7 +1,7 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  June 2026 - Draft
+##  July 2026 - Draft
 ############################################
 ## Platform
 - Exception tracking and reporting system
@@ -21,8 +21,10 @@ This is not an exhaustive change log (see github for that).  This file only outl
 ## XPlane
 - Updated plugin adhering to new stricter coding requirements
 - X-Trident AW109 special implementation - WIP Implementation
-  - Full AFCS integration: cyclic trim rate control, force trim release, and autopilot cyclic following with per-axis deadzone tuning
+  - KNOWN ISSUE: Must map controls in-game and disable "Axis Control" in TelemFFB - Aircraft does not honor axis override dataref nor properly accept external axis control inputs
+  - 4-Axis AFCS integration: cyclic trim rate control, force trim release, and autopilot following
   - Pedal/rudder trim integration
+    - KNOWN ISSUE: Pedal AFCS is not as active as would be expected in real aircraft.. this is due to telemetry limitations from the aircraft
   - Collective spring gain and force trim release
 - X-Plane plugin: Added dataref write and command write support for expanded aircraft control
 - New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with MSFS)
@@ -39,7 +41,6 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - HPG Collective: Sends axis position while vertical mode is active to avoid an axis snap when disengaging the autopilot
 - Fix: restored CowanSim and Taog H500 helicopter features that had been inadvertently dropped
 - Fix heli trim following issue (MSFS/X-Plane)
-
 
 ## DCS
 - Export DLL updates
