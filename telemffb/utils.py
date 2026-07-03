@@ -2861,6 +2861,8 @@ def get_version():
         return G.release_version_str
     if G.dev_build:
         return G.dev_build_str
+    if G.beta_build:
+        return G.beta_build_str
 
     ver = "UNKNOWN"
     try:

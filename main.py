@@ -296,6 +296,10 @@ def _setup_config_paths():
             _setup_dev_userconfig_paths()
         else:
             _setup_standard_config_paths()
+    elif G.beta_build:
+        G.vpf_logo = ":/image/BETAlogo.png"
+        _setup_standard_config_paths()
+
     else:
         _setup_standard_config_paths()
 
@@ -642,7 +646,7 @@ def _handle_window_display(headless_mode):
 
 def _check_version_update():
     """Check for version updates if not release or dev build."""
-    if G.master_instance and not G.release_version and not G.dev_build and getattr(sys, 'frozen', False):
+    if G.master_instance and not G.release_version and not (G.dev_build or G.beta_build) and getattr(sys, 'frozen', False):
         logging.info("Checking for version updates...")
         dlg = QProgressDialog("Checking for updates...", "Skip", 0, 0, G.main_window)
         dlg.setWindowTitle("TelemFFB")
