@@ -50,7 +50,7 @@ release_version : bool = False
 release_version_str: str = "Vx.x.x"
 """Represents the current release version as a string in the format Vx.x.x."""
 
-beta_build : bool = True
+beta_build : bool = False
 """when True, build versions will use 'beta_build_str', will use a beta branded logo and will not look for updates"""
 
 beta_build_str: str = "BETA - 07-02-26"
