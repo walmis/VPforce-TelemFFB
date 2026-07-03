@@ -179,10 +179,6 @@ class XAW109Helicopter(Helicopter):
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
         else:
-            # if not (self.feet_on_active):
-                # self.cpO_x -= self.afcsx_step_size
-            trim_threshold = 1
-
             if trim_required_calc:
                 self.cpO_x += trim_step_size
                 telem_data._telemffb_moving_rud = True
@@ -204,6 +200,96 @@ class XAW109Helicopter(Helicopter):
 
         self.last_pedal_x = phys_x
 
+    def _tst_msfs_update_pedals(self, telem_data: BaseTelemetryData):
+
+        if telem_data.FFBType != 'pedals':
+            return
+
+        phys_x, phys_y = self._get_device_axes()
+        telem_data.phys_x = phys_x
+        telem_data.pedal_position = phys_x
+        telem_data.IAS_kt = (telem_data.IAS or 0) * ms2kt
+        # if self.pedal_ft_release_button:
+        #     state = input_data.isButtonPressed(self.pedal_ft_release_button)
+        #     self.trigger_xp_event("SPECIAL/buttons/cmd_ft_ped_rel", state=state, type="track")
+
+        self._spring_handle.name = "pedal_ap_spring"
+
+        if not self.pedals_init:
+
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
+            if telem_data.get("SimOnGround", 1):
+                self.cpO_x = -1500
+            else:
+                self.cpO_x = round(4096 * self.last_pedal_x)
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(
+                4096 * utils.clamp(self.pedal_spring_gain, 0, 1))
+
+            self.spring_x.cpOffset = self.cpO_x
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+            if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
+                # dont start sending position until physical pedals have centered
+                self.pedals_init = 1
+            else:
+                return
+            self.running_trim_total = 0
+
+        pedal_ft_released = telem_data.get("AW109_ped_force_trim_release_pressed", 0)
+        trim_req = telem_data.get("AW109_rudder_trim_req", 0)
+        damper = telem_data.get("AW109_yaw_damper", 0)
+        delta = 0
+
+        if pedal_ft_released:
+            if self.pedal_ft_damper_enabled:
+                force = int(self.pedal_ft_damper_force * 4096)
+            else:
+                force = 0
+            self.cpO_x = round(4096 * utils.clamp(phys_x, -1, 1))
+            self.spring_x.cpOffset = self.cpO_x
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = force
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+        elif telem_data.get("SimOnGround", 1):
+            self.cpO_x = -1600
+            # pedal_logger.info(f"trim_req = {trim_req} | damper={damper: .4f} | delta = {delta} | cpO_x={self.cpO_x}")
+        else:
+
+            if not hasattr(self, 'last_trim_req'):
+                self.last_trim_req = 0.0
+
+            derivative_trim = trim_req - self.last_trim_req
+
+            if abs(damper) < 0.01:  # 0.008
+                delta = 0
+                magnitude = 0
+            elif abs(trim_req) > 0.30 and abs(damper) > 0.49:
+                magnitude = round(abs(damper) * 80)
+            elif abs(trim_req) > 0.1:
+                magnitude = round(abs(damper) * 70)  # 60
+            else:
+                magnitude = round(abs(damper) * 60)  # 40
+
+            delta = magnitude if damper > 0 else -magnitude
+
+            if abs(derivative_trim) > 0.004 and abs(damper) > 0.4:
+                delta = round(-damper * 500)
+            delta = max(-150, min(150, delta))
+            self.cpO_x = max(-4096, min(4096, self.cpO_x + delta))
+            self.last_trim_req = trim_req
+
+            force = round(4096 * self.pedal_spring_gain)
+            self.spring_x.cpOffset = round(self.cpO_x)
+            self.spring_y.cpOffset = 0
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = int(self.pedal_spring_gain * force)
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.start()
+
+            # pedal_logger.info(f"trim_req = {trim_req} | damper={damper: .4f} | deriv_trim = {derivative_trim:.1f}| delta = {delta} | cpO_x={self.cpO_x}")
+
+        self.last_pedal_x = phys_x
 
     def msfs_update_collective(self, telem_data: BaseTelemetryData):
         if telem_data.FFBType != 'collective':

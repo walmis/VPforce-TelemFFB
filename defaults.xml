@@ -5911,7 +5911,14 @@
 			<model>AW109SP</model>
 			<var>aw109/controls/rudder_trim_req</var>
 			<sc_unit>float</sc_unit>
-			<scale>100</scale>
+			<scale>1</scale>
+		</sc_overrides>
+		<sc_overrides>
+			<name>AW109_hdg_on</name>
+			<model>AW109SP</model>
+			<var>aw109/cockpit/capsule/apms/hdg_on</var>
+			<sc_unit>int</sc_unit>
+			<scale>1.0</scale>
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_cyc_force_trim_release_pressed</name>
@@ -6001,6 +6008,13 @@
 			<name>AW109_target_yaw</name>
 			<model>AW109SP</model>
 			<var>aw109/servo/rudder_ratio_target</var>
+			<sc_unit>float</sc_unit>
+			<scale>1</scale>
+		</sc_overrides>
+		<sc_overrides>
+			<name>AW109_yaw_damper</name>
+			<model>AW109SP</model>
+			<var>aw109/controls/rudder_trim_yaw_damper</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
 		</sc_overrides>
@@ -9764,9 +9778,30 @@
 		<classdefaults_XPLANE>
 			<name>afcs_threshold_value</name>
 			<type>XAW109Helicopter</type>
-			<value>0.4</value>
+			<value>0.3</value>
 			<sim>XPLANE</sim>
 			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>force_trim_enabled</name>
+			<type>XAW109Helicopter</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>rotor_blade_count</name>
+			<type>XAW109Helicopter</type>
+			<value>4</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>telemffb_controls_axes</name>
+			<type>XAW109Helicopter</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>afterburner_effect_enabled</name>
@@ -20343,13 +20378,6 @@
 		<value>true</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
-	</models>
-	<models>
-		<name>telemffb_controls_axes</name>
-		<model>AW109SP</model>
-		<value>true</value>
-		<sim>XPLANE</sim>
-		<device>any</device>
 	</models>
 	<models>
 		<name>rotor_blade_count</name>
