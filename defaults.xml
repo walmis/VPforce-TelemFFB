@@ -569,11 +569,25 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.32</order>
+		<name>override_spring_trim_reset</name>
+		<displayname>Trim Reset</displayname>
+		<prereq>adv_spr_use_hardware_trim</prereq>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
 		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>770.32</order>
+		<order>770.34</order>
 		<name>override_spring_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -588,7 +602,7 @@
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>770.33</order>
+		<order>770.36</order>
 		<name>override_spring_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -603,7 +617,7 @@
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>770.34</order>
+		<order>770.38</order>
 		<name>override_spring_trim_left</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -619,7 +633,7 @@
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>770.35</order>
+		<order>770.40</order>
 		<name>override_spring_trim_right</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -635,7 +649,7 @@
 		<datatype>d_int</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>770.36</order>
+		<order>770.42</order>
 		<name>override_spring_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -726,6 +740,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<IL2>true</IL2>
 		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>

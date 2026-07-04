@@ -20,6 +20,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     adv_spr_use_hardware_trim: bool = False
 
     # override spring trim button bindings and settings
+    override_spring_trim_reset: int = 0
     override_spring_trim_down: int = 0
     override_spring_trim_left: int = 0
     override_spring_trim_up: int = 0
@@ -119,6 +120,9 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             input_data = HapticEffect.device.get_input()
             x, y = self._get_device_axes()
             current_buttons = input_data.getPressedButtons()
+            if self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
+                self.override_spring_cp0_x = 0
+                self.override_spring_cp0_y = 0
 
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 self.override_spring_cp0_y -= trim_step_size
