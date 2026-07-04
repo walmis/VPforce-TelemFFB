@@ -58,14 +58,18 @@ class DecelerationEffectMixIn(AircraftEffectUtilsBase):
         y_gs = 0
         last_y_gs = 0
 
-        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is("BMS"):
-            if self.decel_airborne_disable:
-                # We are on the ground, calculate using G vectors
+        if self._sim_is("IL2") or self._sim_is("BMS"):
+            # IL2/BMS provide body-frame acceleration directly — valid both on the ground and airborne
+            y_gs = (telem_data.ACCs or [0, 0, 0])[0]
+            last_y_gs = (self._last_telem_data.ACCs or [0, 0, 0])[0]
+
+        elif self._sim_is("DCS"):
+            if wow or self.decel_airborne_disable:
+                # On the ground, or airborne-disable is set: use body G vectors
                 y_gs = (telem_data.ACCs or [0, 0, 0])[0]
                 last_y_gs = (self._last_telem_data.ACCs or [0, 0, 0])[0]
             else:
-                # we are in the air, calculate G vector from rate of change of velocity since DCS Y g vector is world orientation
-
+                # DCS airborne: ACCs is world-relative so derive G from rate of change of TAS
                 dt = perftracker.get_time_delta('decel')
                 speed = telem_data.TAS
 
@@ -75,7 +79,7 @@ class DecelerationEffectMixIn(AircraftEffectUtilsBase):
                     self.last_y_gs = 0
                 last_speed = self.last_speed
                 self.last_speed = speed
-
+                telem_data['_dbg_last_speed'] = self.last_speed
                 accel_g = 0
                 if last_speed is not None and dt > 0:
                     delta_v = speed - last_speed
@@ -87,6 +91,7 @@ class DecelerationEffectMixIn(AircraftEffectUtilsBase):
                 y_gs = accel_g
                 last_y_gs = self.last_y_gs
                 self.last_y_gs = y_gs
+                telem_data['_dbg_last_y_gs'] = self.last_y_gs
 
         elif self._sim_is("MSFS"):
             y_gs = telem_data.AccBody[2]
