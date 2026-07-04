@@ -312,11 +312,11 @@ class IL2TelemParser(TelemParserBase):
         if G.il2_ffb_device_ordinal is not None:
             self.telem_data['FFBOrdinal'] = G.il2_ffb_device_ordinal
             my_records = [r for r in self.ffb_records if r['dev'] == G.il2_ffb_device_ordinal]
-            self.telem_data['FFBRecords'] = my_records
             self.telem_data['FFBRecordsCount'] = len(my_records) if my_records else 0
         else:
-            # ordinal not resolved (not IL-2 Korea, or not yet resolved) - expose unfiltered records
-            self.telem_data['FFBRecords'] = self.ffb_records
+            my_records = self.ffb_records
+        # Serialize as JSON (ForceType enum → int) so it survives the string telemetry pipeline
+        self.telem_data['FFBRecords'] = json.dumps([{**r, 'type': int(r['type'])} for r in my_records])
 
         # create structure of the most real-time data to determine if updated telemetry is flowing.  If not, consider
         # the sim paused.  This avoids effects continuing to play when in multiplayer map or after crash since IL-2 never stops sending

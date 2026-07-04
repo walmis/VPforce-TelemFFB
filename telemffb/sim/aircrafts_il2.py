@@ -264,6 +264,7 @@ class Aircraft(AircraftBase):
         super().on_telemetry(telem_data)
         # self._update_focus_loss(telem_data)
         self.il2_override_spring()
+        self.il2_ffb_spring()
         if self.damage_effect_intensity > 0:
             self.il2_update_damage(telem_data)
 
@@ -420,6 +421,49 @@ class Aircraft(AircraftBase):
         spring.setCondition(self.spring_x)
         spring.setCondition(self.spring_y)
         # ensure spring is started with override = true
+        spring.start(override=True)
+
+
+    def il2_ffb_spring(self):
+        """Apply a spring effect driven directly by IL-2 Korea FFB telemetry records.
+
+        For each Spring-type record addressed to this device, axis 0 drives spring_x and
+        axis 1 drives spring_y.  The record's `pos` field (−1..1) sets the spring centre-point
+        offset and the `force` field (0..1) sets the spring coefficient.  Both are passed
+        directly to set_offset / set_coefficient which handle the ×4096 scaling internally.
+        """
+        from telemffb.telem.IL2Manager import ForceType
+
+        if not self.spring_mode_is(SpringModeEnum.TELEM):
+            # If feature disabled, ensure spring is stopped and abort
+            self.effects['il2_ffb_spring'].stop()
+            return
+
+        raw = self.telem_data.FFBRecords
+        records = json.loads(raw) if isinstance(raw, str) and raw else []
+        spring_records = [r for r in records if r.get('type') == ForceType.Spring
+                          and G.il2_ffb_device_ordinal is not None and r.get('dev') == G.il2_ffb_device_ordinal]
+
+        if spring_records:
+            self._last_ffb_spring_records = spring_records
+        else:
+            # IL-2 Korea sends pedal records every other tick — use last cached records
+            spring_records = getattr(self, '_last_ffb_spring_records', [])
+
+        if not spring_records:
+            return
+
+        spring = self.effects['il2_ffb_spring'].spring()
+        for r in spring_records:
+            axis = r.get('axis')
+            if axis == 0:
+                self.spring_x.set_offset(r['pos'])
+                self.spring_x.set_coefficient(r['force'])
+                spring.setCondition(self.spring_x)
+            elif axis == 1:
+                self.spring_y.set_offset(r['pos'])
+                self.spring_y.set_coefficient(r['force'])
+                spring.setCondition(self.spring_y)
         spring.start(override=True)
 
 

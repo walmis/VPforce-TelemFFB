@@ -349,6 +349,7 @@ class EffectTranslator:
         "il2_gunfire.*": ["Gunfire Rumble", "il2_weapon_release_intensity"],
         "il2_bombs": ["Bomb Release", "il2_bomb_release_intensity"],
         "il2_rockets": ["Rocket Fire", "il2_rocket_release_intensity"],
+        "il2_ffb_spring": ["FFB Telemetry Spring Override", ""],
         "inertia": ["Inertia Override", "inertia_force"],
         "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
         "overspeed.*": ["Overspeed Shake", "overspeed_shake_intensity"],

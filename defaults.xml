@@ -391,7 +391,6 @@
 		<displayname>Joystick Spring Mode</displayname>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<validvalues>DCS_IL2_JOYSTICK_SPRING_MODE</validvalues>
 	</defaults>
@@ -405,7 +404,6 @@
 		<displayname>Pedal Spring Mode</displayname>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
-		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>DCS_IL2_PEDAL_SPRING_MODE</validvalues>
 	</defaults>
@@ -422,6 +420,30 @@
 		<IL2>true</IL2>
 		<collective>true</collective>
 		<validvalues>DCS_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.0</order>
+		<name>spring_mode</name>
+		<displayname>Joystick Spring Mode</displayname>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<validvalues>IL2_JOYSTICK_SPRING_MODE</validvalues>
+		<datatype>enumlist</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.0</order>
+		<name>spring_mode</name>
+		<displayname>Pedal Spring Mode</displayname>
+		<IL2>true</IL2>
+		<pedals>true</pedals>
+		<validvalues>IL2_PEDAL_SPRING_MODE</validvalues>
+		<datatype>enumlist</datatype>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>

@@ -11,6 +11,7 @@ from . import xmlutils
 
 class SpringModeEnum(Enum):
     NONE = auto()
+    TELEM = auto()
     BASIC = auto()
     CENTER = auto()
     CNTR_FT = auto()
@@ -190,6 +191,22 @@ class SettingsManager(QObject):
 
     MSFS_XP_FT_ONLY_PEDAL_SPRING_MODE = {
         SpringModeEnum.FORCETRIM: "Force Trim",
+    }
+
+    IL2_PEDAL_SPRING_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.STATIC: "Static Spring",
+        SpringModeEnum.DYNAMIC: "Dynamic Spring",
+        SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    IL2_JOYSTICK_SPRING_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
 
     DCS_IL2_PEDAL_SPRING_MODE = {
