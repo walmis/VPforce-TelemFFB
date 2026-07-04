@@ -1800,7 +1800,7 @@ def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
     return None
 
 
-def analyze_il2_config(file_path, port=34385, window=None):
+def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
     config_data = defaultdict(dict)
 
     # file_path = os.path.join(path, "data\\startup.cfg")
@@ -1943,11 +1943,11 @@ def analyze_il2_config(file_path, port=34385, window=None):
         telem_message = QMessageBox(parent=window)
         telem_message.setIcon(QMessageBox.Icon.Question)
         telem_message.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        telem_message.setWindowTitle("TelemFFB IL-2 Config")
+        telem_message.setWindowTitle(f"TelemFFB {sim_name} Config")
 
         if not telem_match or not motion_match:
             pop = f"""
-            <p>The telemetry and/or motion device configuration in the IL-2 <b>startup.cfg</b>
+            <p>The telemetry and/or motion device configuration in the <b>{html.escape(sim_name)}</b> <b>startup.cfg</b>
             is missing or incorrect and may prohibit TelemFFB from receiving data.</p>
             <p style='font-family:Consolas,monospace; font-size:9pt;'>File = {html.escape(file_path)}</p>
             <p>Would you like to automatically adjust the configuration per the following?</p>

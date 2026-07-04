@@ -114,15 +114,26 @@ class SimIL2(SimTelemListener):
             )
 
     @override
+    def do_validate(self) -> bool:
+        if G.child_instance:
+            return None
+        sturmovik = G.system_settings.get('validateIL2')
+        korea = G.system_settings.get('validateIL2_K')
+        if sturmovik or korea:
+            self.validate()
+            return True
+        return False
+
+    @override
     def validate(self):
         if G.system_settings.get('validateIL2'):
             il2_path = os.path.join(G.system_settings.get('pathIL2'), 'data\\startup.cfg')
             logging.info("Validating IL2 Sturmovik Telemetry Config")
-            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
+            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Sturmovik")
         if G.system_settings.get('validateIL2_K'):
             il2_path = os.path.join(G.system_settings.get('pathIL2_K'), 'game\\data\\startup.cfg')
             logging.info("Validating IL2 Korea Telemetry Config")
-            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
+            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Korea")
 
     @override
     def stop(self):
