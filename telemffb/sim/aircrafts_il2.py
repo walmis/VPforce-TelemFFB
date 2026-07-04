@@ -460,10 +460,14 @@ class Aircraft(AircraftBase):
                 self.spring_x.set_offset(r['pos'])
                 self.spring_x.set_coefficient(r['force'])
                 spring.setCondition(self.spring_x)
+                self.telem_data['FFB_X_Force'] = round(r['force'], 4)
+                self.telem_data['FFB_X_Center'] = round(r['pos'], 4)
             elif axis == 1:
                 self.spring_y.set_offset(r['pos'])
                 self.spring_y.set_coefficient(r['force'])
                 spring.setCondition(self.spring_y)
+                self.telem_data['FFB_Y_Force'] = round(r['force'], 4)
+                self.telem_data['FFB_Y_Center'] = round(r['pos'], 4)
         spring.start(override=True)
 
 

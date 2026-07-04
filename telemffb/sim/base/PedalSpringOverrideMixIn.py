@@ -130,7 +130,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         if self._sim_is_msfs() or self._sim_is_xplane(): # TODO: override ac_override_pedal_spring with a stub in the child class
             return
 
-        if self.spring_mode_is(SpringModeEnum.NONE):
+        if self.spring_mode_is(SpringModeEnum.NONE) or self.spring_mode_is(SpringModeEnum.TELEM):
             if self.effects['pedal_spring'].started:
                 self.effects["pedal_spring"].stop()
             return
