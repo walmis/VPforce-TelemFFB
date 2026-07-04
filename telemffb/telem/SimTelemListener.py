@@ -133,7 +133,7 @@ class SimIL2(SimTelemListener):
         if G.system_settings.get('validateIL2_K'):
             il2_path = os.path.join(G.system_settings.get('pathIL2_K'), 'game\\data\\startup.cfg')
             logging.info("Validating IL2 Korea Telemetry Config")
-            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Korea")
+            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Korea", korea=True)
 
     @override
     def stop(self):

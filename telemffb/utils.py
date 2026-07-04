@@ -1800,7 +1800,7 @@ def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
     return None
 
 
-def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
+def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2", korea=False):
     config_data = defaultdict(dict)
 
     # file_path = os.path.join(path, "data\\startup.cfg")
@@ -1817,6 +1817,7 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
     ref_port = f'{port}'
     telem_proposed = {}
     motion_proposed = {}
+    ffb_proposed = {}
     telemetry_reference = {
         'addr': '127.255.255.255',
         'decimation': '1',
@@ -1829,8 +1830,15 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
         'enable': 'true',
         'port': f'{port}'
     }
+    ffb_reference = {
+        'addr': '127.255.255.255',
+        'decimation': '1',
+        'enable': 'true',
+        'port': f'{port}'
+    }
     telem_config = None
     motion_config = None
+    ffb_config = None
     with open(file_path, 'r', encoding="utf-8") as config_file:
         lines = config_file.readlines()
 
@@ -1937,7 +1945,49 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
                         motion_proposed = insert_dict_item(motion_proposed, 'enable', f'true', 'port', before=True)
                         motion_match = 0
 
-    if telem_match and motion_match:
+    ffb_match = 1
+    ffb_exists = 0
+    if korea:
+        ffb_exists = 0
+        if "ffbdevice" not in config_data:
+            ffb_proposed = ffb_reference
+            ffb_match = 0
+        else:
+            ffb_match = 1
+            ffb_exists = 1
+            ignore_port = False
+            ffb_config = config_data["ffbdevice"]
+            ffb_proposed = {}
+            for k, v in ffb_config.items():
+                ffb_proposed[k] = v.strip("\'\"")
+                ffb_config[k] = v.strip("\'\"")
+
+            for k, v in ffb_proposed.items():
+                ref_v = ffb_reference.get(k, 'null')
+                if v != ref_v:
+                    if k == 'addr':
+                        cur_addr1 = ffb_proposed.get("addr1", "null")
+                        if cur_addr1 != ref_addr1:
+                            if "addr1" in ffb_proposed:
+                                ffb_proposed["addr1"] = ref_addr1
+                            else:
+                                ffb_proposed = insert_dict_item(ffb_proposed, 'addr1', ref_addr1, 'addr', before=False)
+                            ffb_match = 0
+                        ignore_port = True
+                    if k == 'port' and not ignore_port:
+                        if ffb_proposed[k] != ref_port:
+                            ffb_proposed["port"] = ref_port
+                            ffb_match = 0
+                    if k == 'decimation':
+                        if ffb_proposed[k] != ref_decimation:
+                            ffb_proposed = insert_dict_item(ffb_proposed, 'decimation', '1', 'enable', before=True)
+                            ffb_match = 0
+                    if k == 'enable':
+                        if ffb_proposed[k] != ref_enable:
+                            ffb_proposed = insert_dict_item(ffb_proposed, 'enable', 'true', 'port', before=True)
+                            ffb_match = 0
+
+    if telem_match and motion_match and ffb_match:
         return
     else:
         telem_message = QMessageBox(parent=window)
@@ -1945,9 +1995,9 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
         telem_message.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         telem_message.setWindowTitle(f"TelemFFB {sim_name} Config")
 
-        if not telem_match or not motion_match:
+        if not telem_match or not motion_match or not ffb_match:
             pop = f"""
-            <p>The telemetry and/or motion device configuration in the <b>{html.escape(sim_name)}</b> <b>startup.cfg</b>
+            <p>The telemetry, motion and/or FFB device configuration in the <b>{html.escape(sim_name)}</b> <b>startup.cfg</b>
             is missing or incorrect and may prohibit TelemFFB from receiving data.</p>
             <p style='font-family:Consolas,monospace; font-size:9pt;'>File = {html.escape(file_path)}</p>
             <p>Would you like to automatically adjust the configuration per the following?</p>
@@ -1959,6 +2009,9 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
             if not motion_match or not motion_exists:
                 pop += _il2_config_diff_table('motiondevice', motion_config, motion_proposed)
 
+            if korea and (not ffb_match or not ffb_exists):
+                pop += _il2_config_diff_table('ffbdevice', ffb_config, ffb_proposed)
+
             pop += "<p style='color:#d9534f; font-weight:bold; margin-top:12px;'>Please ensure IL-2 is not running before selecting 'Yes'</p>"
         telem_message.setTextFormat(Qt.TextFormat.RichText)
         telem_message.setText(pop)
@@ -1966,6 +2019,8 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2"):
         if ans == QMessageBox.StandardButton.Yes:
             config_data['telemetrydevice'] = telem_proposed
             config_data['motiondevice'] = motion_proposed
+            if korea:
+                config_data['ffbdevice'] = ffb_proposed
             try:
                 write_il2_config(file_path, config_data)
             except Exception as e:
