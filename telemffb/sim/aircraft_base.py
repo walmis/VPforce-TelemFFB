@@ -21,6 +21,7 @@ import logging
 from typing import override
 
 import telemffb.utils as utils
+from telemffb.sim.base.ElevatorDroopEffectMixIn import ElevatorDroopEffectMixIn
 
 from telemffb.sim.base.WindEffectMixIn import WindEffectMixIn
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
@@ -61,6 +62,7 @@ class AircraftBase(
     AdvancedSpringMixIn,
     MotionEffectsMixIn,
     BuffetingEffectMixIn,
+    ElevatorDroopEffectMixIn,
 ):
     """Base class for all aircraft types, providing common functionality and state management."""
 
