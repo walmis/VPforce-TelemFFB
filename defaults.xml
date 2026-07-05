@@ -11538,9 +11538,23 @@
 			<device>any</device>
 		</classdefaults_IL2>
 		<classdefaults_IL2>
+			<name>il2_prop_eng_shake_factor</name>
+			<type>PropellerAircraft</type>
+			<value>1.5</value>
+			<sim>IL2</sim>
+			<device>any</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
 			<name>il2_jet_eng_shake_enabled</name>
 			<type>JetAircraft</type>
 			<value>false</value>
+			<sim>IL2</sim>
+			<device>any</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
+			<name>il2_jet_eng_shake_factor</name>
+			<type>JetAircraft</type>
+			<value>2.0</value>
 			<sim>IL2</sim>
 			<device>any</device>
 		</classdefaults_IL2>

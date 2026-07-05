@@ -147,29 +147,29 @@ class Aircraft(AircraftBase):
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
     def il2_update_engine_shake(self, telem_data: BaseTelemetryData):
-        """Apply piston/propeller engine rumble based on RPM.
+        """Alternative engine shake using harmonic ratios, amplitude taper, and direction spread.
 
-        Telemetry:
-            Read (MSFS/XPLANE): PropRPM   - Union[float, List[float]] (RPM, ≥ 0);
-                                             list max taken for multi-engine aircraft;
-                                             effect suppressed below 5 RPM
-            Read (DCS):         ActualRPM - Union[float, List[float]] (RPM, ≥ 0);
-                                             absolute RPM (not percentage)
-            Read (IL2):         RPM       - Union[float, List[float]] (RPM, ≥ 0)
+        Prop: fundamental + 2nd harmonic (2x) + slow sine-modulated detuning.
+        Jet:  fundamental + 1.5x partial + slower, smaller modulation.
+        Upper harmonic pair plays at 65% amplitude. Direction spread avoids axis-lock.
+        Modulation period scales with frequency so variation feels proportional to RPM.
         """
         factor = 0
+        freq_offset = 0
 
         if telem_data.AircraftClass == 'PropellerAircraft':
             factor = self.il2_prop_eng_shake_factor
             if not self.il2_prop_eng_shake_enabled:
-                self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "iil2_eng_shk3", "il2_eng_shk4")
+                self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "il2_eng_shk3", "il2_eng_shk4")
                 return
-
-        if telem_data.AircraftClass == 'JetAircraft':
+        elif telem_data.AircraftClass == 'JetAircraft':
             factor = self.il2_jet_eng_shake_factor
+            freq_offset = 30
             if not self.il2_jet_eng_shake_enabled:
-                self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "iil2_eng_shk3", "il2_eng_shk4")
+                self.effects.dispose("il2_jet_shk1", "il2_jet_shk2")
                 return
+        else:
+            return
 
         frequency = telem_data.get('EngineShakeFrequency', 0)
         amplitude = telem_data.get('EngineShakeAmplitude', 0)
@@ -177,23 +177,37 @@ class Aircraft(AircraftBase):
         if not frequency or not amplitude:
             return
 
-        frequency = float(frequency)
-        amplitude = float(amplitude) * factor
+        frequency = float(frequency) + freq_offset
+        amplitude = float(amplitude) * factor * 3
 
-        median_modulation = 2
-        frequency2 = frequency + median_modulation
+        if frequency <= 0:
+            self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "il2_eng_shk3", "il2_eng_shk4", "il2_jet_shk1", "il2_jet_shk2")
+            return
 
-        r1_modulation = utils.sine_point_in_time(3, 10000)
-        r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
+        # Harmonic: prop uses 2nd harmonic (2x), jet uses 3rd partial (1.5x — less harsh)
+        if telem_data.AircraftClass == 'PropellerAircraft':
+            frequency2 = frequency * 2.0
+        elif telem_data.AircraftClass == 'JetAircraft':
+            frequency2 = frequency * 1.5
 
-        if frequency > 0:
+        # Modulation period scales with frequency so drift feels proportional at all RPMs
+        mod_period1 = max(5000, int(1000 / frequency * 80))
+        mod_period2 = int(mod_period1 * 1.75)
 
-            self.effects["il2_eng_shk1"].periodic(frequency, amplitude, 0).start()
-            self.effects["il2_eng_shk2"].periodic(frequency + r1_modulation, amplitude, 0).start()
-            self.effects["il2_eng_shk3"].periodic(frequency2, amplitude, 90).start()
-            self.effects["il2_eng_shk4"].periodic(frequency2 + r2_modulation, amplitude, 90).start()
-        else:
-            self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "il2_eng_shk3", "il2_eng_shk4")
+        r1_mod = utils.sine_point_in_time(3, mod_period1)
+        r2_mod = utils.sine_point_in_time(2, mod_period2, phase_offset_deg=45)
+
+        # Upper harmonic plays quieter; small direction spread avoids axis-locked feel
+        amp2 = amplitude * 0.65
+
+        if telem_data.AircraftClass == 'PropellerAircraft':
+            self.effects["il2_eng_shk1"].periodic(frequency,            amplitude, 0  ).start()
+            self.effects["il2_eng_shk2"].periodic(frequency + r1_mod,   amplitude, 10 ).start()
+            self.effects["il2_eng_shk3"].periodic(frequency2,           amp2,      80 ).start()
+            self.effects["il2_eng_shk4"].periodic(frequency2 + r2_mod,  amp2,      100).start()
+        elif telem_data.AircraftClass == 'JetAircraft':
+            self.effects["il2_jet_shk1"].periodic(frequency  + r1_mod,  amplitude, 0,  phase=0  ).start()
+            self.effects["il2_jet_shk2"].periodic(frequency2 + r2_mod,  amp2,      90, phase=120).start()
 
     @override
     def ac_update_cm_weapons(self, telem):
