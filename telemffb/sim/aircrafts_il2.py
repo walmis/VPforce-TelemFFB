@@ -424,7 +424,7 @@ class Aircraft(AircraftBase):
         spring.start(override=True)
 
 
-    def il2_ffb_spring(self):
+    def il2_ffb_spring(self, force=False):
         """Apply a spring effect driven directly by IL-2 Korea FFB telemetry records.
 
         For each Spring-type record addressed to this device, axis 0 drives spring_x and
@@ -434,8 +434,10 @@ class Aircraft(AircraftBase):
         """
         from telemffb.telem.IL2Manager import ForceType
 
-        if not self.spring_mode_is(SpringModeEnum.TELEM):
-            # If feature disabled, ensure spring is stopped and abort
+        if not self.spring_mode_is(SpringModeEnum.TELEM) and not self.spring_mode_is(SpringModeEnum.ADVANCED):
+            self.effects['il2_ffb_spring'].stop()
+            return
+        if self.spring_mode_is(SpringModeEnum.ADVANCED) and self.adv_spr_use_hardware_trim:
             self.effects['il2_ffb_spring'].stop()
             return
 

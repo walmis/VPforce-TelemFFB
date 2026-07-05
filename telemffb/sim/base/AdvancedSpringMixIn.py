@@ -90,6 +90,11 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):
             self.spring_adjuster.stop()
             return
+        if self._sim_is_il2():
+            if not self.adv_spr_use_hardware_trim:
+                self.il2_ffb_spring(force=True)
+            else:
+                self.effects['il2_ffb_spring'].stop()
         # Verify the device firmware meets the minimum version required to execute this effect
         # Flag error and abort if not met
         if self.__firmware_supported is None:
