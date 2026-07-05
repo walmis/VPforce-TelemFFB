@@ -3916,6 +3916,40 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40250</order>
+		<name>il2_prop_eng_shake_enabled</name>
+		<displayname>Engine Rumble (Shake Telemetry)</displayname>
+		<exclusive_with>engine_prop_rumble_enabled</exclusive_with>
+		<prereq>mechanical_group</prereq>
+		<info>Separate engine rumble effect using "Engine Shake Amp/Freq" from game telemetry rather than RPM</info>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40250.2</order>
+		<name>il2_prop_eng_shake_factor</name>
+		<displayname>Shake Boost</displayname>
+		<prereq>il2_prop_eng_shake_enabled</prereq>
+		<info>Factor applied to "Engine Shake Amplitude" from game telemetry</info>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,500</validvalues>
+		<value>3.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<exclusive_with>il2_prop_eng_shake_enabled</exclusive_with>
 		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
@@ -3924,11 +3958,7 @@
 		<displayname>Propeller Rumble</displayname>
 		<prereq>mechanical_group</prereq>
 		<info>Enable Propeller Rumble</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4023,6 +4053,40 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40350</order>
+		<name>il2_jet_eng_shake_enabled</name>
+		<displayname>Engine Rumble (Shake Telemetry)</displayname>
+		<exclusive_with>engine_jet_rumble_enabled</exclusive_with>
+		<prereq>mechanical_group</prereq>
+		<info>Separate engine rumble effect using "Engine Shake Amp/Freq" from game telemetry rather than RPM</info>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40350.2</order>
+		<name>il2_jet_eng_shake_factor</name>
+		<displayname>Shake Boost</displayname>
+		<prereq>il2_jet_eng_shake_enabled</prereq>
+		<info>Factor applied to "Engine Shake Amplitude" from game telemetry</info>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,500</validvalues>
+		<value>3.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<exclusive_with>il2_jet_eng_shake_enabled</exclusive_with>
 		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
@@ -11465,6 +11529,20 @@
 			<value>1.4</value>
 			<sim>IL2</sim>
 			<device>joystick</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
+			<name>il2_prop_eng_shake_enabled</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>IL2</sim>
+			<device>any</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
+			<name>il2_jet_eng_shake_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>IL2</sim>
+			<device>any</device>
 		</classdefaults_IL2>
 		<classdefaults_IL2>
 			<name>jet_engine_rumble_intensity</name>

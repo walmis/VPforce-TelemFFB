@@ -120,6 +120,12 @@ class Aircraft(AircraftBase):
     il2_enable_buffet = 0  # not yet impelemnted
     il2_buffeting_factor: float  = 1.0
     il2_dynamic_gunfire_mode = False
+
+    il2_prop_eng_shake_enabled: bool = False
+    il2_prop_eng_shake_factor: float = 1.0
+
+    il2_jet_eng_shake_enabled: bool = False
+    il2_jet_eng_shake_factor: float = 1.0
     #stop_state = False
 
     def __init__(self, name : str, **kwargs):
@@ -139,6 +145,55 @@ class Aircraft(AircraftBase):
         # self.spring = HapticEffect().spring()
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+
+    def il2_update_engine_shake(self, telem_data: BaseTelemetryData):
+        """Apply piston/propeller engine rumble based on RPM.
+
+        Telemetry:
+            Read (MSFS/XPLANE): PropRPM   - Union[float, List[float]] (RPM, ≥ 0);
+                                             list max taken for multi-engine aircraft;
+                                             effect suppressed below 5 RPM
+            Read (DCS):         ActualRPM - Union[float, List[float]] (RPM, ≥ 0);
+                                             absolute RPM (not percentage)
+            Read (IL2):         RPM       - Union[float, List[float]] (RPM, ≥ 0)
+        """
+        factor = 0
+
+        if telem_data.AircraftClass == 'PropellerAircraft':
+            factor = self.il2_prop_eng_shake_factor
+            if not self.il2_prop_eng_shake_enabled:
+                self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "iil2_eng_shk3", "il2_eng_shk4")
+                return
+
+        if telem_data.AircraftClass == 'JetAircraft':
+            factor = self.il2_jet_eng_shake_factor
+            if not self.il2_jet_eng_shake_enabled:
+                self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "iil2_eng_shk3", "il2_eng_shk4")
+                return
+
+        frequency = telem_data.get('EngineShakeFrequency', 0)
+        amplitude = telem_data.get('EngineShakeAmplitude', 0)
+
+        if not frequency or not amplitude:
+            return
+
+        frequency = float(frequency)
+        amplitude = float(amplitude) * factor
+
+        median_modulation = 2
+        frequency2 = frequency + median_modulation
+
+        r1_modulation = utils.sine_point_in_time(3, 10000)
+        r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
+
+        if frequency > 0:
+
+            self.effects["il2_eng_shk1"].periodic(frequency, amplitude, 0).start()
+            self.effects["il2_eng_shk2"].periodic(frequency + r1_modulation, amplitude, 0).start()
+            self.effects["il2_eng_shk3"].periodic(frequency2, amplitude, 90).start()
+            self.effects["il2_eng_shk4"].periodic(frequency2 + r2_modulation, amplitude, 90).start()
+        else:
+            self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "il2_eng_shk3", "il2_eng_shk4")
 
     @override
     def ac_update_cm_weapons(self, telem):
@@ -483,6 +538,7 @@ class PropellerAircraft(Aircraft):
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
         telem_data.AircraftClass = "PropellerAircraft"   #inject aircraft class into telemetry
+        self.il2_update_engine_shake(telem_data)
         super().on_telemetry(telem_data)
 
 class JetAircraft(Aircraft):
@@ -492,4 +548,5 @@ class JetAircraft(Aircraft):
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
         telem_data.AircraftClass = "JetAircraft"   #inject aircraft class into telemetry
+        self.il2_update_engine_shake(telem_data)
         super().on_telemetry(telem_data)
