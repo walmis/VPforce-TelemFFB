@@ -1767,6 +1767,11 @@ class InstanceStatusRow(QWidget):
 
 class CurveWidget(QWidget):
     modified = pyqtSignal()
+
+    # Tolerance (in %) applied uniformly to every smooth-curve bounds check below,
+    # to absorb floating point noise without letting real overshoot slip through.
+    _BOUNDS_EPSILON = 0.1
+
     def __init__(self, parent=None, unit=None, base_unit=None):
         super().__init__(parent)
         # Default: 0% at 0 knots and 100% at 500 knots
@@ -1875,6 +1880,28 @@ class CurveWidget(QWidget):
 
 
 
+    def _curve_bounds(self, x_values, y_values):
+        """Return the (min, max) of the Akima-interpolated curve for the given points.
+
+        Sample density scales with how tightly the closest pair of points is packed
+        relative to the full X span, so a sharp bend between two nearby points isn't
+        missed by a sampling grid that's only fine enough for the widest gaps.
+        """
+        x_values = np.asarray(x_values, dtype=float)
+        y_values = np.asarray(y_values, dtype=float)
+        akima = Akima1DInterpolator(x_values, y_values)
+
+        span = float(x_values.max() - x_values.min())
+        gaps = np.diff(np.sort(x_values))
+        gaps = gaps[gaps > 0]
+        min_gap = float(gaps.min()) if gaps.size else span
+
+        samples = 500 if min_gap <= 0 else int(np.clip((span / min_gap) * 20, 500, 4000))
+
+        x_smooth = np.linspace(x_values.min(), x_values.max(), samples)
+        y_smooth = akima(x_smooth)
+        return float(np.min(y_smooth)), float(np.max(y_smooth))
+
     def toggle_smooth_curve(self, state):
         """Toggles smooth curve drawing, ensuring bounds are checked and the checkbox state is consistent."""
         toggle = self.sender()
@@ -1898,11 +1925,8 @@ class CurveWidget(QWidget):
         y_values = [p.y() for p in self.points]
 
         try:
-            akima = Akima1DInterpolator(x_values, y_values)
-            x_smooth = np.linspace(min(x_values), max(x_values), 500)
-            y_smooth = akima(x_smooth)
-            # Check bounds
-            if np.min(y_smooth) < 0 or np.max(y_smooth) > 100:
+            y_min, y_max = self._curve_bounds(x_values, y_values)
+            if y_min < -self._BOUNDS_EPSILON or y_max > 100 + self._BOUNDS_EPSILON:
                 self.msg_label.setText("Error: Smooth curve would exceed bounds.")
                 self.msg_label.show()
                 QTimer.singleShot(3000, self.msg_label.hide)
@@ -2168,22 +2192,14 @@ class CurveWidget(QWidget):
         y_values = np.array(y_values)[sorted_indices]
 
         try:
-            # Use Akima interpolation to evaluate smoothness
-            akima = Akima1DInterpolator(x_values, y_values)
-            x_smooth = np.linspace(min(x_values), max(x_values), 100)  # Reduce resolution for performance
-            y_smooth = akima(x_smooth)
+            y_min, y_max = self._curve_bounds(x_values, y_values)
         except Exception as e:
             # If interpolation fails, log the issue and reject the move
             print(f"Akima interpolation error: {e}")
             return False
 
-        # Allow slight tolerance (epsilon) to avoid numerical instability
-        epsilon = 0.1  # Tolerance in percentage
-        y_min_allowed = 0 - epsilon
-        y_max_allowed = 100 + epsilon
-
-        # Check bounds with relaxed tolerance
-        if np.min(y_smooth) < y_min_allowed or np.max(y_smooth) > y_max_allowed:
+        # Check bounds with the same tolerance used everywhere else in this widget
+        if y_min < -self._BOUNDS_EPSILON or y_max > 100 + self._BOUNDS_EPSILON:
             return False  # Curve exceeds bounds
         return True  # Curve is within acceptable bounds
 
@@ -2225,35 +2241,48 @@ class CurveWidget(QWidget):
             x_upper = max(self.x_min, self.x_max)
 
             if index == 0:
-                # First point: allow movement along X=0 or Y=0
-                if new_pos.x() <= x_lower:
+                # First point: allowed anywhere along X=x_lower (Y free) or Y=0 (X free).
+                # If the cursor is off both legs, snap to whichever leg is nearer instead
+                # of freezing the point in place.
+                on_x_leg = new_pos.x() <= x_lower
+                on_y_leg = new_pos.y() <= 0
+                if not (on_x_leg or on_y_leg):
+                    x_frac = (new_pos.x() - x_lower) / (x_upper - x_lower) if x_upper != x_lower else 0
+                    y_frac = new_pos.y() / 100.0
+                    on_x_leg = x_frac <= y_frac
+
+                if on_x_leg:
                     new_pos.setX(x_lower)  # Lock X to min
                     new_pos.setY(max(0, min(100, new_pos.y())))  # Allow vertical movement (Y-axis)
-                elif new_pos.y() <= 0:
+                else:
                     new_pos.setY(0)  # Lock Y to 0
                     new_pos.setX(max(x_lower, min(self.points[1].x() - 0.01, new_pos.x())))  # Allow horizontal movement (X-axis)
-                else:
-                    valid_move = False
 
                 if self.smooth_curve_enabled:
-                    valid_move = valid_move and self.check_smooth_curve_bounds(new_pos, index)
+                    valid_move = self.check_smooth_curve_bounds(new_pos, index)
 
             elif index == len(self.points) - 1:
-                # Last point: allow movement along X=max or Y=100
-                if new_pos.x() >= x_upper:
+                # Last point: allowed anywhere along X=x_upper (Y free) or Y=100 (X free).
+                # Snap to whichever leg is nearer rather than freezing when off both.
+                on_x_leg = new_pos.x() >= x_upper
+                on_y_leg = new_pos.y() >= 100
+                if not (on_x_leg or on_y_leg):
+                    x_frac = (x_upper - new_pos.x()) / (x_upper - x_lower) if x_upper != x_lower else 0
+                    y_frac = (100 - new_pos.y()) / 100.0
+                    on_x_leg = x_frac <= y_frac
+
+                if on_x_leg:
                     new_pos.setX(x_upper)  # Lock X to max
                     new_pos.setY(max(0, min(100, new_pos.y())))  # Allow vertical movement (Y-axis)
-                elif new_pos.y() >= 100:
+                else:
                     new_pos.setY(100)  # Lock Y to 100
                     new_pos.setX(
                         max(self.points[-2].x() + 0.01,
                             min(x_upper, new_pos.x()))  # Allow horizontal movement (X-axis)
                     )
-                else:
-                    valid_move = False
 
                 if self.smooth_curve_enabled:
-                    valid_move = valid_move and self.check_smooth_curve_bounds(new_pos, index)
+                    valid_move = self.check_smooth_curve_bounds(new_pos, index)
 
             else:
                 # Intermediate points: ensure proper bounds and prevent overlap
@@ -2326,7 +2355,7 @@ class CurveWidget(QWidget):
                 self.update()
 
     def add_new_point(self, new_point):
-        """Add a new point and maintain order, ensuring the first point stays at y=0."""
+        """Add a new point and maintain order by X."""
         if not (min(self.x_min, self.x_max) <= new_point.x() <= max(self.x_min, self.x_max)):
             return  # Disallow point outside range
 
@@ -2340,15 +2369,13 @@ class CurveWidget(QWidget):
             y_values = [p.y() for p in projected_points]
 
             try:
-                akima = Akima1DInterpolator(x_values, y_values)
-                x_smooth = np.linspace(min(x_values), max(x_values), 500)
-                y_smooth = akima(x_smooth)
+                y_min, y_max = self._curve_bounds(x_values, y_values)
             except Exception:
                 self.msg_label.setText("Error: Invalid smooth curve with this point.")
                 self.msg_label.show()
                 return
 
-            if np.min(y_smooth) < 0 or np.max(y_smooth) > 100:
+            if y_min < -self._BOUNDS_EPSILON or y_max > 100 + self._BOUNDS_EPSILON:
                 # Reject point if bounds exceeded
                 self.msg_label.setText("Error: Adding this point would exceed curve bounds.")
                 self.msg_label.show()
@@ -2362,8 +2389,6 @@ class CurveWidget(QWidget):
                 QTimer.singleShot(3000, self.msg_label.hide)
                 return
 
-        # Ensure the first point remains affixed at y=0
-        self.points[0].setY(0)
         self.points.append(new_point)
         self.points.sort(key=lambda p: p.x())  # Ensure points are ordered by x (speed)
         self.modified.emit()
