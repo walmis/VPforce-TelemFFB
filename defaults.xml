@@ -15770,6 +15770,20 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>engine_prop_rumble_enabled</name>
+		<model>F-51D.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_prop_eng_shake_enabled</name>
+		<model>F-51D.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>F-51D.*</model>
 		<value>PropellerAircraft</value>
@@ -15805,6 +15819,20 @@
 		<value>{"curve_x": {"x_min": 0, "x_max": 561, "points": [{"x": 0.0, "y": 0.0}, {"x": 50.0, "y": 7.0}, {"x": 83.3, "y": 16.0}, {"x": 100.0, "y": 25.0}, {"x": 271.0, "y": 48.0}, {"x": 407.5, "y": 71.0}, {"x": 505.0, "y": 90.0}, {"x": 561.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 561, "points": [{"x": 0.0, "y": 0.0}, {"x": 561.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 561}</value>
 		<sim>IL2</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>engine_jet_rumble_enabled</name>
+		<model>F-80C-10.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_jet_eng_shake_enabled</name>
+		<model>F-80C-10.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -15844,6 +15872,20 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>engine_jet_rumble_enabled</name>
+		<model>F-84E.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_jet_eng_shake_enabled</name>
+		<model>F-84E.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>F-84E.*</model>
 		<value>JetAircraft</value>
@@ -15879,6 +15921,20 @@
 		<value>{"curve_x": {"x_min": 0, "x_max": 611, "points": [{"x": 0.0, "y": 0.0}, {"x": 54.0, "y": 7.0}, {"x": 90.0, "y": 16.0}, {"x": 108.0, "y": 25.0}, {"x": 294.5, "y": 48.0}, {"x": 443.6, "y": 71.0}, {"x": 550.0, "y": 90.0}, {"x": 611.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 611, "points": [{"x": 0.0, "y": 0.0}, {"x": 611.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 611}</value>
 		<sim>IL2</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>engine_jet_rumble_enabled</name>
+		<model>F-86A-5.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_jet_eng_shake_enabled</name>
+		<model>F-86A-5.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -15918,6 +15974,20 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>engine_prop_rumble_enabled</name>
+		<model>IL-10.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_prop_eng_shake_enabled</name>
+		<model>IL-10.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>IL-10.*</model>
 		<value>PropellerAircraft</value>
@@ -15953,6 +16023,20 @@
 		<value>{"curve_x": {"x_min": 0, "x_max": 467, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 226.65, "y": 48.0}, {"x": 339.4, "y": 71.0}, {"x": 420.0, "y": 90.0}, {"x": 467.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 467, "points": [{"x": 0.0, "y": 0.0}, {"x": 467.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 467}</value>
 		<sim>IL2</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>engine_prop_rumble_enabled</name>
+		<model>La-11.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_prop_eng_shake_enabled</name>
+		<model>La-11.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -15992,6 +16076,20 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>engine_jet_rumble_enabled</name>
+		<model>MiG-15bis.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_jet_eng_shake_enabled</name>
+		<model>MiG-15bis.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>MiG-15bis.*</model>
 		<value>JetAircraft</value>
@@ -16027,6 +16125,20 @@
 		<value>{"curve_x": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 220.65, "y": 48.0}, {"x": 328.2, "y": 71.0}, {"x": 405.0, "y": 90.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 450}</value>
 		<sim>IL2</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>engine_prop_rumble_enabled</name>
+		<model>Yak-9P.*</model>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>il2_prop_eng_shake_enabled</name>
+		<model>Yak-9P.*</model>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
