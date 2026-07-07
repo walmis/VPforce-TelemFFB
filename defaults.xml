@@ -3949,7 +3949,26 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40300</order>
+		<name>engine_prop_rumble_enabled</name>
+		<displayname>Propeller Rumble</displayname>
 		<exclusive_with>il2_prop_eng_shake_enabled</exclusive_with>
+		<prereq>mechanical_group</prereq>
+		<info>Enable Propeller Rumble</info>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
@@ -3958,7 +3977,6 @@
 		<displayname>Propeller Rumble</displayname>
 		<prereq>mechanical_group</prereq>
 		<info>Enable Propeller Rumble</info>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
