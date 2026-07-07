@@ -3228,14 +3228,27 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
 
 
     def _get_current_device_ident(pid):
-        """Get the device identifier for the current device.
-        
+        """Get the device identifier for the device with the given USB PID.
+
+        `G.device_info` only describes the device bound to *this* process/instance.
+        When the master instance is validating a profile for a different device type
+        (e.g. a child instance's pedals while the master owns the joystick), the
+        target device's ident has to come from `G.instance_dev_dict`, which the
+        master populates at startup from a system-wide enumeration of all connected
+        Rhino devices (see `_enumerate_and_log_devices` in main.py) and is keyed by
+        USB PID, not by which process opened the device.
+
         Args:
             pid (int): Device PID
             
         Returns:
             str: Device identifier
         """
+        dev_info = G.instance_dev_dict.get(pid)
+        if dev_info is not None:
+            return dev_info.ident
+        if G.device_info and G.device_info.product_id == pid:
+            return G.device_info.ident
         return G.device_info.ident if G.device_info else "UnknownDevice"
 
 
@@ -3275,13 +3288,15 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
     
     # Step 3: Validate PID matching
     if cfg_pid != pid:
+        target_device_ident = _get_current_device_ident(pid)
         error_msg = (
             f"The VPforce Configurator file does not match the target device:\n\n"
             f"File: {file_path}\n\n"
-            f"Current device:\n"
+            f"Target device:\n"
             f"  Type: {dev_type}\n"
-            f"  PID: {pid:04X}\n\n"
-            f"Profile device:\n"
+            f"  PID: {pid:04X}\n"
+            f"  Name: {target_device_ident}\n\n"
+            f"Profile settings:\n"
             f"  PID: {cfg_pid:04X}\n"
             f"  Name: {cfg_device_name}\n"
             f"  Serial: {cfg_serial}"
