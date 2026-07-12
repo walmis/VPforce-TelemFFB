@@ -2601,6 +2601,12 @@ class TrimCurveWidget(CurveWidget):
         self.y_label_legend = "Elevator Axis %"
         self.current_unit = "%"
 
+        # Label band sized for this widget's tick labels ("-103%") plus the
+        # rotated Y legend; the base margins are too tight and put ticks and
+        # legends in the same pixel columns.
+        self.margin_left = 58
+        self.margin_bottom = 42
+
         # Full-scale view while idle/measuring; set_result() zooms to the data.
         self.x_min = -100.0
         self.x_max = 100.0
@@ -2710,34 +2716,39 @@ class TrimCurveWidget(CurveWidget):
 
     def draw_axis_labels(self, painter, *args, **kwargs):
         rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
-        font = QFont()
-        font.setBold(True)
-        painter.setFont(font)
+        painter.setFont(QFont('Arial', 8))
         painter.setPen(QPen(self.axis_color))
+        fm = painter.fontMetrics()
 
-        for i in range(0, 11):
+        # Every other gridline gets a tick label — all 11 collide at typical
+        # widget heights. Y ticks are right-aligned against the plot edge so
+        # they never reach the rotated legend at the far left.
+        for i in range(0, 11, 2):
             y = int(rect.top() + i * rect.height() / 10)
             val = self.y_max - (self.y_max - self.y_min) * i / 10
-            painter.drawText(rect.left() - self.margin_left + 8, y + 5, f"{val:.0f}%")
+            text = f"{val:.0f}%"
+            painter.drawText(rect.left() - fm.horizontalAdvance(text) - 6,
+                             y + fm.ascent() // 2, text)
 
-        for i in range(0, 11):
+        for i in range(0, 11, 2):
             x = int(rect.left() + i * rect.width() / 10)
             val = self.x_min + (self.x_max - self.x_min) * i / 10
-            painter.drawText(x - 12, rect.bottom() + self.margin_bottom // 2, f"{val:.0f}")
+            text = f"{val:.0f}"
+            painter.drawText(x - fm.horizontalAdvance(text) // 2,
+                             rect.bottom() + fm.ascent() + 4, text)
 
         painter.setFont(QFont('Arial', 9))
+        fm = painter.fontMetrics()
         if self.x_label_legend:
-            text = self.x_label_legend
-            tw = painter.fontMetrics().horizontalAdvance(text)
-            painter.drawText(rect.left() + rect.width() // 2 - tw // 2, rect.bottom() + self.margin_bottom - 2, text)
+            tw = fm.horizontalAdvance(self.x_label_legend)
+            painter.drawText(rect.left() + rect.width() // 2 - tw // 2,
+                             rect.bottom() + self.margin_bottom - 6, self.x_label_legend)
         if self.y_label_legend:
             painter.save()
-            text = self.y_label_legend
-            tw = painter.fontMetrics().height()
-            th = painter.fontMetrics().horizontalAdvance(text)
-            painter.translate(rect.left() - self.margin_left + tw - 5, rect.top() + rect.height() // 2 + th // 2)
+            th = fm.horizontalAdvance(self.y_label_legend)
+            painter.translate(12, rect.top() + rect.height() // 2 + th // 2)
             painter.rotate(-90)
-            painter.drawText(0, 0, text)
+            painter.drawText(0, 0, self.y_label_legend)
             painter.restore()
 
     def _draw_zero_axes(self, painter):

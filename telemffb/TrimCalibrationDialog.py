@@ -69,6 +69,7 @@ class TrimCalibrationDialog(QDialog):
         self._last_result = None
         self._result_shown = False
         self._telem_connected = False
+        self._cal_seen = None    # id() of the calibrator the display belongs to
 
         self._build_ui()
         self._refresh_idle()
@@ -212,8 +213,17 @@ class TrimCalibrationDialog(QDialog):
 
     def _on_telemetry(self, data):
         try:
-            self._update_live_values(data)
             cal = self._calibrator()
+
+            # The calibrator lives on the aircraft instance; a different object
+            # means a new aircraft was loaded — drop the previous aircraft's
+            # displayed result (its own result re-displays if it has one).
+            if cal is not None and id(cal) != self._cal_seen:
+                self._cal_seen = id(cal)
+                self._reset_display(cal)
+
+            ias_ref = getattr(cal, "_ias0", None) if (cal is not None and cal.active) else None
+            self._update_live_values(data, ias_ref)
 
             if G.device_type != "joystick":
                 self._set_ready(False, "Run from the joystick (master) instance")
@@ -251,13 +261,80 @@ class TrimCalibrationDialog(QDialog):
         except Exception as e:  # never let a UI slot break the telemetry stream
             logger.error(f"TrimCalibrationDialog telemetry update error: {e}")
 
-    def _update_live_values(self, data):
+    def _reset_display(self, cal):
+        """Reset all result display state; re-show the (new) calibrator's own
+        completed result when it has one, else the aircraft's saved curve."""
+        self._last_result = None
+        self._result_shown = False
+        self.curve.clear()
+        self._clear_result_labels()
+        if cal is not None and cal.state == CalState.DONE and cal.result:
+            self._show_result(cal.result)
+        else:
+            self._show_stored_curve()
+
+    def _show_stored_curve(self):
+        """Display the aircraft's SAVED calibration curve (view-only).
+
+        A freshly loaded aircraft has a fresh calibrator with no result, but
+        may carry a calibrated curve in its settings. The stored curve is the
+        runtime offset ``offs(T) = -(u(T) - u(0))``; the plot shows the
+        measured-axis space, so it is mirrored back for display. Returns True
+        when something was shown.
+        """
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
+        if not raw or raw == "none":
+            return False
+        try:
+            data = json.loads(raw)
+            samples = [(float(p["t"]), -float(p["offs"])) for p in data["points"]]
+        except (ValueError, KeyError, TypeError) as e:
+            logger.warning(f"Stored trim curve unreadable; not displaying ({e})")
+            return False
+        if len(samples) < 2:
+            return False
+
+        physical_y = getattr(ac, "joystick_trim_follow_gain_physical_y", 1.0) or 1.0
+        virtual_y = getattr(ac, "joystick_trim_follow_gain_virtual_y", 0.0) or 0.0
+        # The static gain's equivalent line, for comparison (zero-referenced).
+        slope = -physical_y * (1.0 - virtual_y)
+        self.curve.set_result(samples, slope, 0.0)
+
+        prov = " · ".join(str(x) for x in [
+            f"captured {data.get('date')}" if data.get("date") else "",
+            f"{data.get('ias_kt')} kt" if data.get("ias_kt") else "",
+        ] if x)
+        use_curve = bool(getattr(ac, "joystick_trim_follow_use_curve_y", False))
+        self.lbl_virtual.setText(
+            "Saved calibration curve for this aircraft"
+            + (f"  &nbsp;({prov})" if prov else "")
+            + f"  &nbsp;·  static value: {virtual_y:.3f}")
+        self.lbl_linearity.setText(
+            f"Curve in use: {'yes' if use_curve else 'no — static gain active'}")
+        self.chk_use_curve.setChecked(use_curve)
+        return True
+
+    def _update_live_values(self, data, ias_ref=None):
         def fmt(v, conv=1.0, unit="", nd=0):
             if v is None:
                 return "—"
             return f"{v * conv:.{nd}f}{unit}"
 
-        self.lbl_ias.setText(fmt(data.get("IAS"), MS_TO_KT, " kt"))
+        # Live airspeed-drift warning during a run: the measured slope is only
+        # trustworthy at roughly constant speed, so surface drift as it happens
+        # rather than only in the post-run note.
+        ias = data.get("IAS")
+        ias_txt = fmt(ias, MS_TO_KT, " kt")
+        ias_style = ""
+        if ias_ref and ias:
+            drift = (ias - ias_ref) / ias_ref
+            if abs(drift) >= 0.05:
+                ias_txt += f" ({drift * 100:+.0f}%)"
+                color = "#cc3333" if abs(drift) >= 0.10 else "#cc7a00"
+                ias_style = f"QLabel {{ color:{color}; font-weight:bold; }}"
+        self.lbl_ias.setText(ias_txt)
+        self.lbl_ias.setStyleSheet(ias_style)
         self.lbl_pitch.setText(fmt(data.get("Pitch"), 1.0, "°", nd=1))
         self.lbl_vs.setText(fmt(data.get("VerticalSpeed"), MS_TO_FPM, " fpm"))
         self.lbl_bank.setText(fmt(data.get("Roll"), 1.0, "°", nd=1))
@@ -402,6 +479,7 @@ class TrimCalibrationDialog(QDialog):
             self._show_result(cal.result)
         elif not has_result:
             self._clear_result_labels()
+            self._show_stored_curve()
         if G.device_type != "joystick":
             self._set_ready(False, "Run from the joystick (master) instance")
             self.btn_start.setEnabled(False)
@@ -422,4 +500,8 @@ class TrimCalibrationDialog(QDialog):
         if cal is not None and cal.active:
             cal.stop("Calibration window closed")
         self._disconnect_telemetry()
+        # Destroy rather than hide: a reopened dialog rebuilds its display from
+        # the CURRENT aircraft's calibrator (completed results live on the
+        # engine), so no stale state can survive an aircraft change.
+        self.deleteLater()
         super().closeEvent(event)
