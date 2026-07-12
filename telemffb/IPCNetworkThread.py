@@ -71,7 +71,12 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+        # Generous kernel receive buffer: the master ingests continuous
+        # telemetry/effects datagrams from every child instance, and a small
+        # buffer (formerly 4 KB = ~1-3 datagrams) overflows under load, making
+        # the kernel silently drop packets — including the 1 Hz child
+        # keepalives, which showed up as spurious child TIMEOUT flaps.
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 262144)
         self._socket.settimeout(0.1)
 
         try:
@@ -107,10 +112,27 @@ class IPCNetworkThread(QObject, threading.Thread):
         while self._running.is_set():
             now = time.monotonic()
 
-            # 1. Handle socket input
+            # 1. Handle socket input: block briefly for the first datagram,
+            # then drain everything already queued without blocking. Reading a
+            # single datagram per pass (with the 10 ms sleep below) capped
+            # intake at ~100 msg/s — below the combined telemetry/effects rate
+            # of multiple child instances — so packets were dropped wholesale.
+            # recvfrom(65535) also prevents Windows from silently discarding
+            # datagrams larger than the read size (WSAEMSGSIZE).
             try:
-                data, fromaddr = self._socket.recvfrom(4096)
+                data, fromaddr = self._socket.recvfrom(65535)
                 self._handle_message(data.decode("utf-8"), fromaddr)
+                self._socket.settimeout(0)
+                try:
+                    # Bounded drain so a sustained flood can never starve the
+                    # periodic keepalive send below.
+                    for _ in range(500):
+                        data, fromaddr = self._socket.recvfrom(65535)
+                        self._handle_message(data.decode("utf-8"), fromaddr)
+                except (BlockingIOError, socket.timeout, OSError):
+                    pass
+                finally:
+                    self._socket.settimeout(0.1)
             except (socket.timeout, OSError):
                 pass
 
