@@ -516,6 +516,111 @@ class TestSafety:
 
 
 # --------------------------------------------------------------------------- #
+#  Oscillation watchdog (adaptive pitch-gain backoff)
+# --------------------------------------------------------------------------- #
+
+def _feed_oscillation(cal, peaks, mean=0.0):
+    """Drive the watchdog with alternating half-cycles of the given |peak|s
+    around ``mean``. Extremum confirmation needs a hysteresis retreat, so each
+    peak is followed by a return to the mean; the first two peaks establish
+    direction/reference, so n peaks yield n-2 amplitudes."""
+    for i, peak in enumerate(peaks):
+        sign = 1 if i % 2 == 0 else -1
+        cal._watch_oscillation(mean + sign * peak)
+        cal._watch_oscillation(mean)
+
+
+GROWING = [0.5, 0.6, 0.75, 0.95, 1.2]
+
+
+class TestOscillationWatchdog:
+    def test_growing_peaks_back_gains_off(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP)
+        _feed_oscillation(cal, GROWING)
+        assert cal._gain_scale == pytest.approx(0.5)
+        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP * 0.5)
+        assert cal._pitch_pid.ki == pytest.approx(cal.PITCH_KI * 0.5)
+
+    def test_detects_oscillation_on_nonzero_mean(self, clock):
+        # The original zero-crossing detector was blind to oscillation riding
+        # on a nonzero mean (integrator still converging) — the exact case
+        # where a first run diverged undetected until the stabilize timeout.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        _feed_oscillation(cal, GROWING, mean=1.5)   # never crosses zero
+        assert cal._gain_scale == pytest.approx(0.5)
+
+    def test_decaying_or_small_peaks_leave_gains_alone(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        _feed_oscillation(cal, [0.9, 0.7, 0.55, 0.45, 0.4])   # decaying
+        _feed_oscillation(cal, [0.1, 0.2, 0.3])               # below jitter floor
+        assert cal._gain_scale == pytest.approx(1.0)
+
+    def test_backoff_preserves_integral_output_term(self, clock):
+        # The integral carries the trim-holding output; backing off must not
+        # step it (a step would drop the nose mid-run).
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        pid = cal._pitch_pid
+        for _ in range(60):
+            pid.update(0.5, 1 / 30.0)
+        term_before = pid.ki * pid._integral
+        cal._set_pitch_gain_scale(0.5)
+        term_after = pid.ki * pid._integral
+        assert term_after == pytest.approx(term_before)
+
+    def test_persistent_divergence_aborts_at_gain_floor(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())   # arm cleanly
+        # 0.5^4 = 0.0625 < floor (0.1): the 4th backoff requests the abort.
+        for _ in range(4):
+            cal._backoff_pitch_gains()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())   # deferred stop is consumed on the next frame
+        assert cal.state == CalState.ABORT
+        assert "oscillation" in cal.abort_reason.lower()
+
+    def test_stabilize_timeout_with_growth_evidence_backs_off(self, clock):
+        # A slow phugoid may not finish 3 half-cycles inside the stabilize
+        # window; two growing amplitudes at timeout must trigger a backoff
+        # and retry rather than a "could not stabilize" abort.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        cal.state = CalState.STABILIZE
+        cal._phase_start_t = time.perf_counter() - cal.STABILIZE_TIMEOUT_S - 1
+        cal._osc_amps = [0.4, 0.6]
+        cal._do_stabilize(ac.telem(), 1 / 30.0)
+        assert cal.state == CalState.STABILIZE, "should retry, not abort"
+        assert cal._gain_scale == pytest.approx(0.5)
+
+    def test_gain_scale_resets_on_new_run(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        _feed_oscillation(cal, GROWING)
+        assert cal._gain_scale == pytest.approx(0.5)
+        cal.stop()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        cal.start()
+        assert cal._gain_scale == pytest.approx(1.0)
+        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP)
+
+
+# --------------------------------------------------------------------------- #
 #  Calibrated trim curve (non-linear enhancement)
 # --------------------------------------------------------------------------- #
 

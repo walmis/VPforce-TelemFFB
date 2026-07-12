@@ -107,6 +107,20 @@ class TrimCalibrator:
     ELEV_SIGN_DEFAULT = 1.0      # used if auto-detect is off or inconclusive
     AIL_SIGN_DEFAULT = 1.0
 
+    # Oscillation watchdog. The pitch loop controls VS, which lags pitch by
+    # ~90 deg in the phugoid cycle — on some aircraft the fixed gains sit past
+    # the stability boundary and the loop pumps a slowly growing oscillation.
+    # When successive VS peak amplitudes keep growing, the pitch gains are
+    # backed off in place (integral term preserved) and the run continues;
+    # below the floor the aircraft is declared unstabilizable and the run
+    # aborts rather than diverging.
+    OSC_PEAK_GROWTH = 1.10       # successive-amplitude ratio counted as growth
+    OSC_PEAKS_TO_ACT = 3         # growing amplitudes in a row before backing off
+    OSC_MIN_PEAK_VS = 0.35       # m/s; smaller amplitudes are jitter (resets streak)
+    OSC_HYSTERESIS = 0.15        # m/s retreat from a candidate extremum to confirm it
+    OSC_BACKOFF = 0.5            # pitch-gain multiplier applied per detection
+    OSC_MIN_GAIN_SCALE = 0.1     # give up below this cumulative scale
+
     # Stabilization gate (must hold within tolerance for the dwell window).
     STABLE_VS_TOL = 0.50         # m/s (~100 fpm)
     STABLE_ROLL_TOL = 3.0        # deg
@@ -227,6 +241,12 @@ class TrimCalibrator:
         self._sign_rb_start = 0.0
         self._sign_flips = 0
         self._u_sat_since = None
+        # oscillation watchdog state (extremum tracking with hysteresis)
+        self._osc_ext = None         # candidate extremum value
+        self._osc_dir = 0            # 0 = undetermined, +1 rising, -1 falling
+        self._osc_prev_ext = None    # last confirmed extremum
+        self._osc_amps = []          # recent half-cycle amplitudes (peak-to-peak / 2)
+        self._set_pitch_gain_scale(1.0)
         # takeover smoothness: hold the stick where it rests and start the
         # axis output where the normal path left it (captured on first frame)
         self._hold_offs = None
@@ -516,10 +536,11 @@ class TrimCalibrator:
         now = time.perf_counter()
 
         # Live gate progress so the dialog shows what we're waiting on.
+        gains_txt = f", gains x{self._gain_scale:.2f}" if self._gain_scale < 1.0 else ""
         self.status_message = (
             f"Stabilizing... VS {vs * 196.85:+.0f} fpm "
             f"(need within {self.STABLE_VS_TOL * 196.85:.0f}), "
-            f"roll {roll:+.1f} deg (need within {self.STABLE_ROLL_TOL:.0f})"
+            f"roll {roll:+.1f} deg (need within {self.STABLE_ROLL_TOL:.0f}){gains_txt}"
         )
 
         if abs(vs) <= self.STABLE_VS_TOL and abs(roll) <= self.STABLE_ROLL_TOL:
@@ -532,6 +553,15 @@ class TrimCalibrator:
             self._stable_since = None
 
         if now - self._phase_start_t > self.STABILIZE_TIMEOUT_S:
+            # A slow phugoid may not complete OSC_PEAKS_TO_ACT half-cycles
+            # inside the window — two growing amplitudes at timeout is enough
+            # evidence of divergence to back off and retry instead of aborting.
+            if len(self._osc_amps) >= 2 and \
+                    self._osc_amps[-1] > self._osc_amps[-2] * self.OSC_PEAK_GROWTH:
+                logger.warning("Stabilize timeout with a growing oscillation pattern; "
+                               "treating as divergence")
+                self._backoff_pitch_gains()
+                return
             self._abort(
                 f"Could not stabilize within {self.STABILIZE_TIMEOUT_S:.0f}s "
                 f"(VS {vs * 196.85:+.0f} fpm, roll {roll:+.1f} deg)"
@@ -854,6 +884,8 @@ class TrimCalibrator:
         delivered axis, which is what the level-flight condition constrains
         (the constant baseline shifts the fit's intercept, never its slope).
         """
+        self._watch_oscillation(telem_data.VerticalSpeed)
+
         vs_err = self._elev_sign * (self.VS_TARGET - telem_data.VerticalSpeed)
         self._u_elev = self._u_base_y + self._pitch_pid.update(vs_err, dt)
 
@@ -861,6 +893,89 @@ class TrimCalibrator:
         self._u_ail = self._u_base_x + self._roll_pid.update(roll_err, dt)
 
         self._command_axes(telem_data)
+
+    def _set_pitch_gain_scale(self, scale):
+        """Scale the pitch-loop gains in place; the PID preserves its integral
+        TERM across the change (it carries the trim-holding steady output)."""
+        self._gain_scale = scale
+        self._pitch_pid.set_gains(self.PITCH_KP * scale,
+                                  self.PITCH_KI * scale,
+                                  self.PITCH_KD * scale)
+
+    def _watch_oscillation(self, vs):
+        """Detect a growing VS oscillation and back the pitch gains off.
+
+        Detection is MEAN-INDEPENDENT: local extrema of VS are confirmed by a
+        hysteresis retreat, and half-cycle amplitudes are measured
+        peak-to-peak. (Zero-crossing based detection missed oscillations
+        riding on a nonzero mean — e.g. while the integrator is still
+        converging early in STABILIZE — letting a diverging run reach the
+        stabilize timeout undetected.)
+        """
+        if self._osc_ext is None:
+            self._osc_ext = vs
+            return
+        h = self.OSC_HYSTERESIS
+
+        if self._osc_dir == 0:
+            # Establish the initial movement direction.
+            if vs >= self._osc_ext + h:
+                self._osc_dir = 1
+                self._osc_ext = vs
+            elif vs <= self._osc_ext - h:
+                self._osc_dir = -1
+                self._osc_ext = vs
+            return
+
+        if self._osc_dir > 0:
+            if vs > self._osc_ext:
+                self._osc_ext = vs
+                return
+            if vs > self._osc_ext - h:
+                return  # not retreated enough to confirm the peak
+        else:
+            if vs < self._osc_ext:
+                self._osc_ext = vs
+                return
+            if vs < self._osc_ext + h:
+                return
+
+        # Direction reversal confirmed: _osc_ext is a local extremum.
+        if self._osc_prev_ext is not None:
+            amp = abs(self._osc_ext - self._osc_prev_ext) / 2.0
+            if amp < self.OSC_MIN_PEAK_VS:
+                self._osc_amps.clear()
+            else:
+                self._osc_amps.append(amp)
+                if len(self._osc_amps) > self.OSC_PEAKS_TO_ACT:
+                    self._osc_amps.pop(0)
+                if len(self._osc_amps) == self.OSC_PEAKS_TO_ACT and all(
+                        b > a * self.OSC_PEAK_GROWTH
+                        for a, b in zip(self._osc_amps, self._osc_amps[1:])):
+                    self._backoff_pitch_gains()
+        self._osc_prev_ext = self._osc_ext
+        self._osc_ext = vs
+        self._osc_dir = -self._osc_dir
+
+    def _backoff_pitch_gains(self):
+        """Halve the pitch gains in response to a growing oscillation, pushing
+        the settle clocks out; at the floor, request a clean abort."""
+        grown = [round(a, 2) for a in self._osc_amps]
+        self._osc_amps.clear()
+        new_scale = self._gain_scale * self.OSC_BACKOFF
+        if new_scale < self.OSC_MIN_GAIN_SCALE:
+            self._stop_reason = ("Pitch oscillation keeps growing at minimum control "
+                                 "gain; aircraft may not be auto-stabilizable at this speed")
+            self._stop_requested = True
+            return
+        self._set_pitch_gain_scale(new_scale)
+        now = time.perf_counter()
+        if self.state == CalState.STABILIZE and self._phase_start_t is not None:
+            self._phase_start_t = now
+        elif self.state == CalState.SWEEP and self._step_settle_deadline is not None:
+            self._step_settle_deadline = now + self.STEP_SETTLE_TIMEOUT_S
+        logger.warning(f"Growing pitch oscillation detected (VS amplitudes {grown} m/s); "
+                       f"pitch gains backed off to x{new_scale:.2f}")
 
     # ---- Output --------------------------------------------------------------
 

@@ -1673,6 +1673,23 @@ class PID:
         self._prev_time = None
         self.output = 0.0
 
+    def set_gains(self, kp, ki, kd, preserve_integral_term=True):
+        """Change gains in place (e.g. adaptive backoff on a live loop).
+
+        With ``preserve_integral_term`` the integral state is rescaled so the
+        integral's output contribution (``ki * integral``) does not step when
+        ``ki`` changes — that contribution typically carries the steady-state
+        component holding the plant, and a step there jolts the output.
+        """
+        if preserve_integral_term and self.ki != ki:
+            if ki:
+                self._integral *= self.ki / ki
+            else:
+                self._integral = 0.0
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+
     def update(self, error, dt=None):
         now = time.perf_counter()
         if dt is None:
