@@ -105,6 +105,9 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
 
         Calibrated curve (absolute axis units, independent of the physical
         gain) when enabled and loaded; else the legacy static-gain formula.
+        Enabled-but-missing curve flags a UI error each frame (the standing
+        convention: the notification lives while the misconfiguration does)
+        and falls back to the static gain.
 
         :param t_damp: dampened raw ElevTrimPct (curve lookup space)
         :param elev_trim: t_damp scaled by the physical gain and clamped
@@ -114,6 +117,10 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
             offs = self._trim_curve_offset(t_damp)
             if offs is not None:
                 return offs
+            self.flag_error(
+                "'Use Calibrated Trim Curve' is enabled but no calibration is stored "
+                "for this aircraft.\nRun the Elevator Trim Calibration or disable the "
+                "option.\nUsing the static Y Trim Gain Virtual value instead.")
         return elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
 
     @property

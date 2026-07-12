@@ -706,6 +706,33 @@ class TestTrimCurve:
         finally:
             harness.teardown_method()
 
+    def test_curve_enabled_without_calibration_flags_error(self):
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_gain_virtual_y = 0.5
+            inst.joystick_trim_follow_use_curve_y = True
+            inst.joystick_trim_follow_curve_y = "none"
+
+            # Falls back to the static gain and raises a UI notification.
+            assert inst._trim_follow_virtual_offset_y(0.2, 0.2) == pytest.approx(0.1)
+            errors = getattr(inst, "_flagged_errors", [])
+            assert any("no calibration is stored" in e for e in errors)
+
+            # With a curve loaded, no error is flagged.
+            import json as _json
+            inst._flagged_errors = []
+            inst.joystick_trim_follow_curve_y = _json.dumps(
+                {"points": [{"t": -0.5, "offs": 0.4}, {"t": 0.5, "offs": -0.4}]})
+            inst._trim_follow_virtual_offset_y(0.2, 0.2)
+            assert inst._flagged_errors == []
+        finally:
+            harness.teardown_method()
+
     def test_curve_cancels_kinked_coupling_where_static_cannot(self, clock):
         # The user-reported failure: with a kinked trim response, the static
         # gain holds the nose only near the fit tangent — trimming across the
