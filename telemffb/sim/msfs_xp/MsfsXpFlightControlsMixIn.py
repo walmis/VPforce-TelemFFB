@@ -53,6 +53,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__dyn_pressure_scale = 0.005  # scale the dynamic pressure to ffb friendly values
+        self._trim_calibrator = None  # lazily created TrimCalibrator (elevator virtual_y auto-cal)
 
         self.use_fbw_for_ap_follow = True
         self.slip_gain = 1.0        
@@ -281,6 +282,17 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     @override
     def ac_modify_game_spring(self):
         """This function is not used in MSFS/X-Plane mixin."""
+
+    def get_trim_calibrator(self):
+        """Get (lazily creating) the elevator virtual_y auto-calibration engine.
+
+        The dialog uses this to arm/stop the run and read live state; the
+        per-frame flight-controls hook delegates to it while it is active.
+        """
+        if self._trim_calibrator is None:
+            from telemffb.sim.msfs_xp.TrimCalibrator import TrimCalibrator
+            self._trim_calibrator = TrimCalibrator(self)
+        return self._trim_calibrator
 
     def _calculate_airspeeds(self, telem_data: BaseTelemetryData, incidence_vec):
         """Calculate and store airspeed values in telemetry data.
@@ -1044,8 +1056,22 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                      _G_term, _pct_max_e, _ec, _pct_max_a, _ac, _pct_max_r, _rc,
                      phys_x, phys_y, _controls_locked
         """
+        # Auto-trim calibration owns the axis/spring output while running; it
+        # bypasses normal trim-following for both FBW and non-FBW aircraft.
+        if self._trim_calibrator is not None and self._trim_calibrator.active:
+            try:
+                self._trim_calibrator.update(telem_data)
+            except Exception:
+                # Telemetry hot path: a calibrator bug must never kill the
+                # processing loop (docs/dev_guidelines.md "Error Handling"),
+                # least of all while it is flying the aircraft. Abort the run
+                # and hand control back to normal flight controls next frame.
+                logging.exception("Trim calibration crashed; aborting run")
+                self._trim_calibrator.force_abort("Internal error - see log")
+            return
+
         self._spring_handle.name = "dynamic_spring"
-        
+
         # Determine autopilot state
         if self._sim_is_msfs():
             ap_active = telem_data.APMaster or 0

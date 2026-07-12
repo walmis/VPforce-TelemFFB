@@ -2581,6 +2581,192 @@ class GForceCurveWidget(CurveWidget):
         self.update()
 
 
+class TrimCurveWidget(CurveWidget):
+    """Read-only display of the auto-trim calibration measurement.
+
+    Sibling of :class:`SpringCurveWidget`/:class:`GForceCurveWidget`. Plots the
+    measured ``elevator_axis(trim)`` samples (scatter) against the fitted line
+    used to solve ``virtual_y``. X is trim %, Y is the elevator-axis command %
+    (signed). It is not editable — the base's point-drag machinery is stubbed
+    out — and it carries none of the spring-specific unit/airspeed/smoothing
+    behavior.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Trim Calibration")
+        self.x_label_text = "Trim:"
+        self.x_label_legend = "Elevator Trim %"
+        self.y_label_text = "Elevator:"
+        self.y_label_legend = "Elevator Axis %"
+        self.current_unit = "%"
+
+        # Full-scale view while idle/measuring; set_result() zooms to the data.
+        self.x_min = -100.0
+        self.x_max = 100.0
+        self.y_min = -100.0
+        self.y_max = 100.0
+
+        self.sample_points = []          # [QPointF(trim%, elevator%)]
+        self.fit_line = None             # (QPointF, QPointF) in %-space
+        self.live_point = None           # QPointF(trim%, elevator%) or None
+        self.points = []                 # unused; keeps base paint helpers safe
+
+    # ---- data API -----------------------------------------------------------
+
+    def set_result(self, samples, slope, intercept):
+        """Populate from calibration output.
+
+        Args:
+            samples: list of (trim_frac, u_elev_frac), both normalized [-1, 1].
+            slope, intercept: linear fit of u_elev vs trim (normalized units).
+        """
+        self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
+        xs = [p.x() for p in self.sample_points]
+        ys = [p.y() for p in self.sample_points]
+        if not xs:
+            self.update()
+            return
+
+        xmin, xmax = min(xs), max(xs)
+        xpad = max((xmax - xmin) * 0.10, 1.0)
+        self.x_min, self.x_max = xmin - xpad, xmax + xpad
+
+        y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
+        y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
+        self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
+
+        ylim = max(max((abs(v) for v in ys), default=0.0), abs(y1), abs(y2), 5.0) * 1.2
+        self.y_min, self.y_max = -ylim, ylim
+        self.update()
+
+    def set_live_point(self, trim_frac, u_elev_frac):
+        """Optional live marker for the current trim/elevator during a run."""
+        if trim_frac is None or u_elev_frac is None:
+            self.live_point = None
+        else:
+            self.live_point = QPointF(trim_frac * 100.0, u_elev_frac * 100.0)
+        self.update()
+
+    def set_samples(self, samples):
+        """Live scatter of the stations accepted so far (no zoom/fit).
+
+        Used while a run is in progress; the view stays at full scale so the
+        picture is stable — set_result() does the zoom at completion.
+        """
+        self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
+        self.update()
+
+    def clear(self):
+        self.sample_points = []
+        self.fit_line = None
+        self.live_point = None
+        # Back to the stable full-scale measuring view (a previous result may
+        # have zoomed the axes to its data).
+        self.x_min, self.x_max = -100.0, 100.0
+        self.y_min, self.y_max = -100.0, 100.0
+        self.update()
+
+    # ---- coordinate mapping (signed Y range) --------------------------------
+
+    def map_to_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        xr = (self.x_max - self.x_min) or 1.0
+        yr = (self.y_max - self.y_min) or 1.0
+        x = rect.left() + ((point.x() - self.x_min) / xr) * rect.width()
+        y = rect.top() + (1 - (point.y() - self.y_min) / yr) * rect.height()
+        return QPointF(x, y)
+
+    def map_from_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        x = self.x_min + ((point.x() - rect.left()) / rect.width()) * (self.x_max - self.x_min)
+        y = self.y_min + (1 - (point.y() - rect.top()) / rect.height()) * (self.y_max - self.y_min)
+        return QPointF(x, y)
+
+    # ---- rendering ----------------------------------------------------------
+
+    def draw_axis_labels(self, painter, *args, **kwargs):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        font = QFont()
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QPen(self.axis_color))
+
+        for i in range(0, 11):
+            y = int(rect.top() + i * rect.height() / 10)
+            val = self.y_max - (self.y_max - self.y_min) * i / 10
+            painter.drawText(rect.left() - self.margin_left + 8, y + 5, f"{val:.0f}%")
+
+        for i in range(0, 11):
+            x = int(rect.left() + i * rect.width() / 10)
+            val = self.x_min + (self.x_max - self.x_min) * i / 10
+            painter.drawText(x - 12, rect.bottom() + self.margin_bottom // 2, f"{val:.0f}")
+
+        painter.setFont(QFont('Arial', 9))
+        if self.x_label_legend:
+            text = self.x_label_legend
+            tw = painter.fontMetrics().horizontalAdvance(text)
+            painter.drawText(rect.left() + rect.width() // 2 - tw // 2, rect.bottom() + self.margin_bottom - 2, text)
+        if self.y_label_legend:
+            painter.save()
+            text = self.y_label_legend
+            tw = painter.fontMetrics().height()
+            th = painter.fontMetrics().horizontalAdvance(text)
+            painter.translate(rect.left() - self.margin_left + tw - 5, rect.top() + rect.height() // 2 + th // 2)
+            painter.rotate(-90)
+            painter.drawText(0, 0, text)
+            painter.restore()
+
+    def _draw_zero_axes(self, painter):
+        """Emphasize the x=0 and y=0 reference lines within the plot band."""
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        painter.setPen(QPen(self.axis_color, 1, Qt.PenStyle.SolidLine))
+        if self.y_min <= 0 <= self.y_max:
+            zy = self.map_to_widget_space(QPointF(self.x_min, 0)).y()
+            painter.drawLine(rect.left(), int(zy), rect.right(), int(zy))
+        if self.x_min <= 0 <= self.x_max:
+            zx = self.map_to_widget_space(QPointF(0, self.y_min)).x()
+            painter.drawLine(int(zx), rect.top(), int(zx), rect.bottom())
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.draw_grid(painter)
+        self._draw_zero_axes(painter)
+        self.draw_axis_labels(painter)
+
+        if self.fit_line is not None:
+            painter.setPen(QPen(self.curve_color, 2))
+            painter.drawLine(self.map_to_widget_space(self.fit_line[0]),
+                             self.map_to_widget_space(self.fit_line[1]))
+
+        painter.setPen(QPen(self.axis_color, 1))
+        painter.setBrush(self.point_fill)
+        for p in self.sample_points:
+            wp = self.map_to_widget_space(p)
+            painter.drawEllipse(QRectF(wp.x() - 3, wp.y() - 3, 6, 6))
+
+        if self.live_point is not None:
+            wp = self.map_to_widget_space(self.live_point)
+            painter.setBrush(QColor("#33cc33"))
+            painter.setPen(QPen(QColor("#116611"), 1))
+            painter.drawEllipse(QRectF(wp.x() - 4, wp.y() - 4, 8, 8))
+
+        if not self._enabled:
+            self.apply_disabled_overlay(painter)
+
+    # ---- read-only: disable point editing -----------------------------------
+
+    def mousePressEvent(self, event):
+        pass
+
+    def mouseMoveEvent(self, event):
+        pass
+
+    def mouseReleaseEvent(self, event):
+        pass
+
+
 class ExceptionStatusWidget(QWidget):
     """Status bar widget showing logged exception count with clickable link."""
     

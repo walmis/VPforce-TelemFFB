@@ -263,6 +263,18 @@ class MainWindow(QMainWindow):
         reload_action.triggered.connect(self.force_reload_aircraft)
         utilities_menu.addAction(reload_action)
 
+        trim_cal_action = QAction('Elevator Trim Calibration...', self)
+        def open_trim_calibration_dialog():
+            from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+            if getattr(self, 'trim_cal_dialog', None) is None:
+                self.trim_cal_dialog = TrimCalibrationDialog(self)
+                self.trim_cal_dialog.result_saved.connect(self.settings_layout.save_trim_virtual_y)
+            self.trim_cal_dialog.raise_()
+            self.trim_cal_dialog.activateWindow()
+            self.trim_cal_dialog.show()
+        trim_cal_action.triggered.connect(open_trim_calibration_dialog)
+        utilities_menu.addAction(trim_cal_action)
+
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             """
             Add Window menu to manage child instances if it is a master instance

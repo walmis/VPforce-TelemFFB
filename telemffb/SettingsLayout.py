@@ -1548,6 +1548,23 @@ class SettingsLayout(QGridLayout):
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
         self.reload_caller()
 
+    def save_trim_virtual_y(self, value: float):
+        """Persist the auto-calibrated elevator Virtual Y gain for the current aircraft.
+
+        Connected to TrimCalibrationDialog.result_saved. Mirrors the write +
+        reload pattern used by the advanced spring / g-effect editors.
+        """
+        self.trigger_form_reload = True
+        G.settings_mgr.write_to_xml(
+            G.settings_mgr.current_sim,
+            G.settings_mgr.current_class,
+            G.settings_mgr.current_pattern,
+            str(round(value, 4)),
+            "joystick_trim_follow_gain_virtual_y",
+        )
+        self.show_erase_button("config_joystick_trim_follow_gain_virtual_y")
+        self.reload_caller()
+
     def update_advanced_spring_gains(self, spring_gain_curves: str, scale: str, units: str):
         self.trigger_form_reload = True
         """
