@@ -2116,7 +2116,6 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -2131,7 +2130,6 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<value>none</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -8667,6 +8665,62 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>PropellerAircraft</type>
+			<value>none</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>JetAircraft</type>
+			<value>none</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>TurbopropAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>TurbopropAircraft</type>
+			<value>none</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>GliderAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>GliderAircraft</type>
+			<value>none</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>max_aileron_coeff</name>
 			<type>GliderAircraft</type>
 			<value>0.5</value>
@@ -10684,6 +10738,62 @@
 			<name>joystick_trim_follow_gain_virtual_y</name>
 			<type>TurbopropAircraft</type>
 			<value>1.0</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>PropellerAircraft</type>
+			<value>none</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>JetAircraft</type>
+			<value>none</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>TurbopropAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>TurbopropAircraft</type>
+			<value>none</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>GliderAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>GliderAircraft</type>
+			<value>none</value>
 			<sim>XPLANE</sim>
 			<device>joystick</device>
 		</classdefaults_XPLANE>
