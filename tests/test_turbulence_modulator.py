@@ -142,9 +142,17 @@ class TestDtNormalisation:
 
 class TestSensitivity:
     def _pitch_for_sensitivity(self, sens):
+        # Fixed dt via patched time (same pattern as TestSymmetry): with real
+        # wall-clock time the output is proportional to the microsecond-scale,
+        # jittery gap between the priming and measuring calls (dt-normalised
+        # smoothing), which made comparing two separate runs flaky.
         m = TurbulenceModulator()
-        _prime(m)
-        result = m.update(0.0, 3.0, 0.0, sensitivity=sens, intensity=1.0)
+        t0 = 1000.0
+        with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+            mock_time.perf_counter.return_value = t0
+            m.update(0.0, 0.0, 0.0)
+            mock_time.perf_counter.return_value = t0 + _REF_DT
+            result = m.update(0.0, 3.0, 0.0, sensitivity=sens, intensity=1.0)
         return abs(result.pitch)
 
     def test_higher_sensitivity_produces_more_force(self):
