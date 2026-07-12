@@ -153,6 +153,8 @@ class DetachedTabWindow(QtWidgets.QMainWindow):
 class AppStatusWidget(QWidget):
     request_set_active_vpconf = pyqtSignal(str)
     request_set_active_configurator = pyqtSignal(bool)
+    request_flag_error = pyqtSignal(str)
+    request_clear_error = pyqtSignal()
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -164,6 +166,11 @@ class AppStatusWidget(QWidget):
         # connect signal to slot (QueuedConnection by default across threads)
         self.request_set_active_vpconf.connect(self.set_active_vpconf)
         self.request_set_active_configurator.connect(self.set_active_configurator)
+        # flag_error/clear_error mutate the notification widget, a one-shot
+        # change that never repaints if called from the telemetry thread.
+        # Route through signals so the mutation runs on the GUI thread.
+        self.request_flag_error.connect(self.flag_error)
+        self.request_clear_error.connect(self.clear_error)
 
         grid = QGridLayout(self)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -346,6 +353,7 @@ class AppStatusWidget(QWidget):
         self.pulse_label(self.sim_status_label.status_label, stop=True)
 
     def flag_error(self, message):
+        # print(f'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TESTING HERE: {message}')
         self.notification_label.setText(message)
         self.notification_label.show()
         self.message_stack.setCurrentIndex(1)

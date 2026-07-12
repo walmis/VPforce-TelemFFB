@@ -2007,7 +2007,7 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
 
-                self.status_container.flag_error(message)
+                self.status_container.request_flag_error.emit(message)
 
                 self.pop_tray_notification("Error", message, renew_period= 2)
 
@@ -2312,7 +2312,7 @@ class MainWindow(QMainWindow):
                         self.update_sim_indicators(data.get('src'), paused=False)
                         self.error_state = False
                         self.telemetry_timed_out = False
-                        self.status_container.clear_error()
+                        self.status_container.request_clear_error.emit()
                     else:
                         self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
             elif error_cond is not None:
