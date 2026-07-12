@@ -200,7 +200,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
 
     def write_xp_dataref(self, dataref, value, type="int"):
         command = f"WRITE:dataref={dataref},value={value},type={type}"
-        print(f"WRITE:dataref={dataref},value={value},type={type}")
+        logging.debug(command)
         self.send_xp_command(command)
 
     def trigger_xp_event(self, dataref, state: bool, type="track"):

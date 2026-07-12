@@ -55,6 +55,7 @@ independent of the physical stick position.
 
 import enum
 import logging
+import math
 import time
 
 from telemffb.utils import PID, clamp, piecewise_linear
@@ -66,9 +67,10 @@ class CalState(enum.Enum):
     IDLE = "idle"
     PROBE = "probe"          # determine control polarity (elevator, then aileron)
     STABILIZE = "stabilize"  # close the leveling loops and wait for steady flight
+    TRIM_NEUTRAL = "trim_neutral"  # slew trim to the natural (zero-axis) point
     SWEEP = "sweep"          # ramp the sim trim and record elevator axis at each station
     SOLVE = "solve"          # fit the samples and compute virtual_y
-    RESTORE = "restore"      # ramp trim back to the starting point while leveling
+    RESTORE = "restore"      # ramp trim back to the natural point while leveling
     DONE = "done"
     ABORT = "abort"
 
@@ -85,11 +87,30 @@ class TrimCalibrator:
 
     # Leveling loops. Output is a normalized elevator/aileron command in the
     # same [-1, 1] space as the trim-following ``y_pos``/``x_pos``.
-    # PITCH_KD acts on d(VS)/dt, which leads the VS error in the phugoid cycle —
-    # it is the main damping term; keep it healthy relative to KP.
+    #
+    # LEGACY pitch loop (VS-only PID, used when the probe cannot determine the
+    # pitch-response polarity). A VS-only loop is structurally weak against
+    # the phugoid — VS is zero at the top and bottom of the cycle — and sits
+    # near the stability margin on some sims (observed as a mild sustained
+    # limit cycle on X-Plane). PITCH_KD acts on d(VS)/dt and is the main
+    # damping term.
     PITCH_KP = 0.06
     PITCH_KI = 0.03
     PITCH_KD = 0.06
+
+    # CASCADE pitch loop (preferred): an inner PID holds pitch ATTITUDE
+    # (short-period dynamics — fast, naturally damped, so the phugoid cannot
+    # limit-cycle) while the outer loop nudges the attitude target from the
+    # VS error and slowly adapts the attitude reference to remove any steady
+    # VS residual. Inner gains are in DEGREE space.
+    CASC_INNER_KP = 0.06         # u per degree of attitude error
+    CASC_INNER_KI = 0.05
+    CASC_INNER_KD = 0.02         # per deg/s (LPF'd)
+    CASC_VS_TO_PITCH = 1.5       # outer P: degrees of target per m/s of VS error
+    CASC_MAX_TARGET_DEG = 5.0    # cap on the outer P correction
+    CASC_REF_ADAPT = 0.3         # outer I: reference deg/s per m/s of residual VS
+    CASC_REF_LIMIT_DEG = 10.0    # reference excursion bound from engage attitude
+
     ROLL_KP = 0.020
     ROLL_KD = 0.010
     ROLL_KI = 0.004
@@ -102,6 +123,7 @@ class TrimCalibrator:
     PROBE_BASELINE_S = 0.4       # no-input drift-measurement window before each probe
     PROBE_MIN_VS = 0.15          # m/s; min |dVS| to trust the elevator probe
     PROBE_MIN_ROLL = 1.0         # deg; min |dRoll| to trust the aileron probe
+    PROBE_MIN_PITCH = 0.3        # deg; min |dPitch| to trust pitch-polarity detection
     PROBE_VS_EXIT = 0.6          # m/s; |dVS| at which the elevator probe ends early
     PROBE_ROLL_EXIT = 2.5        # deg; |dRoll| at which the aileron probe ends early
     ELEV_SIGN_DEFAULT = 1.0      # used if auto-detect is off or inconclusive
@@ -126,6 +148,28 @@ class TrimCalibrator:
     STABLE_ROLL_TOL = 3.0        # deg
     STABLE_DWELL_S = 2.0
     STABILIZE_TIMEOUT_S = 25.0
+
+    # Trim neutralization: before the sweep, find the aircraft's NATURAL trim
+    # point so the band lands in the same place every run, independent of
+    # whatever trim-following settings were active before it. (The old
+    # virtual gain changes how much axis leaks into the sim hands-off, which
+    # moves the pre-run level-trim point — consecutive runs with different
+    # settings were measuring different regions of a curved response.)
+    # Method: the sims model a sprung self-centering stick, so neutral is
+    # DELIVERED AXIS = 0. The fast elevator PID keeps leveling the aircraft
+    # THROUGHOUT (nose stays put). Trim is moved in discrete STEPS toward the
+    # trim that nulls the steady delivered elevator, letting the aircraft
+    # settle between steps so the measured elevator is the true steady value.
+    # Continuous servoing (velocity proportional to a lagged elevator signal)
+    # is a double-integrator loop that oscillates — the field-observed hunting;
+    # settle-between-steps decouples the timescales and cannot hunt.
+    NEUT_U_TOL = 0.03            # |steady elevator| this small = natural point
+    NEUT_PROBE = 0.06            # first trim step (secant needs two points to start)
+    NEUT_STEP_MAX = 0.15         # cap a single trim step
+    NEUT_SETTLE_TIMEOUT_S = 12.0 # per-step ramp+settle allowance
+    NEUT_DWELL_S = 1.0           # settle dwell before measuring the steady elevator
+    NEUT_MAX_STEPS = 10
+    NEUT_TIMEOUT_S = 60.0        # overall cap; proceed (with warning) if hit
 
     # Trim sweep. The band is ADAPTIVE: starting from the center station the
     # sweep walks outward in SWEEP_STEP increments, expanding each side until
@@ -206,6 +250,12 @@ class TrimCalibrator:
                              derivative_lpf_hz=4.0)
         self._elev_sign = self.ELEV_SIGN_DEFAULT
         self._ail_sign = self.AIL_SIGN_DEFAULT
+        # Pitch-response polarity (pitch_n = Pitch * _pitch_sign is nose-up
+        # positive in the +VS sense). Detected by the elevator probe; persists
+        # across runs like the other signs. MSFS reports pitch nose-up
+        # NEGATIVE, X-Plane nose-up positive — this absorbs the difference.
+        self._pitch_sign = 1.0
+        self._pitch_sign_known = False
         self._u_elev = 0.0
         self._u_ail = 0.0
 
@@ -218,6 +268,14 @@ class TrimCalibrator:
         self._probe_phase = "baseline"   # "baseline" (measure drift) then "probe"
         self._probe_ref = None           # reference value at sub-phase start
         self._probe_drift = 0.0          # drift rate measured over the baseline window
+        self._probe_pitch_ref = None     # pitch anchor for pitch-polarity detection
+        self._probe_pitch_drift = 0.0
+        # pitch loop mode: None until engaged (after the probe knows the
+        # pitch polarity); "cascade" or "legacy" afterwards
+        self._pitch_mode = None
+        self._pitch_base_gains = (self.PITCH_KP, self.PITCH_KI, self.PITCH_KD)
+        self._pitch_ref_n = None         # cascade attitude reference (normalized)
+        self._pitch_ref0 = None
         self._stable_since = None
         self._trim0 = 0.0
         self._ias0 = None
@@ -241,6 +299,16 @@ class TrimCalibrator:
         self._sign_rb_start = 0.0
         self._sign_flips = 0
         self._u_sat_since = None
+        # trim-neutralization state (discrete step-and-settle root-find)
+        self._trim_touched = False       # any trim commanded this run (restore flag)
+        self._neut_target = 0.0          # trim target for the current step
+        self._neut_dwell_since = None    # settle-dwell start (None = ramping)
+        self._neut_u_samples = []        # steady-elevator samples for this step
+        self._neut_prev = None           # previous settled (trim, u) for the secant
+        self._neut_steps = 0
+        self._neut_deadline = None       # per-step ramp+settle deadline
+        self._neut_start_t = None        # overall phase start
+        self._neut_u_final = 0.0         # steady elevator at the accepted point
         # oscillation watchdog state (extremum tracking with hysteresis)
         self._osc_ext = None         # candidate extremum value
         self._osc_dir = 0            # 0 = undetermined, +1 rising, -1 falling
@@ -363,6 +431,8 @@ class TrimCalibrator:
             self._do_probe(telem_data, dt)
         elif self.state == CalState.STABILIZE:
             self._do_stabilize(telem_data, dt)
+        elif self.state == CalState.TRIM_NEUTRAL:
+            self._do_trim_neutral(telem_data, dt)
         elif self.state == CalState.SWEEP:
             self._do_sweep(telem_data, dt)
         elif self.state == CalState.RESTORE:
@@ -455,6 +525,7 @@ class TrimCalibrator:
             self._phase_start_t = now
             self._probe_phase = "baseline"
             self._probe_ref = self._probe_value(telem_data)
+            self._probe_pitch_ref = telem_data.Pitch or 0.0
             self.status_message = ("Probing elevator response…" if self._probe_stage == 0
                                    else "Probing aileron response…")
 
@@ -470,11 +541,10 @@ class TrimCalibrator:
             self._u_ail = self._u_base_x
             exit_threshold = self.PROBE_VS_EXIT
         else:
-            # Aileron probe; hold pitch with the full PID using the elevator
-            # sign detected in stage 0 (a weak hold lets the probe's climb
-            # build into a zoom that trips the attitude guard).
-            vs_err = self._elev_sign * (self.VS_TARGET - telem_data.VerticalSpeed)
-            self._u_elev = self._u_base_y + self._pitch_pid.update(vs_err, dt)
+            # Aileron probe; hold pitch with the full leveling loop using the
+            # polarities detected in stage 0 (a weak hold lets the probe's
+            # climb build into a zoom that trips the attitude guard).
+            self._u_elev = self._run_pitch_loop(telem_data, dt)
             self._u_ail = self._u_base_x + (self.PROBE_U if probe_on else 0.0)
             exit_threshold = self.PROBE_ROLL_EXIT
 
@@ -485,6 +555,9 @@ class TrimCalibrator:
         if not probe_on:
             if elapsed >= self.PROBE_BASELINE_S:
                 self._probe_drift = (value - self._probe_ref) / max(elapsed, 1e-6)
+                p_now = telem_data.Pitch or 0.0
+                self._probe_pitch_drift = (p_now - self._probe_pitch_ref) / max(elapsed, 1e-6)
+                self._probe_pitch_ref = p_now
                 self._probe_phase = "probe"
                 self._phase_start_t = now
                 self._probe_ref = value
@@ -500,6 +573,19 @@ class TrimCalibrator:
                 if abs(delta) >= self.PROBE_MIN_VS:
                     self._elev_sign = 1.0 if delta > 0 else -1.0
                     logger.info(f"Elevator polarity detected: {self._elev_sign:+.0f} (dVS={delta:+.2f} m/s in {elapsed:.2f}s)")
+                    # Pitch-response polarity rides on the same probe: a climb
+                    # (dVS) and its attitude change (dPitch) must agree for
+                    # pitch_n = Pitch * sign to be nose-up positive.
+                    d_pitch = ((telem_data.Pitch or 0.0) - self._probe_pitch_ref
+                               - self._probe_pitch_drift * elapsed)
+                    if abs(d_pitch) >= self.PROBE_MIN_PITCH:
+                        self._pitch_sign = 1.0 if (d_pitch > 0) == (delta > 0) else -1.0
+                        self._pitch_sign_known = True
+                        logger.info(f"Pitch polarity detected: {self._pitch_sign:+.0f} "
+                                    f"(dPitch={d_pitch:+.2f} deg)")
+                    elif not self._pitch_sign_known:
+                        logger.warning(f"Pitch response inconclusive (dPitch={d_pitch:+.2f} deg); "
+                                       "using legacy VS leveling loop")
                 else:
                     logger.warning(f"Elevator probe inconclusive (dVS={delta:+.2f} m/s); "
                                    f"keeping sign {self._elev_sign:+.0f}")
@@ -507,7 +593,7 @@ class TrimCalibrator:
                 self._phase_start_t = None
                 self._probe_ref = None
                 self._probe_drift = 0.0
-                self._pitch_pid.reset()  # fresh start for the recovery/leveling loop
+                self._pitch_mode = None  # (re-)engage the pitch loop with fresh polarity info
             else:
                 if abs(delta) >= self.PROBE_MIN_ROLL:
                     self._ail_sign = 1.0 if delta > 0 else -1.0
@@ -547,7 +633,7 @@ class TrimCalibrator:
             if self._stable_since is None:
                 self._stable_since = now
             elif now - self._stable_since >= self.STABLE_DWELL_S:
-                self._enter_sweep(telem_data)
+                self._enter_trim_neutral(telem_data)
                 return
         else:
             self._stable_since = None
@@ -566,6 +652,113 @@ class TrimCalibrator:
                 f"Could not stabilize within {self.STABILIZE_TIMEOUT_S:.0f}s "
                 f"(VS {vs * 196.85:+.0f} fpm, roll {roll:+.1f} deg)"
             )
+
+    # ---- Phase: trim neutralization -------------------------------------------
+
+    def _enter_trim_neutral(self, telem_data):
+        self.state = CalState.TRIM_NEUTRAL
+        # Restore point for an abort during this phase: the user's original
+        # trim. _enter_sweep overwrites it with the natural point, which is
+        # then the (better) restore target for the rest of the run.
+        self._trim0 = telem_data.ElevTrimPct
+        self._trim_cmd = telem_data.ElevTrimPct
+        self._sign_rb_start = telem_data.ElevTrimPct
+        self._sign_cmd_accum = 0.0
+        self._trim_touched = True
+        self._neut_steps = 0
+        self._neut_prev = None
+        self._neut_start_t = time.perf_counter()
+        self._neut_u_final = self._u_elev
+        # First "step" is the current trim: measure u here, then probe.
+        self._begin_neut_step(telem_data.ElevTrimPct or 0.0)
+        self.status_message = "Centering the elevator axis…"
+
+    def _begin_neut_step(self, target):
+        self._neut_target = clamp(target, -0.95, 0.95)
+        self._neut_dwell_since = None
+        self._neut_u_samples = []
+        self._neut_deadline = time.perf_counter() + self.NEUT_SETTLE_TIMEOUT_S
+
+    def _do_trim_neutral(self, telem_data, dt):
+        """Find the natural trim point by a settled root-find on the elevator.
+
+        The sims model a sprung self-centering stick, so the natural trim
+        point is where the DELIVERED elevator axis is zero. The fast elevator
+        PID keeps leveling throughout (the nose stays put) while trim is moved
+        in discrete steps: ramp to the step target, let VS settle, measure the
+        true steady elevator, then step trim toward nulling it. Settling
+        between steps means the measurement has no lag, so — unlike a
+        continuous servo against the lagged elevator — it cannot hunt.
+        """
+        # Elevator keeps leveling (fast — nose stays put); roll stays closed.
+        self._u_elev = self._run_pitch_loop(telem_data, dt)
+        roll_err = self._ail_sign * (0.0 - telem_data.Roll)
+        self._u_ail = self._u_base_x + self._roll_pid.update(roll_err, dt)
+
+        ramping = self._advance_trim(self._neut_target, telem_data, dt)
+        if ramping is None:
+            return  # aborted (unresponsive trim)
+        self._command_axes(telem_data)
+
+        now = time.perf_counter()
+        at_target = (not ramping and
+                     abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self.TRIM_STATION_TOL)
+        settled = at_target and abs(telem_data.VerticalSpeed) <= self.STABLE_VS_TOL \
+            and abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
+
+        self.status_message = (
+            f"Centering elevator axis… step {self._neut_steps + 1}, "
+            f"trim {100 * (telem_data.ElevTrimPct or 0):+.0f}%, "
+            + ("measuring" if settled else "settling"))
+
+        if settled:
+            if self._neut_dwell_since is None:
+                self._neut_dwell_since = now
+            self._neut_u_samples.append(self._u_elev)
+            if now - self._neut_dwell_since >= self.NEUT_DWELL_S:
+                t = telem_data.ElevTrimPct or self._neut_target
+                u = sum(self._neut_u_samples) / len(self._neut_u_samples)
+                self._neut_u_final = u
+                if abs(u) <= self.NEUT_U_TOL or self._neut_steps >= self.NEUT_MAX_STEPS:
+                    logger.info(f"Natural trim point found at {t:+.3f} "
+                                f"(steady elevator {u:+.3f}, {self._neut_steps} steps)")
+                    self._finish_neutral(telem_data, centered=abs(u) <= self.NEUT_U_TOL)
+                    return
+                # Secant root-find toward u = 0. Using the measured local slope
+                # handles either trim polarity (a wrong initial guess self-
+                # corrects on the next step); the first step is a fixed probe.
+                if self._neut_prev is not None and abs(u - self._neut_prev[1]) > 1e-6:
+                    t0, u0 = self._neut_prev
+                    step = clamp(-u * (t - t0) / (u - u0),
+                                 -self.NEUT_STEP_MAX, self.NEUT_STEP_MAX)
+                else:
+                    step = math.copysign(self.NEUT_PROBE, u)  # assume normal polarity
+                self._neut_prev = (t, u)
+                self._neut_steps += 1
+                self._begin_neut_step(t + step)
+        elif now > self._neut_deadline:
+            logger.warning("Trim neutralization step could not settle; sweeping around the "
+                           f"current point (steady elevator ~{self._neut_u_final:+.2f})")
+            self._finish_neutral(telem_data, centered=False)
+            return
+
+        if now - self._neut_start_t > self.NEUT_TIMEOUT_S:
+            logger.warning("Trim neutralization timed out; sweeping around the current point "
+                           f"(steady elevator ~{self._neut_u_final:+.2f})")
+            self._finish_neutral(telem_data, centered=False)
+
+    def _finish_neutral(self, telem_data, centered):
+        """Hand leveling back to the PID from a clean state and start the sweep.
+
+        At the natural point the correct takeover baseline is zero axis; on a
+        timeout the residual elevator becomes the new baseline instead (a
+        constant, so it shifts only the fit's intercept, never the slope).
+        """
+        self._u_base_y = 0.0 if centered else self._neut_u_f
+        self._pitch_pid.reset()
+        self._pitch_ref_n = None
+        self._pitch_ref0 = None
+        self._enter_sweep(telem_data)
 
     # ---- Phase: trim sweep ---------------------------------------------------
 
@@ -886,21 +1079,71 @@ class TrimCalibrator:
         """
         self._watch_oscillation(telem_data.VerticalSpeed)
 
-        vs_err = self._elev_sign * (self.VS_TARGET - telem_data.VerticalSpeed)
-        self._u_elev = self._u_base_y + self._pitch_pid.update(vs_err, dt)
+        self._u_elev = self._run_pitch_loop(telem_data, dt)
 
         roll_err = self._ail_sign * (0.0 - telem_data.Roll)
         self._u_ail = self._u_base_x + self._roll_pid.update(roll_err, dt)
 
         self._command_axes(telem_data)
 
+    def _run_pitch_loop(self, telem_data, dt):
+        """Elevator command holding level flight.
+
+        Preferred mode is the pitch-attitude CASCADE: an inner PID holds pitch
+        attitude (short-period dynamics — fast and naturally damped, so the
+        phugoid cannot limit-cycle the way it can against a VS-only loop),
+        while the outer loop nudges the attitude target from the VS error and
+        slowly adapts the attitude reference (outer integral) to remove any
+        steady VS residual. Falls back to the legacy VS-only PID when the
+        probe could not determine the pitch-response polarity.
+        """
+        if self._pitch_mode is None:
+            self._engage_pitch_loop(telem_data)
+
+        vs = telem_data.VerticalSpeed
+        pitch = telem_data.Pitch
+        if self._pitch_mode == "cascade" and pitch is not None:
+            pitch_n = pitch * self._pitch_sign
+            if self._pitch_ref_n is None:
+                self._pitch_ref_n = pitch_n
+                self._pitch_ref0 = pitch_n
+            self._pitch_ref_n = clamp(
+                self._pitch_ref_n + self.CASC_REF_ADAPT * (self.VS_TARGET - vs) * dt,
+                self._pitch_ref0 - self.CASC_REF_LIMIT_DEG,
+                self._pitch_ref0 + self.CASC_REF_LIMIT_DEG)
+            target_n = self._pitch_ref_n + clamp(
+                self.CASC_VS_TO_PITCH * (self.VS_TARGET - vs),
+                -self.CASC_MAX_TARGET_DEG, self.CASC_MAX_TARGET_DEG)
+            return self._u_base_y + self._elev_sign * self._pitch_pid.update(target_n - pitch_n, dt)
+
+        vs_err = self._elev_sign * (self.VS_TARGET - vs)
+        return self._u_base_y + self._pitch_pid.update(vs_err, dt)
+
+    def _engage_pitch_loop(self, telem_data):
+        """Pick cascade vs legacy for this run and load the matching base gains.
+
+        The cascade needs the pitch-response polarity (probed alongside the
+        elevator polarity); without it a wrong-sign inner loop would be
+        positive feedback, so legacy VS-only is the safe fallback.
+        """
+        use_cascade = self._pitch_sign_known and telem_data.Pitch is not None
+        self._pitch_mode = "cascade" if use_cascade else "legacy"
+        self._pitch_base_gains = (
+            (self.CASC_INNER_KP, self.CASC_INNER_KI, self.CASC_INNER_KD)
+            if use_cascade else (self.PITCH_KP, self.PITCH_KI, self.PITCH_KD))
+        self._pitch_ref_n = None
+        self._pitch_ref0 = None
+        self._pitch_pid.reset()
+        self._set_pitch_gain_scale(self._gain_scale)
+        logger.info(f"Pitch leveling loop engaged: {self._pitch_mode}"
+                    + (f" (pitch polarity {self._pitch_sign:+.0f})" if use_cascade else ""))
+
     def _set_pitch_gain_scale(self, scale):
-        """Scale the pitch-loop gains in place; the PID preserves its integral
-        TERM across the change (it carries the trim-holding steady output)."""
+        """Scale the active pitch-loop gains in place; the PID preserves its
+        integral TERM across the change (it carries the trim-holding output)."""
         self._gain_scale = scale
-        self._pitch_pid.set_gains(self.PITCH_KP * scale,
-                                  self.PITCH_KI * scale,
-                                  self.PITCH_KD * scale)
+        kp, ki, kd = self._pitch_base_gains
+        self._pitch_pid.set_gains(kp * scale, ki * scale, kd * scale)
 
     def _watch_oscillation(self, vs):
         """Detect a growing VS oscillation and back the pitch gains off.
@@ -1043,7 +1286,12 @@ class TrimCalibrator:
                 "AXIS_ELEV_TRIM_SET", -int(pct * self.TRIM_AXIS_RANGE)
             )
         elif self.ac._sim_is_xplane():
-            # TODO: verify dataref/range in-sim; X-Plane trim actuation is experimental.
+            # Write the pilot-control-level trim (float ratio -1..1); the FM
+            # propagates it to sim/flightmodel2/controls/elevator_trim, which
+            # is what the plugin exports as the ElevTrimPct read-back. Same
+            # sign convention both ways, so no MSFS-style negation here.
+            # Aircraft with custom trim systems that swallow this write are
+            # caught by the read-back verification in _advance_trim.
             self.ac.write_xp_dataref("sim/cockpit2/controls/elevator_trim", round(pct, 5), type="float")
 
     # ---- Teardown ------------------------------------------------------------
@@ -1058,9 +1306,9 @@ class TrimCalibrator:
         """Restore trim, release axis control, and hand back to normal flight
         controls (which take over the axis/spring on the next frame)."""
         try:
-            # Only touch trim if we actually moved it (i.e. the sweep began);
-            # otherwise trim0 is still its default and untouched by us.
-            if self._sweep_targets:
+            # Only touch trim if we actually moved it (neutralization or the
+            # sweep); otherwise trim0 is still its default and untouched by us.
+            if self._trim_touched:
                 self._set_trim(self._trim0)
         except Exception as e:
             logger.debug(f"trim restore skipped: {e}")

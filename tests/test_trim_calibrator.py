@@ -60,11 +60,15 @@ class FakePlantAircraft:
     Roll is an integrator of the aileron command (light).
     """
 
-    def __init__(self, coupling=0.5, physical_y=1.0, K_E=25.0, vs_tau=0.4, K_A=60.0):
+    def __init__(self, coupling=0.5, physical_y=1.0, K_E=25.0, vs_tau=0.4, K_A=60.0,
+                 trim_natural=0.0):
         self.coupling = coupling
         self.K_E = K_E
         self.vs_tau = vs_tau
         self.K_A = K_A
+        # Trim at which the elevator command needed to hold level is zero — the
+        # aircraft's "natural" trim point the neutralization phase seeks.
+        self.trim_natural = trim_natural
 
         # calibrator-read settings / flags
         self.joystick_trim_follow_gain_physical_y = physical_y
@@ -148,7 +152,8 @@ class FakePlantAircraft:
                 self.trim = new_trim
         self._simconnect.events.clear()
 
-        target_vs = self.K_E * (self.cmd_elev + self.effective_coupling(self.trim) * self.trim)
+        trim_eff = self.trim - self.trim_natural
+        target_vs = self.K_E * (self.cmd_elev + self.effective_coupling(trim_eff) * trim_eff)
         beta = min(dt / self.vs_tau, 1.0)
         self.vs += (target_vs - self.vs) * beta
         self.roll += (self.K_A * self.cmd_ail + self.roll_bias_rate) * dt
@@ -513,6 +518,120 @@ class TestSafety:
         assert not ok
         ok, msg = cal.can_start(ac.telem(SimOnGround=0))
         assert ok, msg
+
+
+# --------------------------------------------------------------------------- #
+#  Trim neutralization (settings-independent sweep centering)
+# --------------------------------------------------------------------------- #
+
+class TestTrimNeutralization:
+    def test_band_centers_on_natural_trim_regardless_of_start(self, clock):
+        # Field report: consecutive runs with different starting virtual
+        # gains measured different trim regions of a curved response. The
+        # neutralization phase must anchor the band at the natural trim point
+        # (u ~ 0) no matter where the aircraft was trimmed at start.
+        results = []
+        for start_trim in (0.4, -0.15):
+            ac = FakePlantAircraft(trim_natural=0.1)
+            ac.trim = start_trim
+            cal = TrimCalibrator(ac)
+            cal.start()
+            state = run_to_completion(cal, ac, clock)
+            assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+            results.append(cal.result)
+        # both bands must center on the plant's natural trim point (0.1)
+        assert results[0]["trim0"] == pytest.approx(0.1, abs=0.06)
+        assert results[1]["trim0"] == pytest.approx(0.1, abs=0.06)
+        assert results[0]["virtual_y"] == pytest.approx(results[1]["virtual_y"], abs=0.05)
+
+    def test_neutralization_handles_inverted_trim_response(self, clock):
+        # coupling < 0 inverts the u-vs-trim slope. The secant root-find uses
+        # the measured local slope, so a wrong initial probe direction self-
+        # corrects and it still centers on the natural point (here 0.15).
+        ac = FakePlantAircraft(coupling=-0.5, trim_natural=0.15)
+        ac.trim = 0.35
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal.result["trim0"] == pytest.approx(0.15, abs=0.05)
+        assert cal.result["virtual_y"] == pytest.approx(1.5, abs=0.06)
+
+    def test_abort_during_neutralization_restores_entry_trim(self, clock):
+        ac = FakePlantAircraft(trim_natural=0.1)
+        ac.trim = 0.3
+        cal = TrimCalibrator(ac)
+        cal.start()
+        # run until the neutralization phase is active
+        for _ in range(2000):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.TRIM_NEUTRAL:
+                break
+        assert cal.state == CalState.TRIM_NEUTRAL
+        # let it move the trim a bit, then abort
+        for _ in range(60):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+        cal.stop("test abort")
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        ac.step(1 / 30.0)
+        assert cal.state == CalState.ABORT
+        assert ac.trim == pytest.approx(0.3, abs=0.02), \
+            "abort during neutralization must restore the entry trim"
+
+
+# --------------------------------------------------------------------------- #
+#  Pitch-attitude cascade leveling loop
+# --------------------------------------------------------------------------- #
+
+class TestPitchCascade:
+    def test_cascade_engaged_with_pitch_telemetry(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal._pitch_mode == "cascade"
+        assert cal._pitch_sign_known and cal._pitch_sign == 1.0
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_msfs_style_inverted_pitch_sign(self, clock):
+        # MSFS reports pitch nose-up NEGATIVE (X-Plane positive). The probe
+        # must detect the polarity and the cascade must calibrate accurately.
+        class MsfsPitchPlant(FakePlantAircraft):
+            def step(self, dt):
+                super().step(dt)
+                self.pitch = -self.pitch
+
+        ac = MsfsPitchPlant()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal._pitch_mode == "cascade"
+        assert cal._pitch_sign == -1.0
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_legacy_fallback_when_pitch_unresponsive(self, clock):
+        # No usable pitch response (e.g. bad telemetry): polarity stays
+        # unknown, so the safe legacy VS-only loop must fly the run.
+        class DeadPitchPlant(FakePlantAircraft):
+            def step(self, dt):
+                super().step(dt)
+                self.pitch = 0.0
+
+        ac = DeadPitchPlant()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal._pitch_mode == "legacy"
+        assert not cal._pitch_sign_known
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
 
 
 # --------------------------------------------------------------------------- #

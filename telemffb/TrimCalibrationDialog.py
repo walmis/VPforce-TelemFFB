@@ -53,6 +53,7 @@ class TrimCalibrationDialog(QDialog):
     STAGE_DISPLAY = {
         "PROBE": ("#e6a817", "Probing control response…"),
         "STABILIZE": ("#e6a817", "Stabilizing level flight…"),
+        "TRIM_NEUTRAL": ("#e6a817", "Finding natural trim point…"),
         "SWEEP": ("#2a7fd4", "Sweeping trim…"),
         "SOLVE": ("#2a7fd4", "Computing…"),
         "RESTORE": ("#2a7fd4", "Restoring trim…"),
@@ -447,11 +448,12 @@ class TrimCalibrationDialog(QDialog):
         split = result.get("split")
         if split and split["mismatch"] > 0.2:
             notes.append(
-                f"Trim response differs above vs below neutral trim "
-                f"(virtual gain {split['virtual_y_above']:.2f} nose-up side / "
-                f"{split['virtual_y_below']:.2f} nose-down side) — MSFS normalizes trim "
-                "per-side when the up/down limits are asymmetric. The recommended value "
-                "is a compromise; expect some residual pitch at trim extremes.")
+                "Trim response is asymmetric — stronger on one side of neutral trim "
+                f"than the other (equivalent static gains: {split['virtual_y_above']:.2f} "
+                f"nose-up, {split['virtual_y_below']:.2f} nose-down). This is normal when "
+                "the aircraft's nose-up and nose-down trim limits differ. The calibrated "
+                "curve captures the asymmetry; the single static value is a compromise, so "
+                "expect some residual pitch toward the trim extremes.")
         self.lbl_note.setText("\n".join(notes))
         self.btn_apply.setEnabled(True)
         self.btn_save.setEnabled(True)

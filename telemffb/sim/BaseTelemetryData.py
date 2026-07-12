@@ -127,10 +127,11 @@ class BaseTelemetryData:
     """
 
     VerticalSpeed: Optional[float]
-    """Vertical speed (rate of climb/descent).  
-    DCS: LoGetVerticalVelocity() — m/s.  
-    MSFS: VERTICAL SPEED SimVar — m/s.  
-    IL2/BMS: not available (BMS hardcodes 0).  
+    """Vertical speed (rate of climb/descent).
+    DCS: LoGetVerticalVelocity() — m/s.
+    MSFS: VERTICAL SPEED SimVar — m/s.
+    XP: sim/flightmodel/position/vh_ind — m/s.
+    IL2/BMS: not available (BMS hardcodes 0).
     """
 
     GroundSpeed: Optional[float]
@@ -254,17 +255,21 @@ class BaseTelemetryData:
     """
 
     Pitch: Optional[float]
-    """Pitch angle (nose up positive).  
-    DCS: LoGetADIPitchBankYaw()[0] — converted from radians to degrees.  
-    MSFS: PLANE PITCH DEGREES SimVar — degrees.  
-    IL2/BMS: not available.  
+    """Pitch angle in degrees.
+    DCS: LoGetADIPitchBankYaw()[0] — converted from radians to degrees.
+    MSFS: PLANE PITCH DEGREES SimVar — NOTE: negative = nose up.
+    XP: sim/flightmodel/position/theta — positive = nose up.
+    IL2/BMS: not available.
+    Sign convention differs between sims; consumers should use relative /
+    absolute-value comparisons (see TrimCalibrator pitch guard).
     """
 
     Roll: Optional[float]
-    """Bank/roll angle (right wing down positive).  
-    DCS: LoGetADIPitchBankYaw()[1] — converted from radians to degrees.  
-    MSFS: PLANE BANK DEGREES SimVar — degrees.  
-    IL2/BMS: not available.  
+    """Bank/roll angle in degrees.
+    DCS: LoGetADIPitchBankYaw()[1] — converted from radians to degrees.
+    MSFS: PLANE BANK DEGREES SimVar — degrees.
+    XP: sim/flightmodel/position/phi — positive = right wing down.
+    IL2/BMS: not available.
     """
 
     # -- Position --
