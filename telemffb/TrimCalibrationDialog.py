@@ -22,13 +22,14 @@ that lives on ``G.telem_manager.currentAircraft`` and displays live status +
 the result; the control loop itself runs in the telemetry thread. See
 :mod:`telemffb.sim.msfs_xp.TrimCalibrator`.
 """
+import json
 import logging
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QGroupBox, QProgressBar, QMessageBox, QFrame,
+    QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox,
 )
 
 import telemffb.globals as G
@@ -44,8 +45,9 @@ MS_TO_FPM = 196.850394
 class TrimCalibrationDialog(QDialog):
     """Modeless dialog to auto-calibrate ``joystick_trim_follow_gain_virtual_y``."""
 
-    # Emitted (with the computed virtual_y fraction) when the user saves.
-    result_saved = pyqtSignal(float)
+    # Emitted on Save with a JSON payload:
+    # {"virtual_y": float, "curve": dict|None, "use_curve": bool}
+    result_saved = pyqtSignal(str)
 
     # Stage light: color + friendly text per engine state while a run is active.
     STAGE_DISPLAY = {
@@ -139,11 +141,15 @@ class TrimCalibrationDialog(QDialog):
 
         self.lbl_virtual = QLabel("Recommended Y Trim Gain (Virtual): <b>—</b>")
         self.lbl_linearity = QLabel("Linearity (R²): —")
+        self.chk_use_curve = QCheckBox("Use calibrated curve (recommended) — static gain is used when unchecked")
+        self.chk_use_curve.setChecked(True)
+        self.chk_use_curve.setEnabled(False)
         self.lbl_note = QLabel("")
         self.lbl_note.setWordWrap(True)
         self.lbl_note.setStyleSheet("QLabel { color:#cc7a00; }")
         rlay.addWidget(self.lbl_virtual)
         rlay.addWidget(self.lbl_linearity)
+        rlay.addWidget(self.chk_use_curve)
         rlay.addWidget(self.lbl_note)
         root.addWidget(result_box)
 
@@ -281,23 +287,36 @@ class TrimCalibrationDialog(QDialog):
         if cal is not None:
             cal.stop("Cancelled by user")
 
+    def _payload(self):
+        curve = self._last_result.get("curve")
+        return {
+            "virtual_y": float(self._last_result["virtual_y"]),
+            "curve": curve,
+            "use_curve": bool(self.chk_use_curve.isChecked() and curve is not None),
+        }
+
     def _on_apply(self):
         if self._last_result is None:
             return
         ac = G.telem_manager.currentAircraft if G.telem_manager else None
         if ac is not None:
-            ac.joystick_trim_follow_gain_virtual_y = float(self._last_result["virtual_y"])
+            p = self._payload()
+            ac.joystick_trim_follow_gain_virtual_y = p["virtual_y"]
+            # Property setter parses the JSON once into lookup arrays.
+            ac.joystick_trim_follow_curve_y = json.dumps(p["curve"]) if p["curve"] else "none"
+            ac.joystick_trim_follow_use_curve_y = p["use_curve"]
+            mode = "calibrated curve" if p["use_curve"] else "static gain"
             QMessageBox.information(
                 self, "Applied",
-                "Applied live for testing. Trim by hand and confirm the nose holds.\n"
-                "Use Save to write it to this aircraft's profile.")
+                f"Applied live for testing ({mode}). Trim by hand and confirm the "
+                "nose holds.\nUse Save to write it to this aircraft's profile.")
 
     def _on_save(self):
         if self._last_result is None:
             return
-        self.result_saved.emit(float(self._last_result["virtual_y"]))
+        self.result_saved.emit(json.dumps(self._payload()))
         QMessageBox.information(self, "Saved",
-                                "Y Trim Gain Virtual saved for this aircraft.")
+                                "Trim-following calibration saved for this aircraft.")
 
     # ---- result / state display ---------------------------------------------
 
@@ -308,10 +327,14 @@ class TrimCalibrationDialog(QDialog):
         self.curve.set_live_point(None, None)
         current = result.get("current_virtual_y")
         current_txt = f"  &nbsp;·  current profile value: {current:.3f}" if current is not None else ""
+        has_curve = result.get("curve") is not None
+        rec_txt = "<b>calibrated curve</b> (solid line)" if has_curve else "static gain"
         self.lbl_virtual.setText(
-            f"Recommended Y Trim Gain (Virtual): <b>{result['virtual_y']:.3f}</b>"
+            f"Recommended: {rec_txt}  &nbsp;·  static fit: {result['virtual_y']:.3f}"
             f"  &nbsp;(for Physical Y = {result['physical_y']:.2f}){current_txt}")
         self.lbl_linearity.setText(f"Linearity (R²): {result['r_squared']:.3f}")
+        self.chk_use_curve.setEnabled(has_curve)
+        self.chk_use_curve.setChecked(has_curve)
         notes = []
         if not result["linear_ok"]:
             notes.append(
@@ -338,6 +361,7 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_virtual.setText("Recommended Y Trim Gain (Virtual): <b>—</b>")
         self.lbl_linearity.setText("Linearity (R²): —")
         self.lbl_note.setText("")
+        self.chk_use_curve.setEnabled(False)
         self.btn_apply.setEnabled(False)
         self.btn_save.setEnabled(False)
 

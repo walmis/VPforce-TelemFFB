@@ -29,7 +29,7 @@ VALID_DATATYPES = {
     "float", "d_float", "n_float", "negfloat", "pct_float", "anyfloat",
     "int", "d_int",
     "anylist", "text", "path", "button", "convert",
-    "configurator", "advspr", "advgs",
+    "configurator", "advspr", "advgs", "trimcal",
 }
 
 # Internal prereq markers used to hide UI elements (may have leading whitespace/underscores)

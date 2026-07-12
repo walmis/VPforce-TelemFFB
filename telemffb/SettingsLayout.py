@@ -1015,6 +1015,16 @@ class SettingsLayout(QGridLayout):
             self.adv_spr_button.clicked.connect(lambda: self.advanced_spring_button_clicked(self.advanced_spring_settings))
             self.addWidget(self.adv_spr_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        if item['datatype'] == 'trimcal':
+            b_txt = 'Calibrate...' if item['value'] == "none" else "View / Recalibrate..."
+            self.trim_cal_button = QPushButton(b_txt)
+            self.trim_cal_button.setMinimumWidth(150)
+            self.trim_cal_button.setMinimumHeight(25)
+            self.trim_cal_button.setObjectName(f"trimcal_{item['name']}")
+            self.trim_cal_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.trim_cal_button.clicked.connect(self.trim_cal_button_clicked)
+            self.addWidget(self.trim_cal_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
+
         if item['datatype'] == 'configurator':
             self.configurator_button = QPushButton("Configure Gain Overrides")
 
@@ -1548,20 +1558,42 @@ class SettingsLayout(QGridLayout):
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
         self.reload_caller()
 
-    def save_trim_virtual_y(self, value: float):
-        """Persist the auto-calibrated elevator Virtual Y gain for the current aircraft.
+    def trim_cal_button_clicked(self):
+        """Open the elevator trim calibration dialog from the settings row.
 
-        Connected to TrimCalibrationDialog.result_saved. Mirrors the write +
-        reload pattern used by the advanced spring / g-effect editors.
+        Reuses the MainWindow-owned dialog instance (created on first use)
+        so the settings-row button and the Utilities menu share one window.
         """
+        G.main_window.open_trim_calibration_dialog()
+
+    def save_trim_calibration(self, payload_json: str):
+        """Persist the auto-calibration results for the current aircraft.
+
+        Connected to TrimCalibrationDialog.result_saved. The payload carries
+        the static gain, the measured curve, and the use-curve choice; all
+        three settings are written so the user can A/B via the checkbox.
+        Mirrors the write + reload pattern of the advanced spring editor.
+        """
+        try:
+            payload = json.loads(payload_json)
+        except json.JSONDecodeError:
+            logging.error("Invalid trim calibration payload; nothing saved")
+            return
         self.trigger_form_reload = True
+        sim = G.settings_mgr.current_sim
+        cls = G.settings_mgr.current_class
+        pattern = G.settings_mgr.current_pattern
         G.settings_mgr.write_to_xml(
-            G.settings_mgr.current_sim,
-            G.settings_mgr.current_class,
-            G.settings_mgr.current_pattern,
-            str(round(value, 4)),
-            "joystick_trim_follow_gain_virtual_y",
-        )
+            sim, cls, pattern,
+            str(round(payload["virtual_y"], 4)), "joystick_trim_follow_gain_virtual_y")
+        curve = payload.get("curve")
+        G.settings_mgr.write_to_xml(
+            sim, cls, pattern,
+            json.dumps(curve) if curve else "none", "joystick_trim_follow_curve_y")
+        G.settings_mgr.write_to_xml(
+            sim, cls, pattern,
+            "true" if payload.get("use_curve") else "false",
+            "joystick_trim_follow_use_curve_y")
         self.show_erase_button("config_joystick_trim_follow_gain_virtual_y")
         self.reload_caller()
 

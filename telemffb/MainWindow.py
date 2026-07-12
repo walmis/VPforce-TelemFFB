@@ -264,15 +264,7 @@ class MainWindow(QMainWindow):
         utilities_menu.addAction(reload_action)
 
         trim_cal_action = QAction('Elevator Trim Calibration...', self)
-        def open_trim_calibration_dialog():
-            from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
-            if getattr(self, 'trim_cal_dialog', None) is None:
-                self.trim_cal_dialog = TrimCalibrationDialog(self)
-                self.trim_cal_dialog.result_saved.connect(self.settings_layout.save_trim_virtual_y)
-            self.trim_cal_dialog.raise_()
-            self.trim_cal_dialog.activateWindow()
-            self.trim_cal_dialog.show()
-        trim_cal_action.triggered.connect(open_trim_calibration_dialog)
+        trim_cal_action.triggered.connect(self.open_trim_calibration_dialog)
         utilities_menu.addAction(trim_cal_action)
 
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
@@ -1928,6 +1920,25 @@ class MainWindow(QMainWindow):
         except Exception:
             logging.exception("Exception")
         # dialog.exec_()
+
+    def open_trim_calibration_dialog(self):
+        """Open (or focus) the elevator trim calibration dialog.
+
+        Shared entry point for the Utilities menu action and the settings-row
+        'trimcal' button; one dialog instance serves both.
+        """
+        from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+        if getattr(self, 'trim_cal_dialog', None) is None:
+            # The dialog destroys itself on close (stale-display safety); the
+            # destroyed signal clears this reference so the next open builds
+            # a fresh one against the then-current aircraft.
+            self.trim_cal_dialog = TrimCalibrationDialog(self)
+            self.trim_cal_dialog.result_saved.connect(self.settings_layout.save_trim_calibration)
+            self.trim_cal_dialog.destroyed.connect(
+                lambda: setattr(self, 'trim_cal_dialog', None))
+        self.trim_cal_dialog.raise_()
+        self.trim_cal_dialog.activateWindow()
+        self.trim_cal_dialog.show()
 
     def update_settings(self):
         # utils.debug_caller_args('blue')

@@ -57,7 +57,7 @@ import enum
 import logging
 import time
 
-from telemffb.utils import PID, clamp
+from telemffb.utils import PID, clamp, piecewise_linear
 
 logger = logging.getLogger(__name__)
 
@@ -746,6 +746,23 @@ class TrimCalibrator:
         if len(self._station_ias) >= 2 and self._station_ias[0]:
             ias_drift = (self._station_ias[-1] - self._station_ias[0]) / self._station_ias[0]
 
+        # Calibrated response curve: the runtime virtual offset must mirror
+        # the measured level-hold curve, offs(T) = -(u(T) - u(0)), stored in
+        # absolute axis units (independent of physical gain). Zero-referenced
+        # at trim 0 via interp/edge-extrapolation of the stations.
+        curve = None
+        if len(self._samples) >= 2:
+            pts = sorted(self._samples)
+            xs = [p[0] for p in pts]
+            us = [p[1] for p in pts]
+            u_ref = piecewise_linear(xs, us, 0.0)
+            curve = {
+                "points": [{"t": round(t, 4), "offs": round(-(u - u_ref), 4)}
+                           for t, u in zip(xs, us)],
+                "ias_kt": round((self._station_ias[0] if self._station_ias else 0) * 1.94384, 1),
+                "date": time.strftime("%Y-%m-%d"),
+            }
+
         # Per-side fit split at trim = 0: MSFS normalizes ELEVATOR TRIM PCT
         # per-side (up limit vs down limit), so aircraft with asymmetric trim
         # limits have a genuinely different slope on each side of neutral. A
@@ -780,6 +797,7 @@ class TrimCalibrator:
             "station_ias": list(self._station_ias),
             "ias_drift": round(ias_drift, 4),
             "split": split,
+            "curve": curve,
             "trim0": self._trim0,
         }
         self._done_status = (

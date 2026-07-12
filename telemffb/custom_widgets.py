@@ -2609,6 +2609,8 @@ class TrimCurveWidget(CurveWidget):
 
         self.sample_points = []          # [QPointF(trim%, elevator%)]
         self.fit_line = None             # (QPointF, QPointF) in %-space
+        self.curve_polyline = []         # sorted samples joined = the calibrated curve
+        self.extrap_tails = []           # dashed edge-slope segments beyond the band
         self.live_point = None           # QPointF(trim%, elevator%) or None
         self.points = []                 # unused; keeps base paint helpers safe
 
@@ -2628,15 +2630,34 @@ class TrimCurveWidget(CurveWidget):
             self.update()
             return
 
+        # The calibrated curve is the sorted samples joined; dashed tails show
+        # the edge-slope extrapolation the runtime applies beyond the band.
+        pts = sorted(self.sample_points, key=lambda p: p.x())
+        self.curve_polyline = pts
+        self.extrap_tails = []
+        span = pts[-1].x() - pts[0].x()
+        ext = max(span * 0.15, 2.0)
+        if len(pts) >= 2:
+            p0, p1 = pts[0], pts[1]
+            s0 = (p1.y() - p0.y()) / (p1.x() - p0.x()) if p1.x() != p0.x() else 0.0
+            self.extrap_tails.append(
+                (QPointF(p0.x() - ext, p0.y() - s0 * ext), QPointF(p0.x(), p0.y())))
+            q0, q1 = pts[-2], pts[-1]
+            s1 = (q1.y() - q0.y()) / (q1.x() - q0.x()) if q1.x() != q0.x() else 0.0
+            self.extrap_tails.append(
+                (QPointF(q1.x(), q1.y()), QPointF(q1.x() + ext, q1.y() + s1 * ext)))
+
         xmin, xmax = min(xs), max(xs)
-        xpad = max((xmax - xmin) * 0.10, 1.0)
-        self.x_min, self.x_max = xmin - xpad, xmax + xpad
+        self.x_min, self.x_max = xmin - ext - 1.0, xmax + ext + 1.0
 
         y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
         y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
         self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
 
-        ylim = max(max((abs(v) for v in ys), default=0.0), abs(y1), abs(y2), 5.0) * 1.2
+        tail_ys = [p.y() for seg in self.extrap_tails for p in seg]
+        ylim = max(max((abs(v) for v in ys), default=0.0),
+                   max((abs(v) for v in tail_ys), default=0.0),
+                   abs(y1), abs(y2), 5.0) * 1.2
         self.y_min, self.y_max = -ylim, ylim
         self.update()
 
@@ -2660,6 +2681,8 @@ class TrimCurveWidget(CurveWidget):
     def clear(self):
         self.sample_points = []
         self.fit_line = None
+        self.curve_polyline = []
+        self.extrap_tails = []
         self.live_point = None
         # Back to the stable full-scale measuring view (a previous result may
         # have zoomed the axes to its data).
@@ -2735,10 +2758,25 @@ class TrimCurveWidget(CurveWidget):
         self._draw_zero_axes(painter)
         self.draw_axis_labels(painter)
 
+        # Static best-fit: dotted, de-emphasized — the calibrated curve is the
+        # recommended output; the fit is the legacy single-gain reference.
         if self.fit_line is not None:
-            painter.setPen(QPen(self.curve_color, 2))
+            painter.setPen(QPen(self.curve_color, 1, Qt.PenStyle.DotLine))
             painter.drawLine(self.map_to_widget_space(self.fit_line[0]),
                              self.map_to_widget_space(self.fit_line[1]))
+
+        if len(self.curve_polyline) >= 2:
+            painter.setPen(QPen(self.curve_color, 2))
+            wpts = [self.map_to_widget_space(p) for p in self.curve_polyline]
+            for a, b in zip(wpts, wpts[1:]):
+                painter.drawLine(a, b)
+
+        # Edge-slope extrapolation beyond the measured band: dashed.
+        if self.extrap_tails:
+            painter.setPen(QPen(self.curve_color, 2, Qt.PenStyle.DashLine))
+            for seg in self.extrap_tails:
+                painter.drawLine(self.map_to_widget_space(seg[0]),
+                                 self.map_to_widget_space(seg[1]))
 
         painter.setPen(QPen(self.axis_color, 1))
         painter.setBrush(self.point_fill)

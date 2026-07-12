@@ -700,16 +700,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         if not (self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control):
             return 0, 0, 0, 0
 
-        elev_trim = telem_data.ElevTrimPct or 0
         aileron_trim = telem_data.AileronTrimPct or 0
 
         aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
         virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
 
-        elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
-        elev_trim = self.elev_trim_dampener.update(elev_trim, derivative_hz=5, derivative_k=0.15)
+        # Dampen the RAW trim (calibrated-curve lookups live in ElevTrimPct
+        # space), then scale by the physical gain for the spring center.
+        # Identical to the previous scale-then-dampen at physical gain 1.0.
+        t_damp = self.elev_trim_dampener.update(telem_data.ElevTrimPct or 0,
+                                                derivative_hz=5, derivative_k=0.15)
+        elev_trim = clamp(t_damp * self.joystick_trim_follow_gain_physical_y, -1, 1)
 
-        virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+        virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim)
         phys_stick_y_offs = int(elev_trim * 4096)
 
         if self.ap_following and ap_active:

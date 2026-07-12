@@ -35,6 +35,7 @@ import logging
 import sys
 
 import socket
+import bisect
 import time
 import traceback
 import urllib.error
@@ -1303,11 +1304,32 @@ def scale(val, src: tuple, dst: tuple, return_round=False, return_int=False):
 
 def scale_clamp(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
-    Scale the given value from the scale of src to the scale of dst. 
+    Scale the given value from the scale of src to the scale of dst.
     and clamp the result to dst
     """
     v = scale(val, src, dst, return_round=return_round, return_int=return_int)
     return clamp(v, dst[0], dst[1])
+
+
+def piecewise_linear(xs, ys, x):
+    """Piecewise-linear lookup with edge-slope extrapolation.
+
+    :param xs: sample x values, strictly increasing
+    :param ys: sample y values, same length as xs (>= 2 points)
+    :param x: lookup position
+    :returns: interpolated y inside [xs[0], xs[-1]]; outside that range the
+        nearest edge segment's slope is continued linearly (a flat clamp would
+        silently stop correcting past the sampled band).
+    """
+    i = bisect.bisect_left(xs, x)
+    if i <= 0:
+        i = 1
+    elif i >= len(xs):
+        i = len(xs) - 1
+    x0, x1 = xs[i - 1], xs[i]
+    y0, y1 = ys[i - 1], ys[i]
+    slope = (y1 - y0) / (x1 - x0) if x1 != x0 else 0.0
+    return y0 + slope * (x - x0)
 
 
 def non_linear_scaling(x, min_val, max_val, curvature=1.0):

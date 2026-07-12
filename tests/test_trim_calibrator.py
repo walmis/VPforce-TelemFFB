@@ -516,6 +516,127 @@ class TestSafety:
 
 
 # --------------------------------------------------------------------------- #
+#  Calibrated trim curve (non-linear enhancement)
+# --------------------------------------------------------------------------- #
+
+class KinkedTrimPlant(FakePlantAircraft):
+    """Trim coupling that kinks at neutral, like MSFS per-side normalization."""
+
+    def effective_coupling(self, trim):
+        return 0.9 if trim > 0 else 0.3
+
+
+class TestTrimCurve:
+    def test_piecewise_linear_interp_and_edge_extrapolation(self):
+        from telemffb.utils import piecewise_linear
+        xs = [-0.2, 0.0, 0.2]
+        ys = [0.2, 0.0, -0.4]    # slope -1 below zero, -2 above (kinked)
+        assert piecewise_linear(xs, ys, -0.1) == pytest.approx(0.1)
+        assert piecewise_linear(xs, ys, 0.1) == pytest.approx(-0.2)
+        assert piecewise_linear(xs, ys, 0.2) == pytest.approx(-0.4)
+        # beyond the band the edge segment's slope continues
+        assert piecewise_linear(xs, ys, -0.3) == pytest.approx(0.3)
+        assert piecewise_linear(xs, ys, 0.3) == pytest.approx(-0.6)
+
+    def test_solver_emits_zero_referenced_curve(self):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal._samples = [(-0.2, 0.25), (0.0, 0.05), (0.2, -0.35)]
+        cal._sweep_targets = [0]
+        cal._station_ias = [60.0]
+        cal._solve()
+        pts = {p["t"]: p["offs"] for p in cal.result["curve"]["points"]}
+        # offs(T) = -(u(T) - u(0)); u(0) = 0.05
+        assert pts[-0.2] == pytest.approx(-0.2, abs=1e-3)
+        assert pts[0.0] == pytest.approx(0.0, abs=1e-3)
+        assert pts[0.2] == pytest.approx(0.4, abs=1e-3)
+
+    def test_curve_property_parsing_and_fallback(self):
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+
+            inst.joystick_trim_follow_curve_y = "none"
+            assert inst._trim_curve_offset(0.1) is None
+
+            curve = {"points": [{"t": -0.5, "offs": 0.25}, {"t": 0.5, "offs": -0.25}]}
+            inst.joystick_trim_follow_curve_y = _json.dumps(curve)
+            assert inst._trim_curve_offset(0.0) == pytest.approx(0.0)
+            assert inst._trim_curve_offset(0.5) == pytest.approx(-0.25)
+            assert inst.joystick_trim_follow_curve_y == _json.dumps(curve)
+
+            inst.joystick_trim_follow_curve_y = "{not valid json"
+            assert inst._trim_curve_offset(0.1) is None
+            inst.joystick_trim_follow_curve_y = '{"points": [{"t": 0.0, "offs": 0.0}]}'
+            assert inst._trim_curve_offset(0.1) is None, "single-point curve must be ignored"
+        finally:
+            harness.teardown_method()
+
+    def test_virtual_offset_selects_curve_or_legacy(self):
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_gain_virtual_y = 0.5
+
+            # legacy formula when no curve / disabled
+            assert inst._trim_follow_virtual_offset_y(0.2, 0.2) == pytest.approx(0.1)
+
+            curve = {"points": [{"t": -0.5, "offs": 0.4}, {"t": 0.5, "offs": -0.4}]}
+            inst.joystick_trim_follow_curve_y = _json.dumps(curve)
+            inst.joystick_trim_follow_use_curve_y = False
+            assert inst._trim_follow_virtual_offset_y(0.2, 0.2) == pytest.approx(0.1)
+
+            inst.joystick_trim_follow_use_curve_y = True
+            assert inst._trim_follow_virtual_offset_y(0.2, 0.2) == pytest.approx(-0.16)
+        finally:
+            harness.teardown_method()
+
+    def test_curve_cancels_kinked_coupling_where_static_cannot(self, clock):
+        # The user-reported failure: with a kinked trim response, the static
+        # gain holds the nose only near the fit tangent — trimming across the
+        # band walks the nose away. The calibrated curve must cancel the
+        # coupling everywhere the sweep measured.
+        from telemffb.utils import piecewise_linear
+
+        ac = KinkedTrimPlant(physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+
+        curve = cal.result["curve"]
+        xs = [p["t"] for p in curve["points"]]
+        ys = [p["offs"] for p in curve["points"]]
+        vy = cal.result["virtual_y"]
+
+        def required_delta(t):
+            # delivered-axis change (vs trim 0) needed to hold level: u = -c(t)*t
+            return -ac.effective_coupling(t) * t
+
+        ts = [i / 100.0 for i in range(-40, 41, 2)]
+        # stick held: delivered change = -offs(t); residual vs required must be
+        # ~constant for the nose to hold while trimming continuously.
+        resid_curve = [-piecewise_linear(xs, ys, t) - required_delta(t) for t in ts]
+        resid_static = [-t * 1.0 * (1 - vy) - required_delta(t) for t in ts]
+
+        def spread(r):
+            return max(r) - min(r)
+
+        assert spread(resid_curve) < 0.02, "curve must hold level across the band"
+        assert spread(resid_static) > 0.05, "static gain should fail on a kinked plant"
+
+
+# --------------------------------------------------------------------------- #
 #  Suppression of normal flight controls while active
 # --------------------------------------------------------------------------- #
 

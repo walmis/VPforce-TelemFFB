@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import socket
 from typing import TYPE_CHECKING, Any, Callable, Optional
@@ -45,6 +46,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     local_disable_axis_control: bool = False
     telemffb_controls_axes: bool = False
     use_firmware_axis_override: bool = False
+    joystick_trim_follow_use_curve_y: bool = False
     _xplane_event_states: dict = {}
     # end of user parameters
 
@@ -53,7 +55,66 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._socket = None
         self.__xplane_axis_override_active = False
         self.__xplane_addr = ("127.0.0.1", 34391)
+        self._trim_curve_y_json: Optional[str] = None
+        self._trim_curve_y_pts = None   # (xs, ys) parsed lookup arrays
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
+
+    @property
+    def joystick_trim_follow_curve_y(self) -> Optional[str]:
+        return self._trim_curve_y_json
+
+    @joystick_trim_follow_curve_y.setter
+    def joystick_trim_follow_curve_y(self, value):
+        """Assigned a JSON-encoded calibration curve or 'none' via the settings
+        subsystem. Parsed ONCE here into sorted lookup arrays — never in the
+        telemetry hot path. Invalid/short curves are ignored (runtime falls
+        back to the static virtual gain).
+        """
+        self._trim_curve_y_json = None
+        self._trim_curve_y_pts = None
+        if not value or value == 'none':
+            return
+        try:
+            data = json.loads(value) if isinstance(value, str) else value
+            pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
+            xs, ys = [], []
+            for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
+                if xs and abs(t - xs[-1]) < 1e-9:
+                    ys[-1] = o
+                else:
+                    xs.append(t)
+                    ys.append(o)
+            if len(xs) < 2:
+                logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
+                return
+            self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
+            self._trim_curve_y_pts = (xs, ys)
+        except (ValueError, KeyError, TypeError) as e:
+            logging.warning(f"Invalid trim-follow curve setting; ignoring ({e})")
+
+    def _trim_curve_offset(self, t: float) -> Optional[float]:
+        """Calibrated virtual-offset lookup at trim ``t`` (ElevTrimPct space),
+        or None when no curve is loaded."""
+        if self._trim_curve_y_pts is None:
+            return None
+        xs, ys = self._trim_curve_y_pts
+        return utils.clamp(utils.piecewise_linear(xs, ys, t), -1.0, 1.0)
+
+    def _trim_follow_virtual_offset_y(self, t_damp: float, elev_trim: float) -> float:
+        """Virtual stick offset for elevator trim-following.
+
+        Calibrated curve (absolute axis units, independent of the physical
+        gain) when enabled and loaded; else the legacy static-gain formula.
+
+        :param t_damp: dampened raw ElevTrimPct (curve lookup space)
+        :param elev_trim: t_damp scaled by the physical gain and clamped
+            (legacy formula / spring-center space)
+        """
+        if self.joystick_trim_follow_use_curve_y:
+            offs = self._trim_curve_offset(t_damp)
+            if offs is not None:
+                return offs
+        return elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
 
     @property
     def _simconnect(self) -> SimConnectManager:
