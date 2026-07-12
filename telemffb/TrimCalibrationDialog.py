@@ -387,10 +387,28 @@ class TrimCalibrationDialog(QDialog):
             ac.joystick_trim_follow_curve_y = json.dumps(p["curve"]) if p["curve"] else "none"
             ac.joystick_trim_follow_use_curve_y = p["use_curve"]
             mode = "calibrated curve" if p["use_curve"] else "static gain"
-            QMessageBox.information(
-                self, "Applied",
-                f"Applied live for testing ({mode}). Trim by hand and confirm the "
-                "nose holds.\nUse Save to write it to this aircraft's profile.")
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setWindowTitle("Applied for testing")
+            box.setTextFormat(Qt.TextFormat.RichText)
+            box.setText(f"<b>Applied live ({mode})</b> — not yet saved to this "
+                        "aircraft's profile.")
+            box.setInformativeText(
+                "<b>How to test it:</b>"
+                "<ol>"
+                "<li>Fly straight &amp; level and let the aircraft settle.</li>"
+                "<li><b>Hold the stick still</b> in one spot and keep it there — "
+                "this is the condition the value is tuned for.</li>"
+                "<li>Slowly run elevator trim nose-up, then nose-down, across "
+                "its range.</li>"
+                "</ol>"
+                "With a good value the <b>nose stays level</b> as you trim: the "
+                "stick relieves under force feedback but the aircraft does not "
+                "pitch. If the nose drifts up or down while you trim, the value "
+                "needs work — re-run the calibration, or toggle <i>Use calibrated "
+                "curve</i> to compare it against the static value."
+                "<br><br>Click <b>Save</b> to write this to the profile.")
+            box.exec()
 
     def _on_save(self):
         if self._last_result is None:
