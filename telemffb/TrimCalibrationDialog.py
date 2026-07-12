@@ -142,6 +142,10 @@ class TrimCalibrationDialog(QDialog):
 
         self.lbl_virtual = QLabel("Recommended Y Trim Gain (Virtual): <b>—</b>")
         self.lbl_linearity = QLabel("Linearity (R²): —")
+        # Force rich text so entities (e.g. &nbsp;) render regardless of whether
+        # a given text branch happens to contain HTML tags for auto-detection.
+        self.lbl_virtual.setTextFormat(Qt.TextFormat.RichText)
+        self.lbl_linearity.setTextFormat(Qt.TextFormat.RichText)
         self.chk_use_curve = QCheckBox("Use calibrated curve (recommended) — static gain is used when unchecked")
         self.chk_use_curve.setChecked(True)
         self.chk_use_curve.setEnabled(False)
