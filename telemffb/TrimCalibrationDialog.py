@@ -29,7 +29,7 @@ from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox,
+    QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
 )
 
 import telemffb.globals as G
@@ -87,8 +87,9 @@ class TrimCalibrationDialog(QDialog):
             "starting far out of trim wastes elevator authority during the sweep.<br>"
             "3. Autopilot <b>OFF</b>, hands <b>OFF</b> the stick.<br>"
             "4. Press <b>Start</b> — TelemFFB will fly the aircraft while it sweeps the "
-            "elevator trim and measures the required stick input, then computes the "
-            "<i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value."
+            "elevator trim and measures the required stick input, then recommends a "
+            "trim-following <i>curve</i> (with the equivalent static "
+            "<i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to hold the nose level as you trim."
         )
         instructions.setWordWrap(True)
         root.addWidget(instructions)
@@ -138,7 +139,10 @@ class TrimCalibrationDialog(QDialog):
         result_box = QGroupBox("Result")
         rlay = QVBoxLayout(result_box)
         self.curve = TrimCurveWidget()
-        self.curve.setMinimumHeight(240)
+        # Expanding + a modest minimum makes the graph the flexible element:
+        # a tall notes block shrinks it rather than overlapping it.
+        self.curve.setMinimumHeight(200)
+        self.curve.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         rlay.addWidget(self.curve)
 
         self.lbl_virtual = QLabel("Recommended Y Trim Gain (Virtual): <b>—</b>")
@@ -318,7 +322,18 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_linearity.setText(
             f"Curve in use: {'yes' if use_curve else 'no — static gain active'}")
         self.chk_use_curve.setChecked(use_curve)
+        self._fit_to_content()
         return True
+
+    def _fit_to_content(self):
+        """Grow (never shrink) the window so a tall notes block can't overlap
+        the graph. The result text is populated after the dialog is shown, and
+        Qt relayouts within the current window height rather than enlarging it.
+        """
+        self.lbl_note.adjustSize()
+        needed = self.sizeHint().height()
+        if self.height() < needed:
+            self.resize(self.width(), needed)
 
     def _update_live_values(self, data, ias_ref=None):
         def fmt(v, conv=1.0, unit="", nd=0):
@@ -457,6 +472,7 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_note.setText("\n".join(notes))
         self.btn_apply.setEnabled(True)
         self.btn_save.setEnabled(True)
+        self._fit_to_content()
 
     def _clear_result_labels(self):
         self.lbl_virtual.setText("Recommended Y Trim Gain (Virtual): <b>—</b>")
