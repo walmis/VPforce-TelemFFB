@@ -68,6 +68,7 @@ class CalState(enum.Enum):
     PROBE = "probe"          # determine control polarity (elevator, then aileron)
     STABILIZE = "stabilize"  # close the leveling loops and wait for steady flight
     TRIM_NEUTRAL = "trim_neutral"  # slew trim to the natural (zero-axis) point
+    SPEED_SETTLE = "speed_settle"  # optional hold to let airspeed stabilize
     SWEEP = "sweep"          # ramp the sim trim and record elevator axis at each station
     SOLVE = "solve"          # fit the samples and compute virtual_y
     RESTORE = "restore"      # ramp trim back to the natural point while leveling
@@ -171,6 +172,12 @@ class TrimCalibrator:
     NEUT_MAX_STEPS = 10
     NEUT_TIMEOUT_S = 60.0        # overall cap; proceed (with warning) if hit
 
+    # Optional hold at the natural trim point before the sweep, giving the
+    # airspeed time to stabilize at the current throttle/trim so the sweep
+    # measures at (and drift-checks against) the equilibrium speed. Enabled
+    # per-run via ``settle_before_sweep`` (dialog checkbox).
+    SPEED_SETTLE_S = 20.0
+
     # Trim sweep. The band is ADAPTIVE: starting from the center station the
     # sweep walks outward in SWEEP_STEP increments, expanding each side until
     # the elevator needed to hold level exceeds SWEEP_U_BUDGET (relative to
@@ -234,6 +241,10 @@ class TrimCalibrator:
         self._active = False
         self.status_message = "Idle"
         self.progress = 0.0
+        # Run option (set by the dialog before start()): hold level for
+        # SPEED_SETTLE_S after finding the natural trim point so the airspeed
+        # stabilizes before the sweep. Users can disable it for a faster run.
+        self.settle_before_sweep = True
         self.result = None          # dict on success, else None
         self.abort_reason = None
         # Set from the UI thread by stop(); consumed in the telemetry thread so
@@ -309,6 +320,7 @@ class TrimCalibrator:
         self._neut_deadline = None       # per-step ramp+settle deadline
         self._neut_start_t = None        # overall phase start
         self._neut_u_final = 0.0         # steady elevator at the accepted point
+        self._settle_start_t = None      # SPEED_SETTLE phase start
         # oscillation watchdog state (extremum tracking with hysteresis)
         self._osc_ext = None         # candidate extremum value
         self._osc_dir = 0            # 0 = undetermined, +1 rising, -1 falling
@@ -437,6 +449,8 @@ class TrimCalibrator:
             self._do_stabilize(telem_data, dt)
         elif self.state == CalState.TRIM_NEUTRAL:
             self._do_trim_neutral(telem_data, dt)
+        elif self.state == CalState.SPEED_SETTLE:
+            self._do_speed_settle(telem_data, dt)
         elif self.state == CalState.SWEEP:
             self._do_sweep(telem_data, dt)
         elif self.state == CalState.RESTORE:
@@ -768,7 +782,30 @@ class TrimCalibrator:
         self._pitch_pid.reset()
         self._pitch_ref_n = None
         self._pitch_ref0 = None
-        self._enter_sweep(telem_data)
+        if self.settle_before_sweep:
+            self._enter_speed_settle(telem_data)
+        else:
+            self._enter_sweep(telem_data)
+
+    # ---- Phase: airspeed settle ------------------------------------------------
+
+    def _enter_speed_settle(self, telem_data):
+        self.state = CalState.SPEED_SETTLE
+        self._settle_start_t = time.perf_counter()
+        self.status_message = "Letting airspeed stabilize…"
+
+    def _do_speed_settle(self, telem_data, dt):
+        """Hold straight-and-level at the natural trim point so the airspeed
+        settles at the current throttle/trim before the sweep begins. The IAS
+        reference used for the sweep's drift warning and abort band is captured
+        at sweep entry, so it then reflects the equilibrium speed."""
+        self._run_leveling(telem_data, dt)
+        remaining = self.SPEED_SETTLE_S - (time.perf_counter() - self._settle_start_t)
+        ias_kt = (telem_data.IAS or 0) * 1.94384
+        self.status_message = (f"Letting airspeed stabilize… {max(remaining, 0):.0f} s "
+                               f"(IAS {ias_kt:.0f} kt)")
+        if remaining <= 0:
+            self._enter_sweep(telem_data)
 
     # ---- Phase: trim sweep ---------------------------------------------------
 

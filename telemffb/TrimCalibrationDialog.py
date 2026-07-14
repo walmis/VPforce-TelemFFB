@@ -54,6 +54,7 @@ class TrimCalibrationDialog(QDialog):
         "PROBE": ("#e6a817", "Probing control response…"),
         "STABILIZE": ("#e6a817", "Stabilizing level flight…"),
         "TRIM_NEUTRAL": ("#e6a817", "Finding natural trim point…"),
+        "SPEED_SETTLE": ("#e6a817", "Letting airspeed stabilize…"),
         "SWEEP": ("#2a7fd4", "Sweeping trim…"),
         "SOLVE": ("#2a7fd4", "Computing…"),
         "RESTORE": ("#2a7fd4", "Restoring trim…"),
@@ -97,6 +98,15 @@ class TrimCalibrationDialog(QDialog):
         )
         instructions.setWordWrap(True)
         root.addWidget(instructions)
+
+        self.chk_settle = QCheckBox(
+            "Hold level to let the airspeed stabilize before the sweep (adds ~20 s)")
+        self.chk_settle.setChecked(True)
+        self.chk_settle.setToolTip(
+            "After finding the natural trim point, hold straight-and-level for 20 seconds "
+            "so the airspeed settles at the current throttle/trim before measuring.\n"
+            "Recommended — uncheck for a faster run.")
+        root.addWidget(self.chk_settle)
 
         # Warning banner shown only while the engine is flying the aircraft.
         self.banner = QLabel("⚠  TelemFFB is controlling your aircraft — stay ready to take over")
@@ -382,6 +392,7 @@ class TrimCalibrationDialog(QDialog):
         self._last_result = None
         self.curve.clear()
         self._clear_result_labels()
+        cal.settle_before_sweep = self.chk_settle.isChecked()
         cal.start()
 
     def _on_stop(self):
@@ -463,8 +474,10 @@ class TrimCalibrationDialog(QDialog):
         ias_drift = result.get("ias_drift", 0)
         if abs(ias_drift) > 0.05:
             notes.append(
-                f"Airspeed drifted {ias_drift * 100:+.0f}% during the sweep — this can skew "
-                "the result. Re-run with stable power at cruise speed.")
+                f"Airspeed drifted {ias_drift * 100:+.0f}% during the sweep, which can skew "
+                "the measurement. The result may still be fine — test it with Apply, and if "
+                "trim following seems off, consider re-running with a steadier airspeed "
+                "(stable power, and the airspeed-settle option enabled).")
         split = result.get("split")
         if split and split["mismatch"] > 0.2:
             notes.append(

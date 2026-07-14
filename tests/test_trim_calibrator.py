@@ -602,6 +602,45 @@ class TestTrimNeutralization:
 
 
 # --------------------------------------------------------------------------- #
+#  Optional airspeed-settle hold before the sweep
+# --------------------------------------------------------------------------- #
+
+class TestSpeedSettle:
+    def _run_tracking_settle(self, cal, ac, clock, max_frames=40000):
+        settle_frames = 0
+        for _ in range(max_frames):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.SPEED_SETTLE:
+                settle_frames += 1
+            if cal.state in (CalState.DONE, CalState.ABORT):
+                return cal.state, settle_frames
+        return cal.state, settle_frames
+
+    def test_settle_hold_runs_for_configured_time(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.settle_before_sweep = True
+        cal.start()
+        state, settle_frames = self._run_tracking_settle(cal, ac, clock)
+        assert state == CalState.DONE, cal.abort_reason
+        # ~20 s at 30 fps; allow a little slack for phase-entry framing
+        assert settle_frames >= cal.SPEED_SETTLE_S * 30 * 0.95
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_settle_hold_skipped_when_disabled(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.settle_before_sweep = False
+        cal.start()
+        state, settle_frames = self._run_tracking_settle(cal, ac, clock)
+        assert state == CalState.DONE, cal.abort_reason
+        assert settle_frames == 0, "SPEED_SETTLE must be skipped when disabled"
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+
+# --------------------------------------------------------------------------- #
 #  Pitch-attitude cascade leveling loop
 # --------------------------------------------------------------------------- #
 
