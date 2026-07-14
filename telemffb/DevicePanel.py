@@ -20,6 +20,7 @@ DEVICE_ICONS = {
     "pedals": ":/image/icon_pedals.png",
     "collective": ":/image/icon_collective.png",
     "trimwheel": ":/image/icon_trimwheel.png",
+    "shaker": ":/image/icon_shaker.png",
 }
 
 STATUS_COLORS = {

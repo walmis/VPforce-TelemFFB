@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "_comment": [
+    "Empty default inventory. Populated by the Setup Wizard or hand-edited",
+    "via the Devices tab. The setup_presets.json file is the source for",
+    "ready-made layouts (Stick+Shaker, Heli, Full Setup, ...)."
+  ],
+  "devices": []
+}

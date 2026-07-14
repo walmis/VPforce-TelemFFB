@@ -84,21 +84,21 @@ current_device_config_scope: Optional[DeviceTypeLiteral] = None
 """add current device config scope to globals for tracking across telemffb modules"""
 
 # Device information
-device_type : DeviceTypeLiteral = "joystick"
+device_type: DeviceTypeLiteral = "joystick"
 """device type: joystick, pedals, collective, trimwheel"""
 
-device_info : Optional['DeviceInfo'] = None
+device_info: Optional['DeviceInfo'] = None
 """DeviceInfo object representing the connected device. This attribute is redundant, since HapticEffect.device provides the same information."""
 
-device_devpath : Optional[str] = None
+device_devpath: Optional[str] = None
 """System path to device, e.g. /dev/hidraw0 or \\?\\hid#vid_ffff&pid_2055&mi_00#7&2b3b4c3f&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"""
 
-device_usbpid : str # deprecated
+device_usbpid: str  # deprecated
 
-device_ident : str
+device_ident: str
 """Joystick, Pedals, etc.. as set in configurator"""
 
-device_firmware_version : str
+device_firmware_version: str
 """Firmware version as reported by device"""
 
 device_connection_status: bool = False
@@ -111,6 +111,30 @@ Resolved once per SimIL2 listener start; None if not IL-2 Korea or not yet resol
 
 vpconf_init_pending: bool = False
 """switch to True when async device init is complete"""
+
+# Multi-device routing (populated from [devices] section in config.ini at startup
+# by telemffb.device_inventory.load_inventory_from_ini; remains empty until the
+# Setup Wizard has run or the user hand-edits the inventory).
+device_id: str = ""                      # stable slug for THIS process's device, e.g. "stick_main"
+device_positions: list[str] = []         # position tags for THIS process's device
+devices: list[Any] = []                  # list[Device] — full inventory shared by all instances
+effect_router: Optional[Any] = None      # routing.EffectRouter instance (populated in main.py)
+
+# Shaker device-type state. None unless device_type == 'shaker'.
+shaker_synth: 'Optional[ShakerSynth]' = None  # populated by main.py when launching as a shaker child
+shaker_active_profile: Optional[Any] = None  # ShakerProfile; populated at startup, consumed by ffb_shaker._pulse_kwargs
+
+# Multi-device routing (populated from [devices] section in config.ini at startup
+# by telemffb.device_inventory.load_inventory_from_ini; remains empty until the
+# Setup Wizard has run or the user hand-edits the inventory).
+device_id: str = ""                      # stable slug for THIS process's device, e.g. "stick_main"
+device_positions: list[str] = []         # position tags for THIS process's device
+devices: list[Any] = []                  # list[Device] — full inventory shared by all instances
+effect_router: Optional[Any] = None      # routing.EffectRouter instance (populated in main.py)
+
+# Shaker device-type state. None unless device_type == 'shaker'.
+shaker_synth: 'Optional[ShakerSynth]' = None  # populated by main.py when launching as a shaker child
+shaker_active_profile: Optional[Any] = None  # ShakerProfile; populated at startup, consumed by ffb_shaker._pulse_kwargs
 
 # Gain management
 startup_configurator_gains: Optional['FFBReport_Get_Gains_Feature_Data'] = None  

@@ -44,6 +44,9 @@ Not all features are available in all simulators.
 - Helicopter overspeed shaking
 - Damage effect
 - Uncoordinated turn effect
+- G-force loading
+- Deceleration effect
+- Configurable multi-device effect routing with bass shaker support
 
 **Flight Control Forces (MSFS / X-Plane)**
 - Dynamic spring force based on aerodynamic pressure across the aircraft's speed envelope
@@ -93,8 +96,6 @@ TelemFFB is packaged with PyInstaller, which can trigger false positives in Wind
 - Python 3.11+
 - Git
 
-**Steps:**
-
 ```bash
 git clone https://github.com/walmis/VPforce-TelemFFB.git
 cd VPforce-TelemFFB
@@ -115,6 +116,13 @@ git reset --hard origin/master
 git pull
 ```
 
+## Documentation
+
+In-tree documentation:
+- [`docs/ROUTING.md`](docs/ROUTING.md) — multi-device effect routing
+- [`docs/SHAKER.md`](docs/SHAKER.md) — bass-shaker integration deep dive
+- [`CHANGELOG.md`](CHANGELOG.md) — release notes
+
 ## Contributing and Development
 
 Pull requests and issues are welcome on the [GitHub page](https://github.com/walmis/VPforce-TelemFFB).
@@ -126,3 +134,5 @@ if self.has_changed("Gun") or self.has_changed("CannonShells"):
     effects["cm"].stop()
     effects["cm"].periodic(10, self.gun_vibration_intensity, 45, duration=50).start()
 ```
+
+When the multi-device router is active, the same call transparently fans out to every device + layer that the routing matrix declared for it. See [`docs/ROUTING.md`](docs/ROUTING.md) for the data model.

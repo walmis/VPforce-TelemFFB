@@ -266,7 +266,9 @@ class Aircraft(AircraftBase):
             super().ac_update_runway_rumble(telem_data)
         else:
             self.runway_rumble_intensity = 0
-            self.effects.dispose("runway0", "runway1")
+            self.effects.dispose("runway_carrier", "runway_carrier_delayed",
+                                 "runway_impulse", "runway_impulse_delayed",
+                                 "runway1")
 
     @override
     def ac_update_buffeting(self, telem_data: dict):

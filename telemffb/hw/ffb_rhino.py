@@ -1604,6 +1604,54 @@ class HapticEffect(Destroyable):
         
         return self
 
+    def physics(self, rpm: float, divisions: float, load: float = 1.0,
+                **shape_overrides):
+        """Rhino fallback for the shaker's phase-locked impulse train.
+
+        Hardware FFB cannot phase-lock to integrated phase the way the
+        software shaker can, so we degrade to a periodic sine at the same
+        carrier frequency the impulse train would have run at: ``rpm/60 *
+        divisions``. ``load`` scales magnitude. Direction is taken from the
+        ``direction`` override (default 0). All other shape kwargs are
+        ignored on this backend. Chainable.
+        """
+        impulse_hz = max(1.0, (float(rpm) / 60.0) * float(divisions))
+        magnitude = max(0.0, min(1.0, float(load) * float(shape_overrides.get("gain", 1.0))))
+        direction = float(shape_overrides.get("direction", 0.0))
+        return self.periodic(impulse_hz, magnitude, direction)
+
+    def fire_impulse(self, magnitude: float, **shape_overrides):
+        """Rhino fallback for the shaker's one-shot transient. Uses an
+        EFFECT_SQUARE pulse at the configured carrier with the magnitude as
+        amplitude. Self-starts so callers can simply do
+        ``effects[name].fire_impulse(amp)`` (mirrors the shaker API).
+
+        Honors the layer config from shaker_effects_default.json: if the
+        effect has layers and none route to ``stick``/``both`` it is skipped
+        (mirror of ``_layer_is_for_shaker`` on the shaker side); otherwise
+        the magnitude is scaled by the strongest stick-routed layer gain so
+        the layer editor's tuning carries through to the stick.
+        """
+        try:
+            from telemffb.hw.ffb_shaker import EFFECT_LAYERS
+            layers = EFFECT_LAYERS.get(self.name)
+            if layers is not None:
+                stick_layers = [l for l in layers if l.route in ("stick", "both")]
+                if not stick_layers:
+                    return self
+                magnitude = float(magnitude) * max(l.gain for l in stick_layers)
+        except ImportError:
+            pass
+
+        carrier_hz = float(shape_overrides.get("carrier_hz", 30.0))
+        direction = float(shape_overrides.get("direction", 0.0))
+        magnitude = max(0.0, min(1.0, float(magnitude)))
+        # Use SQUARE for the sharper attack typical of an impact pulse.
+        self.periodic(carrier_hz, magnitude, direction,
+                      effect_type=EFFECT_SQUARE,
+                      duration=int(shape_overrides.get("duration_ms", 80)))
+        return self.start(force=True)
+
     @property
     def started(self) -> bool:
         """Return True when the underlying effect is currently playing."""
@@ -1620,6 +1668,18 @@ class HapticEffect(Destroyable):
         Returns:
             Self for chaining.
         """
+        # Mirror of _layer_is_for_shaker on the shaker side: an effect whose
+        # layer config exists but routes nothing to stick/both must not play
+        # on the joystick FFB device. Existing effects all include a stick or
+        # both layer, so this only gates new shaker-only effects.
+        try:
+            from telemffb.hw.ffb_shaker import EFFECT_LAYERS
+            layers = EFFECT_LAYERS.get(self.name)
+            if layers is not None and not any(l.route in ("stick", "both") for l in layers):
+                return self
+        except ImportError:
+            pass
+
         # Ensure effect is created before starting
         self._ensure_effect_created()
 
@@ -1694,8 +1754,19 @@ class HapticEffect(Destroyable):
             self._h_effect = None
 
     def __del__(self):
-        """Destructor helper to ensure resources are freed."""
-        self.destroy()
+        """Destructor helper to ensure resources are freed.
+        
+        Checks _h_effect directly rather than calling destroy() to avoid
+        issues with mocking and to prevent double-destroy when explicit
+        destroy() has already been called and set _h_effect to None.
+        """
+        if getattr(self, '_h_effect', None) is None:
+            return
+        try:
+            self._h_effect.destroy()
+            self._h_effect = None
+        except Exception:
+            pass
 
 # unit test
 if __name__ == "__main__":

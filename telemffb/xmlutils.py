@@ -64,6 +64,29 @@ def update_vars(_device, _userconfig_path, _defaults_path):
     defaults_path = _defaults_path
 
 
+def _read_device_chain(the_device):
+    """Device tags whose settings should be merged when reading config for ``the_device``.
+
+    Returned in dependency order: base layer first, primary device last, so
+    callers using last-write-wins merge semantics get the right precedence.
+    The shaker child runs the same aircraft handler as the joystick (engine
+    rumble, ETL, runway, etc. all live in ``aircraft_base.AircraftBase``)
+    but defaults.xml carries no ``<shaker>true</shaker>`` markers — every
+    effect-trigger flag is gated under ``<joystick>true</joystick>``. We
+    treat ``joystick`` as a base layer for the shaker so its handler sees
+    the same trigger config; the routing pack
+    (``effect_routes_default.json``) is the single source of truth for
+    which device actually plays each effect.
+    """
+    if not the_device:
+        return []
+    chain = []
+    if the_device == 'shaker':
+        chain.append('joystick')
+    chain.append(the_device)
+    return chain
+
+
 def try_parse(file_path, max_attempts=3, delay=0.1):
     """
     Tries to parse an XML file up to max_attempts times with a delay between attempts.
@@ -1133,7 +1156,15 @@ def read_xml_file(the_sim, instance_device=''):
 
     # Collect data in a list of dictionaries
     data_list = []
-    for defaults_elem in auto_defaults_root.findall(f'.//defaults[{the_sim}="true"][{the_device}="true"]'):
+    seen_elems = set()
+    chain = _read_device_chain(the_device)
+    elements = []
+    for dev_tag in chain:
+        elements += auto_defaults_root.findall(f'.//defaults[{the_sim}="true"][{dev_tag}="true"]')
+    for defaults_elem in elements:
+        if id(defaults_elem) in seen_elems:
+            continue
+        seen_elems.add(id(defaults_elem))
 
         grouping_elem = defaults_elem.find('grouping')
         grouping = grouping_elem.text if grouping_elem is not None else ""
@@ -1282,9 +1313,11 @@ def read_models(the_sim, the_class=''):
     all_models = ['']
 
     if the_class == '':
-        def_models =  auto_defaults_root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
-                      auto_defaults_root.findall(f'.//models[sim="any"][device="{device}"]') + \
-                      auto_defaults_root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+        def_models = []
+        for dev_val in _read_device_chain(device):
+            def_models += auto_defaults_root.findall(f'.//models[sim="{the_sim}"][device="{dev_val}"]') + \
+                          auto_defaults_root.findall(f'.//models[sim="any"][device="{dev_val}"]')
+        def_models += auto_defaults_root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
                       auto_defaults_root.findall(f'.//models[sim="any"][device="any"]')
     else:
         def_models = auto_defaults_root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
@@ -1298,9 +1331,11 @@ def read_models(the_sim, the_class=''):
 
 
     if the_class == '':
-        usr_models =  auto_user_root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
-                      auto_user_root.findall(f'.//models[sim="any"][device="{device}"]') + \
-                      auto_user_root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+        usr_models = []
+        for dev_val in _read_device_chain(device):
+            usr_models += auto_user_root.findall(f'.//models[sim="{the_sim}"][device="{dev_val}"]') + \
+                          auto_user_root.findall(f'.//models[sim="any"][device="{dev_val}"]')
+        usr_models += auto_user_root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
                       auto_user_root.findall(f'.//models[sim="any"][device="any"]')
     else:
         usr_models = auto_user_root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
@@ -1371,9 +1406,14 @@ def read_models_data(which_root, sim, full_model_name, alldevices=False, instanc
         any_models = root.findall(f'.//models[sim="{sim}"][device="any"]{profile_match}') + \
                      root.findall(f'.//models[sim="any"][device="any"]{profile_match}')
 
-        # Collect models with specific devices
-        all_models = root.findall(f'.//models[sim="{sim}"][device="{the_device}"]{profile_match}') + \
-                     root.findall(f'.//models[sim="any"][device="{the_device}"]{profile_match}')
+        # Collect models with specific devices. ``_read_device_chain`` returns
+        # the base layer (e.g. ``joystick`` for shaker) first and the primary
+        # device last so the model_dict overwrite below picks the primary's
+        # value over the fallback when both exist.
+        all_models = []
+        for dev_val in _read_device_chain(the_device):
+            all_models += root.findall(f'.//models[sim="{sim}"][device="{dev_val}"]{profile_match}')
+            all_models += root.findall(f'.//models[sim="any"][device="{dev_val}"]{profile_match}')
 
         # Create a dictionary to store models based on unique keys
     model_dict = {}
@@ -1525,11 +1565,16 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
         the_device = device
     else:
         the_device = instance_device
-    # Iterate through models elements
-    for model_elem in auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="{the_device}"]') + \
-                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="{the_device}"]') + \
-                      auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
-                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="any"]'):
+    # Iterate through models elements. The chain expands to ``[joystick,
+    # shaker]`` for the shaker child so its handler picks up class-level
+    # rumble / ETL flags that defaults.xml only declares under joystick.
+    class_elems = []
+    for dev_val in _read_device_chain(the_device):
+        class_elems += auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="{dev_val}"]') + \
+                       auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="{dev_val}"]')
+    class_elems += auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
+                   auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="any"]')
+    for model_elem in class_elems:
 
         if model_elem.find('name') is not None:
 
@@ -1548,10 +1593,13 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
 
             class_data.append(model_dict)
     removal_data = []
-    for model_elem in auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="{the_device}"]') + \
-                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="{the_device}"]') + \
-                      auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="any"]') + \
-                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="any"]'):
+    removal_elems = []
+    for dev_val in _read_device_chain(the_device):
+        removal_elems += auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="{dev_val}"]') + \
+                         auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="{dev_val}"]')
+    removal_elems += auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="any"]') + \
+                     auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="any"]')
+    for model_elem in removal_elems:
         removal_data.append(model_elem.find('name').text)
     if not removal_data:
         removal_data = None
@@ -1726,6 +1774,8 @@ def apply_validvalue_overrides_from_root(data_list, sim, model_class, instance_d
     """
     instance_device = instance_device if instance_device != '' else device
     overrides = auto_defaults_root.findall(".//validvalues_overrides")
+    accepted_devices = set(_read_device_chain(instance_device))
+    accepted_devices.add('any')
 
     for item in data_list:
         for override in overrides:
@@ -1735,7 +1785,7 @@ def apply_validvalue_overrides_from_root(data_list, sim, model_class, instance_d
             device_ = override.findtext("device")
             validvalues = override.findtext("validvalues")
 
-            if (name == item['name'] and sim_ == sim and class_ == model_class and (device_ == instance_device or device_ == 'any')):
+            if (name == item['name'] and sim_ == sim and class_ == model_class and device_ in accepted_devices):
                 item['validvalues'] = validvalues
 
 def read_user_sim_data(the_sim, instance_device=''):
@@ -1766,12 +1816,16 @@ def read_user_sim_data(the_sim, instance_device=''):
         the_device = device
     else:
         the_device = instance_device
-    # Iterate through models elements
-    # for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{device}" or device="any"]'):
-    for model_elem in auto_user_root.findall(f'.//simSettings[sim="{the_sim}"][device="{the_device}"]') + \
-                       auto_user_root.findall(f'.//simSettings[sim="any"][device="{the_device}"]') + \
-                       auto_user_root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]')  + \
-                       auto_user_root.findall(f'.//simSettings[sim="any"][device="any"]'):
+    # Iterate through simSettings elements. The chain expands to ``[joystick,
+    # shaker]`` for the shaker child so its handler inherits user-level sim
+    # overrides written under the joystick.
+    sim_elems = []
+    for dev_val in _read_device_chain(the_device):
+        sim_elems += auto_user_root.findall(f'.//simSettings[sim="{the_sim}"][device="{dev_val}"]') + \
+                     auto_user_root.findall(f'.//simSettings[sim="any"][device="{dev_val}"]')
+    sim_elems += auto_user_root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]') + \
+                 auto_user_root.findall(f'.//simSettings[sim="any"][device="any"]')
+    for model_elem in sim_elems:
 
         if model_elem.find('name') is not None:
 
@@ -1819,12 +1873,12 @@ def read_user_class_data(the_sim, crafttype, instance_device=''):
         the_device = device
     else:
         the_device = instance_device
-    # Iterate through models elements
-    #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
-    for model_elem in auto_user_root.findall(f'.//classSettings[sim="{the_sim}"][device="{the_device}"]'):     # + \
-                      # root.findall(f'.//classSettings[sim="any"][device="{device}"]') + \
-                      # root.findall(f'.//classSettings[sim="{the_sim}"][device="any"]') + \
-                      # root.findall(f'.//classSettings[sim="any"][device="any"]'):
+    # The chain expands to ``[joystick, shaker]`` for the shaker child so its
+    # handler inherits user-level class overrides written under the joystick.
+    class_elems = []
+    for dev_val in _read_device_chain(the_device):
+        class_elems += auto_user_root.findall(f'.//classSettings[sim="{the_sim}"][device="{dev_val}"]')
+    for model_elem in class_elems:
         if model_elem.find('type') is not None:
             # Assuming 'model' is the element containing the wildcard pattern
             pattern = model_elem.find('type').text
@@ -2373,11 +2427,15 @@ def get_craft_attributes(which_root, sim, device):
         logging.exception(f"get_craft_attributes called with invalid root object {which_root}")
         raise ValueError(f"get_craft_attributes with invalid root object {which_root}")
 
-    for defaults_elem in root.findall(f'.//defaults[{sim}="true"][{device}="true"]'):
-        # for defaults_elem in root.findall(f'.//defaults[{sim}="true" and {device}="true"]'):
-        for value_elem in defaults_elem.findall('.//value'):
-            craft_attr = value_elem.get('Craft')
-            if craft_attr is not None:
-                craft_attributes.add(craft_attr)
+    seen_elems = set()
+    for dev_tag in _read_device_chain(device):
+        for defaults_elem in root.findall(f'.//defaults[{sim}="true"][{dev_tag}="true"]'):
+            if id(defaults_elem) in seen_elems:
+                continue
+            seen_elems.add(id(defaults_elem))
+            for value_elem in defaults_elem.findall('.//value'):
+                craft_attr = value_elem.get('Craft')
+                if craft_attr is not None:
+                    craft_attributes.add(craft_attr)
 
     return sorted(list(craft_attributes))
