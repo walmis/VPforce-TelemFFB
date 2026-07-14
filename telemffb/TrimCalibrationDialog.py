@@ -71,6 +71,10 @@ class TrimCalibrationDialog(QDialog):
         self._result_shown = False
         self._telem_connected = False
         self._cal_seen = None    # id() of the calibrator the display belongs to
+        # Paused sims stop sending telemetry, so the timeout fires right after
+        # the pause frame; remember it so the idle fallback can say "unpause"
+        # instead of clobbering it with the generic waiting message.
+        self._sim_paused_seen = False
 
         self._build_ui()
         self._refresh_idle()
@@ -222,6 +226,7 @@ class TrimCalibrationDialog(QDialog):
 
     def _on_telemetry(self, data):
         try:
+            self._sim_paused_seen = bool(data.get("SimPaused"))
             cal = self._calibrator()
 
             # The calibrator lives on the aircraft instance; a different object
@@ -525,6 +530,16 @@ class TrimCalibrationDialog(QDialog):
             self.btn_start.setEnabled(False)
         elif cal is None:
             self._set_ready(False, "Load an MSFS / X-Plane aircraft")
+            self.btn_start.setEnabled(False)
+        else:
+            # No telemetry right now. If the last frame before the timeout
+            # said the sim was paused, keep the specific message; otherwise
+            # show the generic one. _on_telemetry replaces this with the live
+            # can_start result once frames arrive.
+            if self._sim_paused_seen:
+                self._set_ready(False, "Unpause the simulator to calibrate")
+            else:
+                self._set_ready(False, "Waiting for telemetry — is the sim running?")
             self.btn_start.setEnabled(False)
 
     # ---- lifecycle ----------------------------------------------------------

@@ -519,6 +519,23 @@ class TestSafety:
         ok, msg = cal.can_start(ac.telem(SimOnGround=0))
         assert ok, msg
 
+    def test_can_start_rejects_paused_and_slew(self):
+        # A frozen frame while paused is otherwise airborne/level/AP-off, so
+        # without an explicit check the readiness indicator wrongly says ready.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        ok, msg = cal.can_start(ac.telem(SimPaused=1))
+        assert not ok and "npause" in msg
+        ok, msg = cal.can_start(ac.telem(Slew=1))
+        assert not ok and "slew" in msg.lower()
+
+    def test_pause_mid_run_aborts(self, clock):
+        ac, cal = self._armed(clock)
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem(SimPaused=1))
+        assert cal.state == CalState.ABORT
+        assert "paused" in cal.abort_reason.lower()
+
 
 # --------------------------------------------------------------------------- #
 #  Trim neutralization (settings-independent sweep centering)

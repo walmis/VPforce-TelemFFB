@@ -1926,7 +1926,22 @@ class MainWindow(QMainWindow):
 
         Shared entry point for the Utilities menu action and the settings-row
         'trimcal' button; one dialog instance serves both.
+
+        Trim calibration is MSFS/X-Plane only, so refuse to open (with an
+        explanation) when nothing is loaded or the active aircraft is for a
+        different simulator.
         """
+        sim = (G.settings_mgr.current_sim or "").upper()
+        if sim not in ("MSFS", "XPLANE"):
+            if sim in ("", "NOTHING"):
+                msg = ("No aircraft is loaded.\n\nLoad into an MSFS or X-Plane "
+                       "aircraft, then open the Elevator Trim Calibration tool.")
+            else:
+                msg = (f"Elevator Trim Calibration is only available for MSFS and "
+                       f"X-Plane.\n\nThe active aircraft is for {sim}.")
+            QMessageBox.information(self, "Elevator Trim Calibration", msg)
+            return
+
         from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
         if getattr(self, 'trim_cal_dialog', None) is None:
             # The dialog destroys itself on close (stale-display safety); the

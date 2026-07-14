@@ -341,6 +341,10 @@ class TrimCalibrator:
             return False, "Enable 'TelemFFB Controls Axes' (axis control) first"
         if telem_data is None:
             return False, "Waiting for telemetry"
+        if telem_data.get("SimPaused"):
+            return False, "donUnpause the simulator to calibrate"
+        if telem_data.get("Slew"):
+            return False, "Exit slew mode to calibrate"
         if telem_data.get("SimOnGround", 1):
             return False, "Aircraft must be airborne"
         for field in ("VerticalSpeed", "Pitch", "Roll", "IAS", "ElevTrimPct"):
@@ -450,6 +454,12 @@ class TrimCalibrator:
 
     def _precheck(self, telem_data):
         """Common per-frame safety checks; abort and return False on breach."""
+        if telem_data.get("SimPaused"):
+            # Frames keep arriving while paused but the aircraft is frozen; the
+            # wall-clock settle timers would false-settle on the frozen VS and
+            # corrupt the measurement. Bail cleanly — re-run after unpausing.
+            self._abort("Simulator paused")
+            return False
         if self._ap_engaged(telem_data):
             self._abort("Autopilot engaged")
             return False
