@@ -263,6 +263,10 @@ class MainWindow(QMainWindow):
         reload_action.triggered.connect(self.force_reload_aircraft)
         utilities_menu.addAction(reload_action)
 
+        trim_cal_action = QAction('Elevator Trim Calibration...', self)
+        trim_cal_action.triggered.connect(self.open_trim_calibration_dialog)
+        utilities_menu.addAction(trim_cal_action)
+
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             """
             Add Window menu to manage child instances if it is a master instance
@@ -1917,6 +1921,40 @@ class MainWindow(QMainWindow):
             logging.exception("Exception")
         # dialog.exec_()
 
+    def open_trim_calibration_dialog(self):
+        """Open (or focus) the elevator trim calibration dialog.
+
+        Shared entry point for the Utilities menu action and the settings-row
+        'trimcal' button; one dialog instance serves both.
+
+        Trim calibration is MSFS/X-Plane only, so refuse to open (with an
+        explanation) when nothing is loaded or the active aircraft is for a
+        different simulator.
+        """
+        sim = (G.settings_mgr.current_sim or "").upper()
+        if sim not in ("MSFS", "XPLANE"):
+            if sim in ("", "NOTHING"):
+                msg = ("No aircraft is loaded.\n\nLoad into an MSFS or X-Plane "
+                       "aircraft, then open the Elevator Trim Calibration tool.")
+            else:
+                msg = (f"Elevator Trim Calibration is only available for MSFS and "
+                       f"X-Plane.\n\nThe active aircraft is for {sim}.")
+            QMessageBox.information(self, "Elevator Trim Calibration", msg)
+            return
+
+        from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+        if getattr(self, 'trim_cal_dialog', None) is None:
+            # The dialog destroys itself on close (stale-display safety); the
+            # destroyed signal clears this reference so the next open builds
+            # a fresh one against the then-current aircraft.
+            self.trim_cal_dialog = TrimCalibrationDialog(self)
+            self.trim_cal_dialog.result_saved.connect(self.settings_layout.save_trim_calibration)
+            self.trim_cal_dialog.destroyed.connect(
+                lambda: setattr(self, 'trim_cal_dialog', None))
+        self.trim_cal_dialog.raise_()
+        self.trim_cal_dialog.activateWindow()
+        self.trim_cal_dialog.show()
+
     def update_settings(self):
         # utils.debug_caller_args('blue')
         self.populate_profile_combo(None) # populate combo with any new profiles
@@ -1984,7 +2022,7 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
 
-                self.status_container.flag_error(message)
+                self.status_container.request_flag_error.emit(message)
 
                 self.pop_tray_notification("Error", message, renew_period= 2)
 
@@ -2289,7 +2327,7 @@ class MainWindow(QMainWindow):
                         self.update_sim_indicators(data.get('src'), paused=False)
                         self.error_state = False
                         self.telemetry_timed_out = False
-                        self.status_container.clear_error()
+                        self.status_container.request_clear_error.emit()
                     else:
                         self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
             elif error_cond is not None:

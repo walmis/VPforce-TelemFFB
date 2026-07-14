@@ -153,6 +153,8 @@ class DetachedTabWindow(QtWidgets.QMainWindow):
 class AppStatusWidget(QWidget):
     request_set_active_vpconf = pyqtSignal(str)
     request_set_active_configurator = pyqtSignal(bool)
+    request_flag_error = pyqtSignal(str)
+    request_clear_error = pyqtSignal()
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -164,6 +166,11 @@ class AppStatusWidget(QWidget):
         # connect signal to slot (QueuedConnection by default across threads)
         self.request_set_active_vpconf.connect(self.set_active_vpconf)
         self.request_set_active_configurator.connect(self.set_active_configurator)
+        # flag_error/clear_error mutate the notification widget, a one-shot
+        # change that never repaints if called from the telemetry thread.
+        # Route through signals so the mutation runs on the GUI thread.
+        self.request_flag_error.connect(self.flag_error)
+        self.request_clear_error.connect(self.clear_error)
 
         grid = QGridLayout(self)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -346,6 +353,7 @@ class AppStatusWidget(QWidget):
         self.pulse_label(self.sim_status_label.status_label, stop=True)
 
     def flag_error(self, message):
+        # print(f'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TESTING HERE: {message}')
         self.notification_label.setText(message)
         self.notification_label.show()
         self.message_stack.setCurrentIndex(1)
@@ -2579,6 +2587,241 @@ class GForceCurveWidget(CurveWidget):
         self.x_min = new_x_min
         self.x_max = new_x_max
         self.update()
+
+
+class TrimCurveWidget(CurveWidget):
+    """Read-only display of the auto-trim calibration measurement.
+
+    Sibling of :class:`SpringCurveWidget`/:class:`GForceCurveWidget`. Plots the
+    measured ``elevator_axis(trim)`` samples (scatter) against the fitted line
+    used to solve ``virtual_y``. X is trim %, Y is the elevator-axis command %
+    (signed). It is not editable — the base's point-drag machinery is stubbed
+    out — and it carries none of the spring-specific unit/airspeed/smoothing
+    behavior.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Trim Calibration")
+        self.x_label_text = "Trim:"
+        self.x_label_legend = "Elevator Trim %"
+        self.y_label_text = "Elevator:"
+        self.y_label_legend = "Elevator Axis %"
+        self.current_unit = "%"
+
+        # Label band sized for this widget's tick labels ("-103%") plus the
+        # rotated Y legend; the base margins are too tight and put ticks and
+        # legends in the same pixel columns.
+        self.margin_left = 58
+        self.margin_bottom = 42
+
+        # Full-scale view while idle/measuring; set_result() zooms to the data.
+        self.x_min = -100.0
+        self.x_max = 100.0
+        self.y_min = -100.0
+        self.y_max = 100.0
+
+        self.sample_points = []          # [QPointF(trim%, elevator%)]
+        self.fit_line = None             # (QPointF, QPointF) in %-space
+        self.curve_polyline = []         # sorted samples joined = the calibrated curve
+        self.extrap_tails = []           # dashed edge-slope segments beyond the band
+        self.live_point = None           # QPointF(trim%, elevator%) or None
+        self.points = []                 # unused; keeps base paint helpers safe
+
+    # ---- data API -----------------------------------------------------------
+
+    def set_result(self, samples, slope, intercept):
+        """Populate from calibration output.
+
+        Args:
+            samples: list of (trim_frac, u_elev_frac), both normalized [-1, 1].
+            slope, intercept: linear fit of u_elev vs trim (normalized units).
+        """
+        self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
+        xs = [p.x() for p in self.sample_points]
+        ys = [p.y() for p in self.sample_points]
+        if not xs:
+            self.update()
+            return
+
+        # The calibrated curve is the sorted samples joined; dashed tails show
+        # the edge-slope extrapolation the runtime applies beyond the band.
+        pts = sorted(self.sample_points, key=lambda p: p.x())
+        self.curve_polyline = pts
+        self.extrap_tails = []
+        span = pts[-1].x() - pts[0].x()
+        ext = max(span * 0.15, 2.0)
+        if len(pts) >= 2:
+            p0, p1 = pts[0], pts[1]
+            s0 = (p1.y() - p0.y()) / (p1.x() - p0.x()) if p1.x() != p0.x() else 0.0
+            self.extrap_tails.append(
+                (QPointF(p0.x() - ext, p0.y() - s0 * ext), QPointF(p0.x(), p0.y())))
+            q0, q1 = pts[-2], pts[-1]
+            s1 = (q1.y() - q0.y()) / (q1.x() - q0.x()) if q1.x() != q0.x() else 0.0
+            self.extrap_tails.append(
+                (QPointF(q1.x(), q1.y()), QPointF(q1.x() + ext, q1.y() + s1 * ext)))
+
+        xmin, xmax = min(xs), max(xs)
+        self.x_min, self.x_max = xmin - ext - 1.0, xmax + ext + 1.0
+
+        y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
+        y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
+        self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
+
+        tail_ys = [p.y() for seg in self.extrap_tails for p in seg]
+        ylim = max(max((abs(v) for v in ys), default=0.0),
+                   max((abs(v) for v in tail_ys), default=0.0),
+                   abs(y1), abs(y2), 5.0) * 1.2
+        self.y_min, self.y_max = -ylim, ylim
+        self.update()
+
+    def set_live_point(self, trim_frac, u_elev_frac):
+        """Optional live marker for the current trim/elevator during a run."""
+        if trim_frac is None or u_elev_frac is None:
+            self.live_point = None
+        else:
+            self.live_point = QPointF(trim_frac * 100.0, u_elev_frac * 100.0)
+        self.update()
+
+    def set_samples(self, samples):
+        """Live scatter of the stations accepted so far (no zoom/fit).
+
+        Used while a run is in progress; the view stays at full scale so the
+        picture is stable — set_result() does the zoom at completion.
+        """
+        self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
+        self.update()
+
+    def clear(self):
+        self.sample_points = []
+        self.fit_line = None
+        self.curve_polyline = []
+        self.extrap_tails = []
+        self.live_point = None
+        # Back to the stable full-scale measuring view (a previous result may
+        # have zoomed the axes to its data).
+        self.x_min, self.x_max = -100.0, 100.0
+        self.y_min, self.y_max = -100.0, 100.0
+        self.update()
+
+    # ---- coordinate mapping (signed Y range) --------------------------------
+
+    def map_to_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        xr = (self.x_max - self.x_min) or 1.0
+        yr = (self.y_max - self.y_min) or 1.0
+        x = rect.left() + ((point.x() - self.x_min) / xr) * rect.width()
+        y = rect.top() + (1 - (point.y() - self.y_min) / yr) * rect.height()
+        return QPointF(x, y)
+
+    def map_from_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        x = self.x_min + ((point.x() - rect.left()) / rect.width()) * (self.x_max - self.x_min)
+        y = self.y_min + (1 - (point.y() - rect.top()) / rect.height()) * (self.y_max - self.y_min)
+        return QPointF(x, y)
+
+    # ---- rendering ----------------------------------------------------------
+
+    def draw_axis_labels(self, painter, *args, **kwargs):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        painter.setFont(QFont('Arial', 8))
+        painter.setPen(QPen(self.axis_color))
+        fm = painter.fontMetrics()
+
+        # Every other gridline gets a tick label — all 11 collide at typical
+        # widget heights. Y ticks are right-aligned against the plot edge so
+        # they never reach the rotated legend at the far left.
+        for i in range(0, 11, 2):
+            y = int(rect.top() + i * rect.height() / 10)
+            val = self.y_max - (self.y_max - self.y_min) * i / 10
+            text = f"{val:.0f}%"
+            painter.drawText(rect.left() - fm.horizontalAdvance(text) - 6,
+                             y + fm.ascent() // 2, text)
+
+        for i in range(0, 11, 2):
+            x = int(rect.left() + i * rect.width() / 10)
+            val = self.x_min + (self.x_max - self.x_min) * i / 10
+            text = f"{val:.0f}"
+            painter.drawText(x - fm.horizontalAdvance(text) // 2,
+                             rect.bottom() + fm.ascent() + 4, text)
+
+        painter.setFont(QFont('Arial', 9))
+        fm = painter.fontMetrics()
+        if self.x_label_legend:
+            tw = fm.horizontalAdvance(self.x_label_legend)
+            painter.drawText(rect.left() + rect.width() // 2 - tw // 2,
+                             rect.bottom() + self.margin_bottom - 6, self.x_label_legend)
+        if self.y_label_legend:
+            painter.save()
+            th = fm.horizontalAdvance(self.y_label_legend)
+            painter.translate(12, rect.top() + rect.height() // 2 + th // 2)
+            painter.rotate(-90)
+            painter.drawText(0, 0, self.y_label_legend)
+            painter.restore()
+
+    def _draw_zero_axes(self, painter):
+        """Emphasize the x=0 and y=0 reference lines within the plot band."""
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        painter.setPen(QPen(self.axis_color, 1, Qt.PenStyle.SolidLine))
+        if self.y_min <= 0 <= self.y_max:
+            zy = self.map_to_widget_space(QPointF(self.x_min, 0)).y()
+            painter.drawLine(rect.left(), int(zy), rect.right(), int(zy))
+        if self.x_min <= 0 <= self.x_max:
+            zx = self.map_to_widget_space(QPointF(0, self.y_min)).x()
+            painter.drawLine(int(zx), rect.top(), int(zx), rect.bottom())
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.draw_grid(painter)
+        self._draw_zero_axes(painter)
+        self.draw_axis_labels(painter)
+
+        # Static best-fit: dotted, de-emphasized — the calibrated curve is the
+        # recommended output; the fit is the legacy single-gain reference.
+        if self.fit_line is not None:
+            painter.setPen(QPen(self.curve_color, 1, Qt.PenStyle.DotLine))
+            painter.drawLine(self.map_to_widget_space(self.fit_line[0]),
+                             self.map_to_widget_space(self.fit_line[1]))
+
+        if len(self.curve_polyline) >= 2:
+            painter.setPen(QPen(self.curve_color, 2))
+            wpts = [self.map_to_widget_space(p) for p in self.curve_polyline]
+            for a, b in zip(wpts, wpts[1:]):
+                painter.drawLine(a, b)
+
+        # Edge-slope extrapolation beyond the measured band: dashed.
+        if self.extrap_tails:
+            painter.setPen(QPen(self.curve_color, 2, Qt.PenStyle.DashLine))
+            for seg in self.extrap_tails:
+                painter.drawLine(self.map_to_widget_space(seg[0]),
+                                 self.map_to_widget_space(seg[1]))
+
+        painter.setPen(QPen(self.axis_color, 1))
+        painter.setBrush(self.point_fill)
+        for p in self.sample_points:
+            wp = self.map_to_widget_space(p)
+            painter.drawEllipse(QRectF(wp.x() - 3, wp.y() - 3, 6, 6))
+
+        if self.live_point is not None:
+            wp = self.map_to_widget_space(self.live_point)
+            painter.setBrush(QColor("#33cc33"))
+            painter.setPen(QPen(QColor("#116611"), 1))
+            painter.drawEllipse(QRectF(wp.x() - 4, wp.y() - 4, 8, 8))
+
+        if not self._enabled:
+            self.apply_disabled_overlay(painter)
+
+    # ---- read-only: disable point editing -----------------------------------
+
+    def mousePressEvent(self, event):
+        pass
+
+    def mouseMoveEvent(self, event):
+        pass
+
+    def mouseReleaseEvent(self, event):
+        pass
 
 
 class ExceptionStatusWidget(QWidget):

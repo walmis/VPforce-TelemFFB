@@ -53,6 +53,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__dyn_pressure_scale = 0.005  # scale the dynamic pressure to ffb friendly values
+        self._trim_calibrator = None  # lazily created TrimCalibrator (elevator virtual_y auto-cal)
 
         self.use_fbw_for_ap_follow = True
         self.slip_gain = 1.0        
@@ -281,6 +282,17 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     @override
     def ac_modify_game_spring(self):
         """This function is not used in MSFS/X-Plane mixin."""
+
+    def get_trim_calibrator(self):
+        """Get (lazily creating) the elevator virtual_y auto-calibration engine.
+
+        The dialog uses this to arm/stop the run and read live state; the
+        per-frame flight-controls hook delegates to it while it is active.
+        """
+        if self._trim_calibrator is None:
+            from telemffb.sim.msfs_xp.TrimCalibrator import TrimCalibrator
+            self._trim_calibrator = TrimCalibrator(self)
+        return self._trim_calibrator
 
     def _calculate_airspeeds(self, telem_data: BaseTelemetryData, incidence_vec):
         """Calculate and store airspeed values in telemetry data.
@@ -688,16 +700,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         if not (self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control):
             return 0, 0, 0, 0
 
-        elev_trim = telem_data.ElevTrimPct or 0
         aileron_trim = telem_data.AileronTrimPct or 0
 
         aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
         virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
 
-        elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
-        elev_trim = self.elev_trim_dampener.update(elev_trim, derivative_hz=5, derivative_k=0.15)
+        # Dampen the RAW trim (calibrated-curve lookups live in ElevTrimPct
+        # space), then scale by the physical gain for the spring center.
+        # Identical to the previous scale-then-dampen at physical gain 1.0.
+        t_damp = self.elev_trim_dampener.update(telem_data.ElevTrimPct or 0,
+                                                derivative_hz=5, derivative_k=0.15)
+        elev_trim = clamp(t_damp * self.joystick_trim_follow_gain_physical_y, -1, 1)
 
-        virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+        virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim)
         phys_stick_y_offs = int(elev_trim * 4096)
 
         if self.ap_following and ap_active:
@@ -1044,8 +1059,22 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                      _G_term, _pct_max_e, _ec, _pct_max_a, _ac, _pct_max_r, _rc,
                      phys_x, phys_y, _controls_locked
         """
+        # Auto-trim calibration owns the axis/spring output while running; it
+        # bypasses normal trim-following for both FBW and non-FBW aircraft.
+        if self._trim_calibrator is not None and self._trim_calibrator.active:
+            try:
+                self._trim_calibrator.update(telem_data)
+            except Exception:
+                # Telemetry hot path: a calibrator bug must never kill the
+                # processing loop (docs/dev_guidelines.md "Error Handling"),
+                # least of all while it is flying the aircraft. Abort the run
+                # and hand control back to normal flight controls next frame.
+                logging.exception("Trim calibration crashed; aborting run")
+                self._trim_calibrator.force_abort("Internal error - see log")
+            return
+
         self._spring_handle.name = "dynamic_spring"
-        
+
         # Determine autopilot state
         if self._sim_is_msfs():
             ap_active = telem_data.APMaster or 0
