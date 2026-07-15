@@ -3505,7 +3505,11 @@ def upload_vpconf_profile(config_filepath, serial):
 
         logging.info(f"upload_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
         G.current_vpconf_profile = config_filepath
-        G.main_window.status_container.request_set_active_vpconf.emit(config_filepath)
+        # Scope-aware: only updates the indicator if this device is the
+        # selected config scope (a master scoped to a child keeps showing the
+        # child's reported state; ours shows when the user switches back).
+        if G.main_window is not None:
+            G.main_window.refresh_scope_status_indicators(force=True)
 
         def exec():
             # Use NamedMutex to ensure only one instance of the configurator is executed at a time

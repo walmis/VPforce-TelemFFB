@@ -458,17 +458,16 @@ class TelemManager(QObject, threading.Thread):
                 G.current_configurator_gains = state
                 any_true = any(sub.get('enabled', False) for sub in state.values())
                 self.gain_overrides_active = any_true
-                G.main_window.status_container.request_set_active_configurator.emit(any_true)
+                G.main_window.refresh_scope_status_indicators(force=True)
             else:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.status_container.request_set_active_configurator.emit(False)
-                pass
+                G.main_window.refresh_scope_status_indicators(force=True)
         else:
             if self.gain_overrides_active:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.status_container.request_set_active_configurator.emit(False)
+                G.main_window.refresh_scope_status_indicators(force=True)
 
     def _setup_simconnect_overrides(self, aircraft_name, data_source):
         """Setup SimConnect variable overrides for MSFS aircraft."""
@@ -530,11 +529,11 @@ class TelemManager(QObject, threading.Thread):
                 G.current_configurator_gains = state
                 any_true = any(sub.get('enabled', False) for sub in state.values())
                 self.gain_overrides_active = any_true
-                G.main_window.status_container.request_set_active_configurator.emit(any_true)
+                G.main_window.refresh_scope_status_indicators(force=True)
             else:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.status_container.request_set_active_configurator.emit(False)
+                G.main_window.refresh_scope_status_indicators(force=True)
 
     def _recreate_aircraft_with_new_type(self, aircraft_info: AircraftInfo, params, cls_name):
         """Recreate aircraft instance when type changes."""

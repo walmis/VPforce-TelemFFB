@@ -310,7 +310,13 @@ class IPCNetworkThread(QObject, threading.Thread):
     def send_ipc_effects(self, active_effects, active_settings):
         payload = {
             f'{G.device_type}_active_effects': active_effects,
-            f'{G.device_type}_active_settings': active_settings
+            f'{G.device_type}_active_settings': active_settings,
+            # Device-status context so the master can mirror this instance's
+            # vpconf-profile / gain-override indicators when the user selects
+            # this device as the config scope.
+            f'{G.device_type}_vpconf_profile': G.current_vpconf_profile or '',
+            f'{G.device_type}_gain_ovd_active':
+                bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False,
         }
         self.send_message(f"effects:{json.dumps(payload)}")
 

@@ -383,6 +383,14 @@ class AppStatusWidget(QWidget):
 
     @pyqtSlot(str)
     def set_active_vpconf(self, file):
+        if not file:
+            # No profile pushed for the scoped device (or none reported yet):
+            # return to the initial hidden state.
+            self.active_vpconf_label.setText('')
+            self.active_vpconf_label.setToolTip('')
+            self.active_vpconf_header.setVisible(False)
+            self.active_vpconf_label.setVisible(False)
+            return
         self.active_vpconf_label.setText(os.path.splitext(os.path.basename(file))[0])
         self.active_vpconf_label.setToolTip(f"Last profile pushed by TelemFFB:\n{file}")
         self.active_vpconf_header.setVisible(True)

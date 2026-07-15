@@ -1500,7 +1500,34 @@ class MainWindow(QMainWindow):
 
         if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
+        self.refresh_scope_status_indicators(force=True)
         self.settings_layout.reload_caller()
+
+    def refresh_scope_status_indicators(self, force=False):
+        """Update the vpconf-profile and gain-override indicators to reflect
+        the device currently selected as the config scope.
+
+        The master shows its own state while scoped to its own device, and the
+        state reported over IPC (piggybacked on the child's effects payload)
+        while scoped to a child; child instances always show their own state.
+        Safe to call from any thread — the display update goes through the
+        widget's queued request signals — and repeat values are deduplicated
+        so the pulse animation only fires when something actually changed.
+        """
+        scope = G.current_device_config_scope or G.device_type
+        if scope == G.device_type or not G.master_instance:
+            vpconf = G.current_vpconf_profile or ''
+            ovd = bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False
+        else:
+            fx = G.ipc_instance._ipc_telem_effects if G.ipc_instance else {}
+            vpconf = fx.get(f'{scope}_vpconf_profile', '') or ''
+            ovd = bool(fx.get(f'{scope}_gain_ovd_active', False))
+        shown = (scope, vpconf, ovd)
+        if not force and shown == getattr(self, '_scope_status_shown', None):
+            return
+        self._scope_status_shown = shown
+        self.status_container.request_set_active_vpconf.emit(vpconf)
+        self.status_container.request_set_active_configurator.emit(ovd)
 
     def resize_offline_combos(self):
         """
@@ -2251,6 +2278,10 @@ class MainWindow(QMainWindow):
                         active_effects += descr + "\n"
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)
+
+            # Keep the scoped device-status indicators current (deduped; only
+            # repaints when the scoped device's reported state changes).
+            self.refresh_scope_status_indicators()
 
             if G.child_instance:
                 child_effects = str(G.effects.dict.keys())
