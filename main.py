@@ -705,6 +705,20 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
+        # Startup race: when the sim is already running with an aircraft loaded,
+        # the sim-listener thread loads that aircraft and applies its vpconf /
+        # configurator-override layer BEFORE this async init establishes the
+        # device's startup state — and the startup vpconf push above can wipe it.
+        # If an aircraft is already loaded, force a clean reload so its config is
+        # re-applied on top, exactly as the normal aircraft-change path does.
+        # No-op when nothing is loaded yet (the common start-before-sim case).
+        tm = G.telem_manager
+        if tm is not None and tm.currentAircraftName is not None:
+            logging.info("Async device init finished after an aircraft was already "
+                         "loaded; forcing a config reload to re-apply its settings/overrides")
+            G.force_reload_aircraft_trigger = True
+            tm.currentAircraftName = None
+
     init_async()
 
 def _cleanup_on_exit(dev_serial):
