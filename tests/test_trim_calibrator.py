@@ -497,12 +497,15 @@ class TestSafety:
         # must sit exactly on the takeover baseline (no step, no nudge yet).
         expected_base = 0.0 - 0.2 * 1.0 * (1 - 0.5)   # -0.10
         assert ac.cmd_elev == pytest.approx(expected_base, abs=1e-6)
-        # After the baseline window, the probe nudge rides on the baseline.
-        for _ in range(int(cal.PROBE_BASELINE_S * 30) + 2):
+        # Through the baseline window and into the probe, the command must
+        # never jump — it stays on the baseline, then the probe eases in.
+        prev = ac.cmd_elev
+        for _ in range(int(cal.PROBE_BASELINE_S * 30) + 4):
             clock.advance(1 / 30.0)
             cal.update(ac.telem())
             ac.step(1 / 30.0)
-        assert ac.cmd_elev == pytest.approx(expected_base + cal.PROBE_U, abs=1e-6)
+            assert abs(ac.cmd_elev - prev) < cal.PROBE_U * 0.3, "command stepped"
+            prev = ac.cmd_elev
 
     def test_abort_on_telemetry_gap(self, clock):
         ac, cal = self._armed(clock)
@@ -672,6 +675,51 @@ class TestPitchCascade:
         assert cal._pitch_sign == -1.0
         assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
 
+    def test_probe_input_is_ramped_not_stepped(self, clock):
+        # An abrupt (step) probe rings the phugoid on sensitive aircraft; the
+        # probe must ease its input in over several frames, and still detect
+        # polarity.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        prev = ac.cmd_elev
+        max_jump = 0.0
+        for _ in range(400):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            # Measure across BOTH the ramp-up and the ramp-down of the
+            # elevator probe: neither onset nor release may step.
+            if cal.state == CalState.PROBE and cal._probe_stage == 0 \
+                    and cal._probe_phase != "baseline":
+                max_jump = max(max_jump, abs(ac.cmd_elev - prev))
+            prev = ac.cmd_elev
+            if cal._probe_stage == 1 or cal.state != CalState.PROBE:
+                break
+        assert max_jump < cal.PROBE_U * 0.3, f"probe stepped ({max_jump:.3f}); should ramp"
+        assert cal._elev_sign == 1.0, "polarity must still be detected from the ramped probe"
+
+    def test_probe_magnitude_scales_with_control_response(self, clock):
+        # Minimal control response must gentle the probe too, not just the
+        # leveling loop — but never below the response floor.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.initial_gain_scale = 0.25
+        cal.start()
+        peak = 0.0
+        for _ in range(400):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.PROBE and cal._probe_stage == 0 \
+                    and cal._probe_phase == "probe":
+                peak = max(peak, abs(ac.cmd_elev))
+            if cal._probe_stage == 1 or cal.state != CalState.PROBE:
+                break
+        # 0.08 * 0.25 = 0.02, floored at PROBE_U_MIN (0.03); well under full 0.08
+        assert peak <= cal.PROBE_U * 0.6, f"derated probe too strong ({peak:.3f})"
+        assert peak >= cal.PROBE_U_MIN * 0.8, f"derated probe below floor ({peak:.3f})"
+
     def test_legacy_fallback_when_pitch_unresponsive(self, clock):
         # No usable pitch response (e.g. bad telemetry): polarity stays
         # unknown, so the safe legacy VS-only loop must fly the run.
@@ -736,6 +784,18 @@ class TestOscillationWatchdog:
         _feed_oscillation(cal, [0.9, 0.7, 0.55, 0.45, 0.4])   # decaying
         _feed_oscillation(cal, [0.1, 0.2, 0.3])               # below jitter floor
         assert cal._gain_scale == pytest.approx(1.0)
+
+    def test_initial_gain_scale_pre_derates_loop(self, clock):
+        # User-selected Control Response: start gentler for known-sensitive
+        # aircraft; the watchdog backs off from there if still needed.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.initial_gain_scale = 0.5
+        cal.start()
+        assert cal._gain_scale == pytest.approx(0.5)
+        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP * 0.5)
+        _feed_oscillation(cal, GROWING)
+        assert cal._gain_scale == pytest.approx(0.25)
 
     def test_backoff_preserves_integral_output_term(self, clock):
         # The integral carries the trim-holding output; backing off must not

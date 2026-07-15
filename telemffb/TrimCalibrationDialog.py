@@ -30,10 +30,11 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
+    QComboBox,
 )
 
 import telemffb.globals as G
-from telemffb.custom_widgets import TrimCurveWidget
+from telemffb.custom_widgets import InfoLabel, TrimCurveWidget
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,28 @@ class TrimCalibrationDialog(QDialog):
             "so the airspeed settles at the current throttle/trim before measuring.\n"
             "Recommended — uncheck for a faster run.")
         root.addWidget(self.chk_settle)
+
+        response_row = QHBoxLayout()
+        lbl_response = InfoLabel(
+            text="Control response:",
+            tooltip=(
+                "Strength of the control inputs used to fly the aircraft during calibration.\n\n"
+                "Normal — most aircraft.\n"
+                "Reduced — sensitive aircraft that porpoise or bounce during stabilization.\n"
+                "Minimal — very sensitive or aerobatic aircraft with light, twitchy pitch.\n\n"
+                "Calibration also reduces its own control gains automatically when it detects\n"
+                "oscillation; this option just starts from a gentler setting. If a run aborts\n"
+                "with a pitch-oscillation error, retry with the next lower setting."))
+        response_row.addWidget(lbl_response)
+        self.cmb_response = QComboBox()
+        self.cmb_response.addItems([
+            "Normal",
+            "Reduced — sensitive aircraft",
+            "Minimal — very sensitive / aerobatic",
+        ])
+        response_row.addWidget(self.cmb_response)
+        response_row.addStretch(1)
+        root.addLayout(response_row)
 
         # Warning banner shown only while the engine is flying the aircraft.
         self.banner = QLabel("⚠  TelemFFB is controlling your aircraft — stay ready to take over")
@@ -393,6 +416,8 @@ class TrimCalibrationDialog(QDialog):
         self.curve.clear()
         self._clear_result_labels()
         cal.settle_before_sweep = self.chk_settle.isChecked()
+        cal.initial_gain_scale = {0: 1.0, 1: 0.5, 2: 0.25}.get(
+            self.cmb_response.currentIndex(), 1.0)
         cal.start()
 
     def _on_stop(self):

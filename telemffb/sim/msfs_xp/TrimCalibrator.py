@@ -119,8 +119,13 @@ class TrimCalibrator:
 
     # Polarity probe.
     AUTO_DETECT_POLARITY = True
-    PROBE_U = 0.08               # normalized axis command applied during a probe
-    PROBE_TIME_S = 1.2           # per-axis probe window (upper bound)
+    PROBE_U = 0.08               # peak normalized probe command (before ramp/scale)
+    PROBE_U_MIN = 0.03           # floor so a control-response-derated probe still responds
+    PROBE_RAMP_S = 0.6           # ramp the probe in over this long instead of a step —
+                                 # a step is broadband and rings the phugoid on
+                                 # sensitive/pitchy aircraft, starting an oscillation
+                                 # that was not there; a ramp excites far less.
+    PROBE_TIME_S = 2.5           # per-axis probe window (upper bound; exits early on response)
     PROBE_BASELINE_S = 0.4       # no-input drift-measurement window before each probe
     PROBE_MIN_VS = 0.15          # m/s; min |dVS| to trust the elevator probe
     PROBE_MIN_ROLL = 1.0         # deg; min |dRoll| to trust the aileron probe
@@ -245,6 +250,10 @@ class TrimCalibrator:
         # SPEED_SETTLE_S after finding the natural trim point so the airspeed
         # stabilizes before the sweep. Users can disable it for a faster run.
         self.settle_before_sweep = True
+        # Run option: starting pitch-gain scale (1.0 = normal). Lets the user
+        # pre-derate the leveling loop for known-sensitive/pitchy aircraft
+        # instead of waiting for the oscillation watchdog to discover it.
+        self.initial_gain_scale = 1.0
         self.result = None          # dict on success, else None
         self.abort_reason = None
         # Set from the UI thread by stop(); consumed in the telemetry thread so
@@ -276,9 +285,10 @@ class TrimCalibrator:
         self._last_t = None
         self._phase_start_t = None
         self._probe_stage = 0            # 0 = elevator, 1 = aileron
-        self._probe_phase = "baseline"   # "baseline" (measure drift) then "probe"
+        self._probe_phase = "baseline"   # "baseline" -> "probe" -> "rampdown"
         self._probe_ref = None           # reference value at sub-phase start
         self._probe_drift = 0.0          # drift rate measured over the baseline window
+        self._probe_peak_u = 0.0         # probe magnitude at ramp-down start
         self._probe_pitch_ref = None     # pitch anchor for pitch-polarity detection
         self._probe_pitch_drift = 0.0
         # pitch loop mode: None until engaged (after the probe knows the
@@ -326,7 +336,7 @@ class TrimCalibrator:
         self._osc_dir = 0            # 0 = undetermined, +1 rising, -1 falling
         self._osc_prev_ext = None    # last confirmed extremum
         self._osc_amps = []          # recent half-cycle amplitudes (peak-to-peak / 2)
-        self._set_pitch_gain_scale(1.0)
+        self._set_pitch_gain_scale(clamp(self.initial_gain_scale, self.OSC_MIN_GAIN_SCALE, 1.0))
         # takeover smoothness: hold the stick where it rests and start the
         # axis output where the normal path left it (captured on first frame)
         self._hold_offs = None
@@ -556,12 +566,33 @@ class TrimCalibrator:
         elapsed = now - self._phase_start_t
         probe_on = self._probe_phase == "probe"
 
+        # Ramped, gentled probe command: ease the input in over PROBE_RAMP_S
+        # (no step) and scale by the control-response setting so sensitive
+        # aircraft get a smaller nudge. Enough to read polarity, not enough to
+        # start an oscillation. The ramp-DOWN is symmetric — releasing the
+        # input abruptly is as broadband a disturbance as an abrupt onset.
+        if probe_on:
+            mag = max(self.PROBE_U * self._gain_scale, self.PROBE_U_MIN)
+            u_probe = mag * min(elapsed / self.PROBE_RAMP_S, 1.0)
+        elif self._probe_phase == "rampdown":
+            u_probe = self._probe_peak_u * max(1.0 - elapsed / self.PROBE_RAMP_S, 0.0)
+        else:
+            u_probe = 0.0
+
         if self._probe_stage == 0:
             # Elevator probe. The aileron gets NO closed-loop help here: its
             # polarity is unverified at this point, and a wrong-sign
             # wings-level term is positive feedback — seen in the field as a
             # hard roll at start when beginning with residual bank.
-            self._u_elev = self._u_base_y + (self.PROBE_U if probe_on else 0.0)
+            if self._probe_phase == "rampdown":
+                # Blend the held elevator into the leveling loop as we release:
+                # recovery starts now (not one stage later) and the handoff is
+                # stepless. Pitch polarity was detected just before ramp-down.
+                r = min(elapsed / self.PROBE_RAMP_S, 1.0)
+                level_u = self._run_pitch_loop(telem_data, dt)
+                self._u_elev = (1.0 - r) * (self._u_base_y + self._probe_peak_u) + r * level_u
+            else:
+                self._u_elev = self._u_base_y + u_probe
             self._u_ail = self._u_base_x
             exit_threshold = self.PROBE_VS_EXIT
         else:
@@ -569,14 +600,14 @@ class TrimCalibrator:
             # polarities detected in stage 0 (a weak hold lets the probe's
             # climb build into a zoom that trips the attitude guard).
             self._u_elev = self._run_pitch_loop(telem_data, dt)
-            self._u_ail = self._u_base_x + (self.PROBE_U if probe_on else 0.0)
+            self._u_ail = self._u_base_x + u_probe
             exit_threshold = self.PROBE_ROLL_EXIT
 
         self._command_axes(telem_data)
 
         value = self._probe_value(telem_data)
 
-        if not probe_on:
+        if self._probe_phase == "baseline":
             if elapsed >= self.PROBE_BASELINE_S:
                 self._probe_drift = (value - self._probe_ref) / max(elapsed, 1e-6)
                 p_now = telem_data.Pitch or 0.0
@@ -585,6 +616,13 @@ class TrimCalibrator:
                 self._probe_phase = "probe"
                 self._phase_start_t = now
                 self._probe_ref = value
+            return
+
+        if self._probe_phase == "rampdown":
+            # Polarity is already recorded; just ease the input out, then
+            # advance to the next stage (or stabilize).
+            if elapsed >= self.PROBE_RAMP_S:
+                self._advance_probe_stage()
             return
 
         # Drift-compensated response to the probe input.
@@ -613,11 +651,6 @@ class TrimCalibrator:
                 else:
                     logger.warning(f"Elevator probe inconclusive (dVS={delta:+.2f} m/s); "
                                    f"keeping sign {self._elev_sign:+.0f}")
-                self._probe_stage = 1
-                self._phase_start_t = None
-                self._probe_ref = None
-                self._probe_drift = 0.0
-                self._pitch_mode = None  # (re-)engage the pitch loop with fresh polarity info
             else:
                 if abs(delta) >= self.PROBE_MIN_ROLL:
                     self._ail_sign = 1.0 if delta > 0 else -1.0
@@ -625,7 +658,26 @@ class TrimCalibrator:
                 else:
                     logger.warning(f"Aileron probe inconclusive (dRoll={delta:+.2f} deg); "
                                    f"keeping sign {self._ail_sign:+.0f}")
-                self._enter_stabilize()
+            # Polarity recorded; ease the input back out before advancing.
+            self._probe_peak_u = u_probe
+            self._probe_phase = "rampdown"
+            self._phase_start_t = now
+
+    def _advance_probe_stage(self):
+        """After a probe's ramp-down, move to the aileron probe or stabilize.
+
+        The pitch loop was engaged during the elevator ramp-down and stays
+        engaged (its integral already holds recovery progress); resetting it
+        here would discard that and re-step the elevator.
+        """
+        if self._probe_stage == 0:
+            self._probe_stage = 1
+            self._probe_phase = "baseline"
+            self._phase_start_t = None
+            self._probe_ref = None
+            self._probe_drift = 0.0
+        else:
+            self._enter_stabilize()
 
     # ---- Phase: stabilize ----------------------------------------------------
 
