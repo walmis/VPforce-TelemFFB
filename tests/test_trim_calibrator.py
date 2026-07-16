@@ -420,6 +420,85 @@ class TestTrimwheelHold:
 
 
 # --------------------------------------------------------------------------- #
+#  Station-deadline compromise (residual VS: accept 30-60 fpm flagged, abort >60)
+# --------------------------------------------------------------------------- #
+
+class TestStationDeadlineCompromise:
+    def _run_to_sweep_with_samples(self, ac, cal, clock, min_samples=1):
+        cal.start()
+        for _ in range(40000):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.SWEEP and len(cal._samples) >= min_samples:
+                return
+        pytest.fail(f"never reached SWEEP with {min_samples} samples "
+                    f"({cal.state}, {cal.abort_reason})")
+
+    def test_residual_vs_in_band_is_accepted_and_flagged(self, clock):
+        # A steady 30-60 fpm residual is a finite-gain chase of a drifting
+        # target: at the station deadline the best dwell must be accepted,
+        # flagged in the result, and the run must still complete.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        self._run_to_sweep_with_samples(ac, cal, clock)
+        n_before = len(cal._samples)
+        last_trim, last_u = cal._samples[-1]
+        cal._station_best = (last_trim + 0.03, last_u, 60.0, 0.22)   # ~+43 fpm
+        cal._step_settle_deadline = time.perf_counter() - 1.0
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        ac.step(1 / 30.0)
+        assert cal.state != CalState.ABORT, f"aborted: {cal.abort_reason}"
+        assert len(cal._samples) == n_before + 1, "compromise sample must be recorded"
+        assert len(cal._flagged) == 1
+        assert cal._flagged[0]["index"] == n_before
+        assert cal._flagged[0]["vs_fpm"] == pytest.approx(0.22 * 196.85, abs=0.5)
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal.result["flagged"], "flag must surface in the result payload"
+
+    def test_residual_vs_above_hard_limit_aborts_with_reason(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        self._run_to_sweep_with_samples(ac, cal, clock)
+        # sit exactly on-station so the abort names the VS gate, not the trim ramp
+        cal._current_target = ac.trim
+        cal._trim_cmd = ac.trim
+        cal._station_best = (ac.trim, 0.0, 60.0, 0.45)   # ~+89 fpm
+        cal._step_settle_deadline = time.perf_counter() - 1.0
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        ac.step(1 / 30.0)
+        assert cal.state == CalState.ABORT
+        assert "would not settle below 60 fpm" in cal.abort_reason
+        assert "+89 fpm" in cal.abort_reason
+
+    def test_station_deadline_names_unreached_trim_target(self, clock):
+        # The old message blamed VS regardless of the failing gate; a station
+        # whose trim read-back never arrived must say so.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        self._run_to_sweep_with_samples(ac, cal, clock)
+        cal._current_target = ac.trim + 0.2   # far from the read-back
+        cal._station_best = None
+        cal._step_settle_deadline = time.perf_counter() - 1.0
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        ac.step(1 / 30.0)
+        assert cal.state == CalState.ABORT
+        assert "never reached the station target" in cal.abort_reason
+
+    def test_clean_run_has_no_flags(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE
+        assert cal.result["flagged"] == []
+
+
+# --------------------------------------------------------------------------- #
 #  Safety / aborts
 # --------------------------------------------------------------------------- #
 

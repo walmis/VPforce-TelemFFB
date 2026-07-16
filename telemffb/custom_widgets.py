@@ -2630,6 +2630,7 @@ class TrimCurveWidget(CurveWidget):
         self.y_max = 100.0
 
         self.sample_points = []          # [QPointF(trim%, elevator%)]
+        self.flagged_indices = set()     # sample indices taken with a VS residual
         self.fit_line = None             # (QPointF, QPointF) in %-space
         self.curve_polyline = []         # sorted samples joined = the calibrated curve
         self.extrap_tails = []           # dashed edge-slope segments beyond the band
@@ -2638,14 +2639,16 @@ class TrimCurveWidget(CurveWidget):
 
     # ---- data API -----------------------------------------------------------
 
-    def set_result(self, samples, slope, intercept):
+    def set_result(self, samples, slope, intercept, flagged=None):
         """Populate from calibration output.
 
         Args:
             samples: list of (trim_frac, u_elev_frac), both normalized [-1, 1].
             slope, intercept: linear fit of u_elev vs trim (normalized units).
+            flagged: sample indices accepted with a VS residual (drawn amber).
         """
         self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
+        self.flagged_indices = set(flagged or [])
         xs = [p.x() for p in self.sample_points]
         ys = [p.y() for p in self.sample_points]
         if not xs:
@@ -2702,6 +2705,7 @@ class TrimCurveWidget(CurveWidget):
 
     def clear(self):
         self.sample_points = []
+        self.flagged_indices = set()
         self.fit_line = None
         self.curve_polyline = []
         self.extrap_tails = []
@@ -2805,10 +2809,15 @@ class TrimCurveWidget(CurveWidget):
                 painter.drawLine(self.map_to_widget_space(seg[0]),
                                  self.map_to_widget_space(seg[1]))
 
-        painter.setPen(QPen(self.axis_color, 1))
-        painter.setBrush(self.point_fill)
-        for p in self.sample_points:
+        for i, p in enumerate(self.sample_points):
             wp = self.map_to_widget_space(p)
+            if i in self.flagged_indices:
+                # taken with a residual VS (deadline compromise) — draw amber
+                painter.setPen(QPen(QColor("#8a6510"), 1))
+                painter.setBrush(QColor("#e6a817"))
+            else:
+                painter.setPen(QPen(self.axis_color, 1))
+                painter.setBrush(self.point_fill)
             painter.drawEllipse(QRectF(wp.x() - 3, wp.y() - 3, 6, 6))
 
         if self.live_point is not None:

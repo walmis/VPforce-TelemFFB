@@ -479,7 +479,9 @@ class TrimCalibrationDialog(QDialog):
     def _show_result(self, result):
         self._result_shown = True
         self._last_result = result
-        self.curve.set_result(result["samples"], result["slope"], result["intercept"])
+        self.curve.set_result(
+            result["samples"], result["slope"], result["intercept"],
+            flagged=[f["index"] for f in result.get("flagged") or []])
         self.curve.set_live_point(None, None)
         current = result.get("current_virtual_y")
         current_txt = f"  &nbsp;·  current profile value: {current:.3f}" if current is not None else ""
@@ -503,6 +505,17 @@ class TrimCalibrationDialog(QDialog):
                 "the measurement. The result may still be fine — test it with Apply, and if "
                 "trim following seems off, consider re-running with a steadier airspeed "
                 "(stable power, and the airspeed-settle option enabled).")
+        flagged = result.get("flagged") or []
+        if flagged:
+            worst = max(abs(f["vs_fpm"]) for f in flagged)
+            where = ", ".join(f"{100 * f['trim']:+.0f}%" for f in flagged)
+            plural = "s" if len(flagged) > 1 else ""
+            notes.append(
+                f"{len(flagged)} station{plural} (trim {where}, shown in amber) sampled "
+                f"with a residual climb/descent of up to {worst:.0f} fpm — usually slow "
+                "airspeed drift. The curve may be slightly skewed near those points; if "
+                "trim following seems off there, consider re-running with a steadier "
+                "airspeed (stable power, airspeed-settle option enabled).")
         split = result.get("split")
         if split and split["mismatch"] > 0.2:
             notes.append(

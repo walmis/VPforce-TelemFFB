@@ -63,6 +63,8 @@ from telemffb.utils import PID, clamp, piecewise_linear
 
 logger = logging.getLogger(__name__)
 
+MS_TO_FPM = 196.85
+
 
 class CalState(enum.Enum):
     IDLE = "idle"
@@ -201,7 +203,13 @@ class TrimCalibrator:
     # The instantaneous gate (STABLE_VS_TOL) is loose because real air jitters;
     # the mean gate rejects one-sided residuals from a still-converging PID,
     # which otherwise bias the recorded elevator in a trim-correlated way.
-    SAMPLE_VS_MEAN_TOL = 0.15    # m/s
+    SAMPLE_VS_MEAN_TOL = 0.15    # m/s (~30 fpm); clean-sample gate
+    SAMPLE_VS_HARD_TOL = 0.3048  # m/s (60 fpm); worse than this at the station
+                                 # deadline aborts — between the two, the best
+                                 # dwell is accepted and flagged in the results
+                                 # (a residual that holds steady is a finite-gain
+                                 # chase of a drifting target, usually airspeed —
+                                 # waiting longer cannot satisfy the clean gate)
 
     # Trim actuation. Commands are slew-rate limited — an instantaneous trim
     # step acts like yanking the stick and pitches the aircraft violently.
@@ -320,6 +328,8 @@ class TrimCalibrator:
         self._dwell_samples = []
         self._samples = []               # [(ElevTrimPct, u_elev)] steady-state points
         self._station_ias = []           # mean IAS per accepted station (drift diagnostics)
+        self._station_best = None        # best over-tolerance dwell at this station
+        self._flagged = []               # samples accepted with a VS residual (see result)
         # trim command state (read-back space; _set_trim maps to command space)
         self._trim_cmd = 0.0
         self._trim_sign = 1.0            # flipped at runtime if read-back moves opposite
@@ -904,6 +914,7 @@ class TrimCalibrator:
         self._step_settle_deadline = time.perf_counter() + ramp_time + self.STEP_SETTLE_TIMEOUT_S
         self._dwell_since = None
         self._dwell_samples = []
+        self._station_best = None
 
     def _next_station_target(self, last_u):
         """Pick the next station, expanding outward; None ends the sweep.
@@ -1025,45 +1036,99 @@ class TrimCalibrator:
             )
             if now - self._dwell_since >= self.STEP_DWELL_S:
                 n = len(self._dwell_samples)
+                mean_trim = sum(s[0] for s in self._dwell_samples) / n
+                mean_u = sum(s[1] for s in self._dwell_samples) / n
                 mean_vs = sum(s[2] for s in self._dwell_samples) / n
+                mean_ias = sum(s[3] for s in self._dwell_samples) / n
                 if abs(mean_vs) > self.SAMPLE_VS_MEAN_TOL:
                     # Still converging (one-sided VS residual): retry the dwell
-                    # rather than record a biased sample. The step deadline
-                    # still bounds the retries.
+                    # rather than record a biased sample, keeping the best
+                    # completed dwell for the deadline compromise below.
+                    if self._station_best is None or \
+                            abs(mean_vs) < abs(self._station_best[3]):
+                        self._station_best = (mean_trim, mean_u, mean_ias, mean_vs)
                     self._dwell_since = None
                     self._dwell_samples = []
                 else:
-                    mean_trim = sum(s[0] for s in self._dwell_samples) / n
-                    mean_u = sum(s[1] for s in self._dwell_samples) / n
-                    mean_ias = sum(s[3] for s in self._dwell_samples) / n
-                    self._samples.append((mean_trim, mean_u))
-                    self._station_ias.append(mean_ias)
-                    if self._side == 0:
-                        self._u_center = mean_u
-                    logger.info(
-                        f"Station {len(self._samples)} ({side_txt}): "
-                        f"trim {mean_trim:+.4f}, u_elev {mean_u:+.4f}, "
-                        f"IAS {mean_ias * 1.94384:.1f} kt"
-                    )
-                    self.progress = len(self._samples) / self.SWEEP_MAX_STATIONS
-                    nxt = self._next_station_target(mean_u)
-                    if nxt is None:
-                        if len(self._samples) >= self.MIN_SAMPLES_FOR_FIT:
-                            self._solve()
-                        else:
-                            self._abort("Trim band exhausted before enough samples "
-                                        "could be gathered")
-                        return
-                    self._begin_step(nxt)
+                    self._accept_station(mean_trim, mean_u, mean_ias)
+                    return
         else:
             self._dwell_since = None
             self._dwell_samples = []
 
         if now > self._step_settle_deadline:
-            self._abort(
-                f"Could not hold level at sweep station {len(self._samples) + 1} "
-                f"(VS {telem_data.VerticalSpeed * 196.85:+.0f} fpm)"
-            )
+            self._finish_station_on_deadline(telem_data, target)
+
+    def _accept_station(self, mean_trim, mean_u, mean_ias, residual_vs=None):
+        """Record a station sample and advance the sweep (or solve at the end).
+
+        ``residual_vs`` marks a deadline-compromise sample taken with a steady
+        VS residual; it is surfaced in the result so the user can judge it.
+        """
+        side_txt = "center" if self._side == 0 else \
+            ("nose-up side" if self._side > 0 else "nose-dn side")
+        self._samples.append((mean_trim, mean_u))
+        self._station_ias.append(mean_ias)
+        if self._side == 0:
+            self._u_center = mean_u
+        if residual_vs is not None:
+            self._flagged.append({
+                "index": len(self._samples) - 1,
+                "trim": mean_trim,
+                "vs_fpm": residual_vs * MS_TO_FPM,
+            })
+        logger.info(
+            f"Station {len(self._samples)} ({side_txt}): "
+            f"trim {mean_trim:+.4f}, u_elev {mean_u:+.4f}, "
+            f"IAS {mean_ias * 1.94384:.1f} kt"
+            + (f", residual VS {residual_vs * MS_TO_FPM:+.0f} fpm (flagged)"
+               if residual_vs is not None else "")
+        )
+        self.progress = len(self._samples) / self.SWEEP_MAX_STATIONS
+        nxt = self._next_station_target(mean_u)
+        if nxt is None:
+            if len(self._samples) >= self.MIN_SAMPLES_FOR_FIT:
+                self._solve()
+            else:
+                self._abort("Trim band exhausted before enough samples "
+                            "could be gathered")
+            return
+        self._begin_step(nxt)
+
+    def _finish_station_on_deadline(self, telem_data, target):
+        """Station deadline expired without a clean sample: compromise or abort.
+
+        A VS residual that holds steady across retries is the leveler chasing
+        a moving target at finite gain (usually slow airspeed drift), not a
+        lack of elevator authority — waiting longer cannot satisfy the clean
+        gate. Within SAMPLE_VS_HARD_TOL the best dwell is accepted and flagged
+        in the results; beyond it the run aborts, naming the gate that failed.
+        """
+        station = len(self._samples) + 1
+        if self._station_best is not None and \
+                abs(self._station_best[3]) <= self.SAMPLE_VS_HARD_TOL:
+            mean_trim, mean_u, mean_ias, mean_vs = self._station_best
+            logger.warning(
+                f"Station {station}: accepting best dwell with residual VS "
+                f"{mean_vs * MS_TO_FPM:+.0f} fpm (clean gate is "
+                f"{self.SAMPLE_VS_MEAN_TOL * MS_TO_FPM:.0f} fpm); flagged in results")
+            self._accept_station(mean_trim, mean_u, mean_ias, residual_vs=mean_vs)
+            return
+        rb_err = abs((telem_data.ElevTrimPct or 0) - target)
+        if rb_err > self.TRIM_STATION_TOL:
+            why = (f"trim read-back never reached the station target "
+                   f"(off by {100 * rb_err:.1f}%)")
+        elif abs(telem_data.Roll or 0) > self.STABLE_ROLL_TOL:
+            why = f"could not hold wings level (roll {telem_data.Roll:+.1f} deg)"
+        elif self._station_best is not None:
+            why = (f"VS residual would not settle below "
+                   f"{self.SAMPLE_VS_HARD_TOL * MS_TO_FPM:.0f} fpm (best "
+                   f"{self._station_best[3] * MS_TO_FPM:+.0f} fpm) — airspeed may "
+                   f"be drifting; try the airspeed-settle option or steadier power")
+        else:
+            why = (f"could not hold level "
+                   f"(VS {(telem_data.VerticalSpeed or 0) * MS_TO_FPM:+.0f} fpm)")
+        self._abort(f"Sweep station {station}: {why}")
 
     # ---- Phase: solve --------------------------------------------------------
 
@@ -1138,6 +1203,7 @@ class TrimCalibrator:
             "split": split,
             "curve": curve,
             "trim0": self._trim0,
+            "flagged": list(self._flagged),
         }
         self._done_status = (
             f"Done — Virtual Y = {virtual_y:.3f}"
