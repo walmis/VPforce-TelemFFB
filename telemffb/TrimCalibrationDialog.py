@@ -87,15 +87,24 @@ class TrimCalibrationDialog(QDialog):
         root = QVBoxLayout(self)
 
         instructions = QLabel(
-            "<b>How to calibrate</b><br>"
-            "1. Get airborne, straight &amp; level, at a stable cruise speed.<br>"
-            "2. <b>Trim the aircraft</b> so it holds level with near-zero stick force — "
-            "starting far out of trim wastes elevator authority during the sweep.<br>"
-            "3. Autopilot <b>OFF</b>, hands <b>OFF</b> the stick.<br>"
-            "4. Press <b>Start</b> — TelemFFB will fly the aircraft while it sweeps the "
-            "elevator trim and measures the required stick input, then recommends a "
-            "trim-following <i>curve</i> (with the equivalent static "
-            "<i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to hold the nose level as you trim."
+            "<b>How to calibrate</b>"
+            "<ul style='margin-top:2px; margin-bottom:6px; -qt-list-indent:1;'>"
+            "<li>It is recommended to perform the calibration in <b>clear</b>, <b>calm</b> conditions.</li>"
+            "<li>If you have a hardware device controlling the elevator trim <b>AXIS</b>, you may "
+            "need to disconnect or un-bind it as it may interfere with TelemFFB "
+            "controlling the trim during calibration. (Excludes Vpforce trim-wheel)</li>"
+            "</ul>"
+            "<ol style='margin-top:0px; margin-bottom:0px; -qt-list-indent:1;'>"
+            "<li>Get airborne, straight &amp; level, at a stable cruise speed with "
+            "Autopilot <b>OFF</b>.</li>"
+            "<li><b>Trim the aircraft</b> so it holds level with near-zero stick force — "
+            "starting far out of trim wastes elevator authority during the sweep.</li>"
+            "<li>Press <b>Start</b> and take your hands <b>off</b> the stick — TelemFFB "
+            "will fly the aircraft while it sweeps the elevator trim and measures the "
+            "required stick input, then recommends a trim-following <i>curve</i> (with "
+            "the equivalent static <i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to "
+            "hold the nose level as you trim.</li>"
+            "</ol>"
         )
         instructions.setWordWrap(True)
         root.addWidget(instructions)
@@ -158,11 +167,19 @@ class TrimCalibrationDialog(QDialog):
             w.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             grid.addWidget(w, 1, col)
 
-        # State text gets the full row (long per-frame status lines) and the
-        # stage/ready light its own row — sharing a row clips one or the other.
-        grid.addWidget(QLabel("<b>State:</b>"), 2, 0)
+        # State text gets its own full-width row (long per-frame status lines)
+        # and the stage/ready light its own — sharing a row clips one or the
+        # other. An HBox keeps the message left-justified right after the
+        # State: prefix instead of starting at the (wide) second grid column,
+        # and the label reserves two text lines so an occasional word-wrap
+        # cannot bounce the layout below it up and down.
+        state_row = QHBoxLayout()
+        state_row.addWidget(QLabel("<b>State:</b>"), 0, Qt.AlignmentFlag.AlignTop)
         self.lbl_state.setWordWrap(True)
-        grid.addWidget(self.lbl_state, 2, 1, 1, 4)
+        self.lbl_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.lbl_state.setMinimumHeight(2 * self.lbl_state.fontMetrics().lineSpacing())
+        state_row.addWidget(self.lbl_state, 1)
+        grid.addLayout(state_row, 2, 0, 1, 5)
         self.lbl_ready = QLabel("●  —")
         grid.addWidget(self.lbl_ready, 3, 0, 1, 5, alignment=Qt.AlignmentFlag.AlignRight)
 
@@ -188,6 +205,9 @@ class TrimCalibrationDialog(QDialog):
         # a given text branch happens to contain HTML tags for auto-detection.
         self.lbl_virtual.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_linearity.setTextFormat(Qt.TextFormat.RichText)
+        # The recommendation line grows long (curve + static fit + current
+        # value); wrap it instead of pushing past the window edge.
+        self.lbl_virtual.setWordWrap(True)
         self.chk_use_curve = QCheckBox("Use calibrated curve (recommended) — static gain is used when unchecked")
         self.chk_use_curve.setChecked(True)
         self.chk_use_curve.setEnabled(False)
@@ -364,14 +384,29 @@ class TrimCalibrationDialog(QDialog):
         return True
 
     def _fit_to_content(self):
-        """Grow (never shrink) the window so a tall notes block can't overlap
-        the graph. The result text is populated after the dialog is shown, and
-        Qt relayouts within the current window height rather than enlarging it.
+        """Grow (never shrink) the window so the content cannot overlap.
+
+        Word-wrapped labels make the layout height-for-width: a plain
+        sizeHint() under-reports the needed height until a later layout pass,
+        which shows up as text overlapping the graph that fixes itself when
+        the window is moved. Force a layout pass and measure with the
+        height-for-width machinery at the current width instead.
         """
-        self.lbl_note.adjustSize()
-        needed = self.sizeHint().height()
+        lay = self.layout()
+        lay.activate()
+        if lay.hasHeightForWidth():
+            needed = lay.totalHeightForWidth(self.width())
+        else:
+            needed = self.sizeHint().height()
         if self.height() < needed:
             self.resize(self.width(), needed)
+
+    def _refit(self):
+        """Fit now and once more on the next event-loop tick: the deferred
+        pass re-measures after Qt has finished the pending relayout (the same
+        settling a window move used to trigger by accident)."""
+        self._fit_to_content()
+        QtCore.QTimer.singleShot(0, self._fit_to_content)
 
     def _update_live_values(self, data, ias_ref=None):
         def fmt(v, conv=1.0, unit="", nd=0):
@@ -528,7 +563,7 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_note.setText("\n".join(notes))
         self.btn_apply.setEnabled(True)
         self.btn_save.setEnabled(True)
-        self._fit_to_content()
+        self._refit()
 
     def _clear_result_labels(self):
         self.lbl_virtual.setText("Recommended Y Trim Gain (Virtual): <b>—</b>")
@@ -552,12 +587,17 @@ class TrimCalibrationDialog(QDialog):
         self._set_light(color, text)
 
     def _set_running(self, running):
+        banner_appearing = running and not self.banner.isVisible()
         self.banner.setVisible(running)
         self.btn_stop.setEnabled(running)
         self.btn_start.setEnabled(not running and self.btn_start.isEnabled())
         if running:
             self.btn_apply.setEnabled(False)
             self.btn_save.setEnabled(False)
+        if banner_appearing:
+            # The banner adds a row mid-flight; grow the window for it or the
+            # squeeze overlaps the curve's axis labels with the text below.
+            self._refit()
 
     def _refresh_idle(self):
         self.lbl_ias.setText("—")
