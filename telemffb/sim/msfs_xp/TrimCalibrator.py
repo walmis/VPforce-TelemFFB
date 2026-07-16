@@ -830,7 +830,7 @@ class TrimCalibrator:
         timeout the residual elevator becomes the new baseline instead (a
         constant, so it shifts only the fit's intercept, never the slope).
         """
-        self._u_base_y = 0.0 if centered else self._neut_u_f
+        self._u_base_y = 0.0 if centered else self._neut_u_final
         self._pitch_pid.reset()
         self._pitch_ref_n = None
         self._pitch_ref0 = None

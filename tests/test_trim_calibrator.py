@@ -577,6 +577,32 @@ class TestTrimNeutralization:
         assert cal.result["trim0"] == pytest.approx(0.15, abs=0.05)
         assert cal.result["virtual_y"] == pytest.approx(1.5, abs=0.06)
 
+    def test_neutralization_timeout_sweeps_around_current_point(self, clock):
+        # Field crash: the give-up path (timeout / could-not-settle) referenced
+        # a misspelled attribute and raised AttributeError instead of falling
+        # back. Force the timeout and require a graceful hand-off: the residual
+        # steady elevator becomes the sweep baseline and the run still finishes.
+        ac = FakePlantAircraft(trim_natural=0.1)
+        ac.trim = 0.3
+        cal = TrimCalibrator(ac)
+        cal.start()
+        for _ in range(2000):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.TRIM_NEUTRAL:
+                break
+        assert cal.state == CalState.TRIM_NEUTRAL
+        cal._neut_start_t = time.perf_counter() - cal.NEUT_TIMEOUT_S - 1
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        ac.step(1 / 30.0)
+        assert cal.state not in (CalState.TRIM_NEUTRAL, CalState.ABORT), \
+            "timeout must hand off to the sweep, not crash/abort"
+        assert cal._u_base_y == pytest.approx(cal._neut_u_final)
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+
     def test_abort_during_neutralization_restores_entry_trim(self, clock):
         ac = FakePlantAircraft(trim_natural=0.1)
         ac.trim = 0.3
