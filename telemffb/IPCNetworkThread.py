@@ -312,6 +312,14 @@ class IPCNetworkThread(QObject, threading.Thread):
             payload = msg.removeprefix("MASTER_BUTTONS:")
             G.master_buttons = json.loads(payload)
             # print(f"MB: {G.master_buttons}")
+        elif msg.startswith("TRIMCAL HOLD:"):
+            # Master is running a trim calibration: hold/release this
+            # instance's trimwheel sim writes. Refreshed ~1/s while active and
+            # self-expiring, so a crashed master cannot mute the wheel forever.
+            if msg.removeprefix("TRIMCAL HOLD:") == "1":
+                G.trimcal_hold_until = time.perf_counter() + 3.0
+            else:
+                G.trimcal_hold_until = 0.0
         elif msg.startswith("BUTTONS:"):
             payload = msg.removeprefix("BUTTONS:").split("_")
             dev = payload[0]

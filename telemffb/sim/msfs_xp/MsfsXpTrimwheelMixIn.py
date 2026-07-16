@@ -1,3 +1,6 @@
+import time
+
+import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
@@ -28,6 +31,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         self.last_pos_y_pos = 0.0
         self.trim_active = False
         self._tw_limits_warned = False
+        self._tw_hold_prev = False
 
     # NOTE: no on_telemetry hook here. Trimwheel devices are single-purpose:
     # Aircraft.on_telemetry gates them BEFORE the cooperative effects chain
@@ -83,6 +87,16 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         phys_x, phys_y = self._get_device_axes()
         self._spring_handle.name = "trimwheel_ap_spring"
 
+        # A running trim calibration owns the sim's trim: keep the spring
+        # following (the motorized wheel then tracks the sweep) but hold all
+        # writes back to the sim, or two absolute writers fight every frame.
+        hold = time.perf_counter() < G.trimcal_hold_until
+        if self._tw_hold_prev and not hold:
+            # Calibration released the trim: reuse the button-trim latch so no
+            # position is sent until the wheel converges on the restored trim.
+            self.trim_active = True
+        self._tw_hold_prev = hold
+
         # Sim-reported trim in normalized wheel space: direct mode maps
         # ElevTrim (degrees) through the travel limits, axis mode (or a
         # limits-less direct mode) reads ElevTrimPct.
@@ -136,7 +150,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
 
             if self._sim_is_xplane():  # unknown if this works
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
-                if self.trimwheel_init:
+                if self.trimwheel_init and not hold:
                     self.send_xp_command(f"AXIS:cy={round(pos_y_pos, 5)}")
 
             if self._sim_is_msfs():
@@ -172,7 +186,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                     if abs(delta) <= 0.003:
                         self.trim_active = False
 
-                if not self.trim_active:
+                if not self.trim_active and not hold:
                     if self.trimwheel_use_axis:
                         if self.trimwheel_axis_invert:
                             pos_y_pos = -pos_y_pos

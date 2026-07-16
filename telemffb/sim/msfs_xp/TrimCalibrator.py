@@ -58,6 +58,7 @@ import logging
 import math
 import time
 
+import telemffb.globals as G
 from telemffb.utils import PID, clamp, piecewise_linear
 
 logger = logging.getLogger(__name__)
@@ -240,6 +241,13 @@ class TrimCalibrator:
     HOLD_SPRING_COEFF = 1.0      # firm centered spring to keep hands-off stick put
     TRIM_AXIS_RANGE = 16383      # AXIS_ELEV_TRIM_SET: -16383..16384
 
+    # Trimwheel hold: a trimwheel instance writes its absolute wheel position
+    # to the sim every frame, which fights our trim commands writer-vs-writer.
+    # While the run is active we broadcast a self-expiring hold over IPC
+    # (refreshed well inside the TTL so a crashed master un-mutes the wheel).
+    TRIMWHEEL_HOLD_TTL_S = 3.0
+    TRIMWHEEL_HOLD_TX_S = 1.0    # refresh interval
+
     def __init__(self, aircraft):
         self.ac = aircraft
         self.state = CalState.IDLE
@@ -319,6 +327,7 @@ class TrimCalibrator:
         self._sign_cmd_accum = 0.0
         self._sign_rb_start = 0.0
         self._sign_flips = 0
+        self._hold_tx_t = 0.0            # last trimwheel-hold broadcast time
         self._u_sat_since = None
         # trim-neutralization state (discrete step-and-settle root-find)
         self._trim_touched = False       # any trim commanded this run (restore flag)
@@ -427,6 +436,10 @@ class TrimCalibrator:
             self.status_message = f"Aborted: {reason}"
             self.state = CalState.ABORT
             self._active = False
+            try:
+                self._set_trimwheel_hold(False)
+            except Exception:
+                pass  # the hold self-expires within the TTL anyway
 
     # ---- Per-frame driver (called from the telemetry thread) ----------------
 
@@ -449,6 +462,10 @@ class TrimCalibrator:
 
         if not self._precheck(telem_data):
             return
+
+        if now - self._hold_tx_t >= self.TRIMWHEEL_HOLD_TX_S:
+            self._hold_tx_t = now
+            self._set_trimwheel_hold(True)
 
         if not self._u_base_captured:
             self._capture_takeover_baseline(telem_data)
@@ -1411,5 +1428,23 @@ class TrimCalibrator:
                 self._set_trim(self._trim0)
         except Exception as e:
             logger.debug(f"trim restore skipped: {e}")
+        self._set_trimwheel_hold(False)
         self.state = end_state
         self._active = False
+
+    def _set_trimwheel_hold(self, active):
+        """Mute/unmute trimwheel instances' sim writes while we own the trim.
+
+        Sets the local deadline directly (covers a trimwheel on this instance)
+        and broadcasts to children over IPC. The hold self-expires after
+        TRIMWHEEL_HOLD_TTL_S without a refresh, and the trimwheel re-syncs its
+        wheel position before resuming writes (see MsfsXpTrimwheelMixIn).
+        """
+        G.trimcal_hold_until = \
+            (time.perf_counter() + self.TRIMWHEEL_HOLD_TTL_S) if active else 0.0
+        ipc = getattr(G, "ipc_instance", None)
+        if ipc is not None:
+            try:
+                ipc.send_broadcast_message(f"TRIMCAL HOLD:{1 if active else 0}")
+            except Exception as e:
+                logger.debug(f"trimwheel hold broadcast failed: {e}")

@@ -9,10 +9,18 @@ import time
 
 import pytest
 
+import telemffb.globals as G
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.TrimCalibrator import TrimCalibrator, CalState
 
 pytestmark = [pytest.mark.unit, pytest.mark.msfs, pytest.mark.joystick]
+
+
+@pytest.fixture(autouse=True)
+def _reset_trimwheel_hold():
+    """Runs set G.trimcal_hold_until (fake-clock timestamps); never leak it."""
+    yield
+    G.trimcal_hold_until = 0.0
 
 
 # --------------------------------------------------------------------------- #
@@ -69,6 +77,10 @@ class FakePlantAircraft:
         # Trim at which the elevator command needed to hold level is zero — the
         # aircraft's "natural" trim point the neutralization phase seeks.
         self.trim_natural = trim_natural
+
+        # trim response switches for corner-case tests
+        self.responds_to_axis = True   # False models an unresponsive trim
+        self.trim_response_sign = 1.0  # -1 models an inverted trim response
 
         # calibrator-read settings / flags
         self.joystick_trim_follow_gain_physical_y = physical_y
@@ -142,14 +154,17 @@ class FakePlantAircraft:
         # read-backs, so the "sim" negates the received value.
         return -data / 16383.0
 
+    def _apply_new_trim(self, new_trim):
+        new_trim *= self.trim_response_sign
+        self.max_trim_step = max(self.max_trim_step, abs(new_trim - self.trim))
+        self.trim = new_trim
+
     # --- plant integration ---
     def step(self, dt):
         # trim is applied by the "sim": the last commanded AXIS_ELEV_TRIM_SET.
         for event, data in self._simconnect.events:
-            if event == "AXIS_ELEV_TRIM_SET":
-                new_trim = self._apply_trim_event(data)
-                self.max_trim_step = max(self.max_trim_step, abs(new_trim - self.trim))
-                self.trim = new_trim
+            if event == "AXIS_ELEV_TRIM_SET" and self.responds_to_axis:
+                self._apply_new_trim(self._apply_trim_event(data))
         self._simconnect.events.clear()
 
         trim_eff = self.trim - self.trim_natural
@@ -303,15 +318,12 @@ class TestClosedLoop:
         assert cal.result["virtual_y"] == pytest.approx(1.8, abs=0.06)
 
     def test_inverted_trim_response_is_auto_corrected(self, clock):
-        # Some aircraft respond to AXIS_ELEV_TRIM_SET with the opposite sign
+        # Some aircraft respond to trim commands with the opposite sign
         # (cf. the trimwheel_axis_invert user setting). The engine must detect
         # the read-back moving against the command, flip its command sign, and
         # still produce the correct gain.
-        class InvertedTrimPlant(FakePlantAircraft):
-            def _apply_trim_event(self, data):
-                return data / 16383.0   # no negation: mirrored response
-
-        ac = InvertedTrimPlant(coupling=0.5, physical_y=1.0)
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        ac.trim_response_sign = -1.0
         cal = TrimCalibrator(ac)
         cal.start()
         state = run_to_completion(cal, ac, clock)
@@ -351,16 +363,60 @@ class TestClosedLoop:
         assert split["mismatch"] > 0.2
 
     def test_unresponsive_trim_aborts(self, clock):
-        class DeafTrimPlant(FakePlantAircraft):
-            def _apply_trim_event(self, data):
-                return self.trim        # trim never moves
-
-        ac = DeafTrimPlant()
+        ac = FakePlantAircraft()
+        ac.responds_to_axis = False   # trim never moves
         cal = TrimCalibrator(ac)
         cal.start()
         state = run_to_completion(cal, ac, clock)
         assert state == CalState.ABORT
         assert "not responding" in cal.abort_reason
+
+
+# --------------------------------------------------------------------------- #
+#  Trimwheel hold (mute a trimwheel instance's sim writes during the run)
+# --------------------------------------------------------------------------- #
+
+class FakeIPC:
+    def __init__(self):
+        self.broadcasts = []
+
+    def send_broadcast_message(self, msg):
+        self.broadcasts.append(msg)
+
+
+class TestTrimwheelHold:
+    def test_hold_broadcast_lifecycle(self, clock):
+        # While the run owns the trim, a self-expiring hold must be set
+        # locally, broadcast to children, refreshed during the run, and
+        # released on completion.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        ipc = FakeIPC()
+        G.ipc_instance = ipc
+        try:
+            cal.start()
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            assert G.trimcal_hold_until > time.perf_counter(), "hold must be active"
+            assert ipc.broadcasts[0] == "TRIMCAL HOLD:1"
+            state = run_to_completion(cal, ac, clock)
+            assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+            assert G.trimcal_hold_until == 0.0, "hold must be released on finish"
+            assert ipc.broadcasts[-1] == "TRIMCAL HOLD:0"
+            # refreshed ~1/s over a multi-second run, not sent just once
+            assert ipc.broadcasts.count("TRIMCAL HOLD:1") >= 3
+        finally:
+            del G.ipc_instance
+
+    def test_hold_released_on_abort(self, clock):
+        ac = FakePlantAircraft()
+        ac.responds_to_axis = False
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.ABORT
+        assert G.trimcal_hold_until == 0.0, "hold must be released on abort"
 
 
 # --------------------------------------------------------------------------- #
