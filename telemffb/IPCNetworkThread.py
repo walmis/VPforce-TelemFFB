@@ -45,6 +45,7 @@ class IPCNetworkThread(QObject, threading.Thread):
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
     child_exception_signal = pyqtSignal(object)
+    child_status_signal = pyqtSignal()
     toggle_offline_mode_signal = pyqtSignal(bool)
     set_offline_sim_signal = pyqtSignal(str)
     set_offline_class_signal = pyqtSignal(str)
@@ -186,6 +187,24 @@ class IPCNetworkThread(QObject, threading.Thread):
             self.send_broadcast_message("Keepalive")
         else:
             self.send_message(f"Child Keepalive:{G.device_type}:{G.device_connection_status}")
+            self.send_ipc_status()
+
+    def send_ipc_status(self):
+        """Child -> master device-status report (vpconf profile / gain
+        overrides), sent on the keepalive tick.
+
+        The effects payload also carries these keys, but it only flows while
+        telemetry is arriving — a startup vpconf profile is pushed before any
+        telemetry exists, so without this the master never learns about it
+        until an aircraft loads. Riding the 1 Hz keepalive keeps the master
+        correct from child boot and self-heals a master restart.
+        """
+        payload = {
+            f'{G.device_type}_vpconf_profile': G.current_vpconf_profile or '',
+            f'{G.device_type}_gain_ovd_active':
+                bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False,
+        }
+        self.send_message(f"STATUS:{json.dumps(payload)}")
 
     def _handle_message(self, msg, fromaddr):
         if msg == 'Keepalive':
@@ -267,6 +286,15 @@ class IPCNetworkThread(QObject, threading.Thread):
                 self._ipc_telem_effects.update(telem_effects_dict)
                 # print(f"GOT EFFECTS:{self._ipc_telem_effects}")
 
+            except json.JSONDecodeError:
+                pass
+        elif msg.startswith("STATUS:"):
+            payload = msg.removeprefix("STATUS:")
+            try:
+                self._ipc_telem_effects.update(json.loads(payload))
+                # Queued to the main thread; refreshes the scope status display
+                # if the reported device is the active scope.
+                self.child_status_signal.emit()
             except json.JSONDecodeError:
                 pass
         elif msg.startswith("EXCEPTION:"):

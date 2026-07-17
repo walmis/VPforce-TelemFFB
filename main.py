@@ -602,6 +602,7 @@ def _setup_ipc_and_connections():
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
     G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
     G.ipc_instance.child_exception_signal.connect(G.main_window.on_child_exception)
+    G.ipc_instance.child_status_signal.connect(G.main_window.refresh_scope_status_indicators)
     G.ipc_instance.exit_signal.connect(exit_application)
     G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
     G.ipc_instance.show_signal.connect(G.main_window.show)
