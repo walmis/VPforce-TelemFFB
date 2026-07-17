@@ -1172,6 +1172,30 @@ class MainWindow(QMainWindow):
         """Show the exception viewer dialog."""
         dialog = ExceptionViewerDialog(G.exception_tracker, self)
         dialog.exec()
+
+    def on_child_exception(self, data):
+        """Ingest an exception forwarded from a child instance over IPC.
+
+        The record lands in the master's own tracker with the module prefixed
+        by the child's device name, so the status-bar notification fires and
+        the viewer shows the full record labeled with its origin. Runs on the
+        main thread (queued from the IPC thread via child_exception_signal).
+        """
+        from datetime import datetime
+
+        from telemffb.ExceptionTracker import ExceptionRecord
+        try:
+            ts = datetime.fromisoformat(data.get("timestamp", ""))
+        except (ValueError, TypeError):
+            ts = datetime.now()
+        record = ExceptionRecord(
+            timestamp=ts,
+            message=data.get("message", ""),
+            traceback=data.get("traceback", ""),
+            level=data.get("level", "ERROR"),
+            module=f"{data.get('device', 'child')}: {data.get('module', 'unknown')}",
+        )
+        G.exception_tracker.add_exception(record)
         
     def update_exception_count(self):
         """Update the exception count in the status bar."""

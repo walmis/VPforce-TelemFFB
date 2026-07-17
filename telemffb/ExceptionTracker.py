@@ -165,6 +165,34 @@ class ExceptionTracker(QObject):
             self.exception_added.emit()
         except RuntimeError:
             pass  # Qt object deleted during shutdown; nothing to do
+
+        self._forward_to_master(exc_record)
+
+    def _forward_to_master(self, exc_record: ExceptionRecord):
+        """Child instances forward exceptions to the master over IPC so users
+        running headless children still see the error notification (and the
+        full record in the master's exception viewer).
+
+        Never raises and never logs at ERROR level — an error here would
+        re-enter this tracker via the logging handler.
+        """
+        try:
+            import json
+
+            import telemffb.globals as G
+            if not G.child_instance or G.ipc_instance is None or not G.ipc_instance.running:
+                return
+            payload = {
+                "device": G.device_type,
+                "timestamp": exc_record.timestamp.isoformat(),
+                "message": exc_record.message[:2000],
+                "traceback": exc_record.traceback[:20000],
+                "level": exc_record.level,
+                "module": exc_record.module,
+            }
+            G.ipc_instance.send_message(f"EXCEPTION:{json.dumps(payload)}")
+        except Exception:
+            logging.debug("Failed to forward exception to master", exc_info=True)
         
     def get_count(self) -> int:
         """Get the number of tracked exceptions."""

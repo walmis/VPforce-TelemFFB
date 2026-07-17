@@ -44,6 +44,7 @@ class IPCNetworkThread(QObject, threading.Thread):
     show_cfg_ovds_signal = pyqtSignal()
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
+    child_exception_signal = pyqtSignal(object)
     toggle_offline_mode_signal = pyqtSignal(bool)
     set_offline_sim_signal = pyqtSignal(str)
     set_offline_class_signal = pyqtSignal(str)
@@ -266,6 +267,14 @@ class IPCNetworkThread(QObject, threading.Thread):
                 self._ipc_telem_effects.update(telem_effects_dict)
                 # print(f"GOT EFFECTS:{self._ipc_telem_effects}")
 
+            except json.JSONDecodeError:
+                pass
+        elif msg.startswith("EXCEPTION:"):
+            payload = msg.removeprefix("EXCEPTION:")
+            try:
+                # Emitted (queued) to the main thread; the tracker and its UI
+                # consumers must not be touched from the IPC thread.
+                self.child_exception_signal.emit(json.loads(payload))
             except json.JSONDecodeError:
                 pass
         elif msg.startswith("LOADCONFIG:"):
