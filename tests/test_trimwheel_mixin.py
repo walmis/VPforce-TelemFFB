@@ -96,8 +96,9 @@ class TestTrimwheelWriteMethods(BaseTelemetryEffectTestCase):
 
 class TestTrimwheelCalibrationHold(BaseTelemetryEffectTestCase):
     """A running trim calibration broadcasts a hold (G.trimcal_hold_until):
-    the wheel keeps following the sim on the spring but must not write back,
-    and on release it re-syncs before sending again."""
+    the wheel is parked where it sits (the calibrator restores the starting
+    trim, so the parked position is the correct post-run position) and must
+    not write back; on release it re-syncs before sending again."""
 
     def _trimwheel(self, phys_y=0.05):
         instance = self.create_test_instance(
@@ -109,11 +110,11 @@ class TestTrimwheelCalibrationHold(BaseTelemetryEffectTestCase):
         self.mock_device.get_input().set_axis(x=0.0, y=phys_y)
         return instance
 
-    def _telem(self, elev_trim=2.0):
+    def _telem(self, elev_trim=2.0, pct=0.0):
         return (TelemetryDataBuilder()
                 .ffb_type("trimwheel")
                 .set("APMaster", 0)
-                .set("ElevTrimPct", 0.0)
+                .set("ElevTrimPct", pct)
                 .set("ElevTrim", elev_trim)
                 .set("ElevTrimMax", 10.0)
                 .set("ElevTrimMin", -10.0)
@@ -123,8 +124,8 @@ class TestTrimwheelCalibrationHold(BaseTelemetryEffectTestCase):
         sc = instance.mock_simconnect
         return [] if sc is None else sc.sim_data_written
 
-    def test_hold_suppresses_writes_but_spring_still_follows(self):
-        instance = self._trimwheel()
+    def test_hold_suppresses_writes_and_parks_the_wheel(self):
+        instance = self._trimwheel(phys_y=0.05)
         telem = self._telem()
         instance._telem_data = telem
         G.trimcal_hold_until = time.perf_counter() + 5.0
@@ -133,8 +134,16 @@ class TestTrimwheelCalibrationHold(BaseTelemetryEffectTestCase):
 
         assert instance.trimwheel_init == 1
         assert self._writes(instance) == [], "no sim writes while held"
-        # the spring mirror keeps running so the wheel tracks the sweep
-        assert telem["trimwheel_pos_calc"] == pytest.approx(0.2)
+        # the wheel is parked where it sat at hold onset — NOT dragged along
+        # the sweep (chasing the sweep ends displaced and wedges the latch)
+        assert instance.spring_y.cpOffset == pytest.approx(0.05 * 4096, abs=2)
+
+        # sim trim moves during the sweep: the park must not budge
+        telem2 = self._telem(elev_trim=6.0)   # sim trim now 0.6
+        instance._telem_data = telem2
+        instance.msfs_update_trimwheel(telem2)
+        assert instance.spring_y.cpOffset == pytest.approx(0.05 * 4096, abs=2)
+        assert self._writes(instance) == []
 
     def test_hold_release_resyncs_wheel_before_sending(self):
         instance = self._trimwheel(phys_y=0.05)
@@ -159,6 +168,28 @@ class TestTrimwheelCalibrationHold(BaseTelemetryEffectTestCase):
         instance.msfs_update_trimwheel(telem)
         assert not instance.trim_active
         assert len(self._writes(instance)) == 1
+
+    def test_hold_release_near_restored_trim_resumes_immediately(self):
+        # The normal case: the calibrator restored the starting trim, so the
+        # parked wheel is already within the (widened) re-sync tolerance and
+        # the latch must clear on the first frame — no stuck wheel.
+        instance = self._trimwheel(phys_y=0.19)
+        G.trimcal_hold_until = time.perf_counter() + 5.0
+        # wheel was in sync before the run (pct near the wheel so init passes)
+        telem = self._telem(pct=0.19)   # sim trim 0.2; wheel parked at 0.19
+        instance._telem_data = telem
+        instance.msfs_update_trimwheel(telem)
+        assert self._writes(instance) == []
+
+        G.trimcal_hold_until = 0.0
+        telem = self._telem(pct=0.19)
+        instance._telem_data = telem
+        instance.msfs_update_trimwheel(telem)
+        assert not instance.trim_active, \
+            "wheel within post-hold tolerance of the restored trim must unlatch"
+        assert len(self._writes(instance)) == 1
+        assert instance._tw_resync_tol == pytest.approx(0.003), \
+            "tolerance must return to the button-trim default after release"
 
     def test_expired_hold_does_not_suppress(self):
         instance = self._trimwheel()

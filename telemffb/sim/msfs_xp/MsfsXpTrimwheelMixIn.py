@@ -32,6 +32,8 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         self.trim_active = False
         self._tw_limits_warned = False
         self._tw_hold_prev = False
+        self._tw_hold_pos = None       # wheel position parked during a calibration hold
+        self._tw_resync_tol = 0.003    # trim_active release tolerance (widened post-hold)
 
     # NOTE: no on_telemetry hook here. Trimwheel devices are single-purpose:
     # Aircraft.on_telemetry gates them BEFORE the cooperative effects chain
@@ -87,14 +89,22 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         phys_x, phys_y = self._get_device_axes()
         self._spring_handle.name = "trimwheel_ap_spring"
 
-        # A running trim calibration owns the sim's trim: keep the spring
-        # following (the motorized wheel then tracks the sweep) but hold all
-        # writes back to the sim, or two absolute writers fight every frame.
+        # A running trim calibration owns the sim's trim: hold all writes back
+        # to the sim (two absolute writers fight every frame) and PARK the
+        # wheel where it sits. Following the sweep would be pointless motion —
+        # the calibrator restores the starting trim at the end, so the parked
+        # position is already the correct post-run position; chasing the sweep
+        # only risks ending displaced and wedging the re-sync latch.
         hold = time.perf_counter() < G.trimcal_hold_until
+        if hold and not self._tw_hold_prev:
+            self._tw_hold_pos = phys_y
         if self._tw_hold_prev and not hold:
             # Calibration released the trim: reuse the button-trim latch so no
-            # position is sent until the wheel converges on the restored trim.
+            # position is sent until the wheel matches the restored trim. The
+            # restored trim ≈ the parked position, so this clears right away;
+            # the widened tolerance covers restore/readback imprecision.
             self.trim_active = True
+            self._tw_resync_tol = 0.02
         self._tw_hold_prev = hold
 
         # Sim-reported trim in normalized wheel space: direct mode maps
@@ -138,9 +148,14 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         if ap_active == 0:
 
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
-            self.cpO_y = round(utils.scale(trimwheel_pos, (-1, 1), (-4096, 4096)))
-            telem_data._tw_cpO_y = trimwheel_pos
-            self.spring_y.set_offset(trimwheel_pos)
+            # Parked at the hold-onset position during a calibration hold;
+            # normal sim-trim follow otherwise.
+            spring_pos = trimwheel_pos
+            if hold and self._tw_hold_pos is not None:
+                spring_pos = self._tw_hold_pos
+            self.cpO_y = round(utils.scale(spring_pos, (-1, 1), (-4096, 4096)))
+            telem_data._tw_cpO_y = spring_pos
+            self.spring_y.set_offset(spring_pos)
 
             # self.damper.damper(coef_y=0).start()
             self.spring_y.set_coefficient(self.trimwheel_ap_spring_gain, True)
@@ -183,8 +198,9 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                 # utils.dbprint('yellow', f"delta: {delta}")
                 telem_data.TRIM_DELTA = delta
                 if self.trim_active:
-                    if abs(delta) <= 0.003:
+                    if abs(delta) <= self._tw_resync_tol:
                         self.trim_active = False
+                        self._tw_resync_tol = 0.003   # back to the button-trim default
 
                 if not self.trim_active and not hold:
                     if self.trimwheel_use_axis:
@@ -192,12 +208,14 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                             pos_y_pos = -pos_y_pos
                             phys_y = -phys_y
                         self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                        # print("TRIM POSITION", pos_y_pos)
                     elif trim_limits is not None:
                         # Direct mode: map the wheel through the trim travel
                         # and write the surface position itself (deg -> rad).
                         pos_y_pos = utils.scale(phys_y, (-1, 1), trim_limits)
                         pos_y_pos = pos_y_pos * 0.01745
                         self._simconnect.set_simdatum_to_msfs("ELEVATOR TRIM POSITION", pos_y_pos, units="radians")
+                        # print("TRIM TRIM POSITION", pos_y_pos)
                 self.last_pos_y_pos = pos_y_pos
                 telem_data._tw_last = self.last_pos_y_pos
 
