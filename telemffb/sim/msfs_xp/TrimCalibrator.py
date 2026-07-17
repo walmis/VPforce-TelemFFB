@@ -56,6 +56,7 @@ independent of the physical stick position.
 import enum
 import logging
 import math
+import os
 import time
 
 import telemffb.globals as G
@@ -260,6 +261,12 @@ class TrimCalibrator:
     TRIMWHEEL_HOLD_TTL_S = 3.0
     TRIMWHEEL_HOLD_TX_S = 1.0    # refresh interval
 
+    # Diagnostic flight recorder (armed via the trace_enabled run option in
+    # debug mode): one row per telemetry frame (commands, read-backs, loop
+    # internals), dumped as a CSV next to the logs at the end of the run.
+    # Cheap (tuples in a list) — and the only way to debug control-loop
+    # behavior precisely instead of from descriptions of moving graphs.
+
     def __init__(self, aircraft):
         self.ac = aircraft
         self.state = CalState.IDLE
@@ -274,6 +281,13 @@ class TrimCalibrator:
         # pre-derate the leveling loop for known-sensitive/pitchy aircraft
         # instead of waiting for the oscillation watchdog to discover it.
         self.initial_gain_scale = 1.0
+        # Run option: MSFS trim write method — "direct" (default) writes the
+        # ELEVATOR TRIM POSITION SimVar; "axis" sends AXIS_ELEV_TRIM_SET.
+        # Selectable only via the dialog's debug-mode pulldown (see _set_trim
+        # for why direct is primary).
+        self.trim_write_method = "direct"
+        # Run option: per-frame diagnostic CSV trace (debug-mode checkbox).
+        self.trace_enabled = False
         self.result = None          # dict on success, else None
         self.abort_reason = None
         # Set from the UI thread by stop(); consumed in the telemetry thread so
@@ -342,6 +356,14 @@ class TrimCalibrator:
         self._sign_rb_start = 0.0
         self._sign_flips = 0
         self._hold_tx_t = 0.0            # last trimwheel-hold broadcast time
+        self._trim_method_logged = False # effective write method logged once per run
+        # trace (diagnostic flight recorder) state
+        self._trace_rows = []
+        self._trace_t0 = None
+        self._trace_broken = False
+        self._trace_trim_write = None    # last raw value written to the sim's trim
+        self._trace_axis_y = None        # last elevator axis value sent to the sim
+        self._pitch_target_n = None      # cascade outer-loop demand (normalized deg)
         self._u_sat_since = None
         # trim-neutralization state (discrete step-and-settle root-find)
         self._trim_touched = False       # any trim commanded this run (restore flag)
@@ -456,6 +478,7 @@ class TrimCalibrator:
                 self._set_trimwheel_hold(False)
             except Exception:
                 pass  # the hold self-expires within the TTL anyway
+            self._dump_trace()
 
     # ---- Per-frame driver (called from the telemetry thread) ----------------
 
@@ -499,6 +522,84 @@ class TrimCalibrator:
         elif self.state == CalState.RESTORE:
             self._do_restore(telem_data, dt)
         # SOLVE/DONE/ABORT are terminal and handled inline when reached.
+
+        if self._active:
+            self._trace_frame(telem_data, now)
+
+    # ---- Diagnostic trace (per-run flight recorder) ---------------------------
+
+    TRACE_COLUMNS = ("t,state,detail,vs_ms,pitch_deg,roll_deg,ias_ms,"
+                     "trim_pct,trim_deg,trim_cmd,trim_target,trim_write,"
+                     "u_base_y,u_elev,u_ail,axis_y_sent,elev_defl_pct,"
+                     "pid_out,pid_i_term,"
+                     "pitch_target_n,gain_scale,pitch_mode,trim_sign,dir_verified")
+
+    def _log_trim_method(self, desc):
+        """Log the effective MSFS write method once per run (diagnostics)."""
+        if not self._trim_method_logged:
+            self._trim_method_logged = True
+            logger.info(f"Trim writes: {desc}")
+
+    def _trace_frame(self, telem_data, now):
+        """Record one row of everything the engine commanded and observed."""
+        if not self.trace_enabled or self._trace_broken:
+            return
+        try:
+            if self._trace_t0 is None:
+                self._trace_t0 = now
+            if self.state == CalState.PROBE:
+                detail, target = f"stage{self._probe_stage}-{self._probe_phase}", None
+            elif self.state == CalState.TRIM_NEUTRAL:
+                detail, target = f"step{self._neut_steps + 1}", self._neut_target
+            elif self.state == CalState.SWEEP:
+                detail, target = f"station{len(self._samples) + 1}", self._current_target
+            elif self.state == CalState.RESTORE:
+                detail, target = "", self._trim0
+            else:
+                detail, target = "", None
+            pid = self._pitch_pid
+            self._trace_rows.append((
+                now - self._trace_t0, self.state.name, detail,
+                telem_data.VerticalSpeed, telem_data.Pitch, telem_data.Roll,
+                telem_data.IAS, telem_data.ElevTrimPct, telem_data.ElevTrim,
+                self._trim_cmd, target, self._trace_trim_write,
+                self._u_base_y, self._u_elev, self._u_ail, self._trace_axis_y,
+                # actual surface position: vs u_elev it exposes aircraft that
+                # scale control input with airspeed (C208B: ~30% at cruise)
+                telem_data.ElevDeflPct,
+                pid.output, pid.ki * pid._integral, self._pitch_target_n,
+                self._gain_scale, self._pitch_mode, self._trim_sign,
+                int(self._trim_dir_verified),
+            ))
+        except Exception:
+            # Telemetry hot path: diagnostics must never break the run.
+            self._trace_broken = True
+            logger.exception("trace disabled for this run (frame capture failed)")
+
+    def _dump_trace(self):
+        rows, self._trace_rows = self._trace_rows, []
+        if not self.trace_enabled or not rows:
+            return
+        try:
+            folder = os.path.join(os.environ.get("LOCALAPPDATA", "."),
+                                  "VPForce-TelemFFB", "log")
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, time.strftime("trimcal_trace_%Y%m%d_%H%M%S.csv"))
+
+            def fmt(v):
+                if v is None:
+                    return ""
+                if isinstance(v, float):
+                    return f"{v:.5f}"
+                return str(v)
+
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.TRACE_COLUMNS + "\n")
+                for r in rows:
+                    f.write(",".join(fmt(v) for v in r) + "\n")
+            logger.info(f"Trim calibration trace: {len(rows)} frames -> {path}")
+        except Exception:
+            logger.exception("trace dump failed")
 
     # ---- Safety --------------------------------------------------------------
 
@@ -1345,8 +1446,10 @@ class TrimCalibrator:
             target_n = self._pitch_ref_n + clamp(
                 self.CASC_VS_TO_PITCH * (self.VS_TARGET - vs),
                 -self.CASC_MAX_TARGET_DEG, self.CASC_MAX_TARGET_DEG)
+            self._pitch_target_n = target_n
             return self._u_base_y + self._elev_sign * self._pitch_pid.update(target_n - pitch_n, dt)
 
+        self._pitch_target_n = None
         vs_err = self._elev_sign * (self.VS_TARGET - vs)
         return self._u_base_y + self._pitch_pid.update(vs_err, dt)
 
@@ -1468,15 +1571,17 @@ class TrimCalibrator:
 
         if self.ac._use_firmware_axis_backend():
             self.ac._send_firmware_fixed_axes(u_ail * x_scale, u_elev * y_scale)
+            self._trace_axis_y = round(u_elev * y_scale, 5)
         elif self.ac._sim_is_xplane():
             self.ac.send_xp_command(
                 f"AXIS:jx={round(u_ail * x_scale, 5)},jy={round(u_elev * y_scale, 5)}"
             )
+            self._trace_axis_y = round(u_elev * y_scale, 5)
         elif self.ac._sim_is_msfs():
             x_var, x_range = self.ac._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
             y_var, y_range = self.ac._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
             self.ac._send_msfs_axis_value(x_var, u_ail, x_range, x_scale)
-            self.ac._send_msfs_axis_value(y_var, u_elev, y_range, y_scale)
+            self._trace_axis_y = self.ac._send_msfs_axis_value(y_var, u_elev, y_range, y_scale)
 
         self._hold_stick_centered()
 
@@ -1504,18 +1609,50 @@ class TrimCalibrator:
     def _set_trim(self, pct):
         """Command the sim's elevator trim to an absolute normalized position.
 
-        ``pct`` is in ElevTrimPct read-back space. MSFS AXIS_* events are
-        sign-inverted relative to the SimVar read-backs (see the trimwheel
-        mixin's ``pos_y_pos = -int(pos_y_pos)``), hence the negation.
-        ``_trim_sign`` is a runtime correction on top of that, flipped by
-        :meth:`_advance_trim` for aircraft with inverted trim response
-        (cf. the ``trimwheel_axis_invert`` user setting).
+        ``pct`` is in ElevTrimPct read-back space.
+
+        MSFS — the DIRECT method (default) writes the ELEVATOR TRIM POSITION
+        SimVar, mapping pct per-side through the reported travel limits (like
+        the trimwheel's direct mode). Direct is self-referential — it writes
+        the read-back's own quantity — so a hold-in-place command is a true
+        no-op on any aircraft. The AXIS method (debug-mode selection, and the
+        fallback when no usable travel limits are reported) sends
+        AXIS_ELEV_TRIM_SET and assumes the sim maps the event value 1:1 onto
+        the read-back; field testing found aircraft that mishandle the event
+        (Just Flight Arrow III/IV and Hawk T1 apply it raw/32766 UNNEGATED,
+        relocating trim to -cmd/2 on every write — measured in
+        trimcal_trace_20260716_123259), which is why direct is primary. The
+        event value is sign-inverted relative to the SimVar read-backs (see
+        the trimwheel mixin's ``pos_y_pos = -int(pos_y_pos)``), hence the
+        negation. ``_trim_sign`` is a runtime correction on top of either
+        method, flipped by :meth:`_advance_trim` for aircraft with inverted
+        trim response (cf. the ``trimwheel_axis_invert`` user setting).
         """
         pct = clamp(pct * self._trim_sign, -1.0, 1.0)
         if self.ac._sim_is_msfs():
-            self.ac._simconnect.send_event_to_msfs(
-                "AXIS_ELEV_TRIM_SET", -int(pct * self.TRIM_AXIS_RANGE)
-            )
+            limits = None
+            if self.trim_write_method == "direct":
+                get_limits = getattr(self.ac, "_trimwheel_trim_limits", None)
+                telem = getattr(self.ac, "_telem_data", None)
+                if get_limits is not None and telem is not None:
+                    limits = get_limits(telem)
+            if limits is not None:
+                self._log_trim_method("direct ELEVATOR TRIM POSITION (travel "
+                                      f"{limits[0]:+.1f}..{limits[1]:+.1f} deg)")
+                dn, up = limits
+                deg = pct * up if pct >= 0 else pct * abs(dn)
+                self._trace_trim_write = round(deg, 4)
+                self.ac._simconnect.set_simdatum_to_msfs(
+                    "ELEVATOR TRIM POSITION", math.radians(deg), units="radians"
+                )
+                return
+            self._log_trim_method(
+                "AXIS_ELEV_TRIM_SET (debug selection)"
+                if self.trim_write_method == "axis"
+                else "AXIS_ELEV_TRIM_SET (no usable trim-limit telemetry for direct)")
+            out = -int(pct * self.TRIM_AXIS_RANGE)
+            self._trace_trim_write = out
+            self.ac._simconnect.send_event_to_msfs("AXIS_ELEV_TRIM_SET", out)
         elif self.ac._sim_is_xplane():
             # Write the pilot-control-level trim (float ratio -1..1); the FM
             # propagates it to sim/flightmodel2/controls/elevator_trim, which
@@ -1523,6 +1660,7 @@ class TrimCalibrator:
             # sign convention both ways, so no MSFS-style negation here.
             # Aircraft with custom trim systems that swallow this write are
             # caught by the read-back verification in _advance_trim.
+            self._trace_trim_write = round(pct, 5)
             self.ac.write_xp_dataref("sim/cockpit2/controls/elevator_trim", round(pct, 5), type="float")
 
     # ---- Teardown ------------------------------------------------------------
@@ -1546,6 +1684,7 @@ class TrimCalibrator:
         self._set_trimwheel_hold(False)
         self.state = end_state
         self._active = False
+        self._dump_trace()
 
     def _set_trimwheel_hold(self, active):
         """Mute/unmute trimwheel instances' sim writes while we own the trim.

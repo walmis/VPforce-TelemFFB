@@ -5,6 +5,7 @@ tests drive the calibrator against an in-test ``FakePlantAircraft`` — a minima
 implementation of the aircraft interface the calibrator uses, plus a first-order
 pitch/roll toy model — over a monkeypatched deterministic clock.
 """
+import math
 import time
 
 import pytest
@@ -17,8 +18,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.msfs, pytest.mark.joystick]
 
 
 @pytest.fixture(autouse=True)
-def _reset_trimwheel_hold():
-    """Runs set G.trimcal_hold_until (fake-clock timestamps); never leak it."""
+def _calibrator_test_env():
+    """Never leak G.trimcal_hold_until (fake-clock timestamps). The diagnostic
+    trace defaults OFF on the engine, so no CSVs hit the real log folder."""
     yield
     G.trimcal_hold_until = 0.0
 
@@ -51,9 +53,13 @@ class FakeSpringHandle:
 class FakeSimConnect:
     def __init__(self):
         self.events = []
+        self.sim_data = []
 
     def send_event_to_msfs(self, event, data=0):
         self.events.append((event, data))
+
+    def set_simdatum_to_msfs(self, simvar, value, units=""):
+        self.sim_data.append((simvar, value, units))
 
 
 class FakePlantAircraft:
@@ -78,9 +84,17 @@ class FakePlantAircraft:
         # aircraft's "natural" trim point the neutralization phase seeks.
         self.trim_natural = trim_natural
 
-        # trim response switches for corner-case tests
-        self.responds_to_axis = True   # False models an unresponsive trim
+        # trim plumbing: travel limits enable the calibrator's direct SimVar
+        # method (the shipping default); switches model corner-case aircraft
+        self.report_limits = True
+        self.trim_up_limit = 15.0      # degrees
+        self.trim_dn_limit = -15.0     # degrees (signed, like the telemetry)
+        self.responds_to_simvar = True # False models trim deaf to direct writes
+        self.responds_to_axis = True   # False models trim deaf to axis events
         self.trim_response_sign = 1.0  # -1 models an inverted trim response
+        self.simvar_trim_writes = 0    # trim writes received (even if ignored)
+        self.axis_trim_events = 0
+        self._telem_data = None        # set per frame by telem(), like TelemManager
 
         # calibrator-read settings / flags
         self.joystick_trim_follow_gain_physical_y = physical_y
@@ -149,10 +163,22 @@ class FakePlantAircraft:
         """Trim->pitch coupling; override for nonlinear/kinked aircraft."""
         return self.coupling
 
+    def _trimwheel_trim_limits(self, telem_data):
+        # aircraft interface used by the calibrator's direct write method
+        if not self.report_limits:
+            return None
+        return (self.trim_dn_limit, self.trim_up_limit)
+
     def _apply_trim_event(self, data):
         # MSFS AXIS_* events are sign-inverted relative to the SimVar
         # read-backs, so the "sim" negates the received value.
         return -data / 16383.0
+
+    def _apply_trim_simvar(self, radians):
+        # ElevTrimPct read-back normalized per-side against the travel limits
+        # (mirror of the calibrator's direct-mode mapping)
+        deg = math.degrees(radians)
+        return deg / self.trim_up_limit if deg >= 0 else deg / abs(self.trim_dn_limit)
 
     def _apply_new_trim(self, new_trim):
         new_trim *= self.trim_response_sign
@@ -161,11 +187,20 @@ class FakePlantAircraft:
 
     # --- plant integration ---
     def step(self, dt):
-        # trim is applied by the "sim": the last commanded AXIS_ELEV_TRIM_SET.
+        # trim is applied by the "sim": the last commanded value on whichever
+        # write method this aircraft honors.
         for event, data in self._simconnect.events:
-            if event == "AXIS_ELEV_TRIM_SET" and self.responds_to_axis:
-                self._apply_new_trim(self._apply_trim_event(data))
+            if event == "AXIS_ELEV_TRIM_SET":
+                self.axis_trim_events += 1
+                if self.responds_to_axis:
+                    self._apply_new_trim(self._apply_trim_event(data))
         self._simconnect.events.clear()
+        for simvar, value, units in self._simconnect.sim_data:
+            if simvar == "ELEVATOR TRIM POSITION":
+                self.simvar_trim_writes += 1
+                if self.responds_to_simvar:
+                    self._apply_new_trim(self._apply_trim_simvar(value))
+        self._simconnect.sim_data.clear()
 
         trim_eff = self.trim - self.trim_natural
         target_vs = self.K_E * (self.cmd_elev + self.effective_coupling(trim_eff) * trim_eff)
@@ -187,7 +222,9 @@ class FakePlantAircraft:
             "APServos": 0,
         }
         data.update(over)
-        return BaseTelemetryData(initial=data)
+        telem = BaseTelemetryData(initial=data)
+        self._telem_data = telem   # TelemManager does this before on_telemetry
+        return telem
 
 
 # --------------------------------------------------------------------------- #
@@ -364,17 +401,78 @@ class TestClosedLoop:
 
     def test_unresponsive_trim_aborts(self, clock):
         ac = FakePlantAircraft()
-        ac.responds_to_axis = False   # trim never moves
+        ac.responds_to_simvar = False   # trim never moves
+        ac.responds_to_axis = False
         cal = TrimCalibrator(ac)
         cal.start()
         state = run_to_completion(cal, ac, clock)
         assert state == CalState.ABORT
         assert "not responding" in cal.abort_reason
 
+    def test_direct_simvar_write_is_the_default_method(self, clock):
+        # Field-tested primary: direct ELEVATOR TRIM POSITION writes succeed
+        # across the aircraft the axis event fails on (Just Flight mishandles
+        # the event value); the axis event remains a debug-mode selection.
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert ac.simvar_trim_writes > 0
+        assert ac.axis_trim_events == 0, "axis event must not be used by default"
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_axis_event_method_selectable(self, clock):
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        cal.trim_write_method = "axis"
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert ac.axis_trim_events > 0
+        assert ac.simvar_trim_writes == 0
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_direct_without_limits_falls_back_to_axis_event(self, clock):
+        # No usable travel limits in telemetry: direct cannot map pct to
+        # degrees, so the axis event carries the run.
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        ac.report_limits = False
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert ac.simvar_trim_writes == 0
+        assert ac.axis_trim_events > 0
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
 
 # --------------------------------------------------------------------------- #
-#  Trimwheel hold (mute a trimwheel instance's sim writes during the run)
+#  Diagnostic trace
 # --------------------------------------------------------------------------- #
+
+class TestDiagnosticTrace:
+    def test_trace_records_frames_and_dumps_csv(self, clock, tmp_path, monkeypatch):
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.trace_enabled = True
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE
+        files = list((tmp_path / "VPForce-TelemFFB" / "log").glob("trimcal_trace_*.csv"))
+        assert len(files) == 1
+        lines = files[0].read_text().splitlines()
+        header = lines[0].split(",")
+        assert lines[0] == TrimCalibrator.TRACE_COLUMNS
+        assert len(lines) > 100, "a full run must record hundreds of frames"
+        # spot-check a data row: state column populated, floats parse
+        row = dict(zip(header, lines[1].split(",")))
+        assert row["state"] in ("PROBE", "STABILIZE")
+        float(row["vs_ms"])
+        float(row["u_elev"])
+        # rows are cleared after the dump (no growth across runs)
+        assert cal._trace_rows == []
 
 class FakeIPC:
     def __init__(self):
@@ -411,6 +509,7 @@ class TestTrimwheelHold:
 
     def test_hold_released_on_abort(self, clock):
         ac = FakePlantAircraft()
+        ac.responds_to_simvar = False
         ac.responds_to_axis = False
         cal = TrimCalibrator(ac)
         cal.start()

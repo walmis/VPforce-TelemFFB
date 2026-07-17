@@ -140,6 +140,38 @@ class TrimCalibrationDialog(QDialog):
         response_row.addStretch(1)
         root.addLayout(response_row)
 
+        # Debug-only controls (system settings 'debug' flag): trim write
+        # method override + per-run diagnostic trace, for problem-aircraft
+        # reports. Direct SimVar writes are the tested-primary method; the
+        # axis event stays selectable in case an aircraft ever requires it.
+        self._debug = bool(getattr(G, "system_settings", None)
+                           and G.system_settings.get("debug", False))
+        self.cmb_trim_method = None
+        self.chk_trace = None
+        if self._debug:
+            debug_row = QHBoxLayout()
+            debug_row.addWidget(QLabel("Trim write method:"))
+            self.cmb_trim_method = QComboBox()
+            self.cmb_trim_method.addItems([
+                "Direct (ELEVATOR TRIM POSITION)",
+                "Axis event (AXIS_ELEV_TRIM_SET)",
+            ])
+            self.cmb_trim_method.setToolTip(
+                "How calibration commands the sim's elevator trim (MSFS).\n"
+                "Direct writes the trim SimVar itself and is the reliable default.\n"
+                "The axis event assumes the aircraft maps it 1:1 onto the trim —\n"
+                "some addons mishandle it (Just Flight). Debug option.")
+            debug_row.addWidget(self.cmb_trim_method)
+            self.chk_trace = QCheckBox("Record diagnostic trace")
+            self.chk_trace.setChecked(False)
+            self.chk_trace.setToolTip(
+                "Write a per-frame CSV of everything the calibration commands and\n"
+                "observes to the TelemFFB log folder (trimcal_trace_*.csv).\n"
+                "Attach it when reporting a problem aircraft.")
+            debug_row.addWidget(self.chk_trace)
+            debug_row.addStretch(1)
+            root.addLayout(debug_row)
+
         # Warning banner shown only while the engine is flying the aircraft.
         self.banner = QLabel("⚠  TelemFFB is controlling your aircraft — stay ready to take over")
         self.banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -453,6 +485,13 @@ class TrimCalibrationDialog(QDialog):
         cal.settle_before_sweep = self.chk_settle.isChecked()
         cal.initial_gain_scale = {0: 1.0, 1: 0.5, 2: 0.25}.get(
             self.cmb_response.currentIndex(), 1.0)
+        if self._debug:
+            cal.trim_write_method = \
+                "axis" if self.cmb_trim_method.currentIndex() == 1 else "direct"
+            cal.trace_enabled = self.chk_trace.isChecked()
+        else:
+            cal.trim_write_method = "direct"
+            cal.trace_enabled = False
         cal.start()
 
     def _on_stop(self):
