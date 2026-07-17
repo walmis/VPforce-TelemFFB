@@ -352,6 +352,7 @@ class SimConnectManager(threading.Thread):
         SimVar("ElevDeflPct", "ELEVATOR DEFLECTION PCT", "Percent Over 100"),
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
         SimVar("ElevTrimPct", "ELEVATOR TRIM PCT", "Percent Over 100"),
+        SimVar("ElevTrimPct_ex1", "ELEVATOR TRIM PCT EX1", "Percent Over 100", scale="(2 * x) - 1"),
         SimVar("ElevTrimDnLmt", "ELEVATOR TRIM DOWN LIMIT", "degrees"),
         SimVar("ElevTrimUpLmt", "ELEVATOR TRIM UP LIMIT", "degrees"),
         SimVar("ElevTrimNeutral", "ELEVATOR TRIM NEUTRAL", "degrees"),
