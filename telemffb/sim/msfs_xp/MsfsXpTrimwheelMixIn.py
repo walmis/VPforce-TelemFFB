@@ -1,4 +1,3 @@
-from typing import override
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
@@ -29,11 +28,10 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         self.last_pos_y_pos = 0.0
         self.trim_active = False
 
-    @override
-    def on_telemetry(self, telem_data: BaseTelemetryData):
-        super().on_telemetry(telem_data)
-        self.msfs_update_trimwheel(telem_data)    
-    
+    # NOTE: no on_telemetry hook here. Trimwheel devices are single-purpose:
+    # Aircraft.on_telemetry gates them BEFORE the cooperative effects chain
+    # and calls msfs_update_trimwheel directly, so no haptic effect can play
+    # through the wheel.
 
     def msfs_update_trimwheel(self, telem_data: BaseTelemetryData):
         """Drive trimwheel spring position from sim elevator trim and send axis to sim.

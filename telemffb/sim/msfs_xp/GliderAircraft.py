@@ -120,6 +120,8 @@ class GliderAircraft(Aircraft):
         telem_data.AircraftClass = "GliderAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
+        if self.is_trimwheel():
+            return  # single-purpose device; effects chain gated in Aircraft
 
         self.msfs_update_force_trim(telem_data, x_axis=self.aileron_force_trim,
                                                 y_axis=self.elevator_force_trim)

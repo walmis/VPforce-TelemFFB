@@ -193,6 +193,11 @@ class MockConditionEffect:
         self._magnitude = magnitude
         self._direction = direction
         return self
+
+    def periodic(self, frequency=0, magnitude=0, direction=0, *args, **kwargs):
+        """Set periodic effect parameters (rumble/vibration; chainable)."""
+        self._periodic = (frequency, magnitude, direction, kwargs)
+        return self
     
     def setEffect(self):
         """Mock setEffect method."""

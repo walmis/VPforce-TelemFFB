@@ -187,6 +187,17 @@ class Aircraft(
         if not "AircraftClass" in telem_data:
             telem_data.AircraftClass = "GenericAircraft"  # inject aircraft class into telemetry
 
+        if self.is_trimwheel():
+            # A trimwheel is a single-purpose device: run ONLY the trimwheel
+            # routine. Skipping super() stops the entire cooperative effects
+            # chain (engine rumble, buffeting, g-force, ...) — those effects
+            # played through the wheel after the mixin refactor lost the old
+            # early-return guards. Subclass on_telemetry overrides with code
+            # AFTER their super() call must carry their own is_trimwheel()
+            # guard (cf. Helicopter/GliderAircraft/FlyInsideHelicopter).
+            self.msfs_update_trimwheel(telem_data)
+            return
+
         super().on_telemetry(telem_data)
 
         self.msfs_update_stick_shaker(telem_data)
