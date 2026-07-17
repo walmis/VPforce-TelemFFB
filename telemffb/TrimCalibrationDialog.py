@@ -150,17 +150,29 @@ class TrimCalibrationDialog(QDialog):
         self.chk_trace = None
         if self._debug:
             debug_row = QHBoxLayout()
-            debug_row.addWidget(QLabel("Trim write method:"))
+            lbl_trim_method = InfoLabel(
+                text="Trim write method:",
+                tooltip=(
+                    "Debug options — this row is only visible when the Debug Mode "
+                    "system setting is enabled.\n\n"
+                    "Trim write method: how calibration commands the sim's elevator "
+                    "trim (MSFS).\n"
+                    "• Direct (default) — writes the ELEVATOR TRIM POSITION SimVar "
+                    "itself; the most reliable method across tested aircraft.\n"
+                    "• Axis event — sends AXIS_ELEV_TRIM_SET instead, which assumes "
+                    "the aircraft maps the event 1:1 onto its trim. Some addons "
+                    "mishandle the event (e.g. Just Flight); use this only to test "
+                    "an aircraft that misbehaves with the direct method.\n\n"
+                    "Record diagnostic trace: writes a per-frame CSV of everything "
+                    "the calibration commands and observes (trimcal_trace_*.csv in "
+                    "the TelemFFB log folder) — attach it when reporting a problem "
+                    "aircraft."))
+            debug_row.addWidget(lbl_trim_method)
             self.cmb_trim_method = QComboBox()
             self.cmb_trim_method.addItems([
                 "Direct (ELEVATOR TRIM POSITION)",
                 "Axis event (AXIS_ELEV_TRIM_SET)",
             ])
-            self.cmb_trim_method.setToolTip(
-                "How calibration commands the sim's elevator trim (MSFS).\n"
-                "Direct writes the trim SimVar itself and is the reliable default.\n"
-                "The axis event assumes the aircraft maps it 1:1 onto the trim —\n"
-                "some addons mishandle it (Just Flight). Debug option.")
             debug_row.addWidget(self.cmb_trim_method)
             self.chk_trace = QCheckBox("Record diagnostic trace")
             self.chk_trace.setChecked(False)
