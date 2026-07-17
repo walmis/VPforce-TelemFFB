@@ -56,11 +56,15 @@ independent of the physical stick position.
 import enum
 import logging
 import math
+import os
 import time
 
+import telemffb.globals as G
 from telemffb.utils import PID, clamp, piecewise_linear
 
 logger = logging.getLogger(__name__)
+
+MS_TO_FPM = 196.85
 
 
 class CalState(enum.Enum):
@@ -119,8 +123,13 @@ class TrimCalibrator:
 
     # Polarity probe.
     AUTO_DETECT_POLARITY = True
-    PROBE_U = 0.08               # normalized axis command applied during a probe
-    PROBE_TIME_S = 1.2           # per-axis probe window (upper bound)
+    PROBE_U = 0.08               # peak normalized probe command (before ramp/scale)
+    PROBE_U_MIN = 0.03           # floor so a control-response-derated probe still responds
+    PROBE_RAMP_S = 0.6           # ramp the probe in over this long instead of a step —
+                                 # a step is broadband and rings the phugoid on
+                                 # sensitive/pitchy aircraft, starting an oscillation
+                                 # that was not there; a ramp excites far less.
+    PROBE_TIME_S = 2.5           # per-axis probe window (upper bound; exits early on response)
     PROBE_BASELINE_S = 0.4       # no-input drift-measurement window before each probe
     PROBE_MIN_VS = 0.15          # m/s; min |dVS| to trust the elevator probe
     PROBE_MIN_ROLL = 1.0         # deg; min |dRoll| to trust the aileron probe
@@ -195,7 +204,13 @@ class TrimCalibrator:
     # The instantaneous gate (STABLE_VS_TOL) is loose because real air jitters;
     # the mean gate rejects one-sided residuals from a still-converging PID,
     # which otherwise bias the recorded elevator in a trim-correlated way.
-    SAMPLE_VS_MEAN_TOL = 0.15    # m/s
+    SAMPLE_VS_MEAN_TOL = 0.15    # m/s (~30 fpm); clean-sample gate
+    SAMPLE_VS_HARD_TOL = 0.3048  # m/s (60 fpm); worse than this at the station
+                                 # deadline aborts — between the two, the best
+                                 # dwell is accepted and flagged in the results
+                                 # (a residual that holds steady is a finite-gain
+                                 # chase of a drifting target, usually airspeed —
+                                 # waiting longer cannot satisfy the clean gate)
 
     # Trim actuation. Commands are slew-rate limited — an instantaneous trim
     # step acts like yanking the stick and pitches the aircraft violently.
@@ -229,11 +244,28 @@ class TrimCalibrator:
     # polarity probe must begin from wings-level or its measurements start
     # contaminated (and any wrong prior feeds on the existing bank).
     START_MAX_ROLL_DEG = 10.0
+    # Pre-start VS gate: a probe begun in a real climb/descent measures the
+    # phugoid instead of its own input and can coin-flip the pitch polarity
+    # (field: back-to-back runs starting +1600 fpm after a previous abort).
+    START_MAX_VS = 2.54          # m/s (~500 fpm)
     IAS_BAND_FRAC = 0.30         # abort if IAS drifts more than ±30% from start
     TELEM_TIMEOUT_S = 1.0        # no telemetry for this long -> abort
 
     HOLD_SPRING_COEFF = 1.0      # firm centered spring to keep hands-off stick put
     TRIM_AXIS_RANGE = 16383      # AXIS_ELEV_TRIM_SET: -16383..16384
+
+    # Trimwheel hold: a trimwheel instance writes its absolute wheel position
+    # to the sim every frame, which fights our trim commands writer-vs-writer.
+    # While the run is active we broadcast a self-expiring hold over IPC
+    # (refreshed well inside the TTL so a crashed master un-mutes the wheel).
+    TRIMWHEEL_HOLD_TTL_S = 3.0
+    TRIMWHEEL_HOLD_TX_S = 1.0    # refresh interval
+
+    # Diagnostic flight recorder (armed via the trace_enabled run option in
+    # debug mode): one row per telemetry frame (commands, read-backs, loop
+    # internals), dumped as a CSV next to the logs at the end of the run.
+    # Cheap (tuples in a list) — and the only way to debug control-loop
+    # behavior precisely instead of from descriptions of moving graphs.
 
     def __init__(self, aircraft):
         self.ac = aircraft
@@ -245,6 +277,17 @@ class TrimCalibrator:
         # SPEED_SETTLE_S after finding the natural trim point so the airspeed
         # stabilizes before the sweep. Users can disable it for a faster run.
         self.settle_before_sweep = True
+        # Run option: starting pitch-gain scale (1.0 = normal). Lets the user
+        # pre-derate the leveling loop for known-sensitive/pitchy aircraft
+        # instead of waiting for the oscillation watchdog to discover it.
+        self.initial_gain_scale = 1.0
+        # Run option: MSFS trim write method — "direct" (default) writes the
+        # ELEVATOR TRIM POSITION SimVar; "axis" sends AXIS_ELEV_TRIM_SET.
+        # Selectable only via the dialog's debug-mode pulldown (see _set_trim
+        # for why direct is primary).
+        self.trim_write_method = "direct"
+        # Run option: per-frame diagnostic CSV trace (debug-mode checkbox).
+        self.trace_enabled = False
         self.result = None          # dict on success, else None
         self.abort_reason = None
         # Set from the UI thread by stop(); consumed in the telemetry thread so
@@ -276,9 +319,10 @@ class TrimCalibrator:
         self._last_t = None
         self._phase_start_t = None
         self._probe_stage = 0            # 0 = elevator, 1 = aileron
-        self._probe_phase = "baseline"   # "baseline" (measure drift) then "probe"
+        self._probe_phase = "baseline"   # "baseline" -> "probe" -> "rampdown"
         self._probe_ref = None           # reference value at sub-phase start
         self._probe_drift = 0.0          # drift rate measured over the baseline window
+        self._probe_peak_u = 0.0         # probe magnitude at ramp-down start
         self._probe_pitch_ref = None     # pitch anchor for pitch-polarity detection
         self._probe_pitch_drift = 0.0
         # pitch loop mode: None until engaged (after the probe knows the
@@ -302,6 +346,8 @@ class TrimCalibrator:
         self._dwell_samples = []
         self._samples = []               # [(ElevTrimPct, u_elev)] steady-state points
         self._station_ias = []           # mean IAS per accepted station (drift diagnostics)
+        self._station_best = None        # best over-tolerance dwell at this station
+        self._flagged = []               # samples accepted with a VS residual (see result)
         # trim command state (read-back space; _set_trim maps to command space)
         self._trim_cmd = 0.0
         self._trim_sign = 1.0            # flipped at runtime if read-back moves opposite
@@ -309,6 +355,15 @@ class TrimCalibrator:
         self._sign_cmd_accum = 0.0
         self._sign_rb_start = 0.0
         self._sign_flips = 0
+        self._hold_tx_t = 0.0            # last trimwheel-hold broadcast time
+        self._trim_method_logged = False # effective write method logged once per run
+        # trace (diagnostic flight recorder) state
+        self._trace_rows = []
+        self._trace_t0 = None
+        self._trace_broken = False
+        self._trace_trim_write = None    # last raw value written to the sim's trim
+        self._trace_axis_y = None        # last elevator axis value sent to the sim
+        self._pitch_target_n = None      # cascade outer-loop demand (normalized deg)
         self._u_sat_since = None
         # trim-neutralization state (discrete step-and-settle root-find)
         self._trim_touched = False       # any trim commanded this run (restore flag)
@@ -326,7 +381,7 @@ class TrimCalibrator:
         self._osc_dir = 0            # 0 = undetermined, +1 rising, -1 falling
         self._osc_prev_ext = None    # last confirmed extremum
         self._osc_amps = []          # recent half-cycle amplitudes (peak-to-peak / 2)
-        self._set_pitch_gain_scale(1.0)
+        self._set_pitch_gain_scale(clamp(self.initial_gain_scale, self.OSC_MIN_GAIN_SCALE, 1.0))
         # takeover smoothness: hold the stick where it rests and start the
         # axis output where the normal path left it (captured on first frame)
         self._hold_offs = None
@@ -367,6 +422,8 @@ class TrimCalibrator:
         if abs(telem_data.get("Pitch", 0)) > self.MAX_PITCH_DEG or \
                 abs(telem_data.get("Roll", 0)) > self.START_MAX_ROLL_DEG:
             return False, "Get roughly straight-and-level first"
+        if abs(telem_data.get("VerticalSpeed", 0)) > self.START_MAX_VS:
+            return False, "Level off first — still climbing/descending"
         return True, "Ready to calibrate"
 
     def start(self):
@@ -417,6 +474,11 @@ class TrimCalibrator:
             self.status_message = f"Aborted: {reason}"
             self.state = CalState.ABORT
             self._active = False
+            try:
+                self._set_trimwheel_hold(False)
+            except Exception:
+                pass  # the hold self-expires within the TTL anyway
+            self._dump_trace()
 
     # ---- Per-frame driver (called from the telemetry thread) ----------------
 
@@ -440,6 +502,10 @@ class TrimCalibrator:
         if not self._precheck(telem_data):
             return
 
+        if now - self._hold_tx_t >= self.TRIMWHEEL_HOLD_TX_S:
+            self._hold_tx_t = now
+            self._set_trimwheel_hold(True)
+
         if not self._u_base_captured:
             self._capture_takeover_baseline(telem_data)
 
@@ -456,6 +522,84 @@ class TrimCalibrator:
         elif self.state == CalState.RESTORE:
             self._do_restore(telem_data, dt)
         # SOLVE/DONE/ABORT are terminal and handled inline when reached.
+
+        if self._active:
+            self._trace_frame(telem_data, now)
+
+    # ---- Diagnostic trace (per-run flight recorder) ---------------------------
+
+    TRACE_COLUMNS = ("t,state,detail,vs_ms,pitch_deg,roll_deg,ias_ms,"
+                     "trim_pct,trim_deg,trim_cmd,trim_target,trim_write,"
+                     "u_base_y,u_elev,u_ail,axis_y_sent,elev_defl_pct,"
+                     "pid_out,pid_i_term,"
+                     "pitch_target_n,gain_scale,pitch_mode,trim_sign,dir_verified")
+
+    def _log_trim_method(self, desc):
+        """Log the effective MSFS write method once per run (diagnostics)."""
+        if not self._trim_method_logged:
+            self._trim_method_logged = True
+            logger.info(f"Trim writes: {desc}")
+
+    def _trace_frame(self, telem_data, now):
+        """Record one row of everything the engine commanded and observed."""
+        if not self.trace_enabled or self._trace_broken:
+            return
+        try:
+            if self._trace_t0 is None:
+                self._trace_t0 = now
+            if self.state == CalState.PROBE:
+                detail, target = f"stage{self._probe_stage}-{self._probe_phase}", None
+            elif self.state == CalState.TRIM_NEUTRAL:
+                detail, target = f"step{self._neut_steps + 1}", self._neut_target
+            elif self.state == CalState.SWEEP:
+                detail, target = f"station{len(self._samples) + 1}", self._current_target
+            elif self.state == CalState.RESTORE:
+                detail, target = "", self._trim0
+            else:
+                detail, target = "", None
+            pid = self._pitch_pid
+            self._trace_rows.append((
+                now - self._trace_t0, self.state.name, detail,
+                telem_data.VerticalSpeed, telem_data.Pitch, telem_data.Roll,
+                telem_data.IAS, telem_data.ElevTrimPct, telem_data.ElevTrim,
+                self._trim_cmd, target, self._trace_trim_write,
+                self._u_base_y, self._u_elev, self._u_ail, self._trace_axis_y,
+                # actual surface position: vs u_elev it exposes aircraft that
+                # scale control input with airspeed (C208B: ~30% at cruise)
+                telem_data.ElevDeflPct,
+                pid.output, pid.ki * pid._integral, self._pitch_target_n,
+                self._gain_scale, self._pitch_mode, self._trim_sign,
+                int(self._trim_dir_verified),
+            ))
+        except Exception:
+            # Telemetry hot path: diagnostics must never break the run.
+            self._trace_broken = True
+            logger.exception("trace disabled for this run (frame capture failed)")
+
+    def _dump_trace(self):
+        rows, self._trace_rows = self._trace_rows, []
+        if not self.trace_enabled or not rows:
+            return
+        try:
+            folder = os.path.join(os.environ.get("LOCALAPPDATA", "."),
+                                  "VPForce-TelemFFB", "log")
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, time.strftime("trimcal_trace_%Y%m%d_%H%M%S.csv"))
+
+            def fmt(v):
+                if v is None:
+                    return ""
+                if isinstance(v, float):
+                    return f"{v:.5f}"
+                return str(v)
+
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.TRACE_COLUMNS + "\n")
+                for r in rows:
+                    f.write(",".join(fmt(v) for v in r) + "\n")
+            logger.info(f"Trim calibration trace: {len(rows)} frames -> {path}")
+        except Exception:
+            logger.exception("trace dump failed")
 
     # ---- Safety --------------------------------------------------------------
 
@@ -556,12 +700,33 @@ class TrimCalibrator:
         elapsed = now - self._phase_start_t
         probe_on = self._probe_phase == "probe"
 
+        # Ramped, gentled probe command: ease the input in over PROBE_RAMP_S
+        # (no step) and scale by the control-response setting so sensitive
+        # aircraft get a smaller nudge. Enough to read polarity, not enough to
+        # start an oscillation. The ramp-DOWN is symmetric — releasing the
+        # input abruptly is as broadband a disturbance as an abrupt onset.
+        if probe_on:
+            mag = max(self.PROBE_U * self._gain_scale, self.PROBE_U_MIN)
+            u_probe = mag * min(elapsed / self.PROBE_RAMP_S, 1.0)
+        elif self._probe_phase == "rampdown":
+            u_probe = self._probe_peak_u * max(1.0 - elapsed / self.PROBE_RAMP_S, 0.0)
+        else:
+            u_probe = 0.0
+
         if self._probe_stage == 0:
             # Elevator probe. The aileron gets NO closed-loop help here: its
             # polarity is unverified at this point, and a wrong-sign
             # wings-level term is positive feedback — seen in the field as a
             # hard roll at start when beginning with residual bank.
-            self._u_elev = self._u_base_y + (self.PROBE_U if probe_on else 0.0)
+            if self._probe_phase == "rampdown":
+                # Blend the held elevator into the leveling loop as we release:
+                # recovery starts now (not one stage later) and the handoff is
+                # stepless. Pitch polarity was detected just before ramp-down.
+                r = min(elapsed / self.PROBE_RAMP_S, 1.0)
+                level_u = self._run_pitch_loop(telem_data, dt)
+                self._u_elev = (1.0 - r) * (self._u_base_y + self._probe_peak_u) + r * level_u
+            else:
+                self._u_elev = self._u_base_y + u_probe
             self._u_ail = self._u_base_x
             exit_threshold = self.PROBE_VS_EXIT
         else:
@@ -569,14 +734,14 @@ class TrimCalibrator:
             # polarities detected in stage 0 (a weak hold lets the probe's
             # climb build into a zoom that trips the attitude guard).
             self._u_elev = self._run_pitch_loop(telem_data, dt)
-            self._u_ail = self._u_base_x + (self.PROBE_U if probe_on else 0.0)
+            self._u_ail = self._u_base_x + u_probe
             exit_threshold = self.PROBE_ROLL_EXIT
 
         self._command_axes(telem_data)
 
         value = self._probe_value(telem_data)
 
-        if not probe_on:
+        if self._probe_phase == "baseline":
             if elapsed >= self.PROBE_BASELINE_S:
                 self._probe_drift = (value - self._probe_ref) / max(elapsed, 1e-6)
                 p_now = telem_data.Pitch or 0.0
@@ -587,12 +752,27 @@ class TrimCalibrator:
                 self._probe_ref = value
             return
 
+        if self._probe_phase == "rampdown":
+            # Polarity is already recorded; just ease the input out, then
+            # advance to the next stage (or stabilize).
+            if elapsed >= self.PROBE_RAMP_S:
+                self._advance_probe_stage()
+            return
+
         # Drift-compensated response to the probe input.
         delta = (value - self._probe_ref) - self._probe_drift * elapsed
 
         # End the probe as soon as the response is unambiguous — holding the
-        # input for the full window just pumps energy into the aircraft.
-        if elapsed >= self.PROBE_TIME_S or abs(delta) >= exit_threshold:
+        # input for the full window just pumps energy into the aircraft. The
+        # early exit is only trusted once the ramp has fully applied the
+        # input: a threshold crossing in the first fraction of a second is
+        # residual aircraft motion (accelerating phugoid the linear drift
+        # model cannot capture), not probe response — and at a random phugoid
+        # phase the dPitch/dVS agreement is a coin flip, so a wrong-sign
+        # cascade then rails the elevator (seen in the field as full surface
+        # deflection during PROBE and a +/-15 deg attitude-guard abort).
+        if elapsed >= self.PROBE_TIME_S or \
+                (elapsed >= self.PROBE_RAMP_S and abs(delta) >= exit_threshold):
             if self._probe_stage == 0:
                 if abs(delta) >= self.PROBE_MIN_VS:
                     self._elev_sign = 1.0 if delta > 0 else -1.0
@@ -613,11 +793,6 @@ class TrimCalibrator:
                 else:
                     logger.warning(f"Elevator probe inconclusive (dVS={delta:+.2f} m/s); "
                                    f"keeping sign {self._elev_sign:+.0f}")
-                self._probe_stage = 1
-                self._phase_start_t = None
-                self._probe_ref = None
-                self._probe_drift = 0.0
-                self._pitch_mode = None  # (re-)engage the pitch loop with fresh polarity info
             else:
                 if abs(delta) >= self.PROBE_MIN_ROLL:
                     self._ail_sign = 1.0 if delta > 0 else -1.0
@@ -625,7 +800,26 @@ class TrimCalibrator:
                 else:
                     logger.warning(f"Aileron probe inconclusive (dRoll={delta:+.2f} deg); "
                                    f"keeping sign {self._ail_sign:+.0f}")
-                self._enter_stabilize()
+            # Polarity recorded; ease the input back out before advancing.
+            self._probe_peak_u = u_probe
+            self._probe_phase = "rampdown"
+            self._phase_start_t = now
+
+    def _advance_probe_stage(self):
+        """After a probe's ramp-down, move to the aileron probe or stabilize.
+
+        The pitch loop was engaged during the elevator ramp-down and stays
+        engaged (its integral already holds recovery progress); resetting it
+        here would discard that and re-step the elevator.
+        """
+        if self._probe_stage == 0:
+            self._probe_stage = 1
+            self._probe_phase = "baseline"
+            self._phase_start_t = None
+            self._probe_ref = None
+            self._probe_drift = 0.0
+        else:
+            self._enter_stabilize()
 
     # ---- Phase: stabilize ----------------------------------------------------
 
@@ -761,15 +955,50 @@ class TrimCalibrator:
                 self._neut_steps += 1
                 self._begin_neut_step(t + step)
         elif now > self._neut_deadline:
-            logger.warning("Trim neutralization step could not settle; sweeping around the "
-                           f"current point (steady elevator ~{self._neut_u_final:+.2f})")
-            self._finish_neutral(telem_data, centered=False)
+            self._neutral_give_up(telem_data, "Trim neutralization step could not settle")
             return
 
         if now - self._neut_start_t > self.NEUT_TIMEOUT_S:
-            logger.warning("Trim neutralization timed out; sweeping around the current point "
-                           f"(steady elevator ~{self._neut_u_final:+.2f})")
-            self._finish_neutral(telem_data, centered=False)
+            self._neutral_give_up(telem_data, "Trim neutralization timed out")
+
+    def _neutral_give_up(self, telem_data, what):
+        """Neutralization deadline/timeout: degrade or abort, honestly.
+
+        Sweeping around the current point is only a sane degradation when the
+        trim has DEMONSTRATED it responds (direction verified against the
+        read-back). Without that proof the sweep is doomed and proceeding just
+        defers the failure to a slow station timeout: commanded-but-deaf trim
+        aborts as unresponsive, and a give-up before any trim was even
+        commanded (first step settles in place; the aircraft would not calm
+        down) aborts naming the settle problem.
+        """
+        if not self._trim_dir_verified:
+            if abs(self._sign_cmd_accum) >= self.TRIM_SIGN_CHECK_DIST:
+                self._abort("Trim is not responding to commands")
+            else:
+                # Nothing was commanded yet, so name the gate that actually
+                # kept the settle from completing (the settle test is
+                # at-target AND VS AND roll — reporting VS for a trim-drift
+                # or roll problem sends the user chasing the wrong thing).
+                rb_err = abs((telem_data.ElevTrimPct or 0) - self._neut_target)
+                vs_fpm = (telem_data.VerticalSpeed or 0) * MS_TO_FPM
+                if rb_err > self.TRIM_STATION_TOL:
+                    why = (f"trim read-back drifted {100 * rb_err:.1f}% off the hold "
+                           "point while it was held steady — the aircraft's systems "
+                           "may be mishandling the trim commands or moving the trim "
+                           "themselves")
+                elif abs(telem_data.Roll or 0) > self.STABLE_ROLL_TOL:
+                    why = f"could not hold wings level (roll {telem_data.Roll:+.1f} deg)"
+                elif abs(telem_data.VerticalSpeed or 0) > self.STABLE_VS_TOL:
+                    why = f"could not settle level (VS {vs_fpm:+.0f} fpm)"
+                else:
+                    why = ("flight would not stay settled long enough to measure "
+                           f"(VS {vs_fpm:+.0f} fpm at abort)")
+                self._abort(f"Trim neutralization: {why}")
+            return
+        logger.warning(f"{what}; sweeping around the current point "
+                       f"(steady elevator ~{self._neut_u_final:+.2f})")
+        self._finish_neutral(telem_data, centered=False)
 
     def _finish_neutral(self, telem_data, centered):
         """Hand leveling back to the PID from a clean state and start the sweep.
@@ -778,7 +1007,7 @@ class TrimCalibrator:
         timeout the residual elevator becomes the new baseline instead (a
         constant, so it shifts only the fit's intercept, never the slope).
         """
-        self._u_base_y = 0.0 if centered else self._neut_u_f
+        self._u_base_y = 0.0 if centered else self._neut_u_final
         self._pitch_pid.reset()
         self._pitch_ref_n = None
         self._pitch_ref0 = None
@@ -835,6 +1064,7 @@ class TrimCalibrator:
         self._step_settle_deadline = time.perf_counter() + ramp_time + self.STEP_SETTLE_TIMEOUT_S
         self._dwell_since = None
         self._dwell_samples = []
+        self._station_best = None
 
     def _next_station_target(self, last_u):
         """Pick the next station, expanding outward; None ends the sweep.
@@ -956,45 +1186,99 @@ class TrimCalibrator:
             )
             if now - self._dwell_since >= self.STEP_DWELL_S:
                 n = len(self._dwell_samples)
+                mean_trim = sum(s[0] for s in self._dwell_samples) / n
+                mean_u = sum(s[1] for s in self._dwell_samples) / n
                 mean_vs = sum(s[2] for s in self._dwell_samples) / n
+                mean_ias = sum(s[3] for s in self._dwell_samples) / n
                 if abs(mean_vs) > self.SAMPLE_VS_MEAN_TOL:
                     # Still converging (one-sided VS residual): retry the dwell
-                    # rather than record a biased sample. The step deadline
-                    # still bounds the retries.
+                    # rather than record a biased sample, keeping the best
+                    # completed dwell for the deadline compromise below.
+                    if self._station_best is None or \
+                            abs(mean_vs) < abs(self._station_best[3]):
+                        self._station_best = (mean_trim, mean_u, mean_ias, mean_vs)
                     self._dwell_since = None
                     self._dwell_samples = []
                 else:
-                    mean_trim = sum(s[0] for s in self._dwell_samples) / n
-                    mean_u = sum(s[1] for s in self._dwell_samples) / n
-                    mean_ias = sum(s[3] for s in self._dwell_samples) / n
-                    self._samples.append((mean_trim, mean_u))
-                    self._station_ias.append(mean_ias)
-                    if self._side == 0:
-                        self._u_center = mean_u
-                    logger.info(
-                        f"Station {len(self._samples)} ({side_txt}): "
-                        f"trim {mean_trim:+.4f}, u_elev {mean_u:+.4f}, "
-                        f"IAS {mean_ias * 1.94384:.1f} kt"
-                    )
-                    self.progress = len(self._samples) / self.SWEEP_MAX_STATIONS
-                    nxt = self._next_station_target(mean_u)
-                    if nxt is None:
-                        if len(self._samples) >= self.MIN_SAMPLES_FOR_FIT:
-                            self._solve()
-                        else:
-                            self._abort("Trim band exhausted before enough samples "
-                                        "could be gathered")
-                        return
-                    self._begin_step(nxt)
+                    self._accept_station(mean_trim, mean_u, mean_ias)
+                    return
         else:
             self._dwell_since = None
             self._dwell_samples = []
 
         if now > self._step_settle_deadline:
-            self._abort(
-                f"Could not hold level at sweep station {len(self._samples) + 1} "
-                f"(VS {telem_data.VerticalSpeed * 196.85:+.0f} fpm)"
-            )
+            self._finish_station_on_deadline(telem_data, target)
+
+    def _accept_station(self, mean_trim, mean_u, mean_ias, residual_vs=None):
+        """Record a station sample and advance the sweep (or solve at the end).
+
+        ``residual_vs`` marks a deadline-compromise sample taken with a steady
+        VS residual; it is surfaced in the result so the user can judge it.
+        """
+        side_txt = "center" if self._side == 0 else \
+            ("nose-up side" if self._side > 0 else "nose-dn side")
+        self._samples.append((mean_trim, mean_u))
+        self._station_ias.append(mean_ias)
+        if self._side == 0:
+            self._u_center = mean_u
+        if residual_vs is not None:
+            self._flagged.append({
+                "index": len(self._samples) - 1,
+                "trim": mean_trim,
+                "vs_fpm": residual_vs * MS_TO_FPM,
+            })
+        logger.info(
+            f"Station {len(self._samples)} ({side_txt}): "
+            f"trim {mean_trim:+.4f}, u_elev {mean_u:+.4f}, "
+            f"IAS {mean_ias * 1.94384:.1f} kt"
+            + (f", residual VS {residual_vs * MS_TO_FPM:+.0f} fpm (flagged)"
+               if residual_vs is not None else "")
+        )
+        self.progress = len(self._samples) / self.SWEEP_MAX_STATIONS
+        nxt = self._next_station_target(mean_u)
+        if nxt is None:
+            if len(self._samples) >= self.MIN_SAMPLES_FOR_FIT:
+                self._solve()
+            else:
+                self._abort("Trim band exhausted before enough samples "
+                            "could be gathered")
+            return
+        self._begin_step(nxt)
+
+    def _finish_station_on_deadline(self, telem_data, target):
+        """Station deadline expired without a clean sample: compromise or abort.
+
+        A VS residual that holds steady across retries is the leveler chasing
+        a moving target at finite gain (usually slow airspeed drift), not a
+        lack of elevator authority — waiting longer cannot satisfy the clean
+        gate. Within SAMPLE_VS_HARD_TOL the best dwell is accepted and flagged
+        in the results; beyond it the run aborts, naming the gate that failed.
+        """
+        station = len(self._samples) + 1
+        if self._station_best is not None and \
+                abs(self._station_best[3]) <= self.SAMPLE_VS_HARD_TOL:
+            mean_trim, mean_u, mean_ias, mean_vs = self._station_best
+            logger.warning(
+                f"Station {station}: accepting best dwell with residual VS "
+                f"{mean_vs * MS_TO_FPM:+.0f} fpm (clean gate is "
+                f"{self.SAMPLE_VS_MEAN_TOL * MS_TO_FPM:.0f} fpm); flagged in results")
+            self._accept_station(mean_trim, mean_u, mean_ias, residual_vs=mean_vs)
+            return
+        rb_err = abs((telem_data.ElevTrimPct or 0) - target)
+        if rb_err > self.TRIM_STATION_TOL:
+            why = (f"trim read-back never reached the station target "
+                   f"(off by {100 * rb_err:.1f}%)")
+        elif abs(telem_data.Roll or 0) > self.STABLE_ROLL_TOL:
+            why = f"could not hold wings level (roll {telem_data.Roll:+.1f} deg)"
+        elif self._station_best is not None:
+            why = (f"VS residual would not settle below "
+                   f"{self.SAMPLE_VS_HARD_TOL * MS_TO_FPM:.0f} fpm (best "
+                   f"{self._station_best[3] * MS_TO_FPM:+.0f} fpm) — airspeed may "
+                   f"be drifting; try the airspeed-settle option or steadier power")
+        else:
+            why = (f"could not hold level "
+                   f"(VS {(telem_data.VerticalSpeed or 0) * MS_TO_FPM:+.0f} fpm)")
+        self._abort(f"Sweep station {station}: {why}")
 
     # ---- Phase: solve --------------------------------------------------------
 
@@ -1069,6 +1353,7 @@ class TrimCalibrator:
             "split": split,
             "curve": curve,
             "trim0": self._trim0,
+            "flagged": list(self._flagged),
         }
         self._done_status = (
             f"Done — Virtual Y = {virtual_y:.3f}"
@@ -1161,8 +1446,10 @@ class TrimCalibrator:
             target_n = self._pitch_ref_n + clamp(
                 self.CASC_VS_TO_PITCH * (self.VS_TARGET - vs),
                 -self.CASC_MAX_TARGET_DEG, self.CASC_MAX_TARGET_DEG)
+            self._pitch_target_n = target_n
             return self._u_base_y + self._elev_sign * self._pitch_pid.update(target_n - pitch_n, dt)
 
+        self._pitch_target_n = None
         vs_err = self._elev_sign * (self.VS_TARGET - vs)
         return self._u_base_y + self._pitch_pid.update(vs_err, dt)
 
@@ -1284,15 +1571,17 @@ class TrimCalibrator:
 
         if self.ac._use_firmware_axis_backend():
             self.ac._send_firmware_fixed_axes(u_ail * x_scale, u_elev * y_scale)
+            self._trace_axis_y = round(u_elev * y_scale, 5)
         elif self.ac._sim_is_xplane():
             self.ac.send_xp_command(
                 f"AXIS:jx={round(u_ail * x_scale, 5)},jy={round(u_elev * y_scale, 5)}"
             )
+            self._trace_axis_y = round(u_elev * y_scale, 5)
         elif self.ac._sim_is_msfs():
             x_var, x_range = self.ac._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
             y_var, y_range = self.ac._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
             self.ac._send_msfs_axis_value(x_var, u_ail, x_range, x_scale)
-            self.ac._send_msfs_axis_value(y_var, u_elev, y_range, y_scale)
+            self._trace_axis_y = self.ac._send_msfs_axis_value(y_var, u_elev, y_range, y_scale)
 
         self._hold_stick_centered()
 
@@ -1320,18 +1609,50 @@ class TrimCalibrator:
     def _set_trim(self, pct):
         """Command the sim's elevator trim to an absolute normalized position.
 
-        ``pct`` is in ElevTrimPct read-back space. MSFS AXIS_* events are
-        sign-inverted relative to the SimVar read-backs (see the trimwheel
-        mixin's ``pos_y_pos = -int(pos_y_pos)``), hence the negation.
-        ``_trim_sign`` is a runtime correction on top of that, flipped by
-        :meth:`_advance_trim` for aircraft with inverted trim response
-        (cf. the ``trimwheel_axis_invert`` user setting).
+        ``pct`` is in ElevTrimPct read-back space.
+
+        MSFS — the DIRECT method (default) writes the ELEVATOR TRIM POSITION
+        SimVar, mapping pct per-side through the reported travel limits (like
+        the trimwheel's direct mode). Direct is self-referential — it writes
+        the read-back's own quantity — so a hold-in-place command is a true
+        no-op on any aircraft. The AXIS method (debug-mode selection, and the
+        fallback when no usable travel limits are reported) sends
+        AXIS_ELEV_TRIM_SET and assumes the sim maps the event value 1:1 onto
+        the read-back; field testing found aircraft that mishandle the event
+        (Just Flight Arrow III/IV and Hawk T1 apply it raw/32766 UNNEGATED,
+        relocating trim to -cmd/2 on every write — measured in
+        trimcal_trace_20260716_123259), which is why direct is primary. The
+        event value is sign-inverted relative to the SimVar read-backs (see
+        the trimwheel mixin's ``pos_y_pos = -int(pos_y_pos)``), hence the
+        negation. ``_trim_sign`` is a runtime correction on top of either
+        method, flipped by :meth:`_advance_trim` for aircraft with inverted
+        trim response (cf. the ``trimwheel_axis_invert`` user setting).
         """
         pct = clamp(pct * self._trim_sign, -1.0, 1.0)
         if self.ac._sim_is_msfs():
-            self.ac._simconnect.send_event_to_msfs(
-                "AXIS_ELEV_TRIM_SET", -int(pct * self.TRIM_AXIS_RANGE)
-            )
+            limits = None
+            if self.trim_write_method == "direct":
+                get_limits = getattr(self.ac, "_trimwheel_trim_limits", None)
+                telem = getattr(self.ac, "_telem_data", None)
+                if get_limits is not None and telem is not None:
+                    limits = get_limits(telem)
+            if limits is not None:
+                self._log_trim_method("direct ELEVATOR TRIM POSITION (travel "
+                                      f"{limits[0]:+.1f}..{limits[1]:+.1f} deg)")
+                dn, up = limits
+                deg = pct * up if pct >= 0 else pct * abs(dn)
+                self._trace_trim_write = round(deg, 4)
+                self.ac._simconnect.set_simdatum_to_msfs(
+                    "ELEVATOR TRIM POSITION", math.radians(deg), units="radians"
+                )
+                return
+            self._log_trim_method(
+                "AXIS_ELEV_TRIM_SET (debug selection)"
+                if self.trim_write_method == "axis"
+                else "AXIS_ELEV_TRIM_SET (no usable trim-limit telemetry for direct)")
+            out = -int(pct * self.TRIM_AXIS_RANGE)
+            self._trace_trim_write = out
+            self.ac._simconnect.send_event_to_msfs("AXIS_ELEV_TRIM_SET", out)
         elif self.ac._sim_is_xplane():
             # Write the pilot-control-level trim (float ratio -1..1); the FM
             # propagates it to sim/flightmodel2/controls/elevator_trim, which
@@ -1339,6 +1660,7 @@ class TrimCalibrator:
             # sign convention both ways, so no MSFS-style negation here.
             # Aircraft with custom trim systems that swallow this write are
             # caught by the read-back verification in _advance_trim.
+            self._trace_trim_write = round(pct, 5)
             self.ac.write_xp_dataref("sim/cockpit2/controls/elevator_trim", round(pct, 5), type="float")
 
     # ---- Teardown ------------------------------------------------------------
@@ -1359,5 +1681,24 @@ class TrimCalibrator:
                 self._set_trim(self._trim0)
         except Exception as e:
             logger.debug(f"trim restore skipped: {e}")
+        self._set_trimwheel_hold(False)
         self.state = end_state
         self._active = False
+        self._dump_trace()
+
+    def _set_trimwheel_hold(self, active):
+        """Mute/unmute trimwheel instances' sim writes while we own the trim.
+
+        Sets the local deadline directly (covers a trimwheel on this instance)
+        and broadcasts to children over IPC. The hold self-expires after
+        TRIMWHEEL_HOLD_TTL_S without a refresh, and the trimwheel re-syncs its
+        wheel position before resuming writes (see MsfsXpTrimwheelMixIn).
+        """
+        G.trimcal_hold_until = \
+            (time.perf_counter() + self.TRIMWHEEL_HOLD_TTL_S) if active else 0.0
+        ipc = getattr(G, "ipc_instance", None)
+        if ipc is not None:
+            try:
+                ipc.send_broadcast_message(f"TRIMCAL HOLD:{1 if active else 0}")
+            except Exception as e:
+                logger.debug(f"trimwheel hold broadcast failed: {e}")

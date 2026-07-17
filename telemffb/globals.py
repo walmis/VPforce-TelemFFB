@@ -151,6 +151,13 @@ sim_listeners : 'SimListenerManager'
 # Triggers and flags
 force_reload_aircraft_trigger: bool = False
 
+trimcal_hold_until: float = 0.0
+"""While a trim calibration run owns the sim's elevator trim, trimwheel
+instances must not write their wheel position (two absolute writers fight
+frame-by-frame). The master broadcasts a refreshing hold over IPC; this is
+the local time.perf_counter() deadline, so a dead master un-mutes the wheel
+on its own within the TTL."""
+
 # Exception tracking
 exception_tracker : 'ExceptionTracker'  
 """Tracks logged exceptions for user notification and reporting"""

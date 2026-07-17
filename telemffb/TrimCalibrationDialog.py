@@ -30,10 +30,11 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
+    QComboBox,
 )
 
 import telemffb.globals as G
-from telemffb.custom_widgets import TrimCurveWidget
+from telemffb.custom_widgets import InfoLabel, TrimCurveWidget
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState
 
 logger = logging.getLogger(__name__)
@@ -86,15 +87,24 @@ class TrimCalibrationDialog(QDialog):
         root = QVBoxLayout(self)
 
         instructions = QLabel(
-            "<b>How to calibrate</b><br>"
-            "1. Get airborne, straight &amp; level, at a stable cruise speed.<br>"
-            "2. <b>Trim the aircraft</b> so it holds level with near-zero stick force — "
-            "starting far out of trim wastes elevator authority during the sweep.<br>"
-            "3. Autopilot <b>OFF</b>, hands <b>OFF</b> the stick.<br>"
-            "4. Press <b>Start</b> — TelemFFB will fly the aircraft while it sweeps the "
-            "elevator trim and measures the required stick input, then recommends a "
-            "trim-following <i>curve</i> (with the equivalent static "
-            "<i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to hold the nose level as you trim."
+            "<b>How to calibrate</b>"
+            "<ul style='margin-top:2px; margin-bottom:6px; -qt-list-indent:1;'>"
+            "<li>It is recommended to perform the calibration in <b>clear</b>, <b>calm</b> conditions.</li>"
+            "<li>If you have a hardware device controlling the elevator trim <b>AXIS</b>, you may "
+            "need to disconnect or un-bind it as it may interfere with TelemFFB "
+            "controlling the trim during calibration. (Excludes Vpforce trim-wheel)</li>"
+            "</ul>"
+            "<ol style='margin-top:0px; margin-bottom:0px; -qt-list-indent:1;'>"
+            "<li>Get airborne, straight &amp; level, at a stable cruise speed with "
+            "Autopilot <b>OFF</b>.</li>"
+            "<li><b>Trim the aircraft</b> so it holds level with near-zero stick force — "
+            "starting far out of trim wastes elevator authority during the sweep.</li>"
+            "<li>Press <b>Start</b> and take your hands <b>off</b> the stick — TelemFFB "
+            "will fly the aircraft while it sweeps the elevator trim and measures the "
+            "required stick input, then recommends a trim-following <i>curve</i> (with "
+            "the equivalent static <i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to "
+            "hold the nose level as you trim.</li>"
+            "</ol>"
         )
         instructions.setWordWrap(True)
         root.addWidget(instructions)
@@ -107,6 +117,72 @@ class TrimCalibrationDialog(QDialog):
             "so the airspeed settles at the current throttle/trim before measuring.\n"
             "Recommended — uncheck for a faster run.")
         root.addWidget(self.chk_settle)
+
+        response_row = QHBoxLayout()
+        lbl_response = InfoLabel(
+            text="Control response:",
+            tooltip=(
+                "Strength of the control inputs used to fly the aircraft during calibration.\n\n"
+                "Normal — most aircraft.\n"
+                "Reduced — sensitive aircraft that porpoise or bounce during stabilization.\n"
+                "Minimal — very sensitive or aerobatic aircraft with light, twitchy pitch.\n\n"
+                "Calibration also reduces its own control gains automatically when it detects\n"
+                "oscillation; this option just starts from a gentler setting. If a run aborts\n"
+                "with a pitch-oscillation error, retry with the next lower setting."))
+        response_row.addWidget(lbl_response)
+        self.cmb_response = QComboBox()
+        self.cmb_response.addItems([
+            "Normal",
+            "Reduced — sensitive aircraft",
+            "Minimal — very sensitive / aerobatic",
+        ])
+        response_row.addWidget(self.cmb_response)
+        response_row.addStretch(1)
+        root.addLayout(response_row)
+
+        # Debug-only controls (system settings 'debug' flag): trim write
+        # method override + per-run diagnostic trace, for problem-aircraft
+        # reports. Direct SimVar writes are the tested-primary method; the
+        # axis event stays selectable in case an aircraft ever requires it.
+        self._debug = bool(getattr(G, "system_settings", None)
+                           and G.system_settings.get("debug", False))
+        self.cmb_trim_method = None
+        self.chk_trace = None
+        if self._debug:
+            debug_row = QHBoxLayout()
+            lbl_trim_method = InfoLabel(
+                text="Trim write method:",
+                tooltip=(
+                    "Debug options — this row is only visible when the Debug Mode "
+                    "system setting is enabled.\n\n"
+                    "Trim write method: how calibration commands the sim's elevator "
+                    "trim (MSFS).\n"
+                    "• Direct (default) — writes the ELEVATOR TRIM POSITION SimVar "
+                    "itself; the most reliable method across tested aircraft.\n"
+                    "• Axis event — sends AXIS_ELEV_TRIM_SET instead, which assumes "
+                    "the aircraft maps the event 1:1 onto its trim. Some addons "
+                    "mishandle the event (e.g. Just Flight); use this only to test "
+                    "an aircraft that misbehaves with the direct method.\n\n"
+                    "Record diagnostic trace: writes a per-frame CSV of everything "
+                    "the calibration commands and observes (trimcal_trace_*.csv in "
+                    "the TelemFFB log folder) — attach it when reporting a problem "
+                    "aircraft."))
+            debug_row.addWidget(lbl_trim_method)
+            self.cmb_trim_method = QComboBox()
+            self.cmb_trim_method.addItems([
+                "Direct (ELEVATOR TRIM POSITION)",
+                "Axis event (AXIS_ELEV_TRIM_SET)",
+            ])
+            debug_row.addWidget(self.cmb_trim_method)
+            self.chk_trace = QCheckBox("Record diagnostic trace")
+            self.chk_trace.setChecked(False)
+            self.chk_trace.setToolTip(
+                "Write a per-frame CSV of everything the calibration commands and\n"
+                "observes to the TelemFFB log folder (trimcal_trace_*.csv).\n"
+                "Attach it when reporting a problem aircraft.")
+            debug_row.addWidget(self.chk_trace)
+            debug_row.addStretch(1)
+            root.addLayout(debug_row)
 
         # Warning banner shown only while the engine is flying the aircraft.
         self.banner = QLabel("⚠  TelemFFB is controlling your aircraft — stay ready to take over")
@@ -135,11 +211,19 @@ class TrimCalibrationDialog(QDialog):
             w.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             grid.addWidget(w, 1, col)
 
-        # State text gets the full row (long per-frame status lines) and the
-        # stage/ready light its own row — sharing a row clips one or the other.
-        grid.addWidget(QLabel("<b>State:</b>"), 2, 0)
+        # State text gets its own full-width row (long per-frame status lines)
+        # and the stage/ready light its own — sharing a row clips one or the
+        # other. An HBox keeps the message left-justified right after the
+        # State: prefix instead of starting at the (wide) second grid column,
+        # and the label reserves two text lines so an occasional word-wrap
+        # cannot bounce the layout below it up and down.
+        state_row = QHBoxLayout()
+        state_row.addWidget(QLabel("<b>State:</b>"), 0, Qt.AlignmentFlag.AlignTop)
         self.lbl_state.setWordWrap(True)
-        grid.addWidget(self.lbl_state, 2, 1, 1, 4)
+        self.lbl_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.lbl_state.setMinimumHeight(2 * self.lbl_state.fontMetrics().lineSpacing())
+        state_row.addWidget(self.lbl_state, 1)
+        grid.addLayout(state_row, 2, 0, 1, 5)
         self.lbl_ready = QLabel("●  —")
         grid.addWidget(self.lbl_ready, 3, 0, 1, 5, alignment=Qt.AlignmentFlag.AlignRight)
 
@@ -165,6 +249,9 @@ class TrimCalibrationDialog(QDialog):
         # a given text branch happens to contain HTML tags for auto-detection.
         self.lbl_virtual.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_linearity.setTextFormat(Qt.TextFormat.RichText)
+        # The recommendation line grows long (curve + static fit + current
+        # value); wrap it instead of pushing past the window edge.
+        self.lbl_virtual.setWordWrap(True)
         self.chk_use_curve = QCheckBox("Use calibrated curve (recommended) — static gain is used when unchecked")
         self.chk_use_curve.setChecked(True)
         self.chk_use_curve.setEnabled(False)
@@ -341,14 +428,29 @@ class TrimCalibrationDialog(QDialog):
         return True
 
     def _fit_to_content(self):
-        """Grow (never shrink) the window so a tall notes block can't overlap
-        the graph. The result text is populated after the dialog is shown, and
-        Qt relayouts within the current window height rather than enlarging it.
+        """Grow (never shrink) the window so the content cannot overlap.
+
+        Word-wrapped labels make the layout height-for-width: a plain
+        sizeHint() under-reports the needed height until a later layout pass,
+        which shows up as text overlapping the graph that fixes itself when
+        the window is moved. Force a layout pass and measure with the
+        height-for-width machinery at the current width instead.
         """
-        self.lbl_note.adjustSize()
-        needed = self.sizeHint().height()
+        lay = self.layout()
+        lay.activate()
+        if lay.hasHeightForWidth():
+            needed = lay.totalHeightForWidth(self.width())
+        else:
+            needed = self.sizeHint().height()
         if self.height() < needed:
             self.resize(self.width(), needed)
+
+    def _refit(self):
+        """Fit now and once more on the next event-loop tick: the deferred
+        pass re-measures after Qt has finished the pending relayout (the same
+        settling a window move used to trigger by accident)."""
+        self._fit_to_content()
+        QtCore.QTimer.singleShot(0, self._fit_to_content)
 
     def _update_live_values(self, data, ias_ref=None):
         def fmt(v, conv=1.0, unit="", nd=0):
@@ -393,6 +495,15 @@ class TrimCalibrationDialog(QDialog):
         self.curve.clear()
         self._clear_result_labels()
         cal.settle_before_sweep = self.chk_settle.isChecked()
+        cal.initial_gain_scale = {0: 1.0, 1: 0.5, 2: 0.25}.get(
+            self.cmb_response.currentIndex(), 1.0)
+        if self._debug:
+            cal.trim_write_method = \
+                "axis" if self.cmb_trim_method.currentIndex() == 1 else "direct"
+            cal.trace_enabled = self.chk_trace.isChecked()
+        else:
+            cal.trim_write_method = "direct"
+            cal.trace_enabled = False
         cal.start()
 
     def _on_stop(self):
@@ -454,7 +565,9 @@ class TrimCalibrationDialog(QDialog):
     def _show_result(self, result):
         self._result_shown = True
         self._last_result = result
-        self.curve.set_result(result["samples"], result["slope"], result["intercept"])
+        self.curve.set_result(
+            result["samples"], result["slope"], result["intercept"],
+            flagged=[f["index"] for f in result.get("flagged") or []])
         self.curve.set_live_point(None, None)
         current = result.get("current_virtual_y")
         current_txt = f"  &nbsp;·  current profile value: {current:.3f}" if current is not None else ""
@@ -478,6 +591,17 @@ class TrimCalibrationDialog(QDialog):
                 "the measurement. The result may still be fine — test it with Apply, and if "
                 "trim following seems off, consider re-running with a steadier airspeed "
                 "(stable power, and the airspeed-settle option enabled).")
+        flagged = result.get("flagged") or []
+        if flagged:
+            worst = max(abs(f["vs_fpm"]) for f in flagged)
+            where = ", ".join(f"{100 * f['trim']:+.0f}%" for f in flagged)
+            plural = "s" if len(flagged) > 1 else ""
+            notes.append(
+                f"{len(flagged)} station{plural} (trim {where}, shown in amber) sampled "
+                f"with a residual climb/descent of up to {worst:.0f} fpm — usually slow "
+                "airspeed drift. The curve may be slightly skewed near those points; if "
+                "trim following seems off there, consider re-running with a steadier "
+                "airspeed (stable power, airspeed-settle option enabled).")
         split = result.get("split")
         if split and split["mismatch"] > 0.2:
             notes.append(
@@ -490,7 +614,7 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_note.setText("\n".join(notes))
         self.btn_apply.setEnabled(True)
         self.btn_save.setEnabled(True)
-        self._fit_to_content()
+        self._refit()
 
     def _clear_result_labels(self):
         self.lbl_virtual.setText("Recommended Y Trim Gain (Virtual): <b>—</b>")
@@ -514,12 +638,17 @@ class TrimCalibrationDialog(QDialog):
         self._set_light(color, text)
 
     def _set_running(self, running):
+        banner_appearing = running and not self.banner.isVisible()
         self.banner.setVisible(running)
         self.btn_stop.setEnabled(running)
         self.btn_start.setEnabled(not running and self.btn_start.isEnabled())
         if running:
             self.btn_apply.setEnabled(False)
             self.btn_save.setEnabled(False)
+        if banner_appearing:
+            # The banner adds a row mid-flight; grow the window for it or the
+            # squeeze overlaps the curve's axis labels with the text below.
+            self._refit()
 
     def _refresh_idle(self):
         self.lbl_ias.setText("—")
