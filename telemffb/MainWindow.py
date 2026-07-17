@@ -2439,9 +2439,9 @@ class MainWindow(QMainWindow):
                 if self.teleplot_dialog.isVisible:
                     update_telem_vars = True
 
-            if window_mode == 0 or update_telem_vars:
-                self.lbl_telem_data.setText(telem_items)
-                self.lbl_effects_data.setText(active_effects)
+            # if window_mode == 0 or update_telem_vars:
+            self.lbl_telem_data.setText(telem_items)
+            self.lbl_effects_data.setText(active_effects)
 
         except Exception:
             logging.exception("Exception")
