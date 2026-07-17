@@ -717,17 +717,18 @@ class TestTrimNeutralization:
         # a misspelled attribute and raised AttributeError instead of falling
         # back. Force the timeout and require a graceful hand-off: the residual
         # steady elevator becomes the sweep baseline and the run still finishes.
+        # (The hand-off requires the trim to have proven responsive first.)
         ac = FakePlantAircraft(trim_natural=0.1)
         ac.trim = 0.3
         cal = TrimCalibrator(ac)
         cal.start()
-        for _ in range(2000):
+        for _ in range(4000):
             clock.advance(1 / 30.0)
             cal.update(ac.telem())
             ac.step(1 / 30.0)
-            if cal.state == CalState.TRIM_NEUTRAL:
+            if cal.state == CalState.TRIM_NEUTRAL and cal._trim_dir_verified:
                 break
-        assert cal.state == CalState.TRIM_NEUTRAL
+        assert cal.state == CalState.TRIM_NEUTRAL and cal._trim_dir_verified
         cal._neut_start_t = time.perf_counter() - cal.NEUT_TIMEOUT_S - 1
         clock.advance(1 / 30.0)
         cal.update(ac.telem())
@@ -737,6 +738,76 @@ class TestTrimNeutralization:
         assert cal._u_base_y == pytest.approx(cal._neut_u_final)
         state = run_to_completion(cal, ac, clock)
         assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+
+    def test_neutralization_giveup_with_deaf_trim_aborts(self, clock):
+        # Field failure: a give-up (step could not settle) proceeded to the
+        # sweep even though the trim had never responded — the sweep was
+        # doomed and only failed later, slowly. Unverified + commanded trim
+        # at give-up must abort as unresponsive.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        for _ in range(2000):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.TRIM_NEUTRAL:
+                break
+        assert cal.state == CalState.TRIM_NEUTRAL
+        cal._trim_dir_verified = False
+        cal._sign_cmd_accum = cal.TRIM_SIGN_CHECK_DIST   # trim was commanded
+        cal._neut_deadline = time.perf_counter() - 1.0
+        clock.advance(1 / 30.0)
+        # unsettled frame (the deadline path only runs while not settled)
+        cal.update(ac.telem(VerticalSpeed=2.0))
+        assert cal.state == CalState.ABORT
+        assert "not responding" in cal.abort_reason
+
+    def test_neutralization_giveup_before_any_trim_command_aborts_with_settle_reason(self, clock):
+        # The first neutralization step settles in place (no trim commanded
+        # yet); if the aircraft never calms down, blaming the trim would be
+        # wrong — the abort must name the settle problem instead.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        for _ in range(2000):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.TRIM_NEUTRAL:
+                break
+        assert cal.state == CalState.TRIM_NEUTRAL
+        cal._trim_dir_verified = False
+        cal._sign_cmd_accum = 0.0                        # nothing commanded yet
+        cal._neut_deadline = time.perf_counter() - 1.0
+        clock.advance(1 / 30.0)
+        # unsettled frame (the deadline path only runs while not settled)
+        cal.update(ac.telem(VerticalSpeed=2.0))
+        assert cal.state == CalState.ABORT
+        assert "could not settle level" in cal.abort_reason
+
+    def test_neutralization_giveup_names_uncommanded_trim_drift(self, clock):
+        # Field report: abort said VS -12 fpm — virtually level — because the
+        # message blamed VS regardless of the failing gate. When the trim
+        # read-back has wandered off the hold point on its own, say THAT.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        for _ in range(2000):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state == CalState.TRIM_NEUTRAL:
+                break
+        assert cal.state == CalState.TRIM_NEUTRAL
+        cal._trim_dir_verified = False
+        cal._sign_cmd_accum = 0.0
+        cal._neut_deadline = time.perf_counter() - 1.0
+        clock.advance(1 / 30.0)
+        # trim read-back far from the hold target, aircraft otherwise level
+        cal.update(ac.telem(ElevTrimPct=cal._neut_target + 0.1))
+        assert cal.state == CalState.ABORT
+        assert "drifted" in cal.abort_reason and "off the hold point" in cal.abort_reason
 
     def test_abort_during_neutralization_restores_entry_trim(self, clock):
         ac = FakePlantAircraft(trim_natural=0.1)
@@ -835,6 +906,41 @@ class TestPitchCascade:
         assert cal._pitch_mode == "cascade"
         assert cal._pitch_sign == -1.0
         assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_probe_early_exit_waits_for_ramp_completion(self, clock):
+        # Field failure: with the aircraft still surging from a previous
+        # aborted run, drift-compensated VS crossed the exit threshold in
+        # 0.15-0.22s — before the ramp had applied meaningful input — and the
+        # phugoid's dPitch/dVS phase coin-flipped the pitch polarity, railing
+        # the cascade. The early exit must not fire before PROBE_RAMP_S.
+        ac = FakePlantAircraft(K_E=80.0)   # strong response: exit threshold
+        cal = TrimCalibrator(ac)           # is reached well inside the ramp
+        cal.start()
+        probe_started_t = None
+        exit_elapsed = None
+        for _ in range(400):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            if cal.state != CalState.PROBE or cal._probe_stage != 0:
+                break
+            if cal._probe_phase == "probe" and probe_started_t is None:
+                probe_started_t = clock.t
+            if cal._probe_phase == "rampdown" and exit_elapsed is None:
+                exit_elapsed = clock.t - probe_started_t
+        assert exit_elapsed is not None, "elevator probe never concluded"
+        assert exit_elapsed >= cal.PROBE_RAMP_S - 1 / 30.0, \
+            f"probe exited {exit_elapsed:.2f}s in, before the ramp completed"
+        assert cal._elev_sign == 1.0
+
+    def test_can_start_rejects_climbing_aircraft(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        ok, msg = cal.can_start(ac.telem(VerticalSpeed=8.0))   # ~1600 fpm
+        assert not ok
+        assert "Level off" in msg
+        ok, _ = cal.can_start(ac.telem(VerticalSpeed=1.0))
+        assert ok
 
     def test_probe_input_is_ramped_not_stepped(self, clock):
         # An abrupt (step) probe rings the phugoid on sensitive aircraft; the

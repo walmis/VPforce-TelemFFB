@@ -243,6 +243,10 @@ class TrimCalibrator:
     # polarity probe must begin from wings-level or its measurements start
     # contaminated (and any wrong prior feeds on the existing bank).
     START_MAX_ROLL_DEG = 10.0
+    # Pre-start VS gate: a probe begun in a real climb/descent measures the
+    # phugoid instead of its own input and can coin-flip the pitch polarity
+    # (field: back-to-back runs starting +1600 fpm after a previous abort).
+    START_MAX_VS = 2.54          # m/s (~500 fpm)
     IAS_BAND_FRAC = 0.30         # abort if IAS drifts more than ±30% from start
     TELEM_TIMEOUT_S = 1.0        # no telemetry for this long -> abort
 
@@ -396,6 +400,8 @@ class TrimCalibrator:
         if abs(telem_data.get("Pitch", 0)) > self.MAX_PITCH_DEG or \
                 abs(telem_data.get("Roll", 0)) > self.START_MAX_ROLL_DEG:
             return False, "Get roughly straight-and-level first"
+        if abs(telem_data.get("VerticalSpeed", 0)) > self.START_MAX_VS:
+            return False, "Level off first — still climbing/descending"
         return True, "Ready to calibrate"
 
     def start(self):
@@ -656,8 +662,16 @@ class TrimCalibrator:
         delta = (value - self._probe_ref) - self._probe_drift * elapsed
 
         # End the probe as soon as the response is unambiguous — holding the
-        # input for the full window just pumps energy into the aircraft.
-        if elapsed >= self.PROBE_TIME_S or abs(delta) >= exit_threshold:
+        # input for the full window just pumps energy into the aircraft. The
+        # early exit is only trusted once the ramp has fully applied the
+        # input: a threshold crossing in the first fraction of a second is
+        # residual aircraft motion (accelerating phugoid the linear drift
+        # model cannot capture), not probe response — and at a random phugoid
+        # phase the dPitch/dVS agreement is a coin flip, so a wrong-sign
+        # cascade then rails the elevator (seen in the field as full surface
+        # deflection during PROBE and a +/-15 deg attitude-guard abort).
+        if elapsed >= self.PROBE_TIME_S or \
+                (elapsed >= self.PROBE_RAMP_S and abs(delta) >= exit_threshold):
             if self._probe_stage == 0:
                 if abs(delta) >= self.PROBE_MIN_VS:
                     self._elev_sign = 1.0 if delta > 0 else -1.0
@@ -840,15 +854,50 @@ class TrimCalibrator:
                 self._neut_steps += 1
                 self._begin_neut_step(t + step)
         elif now > self._neut_deadline:
-            logger.warning("Trim neutralization step could not settle; sweeping around the "
-                           f"current point (steady elevator ~{self._neut_u_final:+.2f})")
-            self._finish_neutral(telem_data, centered=False)
+            self._neutral_give_up(telem_data, "Trim neutralization step could not settle")
             return
 
         if now - self._neut_start_t > self.NEUT_TIMEOUT_S:
-            logger.warning("Trim neutralization timed out; sweeping around the current point "
-                           f"(steady elevator ~{self._neut_u_final:+.2f})")
-            self._finish_neutral(telem_data, centered=False)
+            self._neutral_give_up(telem_data, "Trim neutralization timed out")
+
+    def _neutral_give_up(self, telem_data, what):
+        """Neutralization deadline/timeout: degrade or abort, honestly.
+
+        Sweeping around the current point is only a sane degradation when the
+        trim has DEMONSTRATED it responds (direction verified against the
+        read-back). Without that proof the sweep is doomed and proceeding just
+        defers the failure to a slow station timeout: commanded-but-deaf trim
+        aborts as unresponsive, and a give-up before any trim was even
+        commanded (first step settles in place; the aircraft would not calm
+        down) aborts naming the settle problem.
+        """
+        if not self._trim_dir_verified:
+            if abs(self._sign_cmd_accum) >= self.TRIM_SIGN_CHECK_DIST:
+                self._abort("Trim is not responding to commands")
+            else:
+                # Nothing was commanded yet, so name the gate that actually
+                # kept the settle from completing (the settle test is
+                # at-target AND VS AND roll — reporting VS for a trim-drift
+                # or roll problem sends the user chasing the wrong thing).
+                rb_err = abs((telem_data.ElevTrimPct or 0) - self._neut_target)
+                vs_fpm = (telem_data.VerticalSpeed or 0) * MS_TO_FPM
+                if rb_err > self.TRIM_STATION_TOL:
+                    why = (f"trim read-back drifted {100 * rb_err:.1f}% off the hold "
+                           "point while it was held steady — the aircraft's systems "
+                           "may be mishandling the trim commands or moving the trim "
+                           "themselves")
+                elif abs(telem_data.Roll or 0) > self.STABLE_ROLL_TOL:
+                    why = f"could not hold wings level (roll {telem_data.Roll:+.1f} deg)"
+                elif abs(telem_data.VerticalSpeed or 0) > self.STABLE_VS_TOL:
+                    why = f"could not settle level (VS {vs_fpm:+.0f} fpm)"
+                else:
+                    why = ("flight would not stay settled long enough to measure "
+                           f"(VS {vs_fpm:+.0f} fpm at abort)")
+                self._abort(f"Trim neutralization: {why}")
+            return
+        logger.warning(f"{what}; sweeping around the current point "
+                       f"(steady elevator ~{self._neut_u_final:+.2f})")
+        self._finish_neutral(telem_data, centered=False)
 
     def _finish_neutral(self, telem_data, centered):
         """Hand leveling back to the PID from a clean state and start the sweep.
