@@ -8,6 +8,13 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - New runtime exception tracker with UI viewer showing recent error history
   - Support bundle improvements: now includes DCS logs and Export.lua; switched to LZMA compression for smaller archives
   - Automatic error deduplication prevents repeated alerts for the same issue
+  - Child instance exceptions are forwarded to the master instance so all errors are visible in one place
+- Settings QoL: changing a setting back to its inherited/default value now automatically removes the user override (and the circle-x revert button) instead of leaving a redundant entry in your config
+- Master instance now mirrors child device status (active vpconf profile / configurator overrides) when switching the device config scope
+- Curve editor usability improvements (Advanced Spring / Advanced G-Force widgets): smarter curve bounds checking, fixed point-insert resetting the first point, better endpoint drag behavior
+- Fix: configurator gain overrides not being applied when TelemFFB started with the sim already loaded into an aircraft
+- Fix: master instance was incorrectly validating child device PID when selecting per-aircraft vpconf profiles
+- Fix: IPC telemetry datagrams could be dropped under load in multi-device setups causing erroneous device icon failure status changes
 - FFB Device Management enhancements
   - Auto-assign device paths for unconfigured slots on startup; selections are persisted in system settings
   - Improved USB device selector in System Settings — prevents duplicate device assignments across slots
@@ -20,27 +27,39 @@ This is not an exhaustive change log (see github for that).  This file only outl
 
 ## XPlane
 - Updated plugin adhering to new stricter coding requirements
-- X-Trident AW109 special implementation - WIP Implementation
+- **NEW: X-Trident AW109 special implementation - WIP Implementation**
   - KNOWN ISSUE: Must map controls in-game and disable "Axis Control" in TelemFFB - Aircraft does not honor axis override dataref nor properly accept external axis control inputs
   - 4-Axis AFCS integration: cyclic trim rate control, force trim release, and autopilot following
   - Pedal/rudder trim integration
     - KNOWN ISSUE: Pedal AFCS is not as active as would be expected in real aircraft.. this is due to telemetry limitations from the aircraft
   - Collective spring gain and force trim release
 - X-Plane plugin: Added dataref write and command write support for expanded aircraft control
+- X-Plane plugin: now exports vertical speed and pitch/roll rate data (used by the new trim calibration and future effects)
 - New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with MSFS)
 
+## MSFS / X-Plane
+- **NEW: Automated Elevator Trim-Following Calibration** (fixed wing)
+  - Trim following has always assumed a 1:1 relationship between trim position and the elevator input needed to stay level - many aircraft (especially 3rd party) are far from 1:1, causing the nose to wander when trimming with the stick held
+  - The new calibration tool flies a short automated routine (trim neutralization, then a sweep across the trim range) and measures the actual elevator input required to hold level flight at each trim position
+  - Produces a calibrated non-linear trim-following curve plus a (legacy) equivalent static gain value - with the curve enabled, the virtual stick tracks your aircraft's real trim response across the whole band
+  - Results are plotted in the dialog; you can Apply and test live in the sim before saving to the aircraft profile
+  - Control Response selector (Normal/Reduced/Minimal) tames the routine on pitch-sensitive aircraft
+  - NOTE: Some aircraft have proven to be non-calibratable - e.g. trim authority that overpowers full elevator deflection, or extreme trim sensitivity.  The tool will tell you when a run fails and why.
+
 ## MSFS
-- Control lock feature added for Fixed wing and Helicopter aircraft:
+- **NEW: Control lock feature added for Fixed wing and Helicopter aircraft:**
   - Saab 340, PC-6 Porter, Wilga, Beechcraft A36 Bonanza, Beechcraft B58 Baron, A2A Comanche PA-24, Cessna 414, Beechcraft Duke
   - Taog H500
-- Taog H500/OH6 special implementation with optimized spring and trim configuration
+- **NEW: Taog H500/OH6 special implementation with optimized spring and trim configuration**
 - CowanSim S76: Updated default profile; added option to disable ROTOR TRIM RESET command
 - FlyInsideHeli: Engine vibrations now mapped to pedals and collective axes
-- New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)
+- **NEW: 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)**
 - HPG Pedals: Added force trim button option
 - HPG Collective: Sends axis position while vertical mode is active to avoid an axis snap when disengaging the autopilot
 - Fix: restored CowanSim and Taog H500 helicopter features that had been inadvertently dropped
 - Fix heli trim following issue (MSFS/X-Plane)
+- Fix: intermittent stale/missing aircraft display when starting TelemFFB while the sim was already running (telemetry frame arriving during startup could be silently dropped)
+
 
 ## DCS
 - Export DLL updates
@@ -49,13 +68,22 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Added F100D
   - Fixed rudder control surface telemetry
 - DCS start/stop event handling: TelemFFB UI now responds earlier when the DCS export module loads or unloads
+- TelemFFB will now log a (non blocking) exception if DCS Realistic or SimHaptic are installed with the autostart feature enabled in export.lua (breaks DCS FFB)
 
 ## IL2
-- IL-2 Korea support: automatic telemetry/UDP configuration, new System Settings UI, and game process detection
-  - KNOWN ISSUE:  IL-2 Korea is not outputting any engine RPM info, therefore the engine rumble effects are non-functional
-- Decode additional IL-2 Korea telemetry channels: angle of sideslip (AOS) and vertical speed
-- New: forward raw IL-2 telemetry, motion, and FFB UDP streams to one or more external IP/port destinations, with each destination independently choosing which stream(s) to receive (System Settings > IL2)
+- **NEW: IL-2 Korea support**
+  - KNOWN ISSUE:  IL-2 Korea is not outputting any engine RPM info, therefore the RPM-based engine rumble effects are non-functional (see the new alternative engine shake effect below)
+- IL-2 Korea: default aircraft profiles included with starter Advanced Spring curves
+- IL-2 Korea: new spring override option leveraging the 'ffbdevice' telemetry stream (stream is configured automatically by auto-setup)
+- Advanced Spring Override enhancements
+  - Game-supplied spring center ('ffb telemetry') can now stack with a custom spring gain curve - the sim controls the center while your curve controls the force
+  - New trim reset button binding
+- **NEW: Alternative engine shake effect driven by raw engine shake frequency/amplitude data from the FFB telemetry stream**
+  - provides engine vibration feel on aircraft/titles where RPM telemetry is unavailable
+- **NEW: forward raw IL-2 telemetry, motion, and FFB UDP streams to one or more external IP/port destinations, with each destination independently choosing which stream(s) to receive (System Settings > IL2)**
 - Fix telemetry pause/flicker during multiplayer menus; removed unreliable window-focus-based pause detection
+- Fix airborne deceleration effect
+- Fix g-force effect activating incorrectly on aircraft that report weight-on-wheels while airborne (now treated as airborne when all gear are retracted)
 
 ## Effects
 - New envelope and detent effect support in HapticEffect
