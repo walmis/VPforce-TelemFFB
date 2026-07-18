@@ -750,7 +750,7 @@ class MainWindow(QMainWindow):
 
         self.effect_lbl = QLabel('Active Effects:')
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
+            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
 
 
         """ Add headers and labels to the monitor layout """
@@ -1523,7 +1523,7 @@ class MainWindow(QMainWindow):
         #self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
+            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
         self.refresh_scope_status_indicators(force=True)
         self.settings_layout.reload_caller()
 
@@ -1532,26 +1532,35 @@ class MainWindow(QMainWindow):
         the device currently selected as the config scope.
 
         The master shows its own state while scoped to its own device, and the
-        state reported over IPC (piggybacked on the child's effects payload)
+        state reported over IPC (effects payload / keepalive STATUS message)
         while scoped to a child; child instances always show their own state.
         Safe to call from any thread — the display update goes through the
         widget's queued request signals — and repeat values are deduplicated
         so the pulse animation only fires when something actually changed.
         """
         scope = G.current_device_config_scope or G.device_type
+        own_vpconf = G.current_vpconf_profile or ''
+        own_ovd = bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False
+        # Snapshot the IPC-reported dict: it is mutated by the IPC thread and
+        # this method may run on the telemetry thread.
+        fx = dict(G.ipc_instance._ipc_telem_effects) if (G.master_instance and G.ipc_instance) else {}
         if scope == G.device_type or not G.master_instance:
-            vpconf = G.current_vpconf_profile or ''
-            ovd = bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False
+            vpconf, ovd = own_vpconf, own_ovd
         else:
-            fx = G.ipc_instance._ipc_telem_effects if G.ipc_instance else {}
             vpconf = fx.get(f'{scope}_vpconf_profile', '') or ''
             ovd = bool(fx.get(f'{scope}_gain_ovd_active', False))
-        shown = (scope, vpconf, ovd)
+        # A row is only present at all while at least one device (master or
+        # child) is using the feature; devices without a value then show a
+        # "(None)" placeholder so the panel geometry is identical across
+        # scopes. Users not using the feature don't lose the UI space.
+        any_vpconf = bool(own_vpconf) or any(v for k, v in fx.items() if k.endswith('_vpconf_profile'))
+        any_ovd = own_ovd or any(v for k, v in fx.items() if k.endswith('_gain_ovd_active'))
+        shown = (scope, vpconf, ovd, any_vpconf, any_ovd)
         if not force and shown == getattr(self, '_scope_status_shown', None):
             return
         self._scope_status_shown = shown
-        self.status_container.request_set_active_vpconf.emit(vpconf)
-        self.status_container.request_set_active_configurator.emit(ovd)
+        self.status_container.request_set_active_vpconf.emit(vpconf, any_vpconf)
+        self.status_container.request_set_active_configurator.emit(ovd, any_ovd)
 
     def resize_offline_combos(self):
         """

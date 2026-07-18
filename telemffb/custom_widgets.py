@@ -150,9 +150,30 @@ class DetachedTabWindow(QtWidgets.QMainWindow):
             self.reattachRequested.emit(self._title)
         super().closeEvent(e)
 
+class ElidedLabel(QLabel):
+    """QLabel that elides its text at a fixed pixel budget so long values
+    can't grow the surrounding layout. When elided, the full text is shown
+    in the tooltip; text() always returns the full string."""
+    def __init__(self, text='', max_text_px=200, parent=None):
+        super().__init__(parent)
+        self._full_text = ''
+        self._max_text_px = max_text_px
+        if text:
+            self.setText(text)
+
+    def setText(self, text):
+        self._full_text = text
+        elided = self.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, self._max_text_px)
+        super().setText(elided)
+        super().setToolTip(text if elided != text else '')
+
+    def text(self):
+        return self._full_text
+
+
 class AppStatusWidget(QWidget):
-    request_set_active_vpconf = pyqtSignal(str)
-    request_set_active_configurator = pyqtSignal(bool)
+    request_set_active_vpconf = pyqtSignal(str, bool)
+    request_set_active_configurator = pyqtSignal(bool, bool)
     request_flag_error = pyqtSignal(str)
     request_clear_error = pyqtSignal()
     def __init__(self, master_instance=True, parent=None):
@@ -177,44 +198,63 @@ class AppStatusWidget(QWidget):
         grid.setContentsMargins(10, 10, 10, 10)
         grid.setVerticalSpacing(10)
         grid.setHorizontalSpacing(10)
+        # Pin the value column so the panel width is constant regardless of
+        # content: every value widget's width is capped below this (elided
+        # labels / chip budgets), so nothing can grow the column and shorter
+        # values can't shrink it.
+        grid.setColumnMinimumWidth(1, 280)
 
         row = 0
-        label_align = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        label_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         value_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
+        # Item labels are dimmed (values full-brightness) so the label/value
+        # distinction reads across the alignment gap. Derived from the active
+        # theme's text color so it stays legible in both dark and light mode.
+        dim = self.palette().color(QPalette.ColorRole.WindowText)
+        dim_label_style = f"color: rgba({dim.red()}, {dim.green()}, {dim.blue()}, 150);"
+
+        def make_item_label(text):
+            lbl = QLabel(text)
+            lbl.setStyleSheet(dim_label_style)
+            return lbl
+
         sim_status_header = InfoLabel()
-        sim_status_header.text_label.setText('Sim Status:')
+        sim_status_header.text_label.setText('Sim Status')
+        sim_status_header.text_label.setStyleSheet(dim_label_style)
         sim_status_header.setToolTip('Enabled Sims:\n  DCS\n  MSFS\n  XPLANE\n\nDisabled Sims:\n  IL2')
 
         self.sim_status_label = SimStatusWidget()
-        self.cur_craft_label = QLabel("None Detected")
-        self.cur_pattern_label = QLabel("(No Match)")
-        self.active_profile_label = QLabel("(None)")
-        self.active_vpconf_header = QLabel('VPconf File:')
-        self.active_vpconf_label = QLabel('')
-        self.active_vpconf_label.hide()
-
-        self.active_vpconf_label.setStyleSheet(f"""
-                    QLabel {{
+        # Semibold values against the dimmed labels: two-tier hierarchy.
+        # Set via QFont (not stylesheet) so ElidedLabel's fontMetrics-based
+        # elide budget accounts for the wider weight.
+        value_font = QFont(self.font())
+        value_font.setWeight(QFont.Weight.DemiBold)
+        self.cur_craft_label = ElidedLabel("None Detected", max_text_px=260)
+        self.cur_pattern_label = ElidedLabel("(No Match)", max_text_px=260)
+        self.active_profile_label = ElidedLabel("(None)", max_text_px=180)
+        for lbl in (self.cur_craft_label, self.cur_pattern_label, self.active_profile_label):
+            lbl.setFont(value_font)
+        # Pill styling for the vpconf/override labels; also used for the
+        # "None" placeholder so the row height never changes.
+        self._chip_style = """
+                    QLabel {
                         padding: 2px 8px;
                         border-radius: 10px;
                         background-color: rgba(128,128,128, 100);
                         font-weight: bold;
-                    }}
-                """)
+                    }
+                """
 
+        self.active_vpconf_header = make_item_label('VPconf File')
+        self.active_vpconf_label = QLabel('')
+        self.active_vpconf_label.setStyleSheet(self._chip_style)
+        self.active_vpconf_label.hide()
         self.active_vpconf_header.hide()
 
-        self.active_configurator_header = QLabel('Gains Ovd:')
+        self.active_configurator_header = make_item_label('Gains Ovd')
         self.active_configurator_label = QLabel('Active')
-        self.active_configurator_label.setStyleSheet(f"""
-                            QLabel {{
-                                padding: 2px 8px;
-                                border-radius: 10px;
-                                background-color: rgba(128,128,128, 100);
-                                font-weight: bold;
-                            }}
-                        """)
+        self.active_configurator_label.setStyleSheet(self._chip_style)
         self.active_configurator_label.hide()
         self.active_configurator_header.hide()
 
@@ -266,11 +306,11 @@ class AppStatusWidget(QWidget):
         grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
         row += 1
 
-        grid.addWidget(QLabel("Current Aircraft:"), row, 0, alignment=label_align)
+        grid.addWidget(make_item_label("Current Aircraft"), row, 0, alignment=label_align)
         grid.addWidget(self.cur_craft_label, row, 1, alignment=value_align)
         row += 1
 
-        grid.addWidget(QLabel("Matched Model:"), row, 0, alignment=label_align)
+        grid.addWidget(make_item_label("Matched Model"), row, 0, alignment=label_align)
         grid.addWidget(self.cur_pattern_label, row, 1, alignment=value_align)
         row += 1
 
@@ -283,8 +323,11 @@ class AppStatusWidget(QWidget):
         profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         profile_row_layout.addWidget(self.active_profile_label)
         profile_row_layout.addWidget(self.cb_selectProfileCombo)
+        # Absorb the value column's spare width so the combo keeps its natural
+        # size instead of stretching to fill the (fixed-width) cell.
+        profile_row_layout.addStretch(1)
 
-        grid.addWidget(QLabel("Active Profile:"), row, 0, alignment=label_align)
+        grid.addWidget(make_item_label("Active Profile"), row, 0, alignment=label_align)
         grid.addLayout(profile_row_layout, row, 1)
         row += 1
 
@@ -381,34 +424,47 @@ class AppStatusWidget(QWidget):
         self.active_profile_label.setText("(None)")
         self.set_waiting(src)
 
-    @pyqtSlot(str)
-    def set_active_vpconf(self, file):
+    @pyqtSlot(str, bool)
+    def set_active_vpconf(self, file, row_visible=True):
         if not file:
-            # No profile pushed for the scoped device (or none reported yet):
-            # return to the initial hidden state.
-            self.active_vpconf_label.setText('')
-            self.active_vpconf_label.setToolTip('')
-            self.active_vpconf_header.setVisible(False)
-            self.active_vpconf_label.setVisible(False)
+            # No profile pushed for the scoped device. Keep the row as a
+            # "None" chip while any device is using the feature — same chip
+            # styling as a real value so the row height is identical across
+            # scopes — and hide it entirely when no device is. Placeholders
+            # never pulse.
+            self.active_vpconf_label.setText('None')
+            self.active_vpconf_label.setToolTip('No vpconf profile has been pushed by TelemFFB for this device')
+            self.active_vpconf_header.setVisible(row_visible)
+            self.active_vpconf_label.setVisible(row_visible)
             return
-        self.active_vpconf_label.setText(os.path.splitext(os.path.basename(file))[0])
+        name = os.path.splitext(os.path.basename(file))[0]
+        # Elide long profile names so the chip can't stretch the panel; the
+        # tooltip carries the full path. The budget is the value column's
+        # 280px minus the chip's horizontal padding, so the chip can use the
+        # full width that is reserved for it anyway. Metrics use a bold font
+        # to match the chip stylesheet's font-weight.
+        font = QFont(self.active_vpconf_label.font())
+        font.setBold(True)
+        name = QtGui.QFontMetrics(font).elidedText(name, Qt.TextElideMode.ElideRight, 260)
+        self.active_vpconf_label.setText(name)
         self.active_vpconf_label.setToolTip(f"Last profile pushed by TelemFFB:\n{file}")
         self.active_vpconf_header.setVisible(True)
         self.active_vpconf_label.setVisible(True)
         self.pulse_label(self.active_vpconf_label, color=QColor(0, 200, 0))
 
-    def set_active_configurator(self, active=True):
-        #debug_caller_args('blue')
+    @pyqtSlot(bool, bool)
+    def set_active_configurator(self, active=True, row_visible=True):
         if active:
-            self.active_configurator_header.show()
-            self.active_configurator_label.show()
             self.active_configurator_label.setText('Active')
             self.active_configurator_label.setToolTip('The configurator gains have been modified from the currently\nactive configurator profile (if any)')
+            self.active_configurator_header.setVisible(True)
+            self.active_configurator_label.setVisible(True)
             self.pulse_label(self.active_configurator_label, color=QColor(0, 200, 0))
         else:
             self.active_configurator_label.setText('None')
             self.active_configurator_label.setToolTip('Configurator gains have been reset to those applied by\nthe current vpconf profile (if active) or the gains learned on startup')
-            self.pulse_label(self.active_configurator_label, color=QColor(0, 200, 0))
+            self.active_configurator_header.setVisible(row_visible)
+            self.active_configurator_label.setVisible(row_visible)
 
 
 
@@ -419,7 +475,8 @@ class AppStatusWidget(QWidget):
                 "DCS": False,
                 "MSFS": False,
                 "XPLANE": False,
-                "IL2": False
+                "IL2": False,
+                "BMS": False,
             }
 
         # Update the state for the provided sim

@@ -64,8 +64,10 @@ class SettingsLayout(QGridLayout):
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
 
         self.mainwindow = mainwindow
-        if result is not None:
+        if result:
             self.build_rows(result)
+        else:
+            self._build_empty_notice()
         self.device = HapticEffect()
         self.setColumnMinimumWidth(7, 20)
         self.trigger_form_reload = True
@@ -424,16 +426,57 @@ class SettingsLayout(QGridLayout):
         # stack = inspect.stack()
         # for frame_info in stack:
         #     dbprint("green", f"Function {frame_info.function} in {frame_info.filename} at line {frame_info.lineno}")
-        self.clear_layout()
+        self.clear_layout(show_empty_notice=False)
         # Clear unit tracking when reloading layout
         self.unit_previous_values = {}
         if result is None:
             cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name, G.settings_mgr.current_class)
             G.settings_mgr.current_pattern = pat
-        if result is not None:
+        if result:
             self.build_rows(result)
+        else:
+            self._build_empty_notice()
 
-    def clear_layout(self):
+    def _build_empty_notice(self):
+        """Populate the (empty) layout with guidance instead of leaving the
+        Settings tab an unexplained blank when there is nothing to edit."""
+        notice = QLabel()
+        notice.setTextFormat(Qt.TextFormat.RichText)
+        notice.setWordWrap(True)
+        if G.settings_mgr.offline_mode:
+            notice.setText(
+                "<h3>Offline editing mode</h3>"
+                "<p>Use the <i>Offline Editor Setup</i> panel above to choose what to edit — "
+                "the settings will appear here. The scope you select determines how widely "
+                "your changes apply:</p>"
+                "<ul>"
+                "<li><b>Sim only</b> — changes apply to every class and aircraft within that "
+                "sim, unless overridden at a lower level.</li>"
+                "<li><b>Sim and class</b> — changes apply to every aircraft of that class "
+                "within the sim, unless overridden for a specific aircraft.</li>"
+                "<li><b>Specific aircraft</b> — also select the profile you wish to edit; "
+                "changes apply to that aircraft/profile only.</li>"
+                "</ul>")
+        else:
+            text = (
+                "<h3>No aircraft loaded</h3>"
+                "<p>Settings are per-aircraft: start one of your enabled sims and load an "
+                "aircraft, and its settings will appear here automatically.</p>")
+            if G.master_instance:
+                text += (
+                    "<p>To view or edit profiles without running a sim, open the offline editor "
+                    "(<i>Profiles &rarr; Offline Profile\\Sim Default\\Class Default Mode</i>).</p>")
+            notice.setText(text)
+        self.addWidget(notice, 0, 1, 1, 6)
+        if not G.settings_mgr.offline_mode and G.master_instance and self.mainwindow is not None:
+            btn = QPushButton('Open Offline Editor')
+            btn.clicked.connect(lambda checked=False: self.mainwindow.toggle_offline_mode(True))
+            self.addWidget(btn, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.addItem(spacer, 2, 1)
+        self.setColumnStretch(5, 10)
+
+    def clear_layout(self, show_empty_notice=True):
         layout = self.layout()
         if layout is not None:
             while layout.count():
@@ -446,6 +489,11 @@ class SettingsLayout(QGridLayout):
                     if sub_layout:
                         self._clear_sub_layout(sub_layout)
                         sub_layout.deleteLater()
+        # Direct clears (sim exit, offline transitions) leave the tab empty;
+        # show the guidance notice rather than a blank page. reload_layout
+        # passes False because it decides rows-vs-notice itself.
+        if show_empty_notice:
+            self._build_empty_notice()
 
     def _clear_sub_layout(self, layout):
         while layout.count():
