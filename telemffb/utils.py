@@ -3521,6 +3521,16 @@ def upload_vpconf_profile(config_filepath, serial):
                     logging.info(f"VPForce Configurator exited with code {ret}")
             finally:
                 G.vpconf_init_pending = False
+                # Deliver any telemetry frame that arrived while frames were
+                # suspended — in the MSFS menus it is the ONLY frame there is
+                # (stop latch), and losing it meant no aircraft until a
+                # camera-state change.
+                tm = getattr(G, "telem_manager", None)
+                if tm is not None:
+                    try:
+                        tm.flush_deferred_startup_frame()
+                    except Exception:
+                        logging.exception("deferred startup frame flush failed")
 
         thread = threading.Thread(target=exec)
         thread.start()

@@ -216,10 +216,27 @@ class TelemManager(QObject, threading.Thread):
         self._run = False
         self.join()
 
+    def flush_deferred_startup_frame(self):
+        """Deliver the last telemetry frame that arrived while the startup
+        vpconf push had frame processing suspended (see submit_frame). Called
+        by utils.init_vpconf_profile right after clearing the pending flag."""
+        frame = getattr(self, "_vpconf_deferred_frame", None)
+        self._vpconf_deferred_frame = None
+        if frame is not None:
+            logging.info("Delivering telemetry frame deferred during the "
+                         "startup vpconf push")
+            self.submit_frame(frame)
+
     def submit_frame(self, data_in: bytes):
         if G.vpconf_init_pending:
-            # Startup vpconf push is configured by async push is not complete yet
-            # gets reset by utils.init_vpconf_profile()
+            # Startup vpconf push not complete yet (reset by
+            # utils.init_vpconf_profile, which then flushes the frame stashed
+            # here). DEFER the frame instead of discarding it: while MSFS sits
+            # in the menus the SimConnect stop latch delivers exactly ONE
+            # telemetry packet, and dropping it in this window left the master
+            # instance with no aircraft until a camera-state change — a
+            # milliseconds-wide race, master-only, maddeningly intermittent.
+            self._vpconf_deferred_frame = data_in
             return
         if self.pause_state:
             # don't process frames while paused state True
