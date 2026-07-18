@@ -59,6 +59,7 @@ class SettingsLayout(QGridLayout):
         super(SettingsLayout, self).__init__(parent)
         self.exclusive_list = []
         self.parent_expander_dict = {}
+        self.revert_targets = {}  # per-setting: value the setting resolves to without the user override
         result = None
         if G.settings_mgr.current_sim != 'nothing':
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
@@ -429,6 +430,7 @@ class SettingsLayout(QGridLayout):
         self.clear_layout(show_empty_notice=False)
         # Clear unit tracking when reloading layout
         self.unit_previous_values = {}
+        self.revert_targets = {}
         if result is None:
             cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name, G.settings_mgr.current_class)
             G.settings_mgr.current_pattern = pat
@@ -1190,6 +1192,20 @@ class SettingsLayout(QGridLayout):
         if include_action:
             action_item.setVisible(True)
 
+        # Remember what this setting would revert to if the user-scope override
+        # were erased, so write_or_revert() can auto-erase the override when the
+        # user dials the value back to it. Overridden rows revert to the value
+        # the merge stashed beneath the override; clean rows "revert" to their
+        # current value (writing that back would just create a redundant override).
+        # Only the action_item widget is in the layout, so when the row shows the
+        # sim/class override info icon instead of the erase button, toggling the
+        # icon requires a form rebuild - record which one this row got.
+        eb_in_layout = action_item is erase_button
+        if item['replaced'].lower() == replace_scope.lower():
+            self.revert_targets[item['name']] = (item.get('prior_value'), item.get('prior_unit', ''), True, eb_in_layout)
+        else:
+            self.revert_targets[item['name']] = (item['value'], item['unit'], False, eb_in_layout)
+
         self.setRowStretch(i, 0)
 
 
@@ -1251,6 +1267,62 @@ class SettingsLayout(QGridLayout):
         else:
             logging.info(f"Can't find erase button for '{setting}'.  Probably child device being configured via master")
 
+    def hide_erase_button(self, setting_name):
+        eb = self.mainwindow.findChild(QPushButton, f"eb_{setting_name}")
+        if eb is not None:
+            eb.setVisible(False)
+            eb.setToolTip("")
+        else:
+            logging.info(f"Can't find erase button for '{setting_name}'.  Probably child device being configured via master")
+
+    @staticmethod
+    def setting_values_equal(new_value, target_value):
+        if target_value is None:
+            return False
+        a = str(new_value).strip()
+        b = str(target_value).strip()
+        if a.lower() == b.lower():
+            return True
+        # settings are stored as strings; equal numbers can be formatted
+        # differently (e.g. '0.5' from a spinbox vs '0.50' in defaults)
+        try:
+            return float(a) == float(b)
+        except ValueError:
+            return False
+
+    def write_or_revert(self, setting_name, value, unit=''):
+        """Write the setting to the user config, unless the new value matches what
+        the setting would resolve to without the user-scope override - in that case
+        erase the override (or skip the redundant write) so the setting reverts to
+        its inherited/default value and the erase button disappears.
+        Returns True when the change was handled by erasing/skipping."""
+        target = self.revert_targets.get(setting_name)
+        if target is not None and setting_name != 'type':
+            t_value, t_unit, has_override, eb_in_layout = target
+            if (unit or '') == (t_unit or '') and self.setting_values_equal(value, t_value):
+                if has_override:
+                    logging.debug(f"Setting '{setting_name}' changed back to its inherited value '{t_value}' - erasing the override")
+                    G.settings_mgr.erase_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, setting_name)
+                    self.revert_targets[setting_name] = (t_value, t_unit, False, eb_in_layout)
+                    if eb_in_layout:
+                        self.hide_erase_button(setting_name)
+                    # rebuild the form (same as a manual erase click) so the
+                    # action icon reflects the layer now in effect, e.g. a
+                    # sim/class override icon hiding under the erased override
+                    self.trigger_form_reload = True
+                return True
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
+        if target is not None:
+            t_value, t_unit, _, eb_in_layout = target
+            self.revert_targets[setting_name] = (t_value, t_unit, True, eb_in_layout)
+            if not eb_in_layout:
+                # the row shows the sim/class override info icon instead of the
+                # erase button; only a form rebuild can swap in the erase button
+                self.trigger_form_reload = True
+                return False
+        self.show_erase_button(f'eb_{setting_name}')
+        return False
+
     def remove_widget(self, olditem):
         widget = olditem.widget()
         if widget is not None:
@@ -1279,9 +1351,9 @@ class SettingsLayout(QGridLayout):
         if value == 'true' and enforce_list is not None:
             for exclusive in enforce_list:
                 #enforce_list is a list of settings that must not be true if 'value' is true (per exclusive attribute in defauls.xml)
-                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, "false", exclusive)
+                self.write_or_revert(exclusive, "false")
 
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, name)
+        self.write_or_revert(name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1316,9 +1388,7 @@ class SettingsLayout(QGridLayout):
 
             if validate_vpconf_profile(file_path, pid=usbpid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
-                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, file_path, 'vpconf')
-
-                self.show_erase_button('config_vpconf')
+                self.write_or_revert('vpconf', file_path)
                 self.vpconf_browse_button.setText(os.path.basename(file_path))
                 if G.settings_mgr.timed_out:
                     self.reload_caller()
@@ -1328,8 +1398,7 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('sb_', '')
         value = str(self.sender().value())
         logging.debug(f"Spin Box {setting_name} changed. New value: {value}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1338,8 +1407,7 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('le_', '')
         value = self.sender().text()
         logging.debug(f"Textbox {setting_name} changed. New value: {value}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1368,15 +1436,7 @@ class SettingsLayout(QGridLayout):
             value = combo.currentText()
 
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
-        G.settings_mgr.write_to_xml(
-            G.settings_mgr.current_sim,
-            G.settings_mgr.current_class,
-            G.settings_mgr.current_pattern,
-            value,
-            setting_name
-        )
-
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1466,8 +1526,7 @@ class SettingsLayout(QGridLayout):
         self.unit_previous_values[setting_name] = new_unit
         
         logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{new_unit}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, new_unit)
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value, new_unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1481,8 +1540,7 @@ class SettingsLayout(QGridLayout):
             unit = unit_dropbox.currentText()
         value = self.sender().text()
         logging.debug(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value, unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1529,8 +1587,7 @@ class SettingsLayout(QGridLayout):
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText(str(value))
         if str(value) != '0':
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(value), button_name)
-            self.show_erase_button(setting_name=f'pb_{button_name}')
+            self.write_or_revert(button_name, str(value))
         else:
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
@@ -1708,15 +1765,8 @@ class SettingsLayout(QGridLayout):
             )
 
         if write:
-            G.settings_mgr.write_to_xml(
-                G.settings_mgr.current_sim,
-                G.settings_mgr.current_class,
-                G.settings_mgr.current_pattern,
-                str(decimal_value),  # stored as decimal percent
-                setting_name,
-                unit
-            )
-            self.show_erase_button()
+            # stored as decimal percent
+            self.write_or_revert(setting_name, str(decimal_value), unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1738,8 +1788,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1759,8 +1808,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1786,8 +1834,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save, unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1813,8 +1860,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save, unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 

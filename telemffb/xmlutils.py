@@ -1086,6 +1086,11 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 
         # Check if the setting exists in the model_data
         if name in model_dict:
+            # Keep the value this override is hiding: since the layers merge in a
+            # fixed order, the topmost override's stash is what the setting would
+            # resolve to if that override were erased (used for auto-revert)
+            item['prior_value'] = item['value']
+            item['prior_unit'] = item['unit']
             # Update the value and unit in defaults_data with the values from model_data
             item['value'] = model_dict[name]['value']
             item['unit'] = model_dict[name]['unit']
