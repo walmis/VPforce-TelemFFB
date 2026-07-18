@@ -88,11 +88,19 @@ class TestHighPassFilter:
     """Verify HPF behaviour: sustained offsets decay, transients pass."""
 
     def test_constant_wind_decays_to_zero(self, modulator):
-        _prime(modulator)
-        # Step change, then hold constant
-        modulator.update(10.0, 10.0, 10.0, intensity=1.0, sensitivity=1.0)
-        for _ in range(200):
-            result = modulator.update(10.0, 10.0, 10.0, intensity=1.0, sensitivity=1.0)
+        # Fixed dt via patched time: at the microsecond dt of an unthrottled
+        # loop the dt-normalised alpha is ~1.0, so the HPF barely decays and
+        # the test only passed because the output accumulates in proportion
+        # to total loop wall time - one scheduler stall mid-loop blew the
+        # threshold. Stepping _REF_DT per frame tests the actual decay.
+        t0 = 1000.0
+        with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+            mock_time.perf_counter.return_value = t0
+            modulator.update(0.0, 0.0, 0.0)  # prime
+            # Step change, then hold constant across 200 fixed 60 Hz frames
+            for i in range(1, 202):
+                mock_time.perf_counter.return_value = t0 + i * _REF_DT
+                result = modulator.update(10.0, 10.0, 10.0, intensity=1.0, sensitivity=1.0)
         assert abs(result.pitch) < 0.01
         assert abs(result.roll) < 0.01
         assert abs(result.yaw) < 0.01
@@ -208,15 +216,21 @@ class TestPhysicsMapping:
 
     def test_vertical_dominates_longitudinal_for_pitch(self, modulator):
         """Same-magnitude vertical gust produces more pitch than longitudinal."""
-        m1 = TurbulenceModulator()
-        _prime(m1)
-        vert_result = m1.update(0.0, 10.0, 0.0, intensity=1.0, sensitivity=1.0)
+        # Fixed dt + sub-clamp gust: the old 10-unit gust at sensitivity 1.0
+        # saturated the intensity clamp in BOTH runs, so the outputs were
+        # equal targets scaled by each run's jittery wall-clock dt - a coin
+        # flip. A 2-unit gust at sensitivity 0.5 stays under the clamp so the
+        # 1.0 vs 0.25 gain ratio is actually observable.
+        def pitch_for(vert, lon):
+            m = TurbulenceModulator()
+            t0 = 1000.0
+            with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+                mock_time.perf_counter.return_value = t0
+                m.update(0.0, 0.0, 0.0)
+                mock_time.perf_counter.return_value = t0 + _REF_DT
+                return abs(m.update(0.0, vert, lon, intensity=1.0, sensitivity=0.5).pitch)
 
-        m2 = TurbulenceModulator()
-        _prime(m2)
-        lon_result = m2.update(0.0, 0.0, 10.0, intensity=1.0, sensitivity=1.0)
-
-        assert abs(vert_result.pitch) > abs(lon_result.pitch)
+        assert pitch_for(2.0, 0.0) > pitch_for(0.0, 2.0)
 
 
 class TestAxisMixingGains:
