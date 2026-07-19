@@ -137,7 +137,10 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 # Calibrated curve when enabled, else the legacy static gain.
                 virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim)
 
-                phys_stick_y_offs = int(elev_trim * 4096)
+                # Curve mode walks the spring center along the measured curve
+                # (axis units) so held-stick force trims off at the aircraft's
+                # true rate; legacy mode keeps the raw-trim center.
+                phys_stick_y_offs = int(self._trim_follow_center_y(elev_trim, virtual_stick_y_offs) * 4096)
 
                 if self.ap_following and ap_active:
                     phys_x, phys_y = self._get_device_axes()

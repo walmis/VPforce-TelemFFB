@@ -1949,6 +1949,10 @@ class TrimCalibrator:
             curve = {
                 "points": [{"t": round(t, 4), "offs": round(-(u - u_ref), 4)}
                            for t, u in zip(xs, us)],
+                # Natural trim at calibration: the runtime anchors the curve
+                # mode's spring-center walk here so the hands-off rest
+                # position matches the legacy center at this point.
+                "t0": round(self._trim0, 4),
                 "ias_kt": round((self._station_ias[0] if self._station_ias else 0) * 1.94384, 1),
                 "date": time.strftime("%Y-%m-%d"),
             }

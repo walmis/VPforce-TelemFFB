@@ -84,6 +84,7 @@ class TrimCalibrationDialog(QDialog):
         self._telem_connected = False
         self._ias_hist = []   # (t, IAS m/s) for the trend indicator
         self._cal_seen = None    # id() of the calibrator the display belongs to
+        self._stored_curve_seen = None  # raw curve JSON the display reflects
         # Paused sims stop sending telemetry, so the timeout fires right after
         # the pause frame; remember it so the idle fallback can say "unpause"
         # instead of clobbering it with the generic waiting message.
@@ -96,6 +97,22 @@ class TrimCalibrationDialog(QDialog):
 
     def _build_ui(self):
         root = QVBoxLayout(self)
+
+        # Trim-following-disabled notice. The Settings-tab entry point is
+        # prereq-gated, but the Utilities menu opens this dialog
+        # unconditionally — without this, a user whose aircraft has trim
+        # following disabled can run a perfect calibration and never learn
+        # why flying with the result changes nothing (the curve/gain
+        # settings are prereq-filtered off the aircraft entirely).
+        self.warn_tf = QLabel()
+        self.warn_tf.setWordWrap(True)
+        self.warn_tf.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.warn_tf.setStyleSheet(
+            "QLabel { background-color:#b36b00; color:white; font-weight:bold;"
+            " font-size:11pt; border-radius:6px; padding:6px; }"
+        )
+        self.warn_tf.setVisible(False)
+        root.addWidget(self.warn_tf)
 
         instructions = QLabel(
             "<b>How to calibrate</b>"
@@ -384,6 +401,36 @@ class TrimCalibrationDialog(QDialog):
             return None
         return ac.get_trim_calibrator()
 
+    def _update_tf_warning(self):
+        """Show/hide the trim-following-disabled banner for the current
+        aircraft. When Axis Control is off, trim following is prereq-blocked
+        with it, so the message names the real first step (the Trim Following
+        row is not even visible on the Settings tab until Axis Control is
+        enabled)."""
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        show = (G.device_type == "joystick"
+                and ac is not None and hasattr(ac, "get_trim_calibrator")
+                and not getattr(ac, "trim_following", False))
+        if show:
+            if not getattr(ac, "telemffb_controls_axes", False):
+                text = (
+                    "⚠  AXIS CONTROL IS DISABLED for this aircraft\n"
+                    "Calibration can run and save, but the result has NO effect "
+                    "in flight. Enable Axis Control, then Trim Following, on the "
+                    "Settings tab.")
+            else:
+                text = (
+                    "⚠  TRIM FOLLOWING IS DISABLED for this aircraft\n"
+                    "Calibration can run and save, but the result has NO effect "
+                    "in flight until Trim Following is enabled on the Settings "
+                    "tab.")
+            if self.warn_tf.text() != text:
+                self.warn_tf.setText(text)
+        if show != self.warn_tf.isVisible():
+            self.warn_tf.setVisible(show)
+            if show:
+                self._refit()
+
     # ---- slots --------------------------------------------------------------
 
     def _on_timeout(self, timed_out):
@@ -401,6 +448,11 @@ class TrimCalibrationDialog(QDialog):
             if cal is not None and id(cal) != self._cal_seen:
                 self._cal_seen = id(cal)
                 self._reset_display(cal)
+
+            # Live-tracked (not just at open): enabling trim following on the
+            # Settings tab re-applies the aircraft params, and the banner
+            # should clear the moment it does.
+            self._update_tf_warning()
 
             ias_ref = getattr(cal, "_ias0", None) if (cal is not None and cal.active) else None
             self._update_live_values(data, ias_ref)
@@ -462,6 +514,20 @@ class TrimCalibrationDialog(QDialog):
                 self._set_ready(ok, msg)
                 self.btn_start.setEnabled(ok)
                 self.btn_assist.setEnabled(ok)
+                # The aircraft's applied curve can change while the dialog is
+                # open (enabling trim following applies a previously
+                # prereq-blocked curve; the config pipeline only runs on
+                # telemetry frames). Redraw the stored-curve view when the
+                # raw JSON changes — string compare per frame, parse only on
+                # change. DONE/ABORT keep their own displays (fresh result /
+                # abort post-mortem).
+                if cal.state not in (CalState.DONE, CalState.ABORT):
+                    ac = G.telem_manager.currentAircraft if G.telem_manager else None
+                    raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
+                    if raw != self._stored_curve_seen:
+                        self.curve.clear()
+                        self._clear_result_labels()
+                        self._show_stored_curve()
 
             if cal.state == CalState.DONE and cal.result and not self._result_shown:
                 self._show_result(cal.result)
@@ -493,6 +559,9 @@ class TrimCalibrationDialog(QDialog):
         """
         ac = G.telem_manager.currentAircraft if G.telem_manager else None
         raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
+        # Record what this display attempt was based on, drawn or not, so the
+        # live change check in _on_telemetry knows when a redraw is due.
+        self._stored_curve_seen = raw
         if not raw or raw == "none":
             return False
         try:
@@ -833,6 +902,7 @@ class TrimCalibrationDialog(QDialog):
         if self.chk_trace is not None:
             self.chk_trace.setEnabled(True)
         cal = self._calibrator()
+        self._update_tf_warning()
         has_result = cal is not None and cal.state == CalState.DONE and cal.result is not None
         last_abort = cal is not None and cal.state == CalState.ABORT and cal.abort_reason
         if has_result and not self._result_shown:

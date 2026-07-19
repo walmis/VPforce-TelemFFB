@@ -57,6 +57,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self.__xplane_addr = ("127.0.0.1", 34391)
         self._trim_curve_y_json: Optional[str] = None
         self._trim_curve_y_pts = None   # (xs, ys) parsed lookup arrays
+        self._trim_curve_y_c0 = 0.0     # spring-center anchor: t0 - offs(t0)
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
 
     @property
@@ -87,6 +88,14 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
             if len(xs) < 2:
                 logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
                 return
+            # Spring-center anchor: t0 is the natural trim point at calibration
+            # (curves saved before t0 existed anchor at the measured band's
+            # midpoint — the sweep centers its band on the natural point, so
+            # the midpoint is a close stand-in). Precomputed here so the hot
+            # path pays one addition: center(T) = P * (offs(T) + c0), which
+            # equals P*t0 at the natural point.
+            t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
+            self._trim_curve_y_c0 = t0 - utils.piecewise_linear(xs, ys, t0)
             self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
             self._trim_curve_y_pts = (xs, ys)
         except (ValueError, KeyError, TypeError) as e:
@@ -122,6 +131,32 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
                 "for this aircraft.\nRun the Elevator Trim Calibration or disable the "
                 "option.\nUsing the static Y Trim Gain Virtual value instead.")
         return elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+
+    def _trim_follow_center_y(self, elev_trim: float, virt_offs: float) -> float:
+        """Spring-center position for elevator trim-following.
+
+        Curve mode: the center walks the measured level-hold curve in AXIS
+        units — center(T) = clamp(P * (offs(T) + c0)) — so trimming relieves
+        a held stick's force at the aircraft's true trim-vs-elevator
+        authority rate (real trim replaces elevator 1:1 in elevator units).
+        The raw-trim center (P * T) under-relieves by the aircraft's slope k:
+        imperceptible at k~1 (standard aircraft, where this reduces to ~P*T)
+        but a dead trim wheel at k~19 (Hawk T1). The anchor c0 keeps the
+        hands-off rest position at P*t0, identical to the legacy center at
+        the calibration's natural trim point.
+
+        Legacy/static mode (or curve enabled but missing): the raw-trim
+        center, unchanged.
+
+        :param elev_trim: legacy center — t_damp scaled by the physical gain
+        :param virt_offs: this frame's virtual offset (the curve lookup when
+            the curve is active — reused so the hot path adds no lookup)
+        """
+        if self.joystick_trim_follow_use_curve_y and self._trim_curve_y_pts is not None:
+            return utils.clamp(
+                (virt_offs + self._trim_curve_y_c0)
+                * self.joystick_trim_follow_gain_physical_y, -1.0, 1.0)
+        return elev_trim
 
     @property
     def _simconnect(self) -> SimConnectManager:

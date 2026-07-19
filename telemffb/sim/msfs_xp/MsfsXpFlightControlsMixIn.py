@@ -713,7 +713,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         elev_trim = clamp(t_damp * self.joystick_trim_follow_gain_physical_y, -1, 1)
 
         virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim)
-        phys_stick_y_offs = int(elev_trim * 4096)
+        # Curve mode walks the spring center along the measured curve (axis
+        # units) so held-stick force trims off at the aircraft's true rate;
+        # legacy mode keeps the raw-trim center.
+        phys_stick_y_offs = int(self._trim_follow_center_y(elev_trim, virtual_stick_y_offs) * 4096)
 
         if self.ap_following and ap_active:
             if self._sim_is_msfs():

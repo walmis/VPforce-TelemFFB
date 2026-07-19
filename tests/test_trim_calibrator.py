@@ -1337,6 +1337,101 @@ class TestTrimCurve:
         finally:
             harness.teardown_method()
 
+    def test_solver_curve_includes_natural_trim_anchor(self):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal._samples = [(-0.2, 0.25), (0.0, 0.05), (0.2, -0.35)]
+        cal._sweep_targets = [0]
+        cal._station_ias = [60.0]
+        cal._trim0 = -0.123
+        cal._solve()
+        assert cal.result["curve"]["t0"] == pytest.approx(-0.123, abs=1e-4)
+
+    def test_center_walks_curve_in_axis_units(self):
+        # The Hawk lesson: force relief must happen at the measured
+        # trim-vs-elevator authority rate. A slope-19 aircraft's spring
+        # center must walk ~19x the raw trim movement (clamped), while
+        # legacy mode keeps the raw-trim center.
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_gain_physical_y = 1.0
+            curve = {"points": [{"t": -0.05, "offs": -0.95},
+                                {"t": 0.05, "offs": 0.95}],
+                     "t0": 0.0}
+            inst.joystick_trim_follow_curve_y = _json.dumps(curve)
+
+            # Legacy mode: center is the raw-trim center regardless of curve.
+            inst.joystick_trim_follow_use_curve_y = False
+            assert inst._trim_follow_center_y(0.01, 0.19) == pytest.approx(0.01)
+
+            inst.joystick_trim_follow_use_curve_y = True
+            offs = inst._trim_curve_offset(0.01)
+            assert offs == pytest.approx(0.19)
+            # 1% trim -> 19% center walk (t0=0 anchor contributes nothing).
+            assert inst._trim_follow_center_y(0.01, offs) == pytest.approx(0.19)
+            # Physical gain scales the walk.
+            inst.joystick_trim_follow_gain_physical_y = 0.5
+            assert inst._trim_follow_center_y(0.01, offs) == pytest.approx(0.095)
+            # Beyond the band the walk clamps at full deflection.
+            inst.joystick_trim_follow_gain_physical_y = 1.0
+            offs_far = inst._trim_curve_offset(0.10)
+            assert inst._trim_follow_center_y(0.10, offs_far) == pytest.approx(1.0)
+        finally:
+            harness.teardown_method()
+
+    def test_center_anchor_rest_position_and_legacy_equivalence(self):
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_gain_physical_y = 1.0
+            inst.joystick_trim_follow_use_curve_y = True
+
+            # Off-zero natural point (SR22T-like, slope 2.2 anchored at t0):
+            # the hands-off rest position at the natural point must equal the
+            # legacy center P*t0, not the zero-referenced curve value.
+            curve = {"points": [{"t": -0.37, "offs": -0.814},
+                                {"t": 0.03, "offs": 0.066}],
+                     "t0": -0.1}
+            inst.joystick_trim_follow_curve_y = _json.dumps(curve)
+            offs_t0 = inst._trim_curve_offset(-0.1)
+            assert inst._trim_follow_center_y(-0.1, offs_t0) == pytest.approx(-0.1, abs=1e-6)
+            # Around the anchor the walk still moves at the measured slope.
+            offs_near = inst._trim_curve_offset(-0.2)
+            walk = inst._trim_follow_center_y(-0.1, offs_t0) - \
+                inst._trim_follow_center_y(-0.2, offs_near)
+            assert walk == pytest.approx(2.2 * 0.1, abs=1e-3)
+
+            # Curves saved before t0 existed anchor at the band midpoint.
+            curve_old = {"points": [{"t": -0.37, "offs": -0.814},
+                                    {"t": 0.03, "offs": 0.066}]}
+            inst.joystick_trim_follow_curve_y = _json.dumps(curve_old)
+            mid = (-0.37 + 0.03) / 2.0
+            offs_mid = inst._trim_curve_offset(mid)
+            assert inst._trim_follow_center_y(mid, offs_mid) == pytest.approx(mid, abs=1e-6)
+
+            # Standard aircraft (slope ~1, t0~0): curve center reduces to the
+            # raw-trim center — behavior change is imperceptible.
+            curve_std = {"points": [{"t": -0.4, "offs": -0.41},
+                                    {"t": 0.4, "offs": 0.41}],
+                         "t0": 0.0}
+            inst.joystick_trim_follow_curve_y = _json.dumps(curve_std)
+            for t in (-0.3, -0.1, 0.2):
+                offs = inst._trim_curve_offset(t)
+                assert inst._trim_follow_center_y(t, offs) == pytest.approx(t, abs=0.02)
+        finally:
+            harness.teardown_method()
+
     def test_curve_cancels_kinked_coupling_where_static_cannot(self, clock):
         # The user-reported failure: with a kinked trim response, the static
         # gain holds the nose only near the fit tangent — trimming across the
