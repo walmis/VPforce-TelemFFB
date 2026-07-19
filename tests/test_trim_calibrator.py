@@ -701,10 +701,13 @@ class TestSafety:
         assert cal.state == CalState.ABORT
         assert "Internal error" in cal.abort_reason
 
-    def test_takeover_preserves_spring_offsets(self, clock):
-        # The hold spring must keep the stick where the trim-following spring
-        # left it — snapping the center to 0/0 yanks the controls at start.
+    def test_takeover_pins_stick_where_it_rests(self, clock):
+        # The hold spring must pin the stick where it actually IS — a
+        # hands-off stick resting at the trim-following center keeps
+        # resting there (no snap to 0/0 at start). A stick held deflected
+        # is covered by TestHoldSpringContinuity.
         ac = FakePlantAircraft()
+        ac.phys_stick = (-100 / 4096, 819 / 4096)   # resting at the old center
         ac.spring_y.cpOffset = 819    # trimmed rest position (~20% of 4096)
         ac.spring_x.cpOffset = -100
         cal = TrimCalibrator(ac)
@@ -713,8 +716,8 @@ class TestSafety:
             clock.advance(1 / 30.0)
             cal.update(ac.telem())
             ac.step(1 / 30.0)
-        assert ac.spring_y.cpOffset == 819
-        assert ac.spring_x.cpOffset == -100
+        assert ac.spring_y.cpOffset == pytest.approx(819, abs=2)
+        assert ac.spring_x.cpOffset == pytest.approx(-100, abs=2)
 
     def test_takeover_is_bumpless_on_axis_output(self, clock):
         # With trim-following active, the normal path was delivering
@@ -1450,6 +1453,158 @@ class TestSuppression:
 
 
 # --------------------------------------------------------------------------- #
+#  Trim assistant (start(assist=True) -> ASSIST_HOLD -> begin_sweep())
+# --------------------------------------------------------------------------- #
+
+def run_until(cal, ac, clock, pred, seconds, dt=1 / 30.0):
+    """Drive the closed loop until ``pred()`` is true (or the time budget or
+    the run ends); returns the predicate's final value."""
+    for _ in range(int(seconds / dt)):
+        clock.advance(dt)
+        cal.update(ac.telem())
+        ac.step(dt)
+        if pred() or not cal.active:
+            break
+    return pred()
+
+
+class TestTrimAssistant:
+    def _start_assist(self, clock, **plant_kw):
+        ac = FakePlantAircraft(**plant_kw)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        return ac, cal
+
+    def test_assist_reaches_hold_and_reports_stable(self, clock):
+        ac, cal = self._start_assist(clock, coupling=0.5, trim_natural=0.1)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 120), \
+            f"never reached ASSIST_HOLD ({cal.state}, {cal.abort_reason})"
+        assert not cal.assist_stable, "must not report stable before the calm window"
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 60), \
+            "assistant never reported stable"
+        # Holding at the natural trim point, level, with no sweep started.
+        assert ac.trim == pytest.approx(0.1, abs=0.05)
+        assert abs(ac.vs) < 0.5
+        assert cal.state == CalState.ASSIST_HOLD
+        assert cal._samples == []
+
+    def test_assist_retrims_after_power_change(self, clock):
+        ac, cal = self._start_assist(clock, coupling=0.5, trim_natural=0.1)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+
+        # "Power change": the level trim point moves; the disturbance shows up
+        # as a VS excursion the assistant must chase back down.
+        ac.trim_natural = 0.30
+        assert run_until(cal, ac, clock, lambda: not cal.assist_stable, 5), \
+            "stability flag must clear as soon as the disturbance is seen"
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 240), \
+            f"assistant never re-trimmed (trim {ac.trim:+.3f}, vs {ac.vs:+.2f})"
+        assert ac.trim == pytest.approx(0.30, abs=0.05)
+        assert cal.state == CalState.ASSIST_HOLD
+
+    def test_assist_stable_clears_immediately_on_disturbance(self, clock):
+        ac, cal = self._start_assist(clock, coupling=0.5)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+        # Asymmetric hysteresis: one disturbed frame clears the flag at once.
+        ac.vs = 2.0
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        assert not cal.assist_stable
+
+    def test_assist_begin_sweep_completes_calibration(self, clock):
+        ac, cal = self._start_assist(clock, coupling=0.5, physical_y=1.0)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+
+        cal.begin_sweep()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        # Polarity and neutral trim carried over from the assistant; the
+        # sweep still measures the same plant coupling.
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+        assert cal.result["r_squared"] > 0.95
+
+    def test_assist_begin_sweep_ignored_outside_hold(self, clock):
+        ac, cal = self._start_assist(clock, coupling=0.5)
+        # Still probing/stabilizing: the request must be a no-op.
+        cal.begin_sweep()
+        assert not cal._sweep_requested
+
+    def test_assist_cancel_keeps_current_trim(self, clock):
+        # Cancelling the assistant must NOT snap trim back to the pre-assist
+        # value: the held trim IS the level trim for the power the user chose.
+        ac, cal = self._start_assist(clock, coupling=0.5, trim_natural=0.2)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+        held_trim = ac.trim
+        assert held_trim == pytest.approx(0.2, abs=0.05)
+
+        cal.stop("Cancelled by user")
+        # Soft cancel settles the stick at the release-continuity position
+        # for ASSIST_CANCEL_SETTLE_S before handing back.
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        ac.step(1 / 30.0)
+        assert cal.active, "soft cancel must settle briefly before release"
+        assert run_until(cal, ac, clock, lambda: not cal.active, 5)
+        assert cal.state == CalState.ABORT
+        assert ac.trim == pytest.approx(held_trim, abs=0.01), \
+            "cancel from the hold must leave the current (level) trim in place"
+
+    def test_assist_abort_during_sweep_restores_natural_trim(self, clock):
+        # Once the sweep has started, an abort restores the sweep anchor
+        # (the natural trim at the chosen speed) exactly like a normal run.
+        ac, cal = self._start_assist(clock, coupling=0.5, trim_natural=0.1)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+        cal.begin_sweep()
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.SWEEP, 60)
+        anchor = cal._trim0
+        cal.stop("Cancelled by user")
+        run_until(cal, ac, clock, lambda: not cal.active, 5)
+        assert ac.trim == pytest.approx(anchor, abs=0.05)
+
+    def test_assist_unresponsive_trim_in_hold_aborts(self, clock):
+        # Neutralization completes without commanding trim (already natural);
+        # the trim then goes deaf and a power change forces the assistant to
+        # step it — the unresponsive-trim give-up must fire, not hang forever.
+        ac, cal = self._start_assist(clock, coupling=0.5, trim_natural=0.0)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+
+        ac.responds_to_simvar = False
+        ac.responds_to_axis = False
+        ac.trim_natural = 0.3
+        run_until(cal, ac, clock, lambda: not cal.active, 240)
+        assert cal.state == CalState.ABORT
+        assert "not responding" in (cal.abort_reason or "")
+
+    def test_assist_retrim_is_one_slope_sized_move(self, clock):
+        # Trim must be the primary corrector: with the trim-response slope
+        # learned during neutralization, a power change is answered by ONE
+        # Newton move straight to the predicted level point (plus at most a
+        # small cleanup) — not a blind probe-and-hunt sequence with the
+        # elevator parked on the load in between.
+        ac, cal = self._start_assist(clock, coupling=0.5, trim_natural=0.1)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+        assert cal._trim_slope_est == pytest.approx(-0.5, abs=0.15), \
+            "neutralization must hand the assistant its measured slope"
+
+        moves = []
+        orig = cal._begin_neut_step
+        cal._begin_neut_step = lambda target: (moves.append(target), orig(target))
+        start_trim = ac.trim
+        ac.trim_natural = 0.30
+        assert run_until(cal, ac, clock, lambda: not cal.assist_stable, 5)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 240)
+        assert ac.trim == pytest.approx(0.30, abs=0.05)
+        # Slope-sized moves capped at NEUT_STEP_MAX: a 0.24 correction is at
+        # most two full bites plus a cleanup — never a blind probe hunt.
+        assert len(moves) <= 3, f"expected slope-sized moves, got {moves}"
+        assert moves[0] - start_trim >= cal.NEUT_STEP_MAX * 0.9, \
+            f"first move must take a full slope-sized bite ({moves})"
+        assert moves == sorted(moves), f"moves must not reverse direction ({moves})"
+
+
+# --------------------------------------------------------------------------- #
 #  Read-back closed loop (misreported travel limits)
 # --------------------------------------------------------------------------- #
 
@@ -1487,3 +1642,161 @@ class TestTrimReadbackClosedLoop:
         state = run_to_completion(cal, ac, clock)
         assert state == CalState.DONE
         assert abs(cal._trim_overdrive) <= cal.TRIM_RB_DEADBAND
+
+
+# --------------------------------------------------------------------------- #
+#  Live control-response change (set_gain_scale)
+# --------------------------------------------------------------------------- #
+
+class TestLiveGainScale:
+    def test_applies_live_after_probe(self, clock):
+        ac = FakePlantAircraft(coupling=0.5)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.STABILIZE, 60)
+        assert cal._gain_scale == pytest.approx(1.0)
+
+        cal.set_gain_scale(0.25)
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        assert cal._gain_scale == pytest.approx(0.25)
+        kp, _, _ = cal._pitch_base_gains
+        assert cal._pitch_pid.kp == pytest.approx(kp * 0.25)
+
+    def test_deferred_during_probe(self, clock):
+        # A mid-probe change must NOT step the probe's input amplitude; it
+        # applies the moment the probe completes.
+        ac = FakePlantAircraft(coupling=0.5)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        dt = 1 / 30.0
+        clock.advance(dt)
+        cal.update(ac.telem())
+        ac.step(dt)
+        assert cal.state == CalState.PROBE
+
+        cal.set_gain_scale(0.5)
+        clock.advance(dt)
+        cal.update(ac.telem())
+        ac.step(dt)
+        assert cal._gain_scale == pytest.approx(1.0), "must not apply mid-probe"
+        assert cal._gain_scale_request == pytest.approx(0.5)
+
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.STABILIZE, 60)
+        clock.advance(dt)
+        cal.update(ac.telem())
+        assert cal._gain_scale == pytest.approx(0.5)
+        assert cal._gain_scale_request is None
+
+    def test_request_clamped_to_floor(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        cal.set_gain_scale(0.01)
+        assert cal._gain_scale_request == pytest.approx(cal.OSC_MIN_GAIN_SCALE)
+
+    def test_assist_relieves_mean_load_while_porpoising(self, clock):
+        # Field failure: a steady-amplitude porpoise (|VS| swinging well past
+        # the level tolerance) kept the level gate shut forever, freezing the
+        # trim while the elevator carried the whole mean load. The long
+        # (phugoid-averaged) load path must keep moving the trim toward the
+        # natural point even though the aircraft never reports "level".
+        class PorpoisingPlant(FakePlantAircraft):
+            osc_amp = 0.0        # m/s VS swing, enabled once holding
+            osc_period = 6.0
+            _t = 0.0
+
+            def step(self, dt):
+                super().step(dt)
+                self._t += dt
+                self.vs += self.osc_amp * math.sin(
+                    2 * math.pi * self._t / self.osc_period)
+
+        ac = PorpoisingPlant(coupling=0.5, trim_natural=0.0)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 240), \
+            f"never reached ASSIST_HOLD ({cal.state}, {cal.abort_reason})"
+        # Seed a slope estimate as a real run would have from neutralization.
+        cal._trim_slope_est = -0.5
+
+        # "Power change" that also excites a sustained porpoise (level tol is
+        # 0.5 m/s; a 2 m/s swing keeps the level gate shut essentially always).
+        ac.osc_amp = 2.0
+        ac.trim_natural = 0.40
+        # The force path stops once the mean load drops under its threshold,
+        # so convergence is to within FORCE/|slope| of the natural point —
+        # the point is that trim MOVES substantially instead of freezing.
+        assert run_until(cal, ac, clock,
+                         lambda: abs(ac.trim - 0.40) < 0.15, 120), \
+            f"trim frozen at {ac.trim:+.3f} despite mean load (vs {ac.vs:+.2f})"
+        assert not cal.assist_stable, \
+            "still porpoising - must not report ready"
+
+
+# --------------------------------------------------------------------------- #
+#  Takeover / handback continuity (no stick snap)
+# --------------------------------------------------------------------------- #
+
+class TestHoldSpringContinuity:
+    def test_hold_pins_at_current_stick_position(self, clock):
+        # Users start runs while holding the stick deflected against an
+        # out-of-trim spring; the hold spring must pin where the HAND is,
+        # not at the old trim-following center (which yanked the stick).
+        ac = FakePlantAircraft()
+        ac.phys_stick = (0.10, -0.30)
+        ac.spring_x.cpOffset = 800   # stale trim-following center
+        ac.spring_y.cpOffset = -1500
+        cal = TrimCalibrator(ac)
+        cal.start()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        assert ac.spring_x.cpOffset == pytest.approx(0.10 * 4096, abs=2)
+        assert ac.spring_y.cpOffset == pytest.approx(-0.30 * 4096, abs=2)
+
+    def test_release_continuity_after_completed_run(self, clock):
+        # At handback the parked stick must sit where the normal path's
+        # first frame delivers what the engine's last frame delivered:
+        # phys* = u_end + trim_follow_offset(T_restored).
+        ac = FakePlantAircraft(coupling=0.5, trim_natural=0.1)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+
+        p_y = ac.joystick_trim_follow_gain_physical_y
+        v_y = ac.joystick_trim_follow_gain_virtual_y
+        offs_y = max(-1, min(1, ac.trim * p_y)) * (1 - v_y)
+        expect_y = max(-1, min(1, cal._u_elev + offs_y))
+        assert ac.spring_y.cpOffset / 4096 == pytest.approx(expect_y, abs=0.03)
+        # No aileron trim in telemetry -> x continuity is just the residual u.
+        expect_x = max(-1, min(1, cal._u_ail))
+        assert ac.spring_x.cpOffset / 4096 == pytest.approx(expect_x, abs=0.03)
+
+    def test_assist_cancel_parks_at_continuity_position(self, clock):
+        ac = FakePlantAircraft(coupling=0.5, trim_natural=0.2)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+
+        cal.stop("Cancelled by user")
+        assert run_until(cal, ac, clock, lambda: not cal.active, 5)
+        # Trimmed hold (u ~ 0): continuity position is just the trim-follow
+        # offset at the held trim.
+        offs_y = max(-1, min(1, ac.trim * 1.0)) * (1 - 0.5)
+        assert ac.spring_y.cpOffset / 4096 == pytest.approx(offs_y, abs=0.05)
+
+    def test_hard_abort_still_releases_immediately(self, clock):
+        # Safety trips must not gain a settle delay: pause mid-hold.
+        ac = FakePlantAircraft(coupling=0.5)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 180)
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem(SimPaused=1))
+        assert not cal.active
+        assert cal.state == CalState.ABORT

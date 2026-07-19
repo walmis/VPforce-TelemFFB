@@ -72,6 +72,7 @@ class CalState(enum.Enum):
     PROBE = "probe"          # determine control polarity (elevator, then aileron)
     STABILIZE = "stabilize"  # close the leveling loops and wait for steady flight
     TRIM_NEUTRAL = "trim_neutral"  # slew trim to the natural (zero-axis) point
+    ASSIST_HOLD = "assist_hold"    # trim assistant: hold level while the user picks a speed
     SPEED_SETTLE = "speed_settle"  # optional hold to let airspeed stabilize
     SWEEP = "sweep"          # ramp the sim trim and record elevator axis at each station
     SOLVE = "solve"          # fit the samples and compute virtual_y
@@ -187,6 +188,46 @@ class TrimCalibrator:
     # per-run via ``settle_before_sweep`` (dialog checkbox).
     SPEED_SETTLE_S = 20.0
 
+    # Trim assistant (started via start(assist=True)): after neutralization
+    # the engine holds ASSIST_HOLD instead of sweeping — the leveling loops
+    # stay closed and the neutralization's settle-measure-step cycle keeps
+    # running, so the trim re-converges as the user changes power to pick a
+    # test speed. Sweep readiness (``assist_stable``) is published with
+    # asymmetric hysteresis: any disturbance clears it instantly; it sets
+    # only after a sustained calm window.
+    ASSIST_STABLE_HOLD_S = 3.0     # calm must persist this long before "stable"
+    ASSIST_IAS_RATE_MAX = 0.15     # m/s per s (~0.3 kt/s); IAS still trending = not stable
+    ASSIST_IAS_RATE_WINDOW_S = 2.0 # IAS rate measured across this window — a per-frame
+                                   # derivative amplifies telemetry jitter ~30x and kept
+                                   # resetting the calm window on a pegged airspeed
+                                   # (field report: 10 s to re-enable at constant 75 kt)
+    ASSIST_U_TAU = 0.8             # s; steady-elevator-load LPF for retrim decisions
+    ASSIST_MEASURE_S = 0.8         # s; sustained quasi-level window = one settled
+                                   # load measurement (replaces the slower dwell here)
+    ASSIST_U_STEADY_TOL = 0.015    # load change across the window above this = the
+                                   # PID is still winding into the load; measuring
+                                   # early under-reads it and turns the single Newton
+                                   # move into a string of under-sized nibbles
+    ASSIST_U_FORCE_MOVE = 0.15     # ...but a load this big moves NOW (chunked), so a
+                                   # long slow power change cannot park the elevator
+                                   # on an ever-growing load waiting for a plateau
+    ASSIST_U_LONG_TAU = 6.0        # s; long mean-load LPF — a phugoid-period average,
+                                   # so a sustained porpoise cannot hide the mean load
+    ASSIST_FORCE_MEAS_S = 4.0      # s; cadence of mean-load moves while NOT level
+                                   # (field: a steady-amplitude porpoise blocks the
+                                   # level gate forever, and holding the untrimmed
+                                   # mean deflection is part of what pumps the cycle)
+    ASSIST_MIN_SLOPE = 0.05        # |du/dtrim| below this -> blind probe fallback
+    ASSIST_PITCH_ANCHOR_SLEW = 0.2 # deg/s; the level attitude legitimately moves with
+                                   # the chosen speed, so the pitch-guard anchor drifts
+                                   # slowly with it (a fast runaway still trips the guard)
+    ASSIST_CONFIRM_SETTLE_S = 5.0  # short pre-sweep confirmation hold from the assistant
+                                   # (the speed is already user-stabilized; this guards
+                                   # the race between the gate reading and the click)
+    ASSIST_CANCEL_SETTLE_S = 0.5   # soft cancel from the hold: beat given to the firm
+                                   # spring to walk the stick to the release-continuity
+                                   # position before control is handed back
+
     # Trim sweep. The band is ADAPTIVE: starting from the center station the
     # sweep walks outward in SWEEP_STEP increments, expanding each side until
     # the elevator needed to hold level exceeds SWEEP_U_BUDGET (relative to
@@ -224,9 +265,9 @@ class TrimCalibrator:
     # Read-back closed loop: some aircraft report travel limits that differ
     # from their actual travel, so the direct pct->degrees mapping lands the
     # read-back proportionally short of the command (field: down-side stations
-    # fell 10% short - under the 2% station tolerance near center, over it
-    # deep in the band: read-back never reached the station target, off by
-    # 2.7%, at trim -26%). Once the command reaches its target, any steady
+    # fell 10% short — under the 2% station tolerance near center, over it
+    # deep in the band: "read-back never reached the station target (off by
+    # 2.7%)" at trim -26%). Once the command reaches its target, any steady
     # residual is bled off with a slew-limited, bounded overdrive correction.
     TRIM_RB_DEADBAND = 0.005     # residual below this = arrived
     TRIM_OVERDRIVE_MAX = 0.20    # bound on the closed-loop correction
@@ -262,6 +303,7 @@ class TrimCalibrator:
 
     HOLD_SPRING_COEFF = 1.0      # firm centered spring to keep hands-off stick put
     TRIM_AXIS_RANGE = 16383      # AXIS_ELEV_TRIM_SET: -16383..16384
+    CPOFFSET_RANGE = 4096        # spring cpOffset units per full axis deflection
 
     # Trimwheel hold: a trimwheel instance writes its absolute wheel position
     # to the sim every frame, which fights our trim commands writer-vs-writer.
@@ -297,12 +339,18 @@ class TrimCalibrator:
         self.trim_write_method = "direct"
         # Run option: per-frame diagnostic CSV trace (debug-mode checkbox).
         self.trace_enabled = False
+        # Run mode (start(assist=True)): stop after neutralization and hold
+        # level indefinitely while the user picks a test speed with the
+        # throttle; the sweep is then started explicitly via begin_sweep().
+        self.assist_mode = False
+        self.assist_stable = False  # published: calm/trimmed, safe to begin the sweep
         self.result = None          # dict on success, else None
         self.abort_reason = None
         # Set from the UI thread by stop(); consumed in the telemetry thread so
         # all sim I/O (trim restore, spring release) stays on one thread.
         self._stop_requested = False
         self._stop_reason = None
+        self._sweep_requested = False  # begin_sweep() flag, consumed in update()
 
         # runtime state (initialized on start / per phase)
         self._pitch_pid = PID(self.PITCH_KP, self.PITCH_KI, self.PITCH_KD,
@@ -385,12 +433,28 @@ class TrimCalibrator:
         self._neut_deadline = None       # per-step ramp+settle deadline
         self._neut_start_t = None        # overall phase start
         self._neut_u_final = 0.0         # steady elevator at the accepted point
+        # trim-assistant state
+        self.assist_stable = False
+        self._assist_sweep_started = False   # begin_sweep() accepted; route onward
+        self._cancel_deadline = None         # soft-cancel settle deadline (hold only)
+        self._cancel_reason = None
+        self._assist_u_lpf = 0.0             # steady elevator load (transients filtered)
+        self._assist_u_long = 0.0            # long mean load (oscillation-averaged)
+        self._assist_stable_since = None     # calm-window start (hysteresis)
+        self._assist_meas_since = None       # quasi-level measurement window start
+        self._assist_meas_u0 = 0.0           # load at window start (plateau check)
+        self._assist_force_since = None      # unsettled mean-load window start
+        self._assist_ias_hist = []           # (t, IAS) samples for the windowed rate
+        self._trim_slope_est = None          # measured du/dtrim; sizes the assistant's
+                                             # Newton retrim steps (seeded by neutralization)
         self._settle_start_t = None      # SPEED_SETTLE phase start
+        self._settle_s = self.SPEED_SETTLE_S # duration of the current settle hold
         # oscillation watchdog state (extremum tracking with hysteresis)
         self._osc_ext = None         # candidate extremum value
         self._osc_dir = 0            # 0 = undetermined, +1 rising, -1 falling
         self._osc_prev_ext = None    # last confirmed extremum
         self._osc_amps = []          # recent half-cycle amplitudes (peak-to-peak / 2)
+        self._gain_scale_request = None  # live control-response change (set_gain_scale)
         self._set_pitch_gain_scale(clamp(self.initial_gain_scale, self.OSC_MIN_GAIN_SCALE, 1.0))
         # takeover smoothness: hold the stick where it rests and start the
         # axis output where the normal path left it (captured on first frame)
@@ -436,8 +500,13 @@ class TrimCalibrator:
             return False, "Level off first — still climbing/descending"
         return True, "Ready to calibrate"
 
-    def start(self):
+    def start(self, assist=False):
         """Arm the engine. Baseline is captured on the first :meth:`update`.
+
+        With ``assist=True`` the engine runs the same probe / stabilize /
+        neutralize sequence but then holds level (ASSIST_HOLD) instead of
+        sweeping, re-trimming as the user changes power to pick a test speed;
+        :meth:`begin_sweep` starts the actual calibration from there.
 
         ``_active`` is set last so the telemetry thread only ever observes a
         fully-initialized engine.
@@ -447,6 +516,8 @@ class TrimCalibrator:
         self.progress = 0.0
         self._stop_requested = False
         self._stop_reason = None
+        self._sweep_requested = False
+        self.assist_mode = bool(assist)
         self._reset_runtime()
         # NOTE: _elev_sign/_ail_sign deliberately persist across runs. Control
         # polarity is a property of the aircraft, and re-runs are safer using
@@ -455,7 +526,28 @@ class TrimCalibrator:
         self.status_message = "Starting…"
         self.state = CalState.PROBE if self.AUTO_DETECT_POLARITY else CalState.STABILIZE
         self._active = True
-        logger.info("Trim calibration started")
+        logger.info("Trim calibration started"
+                    + (" (trim-assistant mode)" if self.assist_mode else ""))
+
+    def begin_sweep(self):
+        """Leave the trim assistant's hold and start the calibration sweep
+        (thread-safe: flagged here, performed on the next :meth:`update` in
+        the telemetry thread). Only meaningful while holding in ASSIST_HOLD."""
+        if self._active and self.state == CalState.ASSIST_HOLD:
+            self._sweep_requested = True
+
+    def set_gain_scale(self, scale):
+        """Live control-response change on a running loop (thread-safe).
+
+        Applied on the next :meth:`update` via the same in-place mechanism
+        the oscillation watchdog uses (integral term preserved — no output
+        step). Deferred while the polarity probe runs so its input amplitude
+        is not stepped mid-measurement; ignored from the sweep onward (the
+        dialog locks the control there — a run's measurement dynamics stay
+        consistent). Sets the scale absolutely: the watchdog can still back
+        off further from the new value if oscillation returns.
+        """
+        self._gain_scale_request = clamp(scale, self.OSC_MIN_GAIN_SCALE, 1.0)
 
     def stop(self, reason="Cancelled by user"):
         """User-requested abort/stop (thread-safe).
@@ -496,8 +588,18 @@ class TrimCalibrator:
         """Advance the state machine one telemetry frame."""
         if self._stop_requested:
             self._stop_requested = False
-            self._abort(self._stop_reason or "Cancelled by user")
-            return
+            if self.state == CalState.ASSIST_HOLD and self._cancel_deadline is None:
+                # Soft stop from the hold: park the stick at the release-
+                # continuity position first — it is sim-inert while the
+                # engine owns the axes — and give the firm spring a beat to
+                # walk it there; _do_assist_hold completes the abort at the
+                # deadline. (A second stop request, and every hard safety
+                # trip via _precheck, still aborts immediately.)
+                self._cancel_reason = self._stop_reason or "Cancelled by user"
+                self._cancel_deadline = time.perf_counter() + self.ASSIST_CANCEL_SETTLE_S
+            else:
+                self._abort(self._stop_reason or "Cancelled by user")
+                return
 
         now = time.perf_counter()
         dt = 0.0 if self._last_t is None else now - self._last_t
@@ -512,6 +614,13 @@ class TrimCalibrator:
         if not self._precheck(telem_data):
             return
 
+        if self._gain_scale_request is not None and self.state != CalState.PROBE:
+            scale, self._gain_scale_request = self._gain_scale_request, None
+            if self.state in (CalState.STABILIZE, CalState.TRIM_NEUTRAL,
+                              CalState.ASSIST_HOLD, CalState.SPEED_SETTLE):
+                logger.info(f"Control response changed live: pitch gains x{scale:.2f}")
+                self._set_pitch_gain_scale(scale)
+
         if now - self._hold_tx_t >= self.TRIMWHEEL_HOLD_TX_S:
             self._hold_tx_t = now
             self._set_trimwheel_hold(True)
@@ -525,6 +634,8 @@ class TrimCalibrator:
             self._do_stabilize(telem_data, dt)
         elif self.state == CalState.TRIM_NEUTRAL:
             self._do_trim_neutral(telem_data, dt)
+        elif self.state == CalState.ASSIST_HOLD:
+            self._do_assist_hold(telem_data, dt)
         elif self.state == CalState.SPEED_SETTLE:
             self._do_speed_settle(telem_data, dt)
         elif self.state == CalState.SWEEP:
@@ -562,6 +673,8 @@ class TrimCalibrator:
                 detail, target = f"stage{self._probe_stage}-{self._probe_phase}", None
             elif self.state == CalState.TRIM_NEUTRAL:
                 detail, target = f"step{self._neut_steps + 1}", self._neut_target
+            elif self.state == CalState.ASSIST_HOLD:
+                detail, target = "assist", self._neut_target
             elif self.state == CalState.SWEEP:
                 detail, target = f"station{len(self._samples) + 1}", self._current_target
             elif self.state == CalState.RESTORE:
@@ -960,6 +1073,10 @@ class TrimCalibrator:
                     t0, u0 = self._neut_prev
                     step = clamp(-u * (t - t0) / (u - u0),
                                  -self.NEUT_STEP_MAX, self.NEUT_STEP_MAX)
+                    if abs(t - t0) > 0.005:
+                        # Local trim-response slope; the trim assistant sizes
+                        # its retrim moves with this (Newton step).
+                        self._trim_slope_est = (u - u0) / (t - t0)
                 else:
                     step = math.copysign(self.NEUT_PROBE, u)  # assume normal polarity
                 self._neut_prev = (t, u)
@@ -1022,15 +1139,210 @@ class TrimCalibrator:
         self._pitch_pid.reset()
         self._pitch_ref_n = None
         self._pitch_ref0 = None
-        if self.settle_before_sweep:
+        if self.assist_mode and not self._assist_sweep_started:
+            self._enter_assist_hold(telem_data)
+        elif self.assist_mode:
+            # From the assistant the speed is already user-stabilized (the
+            # sweep trigger is gated on assist_stable); a short confirmation
+            # hold guards the race between the gate reading and the click.
+            self._enter_speed_settle(telem_data, duration=self.ASSIST_CONFIRM_SETTLE_S)
+        elif self.settle_before_sweep:
             self._enter_speed_settle(telem_data)
         else:
             self._enter_sweep(telem_data)
 
+    # ---- Phase: trim assistant hold ---------------------------------------------
+
+    def _enter_assist_hold(self, telem_data):
+        self.state = CalState.ASSIST_HOLD
+        self.assist_stable = False
+        self._assist_u_lpf = self._neut_u_final
+        self._assist_u_long = self._neut_u_final
+        self._assist_stable_since = None
+        self._assist_meas_since = None
+        self._assist_force_since = None
+        self._assist_ias_hist = []
+        # _neut_prev (last settled point) and _trim_slope_est deliberately
+        # carry over from neutralization: they let the first retrim after a
+        # power change go straight to the predicted level point instead of
+        # re-probing blind.
+        self._begin_neut_step(telem_data.ElevTrimPct or 0.0)
+        logger.info("Trim assistant holding level; waiting for the user to "
+                    "pick a test speed")
+
+    def _do_assist_hold(self, telem_data, dt):
+        """Hold level indefinitely while the user sets their test power/speed.
+
+        The elevator PID stays the fast stabilizer (trim is rate-limited and
+        cannot arrest a VS excursion), but trim is the PRIMARY corrector: as
+        soon as a sustained elevator load appears, the trim is dispatched
+        toward the predicted level point in one rate-limited move — sized by
+        the measured trim-response slope (Newton step) — and the elevator
+        unwinds in lockstep during the move. Each move targets a point
+        computed from a settled measurement (sample-and-hold, not a
+        continuous servo on the lagged elevator, which hunts — see
+        :meth:`_do_trim_neutral`). There is no give-up: the assistant keeps
+        trying until the user starts the sweep or cancels — only the safety
+        envelope and an unresponsive trim end the hold.
+        """
+        if self._cancel_deadline is not None:
+            # Soft cancel: keep leveling while the hold spring walks the
+            # stick to the release-continuity position, then hand back.
+            # (_finish keeps the CURRENT trim when ending from the hold.)
+            self._hold_offs = self._release_hold_targets(telem_data)
+            self._run_leveling(telem_data, dt)
+            if time.perf_counter() >= self._cancel_deadline:
+                self._abort(self._cancel_reason or "Cancelled by user")
+            return
+
+        if self._sweep_requested:
+            self._sweep_requested = False
+            self._assist_sweep_started = True
+            u = self._assist_u_lpf
+            self._neut_u_final = u
+            logger.info(f"Trim assistant handing off to the sweep "
+                        f"(steady elevator {u:+.3f})")
+            self._finish_neutral(telem_data, centered=abs(u) <= self.NEUT_U_TOL)
+            return
+
+        self._run_leveling(telem_data, dt)  # includes the oscillation watchdog
+
+        ramping = self._advance_trim(self._neut_target, telem_data, dt)
+        if ramping is None:
+            return  # aborted (unresponsive trim)
+
+        now = time.perf_counter()
+
+        # The level attitude legitimately changes with the user's chosen
+        # speed; drift the pitch-guard anchor slowly with it so a slow
+        # re-trim never trips the excursion guard while a genuine runaway
+        # (fast divergence) still does.
+        if self._pitch0 is not None and telem_data.Pitch is not None:
+            slew = self.ASSIST_PITCH_ANCHOR_SLEW * dt
+            self._pitch0 += clamp(telem_data.Pitch - self._pitch0, -slew, slew)
+
+        # Steady elevator load: LPF strips the short-period transients so the
+        # retrim logic sees the sustained load, not the stabilization spikes.
+        # The long LPF averages across a whole phugoid cycle — the mean load
+        # a porpoising loop is carrying, unpolluted by the swing.
+        if dt > 0:
+            a = min(dt / self.ASSIST_U_TAU, 1.0)
+            self._assist_u_lpf += (self._u_elev - self._assist_u_lpf) * a
+            a_long = min(dt / self.ASSIST_U_LONG_TAU, 1.0)
+            self._assist_u_long += (self._u_elev - self._assist_u_long) * a_long
+
+        # Windowed IAS rate (NOT a per-frame derivative — that amplifies
+        # telemetry jitter ~30x and kept the calm gate from ever arming).
+        ias = telem_data.IAS or 0.0
+        hist = self._assist_ias_hist
+        hist.append((now, ias))
+        while hist and now - hist[0][0] > self.ASSIST_IAS_RATE_WINDOW_S:
+            hist.pop(0)
+        span = now - hist[0][0]
+        ias_rate = (ias - hist[0][1]) / span if span >= 1.0 else 0.0
+
+        at_target = (not ramping and
+                     abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self.TRIM_STATION_TOL)
+        level = abs(telem_data.VerticalSpeed) <= self.STABLE_VS_TOL \
+            and abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
+
+        # Retrim: once quasi-level with the previous move complete, a short
+        # sustained window is one settled load measurement — accepted only
+        # when the load has PLATEAUED across the window (the PID winding into
+        # a fresh load under-reads it, turning the single Newton move into a
+        # string of under-sized nibbles). Over-tolerance load -> one move to
+        # the predicted level point, sized by the measured slope (secant-
+        # updated from consecutive settled points); the elevator gives the
+        # load back to the trim during the move. A large load skips the
+        # plateau wait and moves in capped chunks immediately.
+        if at_target and level:
+            u = self._assist_u_lpf
+            if self._assist_meas_since is None:
+                self._assist_meas_since = now
+                self._assist_meas_u0 = u
+            elif now - self._assist_meas_since >= self.ASSIST_MEASURE_S:
+                plateaued = abs(u - self._assist_meas_u0) <= self.ASSIST_U_STEADY_TOL
+                self._assist_meas_since = now   # rolling re-measure window
+                self._assist_meas_u0 = u
+                if plateaued or abs(u) >= self.ASSIST_U_FORCE_MOVE:
+                    t = telem_data.ElevTrimPct or self._neut_target
+                    if plateaued and self._neut_prev is not None:
+                        t0, u0 = self._neut_prev
+                        if abs(t - t0) > 0.005 and abs(u - u0) > 1e-6:
+                            self._trim_slope_est = (u - u0) / (t - t0)
+                    if plateaued:
+                        self._neut_prev = (t, u)
+                    if abs(u) > self.NEUT_U_TOL:
+                        self._begin_neut_step(t + self._assist_step_from(u))
+        else:
+            self._assist_meas_since = None
+
+        # Mean-load relief, INDEPENDENT of the level gate: a sustained
+        # steady-amplitude porpoise keeps the level gate shut essentially
+        # forever (and its brief zero-crossing blips must not reset this
+        # window either), which froze the trim with the elevator carrying
+        # the whole mean load — holding that untrimmed deflection helps
+        # pump the cycle. The long, phugoid-averaged load is a valid mean
+        # measurement even mid-oscillation: bleed it off in capped moves.
+        # Slope estimates are NOT updated from these (settled data only).
+        # Harmless when calm: the settled path above fires first (0.8 s
+        # cadence) and its trim ramp resets this window via at_target.
+        if at_target:
+            if self._assist_force_since is None:
+                self._assist_force_since = now
+            elif now - self._assist_force_since >= self.ASSIST_FORCE_MEAS_S:
+                self._assist_force_since = now
+                u_mean = self._assist_u_long
+                if abs(u_mean) >= self.ASSIST_U_FORCE_MOVE:
+                    t = telem_data.ElevTrimPct or self._neut_target
+                    logger.info(f"Trim assistant: relieving mean elevator load "
+                                f"{u_mean:+.2f} while unsettled (trim {t:+.3f})")
+                    self._begin_neut_step(t + self._assist_step_from(u_mean))
+        else:
+            self._assist_force_since = None
+
+        # Readiness with asymmetric hysteresis: distrust instantly, trust
+        # only after a sustained calm window. The load gate reads the live
+        # LPF, not a dwell mean, so re-arming is not lagged by a dwell cycle.
+        trimmed = abs(self._assist_u_lpf) <= self.NEUT_U_TOL
+        calm = at_target and level and trimmed and abs(ias_rate) <= self.ASSIST_IAS_RATE_MAX
+        if calm:
+            if self._assist_stable_since is None:
+                self._assist_stable_since = now
+            self.assist_stable = \
+                now - self._assist_stable_since >= self.ASSIST_STABLE_HOLD_S
+        else:
+            self._assist_stable_since = None
+            self.assist_stable = False
+
+        ias_kt = ias * 1.94384
+        if self.assist_stable:
+            self.status_message = (
+                f"Holding level and trimmed at {ias_kt:.0f} kt — adjust power "
+                "to your test speed, or start the sweep")
+        elif not (at_target and level) or not trimmed:
+            self.status_message = (
+                f"Trim assistant: re-trimming for the current power setting… "
+                f"(IAS {ias_kt:.0f} kt)")
+        else:
+            self.status_message = (
+                f"Trim assistant: waiting for the airspeed to settle… "
+                f"(IAS {ias_kt:.0f} kt)")
+
+    def _assist_step_from(self, u):
+        """Trim step nulling the measured elevator load ``u``: a Newton move
+        sized by the measured slope when one is known, else the blind probe."""
+        if self._trim_slope_est is not None and \
+                abs(self._trim_slope_est) >= self.ASSIST_MIN_SLOPE:
+            return clamp(-u / self._trim_slope_est,
+                         -self.NEUT_STEP_MAX, self.NEUT_STEP_MAX)
+        return math.copysign(self.NEUT_PROBE, u)
+
     # ---- Phase: airspeed settle ------------------------------------------------
 
-    def _enter_speed_settle(self, telem_data):
+    def _enter_speed_settle(self, telem_data, duration=None):
         self.state = CalState.SPEED_SETTLE
+        self._settle_s = duration if duration is not None else self.SPEED_SETTLE_S
         self._settle_start_t = time.perf_counter()
         self.status_message = "Letting airspeed stabilize…"
 
@@ -1040,7 +1352,7 @@ class TrimCalibrator:
         reference used for the sweep's drift warning and abort band is captured
         at sweep entry, so it then reflects the equilibrium speed."""
         self._run_leveling(telem_data, dt)
-        remaining = self.SPEED_SETTLE_S - (time.perf_counter() - self._settle_start_t)
+        remaining = self._settle_s - (time.perf_counter() - self._settle_start_t)
         ias_kt = (telem_data.IAS or 0) * 1.94384
         self.status_message = (f"Letting airspeed stabilize… {max(remaining, 0):.0f} s "
                                f"(IAS {ias_kt:.0f} kt)")
@@ -1398,10 +1710,41 @@ class TrimCalibrator:
         ramping = self._advance_trim(self._trim0, telem_data, dt)
         if ramping is None:
             return  # aborted (unresponsive trim)
+        # Walk the parked stick to the release-continuity position while the
+        # trim ramps back (the stick is sim-inert until release, and the
+        # firm hold spring settles it in a fraction of the restore window):
+        # at handback the physical position, spring center, and delivered
+        # axis all already agree with the normal path — no snap.
+        self._hold_offs = self._release_hold_targets(telem_data)
         self._run_leveling(telem_data, dt)
         if not ramping:
             self.status_message = getattr(self, "_done_status", "Done")
             self._finish(CalState.DONE)
+
+    def _release_hold_targets(self, telem_data):
+        """Stick position (cpOffset units, both axes) at which the normal
+        flight-controls path's first frame delivers exactly what the engine
+        is delivering now — release continuity. Mirrors the runtime's
+        trim-following offset math (calibrated curve or legacy static gain)."""
+        x = clamp(self._u_ail, -1.0, 1.0)
+        y = clamp(self._u_elev, -1.0, 1.0)
+        try:
+            if getattr(self.ac, "trim_following", False):
+                t = telem_data.ElevTrimPct or 0
+                a = telem_data.AileronTrimPct or 0
+                p_y = self.ac.joystick_trim_follow_gain_physical_y
+                v_y = self.ac.joystick_trim_follow_gain_virtual_y
+                p_x = getattr(self.ac, "joystick_trim_follow_gain_physical_x", 1.0)
+                v_x = getattr(self.ac, "joystick_trim_follow_gain_virtual_x", 1.0)
+                elev_trim = clamp(t * p_y, -1, 1)
+                offs_fn = getattr(self.ac, "_trim_follow_virtual_offset_y", None)
+                offs_y = offs_fn(t, elev_trim) if offs_fn is not None \
+                    else elev_trim * (1 - v_y)
+                y = clamp(y + offs_y, -1, 1)
+                x = clamp(x + clamp(a * p_x, -1, 1) * (1 - v_x), -1, 1)
+        except Exception as e:  # continuity is comfort; never break teardown
+            logger.debug(f"release-continuity targets fell back to raw u: {e}")
+        return int(x * self.CPOFFSET_RANGE), int(y * self.CPOFFSET_RANGE)
 
     @staticmethod
     def _fit(samples):
@@ -1611,11 +1954,19 @@ class TrimCalibrator:
     def _hold_stick_centered(self):
         try:
             if self._hold_offs is None:
-                # Hold the stick where it currently rests (the trim-following
-                # spring center). Snapping the center to 0/0 would yank the
-                # controls out of their trimmed position at takeover.
-                self._hold_offs = (int(self.ac.spring_x.cpOffset),
-                                   int(self.ac.spring_y.cpOffset))
+                # Pin the stick where the HAND is, not at the old spring
+                # center: users start runs while holding the stick deflected
+                # against an out-of-trim spring (holding level by force), and
+                # pinning at the trim-following center stepped a full-strength
+                # spring in at an offset away from the hand — a yank at
+                # engagement and a snap across the gap when they let go.
+                try:
+                    px, py = self.ac._get_device_raw_axes()
+                    self._hold_offs = (int(clamp(px, -1, 1) * self.CPOFFSET_RANGE),
+                                       int(clamp(py, -1, 1) * self.CPOFFSET_RANGE))
+                except Exception:
+                    self._hold_offs = (int(self.ac.spring_x.cpOffset),
+                                       int(self.ac.spring_y.cpOffset))
                 logger.info(f"Holding stick at spring offsets "
                             f"x={self._hold_offs[0]}, y={self._hold_offs[1]}")
             self.ac.spring_x.cpOffset = self._hold_offs[0]
@@ -1700,7 +2051,10 @@ class TrimCalibrator:
         try:
             # Only touch trim if we actually moved it (neutralization or the
             # sweep); otherwise trim0 is still its default and untouched by us.
-            if self._trim_touched:
+            # Ending from the assistant's hold keeps the CURRENT trim: it is
+            # the level trim for the power the user chose, and snapping back
+            # to the pre-assist trim would hand back an out-of-trim aircraft.
+            if self._trim_touched and self.state != CalState.ASSIST_HOLD:
                 self._set_trim(self._trim0)
         except Exception as e:
             logger.debug(f"trim restore skipped: {e}")

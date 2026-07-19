@@ -50,11 +50,19 @@ class TrimCalibrationDialog(QDialog):
     # {"virtual_y": float, "curve": dict|None, "use_curve": bool}
     result_saved = pyqtSignal(str)
 
+    # Combo index -> engine pitch-gain scale (Control response).
+    RESPONSE_SCALES = {0: 1.0, 1: 0.5, 2: 0.25}
+    # States in which the control-response combo may still be changed live
+    # (from the sweep onward it locks so the measurement dynamics stay fixed).
+    RESPONSE_LIVE_STATES = ("PROBE", "STABILIZE", "TRIM_NEUTRAL",
+                            "ASSIST_HOLD", "SPEED_SETTLE")
+
     # Stage light: color + friendly text per engine state while a run is active.
     STAGE_DISPLAY = {
         "PROBE": ("#e6a817", "Probing control response…"),
         "STABILIZE": ("#e6a817", "Stabilizing level flight…"),
         "TRIM_NEUTRAL": ("#e6a817", "Finding natural trim point…"),
+        "ASSIST_HOLD": ("#e6a817", "Trim assistant holding…"),
         "SPEED_SETTLE": ("#e6a817", "Letting airspeed stabilize…"),
         "SWEEP": ("#2a7fd4", "Sweeping trim…"),
         "SOLVE": ("#2a7fd4", "Computing…"),
@@ -99,11 +107,16 @@ class TrimCalibrationDialog(QDialog):
             "Autopilot <b>OFF</b>.</li>"
             "<li><b>Trim the aircraft</b> so it holds level with near-zero stick force — "
             "starting far out of trim wastes elevator authority during the sweep.</li>"
-            "<li>Press <b>Start</b> and take your hands <b>off</b> the stick — TelemFFB "
-            "will fly the aircraft while it sweeps the elevator trim and measures the "
-            "required stick input, then recommends a trim-following <i>curve</i> (with "
-            "the equivalent static <i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to "
-            "hold the nose level as you trim.</li>"
+            "<li><i>Optional</i> — press <b>Trim Assistant</b> and TelemFFB will level "
+            "and trim the aircraft for you, then keep re-trimming as you adjust power. "
+            "Set your test speed with the throttle, wait for the assistant to report "
+            "steady (the Start button enables), then start the sweep.</li>"
+            "<li>Press <b>Start</b> — TelemFFB will fly the aircraft while it sweeps the "
+            "elevator trim and measures the required stick input, then recommends a "
+            "trim-following <i>curve</i> (with the equivalent static "
+            "<i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to hold the nose level as "
+            "you trim. Your stick is <b>inactive</b> during calibration — its input is "
+            "disconnected while TelemFFB has the controls.</li>"
             "</ol>"
         )
         instructions.setWordWrap(True)
@@ -128,7 +141,11 @@ class TrimCalibrationDialog(QDialog):
                 "Minimal — very sensitive or aerobatic aircraft with light, twitchy pitch.\n\n"
                 "Calibration also reduces its own control gains automatically when it detects\n"
                 "oscillation; this option just starts from a gentler setting. If a run aborts\n"
-                "with a pitch-oscillation error, retry with the next lower setting."))
+                "with a pitch-oscillation error, retry with the next lower setting.\n\n"
+                "Can be changed during a run up until the sweep begins — e.g. drop to Reduced\n"
+                "while watching a porpoise develop during stabilization. The change applies\n"
+                "immediately (during the brief polarity probe it is applied when the probe\n"
+                "completes); once the sweep starts the setting locks for the rest of the run."))
         response_row.addWidget(lbl_response)
         self.cmb_response = QComboBox()
         self.cmb_response.addItems([
@@ -136,6 +153,7 @@ class TrimCalibrationDialog(QDialog):
             "Reduced — sensitive aircraft",
             "Minimal — very sensitive / aerobatic",
         ])
+        self.cmb_response.currentIndexChanged.connect(self._on_response_changed)
         response_row.addWidget(self.cmb_response)
         response_row.addStretch(1)
         root.addLayout(response_row)
@@ -264,6 +282,25 @@ class TrimCalibrationDialog(QDialog):
         rlay.addWidget(self.lbl_note)
         root.addWidget(result_box)
 
+        # Trim assistant gets its own row (it lives outside the run-control
+        # button row so it does not get lost among the bottom buttons).
+        assist_row = QHBoxLayout()
+        self.btn_assist = QPushButton("Trim Assistant")
+        self.btn_assist.setToolTip(
+            "Have TelemFFB level and trim the aircraft, then hold it level while\n"
+            "you adjust power to the speed you want to calibrate at. The assistant\n"
+            "re-trims after every power change; when it reports steady, press Start\n"
+            "to run the sweep from there (the leveling and trim-finding phases are\n"
+            "already complete). Cancelling the assistant leaves the trim where it\n"
+            "is — the aircraft stays trimmed for the current power.")
+        self.btn_assist.clicked.connect(self._on_assist)
+        assist_row.addWidget(self.btn_assist)
+        lbl_assist = QLabel("Levels and trims the aircraft for you while you set your test speed")
+        lbl_assist.setStyleSheet("QLabel { color: gray; }")
+        assist_row.addWidget(lbl_assist)
+        assist_row.addStretch(1)
+        root.addLayout(assist_row)
+
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         root.addWidget(line)
@@ -340,19 +377,46 @@ class TrimCalibrationDialog(QDialog):
                 self._set_ready(False, "Run from the joystick (master) instance")
                 self._set_running(False)
                 self.btn_start.setEnabled(False)
+                self.btn_assist.setEnabled(False)
                 return
             if cal is None:
                 self._set_ready(False, "Load an MSFS / X-Plane aircraft")
                 self._set_running(False)
                 self.btn_start.setEnabled(False)
+                self.btn_assist.setEnabled(False)
                 return
 
             running = cal.active
+            assist_holding = running and cal.state == CalState.ASSIST_HOLD
             self.lbl_state.setText(getattr(cal.state, "name", str(cal.state)))
             if cal.status_message:
                 self.lbl_state.setText(f"{getattr(cal.state, 'name', '')} — {cal.status_message}")
             self.progress.setValue(int(cal.progress * 100))
-            self._set_running(running)
+            if assist_holding:
+                # Start is the sweep trigger while the assistant holds, gated
+                # on the assistant's own stability determination (starting
+                # mid-transient is a guaranteed abort; the hysteresis lives
+                # engine-side, next to the data).
+                start_want = bool(getattr(cal, "assist_stable", False))
+            elif running:
+                start_want = False
+            else:
+                start_want = self.btn_start.isEnabled()  # can_start decides below
+            self._set_running(running, start_enabled=start_want)
+            self.btn_start.setText("Start sweep" if assist_holding else "Start")
+
+            # Run options lock while a run is active — they are read once at
+            # start and a mid-run change would silently do nothing. The
+            # control-response combo is the exception: it applies live up
+            # until the sweep locks the measurement dynamics.
+            state_name = getattr(cal.state, "name", "")
+            self.cmb_response.setEnabled(
+                not running or state_name in self.RESPONSE_LIVE_STATES)
+            self.chk_settle.setEnabled(not running)
+            if self.cmb_trim_method is not None:
+                self.cmb_trim_method.setEnabled(not running)
+            if self.chk_trace is not None:
+                self.chk_trace.setEnabled(not running)
 
             if running:
                 self._show_stage_light(cal)
@@ -360,10 +424,12 @@ class TrimCalibrationDialog(QDialog):
                 # Show accepted stations as they land (full-scale view; the
                 # zoom-to-fit happens once at completion in _show_result).
                 self.curve.set_samples(list(getattr(cal, "_samples", []) or []))
+                self.btn_assist.setEnabled(False)
             else:
                 ok, msg = cal.can_start(data)
                 self._set_ready(ok, msg)
                 self.btn_start.setEnabled(ok)
+                self.btn_assist.setEnabled(ok)
 
             if cal.state == CalState.DONE and cal.result and not self._result_shown:
                 self._show_result(cal.result)
@@ -484,6 +550,28 @@ class TrimCalibrationDialog(QDialog):
         cal = self._calibrator()
         if cal is None:
             return
+        if cal.active and cal.state == CalState.ASSIST_HOLD:
+            # Assistant is holding: Start hands off to the sweep (the button
+            # is gated on the assistant's own stability determination).
+            cal.begin_sweep()
+            return
+        self._arm_and_start(cal, assist=False)
+
+    def _on_assist(self):
+        cal = self._calibrator()
+        if cal is None or cal.active:
+            return
+        self._arm_and_start(cal, assist=True)
+
+    def _on_response_changed(self, index):
+        # Live control-response change on a running loop (up to the sweep;
+        # the combo is disabled from the sweep onward). Idle changes are
+        # picked up by _arm_and_start at the next start as before.
+        cal = self._calibrator()
+        if cal is not None and cal.active:
+            cal.set_gain_scale(self.RESPONSE_SCALES.get(index, 1.0))
+
+    def _arm_and_start(self, cal, assist):
         ac = G.telem_manager.currentAircraft
         telem = getattr(ac, "telem_data", None)
         ok, msg = cal.can_start(telem)
@@ -495,7 +583,7 @@ class TrimCalibrationDialog(QDialog):
         self.curve.clear()
         self._clear_result_labels()
         cal.settle_before_sweep = self.chk_settle.isChecked()
-        cal.initial_gain_scale = {0: 1.0, 1: 0.5, 2: 0.25}.get(
+        cal.initial_gain_scale = self.RESPONSE_SCALES.get(
             self.cmb_response.currentIndex(), 1.0)
         if self._debug:
             cal.trim_write_method = \
@@ -504,7 +592,7 @@ class TrimCalibrationDialog(QDialog):
         else:
             cal.trim_write_method = "direct"
             cal.trace_enabled = False
-        cal.start()
+        cal.start(assist=assist)
 
     def _on_stop(self):
         cal = self._calibrator()
@@ -634,14 +722,28 @@ class TrimCalibrationDialog(QDialog):
     def _show_stage_light(self, cal):
         """While a run is active, the light reflects the engine stage."""
         state_name = getattr(cal.state, "name", "")
+        if state_name == "ASSIST_HOLD":
+            # The assistant's light doubles as the sweep-readiness indicator.
+            if getattr(cal, "assist_stable", False):
+                self._set_light("#33aa33", "Assistant steady — ready to start the sweep")
+            else:
+                self._set_light("#e6a817", "Assistant leveling / re-trimming…")
+            return
         color, text = self.STAGE_DISPLAY.get(state_name, ("#e6a817", state_name.title()))
         self._set_light(color, text)
 
-    def _set_running(self, running):
+    def _set_running(self, running, start_enabled=None):
         banner_appearing = running and not self.banner.isVisible()
         self.banner.setVisible(running)
         self.btn_stop.setEnabled(running)
-        self.btn_start.setEnabled(not running and self.btn_start.isEnabled())
+        # The desired Start state is applied in ONE transition. This slot runs
+        # per telemetry frame — a disable→re-enable pulse (the old code path
+        # for the assistant's gated Start) clears a QPushButton's in-progress
+        # press, silently swallowing every user click.
+        if start_enabled is None:
+            start_enabled = not running and self.btn_start.isEnabled()
+        if self.btn_start.isEnabled() != start_enabled:
+            self.btn_start.setEnabled(start_enabled)
         if running:
             self.btn_apply.setEnabled(False)
             self.btn_save.setEnabled(False)
@@ -660,6 +762,14 @@ class TrimCalibrationDialog(QDialog):
         self.progress.setValue(0)
         self.banner.setVisible(False)
         self.btn_stop.setEnabled(False)
+        self.btn_start.setText("Start")
+        self.btn_assist.setEnabled(False)
+        self.cmb_response.setEnabled(True)
+        self.chk_settle.setEnabled(True)
+        if self.cmb_trim_method is not None:
+            self.cmb_trim_method.setEnabled(True)
+        if self.chk_trace is not None:
+            self.chk_trace.setEnabled(True)
         cal = self._calibrator()
         has_result = cal is not None and cal.state == CalState.DONE and cal.result is not None
         if has_result and not self._result_shown:
