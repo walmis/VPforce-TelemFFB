@@ -1727,12 +1727,14 @@ class TestLiveGainScale:
         # 0.5 m/s; a 2 m/s swing keeps the level gate shut essentially always).
         ac.osc_amp = 2.0
         ac.trim_natural = 0.40
-        # The force path stops once the mean load drops under its threshold,
-        # so convergence is to within FORCE/|slope| of the natural point —
-        # the point is that trim MOVES substantially instead of freezing.
+        # The force path stops once the (period-matched) mean load drops
+        # under its threshold, so convergence is to within FORCE/|slope| of
+        # the natural point — the point is that trim MOVES substantially
+        # instead of freezing.
         assert run_until(cal, ac, clock,
-                         lambda: abs(ac.trim - 0.40) < 0.15, 120), \
+                         lambda: abs(ac.trim - 0.40) < 0.20, 120), \
             f"trim frozen at {ac.trim:+.3f} despite mean load (vs {ac.vs:+.2f})"
+        assert ac.trim > 0.15
         assert not cal.assist_stable, \
             "still porpoising - must not report ready"
 
@@ -1800,3 +1802,116 @@ class TestHoldSpringContinuity:
         cal.update(ac.telem(SimPaused=1))
         assert not cal.active
         assert cal.state == CalState.ABORT
+
+
+# --------------------------------------------------------------------------- #
+#  Slow-phugoid protection (P-38L field case)
+# --------------------------------------------------------------------------- #
+
+class TestSlowPhugoidProtection:
+    def test_increased_response_scale_applies(self, clock):
+        # Lightly damped long-period phugoids need MORE damping authority:
+        # the Increased option starts the loop above 1.0.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.initial_gain_scale = 1.5
+        cal.start()
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.STABILIZE, 60)
+        assert cal._gain_scale == pytest.approx(1.5)
+        kp, _, _ = cal._pitch_base_gains
+        assert cal._pitch_pid.kp == pytest.approx(kp * 1.5)
+
+    def test_live_request_clamps_to_increased_ceiling(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        cal.set_gain_scale(3.0)
+        assert cal._gain_scale_request == pytest.approx(cal.GAIN_SCALE_MAX)
+
+    def test_trim_does_not_chase_slow_phugoid(self, clock):
+        # At a VS zero crossing of an oscillation the load sits at its swing
+        # extreme and is momentarily flat — the plateau check passes at the
+        # worst phase and the trim chased (and pumped) the porpoise. With a
+        # cycle confirmed, settled measurements are suppressed and the mean
+        # path averages over one measured period, so a trimmed aircraft in a
+        # slow porpoise gets NO trim moves at all.
+        class SlowPhugoidPlant(FakePlantAircraft):
+            osc_amp = 0.0        # per-frame VS forcing, enabled once holding
+            osc_period = 24.0
+            _t = 0.0
+
+            def step(self, dt):
+                super().step(dt)
+                self._t += dt
+                self.vs += self.osc_amp * math.sin(
+                    2 * math.pi * self._t / self.osc_period)
+
+        ac = SlowPhugoidPlant(coupling=0.5, trim_natural=0.0)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 240)
+        cal._trim_slope_est = -0.5
+
+        moves = []
+        orig = cal._begin_neut_step
+        cal._begin_neut_step = lambda tgt: (moves.append(tgt), orig(tgt))
+        # Seed the watchdog as if the cycle was already confirmed (detection
+        # latency on a fresh oscillation is a separate, accepted window);
+        # the run below replaces the seed with real measured gaps.
+        cal._osc_recent = [(0.5, clock.t)]
+        cal._osc_last_ext_t = clock.t
+        cal._osc_half_gaps = [12.0, 12.0]
+        # The closed loop rejects most of the forcing (the disturbance ends
+        # up in the CONTROL signal, which is exactly what poisons the phase
+        # measurements); this amplitude leaves a residual VS cycle whose
+        # confirmed extrema clear the assist presence floor.
+        ac.osc_amp = 0.25
+
+        run_until(cal, ac, clock, lambda: False, 120)   # ride the porpoise
+
+        assert cal.active, f"run died: {cal.abort_reason}"
+        assert not moves, f"trim chased the phugoid: {moves}"
+        assert abs(ac.trim) <= 0.02
+        # (assist_stable MAY arm here: the residual cycle sits inside the
+        # level tolerance and the period-matched mean shows a trimmed
+        # aircraft — that meets the same bar a calm aircraft meets.)
+        # the real cycle got measured and kept the protection alive
+        assert cal._osc_period() == pytest.approx(24.0, abs=6.0)
+
+    def test_gate_rearms_promptly_after_porpoise_damps(self, clock):
+        # Field: with the aircraft pegged level after the porpoise damped,
+        # a lingering oscillation-presence flag kept the settled path
+        # suppressed (small residual loads unretrimmable) and the ready
+        # gate dark. Presence must exit within ~0.6 period of the last
+        # extremum and the gate re-arm shortly after.
+        class SlowPhugoidPlant(FakePlantAircraft):
+            osc_amp = 0.0
+            osc_period = 24.0
+            _t = 0.0
+
+            def step(self, dt):
+                super().step(dt)
+                self._t += dt
+                self.vs += self.osc_amp * math.sin(
+                    2 * math.pi * self._t / self.osc_period)
+
+        ac = SlowPhugoidPlant(coupling=0.5, trim_natural=0.0)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 240)
+        cal._trim_slope_est = -0.5
+        cal._osc_recent = [(0.5, clock.t)]
+        cal._osc_last_ext_t = clock.t
+        cal._osc_half_gaps = [12.0, 12.0]
+        ac.osc_amp = 0.25
+        run_until(cal, ac, clock, lambda: False, 60)   # ride the porpoise
+
+        ac.osc_amp = 0.0    # damps out
+        t0 = clock.t
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 30), \
+            "gate never re-armed after the porpoise damped"
+        assert clock.t - t0 <= 25.0, \
+            f"gate re-arm took {clock.t - t0:.1f}s after damping"

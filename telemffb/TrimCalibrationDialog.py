@@ -51,7 +51,8 @@ class TrimCalibrationDialog(QDialog):
     result_saved = pyqtSignal(str)
 
     # Combo index -> engine pitch-gain scale (Control response).
-    RESPONSE_SCALES = {0: 1.0, 1: 0.5, 2: 0.25}
+    RESPONSE_SCALES = {0: 1.5, 1: 1.0, 2: 0.5, 3: 0.25}
+    RESPONSE_DEFAULT_INDEX = 1   # Normal
     # States in which the control-response combo may still be changed live
     # (from the sweep onward it locks so the measurement dynamics stay fixed).
     RESPONSE_LIVE_STATES = ("PROBE", "STABILIZE", "TRIM_NEUTRAL",
@@ -136,23 +137,29 @@ class TrimCalibrationDialog(QDialog):
             text="Control response:",
             tooltip=(
                 "Strength of the control inputs used to fly the aircraft during calibration.\n\n"
+                "Increased — sluggish or heavy aircraft whose slow porpoising gets WORSE\n"
+                "when the response is lowered (the leveling loop is the only thing damping\n"
+                "a long, lazy phugoid — it needs more authority, not less).\n"
                 "Normal — most aircraft.\n"
                 "Reduced — sensitive aircraft that porpoise or bounce during stabilization.\n"
                 "Minimal — very sensitive or aerobatic aircraft with light, twitchy pitch.\n\n"
                 "Calibration also reduces its own control gains automatically when it detects\n"
-                "oscillation; this option just starts from a gentler setting. If a run aborts\n"
-                "with a pitch-oscillation error, retry with the next lower setting.\n\n"
-                "Can be changed during a run up until the sweep begins — e.g. drop to Reduced\n"
+                "a growing oscillation; this option just starts from a different setting. If a\n"
+                "run aborts with a pitch-oscillation error, retry with the next lower setting;\n"
+                "if a slow porpoise gets worse as you lower it, go the other way.\n\n"
+                "Can be changed during a run up until the sweep begins — e.g. adjust it\n"
                 "while watching a porpoise develop during stabilization. The change applies\n"
                 "immediately (during the brief polarity probe it is applied when the probe\n"
                 "completes); once the sweep starts the setting locks for the rest of the run."))
         response_row.addWidget(lbl_response)
         self.cmb_response = QComboBox()
         self.cmb_response.addItems([
+            "Increased — sluggish / heavy aircraft",
             "Normal",
             "Reduced — sensitive aircraft",
             "Minimal — very sensitive / aerobatic",
         ])
+        self.cmb_response.setCurrentIndex(self.RESPONSE_DEFAULT_INDEX)
         self.cmb_response.currentIndexChanged.connect(self._on_response_changed)
         response_row.addWidget(self.cmb_response)
         response_row.addStretch(1)

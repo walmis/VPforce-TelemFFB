@@ -153,6 +153,12 @@ class TrimCalibrator:
     OSC_HYSTERESIS = 0.15        # m/s retreat from a candidate extremum to confirm it
     OSC_BACKOFF = 0.5            # pitch-gain multiplier applied per detection
     OSC_MIN_GAIN_SCALE = 0.1     # give up below this cumulative scale
+    GAIN_SCALE_MAX = 1.5         # ceiling for the Increased control-response option:
+                                 # some aircraft (long-period, lightly damped phugoid
+                                 # at low speed) need MORE damping authority, not less
+                                 # — derating made the P-38L porpoise WORSE; the
+                                 # growth watchdog still derates from here if 1.5x
+                                 # proves too hot on a given airframe
 
     # Stabilization gate (must hold within tolerance for the dwell window).
     STABLE_VS_TOL = 0.50         # m/s (~100 fpm)
@@ -218,6 +224,26 @@ class TrimCalibrator:
                                    # level gate forever, and holding the untrimmed
                                    # mean deflection is part of what pumps the cycle)
     ASSIST_MIN_SLOPE = 0.05        # |du/dtrim| below this -> blind probe fallback
+    # Slow-phugoid protection for the retrim measurements: at a VS zero
+    # crossing of an oscillation the elevator load sits at its swing EXTREME
+    # and is momentarily flat, so the plateau check passes at exactly the
+    # worst phase and Newton moves get sized on the swing peak — the trim
+    # then chases (and pumps) the porpoise (field: P-38L at slow speed).
+    # While an oscillation is confirmed, settled measurements are suppressed
+    # and the mean-load path averages the load over one MEASURED period,
+    # which cancels the swing exactly regardless of how slow the phugoid is.
+    ASSIST_OSC_PERIOD_MIN = 4.0    # s; sanity bounds on the measured period
+    ASSIST_OSC_PERIOD_MAX = 60.0
+    ASSIST_U_OSC_MOVE = 0.06       # move threshold for the period-matched mean —
+                                   # the swing cancels exactly, so it can be trusted
+                                   # far below the lagged-LPF threshold (which would
+                                   # otherwise leave FORCE/|slope| of trim residual)
+    ASSIST_OSC_MIN_AMP = 0.2       # m/s; presence floor for the assist gate — just
+                                   # above the confirmation hysteresis. Deliberately
+                                   # LOWER than OSC_MIN_PEAK_VS: the watchdog's floor
+                                   # ignores jitter for GAIN decisions, but even a
+                                   # mild rhythmic VS cycle inside the level tolerance
+                                   # phase-poisons the settled load measurements
     ASSIST_PITCH_ANCHOR_SLEW = 0.2 # deg/s; the level attitude legitimately moves with
                                    # the chosen speed, so the pitch-guard anchor drifts
                                    # slowly with it (a fast runaway still trips the guard)
@@ -444,6 +470,7 @@ class TrimCalibrator:
         self._assist_meas_since = None       # quasi-level measurement window start
         self._assist_meas_u0 = 0.0           # load at window start (plateau check)
         self._assist_force_since = None      # unsettled mean-load window start
+        self._assist_osc_since = None        # oscillation-presence onset time
         self._assist_ias_hist = []           # (t, IAS) samples for the windowed rate
         self._trim_slope_est = None          # measured du/dtrim; sizes the assistant's
                                              # Newton retrim steps (seeded by neutralization)
@@ -454,8 +481,16 @@ class TrimCalibrator:
         self._osc_dir = 0            # 0 = undetermined, +1 rising, -1 falling
         self._osc_prev_ext = None    # last confirmed extremum
         self._osc_amps = []          # recent half-cycle amplitudes (peak-to-peak / 2)
+        self._osc_last_ext_t = None  # confirmation time of the last extremum
+        self._osc_half_gaps = []     # recent extremum-to-extremum gaps (half periods)
+        self._osc_recent = []        # (amplitude, t) of recent confirmations — NEVER
+                                     # cleared (unlike _osc_amps, whose clearing is
+                                     # growth-detection bookkeeping); used to decide
+                                     # whether an oscillation is currently present
+        self._assist_u_hist = []     # (t, u) samples for the period-matched mean
         self._gain_scale_request = None  # live control-response change (set_gain_scale)
-        self._set_pitch_gain_scale(clamp(self.initial_gain_scale, self.OSC_MIN_GAIN_SCALE, 1.0))
+        self._set_pitch_gain_scale(clamp(self.initial_gain_scale,
+                                         self.OSC_MIN_GAIN_SCALE, self.GAIN_SCALE_MAX))
         # takeover smoothness: hold the stick where it rests and start the
         # axis output where the normal path left it (captured on first frame)
         self._hold_offs = None
@@ -547,7 +582,8 @@ class TrimCalibrator:
         consistent). Sets the scale absolutely: the watchdog can still back
         off further from the new value if oscillation returns.
         """
-        self._gain_scale_request = clamp(scale, self.OSC_MIN_GAIN_SCALE, 1.0)
+        self._gain_scale_request = clamp(scale, self.OSC_MIN_GAIN_SCALE,
+                                         self.GAIN_SCALE_MAX)
 
     def stop(self, reason="Cancelled by user"):
         """User-requested abort/stop (thread-safe).
@@ -1246,6 +1282,40 @@ class TrimCalibrator:
         level = abs(telem_data.VerticalSpeed) <= self.STABLE_VS_TOL \
             and abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
 
+        # Oscillation awareness: while the watchdog is confirming a cycle,
+        # settled measurements are phase-poisoned — at a VS zero crossing the
+        # load sits at its swing EXTREME and is momentarily flat, so the
+        # plateau check passes at exactly the wrong moment and the trim ends
+        # up chasing (and pumping) the porpoise. Suppress them and let the
+        # mean-load path below work from a period-matched average instead.
+        self._assist_u_hist.append((now, self._u_elev))
+        while self._assist_u_hist and \
+                now - self._assist_u_hist[0][0] > self.ASSIST_OSC_PERIOD_MAX:
+            self._assist_u_hist.pop(0)
+        osc_period = self._osc_period()
+        horizon = osc_period if osc_period is not None else 30.0
+        # Presence must EXIT promptly once the cycle damps (field: a lingering
+        # flag kept the settled path suppressed with the aircraft pegged level,
+        # leaving a small residual load unretrimmable and the ready gate dark):
+        # a live cycle confirms an extremum every half period, so 0.6 periods
+        # without one means it is over; and the last two confirmed amplitudes
+        # both under the floor means it damped out (one small extremum alone
+        # can be direction jitter mid-cycle).
+        osc_active = (self._osc_last_ext_t is not None
+                      and now - self._osc_last_ext_t <= 0.6 * horizon
+                      and max((a for a, _ in self._osc_recent[-2:]), default=0.0)
+                      >= self.ASSIST_OSC_MIN_AMP)
+        if osc_active:
+            if self._assist_osc_since is None:
+                self._assist_osc_since = now
+        else:
+            self._assist_osc_since = None
+        # Period-matched mean, trusted once a full cycle has been observed.
+        pmean_ready = (osc_active and osc_period is not None
+                       and self._assist_osc_since is not None
+                       and now - self._assist_osc_since >= osc_period)
+        pmean = self._assist_period_mean(now, osc_period) if pmean_ready else None
+
         # Retrim: once quasi-level with the previous move complete, a short
         # sustained window is one settled load measurement — accepted only
         # when the load has PLATEAUED across the window (the PID winding into
@@ -1255,7 +1325,7 @@ class TrimCalibrator:
         # updated from consecutive settled points); the elevator gives the
         # load back to the trim during the move. A large load skips the
         # plateau wait and moves in capped chunks immediately.
-        if at_target and level:
+        if at_target and level and not osc_active:
             u = self._assist_u_lpf
             if self._assist_meas_since is None:
                 self._assist_meas_since = now
@@ -1292,8 +1362,21 @@ class TrimCalibrator:
                 self._assist_force_since = now
             elif now - self._assist_force_since >= self.ASSIST_FORCE_MEAS_S:
                 self._assist_force_since = now
-                u_mean = self._assist_u_long
-                if abs(u_mean) >= self.ASSIST_U_FORCE_MOVE:
+                # Period-matched mean while a cycle is confirmed: the 6 s LPF
+                # does not average out a 20-40 s phugoid (60%+ of the swing
+                # leaks through and the moves phase-chase the oscillation).
+                # Period-matched mean once a full cycle of oscillation data
+                # exists (the onset transient mixes calm and one-sided swing
+                # and reads as a phantom mean load); while a cycle is present
+                # but not yet fully observed, wait rather than move on a
+                # measurement that cannot be trusted yet.
+                if osc_active:
+                    u_mean = pmean
+                    threshold = self.ASSIST_U_OSC_MOVE
+                else:
+                    u_mean = self._assist_u_long
+                    threshold = self.ASSIST_U_FORCE_MOVE
+                if u_mean is not None and abs(u_mean) >= threshold:
                     t = telem_data.ElevTrimPct or self._neut_target
                     logger.info(f"Trim assistant: relieving mean elevator load "
                                 f"{u_mean:+.2f} while unsettled (trim {t:+.3f})")
@@ -1304,7 +1387,10 @@ class TrimCalibrator:
         # Readiness with asymmetric hysteresis: distrust instantly, trust
         # only after a sustained calm window. The load gate reads the live
         # LPF, not a dwell mean, so re-arming is not lagged by a dwell cycle.
-        trimmed = abs(self._assist_u_lpf) <= self.NEUT_U_TOL
+        # During a confirmed (sub-tolerance) cycle the period-matched mean is
+        # the honest load — the LPF residual is just cycle phase.
+        trimmed = abs(self._assist_u_lpf) <= self.NEUT_U_TOL or \
+            (pmean is not None and abs(pmean) <= self.NEUT_U_TOL)
         calm = at_target and level and trimmed and abs(ias_rate) <= self.ASSIST_IAS_RATE_MAX
         if calm:
             if self._assist_stable_since is None:
@@ -1328,6 +1414,28 @@ class TrimCalibrator:
             self.status_message = (
                 f"Trim assistant: waiting for the airspeed to settle… "
                 f"(IAS {ias_kt:.0f} kt)")
+
+    def _osc_period(self):
+        """Measured oscillation period from the watchdog's extremum gaps.
+
+        Requires two CONSISTENT consecutive half-gaps — a lone or ragged gap
+        (onset transients, direction jitter) yields a wrong period, and a
+        wrong-period mean re-poisons the very measurement this exists to
+        clean. Returns None until the cycle timing is trustworthy.
+        """
+        if len(self._osc_half_gaps) < 2:
+            return None
+        a, b = self._osc_half_gaps[-2:]
+        if abs(a - b) > 0.3 * max(a, b):
+            return None
+        p = a + b
+        return clamp(p, self.ASSIST_OSC_PERIOD_MIN, self.ASSIST_OSC_PERIOD_MAX)
+
+    def _assist_period_mean(self, now, period):
+        """Mean elevator load over the last full oscillation period — the
+        swing integrates out exactly, leaving the true mean load."""
+        pts = [u for t, u in self._assist_u_hist if now - t <= period]
+        return sum(pts) / len(pts) if pts else self._assist_u_long
 
     def _assist_step_from(self, u):
         """Trim step nulling the measured elevator load ``u``: a Newton move
@@ -1883,9 +1991,26 @@ class TrimCalibrator:
             if vs < self._osc_ext + h:
                 return
 
-        # Direction reversal confirmed: _osc_ext is a local extremum.
+        # Direction reversal confirmed: _osc_ext is a local extremum. The
+        # extremum-to-extremum gap is half the oscillation period; the trim
+        # assistant uses it to average the load over one full cycle.
+        now = time.perf_counter()
+        if self._osc_last_ext_t is not None:
+            gap = now - self._osc_last_ext_t
+            # Gaps shorter than the declared minimum period allows are onset
+            # jitter (a step disturbance rings the short-period mode), not
+            # phugoid half-cycles — letting one in halves the period estimate
+            # and a half-period mean is one-sided by construction.
+            if self.ASSIST_OSC_PERIOD_MIN / 2 <= gap <= self.ASSIST_OSC_PERIOD_MAX:
+                self._osc_half_gaps.append(gap)
+                if len(self._osc_half_gaps) > 2:
+                    self._osc_half_gaps.pop(0)
+        self._osc_last_ext_t = now
         if self._osc_prev_ext is not None:
             amp = abs(self._osc_ext - self._osc_prev_ext) / 2.0
+            self._osc_recent.append((amp, now))
+            if len(self._osc_recent) > 3:
+                self._osc_recent.pop(0)
             if amp < self.OSC_MIN_PEAK_VS:
                 self._osc_amps.clear()
             else:
