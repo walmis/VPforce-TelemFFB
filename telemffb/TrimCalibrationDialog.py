@@ -24,6 +24,7 @@ the result; the control loop itself runs in the telemetry thread. See
 """
 import json
 import logging
+import time
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -34,7 +35,7 @@ from PyQt6.QtWidgets import (
 )
 
 import telemffb.globals as G
-from telemffb.custom_widgets import InfoLabel, TrimCurveWidget
+from telemffb.custom_widgets import IasTrendWidget, InfoLabel, TrimCurveWidget
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ class TrimCalibrationDialog(QDialog):
         self._last_result = None
         self._result_shown = False
         self._telem_connected = False
+        self._ias_hist = []   # (t, IAS m/s) for the trend indicator
         self._cal_seen = None    # id() of the calibrator the display belongs to
         # Paused sims stop sending telemetry, so the timeout fires right after
         # the pause frame; remember it so the idle fallback can say "unpause"
@@ -228,13 +230,34 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_bank = QLabel("—")
         self.lbl_trim = QLabel("—")
         self.lbl_state = QLabel("Idle")
+        # IAS gets a live trend arrow beside the value (MSFS creeps toward
+        # its new equilibrium speed for a minute-plus after a power change;
+        # the arrow shows the assistant is waiting on physics, not wedged).
+        self.ias_trend = IasTrendWidget()
         for col, (name, w) in enumerate([
             ("IAS", self.lbl_ias), ("Pitch", self.lbl_pitch), ("VS", self.lbl_vs),
             ("Bank", self.lbl_bank), ("Trim", self.lbl_trim),
         ]):
             grid.addWidget(QLabel(f"<b>{name}</b>"), 0, col, alignment=Qt.AlignmentFlag.AlignHCenter)
             w.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-            grid.addWidget(w, 1, col)
+            if w is self.lbl_ias:
+                # Arrow pinned at the cell's right edge, OUTSIDE the label's
+                # centering, so neither the arrow redrawing nor the label
+                # text changing shifts anything else.
+                cell = QHBoxLayout()
+                cell.setContentsMargins(0, 0, 0, 0)
+                cell.setSpacing(0)
+                cell.addStretch(1)
+                cell.addWidget(self.lbl_ias)
+                cell.addStretch(1)
+                cell.addWidget(self.ias_trend)
+                grid.addLayout(cell, 1, col)
+            else:
+                grid.addWidget(w, 1, col)
+        # Equal columns regardless of content width, or the whole row
+        # re-negotiates as values change length.
+        for col in range(5):
+            grid.setColumnStretch(col, 1)
 
         # State text gets its own full-width row (long per-frame status lines)
         # and the stage/ready light its own — sharing a row clips one or the
@@ -249,8 +272,10 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_state.setMinimumHeight(2 * self.lbl_state.fontMetrics().lineSpacing())
         state_row.addWidget(self.lbl_state, 1)
         grid.addLayout(state_row, 2, 0, 1, 5)
+        # Left-justified so the light sits at a fixed position — right-
+        # aligned, the whole line (light included) shifted with text length.
         self.lbl_ready = QLabel("●  —")
-        grid.addWidget(self.lbl_ready, 3, 0, 1, 5, alignment=Qt.AlignmentFlag.AlignRight)
+        grid.addWidget(self.lbl_ready, 3, 0, 1, 5, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -535,6 +560,34 @@ class TrimCalibrationDialog(QDialog):
         # trustworthy at roughly constant speed, so surface drift as it happens
         # rather than only in the post-run note.
         ias = data.get("IAS")
+        # Trend arrow: windowed rates (never a per-frame derivative — that
+        # amplifies telemetry jitter ~30x, a lesson the engine learned
+        # first). Two windows: FAST for responsiveness, SLOW because the
+        # assistant responds to ACCUMULATED drift — a creep far below any
+        # instantaneous-rate threshold still walks the natural trim past
+        # the retrim tolerance within a minute. The arrow shows whichever
+        # window sees more (slow creep stays visible); the static dash
+        # requires BOTH quiet, so a green dash genuinely means no retrim
+        # is brewing.
+        rate, static = None, False
+        if ias is not None:
+            now = time.monotonic()
+            self._ias_hist.append((now, ias))
+            while self._ias_hist and now - self._ias_hist[0][0] > 12.5:
+                self._ias_hist.pop(0)
+            span = now - self._ias_hist[0][0]
+            fast = slow = None
+            recent = [s for s in self._ias_hist if now - s[0] <= 2.5]
+            if recent and now - recent[0][0] >= 1.0:
+                fast = (ias - recent[0][1]) / (now - recent[0][0]) * MS_TO_KT
+            if span >= 4.0:
+                slow = (ias - self._ias_hist[0][1]) / span * MS_TO_KT
+            if fast is not None:
+                rate = fast if slow is None or abs(fast) >= abs(slow) else slow
+                static = abs(fast) <= 0.08 and slow is not None and abs(slow) <= 0.03
+        else:
+            self._ias_hist.clear()
+        self.ias_trend.set_rate(rate, static)
         ias_txt = fmt(ias, MS_TO_KT, " kt")
         ias_style = ""
         if ias_ref and ias:
@@ -760,6 +813,8 @@ class TrimCalibrationDialog(QDialog):
             self._refit()
 
     def _refresh_idle(self):
+        self._ias_hist.clear()
+        self.ias_trend.set_rate(None)
         self.lbl_ias.setText("—")
         self.lbl_pitch.setText("—")
         self.lbl_vs.setText("—")
@@ -779,8 +834,16 @@ class TrimCalibrationDialog(QDialog):
             self.chk_trace.setEnabled(True)
         cal = self._calibrator()
         has_result = cal is not None and cal.state == CalState.DONE and cal.result is not None
+        last_abort = cal is not None and cal.state == CalState.ABORT and cal.abort_reason
         if has_result and not self._result_shown:
             self._show_result(cal.result)
+        elif last_abort:
+            # Pausing the sim right after a failed run fires the telemetry
+            # timeout — do NOT wipe the post-mortem (abort reason + the
+            # partial-run plot): users pause precisely to read it and take
+            # screenshots. The calibrator still holds the state; re-assert
+            # the note in case this refresh follows a display reset.
+            self.lbl_note.setText(f"Last run aborted: {cal.abort_reason}")
         elif not has_result:
             self._clear_result_labels()
             self._show_stored_curve()

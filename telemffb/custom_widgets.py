@@ -2970,3 +2970,77 @@ class ExceptionStatusWidget(QWidget):
 
 
 
+
+
+class IasTrendWidget(QWidget):
+    """Tiny vertical trend arrow for an airspeed readout.
+
+    The arrow grows with the rate of change — square-root scaled, because
+    the interesting regime is slow creep (MSFS takes a minute-plus to
+    asymptote after a power change) which linear scaling would render as an
+    invisible nub — points up/down with the sign, and shifts green -> amber
+    -> red with magnitude. A flat green dash means the airspeed is truly
+    static; blank means no rate is known (no telemetry).
+    """
+
+    FULL_SCALE_KTS = 1.5   # kt/s at full arrow length
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Line-height sized: the indicator must not change the row's
+        # geometry (a taller widget shifted every other status column).
+        self.setFixedSize(14, 20)
+        self._rate = None
+        self._static = False
+
+    def set_rate(self, kt_per_s, static=False):
+        """Update the display. ``static`` is the caller's verdict that the
+        speed is truly settled (accumulation-aware, not just instantaneous
+        rate); None blanks the indicator."""
+        if kt_per_s == self._rate and static == self._static:
+            return
+        self._rate = kt_per_s
+        self._static = static
+        self.setToolTip("" if kt_per_s is None
+                        else f"Airspeed trend: {kt_per_s:+.2f} kt/s")
+        self.update()
+
+    @staticmethod
+    def _blend(c1, c2, f):
+        f = max(0.0, min(1.0, f))
+        return QColor(int(c1.red() + (c2.red() - c1.red()) * f),
+                      int(c1.green() + (c2.green() - c1.green()) * f),
+                      int(c1.blue() + (c2.blue() - c1.blue()) * f))
+
+    def paintEvent(self, event):
+        if self._rate is None:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        cx, cy = w / 2.0, h / 2.0
+
+        if self._static:
+            p.setPen(QPen(QColor(51, 170, 51), 3))
+            p.drawLine(QPointF(2.0, cy), QPointF(w - 2.0, cy))
+            return
+
+        frac = min(abs(self._rate) / self.FULL_SCALE_KTS, 1.0) ** 0.5
+        green = QColor(51, 170, 51)
+        amber = QColor(230, 168, 23)
+        red = QColor(204, 51, 51)
+        color = self._blend(green, amber, frac / 0.5) if frac < 0.5 \
+            else self._blend(amber, red, (frac - 0.5) / 0.5)
+
+        length = max(6.0, frac * (cy - 2.0))
+        d = 1.0 if self._rate > 0 else -1.0     # positive rate draws UP
+        tip_y = cy - d * length
+        base_y = cy + d * length * 0.5
+        p.setPen(QPen(color, 2.2))
+        p.drawLine(QPointF(cx, base_y), QPointF(cx, tip_y + d * 4.0))
+        head = QtGui.QPolygonF([QPointF(cx, tip_y),
+                                QPointF(cx - 3.5, tip_y + d * 5.0),
+                                QPointF(cx + 3.5, tip_y + d * 5.0)])
+        p.setBrush(QBrush(color))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawPolygon(head)
