@@ -221,6 +221,15 @@ class TrimCalibrator:
     # (AXIS_ELEV_TRIM_SET polarity varies with aircraft, cf. trimwheel_axis_invert).
     TRIM_SIGN_CHECK_DIST = 0.03
     TRIM_RESPOND_MIN = 0.01      # read-back movement below this = "not responding"
+    # Read-back closed loop: some aircraft report travel limits that differ
+    # from their actual travel, so the direct pct->degrees mapping lands the
+    # read-back proportionally short of the command (field: down-side stations
+    # fell 10% short - under the 2% station tolerance near center, over it
+    # deep in the band: read-back never reached the station target, off by
+    # 2.7%, at trim -26%). Once the command reaches its target, any steady
+    # residual is bled off with a slew-limited, bounded overdrive correction.
+    TRIM_RB_DEADBAND = 0.005     # residual below this = arrived
+    TRIM_OVERDRIVE_MAX = 0.20    # bound on the closed-loop correction
 
     # Elevator-authority guard: sustained command beyond this during the sweep
     # means the trim band exceeds what the elevator can hold level against.
@@ -350,6 +359,7 @@ class TrimCalibrator:
         self._flagged = []               # samples accepted with a VS residual (see result)
         # trim command state (read-back space; _set_trim maps to command space)
         self._trim_cmd = 0.0
+        self._trim_overdrive = 0.0       # read-back closed-loop correction
         self._trim_sign = 1.0            # flipped at runtime if read-back moves opposite
         self._trim_dir_verified = False
         self._sign_cmd_accum = 0.0
@@ -532,7 +542,8 @@ class TrimCalibrator:
                      "trim_pct,trim_deg,trim_cmd,trim_target,trim_write,"
                      "u_base_y,u_elev,u_ail,axis_y_sent,elev_defl_pct,"
                      "pid_out,pid_i_term,"
-                     "pitch_target_n,gain_scale,pitch_mode,trim_sign,dir_verified")
+                     "pitch_target_n,gain_scale,pitch_mode,trim_sign,dir_verified,"
+                     "trim_overdrive")
 
     def _log_trim_method(self, desc):
         """Log the effective MSFS write method once per run (diagnostics)."""
@@ -569,7 +580,7 @@ class TrimCalibrator:
                 telem_data.ElevDeflPct,
                 pid.output, pid.ki * pid._integral, self._pitch_target_n,
                 self._gain_scale, self._pitch_mode, self._trim_sign,
-                int(self._trim_dir_verified),
+                int(self._trim_dir_verified), self._trim_overdrive,
             ))
         except Exception:
             # Telemetry hot path: diagnostics must never break the run.
@@ -1106,7 +1117,18 @@ class TrimCalibrator:
             delta = clamp(diff, -step, step)
             self._trim_cmd += delta
             self._sign_cmd_accum += delta
-        self._set_trim(self._trim_cmd)
+        elif self._trim_dir_verified:
+            # Command at target: close the loop on the read-back. Aircraft
+            # whose reported travel limits differ from their actual travel
+            # land the read-back proportionally short of the command; bleed
+            # the steady residual off with a bounded, slew-limited overdrive
+            # (a no-op on aircraft with an accurate 1:1 mapping).
+            resid = target - (telem_data.ElevTrimPct or 0)
+            if abs(resid) > self.TRIM_RB_DEADBAND:
+                self._trim_overdrive = clamp(
+                    self._trim_overdrive + clamp(resid, -step, step),
+                    -self.TRIM_OVERDRIVE_MAX, self.TRIM_OVERDRIVE_MAX)
+        self._set_trim(self._trim_cmd + self._trim_overdrive)
 
         # Direction verification against the read-back.
         if not self._trim_dir_verified and abs(self._sign_cmd_accum) >= self.TRIM_SIGN_CHECK_DIST:
@@ -1125,6 +1147,7 @@ class TrimCalibrator:
                     # Re-anchor the command at the current read-back so the
                     # flipped command does not jump the trim.
                     self._trim_cmd = rb
+                    self._trim_overdrive = 0.0
                     logger.warning("Trim moved opposite to command; flipping command sign "
                                    f"(now {self._trim_sign:+.0f})")
                 self._sign_cmd_accum = 0.0

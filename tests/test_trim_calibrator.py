@@ -1447,3 +1447,43 @@ class TestSuppression:
             assert crash.active is False, "control must be released"
         finally:
             harness.teardown_method()
+
+
+# --------------------------------------------------------------------------- #
+#  Read-back closed loop (misreported travel limits)
+# --------------------------------------------------------------------------- #
+
+class TestTrimReadbackClosedLoop:
+    def test_misreported_down_travel_still_completes(self, clock):
+        # Field failure: the aircraft's actual nose-down travel is ~10% more
+        # than the reported limit, so every direct write lands the read-back
+        # proportionally short of the command — under the 2% station
+        # tolerance near center, over it deep in the band ("Sweep station 14:
+        # trim read-back never reached the station target (off by 2.7%)").
+        # The overdrive loop must bleed the residual off and finish the run.
+        class MisreportedTravelPlant(FakePlantAircraft):
+            def _apply_trim_simvar(self, radians):
+                deg = math.degrees(radians)
+                if deg >= 0:
+                    return deg / self.trim_up_limit
+                return deg / (abs(self.trim_dn_limit) * 1.10)
+
+        ac = MisreportedTravelPlant(coupling=0.5, physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+        # The band must actually cover the down side (where the error bites).
+        assert min(t for t, _ in cal.result["samples"]) < -0.2
+        assert abs(cal._trim_overdrive) <= cal.TRIM_OVERDRIVE_MAX
+
+    def test_overdrive_stays_zero_on_accurate_mapping(self, clock):
+        # 1:1 aircraft: the closed loop must be a no-op.
+        ac = FakePlantAircraft(coupling=0.5)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE
+        assert abs(cal._trim_overdrive) <= cal.TRIM_RB_DEADBAND
