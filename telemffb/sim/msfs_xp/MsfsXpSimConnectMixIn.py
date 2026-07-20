@@ -56,8 +56,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self.__xplane_axis_override_active = False
         self.__xplane_addr = ("127.0.0.1", 34391)
         self._trim_curve_y_json: Optional[str] = None
-        self._trim_curve_y_pts = None   # (xs, ys) parsed lookup arrays
-        self._trim_curve_y_c0 = 0.0     # spring-center anchor: t0 - offs(t0)
+        self._trim_curve_y_pts = None   # (xs, ys) parsed lookup arrays, anchor-referenced
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
 
     @property
@@ -88,14 +87,20 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
             if len(xs) < 2:
                 logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
                 return
-            # Spring-center anchor: t0 is the natural trim point at calibration
-            # (curves saved before t0 existed anchor at the measured band's
-            # midpoint — the sweep centers its band on the natural point, so
-            # the midpoint is a close stand-in). Precomputed here so the hot
-            # path pays one addition: center(T) = P * (offs(T) + c0), which
-            # equals P*t0 at the natural point.
+            # Anchor referencing: rebase the stored points so offs(t0) == 0
+            # (t0 = natural trim at calibration; curves saved before t0
+            # existed anchor at the measured band's midpoint — the sweep
+            # centers its band on the natural point, so the midpoint is a
+            # close stand-in). Idempotent, so old and new payloads both land
+            # in the same convention. This pins the runtime invariant
+            # "trimmed for level => stick at physical center, zero force,
+            # zero delivered input" at every speed, and keeps every lookup
+            # band-internal — the old trim-gauge-zero reference was an
+            # edge-slope extrapolation far outside the measured band on
+            # aircraft whose natural trim sits away from gauge zero.
             t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
-            self._trim_curve_y_c0 = t0 - utils.piecewise_linear(xs, ys, t0)
+            ref = utils.piecewise_linear(xs, ys, t0)
+            ys = [y - ref for y in ys]
             self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
             self._trim_curve_y_pts = (xs, ys)
         except (ValueError, KeyError, TypeError) as e:
@@ -136,14 +141,18 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         """Spring-center position for elevator trim-following.
 
         Curve mode: the center walks the measured level-hold curve in AXIS
-        units — center(T) = clamp(P * (offs(T) + c0)) — so trimming relieves
-        a held stick's force at the aircraft's true trim-vs-elevator
-        authority rate (real trim replaces elevator 1:1 in elevator units).
-        The raw-trim center (P * T) under-relieves by the aircraft's slope k:
+        units — center(T) = clamp(P * offs(T)) — so trimming relieves a held
+        stick's force at the aircraft's true trim-vs-elevator authority rate
+        (real trim replaces elevator 1:1 in elevator units). The raw-trim
+        center (P * T) under-relieved by the aircraft's slope k:
         imperceptible at k~1 (standard aircraft, where this reduces to ~P*T)
-        but a dead trim wheel at k~19 (Hawk T1). The anchor c0 keeps the
-        hands-off rest position at P*t0, identical to the legacy center at
-        the calibration's natural trim point.
+        but a dead trim wheel at k~19 (Hawk T1).
+
+        The curve is anchor-referenced at parse time (offs(t0) == 0), which
+        makes one invariant exact everywhere: trimmed for level => stick at
+        physical center, zero force, zero delivered input; deviation from
+        center = the un-trimmed load. Position and force both mean "how out
+        of trim you are", at any speed.
 
         Legacy/static mode (or curve enabled but missing): the raw-trim
         center, unchanged.
@@ -154,8 +163,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         """
         if self.joystick_trim_follow_use_curve_y and self._trim_curve_y_pts is not None:
             return utils.clamp(
-                (virt_offs + self._trim_curve_y_c0)
-                * self.joystick_trim_follow_gain_physical_y, -1.0, 1.0)
+                virt_offs * self.joystick_trim_follow_gain_physical_y, -1.0, 1.0)
         return elev_trim
 
     @property

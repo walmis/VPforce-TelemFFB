@@ -319,15 +319,11 @@ class TrimCalibrationDialog(QDialog):
         # The recommendation line grows long (curve + static fit + current
         # value); wrap it instead of pushing past the window edge.
         self.lbl_virtual.setWordWrap(True)
-        self.chk_use_curve = QCheckBox("Use calibrated curve (recommended) — static gain is used when unchecked")
-        self.chk_use_curve.setChecked(True)
-        self.chk_use_curve.setEnabled(False)
         self.lbl_note = QLabel("")
         self.lbl_note.setWordWrap(True)
         self.lbl_note.setStyleSheet("QLabel { color:#cc7a00; }")
         rlay.addWidget(self.lbl_virtual)
         rlay.addWidget(self.lbl_linearity)
-        rlay.addWidget(self.chk_use_curve)
         rlay.addWidget(self.lbl_note)
         root.addWidget(result_box)
 
@@ -564,12 +560,18 @@ class TrimCalibrationDialog(QDialog):
         self._stored_curve_seen = raw
         if not raw or raw == "none":
             return False
+        # Plot the aircraft's PARSED lookup arrays, not the raw JSON: the
+        # setter anchor-references the points (offs(t0) == 0), so this shows
+        # exactly what the runtime flies. JSON is only read for provenance.
+        pts = getattr(ac, "_trim_curve_y_pts", None)
+        if pts is None:
+            logger.warning("Stored trim curve unreadable; not displaying")
+            return False
+        samples = [(t, -o) for t, o in zip(*pts)]
         try:
             data = json.loads(raw)
-            samples = [(float(p["t"]), -float(p["offs"])) for p in data["points"]]
-        except (ValueError, KeyError, TypeError) as e:
-            logger.warning(f"Stored trim curve unreadable; not displaying ({e})")
-            return False
+        except (ValueError, TypeError):
+            data = {}
         if len(samples) < 2:
             return False
 
@@ -589,8 +591,8 @@ class TrimCalibrationDialog(QDialog):
             + (f"  &nbsp;({prov})" if prov else "")
             + f"  &nbsp;·  static value: {virtual_y:.3f}")
         self.lbl_linearity.setText(
-            f"Curve in use: {'yes' if use_curve else 'no — static gain active'}")
-        self.chk_use_curve.setChecked(use_curve)
+            "Curve in use: " + ("yes" if use_curve else
+                                "no — disabled on the Settings tab (static gain active)"))
         self._fit_to_content()
         return True
 
@@ -729,11 +731,15 @@ class TrimCalibrationDialog(QDialog):
             cal.stop("Cancelled by user")
 
     def _payload(self):
+        # Saving/applying a calibration that produced a curve always enables
+        # curve mode — it is the recommended result, and a run good enough to
+        # save is a run good enough to use. Users who want the static gain
+        # instead can disable "use calibrated curve" on the Settings tab.
         curve = self._last_result.get("curve")
         return {
             "virtual_y": float(self._last_result["virtual_y"]),
             "curve": curve,
-            "use_curve": bool(self.chk_use_curve.isChecked() and curve is not None),
+            "use_curve": curve is not None,
         }
 
     def _on_apply(self):
@@ -765,9 +771,10 @@ class TrimCalibrationDialog(QDialog):
                 "With a good value the <b>nose stays level</b> as you trim: the "
                 "stick relieves under force feedback but the aircraft does not "
                 "pitch. If the nose drifts up or down while you trim, the value "
-                "needs work — re-run the calibration, or toggle <i>Use calibrated "
-                "curve</i> to compare it against the static value."
-                "<br><br>Click <b>Save</b> to write this to the profile.")
+                "needs work — re-run the calibration."
+                "<br><br>Click <b>Save</b> to write this to the profile. Saving "
+                "enables the calibrated curve; it can be disabled later from "
+                "the Settings tab.")
             box.exec()
 
     def _on_save(self):
@@ -794,8 +801,6 @@ class TrimCalibrationDialog(QDialog):
             f"Recommended: {rec_txt}  &nbsp;·  static fit: {result['virtual_y']:.3f}"
             f"  &nbsp;(for Physical Y = {result['physical_y']:.2f}){current_txt}")
         self.lbl_linearity.setText(f"Linearity (R²): {result['r_squared']:.3f}")
-        self.chk_use_curve.setEnabled(has_curve)
-        self.chk_use_curve.setChecked(has_curve)
         notes = []
         if not result["linear_ok"]:
             notes.append(
@@ -837,7 +842,6 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_virtual.setText("Recommended Y Trim Gain (Virtual): <b>—</b>")
         self.lbl_linearity.setText("Linearity (R²): —")
         self.lbl_note.setText("")
-        self.chk_use_curve.setEnabled(False)
         self.btn_apply.setEnabled(False)
         self.btn_save.setEnabled(False)
 

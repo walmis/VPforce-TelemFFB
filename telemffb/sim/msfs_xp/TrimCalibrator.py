@@ -319,6 +319,12 @@ class TrimCalibrator:
     # means the trim band exceeds what the elevator can hold level against.
     U_ELEV_SAT = 0.7
     U_ELEV_SAT_TIME_S = 0.7
+    # Outbound-ramp freeze: a slope-blind first step on a steep aircraft can
+    # lurch far past the designed per-station excursion before any sample has
+    # taught the sweep its slope. Past this |u - u_center| while still ramping
+    # OUTBOUND, stop and measure where we are instead of riding on toward the
+    # saturation guard; the step then resizes from that sample.
+    SWEEP_FREEZE_DU = 0.6
     MIN_SAMPLES_FOR_FIT = 4      # truncated sweep still solves with this many
 
     # Result acceptance / setting bounds.
@@ -476,6 +482,7 @@ class TrimCalibrator:
         self._trace_axis_y = None        # last elevator axis value sent to the sim
         self._pitch_target_n = None      # cascade outer-loop demand (normalized deg)
         self._u_sat_since = None
+        self._sat_recovering = False     # unwinding out of a truncated sweep side
         # trim-neutralization state (discrete step-and-settle root-find)
         self._trim_touched = False       # any trim commanded this run (restore flag)
         self._neut_target = 0.0          # trim target for the current step
@@ -931,7 +938,17 @@ class TrimCalibrator:
                 v_y = self.ac.joystick_trim_follow_gain_virtual_y
                 p_x = getattr(self.ac, "joystick_trim_follow_gain_physical_x", 1.0)
                 v_x = getattr(self.ac, "joystick_trim_follow_gain_virtual_x", 1.0)
-                self._u_base_y = clamp(phys_y - clamp(t * p_y, -1, 1) * (1 - v_y), -1, 1)
+                # Mirror the runtime's actual offset math (calibrated curve
+                # or legacy static gain) exactly like _release_hold_targets
+                # does — a hand-rolled static-only formula here computed a
+                # false baseline in curve mode, and the takeover step it
+                # injected upset the aircraft and contaminated the polarity
+                # probe (C208B field abort, trace 20260719_201957).
+                elev_trim = clamp(t * p_y, -1, 1)
+                offs_fn = getattr(self.ac, "_trim_follow_virtual_offset_y", None)
+                offs_y = offs_fn(t, elev_trim) if offs_fn is not None \
+                    else elev_trim * (1 - v_y)
+                self._u_base_y = clamp(phys_y - offs_y, -1, 1)
                 self._u_base_x = clamp(phys_x - clamp(a * p_x, -1, 1) * (1 - v_x), -1, 1)
         except Exception as e:  # baseline is comfort-only; never block the run
             logger.debug(f"takeover baseline capture skipped: {e}")
@@ -1711,6 +1728,26 @@ class TrimCalibrator:
             if abs(cand - self._trim0) > self.SWEEP_MAX_HALF + 1e-9 or abs(cand) > 0.95:
                 self._side_done[side] = True
                 continue
+            # Predict the candidate's steady elevator from the samples so
+            # far and stop the side BEFORE launching a station that would
+            # ride into the saturation guard (C208B field abort: the
+            # retrospective check alone let it saturate mid-approach with 3
+            # samples and the nose-down side untouched). The threshold is
+            # SOFT — one outermost station may land past the budget, like
+            # every field-validated run sampled its band edge; refuse only
+            # predictions deep past it or near the saturation guard.
+            if len(self._samples) >= 2 and self._u_center is not None:
+                slope, intercept, _ = self._fit(self._samples)
+                u_pred = intercept + slope * cand
+                if abs(u_pred - self._u_center) > \
+                        self.SWEEP_U_BUDGET + self.SWEEP_U_STEP_TARGET / 2 or \
+                        abs(u_pred) > self.U_ELEV_SAT - 0.05:
+                    self._side_done[side] = True
+                    logger.info(
+                        f"Sweep side {side:+d}: next station predicts "
+                        f"u_elev {u_pred:+.2f} (beyond budget); stopping "
+                        f"expansion on that side")
+                    continue
             self._side = side
             self._edge[side] = cand
             return cand
@@ -1783,12 +1820,55 @@ class TrimCalibrator:
 
         now = time.perf_counter()
 
+        # Outbound-ramp freeze: measure where we are instead of lurching on.
+        # Gated on the current trim already being on the TARGET's side of
+        # trim0 — side-switch traverses legitimately start with a large
+        # elevator excursion left over from the old side's outermost station
+        # and must not trigger this.
+        trim_now = telem_data.ElevTrimPct or 0
+        if ramping and self._side != 0 and self._u_center is not None and \
+                (trim_now - self._trim0) * self._side > 0 and \
+                abs(self._u_elev - self._u_center) > self.SWEEP_FREEZE_DU:
+            self._edge[self._side] = trim_now
+            logger.info(
+                f"Elevator excursion {abs(self._u_elev - self._u_center):.2f} "
+                f"while ramping to trim {100 * target:+.1f}%; measuring at "
+                f"{100 * trim_now:+.1f}% instead (station step will resize "
+                f"from this sample)")
+            self._begin_step(trim_now)
+            return
+
         # Elevator-authority guard (safety net behind the adaptive budget):
         # sustained near-full elevator means level flight is barely holdable.
         if abs(self._u_elev) > self.U_ELEV_SAT:
-            if self._u_sat_since is None:
+            if self._sat_recovering:
+                # Unwinding out of a truncated side toward the new station:
+                # the elevator legitimately stays railed while the trim
+                # slews back. The guard re-arms once u drops below the
+                # threshold; pitch/roll excursion guards still protect.
+                pass
+            elif self._u_sat_since is None:
                 self._u_sat_since = now
             elif now - self._u_sat_since > self.U_ELEV_SAT_TIME_S:
+                self._u_sat_since = None
+                if self._side != 0 and not self._side_done[-self._side]:
+                    # This side is out of elevator authority but the other
+                    # side is unexplored — truncate here and walk the other
+                    # side instead of giving up. Aborting threw away a whole
+                    # fresh half-band (C208B field abort: 3 nose-up stations,
+                    # nose-down side never visited).
+                    self._side_done[self._side] = True
+                    logger.warning(
+                        f"Elevator saturated heading to a "
+                        f"{'nose-up' if self._side > 0 else 'nose-dn'}-side "
+                        f"station; truncating that side "
+                        f"({len(self._samples)} samples) and continuing on "
+                        f"the other side")
+                    nxt = self._next_station_target(self._u_elev)
+                    if nxt is not None:
+                        self._sat_recovering = True
+                        self._begin_step(nxt)
+                        return
                 if len(self._samples) >= self.MIN_SAMPLES_FOR_FIT:
                     logger.warning(f"Elevator near saturation; truncating sweep with "
                                    f"{len(self._samples)} samples")
@@ -1798,6 +1878,7 @@ class TrimCalibrator:
                 return
         else:
             self._u_sat_since = None
+            self._sat_recovering = False
 
         at_station = (not ramping and
                       abs((telem_data.ElevTrimPct or 0) - target) <= self._station_tol)
@@ -1871,6 +1952,25 @@ class TrimCalibrator:
                if residual_vs is not None else "")
         )
         self.progress = len(self._samples) / self.SWEEP_MAX_STATIONS
+        # Self-sizing: the sweep's own samples ARE a slope measurement. A
+        # slope-blind entry (assist session without a power change teaches
+        # no slope) starts at the default step, which on a steep aircraft
+        # lurches several times the designed excursion per station. Shrink
+        # the step toward the design target as soon as the fit knows better
+        # (shrink-only: station spacing may tighten mid-sweep, never widen).
+        if len(self._samples) >= 2:
+            slope_fit, _, _ = self._fit(self._samples)
+            if abs(slope_fit) > 1e-6:
+                want = clamp(self.SWEEP_U_STEP_TARGET / abs(slope_fit),
+                             self.SWEEP_STEP_MIN, self.SWEEP_STEP)
+                if want < self._sweep_step * 0.95:
+                    self._sweep_step = want
+                    self._station_tol = min(self.TRIM_STATION_TOL,
+                                            max(0.005, want / 2.0))
+                    logger.info(
+                        f"Sweep step resized from measured slope "
+                        f"{slope_fit:+.2f}: step {want:.3f} "
+                        f"(station tol {self._station_tol:.3f})")
         nxt = self._next_station_target(mean_u)
         if nxt is None:
             if len(self._samples) >= self.MIN_SAMPLES_FOR_FIT:

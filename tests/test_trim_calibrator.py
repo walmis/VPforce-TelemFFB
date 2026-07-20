@@ -1385,7 +1385,12 @@ class TestTrimCurve:
         finally:
             harness.teardown_method()
 
-    def test_center_anchor_rest_position_and_legacy_equivalence(self):
+    def test_anchor_referencing_rebases_curve_at_natural_trim(self):
+        # The curve is stored zero-referenced at trim-gauge 0 but flown
+        # anchor-referenced: the parse-time rebase pins offs(t0) == 0, so
+        # "trimmed for level" means stick at physical center, zero force,
+        # zero delivered input — and no lookup ever depends on extrapolating
+        # a narrow band back to gauge zero.
         from tests.framework.base import BaseTelemetryEffectTestCase
         from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
         import json as _json
@@ -1397,31 +1402,45 @@ class TestTrimCurve:
             inst.joystick_trim_follow_gain_physical_y = 1.0
             inst.joystick_trim_follow_use_curve_y = True
 
-            # Off-zero natural point (SR22T-like, slope 2.2 anchored at t0):
-            # the hands-off rest position at the natural point must equal the
-            # legacy center P*t0, not the zero-referenced curve value.
+            # Off-zero natural point (SR22T-like, slope 2.2, anchor t0=-0.1;
+            # points as the solver stores them: zero-referenced at T=0).
             curve = {"points": [{"t": -0.37, "offs": -0.814},
                                 {"t": 0.03, "offs": 0.066}],
                      "t0": -0.1}
             inst.joystick_trim_follow_curve_y = _json.dumps(curve)
-            offs_t0 = inst._trim_curve_offset(-0.1)
-            assert inst._trim_follow_center_y(-0.1, offs_t0) == pytest.approx(-0.1, abs=1e-6)
-            # Around the anchor the walk still moves at the measured slope.
+            # Trimmed for level: zero virtual offset (delivered = phys) and
+            # the spring center at physical center.
+            assert inst._trim_curve_offset(-0.1) == pytest.approx(0.0, abs=1e-9)
+            assert inst._trim_follow_center_y(-0.1, 0.0) == pytest.approx(0.0, abs=1e-9)
+            # The walk away from the anchor still moves at the measured slope.
             offs_near = inst._trim_curve_offset(-0.2)
-            walk = inst._trim_follow_center_y(-0.1, offs_t0) - \
-                inst._trim_follow_center_y(-0.2, offs_near)
-            assert walk == pytest.approx(2.2 * 0.1, abs=1e-3)
+            assert offs_near == pytest.approx(-0.22, abs=1e-3)
+            assert inst._trim_follow_center_y(-0.2, offs_near) == \
+                pytest.approx(-0.22, abs=1e-3)
+            # Physical gain scales the walk but leaves the anchor at center.
+            inst.joystick_trim_follow_gain_physical_y = 0.5
+            assert inst._trim_follow_center_y(-0.1, 0.0) == pytest.approx(0.0, abs=1e-9)
+            assert inst._trim_follow_center_y(-0.2, offs_near) == \
+                pytest.approx(-0.11, abs=1e-3)
+            inst.joystick_trim_follow_gain_physical_y = 1.0
 
-            # Curves saved before t0 existed anchor at the band midpoint.
+            # Curves saved before t0 existed rebase at the band midpoint.
             curve_old = {"points": [{"t": -0.37, "offs": -0.814},
                                     {"t": 0.03, "offs": 0.066}]}
             inst.joystick_trim_follow_curve_y = _json.dumps(curve_old)
             mid = (-0.37 + 0.03) / 2.0
-            offs_mid = inst._trim_curve_offset(mid)
-            assert inst._trim_follow_center_y(mid, offs_mid) == pytest.approx(mid, abs=1e-6)
+            assert inst._trim_curve_offset(mid) == pytest.approx(0.0, abs=1e-9)
 
-            # Standard aircraft (slope ~1, t0~0): curve center reduces to the
-            # raw-trim center — behavior change is imperceptible.
+            # The rebase is idempotent: feeding back already-rebased points
+            # (offs(t0) == 0) changes nothing.
+            rebased = {"points": [{"t": t, "offs": o} for t, o in
+                                  zip(*inst._trim_curve_y_pts)]}
+            inst.joystick_trim_follow_curve_y = _json.dumps(rebased)
+            assert inst._trim_curve_offset(mid) == pytest.approx(0.0, abs=1e-9)
+            assert inst._trim_curve_offset(0.03) == pytest.approx(0.44, abs=1e-3)
+
+            # Standard aircraft (slope ~1, t0~0): rebase is a no-op and the
+            # center reduces to the raw-trim center — imperceptible change.
             curve_std = {"points": [{"t": -0.4, "offs": -0.41},
                                     {"t": 0.4, "offs": 0.41}],
                          "t0": 0.0}
@@ -1431,6 +1450,35 @@ class TestTrimCurve:
                 assert inst._trim_follow_center_y(t, offs) == pytest.approx(t, abs=0.02)
         finally:
             harness.teardown_method()
+
+    def test_takeover_baseline_mirrors_runtime_offset_helper(self):
+        # Field abort (C208B, trace 20260719_201957): the takeover baseline
+        # was computed with the static-gain formula even when the runtime was
+        # flying the calibrated curve. The false baseline stepped the
+        # delivered axis at t=0, upset the aircraft, and contaminated the
+        # polarity probe into a wrong-sign cascade dive. The capture must
+        # mirror the runtime's own offset helper, exactly like the handback
+        # continuity targets do.
+        ac = FakePlantAircraft()
+        ac.trim = -0.0565
+        # Stick resting at the curve-mode spring center; the runtime's curve
+        # lookup says the virtual offset there is -0.4 (anchor-referenced).
+        ac.phys_stick = (0.0, -0.4)
+        ac._trim_follow_virtual_offset_y = lambda t, elev_trim: -0.4
+        cal = TrimCalibrator(ac)
+        cal._capture_takeover_baseline(ac.telem())
+        # Runtime was delivering phys - offs = -0.4 - (-0.4) = 0: bumpless.
+        assert cal._u_base_y == pytest.approx(0.0, abs=1e-9)
+
+        # Without the helper (plants/aircraft without curve support) the
+        # legacy static formula still applies: phys - T*P*(1-vy).
+        ac2 = FakePlantAircraft()
+        ac2.trim = -0.0565
+        ac2.phys_stick = (0.0, -0.4)
+        cal2 = TrimCalibrator(ac2)
+        cal2._capture_takeover_baseline(ac2.telem())
+        expected = -0.4 - (-0.0565 * 1.0 * (1 - 0.5))
+        assert cal2._u_base_y == pytest.approx(expected, abs=1e-9)
 
     def test_curve_cancels_kinked_coupling_where_static_cannot(self, clock):
         # The user-reported failure: with a kinked trim response, the static
@@ -2322,6 +2370,81 @@ class TestAdaptiveSweepStep:
         # but the CURVE over the usable window is the real product
         assert cal.result["virtual_y"] == pytest.approx(-2.0)
         assert cal.result["curve"] is not None
+
+    def test_saturating_side_truncates_and_other_side_completes(self, clock):
+        # C208B field abort 2026-07-19 20:29: three nose-up stations, the
+        # approach to station 4 rode into the elevator-saturation guard, and
+        # the run aborted "before enough samples" with the nose-down side
+        # never visited. Saturation on one side must truncate that side and
+        # continue on the other.
+        class OuterWallPlant(FakePlantAircraft):
+            # Mild near center, brutal outside +-0.125 trim: the global fit
+            # under-predicts the outer stations, so the predictive budget
+            # cannot see the wall coming — only the saturation guard can.
+            def effective_coupling(self, trim):
+                return 1.0 if abs(trim) <= 0.125 else 6.0
+
+        ac = OuterWallPlant(physical_y=1.0)
+        ac.joystick_trim_follow_gain_virtual_y = 1.0
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended {state} ({cal.abort_reason})"
+        ts = [t for t, _ in cal.result["samples"]]
+        assert len(ts) >= cal.MIN_SAMPLES_FOR_FIT
+        assert min(ts) < 0 < max(ts), "both sides must be represented"
+
+    def test_blind_steep_aircraft_self_sizes_and_completes(self, clock):
+        # No assist power change => no learned slope => the sweep enters at
+        # the default 0.06 step. On Hawk-class authority (slope ~13) station
+        # 2 would be a 0.78-elevator lurch: the outbound freeze must stop and
+        # measure early instead, the step must resize from that sample, and
+        # the run must complete without ever touching the saturation guard.
+        ac = FakePlantAircraft(coupling=13.0, physical_y=1.0, trim_natural=0.0)
+        ac.joystick_trim_follow_gain_virtual_y = 1.0
+        cal = TrimCalibrator(ac)
+        cal.start()
+        max_u = 0.0
+        dt = 1 / 30.0
+        for _ in range(40000):
+            clock.advance(dt)
+            cal.update(ac.telem())
+            ac.step(dt)
+            if cal.state == CalState.SWEEP:
+                max_u = max(max_u, abs(cal._u_elev))
+            if cal.state in (CalState.DONE, CalState.ABORT):
+                break
+        assert cal.state == CalState.DONE, f"ended {cal.state} ({cal.abort_reason})"
+        assert len(cal.result["samples"]) >= cal.MIN_SAMPLES_FOR_FIT
+        assert max_u < cal.U_ELEV_SAT, \
+            f"blind entry rode to {max_u:.2f} elevator; freeze must stop earlier"
+        assert cal._sweep_step <= 0.02, \
+            f"step must self-size from the first response (got {cal._sweep_step:.3f})"
+
+    def test_predictive_budget_stops_side_before_saturation(self, clock):
+        # Linear slope-3.5 aircraft (C208B at cruise): the sweep must stop
+        # each side from its own fit prediction without ever riding the
+        # elevator into the saturation guard.
+        ac = FakePlantAircraft(coupling=3.5, physical_y=1.0)
+        ac.joystick_trim_follow_gain_virtual_y = 1.0
+        cal = TrimCalibrator(ac)
+        cal.start()
+        max_u = 0.0
+        dt = 1 / 30.0
+        for _ in range(40000):
+            clock.advance(dt)
+            cal.update(ac.telem())
+            ac.step(dt)
+            if cal.state == CalState.SWEEP:
+                max_u = max(max_u, abs(cal._u_elev))
+            if cal.state in (CalState.DONE, CalState.ABORT):
+                break
+        assert cal.state == CalState.DONE, f"ended {cal.state} ({cal.abort_reason})"
+        assert len(cal.result["samples"]) >= cal.MIN_SAMPLES_FOR_FIT
+        assert max_u < cal.U_ELEV_SAT, \
+            f"sweep rode to {max_u:.2f} elevator; predictive budget must stop earlier"
+        sampled_u = max(abs(u) for _, u in cal.result["samples"])
+        assert sampled_u <= cal.SWEEP_U_BUDGET + 0.1
 
     def test_normal_aircraft_step_unchanged(self, clock):
         # Everything field-validated (|slope| <= 3.3) keeps the exact
