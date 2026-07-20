@@ -31,7 +31,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
-    QComboBox,
+    QComboBox, QToolButton,
 )
 
 import telemffb.globals as G
@@ -114,8 +114,29 @@ class TrimCalibrationDialog(QDialog):
         self.warn_tf.setVisible(False)
         root.addWidget(self.warn_tf)
 
-        instructions = QLabel(
-            "<b>How to calibrate</b>"
+        # Collapsible instructions: veterans reclaim the space with one click
+        # and the collapsed state persists per device (first-time users see
+        # them expanded). A vertical disclosure beats a popup (no second
+        # window to manage) and a side drawer (width changes re-wrap every
+        # height-for-width label — the exact fragility _fit_to_content
+        # exists to contain).
+        self.btn_instructions = QToolButton()
+        self.btn_instructions.setCheckable(True)
+        # Clickability must be visible: link-blue bold text, hand cursor and
+        # a hover highlight — a plain bold label reads as a heading, not a
+        # control (field feedback).
+        self.btn_instructions.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_instructions.setStyleSheet(
+            "QToolButton { border: none; font-weight: bold; color: #2a7fd4;"
+            " padding: 2px 4px; }"
+            "QToolButton:hover { background-color: rgba(42, 127, 212, 38);"
+            " border-radius: 4px; }")
+        self.btn_instructions.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.btn_instructions.clicked.connect(self._on_instructions_toggled)
+        root.addWidget(self.btn_instructions)
+
+        self.lbl_instructions = QLabel(
             "<ul style='margin-top:2px; margin-bottom:6px; -qt-list-indent:1;'>"
             "<li>It is recommended to perform the calibration in <b>clear</b>, <b>calm</b> conditions.</li>"
             "<li>If you have a hardware device controlling the elevator trim <b>AXIS</b>, you may "
@@ -139,8 +160,12 @@ class TrimCalibrationDialog(QDialog):
             "disconnected while TelemFFB has the controls.</li>"
             "</ol>"
         )
-        instructions.setWordWrap(True)
-        root.addWidget(instructions)
+        self.lbl_instructions.setWordWrap(True)
+        root.addWidget(self.lbl_instructions)
+        expanded = not bool(G.system_settings.get(
+            "TrimCalInstructionsCollapsed", False))
+        self.btn_instructions.setChecked(expanded)
+        self._apply_instructions_state(expanded)
 
         self.chk_settle = QCheckBox(
             "Hold level to let the airspeed stabilize before the sweep (adds ~20 s)")
@@ -596,14 +621,19 @@ class TrimCalibrationDialog(QDialog):
         self._fit_to_content()
         return True
 
-    def _fit_to_content(self):
-        """Grow (never shrink) the window so the content cannot overlap.
+    def _fit_to_content(self, allow_shrink=False):
+        """Grow (never shrink, unless asked) the window so the content cannot
+        overlap.
 
         Word-wrapped labels make the layout height-for-width: a plain
         sizeHint() under-reports the needed height until a later layout pass,
         which shows up as text overlapping the graph that fixes itself when
         the window is moved. Force a layout pass and measure with the
         height-for-width machinery at the current width instead.
+
+        ``allow_shrink`` is for deliberate content removal (collapsing the
+        instructions) — the one case where handing space back beats leaving
+        a gap.
         """
         lay = self.layout()
         lay.activate()
@@ -611,15 +641,32 @@ class TrimCalibrationDialog(QDialog):
             needed = lay.totalHeightForWidth(self.width())
         else:
             needed = self.sizeHint().height()
-        if self.height() < needed:
+        if self.height() < needed or (allow_shrink and self.height() > needed):
             self.resize(self.width(), needed)
 
-    def _refit(self):
+    def _refit(self, allow_shrink=False):
         """Fit now and once more on the next event-loop tick: the deferred
         pass re-measures after Qt has finished the pending relayout (the same
         settling a window move used to trigger by accident)."""
-        self._fit_to_content()
-        QtCore.QTimer.singleShot(0, self._fit_to_content)
+        self._fit_to_content(allow_shrink)
+        QtCore.QTimer.singleShot(0, lambda: self._fit_to_content(allow_shrink))
+
+    def _on_instructions_toggled(self, checked):
+        self._apply_instructions_state(checked)
+        # Persist per device, same store as the main window geometry.
+        G.system_settings.setValue(
+            f"{G.device_type}/TrimCalInstructionsCollapsed", not checked)
+
+    def _apply_instructions_state(self, expanded):
+        self.lbl_instructions.setVisible(expanded)
+        self.btn_instructions.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+        self.btn_instructions.setText(
+            "How to use  (click to close)" if expanded
+            else "How to use  (click to expand)")
+        self.btn_instructions.setToolTip(
+            "Hide the instructions" if expanded else "Show the instructions")
+        self._refit(allow_shrink=not expanded)
 
     def _update_live_values(self, data, ias_ref=None):
         def fmt(v, conv=1.0, unit="", nd=0):
