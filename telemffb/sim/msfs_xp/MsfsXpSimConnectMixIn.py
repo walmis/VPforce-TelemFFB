@@ -66,45 +66,19 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     @joystick_trim_follow_curve_y.setter
     def joystick_trim_follow_curve_y(self, value):
         """Assigned a JSON-encoded calibration curve or 'none' via the settings
-        subsystem. Parsed ONCE here into sorted lookup arrays — never in the
-        telemetry hot path. Invalid/short curves are ignored (runtime falls
-        back to the static virtual gain).
+        subsystem. Parsed ONCE here into anchor-referenced lookup arrays —
+        never in the telemetry hot path. The parse/rebase convention lives in
+        :func:`telemffb.utils.parse_trim_follow_curve` (shared with the
+        calibration dialog's offline display). Invalid/short curves are
+        ignored (runtime falls back to the static virtual gain).
         """
         self._trim_curve_y_json = None
         self._trim_curve_y_pts = None
-        if not value or value == 'none':
+        pts = utils.parse_trim_follow_curve(value)
+        if pts is None:
             return
-        try:
-            data = json.loads(value) if isinstance(value, str) else value
-            pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
-            xs, ys = [], []
-            for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
-                if xs and abs(t - xs[-1]) < 1e-9:
-                    ys[-1] = o
-                else:
-                    xs.append(t)
-                    ys.append(o)
-            if len(xs) < 2:
-                logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
-                return
-            # Anchor referencing: rebase the stored points so offs(t0) == 0
-            # (t0 = natural trim at calibration; curves saved before t0
-            # existed anchor at the measured band's midpoint — the sweep
-            # centers its band on the natural point, so the midpoint is a
-            # close stand-in). Idempotent, so old and new payloads both land
-            # in the same convention. This pins the runtime invariant
-            # "trimmed for level => stick at physical center, zero force,
-            # zero delivered input" at every speed, and keeps every lookup
-            # band-internal — the old trim-gauge-zero reference was an
-            # edge-slope extrapolation far outside the measured band on
-            # aircraft whose natural trim sits away from gauge zero.
-            t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
-            ref = utils.piecewise_linear(xs, ys, t0)
-            ys = [y - ref for y in ys]
-            self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
-            self._trim_curve_y_pts = (xs, ys)
-        except (ValueError, KeyError, TypeError) as e:
-            logging.warning(f"Invalid trim-follow curve setting; ignoring ({e})")
+        self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
+        self._trim_curve_y_pts = pts
 
     def _trim_curve_offset(self, t: float) -> Optional[float]:
         """Calibrated virtual-offset lookup at trim ``t`` (ElevTrimPct space),

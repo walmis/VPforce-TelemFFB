@@ -939,7 +939,7 @@ class TestTrimNeutralization:
 
 
 # --------------------------------------------------------------------------- #
-#  Optional airspeed-settle hold before the sweep
+#  Airspeed-settle hold before the sweep (always on for manual runs)
 # --------------------------------------------------------------------------- #
 
 class TestSpeedSettle:
@@ -955,25 +955,17 @@ class TestSpeedSettle:
                 return cal.state, settle_frames
         return cal.state, settle_frames
 
-    def test_settle_hold_runs_for_configured_time(self, clock):
+    def test_manual_run_always_settles_for_full_duration(self, clock):
+        # The settle is no longer optional on the manual path: skipping it
+        # only ever traded 20 seconds for a drift-skewed slope (the checkbox
+        # was removed; assistant handoffs use their own short confirm hold).
         ac = FakePlantAircraft()
         cal = TrimCalibrator(ac)
-        cal.settle_before_sweep = True
         cal.start()
         state, settle_frames = self._run_tracking_settle(cal, ac, clock)
         assert state == CalState.DONE, cal.abort_reason
         # ~20 s at 30 fps; allow a little slack for phase-entry framing
         assert settle_frames >= cal.SPEED_SETTLE_S * 30 * 0.95
-        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
-
-    def test_settle_hold_skipped_when_disabled(self, clock):
-        ac = FakePlantAircraft()
-        cal = TrimCalibrator(ac)
-        cal.settle_before_sweep = False
-        cal.start()
-        state, settle_frames = self._run_tracking_settle(cal, ac, clock)
-        assert state == CalState.DONE, cal.abort_reason
-        assert settle_frames == 0, "SPEED_SETTLE must be skipped when disabled"
         assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
 
 

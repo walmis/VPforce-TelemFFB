@@ -22,6 +22,7 @@ that lives on ``G.telem_manager.currentAircraft`` and displays live status +
 the result; the control loop itself runs in the telemetry thread. See
 :mod:`telemffb.sim.msfs_xp.TrimCalibrator`.
 """
+import html
 import json
 import logging
 import time
@@ -35,8 +36,10 @@ from PyQt6.QtWidgets import (
 )
 
 import telemffb.globals as G
+import telemffb.utils as utils
+import telemffb.xmlutils as xmlutils
 from telemffb.custom_widgets import IasTrendWidget, InfoLabel, TrimCurveWidget
-from telemffb.sim.msfs_xp.TrimCalibrator import CalState
+from telemffb.sim.msfs_xp.TrimCalibrator import CalState, TrimCalibrator
 
 logger = logging.getLogger(__name__)
 
@@ -141,15 +144,16 @@ class TrimCalibrationDialog(QDialog):
             "<li>It is recommended to perform the calibration in <b>clear</b>, <b>calm</b> conditions.</li>"
             "<li>If you have a hardware device controlling the elevator trim <b>AXIS</b>, you may "
             "need to disconnect or un-bind it as it may interfere with TelemFFB "
-            "controlling the trim during calibration. (Excludes Vpforce trim-wheel)</li>"
+            "controlling the trim during calibration. (Excludes VPforce trim-wheel)</li>"
             "</ul>"
             "<ol style='margin-top:0px; margin-bottom:0px; -qt-list-indent:1;'>"
             "<li>Get airborne, straight &amp; level, at a stable cruise speed with "
             "Autopilot <b>OFF</b>.</li>"
             "<li><b>Trim the aircraft</b> so it holds level with near-zero stick force — "
             "starting far out of trim wastes elevator authority during the sweep.</li>"
-            "<li><i>Optional</i> — press <b>Trim Assistant</b> and TelemFFB will level "
-            "and trim the aircraft for you, then keep re-trimming as you adjust power. "
+            "<li><i>Recommended</i> — press <b>Trim Assistant</b> and TelemFFB will level "
+            "and trim the aircraft for you, then keep re-trimming as you adjust power "
+            "(this also measures the aircraft's trim response, which fine-tunes the sweep). "
             "Set your test speed with the throttle, wait for the assistant to report "
             "steady (the Start button enables), then start the sweep.</li>"
             "<li>Press <b>Start</b> — TelemFFB will fly the aircraft while it sweeps the "
@@ -166,15 +170,6 @@ class TrimCalibrationDialog(QDialog):
             "TrimCalInstructionsCollapsed", False))
         self.btn_instructions.setChecked(expanded)
         self._apply_instructions_state(expanded)
-
-        self.chk_settle = QCheckBox(
-            "Hold level to let the airspeed stabilize before the sweep (adds ~20 s)")
-        self.chk_settle.setChecked(True)
-        self.chk_settle.setToolTip(
-            "After finding the natural trim point, hold straight-and-level for 20 seconds "
-            "so the airspeed settles at the current throttle/trim before measuring.\n"
-            "Recommended — uncheck for a faster run.")
-        root.addWidget(self.chk_settle)
 
         response_row = QHBoxLayout()
         lbl_response = InfoLabel(
@@ -328,6 +323,14 @@ class TrimCalibrationDialog(QDialog):
         # ---- result ----
         result_box = QGroupBox("Result")
         rlay = QVBoxLayout(result_box)
+        # Which aircraft this dialog (and any result on it) belongs to —
+        # live telemetry name, or the matched settings pattern when the sim
+        # is offline. Plain text: aircraft names are arbitrary strings.
+        self.lbl_aircraft = QLabel("<b>Aircraft:</b> —")
+        # Rich text for the bold prefix; the aircraft NAME is an arbitrary
+        # string, so _update_aircraft_label must html-escape it.
+        self.lbl_aircraft.setTextFormat(Qt.TextFormat.RichText)
+        rlay.addWidget(self.lbl_aircraft)
         self.curve = TrimCurveWidget()
         # Expanding + a modest minimum makes the graph the flexible element:
         # a tall notes block shrinks it rather than overlapping it.
@@ -422,18 +425,73 @@ class TrimCalibrationDialog(QDialog):
             return None
         return ac.get_trim_calibrator()
 
+    @staticmethod
+    def _offline_editing():
+        return G.settings_mgr is not None and \
+            getattr(G.settings_mgr, "offline_mode", False)
+
+    def _offline_settings(self):
+        """Prereq-filtered settings of the profile selected in the OFFLINE
+        editor, as {name: value} with units applied (the same to_number
+        conversion the live pipeline uses), or None when not in offline
+        editing mode. While editing offline, the live aircraft — and any
+        result sitting on its calibrator — belongs to whatever was flying
+        before offline mode was entered; never display state from it."""
+        if not self._offline_editing():
+            return None
+        sm = G.settings_mgr
+        try:
+            _, _, result = xmlutils.read_single_model(
+                sm.current_sim, sm.current_aircraft_name, sm.current_class,
+                G.device_type, active_profile=sm.active_profile)
+            return {i["name"]: utils.to_number(f"{i['value']}{i['unit'] or ''}")
+                    for i in result if i.get("value") not in (None, "-")}
+        except Exception as e:
+            logger.warning(f"Offline settings read failed: {e}")
+            return None
+
+    def _update_aircraft_label(self):
+        """Aircraft identity for the result box: the offline editor's
+        selection while editing offline, else the live telemetry name with
+        the matched settings pattern as fallback."""
+        sm = G.settings_mgr
+        if self._offline_editing():
+            name = sm.current_aircraft_name or sm.current_pattern or "—"
+            text = f"<b>Aircraft:</b> {html.escape(name)}  <i>(offline editor)</i>"
+        else:
+            name = getattr(G.telem_manager, "currentAircraftName", None) \
+                if G.telem_manager else None
+            if not name:
+                name = getattr(sm, "current_pattern", None) if sm else None
+            text = f"<b>Aircraft:</b> {html.escape(name)}" if name \
+                else "<b>Aircraft:</b> —"
+        if self.lbl_aircraft.text() != text:
+            self.lbl_aircraft.setText(text)
+
     def _update_tf_warning(self):
         """Show/hide the trim-following-disabled banner for the current
         aircraft. When Axis Control is off, trim following is prereq-blocked
         with it, so the message names the real first step (the Trim Following
         row is not even visible on the Settings tab until Axis Control is
         enabled)."""
-        ac = G.telem_manager.currentAircraft if G.telem_manager else None
-        show = (G.device_type == "joystick"
-                and ac is not None and hasattr(ac, "get_trim_calibrator")
-                and not getattr(ac, "trim_following", False))
+        if self._offline_editing():
+            # Judge the EDITED profile, not the stale live aircraft. Prereq
+            # filtering drops trim_following when axis control is off, so
+            # "missing" reads as disabled — the same semantics the live
+            # aircraft would have.
+            vals = self._offline_settings()
+            show = (G.device_type == "joystick" and vals is not None
+                    and vals.get("trim_following") is not True)
+            axis_off = vals is None or \
+                vals.get("telemffb_controls_axes") is not True
+        else:
+            ac = G.telem_manager.currentAircraft if G.telem_manager else None
+            show = (G.device_type == "joystick"
+                    and ac is not None and hasattr(ac, "get_trim_calibrator")
+                    and not getattr(ac, "trim_following", False))
+            axis_off = show and not getattr(ac, "telemffb_controls_axes", False)
         if show:
-            if not getattr(ac, "telemffb_controls_axes", False):
+            if axis_off:
                 text = (
                     "⚠  AXIS CONTROL IS DISABLED for this aircraft\n"
                     "Calibration can run and save, but the result has NO effect "
@@ -474,6 +532,7 @@ class TrimCalibrationDialog(QDialog):
             # Settings tab re-applies the aircraft params, and the banner
             # should clear the moment it does.
             self._update_tf_warning()
+            self._update_aircraft_label()
 
             ias_ref = getattr(cal, "_ias0", None) if (cal is not None and cal.active) else None
             self._update_live_values(data, ias_ref)
@@ -517,7 +576,6 @@ class TrimCalibrationDialog(QDialog):
             state_name = getattr(cal.state, "name", "")
             self.cmb_response.setEnabled(
                 not running or state_name in self.RESPONSE_LIVE_STATES)
-            self.chk_settle.setEnabled(not running)
             if self.cmb_trim_method is not None:
                 self.cmb_trim_method.setEnabled(not running)
             if self.chk_trace is not None:
@@ -575,23 +633,41 @@ class TrimCalibrationDialog(QDialog):
         A freshly loaded aircraft has a fresh calibrator with no result, but
         may carry a calibrated curve in its settings. The stored curve is the
         runtime offset ``offs(T) = -(u(T) - u(0))``; the plot shows the
-        measured-axis space, so it is mirrored back for display. Returns True
-        when something was shown.
+        measured-axis space, so it is mirrored back for display. In offline
+        editing mode the curve comes from the EDITED profile's XML (through
+        the same shared parse/rebase), not from the stale live aircraft.
+        Returns True when something was shown.
         """
-        ac = G.telem_manager.currentAircraft if G.telem_manager else None
-        raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
-        # Record what this display attempt was based on, drawn or not, so the
-        # live change check in _on_telemetry knows when a redraw is due.
-        self._stored_curve_seen = raw
-        if not raw or raw == "none":
-            return False
-        # Plot the aircraft's PARSED lookup arrays, not the raw JSON: the
-        # setter anchor-references the points (offs(t0) == 0), so this shows
-        # exactly what the runtime flies. JSON is only read for provenance.
-        pts = getattr(ac, "_trim_curve_y_pts", None)
-        if pts is None:
-            logger.warning("Stored trim curve unreadable; not displaying")
-            return False
+        vals = self._offline_settings()
+        if vals is not None:
+            raw = vals.get("joystick_trim_follow_curve_y")
+            self._stored_curve_seen = raw
+            pts = utils.parse_trim_follow_curve(raw)
+            if pts is None:
+                return False
+            physical_y = float(vals.get("joystick_trim_follow_gain_physical_y") or 1.0) or 1.0
+            virtual_y = float(vals.get("joystick_trim_follow_gain_virtual_y") or 0.0)
+            use_curve = vals.get("joystick_trim_follow_use_curve_y") is True
+        else:
+            ac = G.telem_manager.currentAircraft if G.telem_manager else None
+            raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
+            # Record what this display attempt was based on, drawn or not, so
+            # the live change check in _on_telemetry knows when a redraw is
+            # due.
+            self._stored_curve_seen = raw
+            if not raw or raw == "none":
+                return False
+            # Plot the aircraft's PARSED lookup arrays, not the raw JSON: the
+            # setter anchor-references the points (offs(t0) == 0), so this
+            # shows exactly what the runtime flies. JSON is only read for
+            # provenance.
+            pts = getattr(ac, "_trim_curve_y_pts", None)
+            if pts is None:
+                logger.warning("Stored trim curve unreadable; not displaying")
+                return False
+            physical_y = getattr(ac, "joystick_trim_follow_gain_physical_y", 1.0) or 1.0
+            virtual_y = getattr(ac, "joystick_trim_follow_gain_virtual_y", 0.0) or 0.0
+            use_curve = bool(getattr(ac, "joystick_trim_follow_use_curve_y", False))
         samples = [(t, -o) for t, o in zip(*pts)]
         try:
             data = json.loads(raw)
@@ -599,9 +675,6 @@ class TrimCalibrationDialog(QDialog):
             data = {}
         if len(samples) < 2:
             return False
-
-        physical_y = getattr(ac, "joystick_trim_follow_gain_physical_y", 1.0) or 1.0
-        virtual_y = getattr(ac, "joystick_trim_follow_gain_virtual_y", 0.0) or 0.0
         # The static gain's equivalent line, for comparison (zero-referenced).
         slope = -physical_y * (1.0 - virtual_y)
         self.curve.set_result(samples, slope, 0.0)
@@ -610,14 +683,24 @@ class TrimCalibrationDialog(QDialog):
             f"captured {data.get('date')}" if data.get("date") else "",
             f"{data.get('ias_kt')} kt" if data.get("ias_kt") else "",
         ] if x)
-        use_curve = bool(getattr(ac, "joystick_trim_follow_use_curve_y", False))
+        # Mean slope derived from the curve endpoints (the offs points are
+        # the mirrored measured axis, hence the sign flip) — same convention
+        # as a fresh result's fit slope.
+        # Slope and R² re-fit from the stored points: the mirror-and-shift
+        # from measured samples to stored offsets is affine in y, so R² (and
+        # |slope|) reproduce the original run's fit exactly — works for every
+        # curve ever saved, no payload change. Reuses the calibrator's own
+        # fit routine.
+        xs, ys = pts
+        fit_slope, _, r2 = TrimCalibrator._fit(list(zip(xs, ys)))
         self.lbl_virtual.setText(
-            "Saved calibration curve for this aircraft"
-            + (f"  &nbsp;({prov})" if prov else "")
-            + f"  &nbsp;·  static value: {virtual_y:.3f}")
+            f"Mean Trim Slope: <b>{-fit_slope:+.2f}</b>"
+            "  &nbsp;·  saved calibration"
+            + (f"  ({prov})" if prov else ""))
         self.lbl_linearity.setText(
-            "Curve in use: " + ("yes" if use_curve else
-                                "no — disabled on the Settings tab (static gain active)"))
+            f"Linearity (R²): {r2:.3f}  &nbsp;·  curve in use: "
+            + ("yes" if use_curve else
+               "no — disabled on the Settings tab (static gain active)"))
         self._fit_to_content()
         return True
 
@@ -760,7 +843,6 @@ class TrimCalibrationDialog(QDialog):
         self._last_result = None
         self.curve.clear()
         self._clear_result_labels()
-        cal.settle_before_sweep = self.chk_settle.isChecked()
         cal.initial_gain_scale = self.RESPONSE_SCALES.get(
             self.cmb_response.currentIndex(), 1.0)
         if self._debug:
@@ -840,13 +922,23 @@ class TrimCalibrationDialog(QDialog):
             result["samples"], result["slope"], result["intercept"],
             flagged=[f["index"] for f in result.get("flagged") or []])
         self.curve.set_live_point(None, None)
-        current = result.get("current_virtual_y")
-        current_txt = f"  &nbsp;·  current profile value: {current:.3f}" if current is not None else ""
         has_curve = result.get("curve") is not None
-        rec_txt = "<b>calibrated curve</b> (solid line)" if has_curve else "static gain"
-        self.lbl_virtual.setText(
-            f"Recommended: {rec_txt}  &nbsp;·  static fit: {result['virtual_y']:.3f}"
-            f"  &nbsp;(for Physical Y = {result['physical_y']:.2f}){current_txt}")
+        if has_curve:
+            # The curve is the product. The static gain is still written to
+            # the profile but only acts if the user disables curve mode, so
+            # headlining it was misleading — and it clamps at the setting
+            # bound on steep aircraft, where the measured slope stays
+            # honest. Mean slope is also the number every cross-run and
+            # cross-speed comparison uses.
+            self.lbl_virtual.setText(
+                f"Mean Trim Slope: <b>{result['slope']:+.2f}</b>")
+        else:
+            current = result.get("current_virtual_y")
+            current_txt = f"  &nbsp;·  current profile value: {current:.3f}" \
+                if current is not None else ""
+            self.lbl_virtual.setText(
+                f"Recommended: static gain {result['virtual_y']:.3f}"
+                f"  &nbsp;(for Physical Y = {result['physical_y']:.2f}){current_txt}")
         self.lbl_linearity.setText(f"Linearity (R²): {result['r_squared']:.3f}")
         notes = []
         if not result["linear_ok"]:
@@ -858,8 +950,8 @@ class TrimCalibrationDialog(QDialog):
             notes.append(
                 f"Airspeed drifted {ias_drift * 100:+.0f}% during the sweep, which can skew "
                 "the measurement. The result may still be fine — test it with Apply, and if "
-                "trim following seems off, consider re-running with a steadier airspeed "
-                "(stable power, and the airspeed-settle option enabled).")
+                "trim following seems off, re-run with steadier power (the Trim Assistant "
+                "helps find a stable speed first).")
         flagged = result.get("flagged") or []
         if flagged:
             worst = max(abs(f["vs_fpm"]) for f in flagged)
@@ -869,8 +961,8 @@ class TrimCalibrationDialog(QDialog):
                 f"{len(flagged)} station{plural} (trim {where}, shown in amber) sampled "
                 f"with a residual climb/descent of up to {worst:.0f} fpm — usually slow "
                 "airspeed drift. The curve may be slightly skewed near those points; if "
-                "trim following seems off there, consider re-running with a steadier "
-                "airspeed (stable power, airspeed-settle option enabled).")
+                "trim following seems off there, re-run with steadier power (the Trim "
+                "Assistant helps find a stable speed first).")
         split = result.get("split")
         if split and split["mismatch"] > 0.2:
             notes.append(
@@ -886,7 +978,7 @@ class TrimCalibrationDialog(QDialog):
         self._refit()
 
     def _clear_result_labels(self):
-        self.lbl_virtual.setText("Recommended Y Trim Gain (Virtual): <b>—</b>")
+        self.lbl_virtual.setText("Mean Trim Slope: <b>—</b>")
         self.lbl_linearity.setText("Linearity (R²): —")
         self.lbl_note.setText("")
         self.btn_apply.setEnabled(False)
@@ -947,13 +1039,28 @@ class TrimCalibrationDialog(QDialog):
         self.btn_start.setText("Start")
         self.btn_assist.setEnabled(False)
         self.cmb_response.setEnabled(True)
-        self.chk_settle.setEnabled(True)
         if self.cmb_trim_method is not None:
             self.cmb_trim_method.setEnabled(True)
         if self.chk_trace is not None:
             self.chk_trace.setEnabled(True)
         cal = self._calibrator()
         self._update_tf_warning()
+        self._update_aircraft_label()
+        if self._offline_editing():
+            # Offline editing: the live aircraft — and any result sitting on
+            # its calibrator — belongs to whatever was flying before offline
+            # mode was entered. Show the EDITED profile's stored curve,
+            # view-only (no Apply/Save of a stale result into the wrong
+            # profile, no starting runs without telemetry). _result_shown is
+            # cleared so a live result re-displays after exiting offline.
+            self._result_shown = False
+            self._clear_result_labels()
+            self.curve.clear()
+            self._show_stored_curve()
+            self._set_ready(False, "Offline editing — run calibrations with a live sim")
+            self.btn_start.setEnabled(False)
+            self.btn_assist.setEnabled(False)
+            return
         has_result = cal is not None and cal.state == CalState.DONE and cal.result is not None
         last_abort = cal is not None and cal.state == CalState.ABORT and cal.abort_reason
         if has_result and not self._result_shown:

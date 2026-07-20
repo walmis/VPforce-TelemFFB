@@ -1332,6 +1332,45 @@ def piecewise_linear(xs, ys, x):
     return y0 + slope * (x - x0)
 
 
+def parse_trim_follow_curve(value):
+    """Parse a stored trim-calibration curve (JSON string or dict) into
+    anchor-referenced lookup arrays ``(xs, ys)``, or None when the value is
+    empty/'none'/invalid.
+
+    Single source of truth for the curve convention — the runtime property
+    setter AND any display/offline reader must go through here (hand-rolled
+    re-derivations of the runtime's math have rotted before: the takeover
+    baseline computed a false value for months). Points are sorted and
+    deduped on trim, then REBASED so offs(t0) == 0: t0 from the payload,
+    falling back to the measured band's midpoint for curves saved before t0
+    existed (the sweep centers its band on the natural point). The rebase is
+    idempotent. This pins the runtime invariant "trimmed for level => stick
+    at physical center, zero force, zero delivered input" and keeps every
+    lookup band-internal regardless of where the trim gauge's zero lies.
+    """
+    if not value or value == 'none':
+        return None
+    try:
+        data = json.loads(value) if isinstance(value, str) else value
+        pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
+        xs, ys = [], []
+        for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
+            if xs and abs(t - xs[-1]) < 1e-9:
+                ys[-1] = o
+            else:
+                xs.append(t)
+                ys.append(o)
+        if len(xs) < 2:
+            logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
+            return None
+        t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
+        ref = piecewise_linear(xs, ys, t0)
+        return xs, [y - ref for y in ys]
+    except (ValueError, KeyError, TypeError) as e:
+        logging.warning(f"Invalid trim-follow curve setting; ignoring ({e})")
+        return None
+
+
 def non_linear_scaling(x, min_val, max_val, curvature=1.0):
     # Scale the input value to a value between 0 and 1 within the given range
     scaled_value = (x - min_val) / (max_val - min_val)

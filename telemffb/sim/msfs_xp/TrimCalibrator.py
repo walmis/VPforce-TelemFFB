@@ -194,10 +194,13 @@ class TrimCalibrator:
     NEUT_MAX_STEPS = 10
     NEUT_TIMEOUT_S = 60.0        # overall cap; proceed (with warning) if hit
 
-    # Optional hold at the natural trim point before the sweep, giving the
-    # airspeed time to stabilize at the current throttle/trim so the sweep
-    # measures at (and drift-checks against) the equilibrium speed. Enabled
-    # per-run via ``settle_before_sweep`` (dialog checkbox).
+    # Hold at the natural trim point before a manual (non-assistant) sweep,
+    # giving the airspeed time to stabilize at the current throttle/trim so
+    # the sweep measures at (and drift-checks against) the equilibrium
+    # speed. Always on: skipping it only ever traded 20 seconds for a
+    # drift-skewed slope (assistant handoffs use their own short
+    # ASSIST_CONFIRM_SETTLE_S hold instead — the assistant's stability gate
+    # already did the settling).
     SPEED_SETTLE_S = 20.0
 
     # Trim assistant (started via start(assist=True)): after neutralization
@@ -379,10 +382,6 @@ class TrimCalibrator:
         self._active = False
         self.status_message = "Idle"
         self.progress = 0.0
-        # Run option (set by the dialog before start()): hold level for
-        # SPEED_SETTLE_S after finding the natural trim point so the airspeed
-        # stabilizes before the sweep. Users can disable it for a faster run.
-        self.settle_before_sweep = True
         # Run option: starting pitch-gain scale (1.0 = normal). Lets the user
         # pre-derate the leveling loop for known-sensitive/pitchy aircraft
         # instead of waiting for the oscillation watchdog to discover it.
@@ -1304,10 +1303,10 @@ class TrimCalibrator:
             # sweep trigger is gated on assist_stable); a short confirmation
             # hold guards the race between the gate reading and the click.
             self._enter_speed_settle(telem_data, duration=self.ASSIST_CONFIRM_SETTLE_S)
-        elif self.settle_before_sweep:
-            self._enter_speed_settle(telem_data)
         else:
-            self._enter_sweep(telem_data)
+            # Manual path: always settle — skipping only ever traded 20
+            # seconds for a drift-skewed slope.
+            self._enter_speed_settle(telem_data)
 
     # ---- Phase: trim assistant hold ---------------------------------------------
 
@@ -2010,7 +2009,8 @@ class TrimCalibrator:
             why = (f"VS residual would not settle below "
                    f"{self.SAMPLE_VS_HARD_TOL * MS_TO_FPM:.0f} fpm (best "
                    f"{self._station_best[3] * MS_TO_FPM:+.0f} fpm) — airspeed may "
-                   f"be drifting; try the airspeed-settle option or steadier power")
+                   f"be drifting; try steadier power (the Trim Assistant helps "
+                   f"find a stable speed first)")
         else:
             why = (f"could not hold level "
                    f"(VS {(telem_data.VerticalSpeed or 0) * MS_TO_FPM:+.0f} fpm)")
