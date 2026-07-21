@@ -223,6 +223,7 @@ class AppStatusWidget(QWidget):
     request_set_active_configurator = pyqtSignal(bool, bool)
     request_flag_error = pyqtSignal(str)
     request_clear_error = pyqtSignal()
+    profile_notes_clicked = pyqtSignal()
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -279,7 +280,7 @@ class AppStatusWidget(QWidget):
         value_font.setWeight(QFont.Weight.DemiBold)
         self.cur_craft_label = ElidedLabel("None Detected", max_text_px=260)
         self.cur_pattern_label = ElidedLabel("(No Match)", max_text_px=260)
-        self.active_profile_label = ElidedLabel("(None)", max_text_px=180)
+        self.active_profile_label = ElidedLabel("(None)", max_text_px=150)
         for lbl in (self.cur_craft_label, self.cur_pattern_label, self.active_profile_label):
             lbl.setFont(value_font)
         # Pill styling for the vpconf/override labels; also used for the
@@ -371,8 +372,26 @@ class AppStatusWidget(QWidget):
         profile_row_layout.setContentsMargins(0, 0, 0, 0)
         profile_row_layout.setSpacing(6)
         profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.btn_profile_notes = QtWidgets.QToolButton()
+        # currentColor SVG rendered at explicit colors: muted glyph when no
+        # notes exist, full-contrast (white on dark / black on light) when
+        # notes are present.
+        if G.useDarkMode:
+            notes_plain_color, notes_active_color = '#d0d0d0', '#ffffff'
+        else:
+            notes_plain_color, notes_active_color = '#707070', '#000000'
+        self._notes_icon_plain = svg_icon('profile-notes.svg', color=notes_plain_color)
+        self._notes_icon_active = svg_icon('profile-notes.svg', color=notes_active_color)
+        self.btn_profile_notes.setIcon(self._notes_icon_plain)
+        self.btn_profile_notes.setIconSize(QSize(20, 20))
+        self.btn_profile_notes.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_profile_notes.setToolTip('View or edit notes for this aircraft profile')
+        self.btn_profile_notes.setEnabled(False)
+        self.btn_profile_notes.clicked.connect(self.profile_notes_clicked.emit)
+
         profile_row_layout.addWidget(self.active_profile_label)
         profile_row_layout.addWidget(self.cb_selectProfileCombo)
+        profile_row_layout.addWidget(self.btn_profile_notes)
         # Absorb the value column's spare width so the combo keeps its natural
         # size instead of stretching to fill the (fixed-width) cell.
         profile_row_layout.addStretch(1)
@@ -486,7 +505,23 @@ class AppStatusWidget(QWidget):
         self.cur_craft_label.setText("None Detected")
         self.cur_pattern_label.setText("(No Match)")
         self.active_profile_label.setText("(None)")
+        self.set_notes_state(False)
         self.set_waiting(src)
+
+    def set_notes_state(self, enabled, has_notes=False):
+        """Enable/disable the profile-notes button. When notes exist (curated
+        or user) the icon glyph goes full-contrast (white on dark / black on
+        light theme) and the button pulses green briefly — same flash as the
+        vpconf/configurator pills — so notes are discoverable at a glance."""
+        self.btn_profile_notes.setEnabled(enabled)
+        if has_notes:
+            self.btn_profile_notes.setIcon(self._notes_icon_active)
+            self.btn_profile_notes.setToolTip('Notes exist for this aircraft profile - click to view or edit')
+            self.pulse_label(self.btn_profile_notes, color=QColor(0, 200, 0))
+        else:
+            self.pulse_label(self.btn_profile_notes, stop=True)
+            self.btn_profile_notes.setIcon(self._notes_icon_plain)
+            self.btn_profile_notes.setToolTip('View or edit notes for this aircraft profile')
 
     @pyqtSlot(str, bool)
     def set_active_vpconf(self, file, row_visible=True):

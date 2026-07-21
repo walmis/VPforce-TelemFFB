@@ -2074,6 +2074,131 @@ def get_class_for_sim_model(sim, model):
     return None
 
 
+def read_default_model_notes(the_sim, full_model_name, prefer_pattern=''):
+    """
+    Return the curated <notes> text from the defaults <models> table for an aircraft.
+
+    Notes live on the name="type" row of a curated model entry. The row is
+    located by regex-matching each type row's model pattern against the full
+    aircraft name; if prefer_pattern is supplied and one of the matching rows
+    uses exactly that pattern (i.e. the pattern the settings resolution chose),
+    that row wins so the note always corresponds to the "Matched Model" shown.
+
+    Args:
+        the_sim (str): Simulator name (e.g. "DCS", "MSFS").
+        full_model_name (str): Full aircraft name as received in telemetry.
+        prefer_pattern (str, optional): Pattern to prefer among multiple matches.
+
+    Returns:
+        str: The curated notes text, or '' if none.
+    """
+    if not full_model_name:
+        return ''
+    notes = ''
+    for elem in auto_defaults_root.findall(f'models[sim="{the_sim}"][name="type"]'):
+        pattern = elem.findtext('model') or ''
+        if not pattern:
+            continue
+        if re.match(pattern, full_model_name) or pattern == full_model_name:
+            row_notes = elem.findtext('notes') or ''
+            if prefer_pattern and pattern == prefer_pattern:
+                return row_notes
+            if row_notes:
+                notes = row_notes
+    return notes
+
+
+def read_user_default_model_notes(the_sim, the_model):
+    """
+    Return the user's <notes> text stored on a name="type" row in the user
+    config (the "user default" tier for user-added aircraft). These notes are
+    profile-independent and are inherited read-only by every profile of the
+    model, alongside the curated defaults notes.
+
+    Args:
+        the_sim (str): Simulator name.
+        the_model (str): The exact model pattern.
+
+    Returns:
+        str: The notes text, or '' if none.
+    """
+    if not the_model:
+        return ''
+    for elem in auto_user_root.findall(f'models[sim="{the_sim}"][model="{the_model}"][name="type"]'):
+        notes = elem.findtext('notes') or ''
+        if notes:
+            return notes
+    return ''
+
+
+def read_user_model_notes(the_sim, the_model, profile):
+    """
+    Return the user's <notes> text stored on the name="profile" row for an
+    exact model pattern and profile in the user config.
+
+    Args:
+        the_sim (str): Simulator name.
+        the_model (str): The exact model pattern the profile row was written with.
+        profile (str): Profile name (e.g. "Auto User").
+
+    Returns:
+        str: The notes text, or '' if none.
+    """
+    if not the_model or not profile:
+        return ''
+    elem = auto_user_root.find(
+        f'models[sim="{the_sim}"][model="{the_model}"][name="profile"][profile="{profile}"]')
+    if elem is None:
+        return ''
+    return elem.findtext('notes') or ''
+
+
+def write_user_model_notes(the_sim, the_model, note_text, profile_name):
+    """
+    Write, replace, or remove the <notes> child on the user config's
+    name="profile" row for (sim, model pattern, profile).
+
+    Mirrors the settings write redirect: the "Built-in" pseudo-profile is not
+    writable, so notes for it land on "Auto User" (the profile row is created
+    if missing, like write_models_to_xml does for setting writes). An empty or
+    whitespace-only note removes the <notes> element. The active profile
+    mapping is deliberately left untouched — saving a note should not switch
+    profiles.
+
+    Returns:
+        str or None: The profile name the note was written under, or None on failure.
+    """
+    if not the_model:
+        logging.error("write_user_model_notes: no model pattern provided")
+        return None
+    if not profile_name or profile_name.lower() in ('none', 'built-in', 'default'):
+        profile_name = 'Auto User'
+
+    row_xpath = f'models[sim="{the_sim}"][model="{the_model}"][name="profile"][profile="{profile_name}"]'
+    row = auto_user_root.find(row_xpath)
+    if row is None:
+        cls = get_class_for_sim_model(the_sim, the_model) or ''
+        add_new_profile(the_sim, cls, the_model, profile_name)
+        row = auto_user_root.find(row_xpath)
+        if row is None:
+            logging.error(f"write_user_model_notes: could not create profile row for "
+                          f"sim={the_sim}, model={the_model}, profile={profile_name}")
+            return None
+
+    notes_elem = row.find('notes')
+    text = (note_text or '').strip()
+    if text:
+        if notes_elem is None:
+            notes_elem = ET.SubElement(row, 'notes')
+        notes_elem.text = text
+    elif notes_elem is not None:
+        row.remove(notes_elem)
+
+    write_userconfig_xml(auto_user_tree)
+    logging.info(f"Saved profile notes for sim={the_sim}, model={the_model}, profile={profile_name}")
+    return profile_name
+
+
 def get_active_profile_for_model(sim, cls, model, users_root=None):
     """
     Given the sim, class, and model, return the currently active profile for that aircraft.

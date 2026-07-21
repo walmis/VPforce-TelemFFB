@@ -55,6 +55,7 @@ from telemffb.DevicePanel import DeviceIconPanel
 from telemffb.ExceptionTracker import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
+from telemffb.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.SettingsLayout import SettingsLayout
 # from telemffb.UserModelDialog import UserModelDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
@@ -388,6 +389,7 @@ class MainWindow(QMainWindow):
         status_layout.addWidget(self.status_container)
 
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
+        self.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.status_container.sim_status_label.set_waiting()
 
         def on_sims_changed(sim: SimTelemListener):
@@ -1659,12 +1661,22 @@ class MainWindow(QMainWindow):
             # reset the craft area text to default
             self.status_container.reset()
             self.settings_layout.reload_caller()
+            # go_online restored the pre-offline context; re-evaluate the
+            # notes button against it (dedupe dropped so a re-load of the
+            # same context still refreshes)
+            self._profile_notes_shown = None
+            self.refresh_profile_notes_button()
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
             self.status_container.set_offline("None")
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
+
+            # Nothing is selected in the offline editor yet; disable the notes
+            # button until force_sim_aircraft establishes an offline scope
+            self._profile_notes_shown = None
+            self.status_container.set_notes_state(False)
 
             # Block signals so we don't trigger text change on .clear() calls
             self.offline_name.blockSignals(True)
@@ -1886,6 +1898,9 @@ class MainWindow(QMainWindow):
         G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
         G.settings_mgr.active_profile = self.offline_profile.currentText()
         self.settings_layout.reload_caller()
+        # reload_caller resolves current_pattern; refresh the notes button for
+        # the newly selected offline scope (no telemetry loop runs it here)
+        self.refresh_profile_notes_button()
 
 
     def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
@@ -2317,6 +2332,12 @@ class MainWindow(QMainWindow):
                 self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         else:
             xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, profile_name)
+            # Keep the in-memory active profile in sync with the mapping we
+            # just wrote (the Add New path already does this). Without it, the
+            # timed-out reload below re-reads settings through the STALE
+            # profile filter — so the form never appears to change while the
+            # sim is paused — and the notes dialog targets the old profile.
+            G.settings_mgr.update_state_vars(active_profile=profile_name)
             if G.telem_manager.timed_out:
                 self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=profile_name)
         if G.telem_manager.timed_out:
@@ -2337,6 +2358,9 @@ class MainWindow(QMainWindow):
         logging.info(f"Application Status: clearing display after {src} exit")
         self.lbl_effects_data.setText("")
         self.status_container.reset_sim_state(src)
+        # reset_sim_state disabled the notes button; drop the dedupe context
+        # so the next aircraft load re-evaluates it even if identical.
+        self._profile_notes_shown = None
         self.settings_layout.clear_layout()
         self.telemetry_timed_out = False
 
@@ -2591,6 +2615,44 @@ class MainWindow(QMainWindow):
         self.status_container.cur_craft_label.setText(craft)
         self.status_container.cur_pattern_label.setText(pattern)
         self.status_container.active_profile_label.setText(profile)
+        self.refresh_profile_notes_button()
+
+    def refresh_profile_notes_button(self):
+        """Update the profile-notes button (enabled + notes-exist tint) for
+        the current aircraft/profile context. Runs from the telemetry update
+        path, so repeat contexts are deduplicated to avoid re-reading the
+        XML tables every frame."""
+        sim = G.settings_mgr.current_sim
+        aircraft = G.settings_mgr.current_aircraft_name
+        pattern = G.settings_mgr.current_pattern
+        profile = G.settings_mgr.active_profile
+        ctx = (sim, aircraft, pattern, profile)
+        if ctx == getattr(self, '_profile_notes_shown', None):
+            return
+        self._profile_notes_shown = ctx
+        enabled = bool(aircraft) and sim not in ('', 'nothing')
+        has_notes = False
+        if enabled:
+            target = profile if profile and str(profile).lower() not in ('none', 'built-in', 'default') else 'Auto User'
+            # Same tiers the dialog shows: curated defaults type notes, user
+            # default (user config type row) notes, and the active profile's
+            # own note — never another profile's.
+            has_notes = bool(
+                xmlutils.read_default_model_notes(sim, aircraft, prefer_pattern=pattern)
+                or xmlutils.read_user_default_model_notes(sim, pattern)
+                or xmlutils.read_user_model_notes(sim, pattern, target))
+        self.status_container.set_notes_state(enabled, has_notes)
+
+    def open_profile_notes_dialog(self):
+        dlg = ProfileNotesDialog(self)
+
+        def on_saved():
+            # Force a re-read so the button tint reflects the new note state.
+            self._profile_notes_shown = None
+            self.refresh_profile_notes_button()
+
+        dlg.notes_saved.connect(on_saved)
+        dlg.show()
 
     def new_ac_wizard_finished(self):
         self.new_craft_button.setVisible(False)

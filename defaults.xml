@@ -14246,6 +14246,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The g-force effects are disabled by default on this aircraft because the native FFB has its own bob-weight implementation</notes>
 	</models>
 	<models>
 		<name>weapon_effect_direction</name>
