@@ -25,6 +25,8 @@ the result; the control loop itself runs in the telemetry thread. See
 import html
 import json
 import logging
+import os
+import re
 import time
 
 from PyQt6 import QtCore
@@ -33,7 +35,7 @@ from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
-    QComboBox, QToolButton, QMenu,
+    QComboBox, QToolButton, QMenu, QFileDialog,
 )
 
 import telemffb.globals as G
@@ -62,6 +64,8 @@ class TrimCalibrationDialog(QDialog):
     position_mode_changed = pyqtSignal(str)
 
     STICK_POSITION_MODES = ("Follows Trim", "Stays Centered")
+    # Export-file header for the shareable calibration-set format.
+    EXPORT_TYPE = "telemffb-trim-calibration"
     # Save within this many knots of a stored entry offers to REPLACE it
     # (re-calibration semantics) instead of storing a near-duplicate speed.
     FAMILY_REPLACE_KT = 5.0
@@ -413,6 +417,19 @@ class TrimCalibrationDialog(QDialog):
             text="Clear all", tooltip="Delete all stored calibrations")
         self.btn_fam_clear.clicked.connect(self._on_family_clear)
         fam_row.addWidget(self.btn_fam_clear)
+        fam_row.addSpacing(10)
+        self.btn_fam_export = _tool_btn(
+            text="Export…",
+            tooltip="Export this aircraft's stored calibrations to a file "
+                    "another user can import")
+        self.btn_fam_export.clicked.connect(self._on_family_export)
+        fam_row.addWidget(self.btn_fam_export)
+        self.btn_fam_import = _tool_btn(
+            text="Import…",
+            tooltip="Import a shared calibration file for this aircraft "
+                    "(replaces the stored set)")
+        self.btn_fam_import.clicked.connect(self._on_family_import)
+        fam_row.addWidget(self.btn_fam_import)
         fam_row.addStretch(1)
         rlay.addLayout(fam_row)
 
@@ -835,6 +852,11 @@ class TrimCalibrationDialog(QDialog):
         self.btn_fam_next.setEnabled(n > 0 and self._fam_sel < n - 1)
         self.btn_fam_delete.setEnabled(editable)
         self.btn_fam_clear.setEnabled(editable)
+        # Export = read-only, works everywhere something is stored. Import
+        # deliberately works in OFFLINE mode too (install a shared file for
+        # an aircraft that is not loaded); only an active run blocks it.
+        self.btn_fam_export.setEnabled(n > 0)
+        self.btn_fam_import.setEnabled(not running)
         self.cmb_stick_pos.setEnabled(not running and not self._offline_editing())
 
     def _step_family(self, delta):
@@ -904,6 +926,149 @@ class TrimCalibrationDialog(QDialog):
             return
         self._fam_sel = 0
         self._emit_family_edit([])
+
+    def _on_family_export(self):
+        """Write the stored calibration set to a shareable JSON file.
+
+        Portable payload = curves + stick-position mode only. The static
+        virtual_y deliberately stays home: it is entangled with the
+        exporter's physical-gain setting, while the curves are
+        physical-gain-independent by design (absolute axis units)."""
+        if not self._fam_raw:
+            return
+        sm = G.settings_mgr
+        vals = self._offline_settings()
+        if vals is not None:
+            stick = vals.get("joystick_trim_follow_stick_position")
+        else:
+            ac = G.telem_manager.currentAircraft if G.telem_manager else None
+            stick = getattr(ac, "joystick_trim_follow_stick_position", None) \
+                if ac is not None else None
+        payload = {
+            "type": self.EXPORT_TYPE,
+            "version": 1,
+            "sim": getattr(sm, "current_sim", "") if sm else "",
+            "aircraft_name": getattr(sm, "current_aircraft_name", "") if sm else "",
+            "pattern": getattr(sm, "current_pattern", "") if sm else "",
+            "exported": time.strftime("%Y-%m-%d"),
+            "stick_position": stick if stick in self.STICK_POSITION_MODES else None,
+            "curves": self._fam_raw,
+        }
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "_",
+                      payload["pattern"] or payload["aircraft_name"]
+                      or "aircraft").strip("_")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export trim calibrations",
+            f"trimcal_{safe}_{payload['exported']}.json",
+            "TelemFFB Trim Calibration (*.json)")
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+        except OSError as e:
+            QMessageBox.warning(self, "Export failed", str(e))
+            return
+        n = len(self._fam_raw)
+        self.lbl_note.setText(
+            f"Exported {n} stored speed{'s' if n != 1 else ''} to "
+            f"{os.path.basename(path)}.")
+
+    def _on_family_import(self):
+        """Import a shared calibration set, replacing the stored family.
+
+        Identity check (user-specified): the match string is the profile key
+        and the authority — the incoming pattern must equal the active one,
+        and the exporter's aircraft NAME must regex-match the ACTIVE match
+        string (liveries differ; the pattern unifies them). Mismatches warn
+        with full detail and allow a deliberate override."""
+        cal = self._calibrator()
+        if cal is not None and cal.active:
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import trim calibrations", "",
+            "TelemFFB Trim Calibration (*.json);;All files (*)")
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError) as e:
+            QMessageBox.warning(self, "Import failed",
+                                f"Could not read the file:\n{e}")
+            return
+        if not isinstance(data, dict) or data.get("type") != self.EXPORT_TYPE \
+                or "curves" not in data:
+            QMessageBox.warning(self, "Import failed",
+                                "Not a TelemFFB trim-calibration export file.")
+            return
+        fam = utils.parse_trim_follow_family({"curves": data["curves"]})
+        if not fam:
+            QMessageBox.warning(self, "Import failed",
+                                "The file contains no usable calibration curves.")
+            return
+
+        sm = G.settings_mgr
+        cur_sim = getattr(sm, "current_sim", "") if sm else ""
+        cur_pattern = getattr(sm, "current_pattern", "") if sm else ""
+        name = data.get("aircraft_name") or ""
+        problems = []
+        if data.get("sim") and cur_sim and data["sim"] != cur_sim:
+            problems.append(f"Sim: file is for {data['sim']}, active is {cur_sim}")
+        if data.get("pattern") != cur_pattern:
+            problems.append(
+                f"Match string: file has '{data.get('pattern')}', "
+                f"active is '{cur_pattern}'")
+        try:
+            if cur_pattern and not re.match(cur_pattern, name):
+                problems.append(
+                    f"Aircraft name '{name}' does not match the active "
+                    f"match string '{cur_pattern}'")
+        except re.error:
+            pass  # unmatchable pattern: the equality check above governs
+
+        n_in = len(fam)
+        speeds = ", ".join(f"{e['ias_kt']:.0f} kt" for e in fam)
+        summary = (f"{n_in} calibrated speed{'s' if n_in != 1 else ''} "
+                   f"({speeds})\nAircraft: {name or '?'}\n"
+                   f"Match string: {data.get('pattern') or '?'}"
+                   + (f"\nExported: {data['exported']}"
+                      if data.get("exported") else ""))
+        if problems:
+            q = QMessageBox.warning(
+                self, "Calibration does not match this aircraft",
+                "This file does not appear to belong to the active aircraft "
+                "profile:\n\n- " + "\n- ".join(problems)
+                + f"\n\n{summary}\n\nImport anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+        else:
+            have = len(self._fam_raw)
+            q = QMessageBox.question(
+                self, "Import calibrations",
+                summary
+                + (f"\n\nThis replaces the {have} currently stored "
+                   f"speed{'s' if have != 1 else ''}." if have else "")
+                + "\n\nImport?")
+        if q != QMessageBox.StandardButton.Yes:
+            return
+
+        payload = {"curves": data["curves"], "use_curve": True}
+        if data.get("stick_position") in self.STICK_POSITION_MODES:
+            payload["stick_position"] = data["stick_position"]
+            if not self._offline_editing():
+                ac = G.telem_manager.currentAircraft if G.telem_manager else None
+                if ac is not None:
+                    ac.joystick_trim_follow_stick_position = data["stick_position"]
+            self._sync_stick_pos_combo(data["stick_position"])
+        self._apply_family_live(list(data["curves"]))
+        self.result_saved.emit(json.dumps(payload))
+        self._clear_result_labels()
+        self.curve.clear()
+        self._show_stored_curve()
+        self.lbl_note.setText(
+            f"Imported {n_in} calibrated speed{'s' if n_in != 1 else ''} "
+            f"from {os.path.basename(path)}.")
 
     def _on_curve_context(self, index):
         """Right-click on a ghosted family curve: context-menu delete.
