@@ -14028,6 +14028,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The spoiler motion effect is zeroed by default because the F-14's DLC and spoiler surfaces are in near-constant motion, which would otherwise produce continuous rumble.</notes>
 		</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -14139,6 +14140,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The g-force effect is disabled by default because the real F-16 uses a force-sensing sidestick, so g-loading stick feel is not appropriate for this aircraft. The flaps motion effect is also disabled because the FLCS schedules the flaperons automatically and would otherwise produce constant rumble.</notes>
 	</models>
 	<models>
 		<name>afterburner_effect_enabled</name>
@@ -14334,6 +14336,7 @@
 		<value>PropellerAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>AoA buffeting is disabled by default because this module implements its own stall buffet natively through the FFB interface. Enabling it will double up with the module's built-in buffet.</notes>
 	</models>
 	<models>
 		<name>wingfold_motion_effect_enabled</name>
@@ -14422,6 +14425,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because the flight control system schedules the flaps/flaperons automatically and would otherwise produce constant rumble.</notes>
 		</models>
 	<models>
 		<name>adv_spr_gains</name>
@@ -14510,6 +14514,7 @@
 		<value>PropellerAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 		</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -15143,6 +15148,7 @@
 		<value>PropellerAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 		</models>
 	<models>
 		<name>cm_vibration_intensity</name>
@@ -15288,6 +15294,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 		</models>
 	<models>
 		<name>type</name>
@@ -15361,6 +15368,7 @@
 	<value>PropellerAircraft</value>
 	<sim>DCS</sim>
 	<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 	</models>
 	<models>
 		<name>cm_vibration_intensity</name>
@@ -16128,6 +16136,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16179,6 +16188,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16230,6 +16240,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16281,6 +16292,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16332,6 +16344,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16383,6 +16396,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16434,6 +16448,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16485,6 +16500,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16593,6 +16609,7 @@
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This profile reads the aircraft's force trim switch state directly via its custom simulation variable, so force trim follows the in-cockpit switch. Spring mode defaults to FORCETRIM to match.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16600,6 +16617,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16607,6 +16625,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>etl_effect_intensity</name>
@@ -16659,6 +16678,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>etl_effect_intensity</name>
@@ -16711,6 +16731,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16825,6 +16846,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 		</models>
 	<models>
 		<name>type</name>
@@ -16924,6 +16946,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This profile drives several effects from A2A's custom simulation variables (prop RPM and thrust, body accelerations, AP master) rather than the standard SimConnect variables, and depends on the A2A Comanche's simulation.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -17060,6 +17083,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 		</models>
 	<models>
 		<name>cyclic_spring_gain</name>
@@ -17111,6 +17135,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_physical_x</name>
@@ -17125,6 +17150,7 @@
 		<value>GliderAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Aileron (X axis) trim following is disabled by default because this glider has no aileron trim.</notes>
 	</models>
 	<models>
 		<name>aileron_spring_gain</name>
@@ -17413,6 +17439,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -17986,6 +18013,7 @@
 		<value>JetAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because the flight control system schedules the flaps automatically and would otherwise produce constant rumble. Trim following is also disabled because the fly-by-wire pitch trim does not behave like a conventional trim surface.</notes>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
@@ -18186,6 +18214,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 	</models>
 	<models>
 		<name>elevator_droop_moment</name>
@@ -19594,6 +19623,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -19713,6 +19743,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -19748,6 +19779,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>max_aileron_coeff</name>
@@ -19860,6 +19892,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Aileron (X axis) trim following is disabled by default because this aircraft has no aileron trim.</notes>
 		</models>
 	<models>
 		<name>type</name>
@@ -19881,6 +19914,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -19888,6 +19922,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -19902,6 +19937,7 @@
 		<value>TaogH500Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the TaogH500Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -20156,6 +20192,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Control expo and elevator droop are zeroed by default to suit this gyrocopter's control feel, which differs fundamentally from fixed-wing aircraft.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -20263,6 +20300,7 @@
 		<value>TaogH500Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the TaogH500Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -20476,6 +20514,7 @@
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Autopilot following is disabled by default because this aircraft's auto-rudder implementation interferes badly with autopilot following.</notes>
 	</models>
 	<models>
 		<name>elevator_droop_moment</name>
@@ -20554,6 +20593,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 		</models>
 	<models>
 		<name>elevator_droop_moment</name>
@@ -20590,6 +20630,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -20734,6 +20775,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -20741,6 +20783,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -20784,6 +20827,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work. The force trim reset command is disabled by default because it conflicts with CowanSim's force trim implementation on this model.</notes>
 	</models>
 	<models>
 		<name>force_trim_send_reset</name>
@@ -20923,6 +20967,7 @@
 		<value>SASHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom SASHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the SASHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -21117,6 +21162,7 @@
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This profile reads the aircraft's force trim switch state directly via its custom simulation variable, so force trim follows the in-cockpit switch. Spring mode defaults to FORCETRIM to match.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -21273,6 +21319,7 @@
 		<value>XAW109Helicopter</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom XAW109Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the XAW109Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>force_trim_enabled</name>
@@ -21420,6 +21467,7 @@
 		<value>GliderAircraft</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+		<notes>Aileron (X axis) trim following is disabled by default because this glider has no aileron trim.</notes>
 	</models>
 	<models>
 		<name>rotor_blade_count</name>
