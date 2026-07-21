@@ -1332,43 +1332,155 @@ def piecewise_linear(xs, ys, x):
     return y0 + slope * (x - x0)
 
 
-def parse_trim_follow_curve(value):
-    """Parse a stored trim-calibration curve (JSON string or dict) into
-    anchor-referenced lookup arrays ``(xs, ys)``, or None when the value is
-    empty/'none'/invalid.
+def _parse_trim_curve_entry(data):
+    """Parse ONE stored curve entry into an anchor-referenced dict, or None.
+
+    Points are sorted and deduped on trim, then REBASED so offs(t0) == 0:
+    t0 from the payload, falling back to the measured band's midpoint for
+    curves saved before t0 existed (the sweep centers its band on the
+    natural point). The rebase is idempotent. This pins the runtime
+    invariant "trimmed for level => stick at physical center, zero force,
+    zero delivered input" and keeps every lookup band-internal regardless
+    of where the trim gauge's zero lies.
+    """
+    pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
+    xs, ys = [], []
+    for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
+        if xs and abs(t - xs[-1]) < 1e-9:
+            ys[-1] = o
+        else:
+            xs.append(t)
+            ys.append(o)
+    if len(xs) < 2:
+        logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
+        return None
+    t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
+    ref = piecewise_linear(xs, ys, t0)
+    return {
+        "ias_kt": float(data.get("ias_kt") or 0.0),
+        "t0": t0,
+        "date": data.get("date"),
+        "xs": xs,
+        "ys": [y - ref for y in ys],
+    }
+
+
+def parse_trim_follow_family(value):
+    """Parse the stored trim-calibration setting into a speed-sorted family.
 
     Single source of truth for the curve convention — the runtime property
     setter AND any display/offline reader must go through here (hand-rolled
     re-derivations of the runtime's math have rotted before: the takeover
-    baseline computed a false value for months). Points are sorted and
-    deduped on trim, then REBASED so offs(t0) == 0: t0 from the payload,
-    falling back to the measured band's midpoint for curves saved before t0
-    existed (the sweep centers its band on the natural point). The rebase is
-    idempotent. This pins the runtime invariant "trimmed for level => stick
-    at physical center, zero force, zero delivered input" and keeps every
-    lookup band-internal regardless of where the trim gauge's zero lies.
+    baseline computed a false value for months).
+
+    Accepts the family form ``{"curves": [entry, ...]}``, the legacy
+    single-curve blob ``{"points": ...}``, a JSON string of either, or
+    'none'/empty. Returns a list of entries ``{ias_kt, t0, date, xs, ys, r}``
+    sorted by ias_kt (ys anchor-rebased per entry, see
+    :func:`_parse_trim_curve_entry`), or None when nothing is usable.
+    Entries within 0.5 kt of each other dedupe to the later one in payload
+    order (re-calibration semantics).
+
+    ``r`` is the positional track R(v) at each entry — where the trimmed
+    stick RESTS in follows-trim mode. Per adjacent speed pair the
+    displacement is the AVERAGE of the two curves' independent estimates of
+    the elevator-equivalent between their anchors (field data: the two
+    estimates agree within ~2%); the chain is normalized to 0 at the
+    median-index entry (the reference constant is sim-invisible — it rides
+    identically in the virtual offset and the spring center) and clamped to
+    +-1 WITH a warning: an extreme aircraft's follows-trim rest position
+    truncates at the stick limits rather than silently changing behavior.
     """
     if not value or value == 'none':
         return None
     try:
         data = json.loads(value) if isinstance(value, str) else value
-        pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
-        xs, ys = [], []
-        for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
-            if xs and abs(t - xs[-1]) < 1e-9:
-                ys[-1] = o
-            else:
-                xs.append(t)
-                ys.append(o)
-        if len(xs) < 2:
-            logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
-            return None
-        t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
-        ref = piecewise_linear(xs, ys, t0)
-        return xs, [y - ref for y in ys]
+        raw_entries = data["curves"] if "curves" in data else [data]
+        entries = []
+        for raw in raw_entries:
+            parsed = _parse_trim_curve_entry(raw)
+            if parsed is not None:
+                entries.append(parsed)
     except (ValueError, KeyError, TypeError) as e:
         logging.warning(f"Invalid trim-follow curve setting; ignoring ({e})")
         return None
+    if not entries:
+        return None
+
+    # Sort by speed; near-identical speeds keep the later payload entry
+    # (stable sort preserves payload order within equal keys).
+    entries.sort(key=lambda e: e["ias_kt"])
+    deduped = []
+    for e in entries:
+        if deduped and abs(e["ias_kt"] - deduped[-1]["ias_kt"]) < 0.5:
+            deduped[-1] = e
+        else:
+            deduped.append(e)
+    entries = deduped
+
+    # Positional track: chain the averaged inter-anchor displacements.
+    # xs are absolute trim, ys anchor-rebased, so offs_a evaluated at b's
+    # anchor IS the displacement estimate S_a(t0_b - t0_a).
+    chain = [0.0]
+    for a, b in zip(entries, entries[1:]):
+        est_a = piecewise_linear(a["xs"], a["ys"], b["t0"])
+        est_b = -piecewise_linear(b["xs"], b["ys"], a["t0"])
+        chain.append(chain[-1] + (est_a + est_b) / 2.0)
+    ref = chain[len(entries) // 2]
+    for e, c in zip(entries, chain):
+        r = c - ref
+        if abs(r) > 1.0:
+            logging.warning(
+                f"Trim-follow positional track clamped at the stick limits "
+                f"for the {e['ias_kt']:.0f} kt calibration (R={r:+.2f}) — "
+                f"the follows-trim rest position truncates there")
+            r = clamp(r, -1.0, 1.0)
+        e["r"] = r
+    return entries
+
+
+def parse_trim_follow_curve(value):
+    """Legacy single-curve view of the stored setting: the median-speed
+    entry's anchor-referenced ``(xs, ys)``, or None. Superseded by
+    :func:`parse_trim_follow_family`; kept for transitional callers."""
+    fam = parse_trim_follow_family(value)
+    if fam is None:
+        return None
+    mid = fam[len(fam) // 2]
+    return mid["xs"], mid["ys"]
+
+
+def trim_follow_blend(fam, t, ias_kt, include_r=True):
+    """Evaluate the multi-speed trim-follow offset at trim ``t`` (ElevTrimPct
+    space) and speed ``ias_kt`` (knots).
+
+    Bracketing interpolation between the two nearest calibrated speeds in
+    ANCHOR-ALIGNED space: the anchor t0(v) lerps, each bracket's shape is
+    looked up at the same anchor-relative position, and the shapes lerp —
+    which reconstructs translating-knee aircraft exactly where absolute-trim
+    lerping smears them (SR22T: 2.5x under-correction). Beyond the
+    calibrated speed range the exact lowest/highest calibration applies (no
+    extrapolation across speed; per-curve edge-slope extrapolation across
+    TRIM is unchanged). ``include_r`` folds in the positional track
+    (follows-trim mode); centered mode passes False. Result clamped +-1.
+    """
+    lo = hi = fam[-1]
+    w = 0.0
+    for i, e in enumerate(fam):
+        if ias_kt <= e["ias_kt"]:
+            hi = e
+            lo = fam[i - 1] if i > 0 else e
+            span = hi["ias_kt"] - lo["ias_kt"]
+            w = (ias_kt - lo["ias_kt"]) / span if span > 1e-9 else 0.0
+            break
+    t0v = lo["t0"] + w * (hi["t0"] - lo["t0"])
+    x = t - t0v   # anchor-relative position, shared by both brackets
+    s = piecewise_linear(lo["xs"], lo["ys"], lo["t0"] + x)
+    if hi is not lo:
+        s += w * (piecewise_linear(hi["xs"], hi["ys"], hi["t0"] + x) - s)
+    if include_r:
+        s += lo["r"] + w * (hi["r"] - lo["r"])
+    return clamp(s, -1.0, 1.0)
 
 
 def non_linear_scaling(x, min_val, max_val, curvature=1.0):

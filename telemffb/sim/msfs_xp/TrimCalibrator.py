@@ -945,7 +945,7 @@ class TrimCalibrator:
                 # probe (C208B field abort, trace 20260719_201957).
                 elev_trim = clamp(t * p_y, -1, 1)
                 offs_fn = getattr(self.ac, "_trim_follow_virtual_offset_y", None)
-                offs_y = offs_fn(t, elev_trim) if offs_fn is not None \
+                offs_y = offs_fn(t, elev_trim, telem_data) if offs_fn is not None \
                     else elev_trim * (1 - v_y)
                 self._u_base_y = clamp(phys_y - offs_y, -1, 1)
                 self._u_base_x = clamp(phys_x - clamp(a * p_x, -1, 1) * (1 - v_x), -1, 1)
@@ -2162,7 +2162,7 @@ class TrimCalibrator:
                 v_x = getattr(self.ac, "joystick_trim_follow_gain_virtual_x", 1.0)
                 elev_trim = clamp(t * p_y, -1, 1)
                 offs_fn = getattr(self.ac, "_trim_follow_virtual_offset_y", None)
-                offs_y = offs_fn(t, elev_trim) if offs_fn is not None \
+                offs_y = offs_fn(t, elev_trim, telem_data) if offs_fn is not None \
                     else elev_trim * (1 - v_y)
                 y = clamp(y + offs_y, -1, 1)
                 x = clamp(x + clamp(a * p_x, -1, 1) * (1 - v_x), -1, 1)

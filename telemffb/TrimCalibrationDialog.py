@@ -29,16 +29,19 @@ import time
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
-    QComboBox, QToolButton,
+    QComboBox, QToolButton, QMenu,
 )
 
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
-from telemffb.custom_widgets import IasTrendWidget, InfoLabel, TrimCurveWidget
+from telemffb.custom_widgets import (
+    IasTrendWidget, InfoLabel, NoWheelComboBox, TrimCurveWidget, vpf_purple,
+)
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState, TrimCalibrator
 
 logger = logging.getLogger(__name__)
@@ -50,9 +53,18 @@ MS_TO_FPM = 196.850394
 class TrimCalibrationDialog(QDialog):
     """Modeless dialog to auto-calibrate ``joystick_trim_follow_gain_virtual_y``."""
 
-    # Emitted on Save with a JSON payload:
-    # {"virtual_y": float, "curve": dict|None, "use_curve": bool}
+    # Emitted on Save / family edits with a JSON payload:
+    # {"virtual_y"?: float, "curves": [entry,...], "use_curve": bool,
+    #  "stick_position"?: str}
     result_saved = pyqtSignal(str)
+    # Emitted when the trimmed-stick-position pulldown changes — persisted
+    # standalone so the mode is adjustable post-calibration without a run.
+    position_mode_changed = pyqtSignal(str)
+
+    STICK_POSITION_MODES = ("Follows Trim", "Stays Centered")
+    # Save within this many knots of a stored entry offers to REPLACE it
+    # (re-calibration semantics) instead of storing a near-duplicate speed.
+    FAMILY_REPLACE_KT = 5.0
 
     # Combo index -> engine pitch-gain scale (Control response).
     RESPONSE_SCALES = {0: 1.5, 1: 1.0, 2: 0.5, 3: 0.25}
@@ -88,6 +100,9 @@ class TrimCalibrationDialog(QDialog):
         self._ias_hist = []   # (t, IAS m/s) for the trend indicator
         self._cal_seen = None    # id() of the calibrator the display belongs to
         self._stored_curve_seen = None  # raw curve JSON the display reflects
+        self._fam_raw = []       # stored family: raw entry dicts, speed-sorted
+        self._fam = []           # parsed view of the same entries (index-aligned)
+        self._fam_sel = 0        # manager selection index
         # Paused sims stop sending telemetry, so the timeout fires right after
         # the pause frame; remember it so the idle fallback can say "unpause"
         # instead of clobbering it with the generic waiting message.
@@ -336,7 +351,96 @@ class TrimCalibrationDialog(QDialog):
         # a tall notes block shrinks it rather than overlapping it.
         self.curve.setMinimumHeight(200)
         self.curve.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.curve.curve_context_requested.connect(self._on_curve_context)
         rlay.addWidget(self.curve)
+
+        # Stored-family manager: page through the calibrated speeds (all are
+        # ghosted on the plot, the selected one highlighted), delete
+        # individually, or clear the set. Destructive actions are view-only
+        # gated (offline editing / active run).
+        # Compact flat controls (QToolButton escapes the app's chunky
+        # QPushButton theming) — same visual language as the instructions
+        # disclosure: hand cursor + hover pill for affordance.
+        _flat = ("QToolButton { border: none; padding: 2px 6px; }"
+                 "QToolButton:hover { background-color: rgba(42, 127, 212, 38);"
+                 " border-radius: 4px; }"
+                 "QToolButton:disabled { color: #808080; }")
+
+        def _tool_btn(text, tooltip=None):
+            b = QToolButton()
+            b.setText(text)
+            if tooltip:
+                b.setToolTip(tooltip)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(_flat)
+            return b
+
+        # Paging arrows: text glyphs (arrow-type glyph size is style-locked)
+        # at a larger size in VPForce purple, translucent-purple hover pill.
+        _arrow = (f"QToolButton {{ border: none; padding: 0px 6px;"
+                  f" color: {vpf_purple}; font-size: 13pt; font-weight: bold; }}"
+                  f"QToolButton:hover {{ background-color: #44ab37c8;"
+                  f" border-radius: 4px; }}"
+                  "QToolButton:disabled { color: #808080; }")
+
+        fam_row = QHBoxLayout()
+        fam_row.addWidget(QLabel("Stored speeds:"))
+        self.btn_fam_prev = _tool_btn(text="◀",
+                                      tooltip="Previous stored calibration")
+        self.btn_fam_prev.setStyleSheet(_arrow)
+        self.btn_fam_prev.clicked.connect(lambda: self._step_family(-1))
+        fam_row.addWidget(self.btn_fam_prev)
+        self.cmb_family = NoWheelComboBox()
+        # Speed-only entries are short: size to content (the 170px minimum
+        # from the dated-entry era kept the row wide after the dates left).
+        self.cmb_family.setMinimumWidth(90)
+        self.cmb_family.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.cmb_family.currentIndexChanged.connect(self._on_family_selected)
+        fam_row.addWidget(self.cmb_family)
+        self.btn_fam_next = _tool_btn(text="▶",
+                                      tooltip="Next stored calibration")
+        self.btn_fam_next.setStyleSheet(_arrow)
+        self.btn_fam_next.clicked.connect(lambda: self._step_family(+1))
+        fam_row.addWidget(self.btn_fam_next)
+        fam_row.addSpacing(10)
+        self.btn_fam_delete = _tool_btn(
+            text="Delete", tooltip="Delete the selected calibration "
+                                   "(or right-click a curve on the plot)")
+        self.btn_fam_delete.clicked.connect(self._on_family_delete)
+        fam_row.addWidget(self.btn_fam_delete)
+        self.btn_fam_clear = _tool_btn(
+            text="Clear all", tooltip="Delete all stored calibrations")
+        self.btn_fam_clear.clicked.connect(self._on_family_clear)
+        fam_row.addWidget(self.btn_fam_clear)
+        fam_row.addStretch(1)
+        rlay.addLayout(fam_row)
+
+        # Trimmed-stick-position mode: an airframe description, adjustable
+        # post-calibration and persisted immediately (no Save required).
+        pos_row = QHBoxLayout()
+        pos_row.addWidget(InfoLabel(
+            text="Trimmed stick position:",
+            tooltip=(
+                "Where the stick rests when the aircraft is trimmed, once\n"
+                "calibrations at multiple speeds are stored.\n\n"
+                "Follows Trim — the rest position rides the measured trim\n"
+                "state (aft when trimmed slow, forward when fast), like\n"
+                "cable/trim-tab aircraft where the yoke is linked to the\n"
+                "control surface.\n\n"
+                "Stays Centered — trimmed flight always rests the stick at\n"
+                "center, like moving-stabilizer, FBW or spring-cartridge\n"
+                "aircraft where trim re-rigs the feel datum. Jets default\n"
+                "to this.\n\n"
+                "Force behavior is identical in both modes (trimmed = zero\n"
+                "force, out-of-trim = force); only the resting geometry\n"
+                "differs. Changes apply and save immediately.")))
+        self.cmb_stick_pos = NoWheelComboBox()
+        self.cmb_stick_pos.addItems(list(self.STICK_POSITION_MODES))
+        self.cmb_stick_pos.currentTextChanged.connect(self._on_stick_pos_changed)
+        pos_row.addWidget(self.cmb_stick_pos)
+        pos_row.addStretch(1)
+        rlay.addLayout(pos_row)
 
         self.lbl_virtual = QLabel("Recommended Y Trim Gain (Virtual): <b>—</b>")
         self.lbl_linearity = QLabel("Linearity (R²): —")
@@ -582,6 +686,12 @@ class TrimCalibrationDialog(QDialog):
                 self.chk_trace.setEnabled(not running)
 
             if running:
+                # Family edits and the position mode lock during a run — the
+                # engine read its state at start. Re-enabled by the next
+                # stored-curve/result render's _update_family_ui.
+                self.btn_fam_delete.setEnabled(False)
+                self.btn_fam_clear.setEnabled(False)
+                self.cmb_stick_pos.setEnabled(False)
                 self._show_stage_light(cal)
                 self.curve.set_live_point(data.get("ElevTrimPct"), getattr(cal, "_u_elev", None))
                 # Show accepted stations as they land (full-scale view; the
@@ -628,74 +738,54 @@ class TrimCalibrationDialog(QDialog):
             self._show_stored_curve()
 
     def _show_stored_curve(self):
-        """Display the aircraft's SAVED calibration curve (view-only).
+        """Display the STORED calibration family (view-only): every entry
+        ghosted on the plot, the selected one highlighted with its stats.
 
-        A freshly loaded aircraft has a fresh calibrator with no result, but
-        may carry a calibrated curve in its settings. The stored curve is the
-        runtime offset ``offs(T) = -(u(T) - u(0))``; the plot shows the
-        measured-axis space, so it is mirrored back for display. In offline
-        editing mode the curve comes from the EDITED profile's XML (through
-        the same shared parse/rebase), not from the stale live aircraft.
+        The stored entries are runtime offsets ``offs(T)``; the plot shows
+        measured-axis space, so they are mirrored back for display. In
+        offline editing mode everything comes from the EDITED profile's XML
+        (through the same shared parser), never the stale live aircraft.
         Returns True when something was shown.
         """
         vals = self._offline_settings()
         if vals is not None:
             raw = vals.get("joystick_trim_follow_curve_y")
-            self._stored_curve_seen = raw
-            pts = utils.parse_trim_follow_curve(raw)
-            if pts is None:
-                return False
-            physical_y = float(vals.get("joystick_trim_follow_gain_physical_y") or 1.0) or 1.0
-            virtual_y = float(vals.get("joystick_trim_follow_gain_virtual_y") or 0.0)
             use_curve = vals.get("joystick_trim_follow_use_curve_y") is True
+            stick_pos = vals.get("joystick_trim_follow_stick_position")
         else:
             ac = G.telem_manager.currentAircraft if G.telem_manager else None
             raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
-            # Record what this display attempt was based on, drawn or not, so
-            # the live change check in _on_telemetry knows when a redraw is
-            # due.
-            self._stored_curve_seen = raw
-            if not raw or raw == "none":
-                return False
-            # Plot the aircraft's PARSED lookup arrays, not the raw JSON: the
-            # setter anchor-references the points (offs(t0) == 0), so this
-            # shows exactly what the runtime flies. JSON is only read for
-            # provenance.
-            pts = getattr(ac, "_trim_curve_y_pts", None)
-            if pts is None:
-                logger.warning("Stored trim curve unreadable; not displaying")
-                return False
-            physical_y = getattr(ac, "joystick_trim_follow_gain_physical_y", 1.0) or 1.0
-            virtual_y = getattr(ac, "joystick_trim_follow_gain_virtual_y", 0.0) or 0.0
             use_curve = bool(getattr(ac, "joystick_trim_follow_use_curve_y", False))
-        samples = [(t, -o) for t, o in zip(*pts)]
-        try:
-            data = json.loads(raw)
-        except (ValueError, TypeError):
-            data = {}
-        if len(samples) < 2:
+            stick_pos = getattr(ac, "joystick_trim_follow_stick_position", None)
+        # Record what this display attempt was based on, drawn or not, so the
+        # live change check in _on_telemetry knows when a redraw is due.
+        self._stored_curve_seen = raw
+        self._sync_stick_pos_combo(stick_pos)
+        self._load_family_from_raw(raw)
+        self._update_family_ui()
+        if not self._fam:
             return False
-        # The static gain's equivalent line, for comparison (zero-referenced).
-        slope = -physical_y * (1.0 - virtual_y)
-        self.curve.set_result(samples, slope, 0.0)
-
-        prov = " · ".join(str(x) for x in [
-            f"captured {data.get('date')}" if data.get("date") else "",
-            f"{data.get('ias_kt')} kt" if data.get("ias_kt") else "",
-        ] if x)
-        # Mean slope derived from the curve endpoints (the offs points are
-        # the mirrored measured axis, hence the sign flip) — same convention
-        # as a fresh result's fit slope.
+        entry = self._fam[self._fam_sel]
+        self.curve.set_family(
+            [[(t, -o) for t, o in zip(e["xs"], e["ys"])] for e in self._fam])
+        samples = [(t, -o) for t, o in zip(entry["xs"], entry["ys"])]
+        # No fit line here: the static gain is dormant in curve mode, and a
+        # stale tangent among several ghosted curves reads as noise.
+        self.curve.set_result(samples, 0.0, 0.0, show_fit=False)
         # Slope and R² re-fit from the stored points: the mirror-and-shift
         # from measured samples to stored offsets is affine in y, so R² (and
         # |slope|) reproduce the original run's fit exactly — works for every
         # curve ever saved, no payload change. Reuses the calibrator's own
         # fit routine.
-        xs, ys = pts
-        fit_slope, _, r2 = TrimCalibrator._fit(list(zip(xs, ys)))
+        fit_slope, _, r2 = TrimCalibrator._fit(list(zip(entry["xs"], entry["ys"])))
+        prov = " · ".join(str(x) for x in [
+            f"{entry['ias_kt']:.1f} kt" if entry.get("ias_kt") else "",
+            f"captured {entry['date']}" if entry.get("date") else "",
+        ] if x)
+        n = len(self._fam)
         self.lbl_virtual.setText(
             f"Mean Trim Slope: <b>{-fit_slope:+.2f}</b>"
-            "  &nbsp;·  saved calibration"
+            f"  &nbsp;·  stored calibration {self._fam_sel + 1} of {n}"
             + (f"  ({prov})" if prov else ""))
         self.lbl_linearity.setText(
             f"Linearity (R²): {r2:.3f}  &nbsp;·  curve in use: "
@@ -703,6 +793,152 @@ class TrimCalibrationDialog(QDialog):
                "no — disabled on the Settings tab (static gain active)"))
         self._fit_to_content()
         return True
+
+    # ---- stored-family manager ----------------------------------------------
+
+    def _load_family_from_raw(self, raw):
+        """Populate the index-aligned raw/parsed family lists from the stored
+        setting value. Each raw entry is probe-parsed individually through
+        the shared family parser, so display indices always match what a
+        delete/save round-trips back to the profile."""
+        entries = []
+        if raw and raw != "none":
+            try:
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                for e in data.get("curves", [data]):
+                    parsed = utils.parse_trim_follow_family(e)
+                    if parsed:
+                        entries.append((float(e.get("ias_kt") or 0.0), e, parsed[0]))
+            except (ValueError, TypeError, AttributeError) as err:
+                logger.warning(f"Stored trim curve unreadable; not displaying ({err})")
+        entries.sort(key=lambda x: x[0])
+        self._fam_raw = [e[1] for e in entries]
+        self._fam = [e[2] for e in entries]
+        self._fam_sel = max(0, min(self._fam_sel, len(self._fam) - 1)) \
+            if self._fam else 0
+
+    def _update_family_ui(self):
+        n = len(self._fam)
+        self.cmb_family.blockSignals(True)
+        self.cmb_family.clear()
+        for e in self._fam:
+            # Speed only — the capture date is in the stats line below.
+            self.cmb_family.addItem(f"{e['ias_kt']:.1f} kt")
+        if n:
+            self.cmb_family.setCurrentIndex(self._fam_sel)
+        self.cmb_family.blockSignals(False)
+        cal = self._calibrator()
+        running = bool(cal is not None and cal.active)
+        editable = n > 0 and not running and not self._offline_editing()
+        self.cmb_family.setEnabled(n > 0)
+        self.btn_fam_prev.setEnabled(n > 0 and self._fam_sel > 0)
+        self.btn_fam_next.setEnabled(n > 0 and self._fam_sel < n - 1)
+        self.btn_fam_delete.setEnabled(editable)
+        self.btn_fam_clear.setEnabled(editable)
+        self.cmb_stick_pos.setEnabled(not running and not self._offline_editing())
+
+    def _step_family(self, delta):
+        if self._fam:
+            self.cmb_family.setCurrentIndex(
+                max(0, min(self._fam_sel + delta, len(self._fam) - 1)))
+
+    def _on_family_selected(self, index):
+        if index < 0 or index == self._fam_sel:
+            return
+        self._fam_sel = index
+        self._clear_result_labels()
+        self.curve.clear()
+        self._show_stored_curve()
+
+    def _apply_family_live(self, raw_entries):
+        """Live-set an edited family on the aircraft so the change acts (and
+        displays) immediately — the XML write follows via result_saved, and
+        the config pipeline re-confirms it on the next telemetry frame."""
+        if self._offline_editing():
+            return
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        if ac is None:
+            return
+        ac.joystick_trim_follow_curve_y = \
+            json.dumps({"curves": raw_entries}) if raw_entries else "none"
+        ac.joystick_trim_follow_use_curve_y = bool(raw_entries)
+
+    def _emit_family_edit(self, raw_entries):
+        self._apply_family_live(raw_entries)
+        self.result_saved.emit(json.dumps(
+            {"curves": raw_entries, "use_curve": bool(raw_entries)}))
+        self._clear_result_labels()
+        self.curve.clear()
+        self._show_stored_curve()
+
+    def _on_family_delete(self):
+        if not self._fam:
+            return
+        e = self._fam[self._fam_sel]
+        what = (f"the {e['ias_kt']:.1f} kt calibration"
+                + (f" (captured {e['date']})" if e.get("date") else ""))
+        if len(self._fam) == 1:
+            # Escalate: the last one also turns curve mode off.
+            msg = (f"Delete {what}?\n\n"
+                   "This is the LAST stored calibration for this aircraft — "
+                   "deleting it disables curve mode (the static gain applies) "
+                   "until you calibrate again.")
+        else:
+            msg = f"Delete {what}?"
+        q = QMessageBox.question(self, "Delete calibration", msg)
+        if q != QMessageBox.StandardButton.Yes:
+            return
+        remaining = [r for i, r in enumerate(self._fam_raw) if i != self._fam_sel]
+        self._fam_sel = max(0, self._fam_sel - 1)
+        self._emit_family_edit(remaining)
+
+    def _on_family_clear(self):
+        if not self._fam:
+            return
+        q = QMessageBox.question(
+            self, "Clear calibrations",
+            f"Delete all {len(self._fam)} stored calibration(s) for this "
+            "aircraft?\n\nThis disables curve mode (the static gain applies) "
+            "until you calibrate again.")
+        if q != QMessageBox.StandardButton.Yes:
+            return
+        self._fam_sel = 0
+        self._emit_family_edit([])
+
+    def _on_curve_context(self, index):
+        """Right-click on a ghosted family curve: context-menu delete.
+
+        Routed through the selector's Delete flow (selection + confirmation),
+        so every gate — offline view-only, active run — is inherited from
+        the Delete button's enabled state."""
+        if index >= len(self._fam) or not self.btn_fam_delete.isEnabled():
+            return
+        e = self._fam[index]
+        menu = QMenu(self)
+        act = menu.addAction(f"Delete the {e['ias_kt']:.1f} kt calibration…")
+        if menu.exec(QCursor.pos()) == act:
+            self._fam_sel = index
+            self._on_family_delete()
+
+    def _sync_stick_pos_combo(self, value):
+        want = value if value in self.STICK_POSITION_MODES \
+            else self.STICK_POSITION_MODES[0]
+        if self.cmb_stick_pos.currentText() != want:
+            self.cmb_stick_pos.blockSignals(True)
+            self.cmb_stick_pos.setCurrentText(want)
+            self.cmb_stick_pos.blockSignals(False)
+
+    def _on_stick_pos_changed(self, text):
+        # An airframe description, not a run result: apply live and persist
+        # immediately — usable post-calibration without a fresh run. The
+        # combo is disabled in offline mode (view-only), so no gating here
+        # beyond the live aircraft's presence.
+        if self._offline_editing():
+            return
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        if ac is not None:
+            ac.joystick_trim_follow_stick_position = text
+        self.position_mode_changed.emit(text)
 
     def _fit_to_content(self, allow_shrink=False):
         """Grow (never shrink, unless asked) the window so the content cannot
@@ -859,28 +1095,78 @@ class TrimCalibrationDialog(QDialog):
         if cal is not None:
             cal.stop("Cancelled by user")
 
-    def _payload(self):
-        # Saving/applying a calibration that produced a curve always enables
-        # curve mode — it is the recommended result, and a run good enough to
-        # save is a run good enough to use. Users who want the static gain
-        # instead can disable "use calibrated curve" on the Settings tab.
-        curve = self._last_result.get("curve")
+    def _merged_family(self, confirm=True):
+        """Fold the fresh result into the stored family.
+
+        Returns the merged raw entry list (speed-sorted), or None when the
+        user declined replacing a near-duplicate speed. The stored state is
+        re-read from the live aircraft at call time, so a save can't
+        resurrect entries deleted after the run finished. ``confirm=False``
+        computes the outcome without asking (prospective display note).
+        """
+        new = self._last_result.get("curve") if self._last_result else None
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
+        self._load_family_from_raw(raw)
+        merged = list(self._fam_raw)
+        if not new:
+            # No-curve run: leave the stored family untouched — a failed or
+            # degenerate run must never clobber good stored calibrations.
+            return merged
+        nv = float(new.get("ias_kt") or 0.0)
+        for i, e in enumerate(merged):
+            if abs(float(e.get("ias_kt") or 0.0) - nv) <= self.FAMILY_REPLACE_KT:
+                if confirm:
+                    q = QMessageBox.question(
+                        self, "Replace calibration?",
+                        f"Replace the {float(e.get('ias_kt') or 0):.1f} kt "
+                        f"calibration"
+                        + (f" (captured {e.get('date')})" if e.get("date") else "")
+                        + f" with this new {nv:.1f} kt run?")
+                    if q != QMessageBox.StandardButton.Yes:
+                        return None
+                merged[i] = new
+                return merged
+        merged.append(new)
+        merged.sort(key=lambda e: float(e.get("ias_kt") or 0.0))
+        return merged
+
+    def _payload(self, merged):
+        # Saving/applying a run that produced a curve always enables curve
+        # mode; a no-curve run leaves the stored family untouched and curve
+        # mode follows whether stored curves exist. The stick-position mode
+        # rides along so Save captures the whole curve-mode state.
         return {
             "virtual_y": float(self._last_result["virtual_y"]),
-            "curve": curve,
-            "use_curve": curve is not None,
+            "curves": merged,
+            "use_curve": bool(merged),
+            "stick_position": self.cmb_stick_pos.currentText(),
         }
+
+    def _live_set_merged(self, p, merged):
+        """Apply the merged family + companion settings to the live aircraft
+        (shared by Apply and Save — Save must act immediately too, not wait
+        for the telemetry-driven config pipeline)."""
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        if ac is None:
+            return
+        ac.joystick_trim_follow_gain_virtual_y = p["virtual_y"]
+        # Property setter parses the JSON once into lookup structures.
+        ac.joystick_trim_follow_curve_y = \
+            json.dumps({"curves": merged}) if merged else "none"
+        ac.joystick_trim_follow_use_curve_y = p["use_curve"]
+        ac.joystick_trim_follow_stick_position = p["stick_position"]
 
     def _on_apply(self):
         if self._last_result is None:
             return
         ac = G.telem_manager.currentAircraft if G.telem_manager else None
         if ac is not None:
-            p = self._payload()
-            ac.joystick_trim_follow_gain_virtual_y = p["virtual_y"]
-            # Property setter parses the JSON once into lookup arrays.
-            ac.joystick_trim_follow_curve_y = json.dumps(p["curve"]) if p["curve"] else "none"
-            ac.joystick_trim_follow_use_curve_y = p["use_curve"]
+            merged = self._merged_family()
+            if merged is None:
+                return  # user declined replacing the near-duplicate speed
+            p = self._payload(merged)
+            self._live_set_merged(p, merged)
             mode = "calibrated curve" if p["use_curve"] else "static gain"
             box = QMessageBox(self)
             box.setIcon(QMessageBox.Icon.Information)
@@ -907,17 +1193,45 @@ class TrimCalibrationDialog(QDialog):
             box.exec()
 
     def _on_save(self):
+        """Save is a step in the multi-speed loop, not the end of it: fold
+        the result into the family, persist, apply live, and return the
+        dialog to the ready state showing the updated stored set — so the
+        next speed is one Trim Assistant click away, no reopen needed."""
         if self._last_result is None:
             return
-        self.result_saved.emit(json.dumps(self._payload()))
-        QMessageBox.information(self, "Saved",
-                                "Trim-following calibration saved for this aircraft.")
+        merged = self._merged_family()
+        if merged is None:
+            return  # user declined replacing the near-duplicate speed
+        p = self._payload(merged)
+        self.result_saved.emit(json.dumps(p))
+        self._live_set_merged(p, merged)
+        # Consume the result: the display moves on to the stored family
+        # (which now includes this run), and the idle refresh must not
+        # resurrect the already-saved result view.
+        self._last_result = None
+        self._result_shown = True
+        self._clear_result_labels()
+        self.curve.clear()
+        self._show_stored_curve()
+        n = len(merged)
+        self.lbl_note.setText(
+            f"Saved — {n} stored speed{'s' if n != 1 else ''} for this "
+            f"aircraft. Ready for the next run: press Trim Assistant, pick "
+            f"the next test speed, and calibrate again.")
 
     # ---- result / state display ---------------------------------------------
 
     def _show_result(self, result):
         self._result_shown = True
         self._last_result = result
+        # Ghost the stored family behind the fresh result for context (and
+        # so the prospective save note below matches what the plot shows).
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        self._load_family_from_raw(
+            getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None)
+        self._update_family_ui()
+        self.curve.set_family(
+            [[(t, -o) for t, o in zip(e["xs"], e["ys"])] for e in self._fam])
         self.curve.set_result(
             result["samples"], result["slope"], result["intercept"],
             flagged=[f["index"] for f in result.get("flagged") or []])
@@ -941,6 +1255,22 @@ class TrimCalibrationDialog(QDialog):
                 f"  &nbsp;(for Physical Y = {result['physical_y']:.2f}){current_txt}")
         self.lbl_linearity.setText(f"Linearity (R²): {result['r_squared']:.3f}")
         notes = []
+        # Prospective save outcome against the stored family (computed
+        # without dialogs — the confirmation happens at Save/Apply).
+        if has_curve:
+            nv = float((result.get("curve") or {}).get("ias_kt") or 0.0)
+            near = next((e for e in self._fam_raw
+                         if abs(float(e.get("ias_kt") or 0.0) - nv)
+                         <= self.FAMILY_REPLACE_KT), None)
+            if near is not None:
+                notes.append(
+                    f"Saving will offer to replace the stored "
+                    f"{float(near.get('ias_kt') or 0):.1f} kt calibration "
+                    f"(within {self.FAMILY_REPLACE_KT:.0f} kt of this run).")
+            elif self._fam_raw:
+                notes.append(
+                    f"Saving stores this as speed {len(self._fam_raw) + 1} — "
+                    "the runtime blends the stored speeds by airspeed.")
         if not result["linear_ok"]:
             notes.append(
                 "Response is non-linear — a single gain can't hold level across the whole "

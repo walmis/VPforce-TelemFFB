@@ -2125,11 +2125,27 @@
 		<order>2400.44</order>
 		<name>joystick_trim_follow_curve_y</name>
 		<displayname>Trim Curve Calibration</displayname>
-		<prereq>trim_following</prereq>
+		<prereq>joystick_trim_follow_use_curve_y</prereq>
 		<info>Auto-calibrated elevator trim response curve. Captured by the Elevator Trim Calibration tool; used when 'Use Calibrated Trim Curve' is enabled.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>list</datatype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2400.45</order>
+		<name>joystick_trim_follow_stick_position</name>
+		<displayname>Trimmed Stick Position</displayname>
+		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<info>Where the stick rests when the aircraft is trimmed, with calibrated curves at multiple speeds.&lt;br&gt;&lt;br&gt;'Follows Trim': the rest position rides the measured trim state - aft when trimmed for slow flight, forward when fast - like cable/trim-tab aircraft where the yoke is linked to the control surface.&lt;br&gt;&lt;br&gt;'Stays Centered': trimmed flight always rests the stick at center - like moving-stabilizer, FBW or spring-cartridge aircraft where trim re-rigs the feel datum.&lt;br&gt;&lt;br&gt;Force behavior is identical in both modes (trimmed = zero force, out-of-trim = force); only the resting geometry differs.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>Follows Trim</value>
+		<validvalues>Follows Trim,Stays Centered</validvalues>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -8693,6 +8709,13 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>JetAircraft</type>
+			<value>Stays Centered</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>joystick_trim_follow_use_curve_y</name>
 			<type>TurbopropAircraft</type>
 			<value>false</value>
@@ -10024,6 +10047,13 @@
 			<value>true</value>
 			<sim>XPLANE</sim>
 			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>JetAircraft</type>
+			<value>Stays Centered</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>aileron_expo</name>

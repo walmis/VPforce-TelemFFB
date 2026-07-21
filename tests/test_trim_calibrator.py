@@ -1443,6 +1443,77 @@ class TestTrimCurve:
         finally:
             harness.teardown_method()
 
+    def test_family_blend_through_runtime_offset_helper(self):
+        # Two-speed family on a real mixin instance: the runtime helper must
+        # blend by the frame's IAS, hold the last speed on an IAS-dropout
+        # frame, and honor the trimmed-stick-position mode.
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        def frame(ias_kt):
+            return BaseTelemetryData(initial={"IAS": ias_kt / 1.94384})
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_use_curve_y = True
+            # 100 kt: slope 2 anchored at +0.1; 200 kt: slope 2 anchored at
+            # -0.1 (SR22T-style translation). r = [+0.4, 0].
+            inst.joystick_trim_follow_curve_y = _json.dumps({"curves": [
+                {"ias_kt": 100, "t0": 0.1,
+                 "points": [{"t": -0.1, "offs": -0.2}, {"t": 0.3, "offs": 0.6}]},
+                {"ias_kt": 200, "t0": -0.1,
+                 "points": [{"t": -0.3, "offs": -0.6}, {"t": 0.1, "offs": 0.2}]},
+            ]})
+
+            # follows-trim (default): S(T - t0(v)) + R(v)
+            assert inst._trim_follow_virtual_offset_y(0.1, 0.0, frame(100)) == \
+                pytest.approx(0.4, abs=1e-9)   # at own anchor: 0 + r=0.4
+            assert inst._trim_follow_virtual_offset_y(0.0, 0.0, frame(150)) == \
+                pytest.approx(0.2, abs=1e-9)   # mid: S(0)=0 + R=0.2
+            # IAS-dropout frame holds the last valid speed (150 kt)
+            assert inst._trim_follow_virtual_offset_y(0.0, 0.0, frame(0)) == \
+                pytest.approx(0.2, abs=1e-9)
+            assert inst._trim_follow_virtual_offset_y(0.0, 0.0, None) == \
+                pytest.approx(0.2, abs=1e-9)
+
+            # centered mode: R suppressed, pure aligned shape
+            inst.joystick_trim_follow_stick_position = "Stays Centered"
+            assert inst._trim_follow_virtual_offset_y(0.1, 0.0, frame(100)) == \
+                pytest.approx(0.0, abs=1e-9)
+            assert inst._trim_follow_virtual_offset_y(0.1, 0.0, frame(150)) == \
+                pytest.approx(0.2, abs=1e-9)   # S(0.1 - 0.0) = 2*0.1
+        finally:
+            harness.teardown_method()
+
+    def test_single_entry_family_matches_legacy_lookup(self):
+        # One stored curve must behave exactly as the single-curve runtime
+        # did — speed-independent, both position modes identical.
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_use_curve_y = True
+            inst.joystick_trim_follow_curve_y = _json.dumps(
+                {"points": [{"t": -0.37, "offs": -0.814}, {"t": 0.03, "offs": 0.066}],
+                 "t0": -0.1, "ias_kt": 132.0})
+            for t in (-0.3, -0.1, 0.0):
+                expect = inst._trim_curve_offset(t)
+                for td in (BaseTelemetryData(initial={"IAS": 60.0}), None):
+                    assert inst._trim_follow_virtual_offset_y(t, 0.0, td) == \
+                        pytest.approx(expect, abs=1e-9)
+            inst.joystick_trim_follow_stick_position = "Stays Centered"
+            assert inst._trim_follow_virtual_offset_y(-0.3, 0.0, None) == \
+                pytest.approx(inst._trim_curve_offset(-0.3), abs=1e-9)
+        finally:
+            harness.teardown_method()
+
     def test_takeover_baseline_mirrors_runtime_offset_helper(self):
         # Field abort (C208B, trace 20260719_201957): the takeover baseline
         # was computed with the static-gain formula even when the runtime was
@@ -1456,7 +1527,7 @@ class TestTrimCurve:
         # Stick resting at the curve-mode spring center; the runtime's curve
         # lookup says the virtual offset there is -0.4 (anchor-referenced).
         ac.phys_stick = (0.0, -0.4)
-        ac._trim_follow_virtual_offset_y = lambda t, elev_trim: -0.4
+        ac._trim_follow_virtual_offset_y = lambda t, elev_trim, telem_data=None: -0.4
         cal = TrimCalibrator(ac)
         cal._capture_takeover_baseline(ac.telem())
         # Runtime was delivering phys - offs = -0.4 - (-0.4) = 0: bumpless.
@@ -1531,6 +1602,51 @@ class _CrashingCalibrator:
     def force_abort(self, reason):
         self.aborted_with = reason
         self.active = False
+
+
+class TestMultiSpeedEndToEnd:
+    """Two REAL engine calibrations at different (coupling, anchor, speed)
+    points -> solver payloads -> family JSON -> blend: the full phase-3
+    pipeline in the exact formats each stage stores and consumes."""
+
+    def _calibrate(self, clock, coupling, t_nat, ias_ms):
+        ac = FakePlantAircraft(coupling=coupling, trim_natural=t_nat)
+        ac.ias = ias_ms
+        ac.trim = t_nat
+        ac.joystick_trim_follow_gain_virtual_y = 1.0
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended {state} ({cal.abort_reason})"
+        return cal.result["curve"]
+
+    def test_family_from_real_runs_blends_between_speeds(self, clock):
+        import json as _json
+        from telemffb.utils import parse_trim_follow_family, trim_follow_blend
+
+        c_slow = self._calibrate(clock, coupling=2.0, t_nat=0.1, ias_ms=50.0)
+        c_fast = self._calibrate(clock, coupling=4.0, t_nat=-0.1, ias_ms=100.0)
+        fam = parse_trim_follow_family(_json.dumps({"curves": [c_slow, c_fast]}))
+        assert len(fam) == 2 and fam[0]["ias_kt"] < fam[1]["ias_kt"]
+
+        v_mid = (fam[0]["ias_kt"] + fam[1]["ias_kt"]) / 2.0
+        t0_mid = (fam[0]["t0"] + fam[1]["t0"]) / 2.0
+        h = 0.02
+        # Local gain at the blended anchor must be the lerped coupling (3.0)
+        s = (trim_follow_blend(fam, t0_mid + h, v_mid, include_r=False)
+             - trim_follow_blend(fam, t0_mid - h, v_mid, include_r=False)) / (2 * h)
+        assert s == pytest.approx(3.0, rel=0.05)
+        # ...and the blend must cross zero at the blended anchor: trimmed for
+        # level at the intermediate speed = zero delivered input.
+        assert trim_follow_blend(fam, t0_mid, v_mid, include_r=False) == \
+            pytest.approx(0.0, abs=0.02)
+
+        # Motivation guard: the single wrong-speed curve fails the same check.
+        fam_slow_only = parse_trim_follow_family(_json.dumps(c_slow))
+        s1 = (trim_follow_blend(fam_slow_only, t0_mid + h, v_mid)
+              - trim_follow_blend(fam_slow_only, t0_mid - h, v_mid)) / (2 * h)
+        assert abs(s1 - 3.0) > 0.5, \
+            "a single-speed curve must not accidentally pass the mid-speed check"
 
 
 class TestSuppression:

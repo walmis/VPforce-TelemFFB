@@ -1793,12 +1793,15 @@ class SettingsLayout(QGridLayout):
         G.main_window.open_trim_calibration_dialog()
 
     def save_trim_calibration(self, payload_json: str):
-        """Persist the auto-calibration results for the current aircraft.
+        """Persist the auto-calibration state for the current aircraft.
 
         Connected to TrimCalibrationDialog.result_saved. The payload carries
-        the static gain, the measured curve, and the use-curve choice; all
-        three settings are written so the user can A/B via the checkbox.
-        Mirrors the write + reload pattern of the advanced spring editor.
+        the multi-speed curve family ("curves", written as the family JSON),
+        the use-curve choice, and optionally the static gain (absent for
+        family edits — delete/clear — which change no measurement) and the
+        trimmed-stick-position mode. A legacy "curve" (single dict) payload
+        is accepted and wrapped. Mirrors the write + reload pattern of the
+        advanced spring editor.
         """
         try:
             payload = json.loads(payload_json)
@@ -1809,18 +1812,37 @@ class SettingsLayout(QGridLayout):
         sim = G.settings_mgr.current_sim
         cls = G.settings_mgr.current_class
         pattern = G.settings_mgr.current_pattern
+        if payload.get("virtual_y") is not None:
+            G.settings_mgr.write_to_xml(
+                sim, cls, pattern,
+                str(round(payload["virtual_y"], 4)), "joystick_trim_follow_gain_virtual_y")
+        curves = payload.get("curves")
+        if curves is None:
+            curve = payload.get("curve")
+            curves = [curve] if curve else []
         G.settings_mgr.write_to_xml(
             sim, cls, pattern,
-            str(round(payload["virtual_y"], 4)), "joystick_trim_follow_gain_virtual_y")
-        curve = payload.get("curve")
-        G.settings_mgr.write_to_xml(
-            sim, cls, pattern,
-            json.dumps(curve) if curve else "none", "joystick_trim_follow_curve_y")
+            json.dumps({"curves": curves}) if curves else "none",
+            "joystick_trim_follow_curve_y")
         G.settings_mgr.write_to_xml(
             sim, cls, pattern,
             "true" if payload.get("use_curve") else "false",
             "joystick_trim_follow_use_curve_y")
+        if payload.get("stick_position"):
+            G.settings_mgr.write_to_xml(
+                sim, cls, pattern,
+                payload["stick_position"], "joystick_trim_follow_stick_position")
         self.show_erase_button("config_joystick_trim_follow_gain_virtual_y")
+        self.reload_caller()
+
+    def save_trim_position_mode(self, value: str):
+        """Persist the trimmed-stick-position mode alone — the calibration
+        dialog's pulldown is usable post-calibration without a fresh run."""
+        self.trigger_form_reload = True
+        G.settings_mgr.write_to_xml(
+            G.settings_mgr.current_sim, G.settings_mgr.current_class,
+            G.settings_mgr.current_pattern, value,
+            "joystick_trim_follow_stick_position")
         self.reload_caller()
 
     def update_advanced_spring_gains(self, spring_gain_curves: str, scale: str, units: str):

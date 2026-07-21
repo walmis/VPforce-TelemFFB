@@ -2710,17 +2710,22 @@ class TrimCurveWidget(CurveWidget):
         self.curve_polyline = []         # sorted samples joined = the calibrated curve
         self.extrap_tails = []           # dashed edge-slope segments beyond the band
         self.live_point = None           # QPointF(trim%, elevator%) or None
+        self.family_polylines = []       # ghosted stored-family curves ([QPointF] each)
         self.points = []                 # unused; keeps base paint helpers safe
 
     # ---- data API -----------------------------------------------------------
 
-    def set_result(self, samples, slope, intercept, flagged=None):
+    def set_result(self, samples, slope, intercept, flagged=None, show_fit=True):
         """Populate from calibration output.
 
         Args:
             samples: list of (trim_frac, u_elev_frac), both normalized [-1, 1].
             slope, intercept: linear fit of u_elev vs trim (normalized units).
             flagged: sample indices accepted with a VS residual (drawn amber).
+            show_fit: draw the dotted linear-fit reference line. True for
+                fresh results (it is that run's own fit, paired with the R²
+                readout); the stored-family view passes False — a stale
+                static-gain tangent among several curves reads as noise.
         """
         self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
         self.flagged_indices = set(flagged or [])
@@ -2749,14 +2754,26 @@ class TrimCurveWidget(CurveWidget):
 
         xmin, xmax = min(xs), max(xs)
         self.x_min, self.x_max = xmin - ext - 1.0, xmax + ext + 1.0
+        # A ghosted stored family widens the view (never shrinks it) so all
+        # speeds stay visible around the highlighted/new curve.
+        fam_x = [p.x() for c in self.family_polylines for p in c]
+        fam_y = [p.y() for c in self.family_polylines for p in c]
+        if fam_x:
+            self.x_min = min(self.x_min, min(fam_x) - 2.0)
+            self.x_max = max(self.x_max, max(fam_x) + 2.0)
 
-        y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
-        y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
-        self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
+        if show_fit:
+            y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
+            y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
+            self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
+        else:
+            self.fit_line = None
+            y1 = y2 = 0.0
 
         tail_ys = [p.y() for seg in self.extrap_tails for p in seg]
         ylim = max(max((abs(v) for v in ys), default=0.0),
                    max((abs(v) for v in tail_ys), default=0.0),
+                   max((abs(v) for v in fam_y), default=0.0),
                    abs(y1), abs(y2), 5.0) * 1.2
         self.y_min, self.y_max = -ylim, ylim
         self.update()
@@ -2778,6 +2795,29 @@ class TrimCurveWidget(CurveWidget):
         self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
         self.update()
 
+    def set_family(self, curves):
+        """Ghost-overlay the STORED multi-speed calibration family.
+
+        ``curves`` is a list of point-lists [(trim_frac, u_frac), ...] in
+        display space (the dialog mirrors stored offsets back to measured-
+        axis space). Ghosts render behind everything; the selected/new curve
+        is drawn on top through the normal :meth:`set_result` path. When no
+        result is loaded the view fits the family; a later set_result()
+        re-fits around its own data and widens for the ghosts.
+        """
+        self.family_polylines = [
+            sorted((QPointF(t * 100.0, u * 100.0) for t, u in c),
+                   key=lambda p: p.x())
+            for c in curves if len(c) >= 2
+        ]
+        if self.family_polylines and not self.curve_polyline:
+            xs = [p.x() for c in self.family_polylines for p in c]
+            ys = [p.y() for c in self.family_polylines for p in c]
+            self.x_min, self.x_max = min(xs) - 4.0, max(xs) + 4.0
+            ylim = max(max(abs(v) for v in ys), 5.0) * 1.2
+            self.y_min, self.y_max = -ylim, ylim
+        self.update()
+
     def clear(self):
         self.sample_points = []
         self.flagged_indices = set()
@@ -2785,6 +2825,7 @@ class TrimCurveWidget(CurveWidget):
         self.curve_polyline = []
         self.extrap_tails = []
         self.live_point = None
+        self.family_polylines = []
         # Back to the stable full-scale measuring view (a previous result may
         # have zoomed the axes to its data).
         self.x_min, self.x_max = -100.0, 100.0
@@ -2864,6 +2905,15 @@ class TrimCurveWidget(CurveWidget):
         self._draw_zero_axes(painter)
         self.draw_axis_labels(painter)
 
+        # Stored family ghosts: behind everything, translucent — context for
+        # the highlighted/new curve drawn through the normal layers on top.
+        if self.family_polylines:
+            painter.setPen(QPen(QColor(128, 128, 128, 110), 1))
+            for poly in self.family_polylines:
+                wpts = [self.map_to_widget_space(p) for p in poly]
+                for a, b in zip(wpts, wpts[1:]):
+                    painter.drawLine(a, b)
+
         # Static best-fit: dotted, de-emphasized — the calibrated curve is the
         # recommended output; the fit is the legacy single-gain reference.
         if self.fit_line is not None:
@@ -2904,10 +2954,37 @@ class TrimCurveWidget(CurveWidget):
         if not self._enabled:
             self.apply_disabled_overlay(painter)
 
-    # ---- read-only: disable point editing -----------------------------------
+    # ---- read-only: no point editing; right-click hits family curves --------
+
+    # Emitted with the family-polyline index under a right-click; the dialog
+    # owns the context menu and the delete flow (with all its gating).
+    curve_context_requested = pyqtSignal(int)
+
+    def _family_hit_test(self, wp, radius=6.0):
+        """Index of the family polyline within ``radius`` px of widget-space
+        point ``wp`` (nearest point-to-segment distance), or None."""
+        best, best_d = None, radius
+        for i, poly in enumerate(self.family_polylines):
+            pts = [self.map_to_widget_space(p) for p in poly]
+            for a, b in zip(pts, pts[1:]):
+                dx, dy = b.x() - a.x(), b.y() - a.y()
+                seg2 = dx * dx + dy * dy
+                if seg2 <= 1e-9:
+                    px, py = a.x(), a.y()
+                else:
+                    t = ((wp.x() - a.x()) * dx + (wp.y() - a.y()) * dy) / seg2
+                    t = max(0.0, min(1.0, t))
+                    px, py = a.x() + t * dx, a.y() + t * dy
+                d = ((wp.x() - px) ** 2 + (wp.y() - py) ** 2) ** 0.5
+                if d < best_d:
+                    best, best_d = i, d
+        return best
 
     def mousePressEvent(self, event):
-        pass
+        if event.button() == Qt.MouseButton.RightButton and self.family_polylines:
+            idx = self._family_hit_test(QPointF(event.position()))
+            if idx is not None:
+                self.curve_context_requested.emit(idx)
 
     def mouseMoveEvent(self, event):
         pass

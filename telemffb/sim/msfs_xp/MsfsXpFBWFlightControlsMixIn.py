@@ -135,7 +135,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
                 elev_trim = clamp(t_damp * self.joystick_trim_follow_gain_physical_y, -1, 1)
                 # Calibrated curve when enabled, else the legacy static gain.
-                virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim)
+                virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim, telem_data)
 
                 # Curve mode walks the spring center along the measured curve
                 # (axis units) so held-stick force trims off at the aircraft's
