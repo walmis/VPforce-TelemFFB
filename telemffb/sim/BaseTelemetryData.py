@@ -180,8 +180,28 @@ class BaseTelemetryData:
     """
 
     Vle: Optional[float]
-    """Maximum landing-gear-extended speed.  
-    Currently not populated by any sim.  
+    """Maximum landing-gear-extended speed.
+    XP: Read from the X-Plane plugin (acf_Vle, converted kt -> m/s).
+    Other sims: not available.
+    """
+
+    Vfe: Optional[float]
+    """Maximum flaps-extended speed.
+    XP: Read from the X-Plane plugin (acf_Vfe, converted kt -> m/s).
+    Other sims: not available.
+    """
+
+    Vno: Optional[float]
+    """Maximum structural cruising speed (level-flyable in smooth air).
+    XP: Read from the X-Plane plugin (acf_Vno, converted kt -> m/s).
+    Other sims: not available (MSFS has no equivalent; DESIGN SPEED VC is
+    the closest level-flight ceiling).
+    """
+
+    Vs: Optional[float]
+    """Clean-configuration stall speed.
+    XP: Read from the X-Plane plugin (acf_Vs, converted kt -> m/s).
+    MSFS: not populated — use DesignSpeed[2] (VS1).
     """
 
     Vne: Optional[float]

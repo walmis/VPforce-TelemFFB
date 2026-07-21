@@ -337,22 +337,48 @@ class TrimCalibrationDialog(QDialog):
         # State: prefix instead of starting at the (wide) second grid column,
         # and the label reserves two text lines so an occasional word-wrap
         # cannot bounce the layout below it up and down.
+        # Suggested calibration speeds sit directly under the IAS value the
+        # user is watching while picking a test speed. Split into a name
+        # label (InfoLabel — the icon belongs after the NAME, not trailing
+        # the numbers) and a rich-text value label (bold/struck speeds).
+        suggest_row = QHBoxLayout()
+        self.lbl_suggest_name = InfoLabel(
+            text="Suggested calibration speeds:",
+            tooltip=(
+                "Derived from the aircraft's declared speed envelope:\n"
+                "low = 1.3 × clean stall, high = maximum level-flight speed\n"
+                "(design cruise / Vno, capped below the red-line), plus a\n"
+                "midpoint on wide envelopes.\n\n"
+                "Suggestions only — there is no requirement to calibrate\n"
+                "them all. The LOW and HIGH speeds matter most.\n"
+                "A struck-out speed already has a stored calibration\n"
+                "within ±5 kt."))
+        self.lbl_suggest_name.setTextStyleSheet("QLabel { color: gray; }")
+        suggest_row.addWidget(self.lbl_suggest_name)
+        self.lbl_suggest = QLabel()
+        self.lbl_suggest.setTextFormat(Qt.TextFormat.RichText)
+        self.lbl_suggest.setStyleSheet("QLabel { color: gray; }")
+        suggest_row.addWidget(self.lbl_suggest)
+        suggest_row.addStretch(1)
+        grid.addLayout(suggest_row, 2, 0, 1, 5)
+        self._set_suggest_visible(False)
+
         state_row = QHBoxLayout()
         state_row.addWidget(QLabel("<b>State:</b>"), 0, Qt.AlignmentFlag.AlignTop)
         self.lbl_state.setWordWrap(True)
         self.lbl_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.lbl_state.setMinimumHeight(2 * self.lbl_state.fontMetrics().lineSpacing())
         state_row.addWidget(self.lbl_state, 1)
-        grid.addLayout(state_row, 2, 0, 1, 5)
+        grid.addLayout(state_row, 3, 0, 1, 5)
         # Left-justified so the light sits at a fixed position — right-
         # aligned, the whole line (light included) shifted with text length.
         self.lbl_ready = QLabel("●  —")
-        grid.addWidget(self.lbl_ready, 3, 0, 1, 5, alignment=Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(self.lbl_ready, 4, 0, 1, 5, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
-        grid.addWidget(self.progress, 4, 0, 1, 5)
+        grid.addWidget(self.progress, 5, 0, 1, 5)
         root.addWidget(status_box)
 
         # ---- result ----
@@ -799,6 +825,7 @@ class TrimCalibrationDialog(QDialog):
                         self.curve.clear()
                         self._clear_result_labels()
                         self._show_stored_curve()
+                self._update_speed_suggestions(data)
 
             if cal.state == CalState.DONE and cal.result and not self._result_shown:
                 self._show_result(cal.result)
@@ -814,6 +841,9 @@ class TrimCalibrationDialog(QDialog):
         self._result_shown = False
         self.curve.clear()
         self._clear_result_labels()
+        # Aircraft changed: last aircraft's speed suggestions are stale;
+        # the next live frame recomputes them for the new one.
+        self._set_suggest_visible(False)
         if cal is not None and cal.state == CalState.DONE and cal.result:
             self._show_result(cal.result)
         else:
@@ -1155,6 +1185,31 @@ class TrimCalibrationDialog(QDialog):
         if menu.exec(QCursor.pos()) == act:
             self._fam_sel = index
             self._on_family_delete()
+
+    def _set_suggest_visible(self, visible):
+        self.lbl_suggest_name.setVisible(visible)
+        self.lbl_suggest.setVisible(visible)
+
+    def _update_speed_suggestions(self, data):
+        """Refresh the passive suggested-speeds line from live telemetry;
+        stored-covered speeds render struck-through."""
+        sugg = utils.suggest_calibration_speeds(
+            data, getattr(G.settings_mgr, "current_sim", "") if G.settings_mgr else "")
+        if not sugg:
+            if self.lbl_suggest.isVisible():
+                self._set_suggest_visible(False)
+            return
+        parts = []
+        for s in sugg:
+            covered = any(abs(e["ias_kt"] - s) <= self.FAMILY_REPLACE_KT
+                          for e in self._fam)
+            parts.append(f"<s>{s}</s>" if covered else f"<b>{s}</b>")
+        text = " &nbsp;·&nbsp; ".join(parts) + " &nbsp;kt"
+        if self.lbl_suggest.text() != text:
+            self.lbl_suggest.setText(text)
+        if not self.lbl_suggest.isVisible():
+            self._set_suggest_visible(True)
+            self._refit()
 
     def _sync_stick_pos_combo(self, value):
         want = value if value in self.STICK_POSITION_MODES \
@@ -1623,6 +1678,9 @@ class TrimCalibrationDialog(QDialog):
             self._clear_result_labels()
             self.curve.clear()
             self._show_stored_curve()
+            # Suggestions need live telemetry; the offline-edited aircraft's
+            # envelope is not on the wire.
+            self._set_suggest_visible(False)
             if self._offline_target_valid():
                 self._set_ready(False, "Offline editing — run calibrations with a live sim")
             else:

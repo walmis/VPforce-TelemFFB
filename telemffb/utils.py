@@ -1450,6 +1450,66 @@ def parse_trim_follow_curve(value):
     return mid["xs"], mid["ys"]
 
 
+def suggest_calibration_speeds(telem_data, sim):
+    """Suggest 2-3 trim-calibration speeds (knots, rounded to 5) from the
+    aircraft's declared speed envelope, or [] when the data is implausible.
+
+    Anchors (clean configuration — calibrations are config-specific):
+    LOW = 1.3 x clean stall (approach-margin factor: safely level-flyable,
+    solidly in the nose-up trim region). HIGH = the max LEVEL-FLIGHT speed,
+    not the red-line (most aircraft cannot hold Vne level): MSFS design
+    cruise VC capped at 0.85 x the red-line, X-Plane Vno capped the same
+    way. MIDDLE = the midpoint, only when the envelope is wide enough to
+    need it (high/low > 1.6). All telemetry sources are m/s (the sims'
+    kt/ft-per-s units are normalized upstream).
+
+    Guards degrade to fewer (or no) suggestions rather than ever returning
+    a confidently wrong number: MSFS's VS1 defaults to 0 when absent from
+    the flightmodel, VC can be an internal estimate, and X-Plane datarefs
+    can hold junk on oddball aircraft.
+    """
+    def pos(v):
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return None
+        return v if v > 0 else None
+
+    kt = 1.94384  # m/s -> knots
+    vs = level_max = redline = None
+    if sim == "MSFS":
+        ds = getattr(telem_data, "DesignSpeed", None)
+        if ds is not None and len(ds) >= 3:
+            level_max = pos(ds[0])   # VC (design cruise)
+            vs = pos(ds[2])          # VS1 (clean stall)
+        redline = pos(getattr(telem_data, "RefMaxIAS", None))
+        if redline is None:
+            vne_kt = pos(getattr(telem_data, "Vne_kt", None))
+            redline = vne_kt / kt if vne_kt else None
+    elif sim == "XPLANE":
+        vs = pos(getattr(telem_data, "Vs", None))
+        level_max = pos(getattr(telem_data, "Vno", None))
+        redline = pos(getattr(telem_data, "Vne", None))
+    if vs is None or level_max is None:
+        return []
+
+    low = 1.3 * vs * kt
+    high = level_max * kt
+    if redline:
+        high = min(high, 0.85 * redline * kt)
+    if low < 40.0 or high <= low * 1.15:
+        return []
+    speeds = [low, high]
+    if high / low > 1.6:
+        speeds.insert(1, (low + high) / 2.0)
+    rounded = [int(round(s / 5.0) * 5) for s in speeds]
+    out = [rounded[0]]
+    for s in rounded[1:]:
+        if s - out[-1] >= 15:   # comfortably clear of the replace window
+            out.append(s)
+    return out if len(out) >= 2 else []
+
+
 def trim_follow_blend(fam, t, ias_kt, include_r=True):
     """Evaluate the multi-speed trim-follow offset at trim ``t`` (ElevTrimPct
     space) and speed ``ias_kt`` (knots).

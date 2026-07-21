@@ -7,7 +7,7 @@ import pytest
 
 from telemffb.utils import (
     parse_trim_follow_curve, parse_trim_follow_family, trim_follow_blend,
-    piecewise_linear,
+    piecewise_linear, suggest_calibration_speeds,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.msfs, pytest.mark.joystick]
@@ -150,3 +150,62 @@ class TestBlend:
         fam = parse_trim_follow_family(json.dumps(entry(100, 0.0, 14.0, half=0.05)))
         assert trim_follow_blend(fam, 0.5, 100) == 1.0
         assert trim_follow_blend(fam, -0.5, 100) == -1.0
+
+
+class _Telem:
+    """Attribute bag standing in for BaseTelemetryData."""
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+class TestSpeedSuggestions:
+    def test_msfs_c172_shape(self):
+        # C172-ish: Vc 63 m/s (~122 kt), Vs1 25 m/s (~49 kt), red-line
+        # 84 m/s (~163 kt). Wide envelope -> three anchors; matches the
+        # field-chosen speeds (67.8 / 100.4 / 125.6) within rounding.
+        td = _Telem(DesignSpeed=[63.0, 24.0, 25.0], RefMaxIAS=84.0)
+        assert suggest_calibration_speeds(td, "MSFS") == [65, 95, 120]
+
+    def test_msfs_redline_caps_cruise(self):
+        # Design cruise beyond 0.85x red-line gets capped.
+        td = _Telem(DesignSpeed=[80.0, 24.0, 25.0], RefMaxIAS=84.0)
+        out = suggest_calibration_speeds(td, "MSFS")
+        assert out[-1] == 140  # 0.85 * 84 m/s = 71.4 m/s ~ 138.8 kt -> 140
+
+    def test_msfs_vne_kt_fallback_when_no_refmax(self):
+        td = _Telem(DesignSpeed=[63.0, 24.0, 25.0], RefMaxIAS=None,
+                    Vne_kt=163.0)
+        assert suggest_calibration_speeds(td, "MSFS") == [65, 95, 120]
+
+    def test_xplane_shape(self):
+        # Vs 30 m/s, Vno 70 m/s, Vne 90 m/s (all m/s from the plugin).
+        td = _Telem(Vs=30.0, Vno=70.0, Vne=90.0)
+        assert suggest_calibration_speeds(td, "XPLANE") == [75, 105, 135]
+
+    def test_narrow_envelope_two_anchors(self):
+        # high/low <= 1.6: no midpoint, but both anchors survive.
+        td = _Telem(Vs=30.0, Vno=50.0, Vne=65.0)
+        assert suggest_calibration_speeds(td, "XPLANE") == [75, 95]
+
+    def test_anchors_collapsing_after_rounding_degrade_to_none(self):
+        # An envelope so tight the anchors land within the separation gate
+        # yields no suggestions rather than a near-duplicate pair.
+        td = _Telem(Vs=30.0, Vno=45.0, Vne=60.0)
+        assert suggest_calibration_speeds(td, "XPLANE") == []
+
+    def test_guards_reject_implausible_data(self):
+        # MSFS VS1 defaults to 0 when absent from the flightmodel.
+        assert suggest_calibration_speeds(
+            _Telem(DesignSpeed=[63.0, 24.0, 0.0], RefMaxIAS=84.0), "MSFS") == []
+        # missing envelope entirely
+        assert suggest_calibration_speeds(_Telem(), "MSFS") == []
+        assert suggest_calibration_speeds(_Telem(), "XPLANE") == []
+        # no meaningful separation between low and high
+        assert suggest_calibration_speeds(
+            _Telem(Vs=40.0, Vno=42.0, Vne=90.0), "XPLANE") == []
+        # absurdly slow "low" anchor
+        assert suggest_calibration_speeds(
+            _Telem(Vs=10.0, Vno=15.0, Vne=20.0), "XPLANE") == []
+        # unknown sim
+        assert suggest_calibration_speeds(
+            _Telem(Vs=30.0, Vno=70.0), "DCS") == []
