@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import html
+import logging
 import os.path
 from typing import Optional
 
@@ -28,7 +29,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayo
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
-    QLinearGradient, QFont
+    QLinearGradient, QFont, QIcon
 from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
 
 from PyQt6.QtCore import Qt
@@ -150,6 +151,51 @@ class DetachedTabWindow(QtWidgets.QMainWindow):
         if self.centralWidget() is not None:
             self.reattachRequested.emit(self._title)
         super().closeEvent(e)
+
+def svg_icon(svg_name, color="#d0d0d0", disabled_color="#707070", size=20):
+    """Build a QIcon from a ``currentColor`` SVG, rendered at explicit
+    colors — standalone SVG rendering resolves currentColor to black, which
+    is invisible on the dark theme. One source file yields the normal and
+    disabled variants, crisp at 2x for scaled displays.
+
+    Loads from the compiled Qt resource (":/image/<name>") when present so
+    frozen builds work once the SVG is added to the resource file, falling
+    back to the source tree (utils.get_resource_path) for dev runs.
+    """
+    from PyQt6.QtCore import QFile, QIODevice
+    from PyQt6.QtSvg import QSvgRenderer
+    data = None
+    qf = QFile(f":/image/{svg_name}")
+    if qf.exists() and qf.open(QIODevice.OpenModeFlag.ReadOnly):
+        data = bytes(qf.readAll())
+        qf.close()
+    else:
+        import telemffb.utils as _utils  # local: avoids import cycle
+        try:
+            with open(_utils.get_resource_path(f"image/{svg_name}"), "rb") as f:
+                data = f.read()
+        except OSError as e:
+            logging.warning(f"svg_icon: could not load {svg_name} ({e})")
+            return QIcon()
+    # Render at the APPLICATION's device-pixel ratio (the HiDpiPixmap
+    # pattern) — a hardcoded ratio draws oversized/clipped on displays
+    # running a different scale.
+    app = QGuiApplication.instance()
+    ratio = app.devicePixelRatio() if app is not None else 1.0
+    icon = QIcon()
+    for col, mode in ((color, QIcon.Mode.Normal),
+                      (disabled_color, QIcon.Mode.Disabled)):
+        svg = data.replace(b'fill="currentColor"', f'fill="{col}"'.encode())
+        renderer = QSvgRenderer(svg)
+        pm = QPixmap(round(size * ratio), round(size * ratio))
+        pm.setDevicePixelRatio(ratio)
+        pm.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pm)
+        renderer.render(painter)
+        painter.end()
+        icon.addPixmap(pm, mode)
+    return icon
+
 
 class ElidedLabel(QLabel):
     """QLabel that elides its text at a fixed pixel budget so long values

@@ -8743,6 +8743,118 @@
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
+		<!-- Elevator trim-curve calibration is fixed-wing only: exclude the
+		     curve settings (NOT trim_following itself - helicopters use
+		     cyclic trim-following) for every helicopter class. These
+		     exclusions also drive the main-window calibration prompt. -->
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!TaogH500Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!TaogH500Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!TaogH500Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>max_aileron_coeff</name>
 			<type>GliderAircraft</type>
@@ -10052,6 +10164,44 @@
 			<name>joystick_trim_follow_stick_position</name>
 			<type>JetAircraft</type>
 			<value>Stays Centered</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<!-- Elevator trim-curve calibration is fixed-wing only: exclude the
+		     curve settings for the helicopter classes (see MSFS section). -->
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!XAW109Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>joystick</device>
 		</classdefaults_XPLANE>

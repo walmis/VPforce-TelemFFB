@@ -42,7 +42,8 @@ import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.custom_widgets import (
-    IasTrendWidget, InfoLabel, NoWheelComboBox, TrimCurveWidget, vpf_purple,
+    IasTrendWidget, InfoLabel, NoWheelComboBox, TrimCurveWidget, svg_icon,
+    vpf_purple,
 )
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState, TrimCalibrator
 
@@ -96,7 +97,10 @@ class TrimCalibrationDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Elevator Trim Calibration (Joystick)")
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
-        self.setMinimumWidth(560)
+        # No explicit minimum width: an explicit minimum OVERRIDES the
+        # layout-derived one in Qt, which allowed the window to be squeezed
+        # below what the stored-family row needs (controls overlapped
+        # instead of the resize stopping). Let the layout derive it.
 
         self._last_result = None
         self._result_shown = False
@@ -176,11 +180,17 @@ class TrimCalibrationDialog(QDialog):
             "Set your test speed with the throttle, wait for the assistant to report "
             "steady (the Start button enables), then start the sweep.</li>"
             "<li>Press <b>Start</b> — TelemFFB will fly the aircraft while it sweeps the "
-            "elevator trim and measures the required stick input, then recommends a "
-            "trim-following <i>curve</i> (with the equivalent static "
-            "<i>Y&nbsp;Trim&nbsp;Gain&nbsp;Virtual</i> value) to hold the nose level as "
-            "you trim. Your stick is <b>inactive</b> during calibration — its input is "
-            "disconnected while TelemFFB has the controls.</li>"
+            "elevator trim and measures the stick input needed to hold the nose level, "
+            "producing a calibrated trim curve <b>for the current airspeed</b>. Your "
+            "stick is <b>inactive</b> during calibration — its input is disconnected "
+            "while TelemFFB has the controls.</li>"
+            "<li><b>Save</b>, then repeat at 2–3 different airspeeds (slow flight, "
+            "cruise, high cruise) — the window stays ready after each save. In flight, "
+            "TelemFFB blends the stored speeds by airspeed, so trim behaves correctly "
+            "across the whole envelope.</li>"
+            "<li>The <b>Stored speeds</b> row reviews each calibration (all are shown "
+            "on the graph), deletes individually, and exports/imports complete "
+            "calibration sets to share between users.</li>"
             "</ol>"
         )
         self.lbl_instructions.setWordWrap(True)
@@ -209,6 +219,9 @@ class TrimCalibrationDialog(QDialog):
                 "while watching a porpoise develop during stabilization. The change applies\n"
                 "immediately (during the brief polarity probe it is applied when the probe\n"
                 "completes); once the sweep starts the setting locks for the rest of the run."))
+        # InfoLabel's internal minimum is broken (width pinned to text
+        # HEIGHT), so it truncates under squeeze — enforce content width.
+        lbl_response.setMinimumWidth(lbl_response.sizeHint().width())
         response_row.addWidget(lbl_response)
         self.cmb_response = QComboBox()
         self.cmb_response.addItems([
@@ -250,6 +263,9 @@ class TrimCalibrationDialog(QDialog):
                     "the calibration commands and observes (trimcal_trace_*.csv in "
                     "the TelemFFB log folder) — attach it when reporting a problem "
                     "aircraft."))
+            # InfoLabel's internal minimum is broken (width pinned to text
+            # HEIGHT), so it truncates under squeeze — enforce content width.
+            lbl_trim_method.setMinimumWidth(lbl_trim_method.sizeHint().width())
             debug_row.addWidget(lbl_trim_method)
             self.cmb_trim_method = QComboBox()
             self.cmb_trim_method.addItems([
@@ -370,9 +386,13 @@ class TrimCalibrationDialog(QDialog):
                  " border-radius: 4px; }"
                  "QToolButton:disabled { color: #808080; }")
 
-        def _tool_btn(text, tooltip=None):
+        def _tool_btn(text=None, icon=None, tooltip=None):
             b = QToolButton()
-            b.setText(text)
+            if icon is not None:
+                b.setIcon(icon)
+                b.setIconSize(QtCore.QSize(20, 20))
+            if text is not None:
+                b.setText(text)
             if tooltip:
                 b.setToolTip(tooltip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -409,23 +429,30 @@ class TrimCalibrationDialog(QDialog):
         fam_row.addWidget(self.btn_fam_next)
         fam_row.addSpacing(10)
         self.btn_fam_delete = _tool_btn(
-            text="Delete", tooltip="Delete the selected calibration "
-                                   "(or right-click a curve on the plot)")
+            icon=svg_icon("delete.svg"),
+            tooltip="Delete the selected calibration "
+                    "(or right-click a curve on the plot)")
         self.btn_fam_delete.clicked.connect(self._on_family_delete)
         fam_row.addWidget(self.btn_fam_delete)
         self.btn_fam_clear = _tool_btn(
-            text="Clear all", tooltip="Delete all stored calibrations")
+            icon=svg_icon("delete-all.svg"),
+            tooltip="Delete all stored calibrations")
         self.btn_fam_clear.clicked.connect(self._on_family_clear)
         fam_row.addWidget(self.btn_fam_clear)
-        fam_row.addSpacing(10)
+        fam_row.addSpacing(6)
+        fam_sep = QFrame()
+        fam_sep.setFrameShape(QFrame.Shape.VLine)
+        fam_sep.setFrameShadow(QFrame.Shadow.Sunken)
+        fam_row.addWidget(fam_sep)
+        fam_row.addSpacing(6)
         self.btn_fam_export = _tool_btn(
-            text="Export…",
+            icon=svg_icon("file-download.svg"),
             tooltip="Export this aircraft's stored calibrations to a file "
                     "another user can import")
         self.btn_fam_export.clicked.connect(self._on_family_export)
         fam_row.addWidget(self.btn_fam_export)
         self.btn_fam_import = _tool_btn(
-            text="Import…",
+            icon=svg_icon("file-upload.svg"),
             tooltip="Import a shared calibration file for this aircraft "
                     "(replaces the stored set)")
         self.btn_fam_import.clicked.connect(self._on_family_import)
@@ -436,7 +463,7 @@ class TrimCalibrationDialog(QDialog):
         # Trimmed-stick-position mode: an airframe description, adjustable
         # post-calibration and persisted immediately (no Save required).
         pos_row = QHBoxLayout()
-        pos_row.addWidget(InfoLabel(
+        lbl_stick_pos = InfoLabel(
             text="Trimmed stick position:",
             tooltip=(
                 "Where the stick rests when the aircraft is trimmed, once\n"
@@ -451,7 +478,9 @@ class TrimCalibrationDialog(QDialog):
                 "to this.\n\n"
                 "Force behavior is identical in both modes (trimmed = zero\n"
                 "force, out-of-trim = force); only the resting geometry\n"
-                "differs. Changes apply and save immediately.")))
+                "differs. Changes apply and save immediately."))
+        lbl_stick_pos.setMinimumWidth(lbl_stick_pos.sizeHint().width())
+        pos_row.addWidget(lbl_stick_pos)
         self.cmb_stick_pos = NoWheelComboBox()
         self.cmb_stick_pos.addItems(list(self.STICK_POSITION_MODES))
         self.cmb_stick_pos.currentTextChanged.connect(self._on_stick_pos_changed)
@@ -488,11 +517,16 @@ class TrimCalibrationDialog(QDialog):
             "already complete). Cancelling the assistant leaves the trim where it\n"
             "is — the aircraft stays trimmed for the current power.")
         self.btn_assist.clicked.connect(self._on_assist)
+        # QPushButton's minimum hint is smaller than its text (Qt clips the
+        # label under squeeze) — pin it so the HINT label yields instead:
+        # word-wrapped, its minimum width collapses and the fit machinery
+        # absorbs the extra line when narrow.
+        self.btn_assist.setMinimumWidth(self.btn_assist.sizeHint().width())
         assist_row.addWidget(self.btn_assist)
         lbl_assist = QLabel("Levels and trims the aircraft for you while you set your test speed")
         lbl_assist.setStyleSheet("QLabel { color: gray; }")
-        assist_row.addWidget(lbl_assist)
-        assist_row.addStretch(1)
+        lbl_assist.setWordWrap(True)
+        assist_row.addWidget(lbl_assist, stretch=1)
         root.addLayout(assist_row)
 
         line = QFrame()
@@ -520,6 +554,12 @@ class TrimCalibrationDialog(QDialog):
         btns.addWidget(self.btn_apply)
         btns.addWidget(self.btn_save)
         btns.addWidget(self.btn_close)
+        # Same clip-under-squeeze protection as the assist button: pin each
+        # bottom-row button's minimum to its content so the layout minimum
+        # (and thus the window's) accounts for their full labels.
+        for b in (self.btn_start, self.btn_stop, self.btn_apply,
+                  self.btn_save, self.btn_close):
+            b.setMinimumWidth(b.sizeHint().width())
         root.addLayout(btns)
 
     # ---- telemetry plumbing -------------------------------------------------
@@ -551,6 +591,17 @@ class TrimCalibrationDialog(QDialog):
         return G.settings_mgr is not None and \
             getattr(G.settings_mgr, "offline_mode", False)
 
+    @staticmethod
+    def _offline_target_valid():
+        """True when the offline editor has an actual aircraft selected.
+        Entering offline mode RETAINS the online aircraft's identity fields
+        and leaves offline_scope None until a selection is made — in that
+        limbo, offline writes silently hit the scope-match fall-through and
+        persist NOTHING, so nothing write-shaped may be offered."""
+        sm = G.settings_mgr
+        return bool(sm and getattr(sm, "offline_scope", None)
+                    and sm.current_sim and sm.current_aircraft_name)
+
     def _offline_settings(self):
         """Prereq-filtered settings of the profile selected in the OFFLINE
         editor, as {name: value} with units applied (the same to_number
@@ -560,6 +611,12 @@ class TrimCalibrationDialog(QDialog):
         before offline mode was entered; never display state from it."""
         if not self._offline_editing():
             return None
+        if not self._offline_target_valid():
+            # Offline with nothing selected: the identity fields still hold
+            # the ONLINE aircraft — reading through them would display (and
+            # invite edits against) an aircraft the offline editor is not
+            # actually targeting. Present a clean empty state instead.
+            return {}
         sm = G.settings_mgr
         try:
             _, _, result = xmlutils.read_single_model(
@@ -577,8 +634,11 @@ class TrimCalibrationDialog(QDialog):
         the matched settings pattern as fallback."""
         sm = G.settings_mgr
         if self._offline_editing():
-            name = sm.current_aircraft_name or sm.current_pattern or "—"
-            text = f"<b>Aircraft:</b> {html.escape(name)}  <i>(offline editor)</i>"
+            if self._offline_target_valid():
+                name = sm.current_aircraft_name or sm.current_pattern or "—"
+                text = f"<b>Aircraft:</b> {html.escape(name)}  <i>(offline editor)</i>"
+            else:
+                text = "<b>Aircraft:</b> —  <i>(offline editor — no aircraft selected)</i>"
         else:
             name = getattr(G.telem_manager, "currentAircraftName", None) \
                 if G.telem_manager else None
@@ -599,7 +659,12 @@ class TrimCalibrationDialog(QDialog):
             # Judge the EDITED profile, not the stale live aircraft. Prereq
             # filtering drops trim_following when axis control is off, so
             # "missing" reads as disabled — the same semantics the live
-            # aircraft would have.
+            # aircraft would have. With NO aircraft selected there is
+            # nothing to judge: no banner (an empty settings dict would
+            # otherwise read as "axis control disabled" — misleading).
+            if not self._offline_target_valid():
+                self.warn_tf.setVisible(False)
+                return
             vals = self._offline_settings()
             show = (G.device_type == "joystick" and vals is not None
                     and vals.get("trim_following") is not True)
@@ -854,9 +919,13 @@ class TrimCalibrationDialog(QDialog):
         self.btn_fam_clear.setEnabled(editable)
         # Export = read-only, works everywhere something is stored. Import
         # deliberately works in OFFLINE mode too (install a shared file for
-        # an aircraft that is not loaded); only an active run blocks it.
+        # an aircraft that is not loaded) — but only against a real offline
+        # SELECTION: with none, offline writes hit the scope fall-through
+        # and silently persist nothing.
         self.btn_fam_export.setEnabled(n > 0)
-        self.btn_fam_import.setEnabled(not running)
+        self.btn_fam_import.setEnabled(
+            not running and (not self._offline_editing()
+                             or self._offline_target_valid()))
         self.cmb_stick_pos.setEnabled(not running and not self._offline_editing())
 
     def _step_family(self, delta):
@@ -985,6 +1054,8 @@ class TrimCalibrationDialog(QDialog):
         cal = self._calibrator()
         if cal is not None and cal.active:
             return
+        if self._offline_editing() and not self._offline_target_valid():
+            return  # backstop: offline writes without a selection go nowhere
         path, _ = QFileDialog.getOpenFileName(
             self, "Import trim calibrations", "",
             "TelemFFB Trim Calibration (*.json);;All files (*)")
@@ -1552,7 +1623,11 @@ class TrimCalibrationDialog(QDialog):
             self._clear_result_labels()
             self.curve.clear()
             self._show_stored_curve()
-            self._set_ready(False, "Offline editing — run calibrations with a live sim")
+            if self._offline_target_valid():
+                self._set_ready(False, "Offline editing — run calibrations with a live sim")
+            else:
+                self._set_ready(False, "Offline editing — select an aircraft "
+                                       "in the Offline Editor to view its calibrations")
             self.btn_start.setEnabled(False)
             self.btn_assist.setEnabled(False)
             return
