@@ -1480,15 +1480,37 @@ def suggest_calibration_speeds(telem_data, sim):
     if sim == "MSFS":
         ds = getattr(telem_data, "DesignSpeed", None)
         if ds is not None and len(ds) >= 3:
-            level_max = pos(ds[0])   # VC (design cruise)
-            vs = pos(ds[2])          # VS1 (clean stall)
-        redline = pos(getattr(telem_data, "RefMaxIAS", None))
+            level_max = pos(ds[0])   # VC (design cruise) — TAS-referenced
+            vs = pos(ds[2])          # VS1 (clean stall) — indicated
+        # VC (flightmodel.cfg cruise_speed) is TAS at the design cruise
+        # altitude, but suggestions are IAS targets: scale by the LIVE
+        # IAS/TAS ratio — the exact conversion for the air currently being
+        # flown in, no assumed altitude (and correctly altitude-aware:
+        # achievable IAS falls as the user climbs). Guarded to a sane band;
+        # outside it (or on the ground) the raw value stands, which field
+        # data shows is a good low-altitude approximation for GA anyway.
+        ratio = 1.0
+        ias = pos(getattr(telem_data, "IAS", None))
+        tas = pos(getattr(telem_data, "TAS", None))
+        if ias and tas and tas > 5.0 and 0.5 <= ias / tas <= 1.05:
+            ratio = ias / tas
+        if level_max is not None:
+            level_max *= ratio
+        redline = pos(getattr(telem_data, "RefMaxIAS", None))  # indicated: no scaling
         if redline is None:
+            # The estimated Vne is VC-derived, so it is TAS-referenced too.
             vne_kt = pos(getattr(telem_data, "Vne_kt", None))
-            redline = vne_kt / kt if vne_kt else None
+            redline = (vne_kt / kt) * ratio if vne_kt else None
     elif sim == "XPLANE":
         vs = pos(getattr(telem_data, "Vs", None))
-        level_max = pos(getattr(telem_data, "Vno", None))
+        # Vno is a structural LIMIT (top of the green arc), not a
+        # performance capability — draggy GA aircraft often cannot hold it
+        # in level flight (X-Plane's C172 tops out well below it). 0.9x
+        # errs conservative: an unreachable suggestion strands the user
+        # chasing a number; a slightly low one costs a few knots the
+        # blend's edge-clamping absorbs.
+        vno = pos(getattr(telem_data, "Vno", None))
+        level_max = 0.9 * vno if vno is not None else None
         redline = pos(getattr(telem_data, "Vne", None))
     if vs is None or level_max is None:
         return []

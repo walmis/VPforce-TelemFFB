@@ -380,6 +380,7 @@ class SimConnectManager(threading.Thread):
         SimVarArray("AccRotBody", "ROTATION ACCELERATION BODY <>", "degrees per second squared", keywords=("X", "Y", "Z")),
         SimVarArray("DesignSpeed", "DESIGN SPEED <>", "meter/second", keywords=("VC", "VS0", "VS1")),
         SimVar("RefMaxIAS", "REFERENCE SPEED MAX IAS", "meter/second"),
+        SimVar("RefMaxIAS_kt", "REFERENCE SPEED MAX IAS", "knots"),
         SimVar("VerticalSpeed", "VERTICAL SPEED", "meter/second"),
         SimVarArray("Brakes", "BRAKE <> POSITION", "Position", keywords=("LEFT", "RIGHT")),
         #SimVar("LinearCLAlpha", "LINEAR CL ALPHA", "Per Radian"),

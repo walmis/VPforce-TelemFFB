@@ -1797,11 +1797,12 @@ class SettingsLayout(QGridLayout):
 
         Connected to TrimCalibrationDialog.result_saved. The payload carries
         the multi-speed curve family ("curves", written as the family JSON),
-        the use-curve choice, and optionally the static gain (absent for
-        family edits — delete/clear — which change no measurement) and the
-        trimmed-stick-position mode. A legacy "curve" (single dict) payload
-        is accepted and wrapped. Mirrors the write + reload pattern of the
-        advanced spring editor.
+        the use-curve choice, and optionally the trimmed-stick-position
+        mode. A legacy "curve" (single dict) payload is accepted and
+        wrapped. The static virtual_y gain is deliberately NOT written —
+        the curve is the product, and the gain is entangled with the
+        physical-gain setting at solve time. Mirrors the write + reload
+        pattern of the advanced spring editor.
         """
         try:
             payload = json.loads(payload_json)
@@ -1812,10 +1813,6 @@ class SettingsLayout(QGridLayout):
         sim = G.settings_mgr.current_sim
         cls = G.settings_mgr.current_class
         pattern = G.settings_mgr.current_pattern
-        if payload.get("virtual_y") is not None:
-            G.settings_mgr.write_to_xml(
-                sim, cls, pattern,
-                str(round(payload["virtual_y"], 4)), "joystick_trim_follow_gain_virtual_y")
         curves = payload.get("curves")
         if curves is None:
             curve = payload.get("curve")
@@ -1832,7 +1829,10 @@ class SettingsLayout(QGridLayout):
             G.settings_mgr.write_to_xml(
                 sim, cls, pattern,
                 payload["stick_position"], "joystick_trim_follow_stick_position")
-        self.show_erase_button("config_joystick_trim_follow_gain_virtual_y")
+        # Reveal the erase-override button on the curve row: with shipped
+        # default calibrations, erasing the user override means "revert to
+        # the factory calibration".
+        self.show_erase_button("config_joystick_trim_follow_curve_y")
         self.reload_caller()
 
     def save_trim_position_mode(self, value: str):

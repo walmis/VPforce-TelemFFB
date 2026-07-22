@@ -57,8 +57,7 @@ class TrimCalibrationDialog(QDialog):
     """Modeless dialog to auto-calibrate ``joystick_trim_follow_gain_virtual_y``."""
 
     # Emitted on Save / family edits with a JSON payload:
-    # {"virtual_y"?: float, "curves": [entry,...], "use_curve": bool,
-    #  "stick_position"?: str}
+    # {"curves": [entry,...], "use_curve": bool, "stick_position"?: str}
     result_saved = pyqtSignal(str)
     # Emitted when the trimmed-stick-position pulldown changes — persisted
     # standalone so the mode is adjustable post-calibration without a run.
@@ -343,12 +342,13 @@ class TrimCalibrationDialog(QDialog):
         # the numbers) and a rich-text value label (bold/struck speeds).
         suggest_row = QHBoxLayout()
         self.lbl_suggest_name = InfoLabel(
-            text="Suggested calibration speeds:",
+            text="Suggested calibration speeds (IAS):",
             tooltip=(
-                "Derived from the aircraft's declared speed envelope:\n"
-                "low = 1.3 × clean stall, high = maximum level-flight speed\n"
-                "(design cruise / Vno, capped below the red-line), plus a\n"
-                "midpoint on wide envelopes.\n\n"
+                "Indicated airspeeds derived from the aircraft's declared\n"
+                "speed envelope: low = 1.3 × clean stall; high estimated\n"
+                "from design cruise (MSFS, corrected to indicated airspeed)\n"
+                "or just below the green arc (X-Plane), capped below the\n"
+                "red-line; plus a midpoint on wide envelopes.\n\n"
                 "Suggestions only — there is no requirement to calibrate\n"
                 "them all. The LOW and HIGH speeds matter most.\n"
                 "A struck-out speed already has a stored calibration\n"
@@ -1426,9 +1426,11 @@ class TrimCalibrationDialog(QDialog):
         # Saving/applying a run that produced a curve always enables curve
         # mode; a no-curve run leaves the stored family untouched and curve
         # mode follows whether stored curves exist. The stick-position mode
-        # rides along so Save captures the whole curve-mode state.
+        # rides along so Save captures the whole curve-mode state. The
+        # legacy static virtual_y is NOT written anywhere anymore — the
+        # curve is the product (the solver still computes the static fit
+        # for display and logs only).
         return {
-            "virtual_y": float(self._last_result["virtual_y"]),
             "curves": merged,
             "use_curve": bool(merged),
             "stick_position": self.cmb_stick_pos.currentText(),
@@ -1441,7 +1443,6 @@ class TrimCalibrationDialog(QDialog):
         ac = G.telem_manager.currentAircraft if G.telem_manager else None
         if ac is None:
             return
-        ac.joystick_trim_follow_gain_virtual_y = p["virtual_y"]
         # Property setter parses the JSON once into lookup structures.
         ac.joystick_trim_follow_curve_y = \
             json.dumps({"curves": merged}) if merged else "none"

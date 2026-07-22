@@ -218,6 +218,13 @@ class BaseTelemetryData:
     when present it is the more authoritative red-line figure.
     """
 
+    RefMaxIAS_kt: Optional[float]
+    """Aircraft-declared maximum indicated airspeed (Vne-equivalent).
+    MSFS: REFERENCE SPEED MAX IAS SimVar — knots. Reported by the aircraft's
+    own reference data, unlike Vne which is estimated from DESIGN SPEED VC;
+    when present it is the more authoritative red-line figure.
+    """
+
     Vne_ms_calc: Optional[float]
     """Computed Vne in m/s (before vne_override).  
     MSFS/XP: Set by MsfsXpFlightControlsMixIn._calculate_vne_and_gains().  

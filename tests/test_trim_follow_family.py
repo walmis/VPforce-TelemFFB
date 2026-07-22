@@ -177,20 +177,48 @@ class TestSpeedSuggestions:
                     Vne_kt=163.0)
         assert suggest_calibration_speeds(td, "MSFS") == [65, 95, 120]
 
+    def test_msfs_vc_scaled_to_indicated_by_live_ratio(self):
+        # VC is TAS at design cruise; scaling by the live IAS/TAS ratio
+        # lowers the high anchor (and any midpoint) toward achievable IAS.
+        raw = _Telem(DesignSpeed=[63.0, 24.0, 25.0], RefMaxIAS=200.0)
+        scaled = _Telem(DesignSpeed=[63.0, 24.0, 25.0], RefMaxIAS=200.0,
+                        IAS=45.0, TAS=63.0)   # ratio ~0.71 (high altitude)
+        assert suggest_calibration_speeds(raw, "MSFS") == [65, 95, 120]
+        assert suggest_calibration_speeds(scaled, "MSFS") == [65, 85]
+
+    def test_msfs_ground_ratio_leaves_values_near_raw(self):
+        # Near sea level IAS ~ TAS, so the correction is negligible.
+        td = _Telem(DesignSpeed=[63.0, 24.0, 25.0], RefMaxIAS=84.0,
+                    IAS=61.0, TAS=62.0)
+        assert suggest_calibration_speeds(td, "MSFS") == [65, 90, 120]
+
+    def test_msfs_out_of_band_ratio_falls_back_to_raw(self):
+        # An implausible IAS/TAS ratio (bad frame) is ignored, not applied.
+        td = _Telem(DesignSpeed=[63.0, 24.0, 25.0], RefMaxIAS=84.0,
+                    IAS=100.0, TAS=63.0)
+        assert suggest_calibration_speeds(td, "MSFS") == [65, 95, 120]
+
     def test_xplane_shape(self):
-        # Vs 30 m/s, Vno 70 m/s, Vne 90 m/s (all m/s from the plugin).
-        td = _Telem(Vs=30.0, Vno=70.0, Vne=90.0)
-        assert suggest_calibration_speeds(td, "XPLANE") == [75, 105, 135]
+        # Vs 30 m/s, Vno 75 m/s, Vne 110 m/s (all m/s from the plugin);
+        # high anchor is 0.9 x Vno (structural limit, not a capability).
+        td = _Telem(Vs=30.0, Vno=75.0, Vne=110.0)
+        assert suggest_calibration_speeds(td, "XPLANE") == [75, 105, 130]
+
+    def test_xplane_c172_high_anchor_is_reachable(self):
+        # The field case: X-Plane C172's Vno (~120 kt) is unreachable in
+        # level flight; 0.9x pulls the high anchor to a flyable ~110.
+        td = _Telem(Vs=24.693, Vno=61.733, Vne=83.854)
+        assert suggest_calibration_speeds(td, "XPLANE") == [60, 85, 110]
 
     def test_narrow_envelope_two_anchors(self):
         # high/low <= 1.6: no midpoint, but both anchors survive.
-        td = _Telem(Vs=30.0, Vno=50.0, Vne=65.0)
+        td = _Telem(Vs=30.0, Vno=54.0, Vne=90.0)
         assert suggest_calibration_speeds(td, "XPLANE") == [75, 95]
 
     def test_anchors_collapsing_after_rounding_degrade_to_none(self):
         # An envelope so tight the anchors land within the separation gate
         # yields no suggestions rather than a near-duplicate pair.
-        td = _Telem(Vs=30.0, Vno=45.0, Vne=60.0)
+        td = _Telem(Vs=30.0, Vno=50.0, Vne=90.0)
         assert suggest_calibration_speeds(td, "XPLANE") == []
 
     def test_guards_reject_implausible_data(self):
