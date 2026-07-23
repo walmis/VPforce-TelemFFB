@@ -82,17 +82,26 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         calibration dialog). Invalid/short curves are ignored (runtime falls
         back to the static virtual gain).
         """
+        prev_json = self._trim_curve_y_json
         self._trim_curve_y_json = None
         self._trim_curve_y_fam = None
         self._trim_curve_y_pts = None
         self._trim_blend_last_v = None
         fam = utils.parse_trim_follow_family(value)
         if fam is None:
+            # Log only a real clear (had curves, now none) — every uncurved
+            # aircraft passes through here on load and would spam otherwise.
+            if prev_json is not None:
+                logging.info("Trim calibration curves cleared")
             return
         self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
         self._trim_curve_y_fam = fam
         mid = fam[len(fam) // 2]
         self._trim_curve_y_pts = (mid["xs"], mid["ys"])
+        if self._trim_curve_y_json != prev_json:
+            speeds = ", ".join(f"{e['ias_kt']:.0f}" for e in fam)
+            logging.info(f"Trim calibration curves loaded: {len(fam)} "
+                         f"speed{'s' if len(fam) != 1 else ''} ({speeds} kt)")
 
     def _trim_curve_offset(self, t: float) -> Optional[float]:
         """Single-curve virtual-offset lookup at trim ``t`` (the family's

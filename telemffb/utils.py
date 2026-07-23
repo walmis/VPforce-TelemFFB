@@ -1360,6 +1360,9 @@ def _parse_trim_curve_entry(data):
         "ias_kt": float(data.get("ias_kt") or 0.0),
         "t0": t0,
         "date": data.get("date"),
+        # Provenance only (glider runs): the sink held while measuring.
+        # Displayed in the stored-curve description; never used at runtime.
+        "vs_fpm": data.get("vs_fpm"),
         "xs": xs,
         "ys": [y - ref for y in ys],
     }

@@ -35,7 +35,7 @@ from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
-    QComboBox, QToolButton, QMenu, QFileDialog,
+    QComboBox, QToolButton, QMenu, QFileDialog, QSpinBox,
 )
 
 import telemffb.globals as G
@@ -73,6 +73,15 @@ class TrimCalibrationDialog(QDialog):
     # Combo index -> engine pitch-gain scale (Control response).
     RESPONSE_SCALES = {0: 1.5, 1: 1.0, 2: 0.5, 3: 0.25}
     RESPONSE_DEFAULT_INDEX = 1   # Normal
+
+    # Glider descent target (spinbox, shown only for GliderAircraft). An
+    # engineless aircraft cannot hold level flight, so calibration holds a
+    # steady sink instead. fpm; m/s = fpm / MS_TO_FPM.
+    MS_TO_FPM = 196.85
+    GLIDER_VS_DEFAULT_FPM = -100
+    GLIDER_VS_MIN_FPM = -1000
+    GLIDER_VS_MAX_FPM = 0
+    GLIDER_VS_STEP_FPM = 10
     # States in which the control-response combo may still be changed live
     # (from the sweep onward it locks so the measurement dynamics stay fixed).
     RESPONSE_LIVE_STATES = ("PROBE", "STABILIZE", "TRIM_NEUTRAL",
@@ -234,6 +243,42 @@ class TrimCalibrationDialog(QDialog):
         response_row.addWidget(self.cmb_response)
         response_row.addStretch(1)
         root.addLayout(response_row)
+
+        # Glider-only: target descent rate. Gliders have no engine, so there
+        # is no "hold level" — the calibration holds a steady sink instead.
+        # The whole row hides for powered aircraft (visibility tracked per
+        # aircraft in _on_telemetry). Not persisted — resets to the default
+        # each time the dialog opens.
+        self.glider_row = QHBoxLayout()
+        self.lbl_glider_vs = InfoLabel(
+            text="Glider descent rate:",
+            tooltip=(
+                "This aircraft is a glider — with no engine it cannot hold level\n"
+                "flight, so the calibration holds a steady descent instead of\n"
+                "leveling off. Pick the sink rate you want to hold during the run\n"
+                "(a gentle, steady descent your glider can maintain hands-off is\n"
+                "ideal).\n\n"
+                "While the trim assistant is holding, this is also how you pick a\n"
+                "different test speed: with no throttle, a glider's airspeed\n"
+                "follows its sink rate — set a steeper descent to fly faster, a\n"
+                "shallower one to fly slower, then start the sweep once it\n"
+                "re-settles. Locks once the sweep begins.\n\n"
+                "This only affects how the aircraft is flown while calibrating;\n"
+                "the stored trim curve is the same regardless."))
+        self.lbl_glider_vs.setMinimumWidth(self.lbl_glider_vs.sizeHint().width())
+        self.glider_row.addWidget(self.lbl_glider_vs)
+        self.spn_glider_vs = QSpinBox()
+        self.spn_glider_vs.setRange(self.GLIDER_VS_MIN_FPM, self.GLIDER_VS_MAX_FPM)
+        self.spn_glider_vs.setSingleStep(self.GLIDER_VS_STEP_FPM)
+        self.spn_glider_vs.setValue(self.GLIDER_VS_DEFAULT_FPM)
+        self.spn_glider_vs.setSuffix(" fpm")
+        self.spn_glider_vs.setToolTip(self.lbl_glider_vs.toolTip())
+        self.spn_glider_vs.valueChanged.connect(self._on_glider_vs_changed)
+        self.glider_row.addWidget(self.spn_glider_vs)
+        self.glider_row.addStretch(1)
+        root.addLayout(self.glider_row)
+        self._is_glider = False
+        self._set_glider_row_visible(False)
 
         # Debug-only controls (system settings 'debug' flag): trim write
         # method override + per-run diagnostic trace, for problem-aircraft
@@ -793,6 +838,17 @@ class TrimCalibrationDialog(QDialog):
             if self.chk_trace is not None:
                 self.chk_trace.setEnabled(not running)
 
+            # Glider descent control: visible only for engineless aircraft.
+            # Live-adjustable through the hold — with the controls taken, the
+            # sink target is the ONLY way a glider user can pick a different
+            # test speed (no throttle; the polar couples speed to sink).
+            # Locked from the sweep onward, same rule as Control response.
+            self._is_glider = self._current_is_glider(data)
+            self._set_glider_row_visible(self._is_glider)
+            self.spn_glider_vs.setEnabled(
+                self._is_glider and
+                (not running or state_name in self.RESPONSE_LIVE_STATES))
+
             if running:
                 # Family edits and the position mode lock during a run — the
                 # engine read its state at start. Re-enabled by the next
@@ -807,6 +863,10 @@ class TrimCalibrationDialog(QDialog):
                 self.curve.set_samples(list(getattr(cal, "_samples", []) or []))
                 self.btn_assist.setEnabled(False)
             else:
+                # Keep the engine's held-VS target current so the live "ready"
+                # gate (can_start) judges a descending glider against its
+                # target sink, not against level.
+                cal.vs_target = self._glider_vs_target_ms()
                 ok, msg = cal.can_start(data)
                 self._set_ready(ok, msg)
                 self.btn_start.setEnabled(ok)
@@ -890,8 +950,15 @@ class TrimCalibrationDialog(QDialog):
         # curve ever saved, no payload change. Reuses the calibrator's own
         # fit routine.
         fit_slope, _, r2 = TrimCalibrator._fit(list(zip(entry["xs"], entry["ys"])))
+        # Glider provenance: the sink held while measuring, folded into the
+        # speed part ("65.0 kt @ 100 fpm descent").
+        vs_fpm = entry.get("vs_fpm")
+        speed_txt = f"{entry['ias_kt']:.1f} kt" if entry.get("ias_kt") else ""
+        if speed_txt and vs_fpm:
+            speed_txt += (f" @ {abs(vs_fpm):.0f} fpm "
+                          + ("descent" if vs_fpm < 0 else "climb"))
         prov = " · ".join(str(x) for x in [
-            f"{entry['ias_kt']:.1f} kt" if entry.get("ias_kt") else "",
+            speed_txt,
             f"captured {entry['date']}" if entry.get("date") else "",
         ] if x)
         n = len(self._fam)
@@ -1010,6 +1077,8 @@ class TrimCalibrationDialog(QDialog):
         if q != QMessageBox.StandardButton.Yes:
             return
         remaining = [r for i, r in enumerate(self._fam_raw) if i != self._fam_sel]
+        logger.info(f"Trim calibration deleted: {what} "
+                    f"({len(remaining)} remaining)")
         self._fam_sel = max(0, self._fam_sel - 1)
         self._emit_family_edit(remaining)
 
@@ -1023,6 +1092,7 @@ class TrimCalibrationDialog(QDialog):
             "until you calibrate again.")
         if q != QMessageBox.StandardButton.Yes:
             return
+        logger.info(f"Trim calibrations cleared: all {len(self._fam)} removed")
         self._fam_sel = 0
         self._emit_family_edit([])
 
@@ -1069,6 +1139,8 @@ class TrimCalibrationDialog(QDialog):
             QMessageBox.warning(self, "Export failed", str(e))
             return
         n = len(self._fam_raw)
+        logger.info(f"Trim calibrations exported: {n} speed(s) for "
+                    f"'{payload['pattern'] or payload['aircraft_name']}' -> {path}")
         self.lbl_note.setText(
             f"Exported {n} stored speed{'s' if n != 1 else ''} to "
             f"{os.path.basename(path)}.")
@@ -1162,6 +1234,9 @@ class TrimCalibrationDialog(QDialog):
                 if ac is not None:
                     ac.joystick_trim_follow_stick_position = data["stick_position"]
             self._sync_stick_pos_combo(data["stick_position"])
+        logger.info(f"Trim calibrations imported: {n_in} speed(s) ({speeds}) "
+                    f"from {os.path.basename(path)}"
+                    + (" [identity mismatch overridden]" if problems else ""))
         self._apply_family_live(list(data["curves"]))
         self.result_saved.emit(json.dumps(payload))
         self._clear_result_labels()
@@ -1189,6 +1264,27 @@ class TrimCalibrationDialog(QDialog):
     def _set_suggest_visible(self, visible):
         self.lbl_suggest_name.setVisible(visible)
         self.lbl_suggest.setVisible(visible)
+
+    def _set_glider_row_visible(self, visible):
+        self.lbl_glider_vs.setVisible(visible)
+        self.spn_glider_vs.setVisible(visible)
+
+    def _current_is_glider(self, data=None):
+        """True when the active aircraft is a glider (no engine). Reads the
+        live telemetry class, falling back to the aircraft's last frame."""
+        cls = data.get("AircraftClass") if data is not None else None
+        if cls is None:
+            ac = G.telem_manager.currentAircraft if G.telem_manager else None
+            td = getattr(ac, "telem_data", None) if ac is not None else None
+            cls = td.get("AircraftClass") if td is not None else None
+        return cls == "GliderAircraft"
+
+    def _glider_vs_target_ms(self):
+        """Sink target (m/s) the calibrator should hold for this run: the
+        glider spinbox value when the glider row applies, else 0.0 (level)."""
+        if self._is_glider:
+            return self.spn_glider_vs.value() / self.MS_TO_FPM
+        return 0.0
 
     def _update_speed_suggestions(self, data):
         """Refresh the passive suggested-speeds line from live telemetry;
@@ -1359,11 +1455,30 @@ class TrimCalibrationDialog(QDialog):
         if cal is not None and cal.active:
             cal.set_gain_scale(self.RESPONSE_SCALES.get(index, 1.0))
 
+    def _on_glider_vs_changed(self, _value):
+        # Live sink-target change on a running loop — the glider's only way
+        # to pick a different test speed once the assistant has the controls
+        # (a steeper sink flies faster, a shallower one slower). The engine
+        # reads vs_target every frame, so the hold simply chases the new
+        # target and the ready gate re-arms when it settles. The spinbox is
+        # disabled from the sweep onward (same rule as Control response), so
+        # a change can never move a measurement in progress; idle changes are
+        # pushed by the per-frame update and _arm_and_start.
+        cal = self._calibrator()
+        if cal is not None and cal.active and self.spn_glider_vs.isEnabled():
+            cal.vs_target = self._glider_vs_target_ms()
+            logger.info(f"Glider sink target changed live: "
+                        f"{self.spn_glider_vs.value()} fpm")
+
     def _arm_and_start(self, cal, assist):
         ac = G.telem_manager.currentAircraft
         telem = getattr(ac, "telem_data", None)
+        # Held vertical speed for this run: the glider sink target, else level.
+        # Set before can_start so its VS gate judges against the same target.
+        cal.vs_target = self._glider_vs_target_ms()
         ok, msg = cal.can_start(telem)
         if not ok:
+            logger.info(f"Calibration start refused: {msg}")
             QMessageBox.warning(self, "Not ready", msg)
             return
         self._result_shown = False

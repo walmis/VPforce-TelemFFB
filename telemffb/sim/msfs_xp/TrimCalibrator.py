@@ -120,7 +120,14 @@ class TrimCalibrator:
     ROLL_KP = 0.020
     ROLL_KD = 0.010
     ROLL_KI = 0.004
-    VS_TARGET = 0.0               # m/s; hold level flight
+    VS_TARGET = 0.0               # m/s; DEFAULT held vertical speed (level).
+                                  # The run holds self.vs_target (this by
+                                  # default); a glider run sets it to the
+                                  # desired sink so an engineless aircraft can
+                                  # be calibrated in steady descent. Only the
+                                  # calibration-time control/gates use it — the
+                                  # stored curve is the trim->stick geometry,
+                                  # independent of the VS it was measured at.
 
     # Polarity probe.
     AUTO_DETECT_POLARITY = True
@@ -402,6 +409,12 @@ class TrimCalibrator:
         # level indefinitely while the user picks a test speed with the
         # throttle; the sweep is then started explicitly via begin_sweep().
         self.assist_mode = False
+        # Held vertical speed (m/s). 0 = level (powered aircraft); a glider
+        # run sets a negative sink target (dialog spinbox) so an engineless
+        # aircraft settles in steady descent instead of chasing an
+        # unreachable level. Set by the dialog before every start; reset here
+        # so any direct start() defaults to level.
+        self.vs_target = self.VS_TARGET
         self.assist_stable = False  # published: calm/trimmed, safe to begin the sweep
         self.result = None          # dict on success, else None
         self.abort_reason = None
@@ -585,9 +598,22 @@ class TrimCalibrator:
         if abs(telem_data.get("Pitch", 0)) > self.MAX_PITCH_DEG or \
                 abs(telem_data.get("Roll", 0)) > self.START_MAX_ROLL_DEG:
             return False, "Get roughly straight-and-level first"
-        if abs(telem_data.get("VerticalSpeed", 0)) > self.START_MAX_VS:
-            return False, "Level off first — still climbing/descending"
+        if abs(self._vs_err(telem_data.get("VerticalSpeed", 0))) > self.START_MAX_VS:
+            return False, ("Settle onto the target sink first"
+                           if self.vs_target else
+                           "Level off first — still climbing/descending")
         return True, "Ready to calibrate"
+
+    def _vs_err(self, vs):
+        """Vertical-speed deviation from the run's held flight condition.
+
+        Zero for a powered level-flight run; for a glider run it is measured
+        against ``self.vs_target`` (the chosen sink), so every 'settled /
+        level' GATE below reads the same whether the aircraft is holding
+        level or holding a steady descent. The pitch loop already drives
+        toward ``vs_target``; this keeps the gates consistent with it.
+        """
+        return (vs or 0.0) - self.vs_target
 
     def start(self, assist=False):
         """Arm the engine. Baseline is captured on the first :meth:`update`.
@@ -616,8 +642,16 @@ class TrimCalibrator:
         self._set_state(CalState.PROBE if self.AUTO_DETECT_POLARITY
                         else CalState.STABILIZE, "run started")
         self._active = True
+        # Field-diagnosis context: the held VS target was invisible in the
+        # 2026-07-23 glider logs and had to be inferred. One line, per run.
+        hold_txt = (f", holding {abs(self.vs_target) * MS_TO_FPM:.0f} fpm "
+                    + ("descent" if self.vs_target < 0 else "climb")
+                    if self.vs_target else ", holding level")
+        scale_txt = (f", control response x{self.initial_gain_scale:.2f}"
+                     if self.initial_gain_scale != 1.0 else "")
         logger.info("Trim calibration started"
-                    + (" (trim-assistant mode)" if self.assist_mode else ""))
+                    + (" (trim-assistant mode)" if self.assist_mode else "")
+                    + hold_txt + scale_txt)
 
     def begin_sweep(self):
         """Leave the trim assistant's hold and start the calibration sweep
@@ -1128,15 +1162,19 @@ class TrimCalibrator:
         roll = telem_data.Roll
         now = time.perf_counter()
 
-        # Live gate progress so the dialog shows what we're waiting on.
+        # Live gate progress so the dialog shows what we're waiting on. For a
+        # glider run the gate is on the deviation from the target sink, so the
+        # target is shown alongside the raw VS.
         gains_txt = f", gains x{self._gain_scale:.2f}" if self._gain_scale < 1.0 else ""
+        target_txt = (f" (target {self.vs_target * MS_TO_FPM:+.0f})"
+                      if self.vs_target else "")
         self.status_message = (
-            f"Stabilizing... VS {vs * 196.85:+.0f} fpm "
-            f"(need within {self.STABLE_VS_TOL * 196.85:.0f}), "
+            f"Stabilizing... VS {vs * MS_TO_FPM:+.0f} fpm{target_txt} "
+            f"(need within {self.STABLE_VS_TOL * MS_TO_FPM:.0f}), "
             f"roll {roll:+.1f} deg (need within {self.STABLE_ROLL_TOL:.0f}){gains_txt}"
         )
 
-        if abs(vs) <= self.STABLE_VS_TOL and abs(roll) <= self.STABLE_ROLL_TOL:
+        if abs(self._vs_err(vs)) <= self.STABLE_VS_TOL and abs(roll) <= self.STABLE_ROLL_TOL:
             if self._stable_since is None:
                 self._stable_since = now
             elif now - self._stable_since >= self.STABLE_DWELL_S:
@@ -1210,7 +1248,7 @@ class TrimCalibrator:
         now = time.perf_counter()
         at_target = (not ramping and
                      abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self.TRIM_STATION_TOL)
-        settled = at_target and abs(telem_data.VerticalSpeed) <= self.STABLE_VS_TOL \
+        settled = at_target and abs(self._vs_err(telem_data.VerticalSpeed)) <= self.STABLE_VS_TOL \
             and abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
 
         self.status_message = (
@@ -1234,25 +1272,30 @@ class TrimCalibrator:
                 # Secant root-find toward u = 0. Using the measured local slope
                 # handles either trim polarity (a wrong initial guess self-
                 # corrects on the next step); the first step is a fixed probe.
+                slope_note = ""
                 if self._neut_prev is not None and abs(u - self._neut_prev[1]) > 1e-6:
                     t0, u0 = self._neut_prev
                     step = clamp(-u * (t - t0) / (u - u0),
                                  -self.NEUT_STEP_MAX, self.NEUT_STEP_MAX)
-                    if abs(t - t0) > 0.005 and \
-                            abs(u - u0) >= self.NEUT_SLOPE_MIN_DU:
-                        # Local trim-response slope; the trim assistant sizes
-                        # (and SIGNS) its retrim moves with this. A du under
-                        # the floor is drift, not response — a mild power or
-                        # speed change moves the load that much by itself.
-                        # Field incident (RV-10): a +0.004 du measured during
-                        # a deceleration exported slope +0.067, seeding the
-                        # assistant's relief direction backwards.
-                        self._trim_slope_est = (u - u0) / (t - t0)
+                    if abs(t - t0) > 0.005:
+                        if abs(u - u0) >= self.NEUT_SLOPE_MIN_DU:
+                            # Local trim-response slope; the trim assistant
+                            # sizes (and SIGNS) its retrim moves with this. A
+                            # du under the floor is drift, not response — a
+                            # mild power or speed change moves the load that
+                            # much by itself. Field incident (RV-10): a +0.004
+                            # du measured during a deceleration exported slope
+                            # +0.067, seeding the assistant's relief direction
+                            # backwards.
+                            self._trim_slope_est = (u - u0) / (t - t0)
+                        else:
+                            slope_note = (f" (du {u - u0:+.3f} below noise "
+                                          "floor; slope not learned)")
                 else:
                     step = math.copysign(self.NEUT_PROBE, u)  # assume normal polarity
                 logger.info(f"Neutralization step {self._neut_steps + 1}: settled at "
                             f"trim {t:+.3f} with steady elevator {u:+.3f}; "
-                            f"stepping {step:+.3f}")
+                            f"stepping {step:+.3f}{slope_note}")
                 self._neut_prev = (t, u)
                 self._neut_steps += 1
                 self._begin_neut_step(t + step)
@@ -1284,6 +1327,7 @@ class TrimCalibrator:
                 # or roll problem sends the user chasing the wrong thing).
                 rb_err = abs((telem_data.ElevTrimPct or 0) - self._neut_target)
                 vs_fpm = (telem_data.VerticalSpeed or 0) * MS_TO_FPM
+                hold_txt = "on the target sink" if self.vs_target else "level"
                 if rb_err > self.TRIM_STATION_TOL:
                     why = (f"trim read-back drifted {100 * rb_err:.1f}% off the hold "
                            "point while it was held steady — the aircraft's systems "
@@ -1291,8 +1335,8 @@ class TrimCalibrator:
                            "themselves")
                 elif abs(telem_data.Roll or 0) > self.STABLE_ROLL_TOL:
                     why = f"could not hold wings level (roll {telem_data.Roll:+.1f} deg)"
-                elif abs(telem_data.VerticalSpeed or 0) > self.STABLE_VS_TOL:
-                    why = f"could not settle level (VS {vs_fpm:+.0f} fpm)"
+                elif abs(self._vs_err(telem_data.VerticalSpeed)) > self.STABLE_VS_TOL:
+                    why = f"could not settle {hold_txt} (VS {vs_fpm:+.0f} fpm)"
                 else:
                     why = ("flight would not stay settled long enough to measure "
                            f"(VS {vs_fpm:+.0f} fpm at abort)")
@@ -1437,7 +1481,7 @@ class TrimCalibrator:
 
         at_target = (not ramping and
                      abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self.TRIM_STATION_TOL)
-        level = abs(telem_data.VerticalSpeed) <= self.STABLE_VS_TOL \
+        level = abs(self._vs_err(telem_data.VerticalSpeed)) <= self.STABLE_VS_TOL \
             and abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
 
         # Arrival tracking: data taken before/while the trim ramps reflects
@@ -2006,7 +2050,7 @@ class TrimCalibrator:
         at_station = (not ramping and
                       abs((telem_data.ElevTrimPct or 0) - target) <= self._station_tol)
         settled = at_station and \
-            abs(telem_data.VerticalSpeed) <= self.STABLE_VS_TOL and \
+            abs(self._vs_err(telem_data.VerticalSpeed)) <= self.STABLE_VS_TOL and \
             abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
 
         phase = "ramping trim" if ramping else ("measuring" if settled else "settling")
@@ -2030,13 +2074,19 @@ class TrimCalibrator:
                 mean_u = sum(s[1] for s in self._dwell_samples) / n
                 mean_vs = sum(s[2] for s in self._dwell_samples) / n
                 mean_ias = sum(s[3] for s in self._dwell_samples) / n
-                if abs(mean_vs) > self.SAMPLE_VS_MEAN_TOL:
+                # Residual is measured against the held condition (0 for level,
+                # the target sink for a glider), so a station is "clean" when
+                # it holds the intended VS — not only when VS is zero.
+                mean_vs_err = self._vs_err(mean_vs)
+                if abs(mean_vs_err) > self.SAMPLE_VS_MEAN_TOL:
                     # Still converging (one-sided VS residual): retry the dwell
                     # rather than record a biased sample, keeping the best
-                    # completed dwell for the deadline compromise below.
+                    # completed dwell for the deadline compromise below. The
+                    # 4th slot carries the deviation from target (what the hard
+                    # gate and the flagged result both judge).
                     if self._station_best is None or \
-                            abs(mean_vs) < abs(self._station_best[3]):
-                        self._station_best = (mean_trim, mean_u, mean_ias, mean_vs)
+                            abs(mean_vs_err) < abs(self._station_best[3]):
+                        self._station_best = (mean_trim, mean_u, mean_ias, mean_vs_err)
                     self._dwell_since = None
                     self._dwell_samples = []
                 else:
@@ -2114,14 +2164,17 @@ class TrimCalibrator:
         in the results; beyond it the run aborts, naming the gate that failed.
         """
         station = len(self._samples) + 1
+        # _station_best[3] is the deviation from the held condition (target
+        # sink for a glider, else level), so these gates read identically in
+        # both cases.
         if self._station_best is not None and \
                 abs(self._station_best[3]) <= self.SAMPLE_VS_HARD_TOL:
-            mean_trim, mean_u, mean_ias, mean_vs = self._station_best
+            mean_trim, mean_u, mean_ias, mean_vs_err = self._station_best
             logger.warning(
                 f"Station {station}: accepting best dwell with residual VS "
-                f"{mean_vs * MS_TO_FPM:+.0f} fpm (clean gate is "
+                f"{mean_vs_err * MS_TO_FPM:+.0f} fpm (clean gate is "
                 f"{self.SAMPLE_VS_MEAN_TOL * MS_TO_FPM:.0f} fpm); flagged in results")
-            self._accept_station(mean_trim, mean_u, mean_ias, residual_vs=mean_vs)
+            self._accept_station(mean_trim, mean_u, mean_ias, residual_vs=mean_vs_err)
             return
         rb_err = abs((telem_data.ElevTrimPct or 0) - target)
         if rb_err > self._station_tol:
@@ -2180,6 +2233,13 @@ class TrimCalibrator:
                 "ias_kt": round((self._station_ias[0] if self._station_ias else 0) * 1.94384, 1),
                 "date": time.strftime("%Y-%m-%d"),
             }
+            if self.vs_target:
+                # Historical provenance only (glider runs hold a sink instead
+                # of level): recorded so the stored-curve description can say
+                # what flight condition the measurement was taken in. Nothing
+                # at runtime consumes it — the curve is trim->stick geometry,
+                # independent of the VS it was measured at.
+                curve["vs_fpm"] = round(self.vs_target * MS_TO_FPM)
 
         # Per-side fit split at trim = 0: MSFS normalizes ELEVATOR TRIM PCT
         # per-side (up limit vs down limit), so aircraft with asymmetric trim
@@ -2354,17 +2414,17 @@ class TrimCalibrator:
                 self._pitch_ref_n = pitch_n
                 self._pitch_ref0 = pitch_n
             self._pitch_ref_n = clamp(
-                self._pitch_ref_n + self.CASC_REF_ADAPT * (self.VS_TARGET - vs) * dt,
+                self._pitch_ref_n + self.CASC_REF_ADAPT * (self.vs_target - vs) * dt,
                 self._pitch_ref0 - self.CASC_REF_LIMIT_DEG,
                 self._pitch_ref0 + self.CASC_REF_LIMIT_DEG)
             target_n = self._pitch_ref_n + clamp(
-                self.CASC_VS_TO_PITCH * (self.VS_TARGET - vs),
+                self.CASC_VS_TO_PITCH * (self.vs_target - vs),
                 -self.CASC_MAX_TARGET_DEG, self.CASC_MAX_TARGET_DEG)
             self._pitch_target_n = target_n
             return self._u_base_y + self._elev_sign * self._pitch_pid.update(target_n - pitch_n, dt)
 
         self._pitch_target_n = None
-        vs_err = self._elev_sign * (self.VS_TARGET - vs)
+        vs_err = self._elev_sign * (self.vs_target - vs)
         return self._u_base_y + self._pitch_pid.update(vs_err, dt)
 
     def _engage_pitch_loop(self, telem_data):

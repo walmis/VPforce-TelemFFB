@@ -1817,6 +1817,12 @@ class SettingsLayout(QGridLayout):
         if curves is None:
             curve = payload.get("curve")
             curves = [curve] if curve else []
+        speeds = ", ".join(f"{float(c.get('ias_kt') or 0):.0f}" for c in curves)
+        logging.info(
+            f"Trim calibration saved: {len(curves)} speed(s) ({speeds} kt) "
+            f"for '{pattern}' [{sim}]"
+            + (f", stick position '{payload['stick_position']}'"
+               if payload.get("stick_position") else ""))
         G.settings_mgr.write_to_xml(
             sim, cls, pattern,
             json.dumps({"curves": curves}) if curves else "none",
@@ -1839,6 +1845,8 @@ class SettingsLayout(QGridLayout):
         """Persist the trimmed-stick-position mode alone — the calibration
         dialog's pulldown is usable post-calibration without a fresh run."""
         self.trigger_form_reload = True
+        logging.info(f"Trimmed stick position set to '{value}' for "
+                     f"'{G.settings_mgr.current_pattern}'")
         G.settings_mgr.write_to_xml(
             G.settings_mgr.current_sim, G.settings_mgr.current_class,
             G.settings_mgr.current_pattern, value,

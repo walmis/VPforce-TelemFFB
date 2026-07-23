@@ -2678,3 +2678,101 @@ class TestAssistDirectionRecovery:
         assert cal._trim_slope_est is None
         assert cal._assist_dir == 1
         assert not cal._assist_sized
+
+
+# --------------------------------------------------------------------------- #
+#  Glider descent target (engineless aircraft can't hold level flight)
+# --------------------------------------------------------------------------- #
+
+class TestGliderDescent:
+    """A glider run holds a steady sink (cal.vs_target) instead of level: the
+    pitch loop already targets vs_target, and every settle/level gate measures
+    VS relative to it, so calibration converges in descent exactly as a
+    powered aircraft converges at level."""
+
+    def test_assist_holds_target_sink_not_level(self, clock):
+        ac = FakePlantAircraft(coupling=0.5, trim_natural=0.1)
+        cal = TrimCalibrator(ac)
+        cal.vs_target = -0.5  # ~ -100 fpm
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 180), \
+            f"never reached ASSIST_HOLD ({cal.state}, {cal.abort_reason})"
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 120), \
+            f"glider never stabilized (vs {ac.vs:+.2f})"
+        # Settled on the target sink, NOT level.
+        assert ac.vs == pytest.approx(-0.5, abs=0.15)
+
+    def test_full_calibration_in_descent_recovers_slope(self, clock):
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        cal.vs_target = -0.5
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended {state} ({cal.abort_reason})"
+        # The measured trim->elevator slope is the plant's, unchanged by the
+        # descent operating point.
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+        assert cal.result["r_squared"] > 0.95
+        # Provenance: the held sink is stamped into the curve entry
+        # (-0.5 m/s = -98 fpm) and survives the parser for display.
+        assert cal.result["curve"]["vs_fpm"] == -98
+        from telemffb.utils import parse_trim_follow_family
+        parsed = parse_trim_follow_family(cal.result["curve"])
+        assert parsed[0]["vs_fpm"] == -98
+
+    def test_level_run_default_target_unchanged(self, clock):
+        # vs_target defaults to 0.0 (level): a powered run is byte-identical.
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        assert cal.vs_target == 0.0
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended {state} ({cal.abort_reason})"
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+        # No provenance key on a level run: powered payloads are unchanged.
+        assert "vs_fpm" not in cal.result["curve"]
+
+    def test_sink_target_change_mid_hold_resettles(self, clock):
+        # The spinbox is the glider's throttle: changing the sink target
+        # mid-hold must drop the ready gate, chase the new sink, and re-arm
+        # once settled there — exactly like a power change on a powered
+        # aircraft.
+        ac = FakePlantAircraft(coupling=0.5, trim_natural=0.1)
+        cal = TrimCalibrator(ac)
+        cal.vs_target = -0.5
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180), \
+            f"never stabilized on the first sink ({cal.state}, {cal.abort_reason})"
+        assert ac.vs == pytest.approx(-0.5, abs=0.15)
+
+        cal.vs_target = -1.5   # user turns the spinbox while holding
+        assert run_until(cal, ac, clock, lambda: not cal.assist_stable, 5), \
+            "ready gate must drop while chasing the new sink"
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 240), \
+            f"never re-settled on the new sink (vs {ac.vs:+.2f})"
+        # The gate's contract: settled within STABLE_VS_TOL of the NEW target
+        # (the outer integral keeps converging beyond that, but stable may
+        # legitimately arm anywhere inside the tolerance).
+        assert abs(ac.vs - (-1.5)) <= cal.STABLE_VS_TOL, \
+            f"stable armed at vs {ac.vs:+.2f}, outside tolerance of -1.5"
+
+    def test_can_start_judges_glider_against_target(self, clock):
+        # Descending at ~590 fpm (3.0 m/s), beyond START_MAX_VS.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        telem = ac.telem(VerticalSpeed=-3.0)
+        cal.vs_target = 0.0  # powered: "level off first"
+        ok, msg = cal.can_start(telem)
+        assert not ok and "climbing/descending" in msg
+        cal.vs_target = -3.0  # glider holding that sink: ready
+        ok, msg = cal.can_start(telem)
+        assert ok, msg
+
+    def test_vs_err_is_relative_to_target(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.vs_target = -0.5
+        assert cal._vs_err(-0.5) == pytest.approx(0.0)
+        assert cal._vs_err(0.0) == pytest.approx(0.5)
+        assert cal._vs_err(None) == pytest.approx(0.5)

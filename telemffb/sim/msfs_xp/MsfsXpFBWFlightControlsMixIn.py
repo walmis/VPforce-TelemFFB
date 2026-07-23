@@ -152,6 +152,18 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 curve_active = self.joystick_trim_follow_use_curve_y and \
                     self._trim_curve_y_fam is not None
 
+                # Transition log (field diagnosis for "stick jumped when the
+                # AP engaged" reports): which Y-center source AP follow used.
+                ap_on = bool(self.ap_following and ap_active)
+                prev_ap = getattr(self, "_ap_follow_seen", False)
+                if ap_on and not prev_ap:
+                    logging.info("AP following engaged: Y center from "
+                                 + ("the calibrated trim curve" if curve_active
+                                    else "raw trim (no curve)"))
+                elif prev_ap and not ap_on:
+                    logging.info("AP following released")
+                self._ap_follow_seen = ap_on
+
                 if self.ap_following and ap_active:
                     phys_x, phys_y = self._get_device_axes()
                     if self._sim_is_msfs():
