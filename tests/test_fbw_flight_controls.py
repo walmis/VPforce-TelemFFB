@@ -680,5 +680,113 @@ class TestMsfsXpFBWFlightControlsCustomAxes(BaseTelemetryEffectTestCase):
         )
 
 
+class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
+    """AP following on calibrated aircraft (field report 2026-07-22): the
+    AP-follow branch overwrote the curve-aware Y spring center/virtual offset
+    with pre-calibration raw-trim formulas, snapping the stick off the curve
+    the moment the AP engaged. With a curve active, the AP path must keep the
+    curve values (MSFS: same trim signal; X-Plane: curve center + servo
+    deviation); without one, behavior stays byte-identical legacy."""
+
+    # Linear single-speed curve: offs = 0.5 * t, anchored at t0 = 0, so the
+    # curve center at trim T is 0.5*T (physical gain 1.0) — distinguishable
+    # from every legacy formula at the gains used below.
+    CURVE = (
+        '{"curves": [{"points": ['
+        '{"t": -1.0, "offs": -0.5}, {"t": -0.75, "offs": -0.375}, '
+        '{"t": -0.5, "offs": -0.25}, {"t": -0.25, "offs": -0.125}, '
+        '{"t": 0.0, "offs": 0.0}, {"t": 0.25, "offs": 0.125}, '
+        '{"t": 0.5, "offs": 0.25}, {"t": 0.75, "offs": 0.375}, '
+        '{"t": 1.0, "offs": 0.5}], '
+        '"t0": 0.0, "ias_kt": 100.0, "date": "2026-07-22"}]}'
+    )
+
+    def _curve_instance(self, sim_msfs=True):
+        instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
+        if sim_msfs:
+            instance._test_sim_is_msfs = True
+        else:
+            instance._test_sim_is_xplane = True
+        instance.trim_following = True
+        instance.ap_following = True
+        instance.telemffb_controls_axes = True
+        instance._simconnect = self.mock_simconnect
+        instance.joystick_trim_follow_gain_physical_y = 1.0
+        instance.joystick_trim_follow_gain_virtual_y = 0.2
+        instance.joystick_ap_follow_gain_physical_y = 1.0
+        instance.joystick_trim_follow_use_curve_y = True
+        instance.joystick_trim_follow_curve_y = self.CURVE
+        assert instance._trim_curve_y_fam is not None, "curve must parse"
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        return instance
+
+    def _y_offset(self, instance, telem):
+        self.set_telemetry(instance, telem)
+        instance.update_fbw_flight_controls(telem)
+        _, y = instance._spring_handle.get_offsets()
+        return y
+
+    def _settled_y(self, instance, telem, frames=3):
+        # A few frames so the trim dampener's derivative term dies off.
+        for _ in range(frames):
+            y = self._y_offset(instance, telem)
+        return y
+
+    def test_msfs_ap_engage_does_not_snap_off_the_curve(self):
+        instance = self._curve_instance(sim_msfs=True)
+        trimmed = TelemetryDataBuilder().ffb_type("joystick") \
+            .elevator_trim(0.5).autopilot(False).build()
+        y_hand = self._settled_y(instance, trimmed)
+        # Curve center, not raw trim: 0.5*0.5*4096, not 0.5*4096.
+        assert y_hand == pytest.approx(0.25 * 4096, abs=40)
+
+        ap_on = TelemetryDataBuilder().ffb_type("joystick") \
+            .elevator_trim(0.5).autopilot(True).build()
+        y_ap = self._settled_y(instance, ap_on)
+        assert y_ap == y_hand, (
+            f"AP engage snapped the center: hand {y_hand} -> AP {y_ap}"
+        )
+
+    def test_xplane_ap_center_is_curve_center_plus_servo(self):
+        instance = self._curve_instance(sim_msfs=False)
+        trimmed = TelemetryDataBuilder().ffb_type("joystick") \
+            .elevator_trim(0.5).autopilot(False).build()
+        y_hand = self._settled_y(instance, trimmed)
+        assert y_hand == pytest.approx(0.25 * 4096, abs=40)
+
+        # AP in trim (servo ~ 0): rest point identical to hand-flying.
+        ap_trimmed = TelemetryDataBuilder().ffb_type("joystick") \
+            .elevator_trim(0.5).autopilot(True) \
+            .ap_servos(roll=0.0, pitch=0.0).build()
+        assert self._settled_y(instance, ap_trimmed) == y_hand
+
+        # AP commanding pitch: stick deviates from the trimmed rest point by
+        # exactly the servo command.
+        ap_pitching = TelemetryDataBuilder().ffb_type("joystick") \
+            .elevator_trim(0.5).autopilot(True) \
+            .ap_servos(roll=0.0, pitch=0.2).build()
+        y_dev = self._settled_y(instance, ap_pitching)
+        assert y_dev - y_hand == pytest.approx(0.2 * 4096, abs=40)
+
+    def test_msfs_legacy_ap_follow_unchanged_without_curve(self):
+        instance = self._curve_instance(sim_msfs=True)
+        instance.joystick_trim_follow_use_curve_y = False  # legacy path
+        ap_on = TelemetryDataBuilder().ffb_type("joystick") \
+            .elevator_trim(0.5).autopilot(True).build()
+        y_ap = self._settled_y(instance, ap_on)
+        # Legacy formula: raw trim * ap physical gain (1.0) * 4096.
+        assert y_ap == pytest.approx(0.5 * 4096, abs=40)
+
+    def test_xplane_legacy_ap_follow_unchanged_without_curve(self):
+        instance = self._curve_instance(sim_msfs=False)
+        instance.joystick_trim_follow_use_curve_y = False  # legacy path
+        ap_on = TelemetryDataBuilder().ffb_type("joystick") \
+            .elevator_trim(0.5).autopilot(True) \
+            .ap_servos(roll=0.0, pitch=0.2).build()
+        y_ap = self._settled_y(instance, ap_on)
+        # Legacy: servo position alone.
+        assert y_ap == pytest.approx(0.2 * 4096, abs=2)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
