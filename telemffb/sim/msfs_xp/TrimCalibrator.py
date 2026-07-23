@@ -189,6 +189,8 @@ class TrimCalibrator:
     NEUT_U_TOL = 0.03            # |steady elevator| this small = natural point
     NEUT_PROBE = 0.06            # first trim step (secant needs two points to start)
     NEUT_STEP_MAX = 0.15         # cap a single trim step
+    NEUT_SLOPE_MIN_DU = 0.02     # |du| below this is drift, not trim response —
+                                 # too small to teach a slope
     NEUT_SETTLE_TIMEOUT_S = 12.0 # per-step ramp+settle allowance
     NEUT_DWELL_S = 1.0           # settle dwell before measuring the steady elevator
     NEUT_MAX_STEPS = 10
@@ -246,6 +248,9 @@ class TrimCalibrator:
                                    # short window is visibly in motion then
     ASSIST_U_MOVE_UNSTEADY = 0.06  # move threshold for the long mean
     ASSIST_MIN_SLOPE = 0.05        # |du/dtrim| below this -> blind probe fallback
+    ASSIST_SEQ_MIN_MOVES = 2       # unrelieved moves before the run is judged whole
+    ASSIST_SEQ_MIN_DTRIM = 0.10    # trim travel giving the run-secant a real baseline
+    TRIM_CMD_CLAMP = 0.95          # commanded trim targets are clamped to +/- this
     ASSIST_PITCH_ANCHOR_SLEW = 0.2 # deg/s; the level attitude legitimately moves with
                                    # the chosen speed, so the pitch-guard anchor drifts
                                    # slowly with it (a fast runaway still trips the guard)
@@ -508,6 +513,12 @@ class TrimCalibrator:
         self._assist_sized = False           # slope magnitude trusted for Newton sizing
         self._assist_premove = None          # (u_mean, step) of the move being verified
         self._assist_worsen = 0              # consecutive moves that made the load worse
+        self._assist_dir_proven = False      # a relieved verdict has confirmed _assist_dir
+        self._assist_seq0 = None             # (trim, load) at the start of an unrelieved
+                                             # run of moves (sequence-secant baseline)
+        self._assist_seq_n = 0               # verdict-eligible moves in that run
+        self._assist_railed = False          # proven direction but trim pinned at its
+                                             # limit: out of trim authority
         self._assist_gate_log_t = None       # ready-gate log flap guard
         # throttle-movement tracking (decision-log context)
         self._thr_ref = None                 # settled lever position reference (pct)
@@ -1170,7 +1181,7 @@ class TrimCalibrator:
         self.status_message = "Centering the elevator axis…"
 
     def _begin_neut_step(self, target):
-        self._neut_target = clamp(target, -0.95, 0.95)
+        self._neut_target = clamp(target, -self.TRIM_CMD_CLAMP, self.TRIM_CMD_CLAMP)
         self._neut_dwell_since = None
         self._neut_u_samples = []
         self._neut_deadline = time.perf_counter() + self.NEUT_SETTLE_TIMEOUT_S
@@ -1227,9 +1238,15 @@ class TrimCalibrator:
                     t0, u0 = self._neut_prev
                     step = clamp(-u * (t - t0) / (u - u0),
                                  -self.NEUT_STEP_MAX, self.NEUT_STEP_MAX)
-                    if abs(t - t0) > 0.005:
+                    if abs(t - t0) > 0.005 and \
+                            abs(u - u0) >= self.NEUT_SLOPE_MIN_DU:
                         # Local trim-response slope; the trim assistant sizes
-                        # its retrim moves with this (Newton step).
+                        # (and SIGNS) its retrim moves with this. A du under
+                        # the floor is drift, not response — a mild power or
+                        # speed change moves the load that much by itself.
+                        # Field incident (RV-10): a +0.004 du measured during
+                        # a deceleration exported slope +0.067, seeding the
+                        # assistant's relief direction backwards.
                         self._trim_slope_est = (u - u0) / (t - t0)
                 else:
                     step = math.copysign(self.NEUT_PROBE, u)  # assume normal polarity
@@ -1329,6 +1346,10 @@ class TrimCalibrator:
         self._assist_sized = self._trim_slope_est is not None
         self._assist_premove = None
         self._assist_worsen = 0
+        self._assist_dir_proven = False
+        self._assist_seq0 = None
+        self._assist_seq_n = 0
+        self._assist_railed = False
         # _neut_prev (last settled point) and _trim_slope_est deliberately
         # carry over from neutralization: they let the first retrim after a
         # power change go straight to the predicted level point instead of
@@ -1446,6 +1467,10 @@ class TrimCalibrator:
                 logger.info(f"Assist move unverified: airspeed trending "
                             f"({ias_rate * 1.94384:+.2f} kt/s) — a power change "
                             "would take credit/blame for the move")
+                # A trending airspeed also poisons the sequence baseline
+                # (both of its endpoints must be power-steady).
+                self._assist_seq0 = None
+                self._assist_seq_n = 0
             elif abs(prev_step) > 1e-6:
                 if abs(self._assist_u_mean) < abs(pre_u) - 0.01:
                     # The move relieved: direction confirmed; its observed
@@ -1453,6 +1478,9 @@ class TrimCalibrator:
                     # settled secant pair (bigger baseline, same conditions).
                     self._assist_worsen = 0
                     self._assist_sized = True
+                    self._assist_dir_proven = True
+                    self._assist_seq0 = None
+                    self._assist_seq_n = 0
                     s = (self._assist_u_mean - pre_u) / prev_step
                     learned = 0.05 <= abs(s) <= 20.0 and (s < 0) == (self._assist_dir > 0)
                     if learned:
@@ -1460,20 +1488,33 @@ class TrimCalibrator:
                     logger.info(f"Assist move relieved: load {pre_u:+.3f} -> "
                                 f"{self._assist_u_mean:+.3f}"
                                 + (f", slope learned {s:+.2f}" if learned else ""))
-                elif abs(self._assist_u_mean) > abs(pre_u) + 0.02:
-                    # The move made it worse: stop trusting the magnitude at
-                    # once; flip the direction only on two consecutive
-                    # worsenings (one can be an unlucky gust/transient).
-                    self._assist_sized = False
-                    self._assist_worsen += 1
-                    logger.warning(f"Assist move WORSENED the load: {pre_u:+.3f} -> "
-                                   f"{self._assist_u_mean:+.3f} "
-                                   f"(sizing distrusted; {self._assist_worsen} consecutive)")
-                    if self._assist_worsen >= 2:
-                        self._assist_dir = -self._assist_dir
-                        self._assist_worsen = 0
-                        logger.warning("Trim assistant: relief direction flipped "
-                                       "after two worsening moves")
+                else:
+                    self._assist_seq_n += 1
+                    if abs(self._assist_u_mean) > abs(pre_u) + 0.02:
+                        # The move made it worse: stop trusting the magnitude
+                        # at once; flip the direction only on two consecutive
+                        # worsenings (one can be an unlucky gust/transient).
+                        self._assist_sized = False
+                        self._assist_worsen += 1
+                        logger.warning(f"Assist move WORSENED the load: {pre_u:+.3f} -> "
+                                       f"{self._assist_u_mean:+.3f} "
+                                       f"(sizing distrusted; {self._assist_worsen} consecutive)")
+                        if self._assist_worsen >= 2:
+                            self._assist_dir = -self._assist_dir
+                            self._assist_worsen = 0
+                            self._assist_dir_proven = False
+                            self._assist_seq0 = None
+                            self._assist_seq_n = 0
+                            logger.warning("Trim assistant: relief direction flipped "
+                                           "after two worsening moves")
+                    # An unrelieved run of moves is judged as a WHOLE, not
+                    # only per-move — on a weak-trim aircraft a wrong
+                    # direction can worsen the load by less than the per-move
+                    # threshold on every single move (the RV-10 field
+                    # incident: ~+0.01 per probe, fifteen straight
+                    # inconclusive verdicts while the trim marched to its
+                    # rail).
+                    self._assist_seq_flip_check(telem_data)
 
         # Single retrim rule: at a fixed cadence, an over-tolerance mean load
         # gets one relief move. Steady means move at the neutral tolerance;
@@ -1488,27 +1529,66 @@ class TrimCalibrator:
                 else self.ASSIST_U_MOVE_UNSTEADY
             if abs(u) > threshold:
                 step = self._assist_step_from(u)
-                self._assist_premove = (u, step)
-                logger.info(
-                    f"Assist retrim: load {u:+.3f} "
-                    f"({'steady' if self._assist_mean_steady else 'long-window'}), "
-                    f"{'Newton' if self._assist_sized else 'probe'} step {step:+.3f} "
-                    f"-> trim {t + step:+.3f}" + self._thr_context(now))
-                # Keep the load history valid ACROSS the move: its expected
-                # effect on the load is step*slope, so shifting the stored
-                # samples by that much makes history read as if the trim had
-                # always been at the new setting — the long window never
-                # needs resetting through a correction sequence. Only done
-                # while the sizing model is relief-verified; otherwise start
-                # the history fresh.
-                if self._assist_sized and self._trim_slope_est is not None and \
-                        abs(self._trim_slope_est) >= self.ASSIST_MIN_SLOPE:
-                    du = step * self._trim_slope_est
-                    self._assist_u_hist = [(ts, uu + du)
-                                           for ts, uu in self._assist_u_hist]
-                else:
-                    self._assist_u_hist = []
-                self._begin_neut_step(t + step)
+                # Trim-rail guard: an outward step from a read-back already at
+                # the command clamp is a no-op — re-issuing it forever only
+                # feeds the verdict judge zero-effect moves (the RV-10 field
+                # incident ended pegged at the rail with every verdict
+                # inconclusive).
+                if abs(t) >= self.TRIM_CMD_CLAMP - self.TRIM_STATION_TOL \
+                        and t * step > 0:
+                    if not self._assist_dir_proven:
+                        # This direction never once relieved and the trim ran
+                        # out of range trying: it cannot get worse than a
+                        # rail — reverse.
+                        self._assist_dir = -self._assist_dir
+                        self._assist_sized = False
+                        self._assist_worsen = 0
+                        self._assist_seq0 = None
+                        self._assist_seq_n = 0
+                        logger.warning(
+                            "Trim assistant: trim hit its limit with the load "
+                            "unrelieved and the relief direction never "
+                            "verified — reversing direction")
+                        step = self._assist_step_from(u)
+                    else:
+                        # Direction is relief-proven: the aircraft is
+                        # genuinely out of trim authority at this speed.
+                        if not self._assist_railed:
+                            self._assist_railed = True
+                            logger.warning(
+                                f"Trim assistant: trim is at its limit with "
+                                f"load {u:+.3f} still held — out of trim "
+                                "authority at this speed")
+                        step = None
+                if step is not None:
+                    self._assist_railed = False
+                    self._assist_premove = (u, step)
+                    if self._assist_seq0 is None:
+                        # Baseline for judging the coming run of moves as a
+                        # whole (cleared by any relieved verdict).
+                        self._assist_seq0 = (t, u)
+                    logger.info(
+                        f"Assist retrim: load {u:+.3f} "
+                        f"({'steady' if self._assist_mean_steady else 'long-window'}), "
+                        f"{'Newton' if self._assist_sized else 'probe'} step {step:+.3f} "
+                        f"-> trim {t + step:+.3f}" + self._thr_context(now))
+                    # Keep the load history valid ACROSS the move: its expected
+                    # effect on the load is step*slope, so shifting the stored
+                    # samples by that much makes history read as if the trim had
+                    # always been at the new setting — the long window never
+                    # needs resetting through a correction sequence. Only done
+                    # while the sizing model is relief-verified; otherwise start
+                    # the history fresh.
+                    if self._assist_sized and self._trim_slope_est is not None and \
+                            abs(self._trim_slope_est) >= self.ASSIST_MIN_SLOPE:
+                        du = step * self._trim_slope_est
+                        self._assist_u_hist = [(ts, uu + du)
+                                               for ts, uu in self._assist_u_hist]
+                    else:
+                        self._assist_u_hist = []
+                    self._begin_neut_step(t + step)
+            else:
+                self._assist_railed = False
 
         # Readiness with asymmetric hysteresis: distrust instantly, trust
         # only after a sustained calm window. Trimmed reads the same windowed
@@ -1551,6 +1631,10 @@ class TrimCalibrator:
         elif self._assist_u_mean is None:
             self.status_message = (
                 f"Trim assistant: measuring the trim load… (IAS {ias_kt:.0f} kt)")
+        elif self._assist_railed:
+            self.status_message = (
+                f"Trim assistant: trim is at its limit — the remaining load "
+                f"can't be trimmed away (IAS {ias_kt:.0f} kt)")
         elif not (at_target and level) or not trimmed:
             self.status_message = (
                 f"Trim assistant: re-trimming for the current power setting… "
@@ -1623,6 +1707,46 @@ class TrimCalibrator:
         if hist_span >= self.ASSIST_MEAS_LONG_S:
             return long_, False
         return None, False
+
+    def _assist_seq_flip_check(self, telem_data):
+        """Judge the whole unrelieved run of moves, not only the last one.
+
+        The run's own secant — total load change over total trim travel,
+        taken between power-steady verdicts — has the largest baseline of any
+        measurement available, so it resolves a wrong direction whose
+        per-move effect hides inside the verdict dead zone. It may only
+        override a direction that has NEVER been relief-verified: a proven
+        direction is never second-guessed by slow drift.
+        """
+        if self._assist_dir_proven or self._assist_seq0 is None or \
+                self._assist_seq_n < self.ASSIST_SEQ_MIN_MOVES:
+            return
+        t0, u0 = self._assist_seq0
+        t = telem_data.ElevTrimPct or self._neut_target
+        d_trim = t - t0
+        du = self._assist_u_mean - u0
+        if abs(d_trim) < self.ASSIST_SEQ_MIN_DTRIM or \
+                abs(du) < self.NEUT_SLOPE_MIN_DU:
+            return
+        slope = du / d_trim
+        new_dir = -1 if slope > 0 else 1
+        if new_dir == self._assist_dir:
+            return
+        n = self._assist_seq_n
+        self._assist_dir = new_dir
+        self._assist_worsen = 0
+        self._assist_seq0 = None
+        self._assist_seq_n = 0
+        if 0.05 <= abs(slope) <= 20.0:
+            # The run is a real slope measurement (same trust bounds as
+            # relief learning) — the first corrected move can be Newton-sized.
+            self._trim_slope_est = slope
+            self._assist_sized = True
+        else:
+            self._assist_sized = False
+        logger.warning(
+            f"Trim assistant: {n} unrelieved moves measured slope "
+            f"{slope:+.2f} over {d_trim:+.3f} trim — relief direction reversed")
 
     def _assist_step_from(self, u):
         """Trim step RELIEVING the measured load ``u``.

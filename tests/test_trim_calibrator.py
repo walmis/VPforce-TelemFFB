@@ -2567,3 +2567,114 @@ class TestAdaptiveSweepStep:
         assert state == CalState.DONE
         assert cal._sweep_step == pytest.approx(cal.SWEEP_STEP)
         assert cal._station_tol == pytest.approx(cal.TRIM_STATION_TOL)
+
+
+# --------------------------------------------------------------------------- #
+#  Assistant direction recovery (RV-10 field incident, 2026-07-22)
+# --------------------------------------------------------------------------- #
+
+class TestAssistDirectionRecovery:
+    """A deceleration-confounded neutralization secant seeded the relief
+    direction backwards; on a weak-trim aircraft (|du/dtrim| ~ 0.18) every
+    wrong-way move worsened the load by less than the per-move verdict
+    threshold, so the two-worsenings flip never armed and the trim marched
+    to its rail with the load still growing."""
+
+    def _poisoned_hold(self, clock, coupling=0.18, natural=0.5):
+        # Reach a clean, stable hold at natural trim 0 (no moves needed, so
+        # the direction is still unproven), then inject the field state: a
+        # noise secant taught a wrong-sign slope, and a power change makes a
+        # load appear.
+        ac = FakePlantAircraft(coupling=coupling, trim_natural=0.0)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 240), \
+            f"never reached ASSIST_HOLD ({cal.state}, {cal.abort_reason})"
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 120)
+        assert not cal._assist_dir_proven
+        cal._trim_slope_est = +0.067   # the RV-10's confounded export
+        cal._assist_sized = True
+        cal._assist_dir = -1
+        ac.trim_natural = natural      # load appears; correct relief is UP
+        return ac, cal
+
+    def test_wrong_direction_recovers_via_sequence_secant(self, clock):
+        ac, cal = self._poisoned_hold(clock)
+        assert run_until(cal, ac, clock, lambda: cal._assist_dir == 1, 180), \
+            f"direction never flipped (trim {ac.trim:+.3f})"
+        # The whole point: the flip must come from judging the unrelieved
+        # run, long before the trim reaches the rail.
+        assert ac.trim > -0.6, \
+            f"flip only came at the rail (trim {ac.trim:+.3f})"
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 300), \
+            f"assistant never recovered (trim {ac.trim:+.3f})"
+        # Weak trim: "trimmed" means the residual LOAD is inside tolerance
+        # (the trim band that allows is NEUT_U_TOL / coupling wide).
+        assert abs(0.18 * (ac.trim - 0.5)) <= cal.NEUT_U_TOL + 0.01
+
+    def test_unproven_direction_flips_at_the_rail(self, clock):
+        # Same poison, but the hold is already near the rail so the march has
+        # no room to build a sequence baseline before pegging: the rail
+        # itself must force the reversal.
+        ac, cal = self._poisoned_hold(clock, natural=0.2)
+        ac.trim = -0.9
+        cal._neut_target = -0.9
+        assert run_until(cal, ac, clock, lambda: cal._assist_dir == 1, 180), \
+            f"direction never flipped at the rail (trim {ac.trim:+.3f})"
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 300), \
+            f"assistant never recovered (trim {ac.trim:+.3f})"
+        assert abs(0.18 * (ac.trim - 0.2)) <= cal.NEUT_U_TOL + 0.01
+
+    def test_out_of_authority_reports_and_stops_stepping(self, clock):
+        # Relief-proven direction that genuinely runs out of trim range must
+        # NOT flip — it reports and stops issuing no-op steps at the rail.
+        ac = FakePlantAircraft(coupling=0.4, trim_natural=0.0)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 240)
+        ac.trim_natural = 1.2   # beyond the +/-0.95 command clamp
+        assert run_until(cal, ac, clock, lambda: cal._assist_railed, 400), \
+            f"never reported the rail (trim {ac.trim:+.3f}, dir {cal._assist_dir})"
+        assert cal._assist_dir == 1, "a proven direction must never flip"
+        assert ac.trim == pytest.approx(cal.TRIM_CMD_CLAMP, abs=0.02)
+        assert "limit" in cal.status_message
+        # No further stepping: the trim stays parked at the clamp and no move
+        # is pending verification.
+        for _ in range(int(30 / (1 / 30.0))):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+        assert ac.trim == pytest.approx(cal.TRIM_CMD_CLAMP, abs=0.02)
+        assert cal._assist_premove is None
+
+    def test_sequence_secant_never_overrides_a_proven_direction(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal._assist_dir = 1
+        cal._assist_dir_proven = True
+        cal._assist_u_mean = 0.3
+        cal._assist_seq0 = (0.0, 0.1)
+        cal._assist_seq_n = 5
+        telem = ac.telem(ElevTrimPct=0.5)
+        cal._assist_seq_flip_check(telem)
+        assert cal._assist_dir == 1
+        # Identical evidence with the direction unproven must flip it.
+        cal._assist_dir_proven = False
+        cal._assist_seq_flip_check(telem)
+        assert cal._assist_dir == -1
+
+    def test_neutralization_noise_secant_not_exported(self, clock):
+        # Trim so weak each probe moves the load ~0.006 — drift-level du.
+        # Neutralization may still converge, but the noise secant must NOT be
+        # exported to sign/size the assistant's retrims (the hold then enters
+        # with the normal-convention default direction, unsized).
+        ac = FakePlantAircraft(coupling=0.1, trim_natural=0.5)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 240), \
+            f"never reached ASSIST_HOLD ({cal.state}, {cal.abort_reason})"
+        assert cal._trim_slope_est is None
+        assert cal._assist_dir == 1
+        assert not cal._assist_sized
