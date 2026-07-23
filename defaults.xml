@@ -18045,6 +18045,27 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>C172SP.*</model>
+		<value>{"curves": [{"points": [{"t": 0.1355, "offs": 0.1108}, {"t": 0.1955, "offs": 0.1598}, {"t": 0.2555, "offs": 0.2091}, {"t": 0.3155, "offs": 0.2585}, {"t": 0.3755, "offs": 0.3081}, {"t": 0.4355, "offs": 0.361}, {"t": 0.4955, "offs": 0.4036}, {"t": 0.5555, "offs": 0.4711}, {"t": 0.6155, "offs": 0.5145}, {"t": 0.6755, "offs": 0.5591}, {"t": 0.7355, "offs": 0.6014}, {"t": 0.7955, "offs": 0.6472}, {"t": 0.8555, "offs": 0.6916}, {"t": 0.9155, "offs": 0.7371}], "t0": 0.5555, "ias_kt": 60.8, "date": "2026-07-21"}, {"points": [{"t": -0.2545, "offs": -0.2033}, {"t": -0.1945, "offs": -0.1558}, {"t": -0.1345, "offs": -0.1073}, {"t": -0.0745, "offs": -0.0589}, {"t": -0.0145, "offs": -0.0125}, {"t": 0.0455, "offs": 0.0391}, {"t": 0.1055, "offs": 0.0981}, {"t": 0.1655, "offs": 0.136}, {"t": 0.2255, "offs": 0.1828}, {"t": 0.2855, "offs": 0.2294}, {"t": 0.3455, "offs": 0.2774}, {"t": 0.4055, "offs": 0.3256}, {"t": 0.4655, "offs": 0.3724}, {"t": 0.5255, "offs": 0.4206}, {"t": 0.5855, "offs": 0.4717}], "t0": 0.1655, "ias_kt": 94.4, "date": "2026-07-21"}, {"points": [{"t": -0.4105, "offs": -0.4432}, {"t": -0.3505, "offs": -0.3791}, {"t": -0.2905, "offs": -0.3155}, {"t": -0.2305, "offs": -0.2515}, {"t": -0.1705, "offs": -0.1874}, {"t": -0.1105, "offs": -0.1229}, {"t": -0.0505, "offs": -0.0615}, {"t": 0.0095, "offs": 0.0116}, {"t": 0.0695, "offs": 0.0752}, {"t": 0.1295, "offs": 0.1435}, {"t": 0.1895, "offs": 0.2056}, {"t": 0.2495, "offs": 0.2712}, {"t": 0.3095, "offs": 0.3334}, {"t": 0.3695, "offs": 0.3966}, {"t": 0.4295, "offs": 0.4601}], "t0": 0.0095, "ias_kt": 120.0, "date": "2026-07-20"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>C172SP.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>C172SP.*</model>
+		<value>Follows Trim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>C172SP.*</model>
 		<value>0.55</value>
@@ -18143,6 +18164,27 @@
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>C208B.*</model>
+		<value>{"curves": [{"points": [{"t": -0.1707, "offs": -0.2202}, {"t": -0.1107, "offs": -0.1431}, {"t": -0.0507, "offs": -0.0656}, {"t": 0.0093, "offs": 0.012}, {"t": 0.0693, "offs": 0.0872}, {"t": 0.1293, "offs": 0.1704}, {"t": 0.1893, "offs": 0.2494}, {"t": 0.2493, "offs": 0.3356}, {"t": 0.3093, "offs": 0.4076}, {"t": 0.3693, "offs": 0.4828}, {"t": 0.4293, "offs": 0.558}, {"t": 0.4893, "offs": 0.6346}, {"t": 0.5493, "offs": 0.7105}], "t0": 0.1893, "ias_kt": 88.9, "date": "2026-07-21"}, {"points": [{"t": -0.2053, "offs": -0.4552}, {"t": -0.1453, "offs": -0.3254}, {"t": -0.0853, "offs": -0.1948}, {"t": -0.0253, "offs": -0.0589}, {"t": 0.0347, "offs": 0.0808}, {"t": 0.0947, "offs": 0.2097}, {"t": 0.1547, "offs": 0.3494}, {"t": 0.2147, "offs": 0.4828}, {"t": 0.2747, "offs": 0.6118}], "t0": 0.0347, "ias_kt": 121.3, "date": "2026-07-21"}, {"points": [{"t": -0.1474, "offs": -0.4931}, {"t": -0.0926, "offs": -0.329}, {"t": -0.0379, "offs": -0.1278}, {"t": 0.0168, "offs": 0.0567}, {"t": 0.0716, "offs": 0.235}, {"t": 0.1263, "offs": 0.4137}], "t0": -0.0379, "ias_kt": 149.6, "date": "2026-07-21"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>C208B.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>C208B.*</model>
+		<value>Follows Trim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -21319,7 +21361,7 @@
 		<value>XAW109Helicopter</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom XAW109Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the XAW109Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom XAW109Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the XAW109Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.&lt;br&gt;&lt;br&gt;The profile has axis control disabled because the aircraft does not honor the dataref write.  You will need to bind your controls in the sim to use this Aircraft.</notes>
 	</models>
 	<models>
 		<name>force_trim_enabled</name>
@@ -21378,11 +21420,25 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
+		<name>joystick_trim_follow_curve_y</name>
 		<model>Cessna Skyhawk.*</model>
-		<value>PropellerAircraft</value>
+		<value>{"curves": [{"points": [{"t": 0.043, "offs": 0.0176}, {"t": 0.103, "offs": 0.0422}, {"t": 0.163, "offs": 0.0683}, {"t": 0.223, "offs": 0.0963}, {"t": 0.283, "offs": 0.1258}, {"t": 0.343, "offs": 0.1588}, {"t": 0.403, "offs": 0.1891}, {"t": 0.463, "offs": 0.2155}, {"t": 0.523, "offs": 0.2436}, {"t": 0.583, "offs": 0.2671}, {"t": 0.643, "offs": 0.289}, {"t": 0.703, "offs": 0.3102}, {"t": 0.763, "offs": 0.3304}, {"t": 0.823, "offs": 0.3498}, {"t": 0.883, "offs": 0.3685}], "t0": 0.463, "ias_kt": 58.7, "date": "2026-07-21"}, {"points": [{"t": -0.465, "offs": -0.1876}, {"t": -0.405, "offs": -0.1667}, {"t": -0.345, "offs": -0.1449}, {"t": -0.285, "offs": -0.1219}, {"t": -0.225, "offs": -0.0976}, {"t": -0.165, "offs": -0.0718}, {"t": -0.105, "offs": -0.0473}, {"t": -0.045, "offs": -0.0258}, {"t": 0.015, "offs": 0.0086}, {"t": 0.075, "offs": 0.0355}, {"t": 0.135, "offs": 0.0632}, {"t": 0.195, "offs": 0.0887}, {"t": 0.255, "offs": 0.113}, {"t": 0.315, "offs": 0.1358}, {"t": 0.375, "offs": 0.1576}], "t0": -0.045, "ias_kt": 89.0, "date": "2026-07-21"}, {"points": [{"t": -0.816, "offs": -0.3428}, {"t": -0.756, "offs": -0.3248}, {"t": -0.696, "offs": -0.3059}, {"t": -0.636, "offs": -0.2862}, {"t": -0.576, "offs": -0.2655}, {"t": -0.516, "offs": -0.2439}, {"t": -0.456, "offs": -0.221}, {"t": -0.396, "offs": -0.1933}, {"t": -0.336, "offs": -0.1639}, {"t": -0.276, "offs": -0.1297}, {"t": -0.216, "offs": -0.0987}, {"t": -0.156, "offs": -0.0689}, {"t": -0.096, "offs": -0.041}, {"t": -0.036, "offs": -0.0149}, {"t": 0.024, "offs": 0.0099}], "t0": -0.396, "ias_kt": 115.0, "date": "2026-07-21"}]}</value>
 		<sim>XPLANE</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cessna Skyhawk.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Cessna Skyhawk.*</model>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -21392,11 +21448,25 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
-		<model>Cirrus personal jet</model>
-		<value>JetAircraft</value>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Cirrus SR-22.*</model>
+		<value>{"curves": [{"points": [{"t": -0.104, "offs": -0.0412}, {"t": -0.044, "offs": -0.0187}, {"t": 0.016, "offs": 0.0068}, {"t": 0.076, "offs": 0.0399}, {"t": 0.136, "offs": 0.0757}, {"t": 0.196, "offs": 0.1159}, {"t": 0.256, "offs": 0.1535}, {"t": 0.316, "offs": 0.2091}, {"t": 0.376, "offs": 0.2427}, {"t": 0.436, "offs": 0.2704}, {"t": 0.496, "offs": 0.2977}, {"t": 0.556, "offs": 0.3234}, {"t": 0.616, "offs": 0.3477}, {"t": 0.676, "offs": 0.3707}, {"t": 0.736, "offs": 0.3925}], "t0": 0.316, "ias_kt": 90.3, "date": "2026-07-22"}, {"points": [{"t": -0.362, "offs": -0.149}, {"t": -0.302, "offs": -0.1273}, {"t": -0.242, "offs": -0.1046}, {"t": -0.182, "offs": -0.0805}, {"t": -0.122, "offs": -0.055}, {"t": -0.062, "offs": -0.0282}, {"t": -0.002, "offs": -0.0013}, {"t": 0.058, "offs": 0.0385}, {"t": 0.118, "offs": 0.0772}, {"t": 0.178, "offs": 0.1091}, {"t": 0.238, "offs": 0.1398}, {"t": 0.298, "offs": 0.1684}, {"t": 0.358, "offs": 0.1952}, {"t": 0.418, "offs": 0.2204}, {"t": 0.478, "offs": 0.2442}], "t0": 0.058, "ias_kt": 125.7, "date": "2026-07-22"}, {"points": [{"t": -0.54, "offs": -0.2348}, {"t": -0.48, "offs": -0.2143}, {"t": -0.42, "offs": -0.1928}, {"t": -0.36, "offs": -0.1703}, {"t": -0.3, "offs": -0.1466}, {"t": -0.24, "offs": -0.1215}, {"t": -0.18, "offs": -0.0949}, {"t": -0.12, "offs": -0.0618}, {"t": -0.06, "offs": -0.028}, {"t": 0.0, "offs": -0.0}, {"t": 0.06, "offs": 0.035}, {"t": 0.12, "offs": 0.0665}, {"t": 0.18, "offs": 0.096}, {"t": 0.24, "offs": 0.1236}, {"t": 0.3, "offs": 0.1493}], "t0": -0.12, "ias_kt": 160.6, "date": "2026-07-22"}]}</value>
 		<sim>XPLANE</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cirrus SR-22.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Cirrus SR-22.*</model>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -21404,6 +21474,14 @@
 		<value>PropellerAircraft</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cirrus Vision SF50.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+		<notes>Overrides the JetAircraft class default (Stays Centered): the Vision Jet uses conventional mechanical (pushrod/cable) flight controls, not FBW or a boosted artificial-feel system, despite being a jet.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -21491,11 +21569,68 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Van's RV-10.*</model>
+		<value>{"curves": [{"points": [{"t": 0.165, "offs": 0.0567}, {"t": 0.225, "offs": 0.0773}, {"t": 0.285, "offs": 0.0991}, {"t": 0.345, "offs": 0.122}, {"t": 0.405, "offs": 0.146}, {"t": 0.465, "offs": 0.172}, {"t": 0.525, "offs": 0.1973}, {"t": 0.585, "offs": 0.2033}, {"t": 0.645, "offs": 0.2297}, {"t": 0.705, "offs": 0.2487}, {"t": 0.765, "offs": 0.2679}, {"t": 0.825, "offs": 0.2863}, {"t": 0.885, "offs": 0.3039}, {"t": 0.945, "offs": 0.321}], "t0": 0.585, "ias_kt": 80.9, "date": "2026-07-22"}, {"points": [{"t": -0.195, "offs": -0.068}, {"t": -0.135, "offs": -0.0482}, {"t": -0.075, "offs": -0.0275}, {"t": -0.015, "offs": -0.0057}, {"t": 0.045, "offs": 0.0172}, {"t": 0.105, "offs": 0.0409}, {"t": 0.165, "offs": 0.0654}, {"t": 0.225, "offs": 0.0894}, {"t": 0.285, "offs": 0.1119}, {"t": 0.345, "offs": 0.1314}, {"t": 0.405, "offs": 0.1505}, {"t": 0.465, "offs": 0.1688}, {"t": 0.525, "offs": 0.1864}, {"t": 0.585, "offs": 0.2034}, {"t": 0.645, "offs": 0.2197}], "t0": 0.225, "ias_kt": 109.8, "date": "2026-07-22"}, {"points": [{"t": -0.465, "offs": -0.1661}, {"t": -0.405, "offs": -0.1481}, {"t": -0.345, "offs": -0.1293}, {"t": -0.285, "offs": -0.1095}, {"t": -0.225, "offs": -0.089}, {"t": -0.165, "offs": -0.0678}, {"t": -0.105, "offs": -0.0463}, {"t": -0.045, "offs": -0.0198}, {"t": 0.015, "offs": 0.0066}, {"t": 0.075, "offs": 0.0277}, {"t": 0.135, "offs": 0.0488}, {"t": 0.195, "offs": 0.0691}, {"t": 0.255, "offs": 0.0884}, {"t": 0.315, "offs": 0.107}, {"t": 0.375, "offs": 0.1248}], "t0": -0.045, "ias_kt": 140.2, "date": "2026-07-22"}]}</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Van's RV-10.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Van's RV-10.*</model>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Van's RV-10.*</model>
 		<value>PropellerAircraft</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Airbus A330-300.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Boeing 737-800.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>McDonnell Douglas MD-82.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>ALIA 250.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>ALIA 250.*</model>
+		<value>Stays Centered</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+		<notes>All-electric fly-by-wire eVTOL; classed PropellerAircraft for propulsion-effect defaults (no afterburner), but the trim feel is FBW-centered, not tab/cable.</notes>
 	</models>
 	<classes>
 		<sim>DCS</sim>
