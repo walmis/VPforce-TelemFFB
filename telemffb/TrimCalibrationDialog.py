@@ -87,19 +87,22 @@ class TrimCalibrationDialog(QDialog):
     RESPONSE_LIVE_STATES = ("PROBE", "STABILIZE", "TRIM_NEUTRAL",
                             "ASSIST_HOLD", "SPEED_SETTLE")
 
-    # Stage light: color + friendly text per engine state while a run is active.
-    STAGE_DISPLAY = {
-        "PROBE": ("#e6a817", "Probing control response…"),
-        "STABILIZE": ("#e6a817", "Stabilizing level flight…"),
-        "TRIM_NEUTRAL": ("#e6a817", "Finding natural trim point…"),
-        "ASSIST_HOLD": ("#e6a817", "Trim assistant holding…"),
-        "SPEED_SETTLE": ("#e6a817", "Letting airspeed stabilize…"),
-        "SWEEP": ("#2a7fd4", "Sweeping trim…"),
-        "SOLVE": ("#2a7fd4", "Computing…"),
-        "RESTORE": ("#2a7fd4", "Restoring trim…"),
-        "DONE": ("#33aa33", "Calibration complete"),
-        "ABORT": ("#cc3333", "Aborted"),
+    # Guided-flow step tracker: the engine's states map onto three
+    # user-facing steps in domain terms. Colors carry WHO acts — blue =
+    # automatic (TelemFFB is flying), amber = user action needed, green =
+    # armed / complete, red = failure. The engine's own status_message
+    # remains the unabridged detail feed below the tracker; only the raw
+    # state enum leaves the (non-debug) UI.
+    TRACKER_STEPS = ("Level &amp; neutral trim", "Test speed", "Trim sweep")  # HTML-ready
+    TRACKER_STEP_OF_STATE = {
+        "PROBE": 1, "STABILIZE": 1, "TRIM_NEUTRAL": 1,
+        "ASSIST_HOLD": 2,
+        "SPEED_SETTLE": 3, "SWEEP": 3, "SOLVE": 3, "RESTORE": 3,
     }
+    COL_AUTO = "#2a7fd4"
+    COL_ACTION = "#e6a817"
+    COL_OK = "#33aa33"
+    COL_BAD = "#cc3333"
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -116,6 +119,7 @@ class TrimCalibrationDialog(QDialog):
         self._ias_hist = []   # (t, IAS m/s) for the trend indicator
         self._cal_seen = None    # id() of the calibrator the display belongs to
         self._stored_curve_seen = None  # raw curve JSON the display reflects
+        self._was_running = False       # rising-edge detect: a new run clears the graph
         self._fam_raw = []       # stored family: raw entry dicts, speed-sorted
         self._fam = []           # parsed view of the same entries (index-aligned)
         self._fam_sel = 0        # manager selection index
@@ -180,18 +184,20 @@ class TrimCalibrationDialog(QDialog):
             "<ol style='margin-top:0px; margin-bottom:0px; -qt-list-indent:1;'>"
             "<li>Get airborne, straight &amp; level, at a stable cruise speed with "
             "Autopilot <b>OFF</b>.</li>"
-            "<li><b>Trim the aircraft</b> so it holds level with near-zero stick force — "
-            "starting far out of trim wastes elevator authority during the sweep.</li>"
-            "<li><i>Recommended</i> — press <b>Trim Assistant</b> and TelemFFB will level "
-            "and trim the aircraft for you, then keep re-trimming as you adjust power "
-            "(this also measures the aircraft's trim response, which fine-tunes the sweep). "
-            "Set your test speed with the throttle, wait for the assistant to report "
-            "steady (the Start button enables), then start the sweep.</li>"
-            "<li>Press <b>Start</b> — TelemFFB will fly the aircraft while it sweeps the "
-            "elevator trim and measures the stick input needed to hold the nose level, "
-            "producing a calibrated trim curve <b>for the current airspeed</b>. Your "
-            "stick is <b>inactive</b> during calibration — its input is disconnected "
-            "while TelemFFB has the controls.</li>"
+            "<li>Press <b>Begin Calibration</b> — TelemFFB takes the controls, "
+            "levels and trims the aircraft (<i>Preparing…</i>), then holds it "
+            "while you set your test speed with the throttle (<i>Settling…</i> — "
+            "it re-trims after every power change; in a glider, adjust the "
+            "target descent rate instead — airspeed follows the sink). Your "
+            "stick is <b>inactive</b> while TelemFFB has the controls.</li>"
+            "<li>Once speed and trim hold steady, the button becomes "
+            "<b>Start Trim Sweep</b> — press it to calibrate the current "
+            "airspeed, or adjust power first to pick a different speed. "
+            "<b>Abort</b> works at any point; aborting during the hold leaves "
+            "the aircraft trimmed for the current power.</li>"
+            "<li>The sweep measures the stick input needed to hold the nose level "
+            "across the trim range, producing a calibrated trim curve <b>for that "
+            "airspeed</b>; trim is restored when it finishes.</li>"
             "<li><b>Save</b>, then repeat at 2–3 different airspeeds (slow flight, "
             "cruise, high cruise) — the window stays ready after each save. In flight, "
             "TelemFFB blends the stored speeds by airspeed, so trim behaves correctly "
@@ -327,64 +333,48 @@ class TrimCalibrationDialog(QDialog):
             debug_row.addStretch(1)
             root.addLayout(debug_row)
 
-        # Warning banner shown only while the engine is flying the aircraft.
-        self.banner = QLabel("⚠  TelemFFB is controlling your aircraft — stay ready to take over")
-        self.banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.banner.setStyleSheet(
-            "QLabel { background-color:#cc3300; color:white; font-weight:bold;"
-            " border-radius:6px; padding:5px; }"
-        )
-        self.banner.setVisible(False)
-        root.addWidget(self.banner)
+        # ---- guided calibration controls ----
+        # The action pair sits directly above the status cluster —
+        # left-justified, with deliberate distance between the go button and
+        # Abort so neither is pressed reaching for the other.
+        wizard_row = QHBoxLayout()
+        # No tooltip: the instructions, phase line, and step lamps carry the
+        # flow now — a tooltip restating them was one more redundant surface.
+        self.btn_wizard = QPushButton("Begin Calibration")
+        self.btn_wizard.clicked.connect(self._on_wizard)
+        # QPushButton's minimum hint is smaller than its text (Qt clips the
+        # label under squeeze) — pin the minimum to the WIDEST label the
+        # button morphs through so state changes never jiggle the layout.
+        widest = 0
+        for txt in ("Begin Calibration", "Start Trim Sweep",
+                    "Preparing…", "Settling…", "Measuring…"):
+            self.btn_wizard.setText(txt)
+            widest = max(widest, self.btn_wizard.sizeHint().width())
+        self.btn_wizard.setText("Begin Calibration")
+        self.btn_wizard.setMinimumWidth(widest)
+        wizard_row.addWidget(self.btn_wizard)
+        # Abort at the far edge — deliberate distance from the go button.
+        wizard_row.addStretch(1)
+        self.btn_stop = QPushButton("Abort")
+        self.btn_stop.clicked.connect(self._on_stop)
+        self.btn_stop.setEnabled(False)
+        self.btn_stop.setMinimumWidth(self.btn_stop.sizeHint().width())
+        wizard_row.addWidget(self.btn_stop)
+        root.addLayout(wizard_row)
 
         # ---- live status ----
         status_box = QGroupBox("Live status")
         grid = QGridLayout(status_box)
-        self.lbl_ias = QLabel("—")
-        self.lbl_pitch = QLabel("—")
-        self.lbl_vs = QLabel("—")
-        self.lbl_bank = QLabel("—")
-        self.lbl_trim = QLabel("—")
-        self.lbl_state = QLabel("Idle")
-        # IAS gets a live trend arrow beside the value (MSFS creeps toward
-        # its new equilibrium speed for a minute-plus after a power change;
-        # the arrow shows the assistant is waiting on physics, not wedged).
-        self.ias_trend = IasTrendWidget()
-        for col, (name, w) in enumerate([
-            ("IAS", self.lbl_ias), ("Pitch", self.lbl_pitch), ("VS", self.lbl_vs),
-            ("Bank", self.lbl_bank), ("Trim", self.lbl_trim),
-        ]):
-            grid.addWidget(QLabel(f"<b>{name}</b>"), 0, col, alignment=Qt.AlignmentFlag.AlignHCenter)
-            w.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-            if w is self.lbl_ias:
-                # Arrow pinned at the cell's right edge, OUTSIDE the label's
-                # centering, so neither the arrow redrawing nor the label
-                # text changing shifts anything else.
-                cell = QHBoxLayout()
-                cell.setContentsMargins(0, 0, 0, 0)
-                cell.setSpacing(0)
-                cell.addStretch(1)
-                cell.addWidget(self.lbl_ias)
-                cell.addStretch(1)
-                cell.addWidget(self.ias_trend)
-                grid.addLayout(cell, 1, col)
-            else:
-                grid.addWidget(w, 1, col)
-        # Equal columns regardless of content width, or the whole row
-        # re-negotiates as values change length.
-        for col in range(5):
-            grid.setColumnStretch(col, 1)
 
-        # State text gets its own full-width row (long per-frame status lines)
-        # and the stage/ready light its own — sharing a row clips one or the
-        # other. An HBox keeps the message left-justified right after the
-        # State: prefix instead of starting at the (wide) second grid column,
-        # and the label reserves two text lines so an occasional word-wrap
-        # cannot bounce the layout below it up and down.
-        # Suggested calibration speeds sit directly under the IAS value the
-        # user is watching while picking a test speed. Split into a name
-        # label (InfoLabel — the icon belongs after the NAME, not trailing
-        # the numbers) and a rich-text value label (bold/struck speeds).
+        def _hline():
+            ln = QFrame()
+            ln.setFrameShape(QFrame.Shape.HLine)
+            ln.setStyleSheet("color: #555555;")
+            return ln
+
+        # Row order (user-designed): suggested speeds, the separated flight
+        # values, the status lines, sweep progress, then the three step
+        # lamps at the bottom of the box.
         suggest_row = QHBoxLayout()
         self.lbl_suggest_name = InfoLabel(
             text="Suggested calibration speeds (IAS):",
@@ -405,26 +395,120 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_suggest.setStyleSheet("QLabel { color: gray; }")
         suggest_row.addWidget(self.lbl_suggest)
         suggest_row.addStretch(1)
-        grid.addLayout(suggest_row, 2, 0, 1, 5)
+        # Fixed footprint: the row keeps its height while hidden (no
+        # suggestions / offline) so showing it never reflows the box.
+        for w in (self.lbl_suggest_name, self.lbl_suggest):
+            sp = w.sizePolicy()
+            sp.setRetainSizeWhenHidden(True)
+            w.setSizePolicy(sp)
+        grid.addLayout(suggest_row, 0, 0, 1, 5)
         self._set_suggest_visible(False)
 
-        state_row = QHBoxLayout()
-        state_row.addWidget(QLabel("<b>State:</b>"), 0, Qt.AlignmentFlag.AlignTop)
-        self.lbl_state.setWordWrap(True)
-        self.lbl_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.lbl_state.setMinimumHeight(2 * self.lbl_state.fontMetrics().lineSpacing())
-        state_row.addWidget(self.lbl_state, 1)
-        grid.addLayout(state_row, 3, 0, 1, 5)
-        # Left-justified so the light sits at a fixed position — right-
-        # aligned, the whole line (light included) shifted with text length.
-        self.lbl_ready = QLabel("●  —")
-        grid.addWidget(self.lbl_ready, 4, 0, 1, 5, alignment=Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(_hline(), 1, 0, 1, 5)
 
+        self.lbl_ias = QLabel("—")
+        self.lbl_pitch = QLabel("—")
+        self.lbl_vs = QLabel("—")
+        self.lbl_bank = QLabel("—")
+        self.lbl_trim = QLabel("—")
+        # IAS gets a live trend arrow beside the value (MSFS creeps toward
+        # its new equilibrium speed for a minute-plus after a power change;
+        # the arrow shows the assistant is waiting on physics, not wedged).
+        self.ias_trend = IasTrendWidget()
+        for col, (name, w) in enumerate([
+            ("IAS", self.lbl_ias), ("Pitch", self.lbl_pitch), ("VS", self.lbl_vs),
+            ("Bank", self.lbl_bank), ("Trim", self.lbl_trim),
+        ]):
+            grid.addWidget(QLabel(f"<b>{name}</b>"), 2, col, alignment=Qt.AlignmentFlag.AlignHCenter)
+            w.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            if w is self.lbl_ias:
+                # Arrow pinned at the cell's right edge, OUTSIDE the label's
+                # centering, so neither the arrow redrawing nor the label
+                # text changing shifts anything else.
+                cell = QHBoxLayout()
+                cell.setContentsMargins(0, 0, 0, 0)
+                cell.setSpacing(0)
+                cell.addStretch(1)
+                cell.addWidget(self.lbl_ias)
+                cell.addStretch(1)
+                cell.addWidget(self.ias_trend)
+                grid.addLayout(cell, 3, col)
+            else:
+                grid.addWidget(w, 3, col)
+        # Equal columns regardless of content width, or the whole row
+        # re-negotiates as values change length.
+        for col in range(5):
+            grid.setColumnStretch(col, 1)
+
+        grid.addWidget(_hline(), 4, 0, 1, 5)
+
+        # Phase line: the light + one factual sentence — readiness when
+        # idle, the current phase while running. Detail line: the engine's
+        # own status_message feed, unabridged (VS tolerances, station
+        # numbers, ...). Both word-wrap (per-frame text must never force
+        # the window wider); the detail reserves two text lines so an
+        # occasional wrap cannot bounce the layout below it.
+        self.lbl_ready = QLabel("●  —")
+        self.lbl_ready.setWordWrap(True)
+        self.lbl_ready.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        # Two text lines reserved: a wrap must change what's shown, never
+        # the geometry around it.
+        self.lbl_ready.setMinimumHeight(2 * self.lbl_ready.fontMetrics().lineSpacing())
+        grid.addWidget(self.lbl_ready, 5, 0, 1, 5)
+        self.lbl_detail = QLabel("")
+        self.lbl_detail.setStyleSheet("QLabel { color: gray; }")
+        self.lbl_detail.setWordWrap(True)
+        self.lbl_detail.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.lbl_detail.setMinimumHeight(2 * self.lbl_detail.fontMetrics().lineSpacing())
+        grid.addWidget(self.lbl_detail, 6, 0, 1, 5)
+
+        # Progress is meaningful only during the sweep (step 3): shown there
+        # with its real meaning (station count), hidden otherwise so a dead
+        # bar never reads as "stuck".
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
-        grid.addWidget(self.progress, 5, 0, 1, 5)
+        self.progress.setVisible(False)
+        # Fixed footprint while hidden — appearing at sweep time must not
+        # push the lamps/result area down.
+        sp = self.progress.sizePolicy()
+        sp.setRetainSizeWhenHidden(True)
+        self.progress.setSizePolicy(sp)
+        grid.addWidget(self.progress, 7, 0, 1, 5)
+
+        # Step lamps (bottom of the box): the three steps as equal-width
+        # annunciator cells — the active one lit in the who-acts color
+        # (blue = automatic, amber = user action, green = armed/complete),
+        # completed steps become green checks.
+        lamp_row = QHBoxLayout()
+        self._tracker_cells = []
+        self._tracker_cache = [None, None, None]
+        for _ in range(3):
+            c = QLabel()
+            c.setTextFormat(Qt.TextFormat.RichText)
+            c.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            c.setStyleSheet("QLabel { border: 1px solid #777777;"
+                            " border-radius: 3px; padding: 4px 6px; }")
+            c.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            self._tracker_cells.append(c)
+            lamp_row.addWidget(c, 1)
+        grid.addLayout(lamp_row, 8, 0, 1, 5)
         root.addWidget(status_box)
+
+        # Warning banner between the status cluster and the results, shown
+        # only while the engine is flying the aircraft. Space is reserved
+        # while hidden so a run starting/stopping never reflows the form.
+        self.banner = QLabel("⚠  TelemFFB is controlling your aircraft — stay ready to take over")
+        self.banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.banner.setStyleSheet(
+            "QLabel { background-color:#cc3300; color:white; font-weight:bold;"
+            " border-radius:6px; padding:5px; }"
+        )
+        self.banner.setVisible(False)
+        sp = self.banner.sizePolicy()
+        sp.setRetainSizeWhenHidden(True)
+        self.banner.setSizePolicy(sp)
+        root.addWidget(self.banner)
 
         # ---- result ----
         result_box = QGroupBox("Result")
@@ -576,42 +660,12 @@ class TrimCalibrationDialog(QDialog):
         rlay.addWidget(self.lbl_note)
         root.addWidget(result_box)
 
-        # Trim assistant gets its own row (it lives outside the run-control
-        # button row so it does not get lost among the bottom buttons).
-        assist_row = QHBoxLayout()
-        self.btn_assist = QPushButton("Trim Assistant")
-        self.btn_assist.setToolTip(
-            "Have TelemFFB level and trim the aircraft, then hold it level while\n"
-            "you adjust power to the speed you want to calibrate at. The assistant\n"
-            "re-trims after every power change; when it reports steady, press Start\n"
-            "to run the sweep from there (the leveling and trim-finding phases are\n"
-            "already complete). Cancelling the assistant leaves the trim where it\n"
-            "is — the aircraft stays trimmed for the current power.")
-        self.btn_assist.clicked.connect(self._on_assist)
-        # QPushButton's minimum hint is smaller than its text (Qt clips the
-        # label under squeeze) — pin it so the HINT label yields instead:
-        # word-wrapped, its minimum width collapses and the fit machinery
-        # absorbs the extra line when narrow.
-        self.btn_assist.setMinimumWidth(self.btn_assist.sizeHint().width())
-        assist_row.addWidget(self.btn_assist)
-        lbl_assist = QLabel("Levels and trims the aircraft for you while you set your test speed")
-        lbl_assist.setStyleSheet("QLabel { color: gray; }")
-        lbl_assist.setWordWrap(True)
-        assist_row.addWidget(lbl_assist, stretch=1)
-        root.addLayout(assist_row)
-
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         root.addWidget(line)
 
-        # ---- buttons ----
+        # ---- result / session actions (Abort lives with the wizard button) ----
         btns = QHBoxLayout()
-        self.btn_start = QPushButton("Start")
-        self.btn_stop = QPushButton("⛔ Abort")
-        self.btn_start.clicked.connect(self._on_start)
-        self.btn_stop.clicked.connect(self._on_stop)
-        btns.addWidget(self.btn_start)
-        btns.addWidget(self.btn_stop)
         btns.addStretch(1)
 
         self.btn_apply = QPushButton("Apply (test in sim)")
@@ -625,11 +679,10 @@ class TrimCalibrationDialog(QDialog):
         btns.addWidget(self.btn_apply)
         btns.addWidget(self.btn_save)
         btns.addWidget(self.btn_close)
-        # Same clip-under-squeeze protection as the assist button: pin each
+        # Same clip-under-squeeze protection as the wizard button: pin each
         # bottom-row button's minimum to its content so the layout minimum
         # (and thus the window's) accounts for their full labels.
-        for b in (self.btn_start, self.btn_stop, self.btn_apply,
-                  self.btn_save, self.btn_close):
+        for b in (self.btn_apply, self.btn_save, self.btn_close):
             b.setMinimumWidth(b.sizeHint().width())
         root.addLayout(btns)
 
@@ -797,34 +850,85 @@ class TrimCalibrationDialog(QDialog):
             if G.device_type != "joystick":
                 self._set_ready(False, "Run from the joystick (master) instance")
                 self._set_running(False)
-                self.btn_start.setEnabled(False)
-                self.btn_assist.setEnabled(False)
+                self._apply_wizard("Begin Calibration", False)
+                self._set_tracker(0)
+                self._set_detail("")
+                self._set_progress(False)
                 return
             if cal is None:
                 self._set_ready(False, "Load an MSFS / X-Plane aircraft")
                 self._set_running(False)
-                self.btn_start.setEnabled(False)
-                self.btn_assist.setEnabled(False)
+                self._apply_wizard("Begin Calibration", False)
+                self._set_tracker(0)
+                self._set_detail("")
+                self._set_progress(False)
                 return
 
             running = cal.active
             assist_holding = running and cal.state == CalState.ASSIST_HOLD
-            self.lbl_state.setText(getattr(cal.state, "name", str(cal.state)))
-            if cal.status_message:
-                self.lbl_state.setText(f"{getattr(cal.state, 'name', '')} — {cal.status_message}")
-            self.progress.setValue(int(cal.progress * 100))
+            state_name = getattr(cal.state, "name", "")
+            # A new run owns the graph: whatever the display held (the
+            # stored-family view after a save, a previous result's zoom)
+            # must not leave its ghosts/axes under the live points — the
+            # live marker walks straight off a view fitted to old data.
+            # Rising-edge here catches EVERY start path (wizard, sweep
+            # handoff, calibrator recreation mid-session).
+            if running and not self._was_running:
+                self.curve.clear()
+                self._clear_result_labels()
+                self._stored_curve_seen = None
+            self._was_running = running
+            self._set_running(running)
+            # One narrative cluster: the wizard button walks the guided flow,
+            # the tracker shows where in it we are (color = who acts), the
+            # phase line states the current fact, and the detail line carries
+            # the engine's unabridged status feed. While the assistant holds,
+            # the button is the sweep trigger, gated on the assistant's own
+            # stability determination (starting mid-transient is a guaranteed
+            # abort; the hysteresis lives engine-side, next to the data).
             if assist_holding:
-                # Start is the sweep trigger while the assistant holds, gated
-                # on the assistant's own stability determination (starting
-                # mid-transient is a guaranteed abort; the hysteresis lives
-                # engine-side, next to the data).
-                start_want = bool(getattr(cal, "assist_stable", False))
+                if getattr(cal, "assist_stable", False):
+                    self._apply_wizard("Start Trim Sweep", True)
+                    self._set_tracker(2, self.COL_OK)
+                    ias_kt = (data.get("IAS") or 0) * 1.94384
+                    self._set_light(self.COL_OK,
+                                    f"Steady at {ias_kt:.0f} kt — sweep ready")
+                else:
+                    self._apply_wizard("Settling…", False)
+                    self._set_tracker(2, self.COL_ACTION)
+                    self._set_light(self.COL_ACTION,
+                                    "Holding level — set power for the target "
+                                    "airspeed; the sweep arms when speed and "
+                                    "trim are steady")
             elif running:
-                start_want = False
-            else:
-                start_want = self.btn_start.isEnabled()  # can_start decides below
-            self._set_running(running, start_enabled=start_want)
-            self.btn_start.setText("Start sweep" if assist_holding else "Start")
+                step = self.TRACKER_STEP_OF_STATE.get(state_name, 1)
+                if step == 1:
+                    self._apply_wizard("Preparing…", False)
+                    self._set_tracker(1, self.COL_AUTO)
+                    self._set_light(self.COL_AUTO,
+                                    "TelemFFB is flying — leveling and finding "
+                                    "the neutral trim point")
+                else:
+                    self._apply_wizard("Measuring…", False)
+                    self._set_tracker(3, self.COL_AUTO)
+                    self._set_light(self.COL_AUTO,
+                                    "Confirming a steady airspeed before the sweep"
+                                    if state_name == "SPEED_SETTLE" else
+                                    "Sweeping the trim range"
+                                    if state_name == "SWEEP" else
+                                    "Computing the curve and restoring trim")
+            if running:
+                self._set_detail(cal.status_message or "")
+                if state_name in ("SWEEP", "SOLVE", "RESTORE"):
+                    max_st = getattr(cal, "SWEEP_MAX_STATIONS", 15)
+                    n = len(getattr(cal, "_samples", []) or [])
+                    fmt = (f"station {min(n + 1, max_st)} of ~{max_st}"
+                           if state_name == "SWEEP" else "finishing…")
+                    self._set_progress(True, int(cal.progress * 100), fmt)
+                else:
+                    self._set_progress(False)
+            # Idle: tracker/phase/button applied in the not-running branch
+            # below (can_start decides).
 
             # Run options lock while a run is active — they are read once at
             # start and a mid-run change would silently do nothing. The
@@ -856,12 +960,10 @@ class TrimCalibrationDialog(QDialog):
                 self.btn_fam_delete.setEnabled(False)
                 self.btn_fam_clear.setEnabled(False)
                 self.cmb_stick_pos.setEnabled(False)
-                self._show_stage_light(cal)
                 self.curve.set_live_point(data.get("ElevTrimPct"), getattr(cal, "_u_elev", None))
                 # Show accepted stations as they land (full-scale view; the
                 # zoom-to-fit happens once at completion in _show_result).
                 self.curve.set_samples(list(getattr(cal, "_samples", []) or []))
-                self.btn_assist.setEnabled(False)
             else:
                 # Keep the engine's held-VS target current so the live "ready"
                 # gate (can_start) judges a descending glider against its
@@ -869,8 +971,13 @@ class TrimCalibrationDialog(QDialog):
                 cal.vs_target = self._glider_vs_target_ms()
                 ok, msg = cal.can_start(data)
                 self._set_ready(ok, msg)
-                self.btn_start.setEnabled(ok)
-                self.btn_assist.setEnabled(ok)
+                self._apply_wizard("Begin Calibration", ok)
+                # Tracker: a fresh unsaved result keeps all three checks
+                # (orientation: the run finished); anything else idles gray.
+                self._set_tracker(0, complete=(
+                    cal.state == CalState.DONE and cal.result is not None))
+                self._set_detail("")
+                self._set_progress(False)
                 # The aircraft's applied curve can change while the dialog is
                 # open (enabling trim following applies a previously
                 # prereq-blocked curve; the config pipeline only runs on
@@ -904,6 +1011,11 @@ class TrimCalibrationDialog(QDialog):
         # Aircraft changed: last aircraft's speed suggestions are stale;
         # the next live frame recomputes them for the new one.
         self._set_suggest_visible(False)
+        if cal is not None and cal.active:
+            # A run is in progress on this engine: the live view owns the
+            # graph — re-rendering the stored family here would put its
+            # zoom/ghosts under the run's live points.
+            return
         if cal is not None and cal.state == CalState.DONE and cal.result:
             self._show_result(cal.result)
         else:
@@ -1430,22 +1542,66 @@ class TrimCalibrationDialog(QDialog):
 
     # ---- button handlers ----------------------------------------------------
 
-    def _on_start(self):
+    def _on_wizard(self):
+        """The single guided-flow button: begins the assisted run when idle,
+        hands off to the sweep while the assistant holds steady. (The direct
+        no-assistant start is engine/tests-only now — assisted runs proved
+        strictly better in the field, so the UI offers one path.)"""
         cal = self._calibrator()
         if cal is None:
             return
         if cal.active and cal.state == CalState.ASSIST_HOLD:
-            # Assistant is holding: Start hands off to the sweep (the button
-            # is gated on the assistant's own stability determination).
+            # The button is gated on the assistant's own stability
+            # determination (assist_stable).
             cal.begin_sweep()
             return
-        self._arm_and_start(cal, assist=False)
+        if not cal.active:
+            self._arm_and_start(cal, assist=True)
 
-    def _on_assist(self):
-        cal = self._calibrator()
-        if cal is None or cal.active:
-            return
-        self._arm_and_start(cal, assist=True)
+    def _apply_wizard(self, label, enabled):
+        """Apply the wizard button state in ONE transition per property.
+
+        Runs per telemetry frame — a disable→re-enable pulse clears a
+        QPushButton's in-progress press, silently swallowing user clicks
+        (the bug the old gated Start button had), so every property is
+        change-guarded."""
+        if self.btn_wizard.text() != label:
+            self.btn_wizard.setText(label)
+        if self.btn_wizard.isEnabled() != enabled:
+            self.btn_wizard.setEnabled(enabled)
+
+    def _set_tracker(self, active, color=None, complete=False, failed=False):
+        """Render the 3-step lamps (change-guarded per cell).
+
+        ``active`` 1-3 lights that step in ``color`` (who-acts color); steps
+        before it become green checks. 0 = all pending (idle). ``complete``
+        checks all three; ``failed`` marks the active step red.
+        """
+        for i, name in enumerate(self.TRACKER_STEPS, start=1):
+            digit = "①②③"[i - 1]
+            if complete or (active and i < active):
+                html = f"<span style='color:{self.COL_OK}'>✓ {name}</span>"
+            elif i == active and failed:
+                html = f"<b><span style='color:{self.COL_BAD}'>{digit} {name}</span></b>"
+            elif i == active:
+                html = f"<b><span style='color:{color}'>{digit} {name}</span></b>"
+            else:
+                html = f"<span style='color:gray'>{digit} {name}</span>"
+            if html != self._tracker_cache[i - 1]:
+                self._tracker_cache[i - 1] = html
+                self._tracker_cells[i - 1].setText(html)
+
+    def _set_detail(self, text):
+        if self.lbl_detail.text() != text:
+            self.lbl_detail.setText(text)
+
+    def _set_progress(self, visible, value=None, fmt=None):
+        if self.progress.isVisible() != visible:
+            self.progress.setVisible(visible)
+        if value is not None:
+            self.progress.setValue(value)
+        if fmt is not None and self.progress.format() != fmt:
+            self.progress.setFormat(fmt)
 
     def _on_response_changed(self, index):
         # Live control-response change on a running loop (up to the sweep;
@@ -1728,38 +1884,17 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_ready.setText(
             f"<span style='color:{color}; font-size:15pt;'>●</span>  {message}")
 
-    def _show_stage_light(self, cal):
-        """While a run is active, the light reflects the engine stage."""
-        state_name = getattr(cal.state, "name", "")
-        if state_name == "ASSIST_HOLD":
-            # The assistant's light doubles as the sweep-readiness indicator.
-            if getattr(cal, "assist_stable", False):
-                self._set_light("#33aa33", "Assistant steady — ready to start the sweep")
-            else:
-                self._set_light("#e6a817", "Assistant leveling / re-trimming…")
-            return
-        color, text = self.STAGE_DISPLAY.get(state_name, ("#e6a817", state_name.title()))
-        self._set_light(color, text)
-
-    def _set_running(self, running, start_enabled=None):
-        banner_appearing = running and not self.banner.isVisible()
+    def _set_running(self, running):
+        # Banner space is retained while hidden (fixed footprint), so
+        # showing it never reflows the window — no refit needed.
         self.banner.setVisible(running)
         self.btn_stop.setEnabled(running)
-        # The desired Start state is applied in ONE transition. This slot runs
-        # per telemetry frame — a disable→re-enable pulse (the old code path
-        # for the assistant's gated Start) clears a QPushButton's in-progress
-        # press, silently swallowing every user click.
-        if start_enabled is None:
-            start_enabled = not running and self.btn_start.isEnabled()
-        if self.btn_start.isEnabled() != start_enabled:
-            self.btn_start.setEnabled(start_enabled)
+        # The wizard button (label/enabled) is applied separately via
+        # _apply_wizard — change-guarded there for the same click-swallowing
+        # reason the old gated Start needed.
         if running:
             self.btn_apply.setEnabled(False)
             self.btn_save.setEnabled(False)
-        if banner_appearing:
-            # The banner adds a row mid-flight; grow the window for it or the
-            # squeeze overlaps the curve's axis labels with the text below.
-            self._refit()
 
     def _refresh_idle(self):
         self._ias_hist.clear()
@@ -1769,12 +1904,15 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_vs.setText("—")
         self.lbl_bank.setText("—")
         self.lbl_trim.setText("—")
-        self.lbl_state.setText("Idle")
-        self.progress.setValue(0)
+        self._set_progress(False, value=0)
         self.banner.setVisible(False)
         self.btn_stop.setEnabled(False)
-        self.btn_start.setText("Start")
-        self.btn_assist.setEnabled(False)
+        self._apply_wizard("Begin Calibration", False)
+        self._set_detail("")
+        cal_pre = self._calibrator()
+        self._set_tracker(0, complete=(
+            cal_pre is not None and cal_pre.state == CalState.DONE
+            and cal_pre.result is not None))
         self.cmb_response.setEnabled(True)
         if self.cmb_trim_method is not None:
             self.cmb_trim_method.setEnabled(True)
@@ -1802,8 +1940,15 @@ class TrimCalibrationDialog(QDialog):
             else:
                 self._set_ready(False, "Offline editing — select an aircraft "
                                        "in the Offline Editor to view its calibrations")
-            self.btn_start.setEnabled(False)
-            self.btn_assist.setEnabled(False)
+            return
+        if cal is not None and cal.active:
+            # A telemetry BLIP mid-run lands here (timeout fires while the
+            # engine is still active, and often resumes before the engine's
+            # own lost-telemetry abort). The live run owns the graph:
+            # rendering the stored family now would park its zoom/ghosts
+            # under the run's points (field report: mid-sweep zoom jump).
+            # Re-arm the rising edge so resumed frames re-clear the view.
+            self._was_running = False
             return
         has_result = cal is not None and cal.state == CalState.DONE and cal.result is not None
         last_abort = cal is not None and cal.state == CalState.ABORT and cal.abort_reason
@@ -1821,10 +1966,8 @@ class TrimCalibrationDialog(QDialog):
             self._show_stored_curve()
         if G.device_type != "joystick":
             self._set_ready(False, "Run from the joystick (master) instance")
-            self.btn_start.setEnabled(False)
         elif cal is None:
             self._set_ready(False, "Load an MSFS / X-Plane aircraft")
-            self.btn_start.setEnabled(False)
         else:
             # No telemetry right now. If the last frame before the timeout
             # said the sim was paused, keep the specific message; otherwise
@@ -1834,7 +1977,6 @@ class TrimCalibrationDialog(QDialog):
                 self._set_ready(False, "Unpause the simulator to calibrate")
             else:
                 self._set_ready(False, "Waiting for telemetry — is the sim running?")
-            self.btn_start.setEnabled(False)
 
     # ---- lifecycle ----------------------------------------------------------
 
