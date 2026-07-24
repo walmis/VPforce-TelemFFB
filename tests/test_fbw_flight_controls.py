@@ -787,6 +787,35 @@ class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
         # Legacy: servo position alone.
         assert y_ap == pytest.approx(0.2 * 4096, abs=2)
 
+    def test_msfs_ap_follow_axis_tracks_deflection(self):
+        # joystick_ap_y_follow_axis (restored from the dea669a regression):
+        # with no curve, AP-follow Y tracks elevator DEFLECTION, not trim.
+        instance = self._curve_instance(sim_msfs=True)
+        instance.joystick_trim_follow_use_curve_y = False
+        instance.joystick_ap_follow_gain_virtual_y = 0.2
+        telem = (TelemetryDataBuilder().ffb_type("joystick")
+                 .elevator_trim(0.5).elevator_deflection(-0.3)
+                 .autopilot(True).build())
+
+        # Toggle OFF: follows trim.
+        instance.joystick_ap_y_follow_axis = False
+        assert self._settled_y(instance, telem) == pytest.approx(0.5 * 4096, abs=40)
+
+        # Toggle ON: follows deflection (physical gain 1.0), NOT trim.
+        instance.joystick_ap_y_follow_axis = True
+        assert self._settled_y(instance, telem) == pytest.approx(-0.3 * 4096, abs=40)
+
+    def test_curve_overrides_ap_follow_axis(self):
+        # With a curve active, the toggle is ignored — the curve owns the
+        # center (no snap to raw deflection when the AP engages).
+        instance = self._curve_instance(sim_msfs=True)  # curve enabled
+        instance.joystick_ap_y_follow_axis = True
+        telem = (TelemetryDataBuilder().ffb_type("joystick")
+                 .elevator_trim(0.5).elevator_deflection(-0.3)
+                 .autopilot(True).build())
+        # Curve center at trim 0.5 is 0.25*4096, not the -0.3 deflection.
+        assert self._settled_y(instance, telem) == pytest.approx(0.25 * 4096, abs=40)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
