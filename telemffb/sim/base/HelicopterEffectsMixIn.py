@@ -252,6 +252,14 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # If feature disabled, ensure spring is stopped and abort
             self.effects["collective_ft"].stop()
             return
+        if not self.collective_ft_ovd_release:
+            # Force trim on the collective is unusable without a release
+            # button (unlike pedals, where an unbound button is a valid
+            # configuration). Flagged per-frame so the message persists while
+            # the condition exists and clears once a button is bound.
+            logging.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            self.flag_error("Collective force trim enabled but the trim release button is not configured")
+            return
 
         dt = perftracker.get_time_delta("collective_ft_perf")
         self.telem_data._coll_ft_dt = dt

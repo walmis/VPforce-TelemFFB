@@ -136,6 +136,43 @@ class TestHelicopterCollective(BaseTelemetryEffectTestCase):
         
         assert instance.collective_init == 0
     
+    def test_collective_force_trim_flags_error_when_release_button_unbound(self):
+        """FORCETRIM on the collective is unusable without a release button:
+        the configuration error must be flagged."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="collective")
+        telem = self._create_heli_telem()
+        self.set_telemetry(instance, telem)
+        instance.spring_mode = SpringModeEnum.FORCETRIM
+        instance.collective_ft_ovd_release = 0
+
+        instance.ac_collective_force_trim_override(telem, MagicMock())
+
+        assert 'release button is not configured' in (instance.telem_data.get('error') or '')
+
+    def test_collective_force_trim_no_flag_when_mode_disabled(self):
+        """No configuration error when FORCETRIM is not the active spring mode."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="collective")
+        telem = self._create_heli_telem()
+        self.set_telemetry(instance, telem)
+        instance.spring_mode = SpringModeEnum.NONE
+        instance.collective_ft_ovd_release = 0
+
+        instance.ac_collective_force_trim_override(telem, MagicMock())
+
+        assert instance.telem_data.get('error') is None
+
+    def test_collective_force_trim_no_flag_when_release_button_bound(self):
+        """No configuration error when the release button is configured."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="collective")
+        telem = self._create_heli_telem()
+        self.set_telemetry(instance, telem)
+        instance.spring_mode = SpringModeEnum.FORCETRIM
+        instance.collective_ft_ovd_release = 5
+
+        instance.ac_collective_force_trim_override(telem, MagicMock())
+
+        assert instance.telem_data.get('error') is None
+
     def test_collective_initialization_on_ground(self):
         """Test collective initializes to full down when on ground."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="collective")
