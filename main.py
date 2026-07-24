@@ -629,9 +629,8 @@ def _sim_connected_events():
     # When the first frame from a (new) sim arrives, flip the status widget to Running.
     # first_frame_received fires once per restart cycle (reset_sim_connected resets the flag),
     # so this fires on initial startup AND after each sim_exited → restart_all() cycle.
-    G.telem_manager.first_frame_received.connect(
-        lambda src: G.main_window.update_sim_indicators(src, paused=False)
-    )
+    # on_first_sim_frame guards against clobbering an error the same frame raised.
+    G.telem_manager.first_frame_received.connect(G.main_window.on_first_sim_frame)
     G.telem_manager.sim_exited.connect(lambda src: G.sim_listeners.restart_all())
     G.telem_manager.sim_exited.connect(G.main_window.on_sim_exited)
 

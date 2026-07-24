@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import html
 import os.path
 from typing import Optional
 
@@ -265,15 +266,18 @@ class AppStatusWidget(QWidget):
         size_policy.setRetainSizeWhenHidden(True)
         self.notification_label.setSizePolicy(size_policy)
         self.notification_label.hide()
-        self.notification_label.setStyleSheet("""
-            QLabel {
+        # Bright red reads on the dark theme; on the light theme's pale-pink
+        # notification background it washes out, so use a strong dark red.
+        err_text_color = "#ff6b6b" if G.useDarkMode else "#a02020"
+        self.notification_label.setStyleSheet(f"""
+            QLabel {{
                 padding-left: 10px;
                 padding-top: 2px;
-                color: #ff6b6b;
+                color: {err_text_color};
                 background-color: rgba(255, 50, 50, 30);
                 border: 1px solid #c33;
                 border-radius: 4px;
-            }
+            }}
         """)
 
         self.offline_label = QLabel('Telemetry is paused while in offline editing mode')
@@ -396,8 +400,22 @@ class AppStatusWidget(QWidget):
         self.pulse_label(self.sim_status_label.status_label, stop=True)
 
     def flag_error(self, message):
-        # print(f'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TESTING HERE: {message}')
-        self.notification_label.setText(message)
+        # A rectified config error only clears when the runtime sees a fresh
+        # telemetry frame without the error, so it stays displayed until the
+        # sim is running again. Spell that out under the message so a user who
+        # fixes the config while paused isn't confused that it persists.
+        note = ("Note: A rectified error will only clear when the simulator is running/unpaused...")
+        body = html.escape(message or "").replace("\n", "<br>")
+        # The notification background is a translucent red: a light muted red
+        # reads on the dark theme but washes out on the light theme's pale-pink,
+        # so use a darker red there.
+        note_color = "#e6a6a6" if G.useDarkMode else "#a83232"
+        self.notification_label.setTextFormat(Qt.TextFormat.RichText)
+        self.notification_label.setText(
+            f"{body}"
+            f"<div style='margin-top:6px; font-size:11px; font-style:italic; color:{note_color};'>"
+            f"{html.escape(note)}</div>"
+        )
         self.notification_label.show()
         self.message_stack.setCurrentIndex(1)
 

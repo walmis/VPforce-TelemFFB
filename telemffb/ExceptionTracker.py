@@ -194,6 +194,38 @@ class ExceptionTracker(QObject):
         except Exception:
             logging.debug("Failed to forward exception to master", exc_info=True)
         
+    def remove_matching(self, message: str) -> int:
+        """Remove records whose message matches the given flagged-error text.
+
+        Used to auto-clear flag_error-sourced records when the underlying
+        condition clears (the app-status message and tracker entry then agree).
+        Matches the exact message and, because a child's error arrives at the
+        master both device-prefixed (its own log of the merged telemetry) and
+        raw (forwarded from the child's tracker), also the message with a
+        leading "Device: " prefix stripped.
+
+        Returns the number of records removed. Emits exceptions_cleared when
+        anything was removed so the status-bar count refreshes.
+        """
+        msg = (message or "").strip()
+        if not msg:
+            return 0
+        candidates = {msg}
+        for dev in ("Joystick", "Pedals", "Collective", "Trimwheel"):
+            prefix = f"{dev}: "
+            if msg.startswith(prefix):
+                candidates.add(msg[len(prefix):].strip())
+        before = len(self.exceptions)
+        self.exceptions = [e for e in self.exceptions
+                           if (e.message or "").strip() not in candidates]
+        removed = before - len(self.exceptions)
+        if removed:
+            try:
+                self.exceptions_cleared.emit()
+            except RuntimeError:
+                pass  # Qt object deleted during shutdown; nothing to do
+        return removed
+
     def get_count(self) -> int:
         """Get the number of tracked exceptions."""
         return len(self.exceptions)

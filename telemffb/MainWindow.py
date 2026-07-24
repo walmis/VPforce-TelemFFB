@@ -73,6 +73,7 @@ class MainWindow(QMainWindow):
         self.new_craft_notification_sent = False
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
         self.error_clean_counter = 0 # counter to use as hysteresis for clearing error condition - not always 'error' from child instance on every loop
+        self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
         self.telemetry_timed_out = True
         self.last_telemetry_refresh = utils.millis()
         self.show_simvars = False
@@ -2067,6 +2068,11 @@ class MainWindow(QMainWindow):
         if source is None:
             return
 
+        # Called only on state transitions (error onset / clear / timeout), so
+        # this is not on the per-frame hot path — traces which state the App
+        # Status area is being driven to.
+        logging.info(f"App status indicator -> {'error' if error else 'paused' if paused else 'running'} (src={source})")
+
         if error:
             self.status_container.set_error(source)
         elif paused:
@@ -2095,6 +2101,23 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_run.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
                 # re-show the "current aircraft" label once error cleared
+
+    def on_first_sim_frame(self, src):
+        """Handle first_frame_received: clear the initial 'Waiting' state by
+        flipping the status to Running.
+
+        Guarded against error_state: process_data emits telemetryReceived
+        before first_frame_received, so when the very first frame is the one
+        that raises a config error (common at startup), on_update_telemetry has
+        already set the error indicator by the time this runs. Without this
+        guard the unconditional flip to Running clobbers that error and, since
+        error_state stays set, it is never re-asserted. The paused-in-menus
+        case is unaffected (error_state is False there: Running here, then the
+        telemetry timeout flips it to Paused).
+        """
+        if self.error_state:
+            return
+        self.update_sim_indicators(src, paused=False)
 
 
 
@@ -2388,10 +2411,18 @@ class MainWindow(QMainWindow):
             if error_cond is None:  # no 'error' key in telemetry
                 if self.telemetry_timed_out or self.error_state:  # only set status to run if previously debug_timed out or error status was true
                     if not self.error_clean_counter:  # avoid flapping due to ipc_telem not populating on every frame due to thread timing between instances
+                        if self.error_state:
+                            logging.info("App status error cleared by an error-free frame (debounce elapsed)")
                         self.update_sim_indicators(data.get('src'), paused=False)
                         self.error_state = False
                         self.telemetry_timed_out = False
                         self.status_container.request_clear_error.emit()
+                        # The condition was rectified: drop the flag_error
+                        # records this session logged into the exception
+                        # tracker so it agrees with the (cleared) app status
+                        for msg in self.flagged_error_msgs:
+                            G.exception_tracker.remove_matching(msg)
+                        self.flagged_error_msgs.clear()
                     else:
                         self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
             elif error_cond is not None:
@@ -2400,6 +2431,7 @@ class MainWindow(QMainWindow):
                 if not self.error_state:  # only set error status once when there is error cond but state is not yet true
                     self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
                     logging.error(error_cond)
+                    self.flagged_error_msgs.add(error_cond)
                     self.error_state = True
 
 

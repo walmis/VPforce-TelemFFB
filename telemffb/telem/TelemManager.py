@@ -116,6 +116,8 @@ class TelemManager(QObject, threading.Thread):
         self.gain_overrides_active = False
         self.stop_state = False
         self.pause_state = False
+        self._vpconf_deferred_frame = None   # single-slot buffer for a frame arriving during the startup vpconf push
+        self._flushing_deferred = False      # True only while re-injecting the deferred frame (diagnostic logging)
         self._first_frame_from_sim = False
         self._sim_exit_signaled = False   # True after notify_sim_exited fires; prevents re-entrancy until reset_sim_connected() clears it
         self._process_check_deadline: Optional[float] = None  # perf_counter() timestamp of the next scheduled process check; None when inactive
@@ -220,12 +222,20 @@ class TelemManager(QObject, threading.Thread):
         """Deliver the last telemetry frame that arrived while the startup
         vpconf push had frame processing suspended (see submit_frame). Called
         by utils.init_vpconf_profile right after clearing the pending flag."""
-        frame = getattr(self, "_vpconf_deferred_frame", None)
+        frame = self._vpconf_deferred_frame
         self._vpconf_deferred_frame = None
-        if frame is not None:
-            logging.info("Delivering telemetry frame deferred during the "
-                         "startup vpconf push")
+        if frame is None:
+            return
+        logging.info("Delivering telemetry frame deferred during the "
+                     "startup vpconf push")
+        # _flushing_deferred lets the drop/pause branches below distinguish a
+        # re-injected startup frame (a real loss) from an ordinary dropped
+        # frame, without logging on the per-frame hot path.
+        self._flushing_deferred = True
+        try:
             self.submit_frame(frame)
+        finally:
+            self._flushing_deferred = False
 
     def submit_frame(self, data_in: bytes):
         if G.vpconf_init_pending:
@@ -236,10 +246,15 @@ class TelemManager(QObject, threading.Thread):
             # telemetry packet, and dropping it in this window left the master
             # instance with no aircraft until a camera-state change — a
             # milliseconds-wide race, master-only, maddeningly intermittent.
+            if self._vpconf_deferred_frame is None:
+                # log once per window (empty->full); overwrites stay silent
+                logging.info("Deferring telemetry frame during startup vpconf push")
             self._vpconf_deferred_frame = data_in
             return
         if self.pause_state:
             # don't process frames while paused state True
+            if self._flushing_deferred:
+                logging.warning("Deferred startup frame swallowed by pause_state gate")
             return
 
         data : str
@@ -257,6 +272,9 @@ class TelemManager(QObject, threading.Thread):
                 self._cond.notify()  # notify waiting thread of new data
             else:
                 self._dropped_frames += 1
+                if self._flushing_deferred:
+                    logging.warning("Deferred startup frame dropped on re-inject "
+                                    "(previous frame not yet consumed)")
                 # log dropped frames, this is not necessarily a bad thing
                 # USB interrupt transfers (1ms) might take longer than one video frame
                 # we drop frames to keep latency to a minimum
@@ -783,6 +801,7 @@ class TelemManager(QObject, threading.Thread):
                     if self.timed_out:
                         # Data has resumed after a timeout — clear timeout state and
                         # cancel the process-check so it doesn't fire spuriously.
+                        logging.info("Telemetry resumed after timeout")
                         self.telemetryTimeout.emit(False)
                         self.timed_out = False
                         self._process_check_deadline = None  # sim resumed; cancel check
