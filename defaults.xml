@@ -2030,9 +2030,9 @@
 		<parentgroup>basic</parentgroup>
 		<order>2400</order>
 		<name>trim_following</name>
-		<displayname>Trim Following</displayname>
+		<displayname>Trim / AP Following</displayname>
 		<prereq>telemffb_controls_axes</prereq>
-		<info>Enable physical stick movement with in-game trims</info>
+		<info>Enable physical stick movement with in-game trims and auto-pilot.&lt;br&gt;&lt;br&gt;Note: Not all aircraft types support AP following</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2186,7 +2186,7 @@
 		<order>2450</order>
 		<name>ap_following</name>
 		<displayname>Autopilot Following</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<info>Enable physical stick following of autopilot movements</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>

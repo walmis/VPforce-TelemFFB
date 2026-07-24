@@ -55,6 +55,17 @@ class SettingsLayout(QGridLayout):
 
     all_sliders = []
     incrvalue = 1
+
+    # Grid column of the value/entry widgets (sliders, dropdowns, buttons).
+    # Each indent level consumes one grid column to its left (expander,
+    # checkbox, label), so this value also sets how deep the row layout can
+    # nest: a label needs ENTRY_COL - 3 >= indent to keep a non-zero span.
+    # ENTRY_COL = 6 supports up to indent 3 (e.g. Axis Control > Trim Following
+    # > AP Following > child); generate_settings_row clamps anything deeper so
+    # labels never collapse to zero width. The value/erase/stretch columns are
+    # all derived from this, so it is the single knob for the entry position.
+    ENTRY_COL = 6
+
     def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
         self.exclusive_list = []
@@ -70,7 +81,7 @@ class SettingsLayout(QGridLayout):
         else:
             self._build_empty_notice()
         self.device = HapticEffect()
-        self.setColumnMinimumWidth(7, 20)
+        self.setColumnMinimumWidth(self.ENTRY_COL + 2, 20)  # value column
         self.trigger_form_reload = True
         self.advanced_spring_settings = None
         self.adv_spr_dialog = None
@@ -425,7 +436,7 @@ class SettingsLayout(QGridLayout):
 
         # Give entry column a high stretch factor, all others remain default 0.
         # When window is resized, the entry column will grow to take up all the new space
-        self.setColumnStretch(5, 10)
+        self.setColumnStretch(self.ENTRY_COL, 10)
 
         # print (f"{i} rows with {self.count()} widgets")
 
@@ -593,7 +604,7 @@ class SettingsLayout(QGridLayout):
             self.addWidget(btn, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.addItem(spacer, 2, 1)
-        self.setColumnStretch(5, 10)
+        self.setColumnStretch(self.ENTRY_COL, 10)
 
     def clear_layout(self, show_empty_notice=True):
         layout = self.layout()
@@ -663,7 +674,7 @@ class SettingsLayout(QGridLayout):
         exp_col = 0
         chk_col = 1
         lbl_col = 2
-        entry_col = 5
+        entry_col = self.ENTRY_COL
         unit_col = entry_col + 1
         val_col = unit_col + 1
         erase_col = val_col + 1
@@ -714,10 +725,16 @@ class SettingsLayout(QGridLayout):
             lbl_col = 0
             item['indent'] = -1
         else:
-            exp_col = item['indent']
+            # Each indent level shifts expander/checkbox/label one grid column
+            # right. Clamp so the label column can never reach entry_col (which
+            # would leave the label a zero-width, mis-rendered cell). Nesting
+            # deeper than the grid can show still reads via the leading-space
+            # indentation baked into the displayname.
+            eff_indent = min(item['indent'], entry_col - 3)
+            exp_col = eff_indent
             chk_col = exp_col + 1
             lbl_col = chk_col + 1
-        lbl_colspan = entry_col - lbl_col
+        lbl_colspan = max(1, entry_col - lbl_col)
 
 
         # booleans get a checkbox
