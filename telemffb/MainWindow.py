@@ -2075,6 +2075,11 @@ class MainWindow(QMainWindow):
 
         if error:
             self.status_container.set_error(source)
+            # The in-window error notification must show on child instances too
+            # (they are headless but the widget retains state until the user
+            # opens the window). Only the tray icon/popup below stay master-only,
+            # since children have no system tray.
+            self.status_container.request_flag_error.emit(message)
         elif paused:
             self.status_container.set_paused(source)
         else:
@@ -2087,8 +2092,6 @@ class MainWindow(QMainWindow):
 
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-
-                self.status_container.request_flag_error.emit(message)
 
                 self.pop_tray_notification("Error", message, renew_period= 2)
 
