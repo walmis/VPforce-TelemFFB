@@ -149,10 +149,27 @@ class SettingsLayout(QGridLayout):
                 else:
                     item['parent_expanded'] = 'false'
 
-    def is_top_level_expanded(self, item, datalist):
+    def is_top_level_expanded(self, item, datalist, _visited=None):
         """
         Recursively check if the top-level parent of `item` is in self.expanded_items.
+
+        `_visited` guards against cyclic / self-referential prereq chains. One can
+        arise when a mid-chain parent is dropped during the settings merge: e.g. with
+        `telemffb_controls_axes=false`, eliminate_no_prereq removes `enable_custom_x_axis`
+        but leaves its child `custom_x_axis` orphaned. The substring parent lookup below
+        then matches the orphan's prereq (`enable_custom_x_axis`) against the only
+        surviving name that is a substring of it -- `custom_x_axis` itself -- so the row
+        becomes its own parent. Without this guard that recurses until Python's limit and
+        takes the whole settings form down with a RecursionError (wiping every setting).
         """
+        if _visited is None:
+            _visited = set()
+        if item['name'] in _visited:
+            # Cycle / dangling self-reference: treat as not expanded so the orphaned
+            # row is simply hidden rather than crashing the form.
+            return False
+        _visited.add(item['name'])
+
         prereq = item.get('prereq', '')
         if not prereq:
             # Reached the top-level item
@@ -169,7 +186,7 @@ class SettingsLayout(QGridLayout):
             return False
 
         # Recurse upward
-        return self.is_top_level_expanded(parent_item, datalist)
+        return self.is_top_level_expanded(parent_item, datalist, _visited)
 
     def is_visible(self, datalist):
         for item in datalist:

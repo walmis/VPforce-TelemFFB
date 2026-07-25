@@ -2213,27 +2213,47 @@ def eliminate_no_prereq(datalist):
         - The prerequisite is either met (e.g., parent value is 'true')
         - Or the item has no prerequisite
 
+        Runs to a *fixed point*. A single pass keeps a child whenever its prereq
+        parent is present and satisfied (true-valued or a top-level '.0' group). But a
+        mid-chain parent can itself be removed because ITS parent is unsatisfied while
+        its own value is still 'true' (e.g. enable_custom_x_axis=true sitting under
+        telemffb_controls_axes=false). A single pass evaluates the grandchild against
+        that soon-to-be-removed parent and wrongly keeps it, leaving it orphaned in the
+        result. Repeating the pass against the shrinking set prunes those orphans too,
+        so an item survives only with an unbroken chain of satisfied parents up to a
+        root. For a config with no such orphans the first pass is already stable, so
+        valid trees are unaffected.
+
         Args:
             datalist (List[dict]): List of settings items with optional 'prereq' fields.
 
         Returns:
             List[dict]: A filtered list including only items with satisfied prerequisites.
         """
-    newlist = []
-    for child_item in datalist:
-        add_item = True
-        if child_item['prereq'] != '':
-            add_item = False
-            for parent_item in datalist:
-                if parent_item['name'] in child_item['prereq'] and (parent_item['value'].lower() == 'true' or '.0' in parent_item['order']):
-                    if parent_item['name'] == child_item['prereq'] or '.' in child_item['prereq']:
-                        add_item = True
-                        break
+    working = list(datalist)
+    while True:
+        newlist = []
+        for child_item in working:
+            add_item = True
+            if child_item['prereq'] != '':
+                add_item = False
+                for parent_item in working:
+                    if parent_item is child_item:
+                        # A setting is never its own parent; skip so a substring
+                        # self-match (name is a substring of its own prereq) cannot
+                        # keep an orphan alive.
+                        continue
+                    if parent_item['name'] in child_item['prereq'] and (parent_item['value'].lower() == 'true' or '.0' in parent_item['order']):
+                        if parent_item['name'] == child_item['prereq'] or '.' in child_item['prereq']:
+                            add_item = True
+                            break
 
-        if add_item:
-            newlist.append(child_item)
+            if add_item:
+                newlist.append(child_item)
 
-    return newlist
+        if len(newlist) == len(working):
+            return newlist
+        working = newlist
 
 
 def filter_rows(data_list):
