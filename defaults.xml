@@ -2041,10 +2041,54 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2405</order>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<displayname>Use Calibrated Trim Curve</displayname>
+		<prereq>trim_following</prereq>
+		<info>Use the auto-calibrated elevator trim response curve instead of the static Y Trim Gain Virtual value.&lt;br&gt;&lt;br&gt;Run the calibration (button below) to capture the curve. Recommended for aircraft where the nose drifts as trim is applied even with a tuned static gain.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2405.2</order>
+		<name>joystick_trim_follow_curve_y</name>
+		<displayname>Trim Curve Calibration</displayname>
+		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<info>Auto-calibrated elevator trim response curve. Captured by the Elevator Trim Calibration tool; used when 'Use Calibrated Trim Curve' is enabled.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<datatype>trimcal</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2405.3</order>
+		<name>joystick_trim_follow_stick_position</name>
+		<displayname>Trimmed Stick Position</displayname>
+		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<info>Where the stick rests when the aircraft is trimmed, with calibrated curves at multiple speeds.&lt;br&gt;&lt;br&gt;'Follows Trim': the rest position rides the measured trim state - aft when trimmed for slow flight, forward when fast - like cable/trim-tab aircraft where the yoke is linked to the control surface.&lt;br&gt;&lt;br&gt;'Stays Centered': trimmed flight always rests the stick at center - like moving-stabilizer, FBW or spring-cartridge aircraft where trim re-rigs the feel datum.&lt;br&gt;&lt;br&gt;Force behavior is identical in both modes (trimmed = zero force, out-of-trim = force); only the resting geometry differs.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>Follows Trim</value>
+		<validvalues>Follows Trim,Stays Centered</validvalues>
+		<datatype>list</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.2</order>
+		<order>2410</order>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<displayname>X Trim Gain Physical</displayname>
 		<prereq>trim_following</prereq>
@@ -2060,7 +2104,7 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.22</order>
+		<order>2415</order>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<displayname>X Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
@@ -2076,7 +2120,7 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.4</order>
+		<order>2420</order>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<displayname>Y Trim Gain Physical</displayname>
 		<prereq>trim_following</prereq>
@@ -2092,10 +2136,11 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.42</order>
+		<order>2425</order>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<displayname>Y Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
 		<info>Amount of physical movement of the stick that will be transmittted to sim&lt;br&gt;&lt;br&gt;Amount of physical movementof the stick that will be transmitted to sim. &lt;br&gt; &lt;br&gt;Adjust virtual y % so that trim ingame does not pitch aircraft when stick held. &lt;br&gt;&lt;br&gt; To configure, slowly apply nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negative.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2105,54 +2150,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2400.43</order>
-		<name>joystick_trim_follow_use_curve_y</name>
-		<displayname>Use Calibrated Trim Curve</displayname>
-		<prereq>trim_following</prereq>
-		<info>Use the auto-calibrated elevator trim response curve instead of the static Y Trim Gain Virtual value.&lt;br&gt;&lt;br&gt;Run the calibration (button below) to capture the curve. Recommended for aircraft where the nose drifts as trim is applied even with a tuned static gain.</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>trimcal</datatype>
-		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2400.44</order>
-		<name>joystick_trim_follow_curve_y</name>
-		<displayname>Trim Curve Calibration</displayname>
-		<prereq>joystick_trim_follow_use_curve_y</prereq>
-		<info>Auto-calibrated elevator trim response curve. Captured by the Elevator Trim Calibration tool; used when 'Use Calibrated Trim Curve' is enabled.</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>list</datatype>
-		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2400.45</order>
-		<name>joystick_trim_follow_stick_position</name>
-		<displayname>Trimmed Stick Position</displayname>
-		<prereq>joystick_trim_follow_use_curve_y</prereq>
-		<info>Where the stick rests when the aircraft is trimmed, with calibrated curves at multiple speeds.&lt;br&gt;&lt;br&gt;'Follows Trim': the rest position rides the measured trim state - aft when trimmed for slow flight, forward when fast - like cable/trim-tab aircraft where the yoke is linked to the control surface.&lt;br&gt;&lt;br&gt;'Stays Centered': trimmed flight always rests the stick at center - like moving-stabilizer, FBW or spring-cartridge aircraft where trim re-rigs the feel datum.&lt;br&gt;&lt;br&gt;Force behavior is identical in both modes (trimmed = zero force, out-of-trim = force); only the resting geometry differs.</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<value>Follows Trim</value>
-		<validvalues>Follows Trim,Stays Centered</validvalues>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.6</order>
+		<order>2430</order>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<prereq>trim_following</prereq>
@@ -2168,7 +2169,7 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.62</order>
+		<order>2435</order>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<prereq>trim_following</prereq>
@@ -2299,6 +2300,7 @@
 		<name>joystick_ap_y_follow_axis</name>
 		<displayname>    AP Pitch - Follow axis instead of trim</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
 		<info>Elevator AP will attempt to follow the axis position rather than the trim value</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -5604,6 +5606,20 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<grouping>FlyByWire</grouping>
+		<order>99600</order>
+		<name>aircraft_is_fbw</name>
+		<displayname>FlyByWire (FBW)</displayname>
+		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>false</value>
+		<datatype>convert</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
 		<datatype>convert</datatype>
 		<grouping>SpringCenter</grouping>
 		<order>99500</order>
@@ -5617,18 +5633,14 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>convert</datatype>
-		<grouping>FlyByWire</grouping>
-		<order>99600</order>
-		<name>aircraft_is_fbw</name>
-		<displayname>FlyByWire (FBW)</displayname>
-		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
+		<grouping>placeholder</grouping>
+		<order>100000</order>
+		<name>placeholder</name>
+		<displayname>placeholder</displayname>
+		<prereq>	do not show</prereq>
+		<render_prereq>_placeholder_</render_prereq>
 		<value>false</value>
+		<datatype>bool</datatype>
 	</defaults>
 <sc_overrides>
 		<name>EngRPM</name>
