@@ -245,6 +245,61 @@ class SettingsLayout(QGridLayout):
             # if iv.lower() == 'true':
             #     print (f"{item['displayname']} visible because {cond}")
 
+    def apply_conditional_gates(self, datalist):
+        """Apply the cross-tree `render_prereq` / `enable_prereq` gates.
+
+        Unlike `prereq` (which is both tree parentage and visibility), these
+        gate a setting on the current value of *other* bool settings anywhere
+        in the tree:
+
+          - `render_prereq` failing -> hide the row (is_visible = 'false').
+          - `enable_prereq` failing -> keep it visible but disabled, with an
+            explanatory tooltip stored on the item.
+
+        Grammar (both fields): comma-separated tokens; `name` requires that
+        setting be true, `!name` requires it false; ALL tokens must pass.
+        A referenced setting absent from the resolved set is treated as false.
+        Runs after is_visible() so it can override visibility, and before
+        eliminate_invisible() so hidden rows are dropped.
+        """
+        values = {it['name']: (it.get('value') or '') for it in datalist}
+        displaynames = {it['name']: (it.get('displayname') or it['name']).strip() for it in datalist}
+
+        def evaluate(expr):
+            """Return (passed, [(ref, is_true), ...failing tokens])."""
+            failing = []
+            for token in expr.split(','):
+                token = token.strip()
+                if not token:
+                    continue
+                want_true = not token.startswith('!')
+                ref = token[1:].strip() if token.startswith('!') else token
+                is_true = str(values.get(ref, 'false')).strip().lower() == 'true'
+                if is_true != want_true:
+                    failing.append((ref, is_true))
+            return (not failing), failing
+
+        def reason(failing):
+            parts = [f"{displaynames.get(ref, ref)} is {'enabled' if is_true else 'disabled'}"
+                     for ref, is_true in failing]
+            return "Disabled because " + " and ".join(parts)
+
+        for item in datalist:
+            item['force_disabled'] = False
+            item['disabled_reason'] = ''
+
+            render_expr = (item.get('render_prereq') or '').strip()
+            if render_expr and not evaluate(render_expr)[0]:
+                item['is_visible'] = 'false'
+
+            enable_expr = (item.get('enable_prereq') or '').strip()
+            if enable_expr and item.get('is_visible', 'false').lower() == 'true':
+                passed, failing = evaluate(enable_expr)
+                if not passed:
+                    item['force_disabled'] = True
+                    item['disabled_reason'] = reason(failing)
+        return datalist
+
     def eliminate_invisible(self, datalist):
         newlist = []
         for item in datalist:
@@ -403,6 +458,7 @@ class SettingsLayout(QGridLayout):
         self.append_prereq_count(sorted_data)
         self.add_expanded(sorted_data)
         self.is_visible(sorted_data)
+        self.apply_conditional_gates(sorted_data)
         self.get_parent_indent(sorted_data)
         newlist = self.eliminate_invisible(sorted_data)
 
@@ -417,7 +473,7 @@ class SettingsLayout(QGridLayout):
         i = 0
         for item in newlist:
             bumped_up = item['order'][-1:] == '1' and '.' in item['order']
-            rowdisabled = False
+            rowdisabled = bool(item.get('force_disabled', False))
             addrow = False
             is_expnd = is_expanded(item)
             # print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
@@ -769,6 +825,10 @@ class SettingsLayout(QGridLayout):
                 checkbox.setToolTip(f"{chk_col}")
             self.addWidget(checkbox, i, chk_col)
             checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
+            if item.get('force_disabled'):
+                # enable_prereq: the toggle is inert (another setting overrides
+                # it), so disable it too — rowdisabled only greys value widgets.
+                checkbox.setDisabled(True)
 
         if item['unit'] is not None and item['unit'] != '':
             entry_colspan = 1
@@ -799,7 +859,14 @@ class SettingsLayout(QGridLayout):
                 self.remove_widget(olditem)
 
         cdb = f"{lbl_col} {lbl_colspan} ind:{item['indent']} " if self.show_col_debug else ''
-        label.setToolTip(f"{cdb}{item['info']}")
+        tip = item['info']
+        if item.get('force_disabled') and item.get('disabled_reason'):
+            # While disabled, show ONLY the reason: the config info is moot when
+            # the setting is inert, and appending it (plain text) alongside the
+            # info's HTML <br> tags breaks Qt's tooltip rich-text detection so
+            # the <br>s render literally.
+            tip = item['disabled_reason']
+        label.setToolTip(f"{cdb}{tip}")
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
 
         slider = NoWheelSlider()
@@ -1258,12 +1325,31 @@ class SettingsLayout(QGridLayout):
             expand_button.setVisible(False)
 
 
-        label.setDisabled(rowdisabled)
+        # Keep the InfoLabel enabled when force-disabled by enable_prereq so its
+        # info-icon tooltip still shows the reason on hover (disabled widgets
+        # swallow tooltip events); grey its text via stylesheet instead so it
+        # still reads as disabled. Normal (bool-off) rows disable it outright.
+        if item.get('force_disabled'):
+            label.setTextStyleSheet("color: #808080;")
+        else:
+            label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
         d_slider.setDisabled(rowdisabled)
         df_slider.setDisabled(rowdisabled)
         line_edit.setDisabled(rowdisabled)
         expand_button.setDisabled(rowdisabled)
+        # The +/- step buttons and value readout weren't disabled, so a
+        # "disabled" slider was still nudge-able and the value looked live.
+        m_butt.setDisabled(rowdisabled)
+        p_butt.setDisabled(rowdisabled)
+        value_label.setDisabled(rowdisabled)
+        if rowdisabled:
+            # Qt's default disabled frame looks bad on these borderless +/-
+            # glyphs; keep them borderless and just grey the glyph colour.
+            _pm_disabled_css = ('QPushButton[buttonType="p_m_button"] { color: #808080; '
+                                'border: none; background-color: transparent; }')
+            m_butt.setStyleSheet(_pm_disabled_css)
+            p_butt.setStyleSheet(_pm_disabled_css)
 
         self.parent().parent().parent().addSlider(slider)
         self.parent().parent().parent().addSlider(d_slider)

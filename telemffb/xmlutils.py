@@ -1159,6 +1159,14 @@ def read_xml_file(the_sim, instance_device=''):
         info = (f"{info_elem.text}") if info_elem is not None else ""
         prereq_elem = defaults_elem.find('prereq')
         prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
+        # Cross-tree gates (independent of prereq parentage): render_prereq
+        # hides the setting when its condition fails; enable_prereq leaves it
+        # visible but disabled. Both evaluated later in SettingsLayout against
+        # the resolved values of the referenced bool settings.
+        render_prereq_elem = defaults_elem.find('render_prereq')
+        render_prereq = render_prereq_elem.text if render_prereq_elem is not None else ""
+        enable_prereq_elem = defaults_elem.find('enable_prereq')
+        enable_prereq = enable_prereq_elem.text if enable_prereq_elem is not None else ""
         debug_only_elem = defaults_elem.find('debug_only')
         debug_only = debug_only_elem is not None and debug_only_elem.text.strip().lower() == 'true'
         if debug_only and not G.system_settings.get('debug', False):
@@ -1182,6 +1190,8 @@ def read_xml_file(the_sim, instance_device=''):
             'validvalues': validvalues,
             'replaced': replaced,
             'prereq': prereq,
+            'render_prereq': render_prereq,
+            'enable_prereq': enable_prereq,
             'info': info,
             'sliderfactor': sliderfactor,
             'device_text': device_text,
