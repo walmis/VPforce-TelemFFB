@@ -483,6 +483,55 @@ class TestExclusivityReferences:
                 )
 
 
+class TestConditionalGateReferences:
+    """`render_prereq` / `enable_prereq` reference existing bool settings.
+
+    These cross-tree gates hide (render_prereq) or disable (enable_prereq) a
+    setting based on another setting's value, evaluated as a boolean. So each
+    referenced name must exist in <defaults> and be datatype 'bool'. Grammar:
+    comma-separated tokens, each `name` (require true) or `!name` (require
+    false). Catches typos and gating on a non-boolean.
+    """
+
+    def _name_datatypes(self, root):
+        dt = {}
+        for e in root.findall(".//defaults"):
+            if _is_placeholder_default(e):
+                continue
+            name = e.findtext("name")
+            if name:
+                dt[name] = e.findtext("datatype")
+        return dt
+
+    def _check(self, root, tag):
+        name_dt = self._name_datatypes(root)
+        for elem in root.findall(".//defaults"):
+            if _is_placeholder_default(elem) or _is_dummy_setting(elem):
+                continue
+            expr = (elem.findtext(tag) or "").strip()
+            if not expr:
+                continue
+            for token in expr.split(","):
+                token = token.strip()
+                if not token:
+                    continue
+                ref = token[1:].strip() if token.startswith("!") else token
+                assert ref in name_dt, (
+                    f"<defaults> '{elem.findtext('name')}' {tag}='{expr}' "
+                    f"references unknown setting '{ref}'"
+                )
+                assert name_dt[ref] == "bool", (
+                    f"<defaults> '{elem.findtext('name')}' {tag}='{expr}' references "
+                    f"'{ref}' which is datatype '{name_dt[ref]}', not bool"
+                )
+
+    def test_render_prereq_refs_existing_bool(self, defaults_root):
+        self._check(defaults_root, "render_prereq")
+
+    def test_enable_prereq_refs_existing_bool(self, defaults_root):
+        self._check(defaults_root, "enable_prereq")
+
+
 # ─────────────────────────────────────────────────────────────
 # Numeric value parseability
 # ─────────────────────────────────────────────────────────────

@@ -71,7 +71,9 @@ and per-sim `validvalues` lists are handled.
 | `info` | No | Tooltip text. May contain HTML entities (e.g., `&lt;br&gt;`). |
 | `grouping` | No | Label of the UI group under which this setting appears. |
 | `parentgroup` | No | Organizational label used for XML-internal tracking. Does not affect UI rendering. |
-| `prereq` | No | Conditional visibility rule. See [The `prereq` Field](#the-prereq-field). |
+| `prereq` | No | Conditional visibility rule tied to tree parentage. See [The `prereq` Field](#the-prereq-field). |
+| `render_prereq` | No | Cross-tree gate: **hide** this setting when the condition (based on other bool settings' values) fails. See [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields). |
+| `enable_prereq` | No | Cross-tree gate: render but **disable** this setting (with an auto-generated explanatory tooltip) when the condition fails. See [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields). |
 | `debug_only` | No | If `true`, the setting is only parsed/shown when the app is in debug mode (`G.system_settings.get('debug', False)`). See [The `debug_only` Field](#the-debug_only-field). |
 | `order` | Yes | Float; controls row position and layout behavior. See [The `order` Field](#the-order-field). |
 | `unit` | No | If present, adds a unit dropdown next to the value field. Supported unit groups: speed (`m/s`, `ft/s`, `km/h`, `kts`, `mph`) and length (`m`, `ft`, `km`, `mi`, `nm`). Switching units auto-converts the stored value. |
@@ -467,6 +469,58 @@ satisfied for the setting to appear.
 
 ---
 
+## The `render_prereq` and `enable_prereq` Fields
+
+Where `prereq` couples a setting's visibility to its **tree parent**, these two fields gate a
+setting on the current value of **any other bool setting(s)**, regardless of where they sit in
+the hierarchy. Use them when a setting is made irrelevant or conflicting by a control elsewhere
+in the tree — e.g. two legacy trim knobs that become inert once the auto-calibrated trim curve
+is enabled.
+
+| Field | Effect when the condition **fails** |
+|-------|-------------------------------------|
+| `render_prereq` | The setting is **hidden** (removed from the form entirely). |
+| `enable_prereq` | The setting still **renders but is disabled/greyed**, and its tooltip is prefixed with an auto-generated reason (e.g. *"Disabled because Use Calibrated Trim Curve is enabled"*). |
+
+### Syntax (both fields)
+
+```
+render_prereq = name
+enable_prereq = !name
+render_prereq = name1,!name2
+```
+
+- Comma-separated list of tokens. `name` requires that setting be `true`; `!name` requires it
+  be `false`. **All** tokens must pass for the condition to hold.
+- Each referenced name must be an existing `bool` setting (enforced by the schema tests).
+- A referenced setting absent from the resolved set is treated as `false`.
+
+### Evaluation
+
+Unlike `debug_only` (a parse-time gate against a global), these depend on another setting's
+**resolved value**, so they are evaluated in the view layer (`SettingsLayout.apply_conditional_gates`),
+after normal `prereq` visibility and before invisible rows are dropped. Evaluation is against the
+referenced setting's **value**, not its visibility — so the gate still works when the controlling
+toggle is itself collapsed or hidden.
+
+### Precedence
+
+`render_prereq` (hide) wins over `enable_prereq` (disable) if both are present and both fail — a
+hidden row cannot be disabled. The two may target different controllers (e.g. hide when a feature
+is inapplicable, disable when a conflicting setting is active).
+
+### Example
+
+```xml
+<!-- Inert once the calibrated trim curve is in use -->
+<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
+```
+
+on `joystick_trim_follow_gain_virtual_y` and `joystick_ap_y_follow_axis`: both stay visible but
+grey out with an explanatory tooltip whenever `joystick_trim_follow_use_curve_y` is `true`.
+
+---
+
 ## The `order` Field
 
 A float that controls row position and layout behavior within the settings list.
@@ -534,7 +588,10 @@ writing to prevent drift.
 2. Set `datatype`, `value`, `validvalues`, and `sliderfactor` appropriately (see
    [Datatypes](#datatypes)).
 3. Set `prereq` to the name of a parent `bool` or `group` setting if the new setting should
-   only be visible when that parent is enabled.
+   only be visible when that parent is enabled. If visibility or enablement should instead
+   depend on a setting **elsewhere** in the tree (not its parent), use `render_prereq` (hide)
+   or `enable_prereq` (disable) — see
+   [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields).
 4. Set `order` to a value that places the row logically within its group.
 5. Add `<classdefaults_{sim}>` entries if the default value should differ by aircraft class.
 6. Add `<validvalues_overrides>` entries if the dropdown options should differ by class.

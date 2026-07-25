@@ -16,6 +16,11 @@
         <file>image/icon_BMS_lm.png</file>
         <file>image/disabledcheckbox.png</file>
         <file>image/down-down.png</file>
+        <file>image/delete.svg</file>
+        <file>image/delete-all.svg</file>
+        <file>image/file-download.svg</file>
+        <file>image/file-upload.svg</file>
+        <file>image/profile-notes.svg</file>
         <file>image/up-up.png</file>
         <file>image/down-down_grey.png</file>
         <file>image/up-up_grey.png</file>

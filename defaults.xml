@@ -2030,9 +2030,9 @@
 		<parentgroup>basic</parentgroup>
 		<order>2400</order>
 		<name>trim_following</name>
-		<displayname>Trim Following</displayname>
+		<displayname>Trim / AP Following</displayname>
 		<prereq>telemffb_controls_axes</prereq>
-		<info>Enable physical stick movement with in-game trims</info>
+		<info>Enable physical stick movement with in-game trims and auto-pilot.&lt;br&gt;&lt;br&gt;Note: Not all aircraft types support AP following</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2041,10 +2041,54 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2405</order>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<displayname>Use Calibrated Trim Curve</displayname>
+		<prereq>trim_following</prereq>
+		<info>Use the auto-calibrated elevator trim response curve instead of the static Y Trim Gain Virtual value.&lt;br&gt;&lt;br&gt;Run the calibration (button below) to capture the curve. Recommended for aircraft where the nose drifts as trim is applied even with a tuned static gain.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2405.2</order>
+		<name>joystick_trim_follow_curve_y</name>
+		<displayname>Trim Curve Calibration</displayname>
+		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<info>Auto-calibrated elevator trim response curve. Captured by the Elevator Trim Calibration tool; used when 'Use Calibrated Trim Curve' is enabled.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<datatype>trimcal</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2405.3</order>
+		<name>joystick_trim_follow_stick_position</name>
+		<displayname>Trimmed Stick Position</displayname>
+		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<info>Where the stick rests when the aircraft is trimmed, with calibrated curves at multiple speeds.&lt;br&gt;&lt;br&gt;'Follows Trim': the rest position rides the measured trim state - aft when trimmed for slow flight, forward when fast - like cable/trim-tab aircraft where the yoke is linked to the control surface.&lt;br&gt;&lt;br&gt;'Stays Centered': trimmed flight always rests the stick at center - like moving-stabilizer, FBW or spring-cartridge aircraft where trim re-rigs the feel datum.&lt;br&gt;&lt;br&gt;Force behavior is identical in both modes (trimmed = zero force, out-of-trim = force); only the resting geometry differs.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>Follows Trim</value>
+		<validvalues>Follows Trim,Stays Centered</validvalues>
+		<datatype>list</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.2</order>
+		<order>2410</order>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<displayname>X Trim Gain Physical</displayname>
 		<prereq>trim_following</prereq>
@@ -2060,7 +2104,7 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.22</order>
+		<order>2415</order>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<displayname>X Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
@@ -2076,7 +2120,7 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.4</order>
+		<order>2420</order>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<displayname>Y Trim Gain Physical</displayname>
 		<prereq>trim_following</prereq>
@@ -2092,10 +2136,11 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.42</order>
+		<order>2425</order>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<displayname>Y Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
 		<info>Amount of physical movement of the stick that will be transmittted to sim&lt;br&gt;&lt;br&gt;Amount of physical movementof the stick that will be transmitted to sim. &lt;br&gt; &lt;br&gt;Adjust virtual y % so that trim ingame does not pitch aircraft when stick held. &lt;br&gt;&lt;br&gt; To configure, slowly apply nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negative.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2105,38 +2150,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2400.43</order>
-		<name>joystick_trim_follow_use_curve_y</name>
-		<displayname>Use Calibrated Trim Curve</displayname>
-		<prereq>trim_following</prereq>
-		<info>Use the auto-calibrated elevator trim response curve instead of the static Y Trim Gain Virtual value.&lt;br&gt;&lt;br&gt;Run the calibration (button below) to capture the curve. Recommended for aircraft where the nose drifts as trim is applied even with a tuned static gain.</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>trimcal</datatype>
-		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2400.44</order>
-		<name>joystick_trim_follow_curve_y</name>
-		<displayname>Trim Curve Calibration</displayname>
-		<prereq>trim_following</prereq>
-		<info>Auto-calibrated elevator trim response curve. Captured by the Elevator Trim Calibration tool; used when 'Use Calibrated Trim Curve' is enabled.</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.6</order>
+		<order>2430</order>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<prereq>trim_following</prereq>
@@ -2152,7 +2169,7 @@
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2400.62</order>
+		<order>2435</order>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<prereq>trim_following</prereq>
@@ -2170,7 +2187,7 @@
 		<order>2450</order>
 		<name>ap_following</name>
 		<displayname>Autopilot Following</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<info>Enable physical stick following of autopilot movements</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2283,6 +2300,7 @@
 		<name>joystick_ap_y_follow_axis</name>
 		<displayname>    AP Pitch - Follow axis instead of trim</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
 		<info>Elevator AP will attempt to follow the axis position rather than the trim value</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -5588,6 +5606,20 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<grouping>FlyByWire</grouping>
+		<order>99600</order>
+		<name>aircraft_is_fbw</name>
+		<displayname>FlyByWire (FBW)</displayname>
+		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>false</value>
+		<datatype>convert</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
 		<datatype>convert</datatype>
 		<grouping>SpringCenter</grouping>
 		<order>99500</order>
@@ -5601,18 +5633,14 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>convert</datatype>
-		<grouping>FlyByWire</grouping>
-		<order>99600</order>
-		<name>aircraft_is_fbw</name>
-		<displayname>FlyByWire (FBW)</displayname>
-		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
+		<grouping>placeholder</grouping>
+		<order>100000</order>
+		<name>placeholder</name>
+		<displayname>placeholder</displayname>
+		<prereq>	do not show</prereq>
+		<render_prereq>_placeholder_</render_prereq>
 		<value>false</value>
+		<datatype>bool</datatype>
 	</defaults>
 <sc_overrides>
 		<name>EngRPM</name>
@@ -8693,6 +8721,13 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>JetAircraft</type>
+			<value>Stays Centered</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>joystick_trim_follow_use_curve_y</name>
 			<type>TurbopropAircraft</type>
 			<value>false</value>
@@ -8717,6 +8752,118 @@
 			<name>joystick_trim_follow_curve_y</name>
 			<type>GliderAircraft</type>
 			<value>none</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<!-- Elevator trim-curve calibration is fixed-wing only: exclude the
+		     curve settings (NOT trim_following itself - helicopters use
+		     cyclic trim-following) for every helicopter class. These
+		     exclusions also drive the main-window calibration prompt. -->
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!TaogH500Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!TaogH500Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!TaogH500Helicopter</type>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
@@ -10024,6 +10171,51 @@
 			<value>true</value>
 			<sim>XPLANE</sim>
 			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>JetAircraft</type>
+			<value>Stays Centered</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<!-- Elevator trim-curve calibration is fixed-wing only: exclude the
+		     curve settings for the helicopter classes (see MSFS section). -->
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>aileron_expo</name>
@@ -13848,6 +14040,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The spoiler motion effect is zeroed by default because the F-14's DLC and spoiler surfaces are in near-constant motion, which would otherwise produce continuous rumble.</notes>
 		</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -13959,6 +14152,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The g-force effect is disabled by default because the real F-16 uses a force-sensing sidestick, so g-loading stick feel is not appropriate for this aircraft. The flaps motion effect is also disabled because the FLCS schedules the flaperons automatically and would otherwise produce constant rumble.</notes>
 	</models>
 	<models>
 		<name>afterburner_effect_enabled</name>
@@ -14066,6 +14260,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The g-force effects are disabled by default on this aircraft because the native FFB has its own bob-weight implementation</notes>
 	</models>
 	<models>
 		<name>weapon_effect_direction</name>
@@ -14153,6 +14348,7 @@
 		<value>PropellerAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>AoA buffeting is disabled by default because this module implements its own stall buffet natively through the FFB interface. Enabling it will double up with the module's built-in buffet.</notes>
 	</models>
 	<models>
 		<name>wingfold_motion_effect_enabled</name>
@@ -14241,6 +14437,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because the flight control system schedules the flaps/flaperons automatically and would otherwise produce constant rumble.</notes>
 		</models>
 	<models>
 		<name>adv_spr_gains</name>
@@ -14329,6 +14526,7 @@
 		<value>PropellerAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 		</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -14962,6 +15160,7 @@
 		<value>PropellerAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 		</models>
 	<models>
 		<name>cm_vibration_intensity</name>
@@ -15107,6 +15306,7 @@
 		<value>JetAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 		</models>
 	<models>
 		<name>type</name>
@@ -15180,6 +15380,7 @@
 	<value>PropellerAircraft</value>
 	<sim>DCS</sim>
 	<device>any</device>
+		<notes>Stick buffeting intensity is zeroed by default because this module implements its own stall buffet natively through the FFB interface. Raising it will double up with the module's built-in buffet.</notes>
 	</models>
 	<models>
 		<name>cm_vibration_intensity</name>
@@ -15947,6 +16148,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -15998,6 +16200,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16049,6 +16252,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16100,6 +16304,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16151,6 +16356,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16202,6 +16408,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16253,6 +16460,7 @@
 		<value>JetAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
@@ -16304,6 +16512,7 @@
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
 		<device>any</device>
+		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16412,6 +16621,7 @@
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This profile reads the aircraft's force trim switch state directly via its custom simulation variable, so force trim follows the in-cockpit switch. Spring mode defaults to FORCETRIM to match.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16419,6 +16629,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16426,6 +16637,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>etl_effect_intensity</name>
@@ -16478,6 +16690,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>etl_effect_intensity</name>
@@ -16530,6 +16743,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16644,6 +16858,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 		</models>
 	<models>
 		<name>type</name>
@@ -16743,6 +16958,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This profile drives several effects from A2A's custom simulation variables (prop RPM and thrust, body accelerations, AP master) rather than the standard SimConnect variables, and depends on the A2A Comanche's simulation.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -16879,6 +17095,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 		</models>
 	<models>
 		<name>cyclic_spring_gain</name>
@@ -16930,6 +17147,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_physical_x</name>
@@ -16944,6 +17162,7 @@
 		<value>GliderAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Aileron (X axis) trim following is disabled by default because this glider has no aileron trim.</notes>
 	</models>
 	<models>
 		<name>aileron_spring_gain</name>
@@ -17010,6 +17229,41 @@
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Asobo Cessna Citation.*</model>
+		<value>{"curves": [{"points": [{"t": -0.2738, "offs": -0.1585}, {"t": -0.2138, "offs": -0.1239}, {"t": -0.1538, "offs": -0.0891}, {"t": -0.0938, "offs": -0.0545}, {"t": -0.0338, "offs": -0.0197}, {"t": 0.0262, "offs": 0.0153}, {"t": 0.0862, "offs": 0.0475}, {"t": 0.1462, "offs": 0.0901}, {"t": 0.2062, "offs": 0.1287}, {"t": 0.2662, "offs": 0.1609}, {"t": 0.3262, "offs": 0.1951}, {"t": 0.3862, "offs": 0.2289}, {"t": 0.4462, "offs": 0.2629}, {"t": 0.5062, "offs": 0.2968}, {"t": 0.5662, "offs": 0.3308}], "t0": 0.1462, "ias_kt": 181.5, "date": "2026-07-23"}, {"points": [{"t": -0.6038, "offs": -0.3429}, {"t": -0.5438, "offs": -0.3093}, {"t": -0.4838, "offs": -0.2758}, {"t": -0.4238, "offs": -0.2424}, {"t": -0.3638, "offs": -0.2092}, {"t": -0.3038, "offs": -0.1758}, {"t": -0.2438, "offs": -0.1419}, {"t": -0.1838, "offs": -0.1082}, {"t": -0.1238, "offs": -0.0704}, {"t": -0.0638, "offs": -0.0363}, {"t": -0.0038, "offs": -0.0022}, {"t": 0.0562, "offs": 0.032}, {"t": 0.1162, "offs": 0.0662}, {"t": 0.1762, "offs": 0.1003}, {"t": 0.2362, "offs": 0.1349}], "t0": -0.1838, "ias_kt": 293.8, "date": "2026-07-23"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Asobo Cessna Citation.*</model>
+		<value>Stays Centered</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Asobo Cessna Citation.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>spring_mode</name>
+		<model>Asobo Cessna Citation.*</model>
+		<value>CENTER</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>trim_following</name>
+		<model>Asobo Cessna Citation.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -17232,6 +17486,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -17805,6 +18060,7 @@
 		<value>JetAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because the flight control system schedules the flaps automatically and would otherwise produce constant rumble. Trim following is also disabled because the fly-by-wire pitch trim does not behave like a conventional trim surface.</notes>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
@@ -17832,6 +18088,27 @@
 		<name>elevator_droop_moment</name>
 		<model>C172SP.*</model>
 		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>C172SP.*</model>
+		<value>{"curves": [{"points": [{"t": 0.1355, "offs": 0.1108}, {"t": 0.1955, "offs": 0.1598}, {"t": 0.2555, "offs": 0.2091}, {"t": 0.3155, "offs": 0.2585}, {"t": 0.3755, "offs": 0.3081}, {"t": 0.4355, "offs": 0.361}, {"t": 0.4955, "offs": 0.4036}, {"t": 0.5555, "offs": 0.4711}, {"t": 0.6155, "offs": 0.5145}, {"t": 0.6755, "offs": 0.5591}, {"t": 0.7355, "offs": 0.6014}, {"t": 0.7955, "offs": 0.6472}, {"t": 0.8555, "offs": 0.6916}, {"t": 0.9155, "offs": 0.7371}], "t0": 0.5555, "ias_kt": 60.8, "date": "2026-07-21"}, {"points": [{"t": -0.2545, "offs": -0.2033}, {"t": -0.1945, "offs": -0.1558}, {"t": -0.1345, "offs": -0.1073}, {"t": -0.0745, "offs": -0.0589}, {"t": -0.0145, "offs": -0.0125}, {"t": 0.0455, "offs": 0.0391}, {"t": 0.1055, "offs": 0.0981}, {"t": 0.1655, "offs": 0.136}, {"t": 0.2255, "offs": 0.1828}, {"t": 0.2855, "offs": 0.2294}, {"t": 0.3455, "offs": 0.2774}, {"t": 0.4055, "offs": 0.3256}, {"t": 0.4655, "offs": 0.3724}, {"t": 0.5255, "offs": 0.4206}, {"t": 0.5855, "offs": 0.4717}], "t0": 0.1655, "ias_kt": 94.4, "date": "2026-07-21"}, {"points": [{"t": -0.4105, "offs": -0.4432}, {"t": -0.3505, "offs": -0.3791}, {"t": -0.2905, "offs": -0.3155}, {"t": -0.2305, "offs": -0.2515}, {"t": -0.1705, "offs": -0.1874}, {"t": -0.1105, "offs": -0.1229}, {"t": -0.0505, "offs": -0.0615}, {"t": 0.0095, "offs": 0.0116}, {"t": 0.0695, "offs": 0.0752}, {"t": 0.1295, "offs": 0.1435}, {"t": 0.1895, "offs": 0.2056}, {"t": 0.2495, "offs": 0.2712}, {"t": 0.3095, "offs": 0.3334}, {"t": 0.3695, "offs": 0.3966}, {"t": 0.4295, "offs": 0.4601}], "t0": 0.0095, "ias_kt": 120.0, "date": "2026-07-20"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>C172SP.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>C172SP.*</model>
+		<value>Follows Trim</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -17936,6 +18213,27 @@
 		<device>trimwheel</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>C208B.*</model>
+		<value>{"curves": [{"points": [{"t": -0.1707, "offs": -0.2202}, {"t": -0.1107, "offs": -0.1431}, {"t": -0.0507, "offs": -0.0656}, {"t": 0.0093, "offs": 0.012}, {"t": 0.0693, "offs": 0.0872}, {"t": 0.1293, "offs": 0.1704}, {"t": 0.1893, "offs": 0.2494}, {"t": 0.2493, "offs": 0.3356}, {"t": 0.3093, "offs": 0.4076}, {"t": 0.3693, "offs": 0.4828}, {"t": 0.4293, "offs": 0.558}, {"t": 0.4893, "offs": 0.6346}, {"t": 0.5493, "offs": 0.7105}], "t0": 0.1893, "ias_kt": 88.9, "date": "2026-07-21"}, {"points": [{"t": -0.2053, "offs": -0.4552}, {"t": -0.1453, "offs": -0.3254}, {"t": -0.0853, "offs": -0.1948}, {"t": -0.0253, "offs": -0.0589}, {"t": 0.0347, "offs": 0.0808}, {"t": 0.0947, "offs": 0.2097}, {"t": 0.1547, "offs": 0.3494}, {"t": 0.2147, "offs": 0.4828}, {"t": 0.2747, "offs": 0.6118}], "t0": 0.0347, "ias_kt": 121.3, "date": "2026-07-21"}, {"points": [{"t": -0.1474, "offs": -0.4931}, {"t": -0.0926, "offs": -0.329}, {"t": -0.0379, "offs": -0.1278}, {"t": 0.0168, "offs": 0.0567}, {"t": 0.0716, "offs": 0.235}, {"t": 0.1263, "offs": 0.4137}], "t0": -0.0379, "ias_kt": 149.6, "date": "2026-07-21"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>C208B.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>C208B.*</model>
+		<value>Follows Trim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>C208B.*</model>
 		<value>TurbopropAircraft</value>
@@ -18005,6 +18303,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 	</models>
 	<models>
 		<name>elevator_droop_moment</name>
@@ -18150,6 +18449,27 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Cessna C152.*</model>
+		<value>{"curves": [{"points": [{"t": -0.1706, "offs": -0.2141}, {"t": -0.1106, "offs": -0.1389}, {"t": -0.0506, "offs": -0.0636}, {"t": 0.0094, "offs": 0.0118}, {"t": 0.0694, "offs": 0.0864}, {"t": 0.1294, "offs": 0.1616}, {"t": 0.1894, "offs": 0.2325}, {"t": 0.2494, "offs": 0.2939}, {"t": 0.3094, "offs": 0.3706}, {"t": 0.3694, "offs": 0.4434}, {"t": 0.4294, "offs": 0.5152}, {"t": 0.4894, "offs": 0.5875}, {"t": 0.5494, "offs": 0.6601}, {"t": 0.6094, "offs": 0.7332}, {"t": 0.6694, "offs": 0.8063}], "t0": 0.2494, "ias_kt": 50.6, "date": "2026-07-23"}, {"points": [{"t": -0.3366, "offs": -0.4033}, {"t": -0.2766, "offs": -0.3317}, {"t": -0.2166, "offs": -0.2599}, {"t": -0.1566, "offs": -0.1881}, {"t": -0.0966, "offs": -0.116}, {"t": -0.0366, "offs": -0.0435}, {"t": 0.0234, "offs": 0.0278}, {"t": 0.0834, "offs": 0.1002}, {"t": 0.1434, "offs": 0.1732}, {"t": 0.2034, "offs": 0.2472}, {"t": 0.2634, "offs": 0.3177}, {"t": 0.3234, "offs": 0.3888}, {"t": 0.3834, "offs": 0.4599}, {"t": 0.4434, "offs": 0.5311}, {"t": 0.5034, "offs": 0.6025}], "t0": 0.0834, "ias_kt": 75.8, "date": "2026-07-23"}, {"points": [{"t": -0.3966, "offs": -0.4696}, {"t": -0.3366, "offs": -0.3989}, {"t": -0.2766, "offs": -0.3279}, {"t": -0.2166, "offs": -0.257}, {"t": -0.1566, "offs": -0.1859}, {"t": -0.0966, "offs": -0.1147}, {"t": -0.0366, "offs": -0.0443}, {"t": 0.0234, "offs": 0.0283}, {"t": 0.0834, "offs": 0.0998}, {"t": 0.1434, "offs": 0.1708}, {"t": 0.2034, "offs": 0.2449}, {"t": 0.2634, "offs": 0.3154}, {"t": 0.3234, "offs": 0.3862}, {"t": 0.3834, "offs": 0.457}, {"t": 0.4434, "offs": 0.5277}], "t0": 0.0234, "ias_kt": 93.0, "date": "2026-07-23"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cessna C152.*</model>
+		<value>Follows Trim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Cessna C152.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Cessna C152.*</model>
 		<value>PropellerAircraft</value>
@@ -18247,6 +18567,27 @@
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Cirrus SR22T.*</model>
+		<value>{"curves": [{"points": [{"t": -0.1054, "offs": -0.1354}, {"t": -0.0454, "offs": -0.0698}, {"t": 0.0146, "offs": 0.0224}, {"t": 0.0746, "offs": 0.1905}, {"t": 0.1346, "offs": 0.3629}, {"t": 0.1946, "offs": 0.5579}, {"t": 0.2546, "offs": 0.6556}], "t0": 0.0746, "ias_kt": 91.7, "date": "2026-07-23"}, {"points": [{"t": -0.4177, "offs": -0.8505}, {"t": -0.3577, "offs": -0.7724}, {"t": -0.2977, "offs": -0.6779}, {"t": -0.2377, "offs": -0.5828}, {"t": -0.1777, "offs": -0.3909}, {"t": -0.1177, "offs": -0.1977}, {"t": -0.0577, "offs": -0.0963}, {"t": 0.0023, "offs": 0.0038}, {"t": 0.0623, "offs": 0.0826}], "t0": -0.1777, "ias_kt": 135.3, "date": "2026-07-23"}, {"points": [{"t": -0.5192, "offs": -1.0884}, {"t": -0.4592, "offs": -0.9953}, {"t": -0.3992, "offs": -0.8702}, {"t": -0.3392, "offs": -0.7044}, {"t": -0.2792, "offs": -0.4981}, {"t": -0.2192, "offs": -0.3581}, {"t": -0.1592, "offs": -0.2601}], "t0": -0.3392, "ias_kt": 165.1, "date": "2026-07-23"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cirrus SR22T.*</model>
+		<value>Follows Trim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Cirrus SR22T.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -18775,6 +19116,27 @@
 		<unit>ft</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>{"curves": [{"points": [{"t": 0.0493, "offs": 0.0102}, {"t": 0.1093, "offs": 0.0227}, {"t": 0.1693, "offs": 0.0338}, {"t": 0.2293, "offs": 0.0473}, {"t": 0.2893, "offs": 0.0604}, {"t": 0.3493, "offs": 0.072}, {"t": 0.4093, "offs": 0.0846}, {"t": 0.4693, "offs": 0.0818}, {"t": 0.5293, "offs": 0.1022}, {"t": 0.5893, "offs": 0.1195}, {"t": 0.6493, "offs": 0.1372}, {"t": 0.7093, "offs": 0.1527}, {"t": 0.7693, "offs": 0.1679}, {"t": 0.8293, "offs": 0.1825}, {"t": 0.8893, "offs": 0.1965}], "t0": 0.4693, "ias_kt": 61.5, "date": "2026-07-23", "vs_fpm": -100}, {"points": [{"t": -0.8781, "offs": -0.3615}, {"t": -0.8181, "offs": -0.3366}, {"t": -0.7581, "offs": -0.3121}, {"t": -0.6981, "offs": -0.2876}, {"t": -0.6381, "offs": -0.2629}, {"t": -0.5781, "offs": -0.2386}, {"t": -0.5181, "offs": -0.214}, {"t": -0.4581, "offs": -0.1902}, {"t": -0.3981, "offs": -0.1617}, {"t": -0.3381, "offs": -0.1379}, {"t": -0.2781, "offs": -0.1137}, {"t": -0.2181, "offs": -0.0892}, {"t": -0.1581, "offs": -0.0646}, {"t": -0.0981, "offs": -0.0392}, {"t": -0.0381, "offs": -0.0152}], "t0": -0.4581, "ias_kt": 102.8, "date": "2026-07-23", "vs_fpm": -400}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>Follows Trim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -19413,6 +19775,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -19532,6 +19895,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -19567,6 +19931,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>max_aileron_coeff</name>
@@ -19679,6 +20044,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Aileron (X axis) trim following is disabled by default because this aircraft has no aileron trim.</notes>
 		</models>
 	<models>
 		<name>type</name>
@@ -19700,6 +20066,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -19707,6 +20074,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -19721,6 +20089,7 @@
 		<value>TaogH500Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the TaogH500Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -19975,6 +20344,35 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Control expo and elevator droop are zeroed by default to suit this gyrocopter's control feel, which differs fundamentally from fixed-wing aircraft.</notes>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Microsoft Vision Jet.*</model>
+		<value>{"curves": [{"points": [{"t": -0.274, "offs": -0.2999}, {"t": -0.214, "offs": -0.2351}, {"t": -0.154, "offs": -0.1671}, {"t": -0.094, "offs": -0.1016}, {"t": -0.034, "offs": -0.0387}, {"t": 0.026, "offs": 0.0296}, {"t": 0.086, "offs": 0.0863}, {"t": 0.146, "offs": 0.1482}, {"t": 0.206, "offs": 0.2222}, {"t": 0.266, "offs": 0.2856}, {"t": 0.326, "offs": 0.3531}, {"t": 0.3859, "offs": 0.421}, {"t": 0.446, "offs": 0.4854}, {"t": 0.506, "offs": 0.5525}, {"t": 0.566, "offs": 0.6192}], "t0": 0.146, "ias_kt": 111.0, "date": "2026-07-23"}, {"points": [{"t": -0.514, "offs": -0.4695}, {"t": -0.454, "offs": -0.4159}, {"t": -0.394, "offs": -0.3624}, {"t": -0.334, "offs": -0.3087}, {"t": -0.274, "offs": -0.2549}, {"t": -0.214, "offs": -0.2012}, {"t": -0.154, "offs": -0.1491}, {"t": -0.094, "offs": -0.0863}, {"t": -0.034, "offs": -0.0326}, {"t": 0.026, "offs": 0.025}, {"t": 0.086, "offs": 0.0761}, {"t": 0.146, "offs": 0.1289}, {"t": 0.206, "offs": 0.1818}, {"t": 0.266, "offs": 0.2347}, {"t": 0.326, "offs": 0.2877}], "t0": -0.094, "ias_kt": 159.3, "date": "2026-07-23"}, {"points": [{"t": -0.7146, "offs": -0.5882}, {"t": -0.6546, "offs": -0.5394}, {"t": -0.5946, "offs": -0.4907}, {"t": -0.5346, "offs": -0.4419}, {"t": -0.4746, "offs": -0.3931}, {"t": -0.4146, "offs": -0.3443}, {"t": -0.3546, "offs": -0.2954}, {"t": -0.2946, "offs": -0.2468}, {"t": -0.2346, "offs": -0.1975}, {"t": -0.1746, "offs": -0.1482}, {"t": -0.1146, "offs": -0.0931}, {"t": -0.0546, "offs": -0.0447}, {"t": 0.0054, "offs": 0.0044}, {"t": 0.0654, "offs": 0.0534}, {"t": 0.1254, "offs": 0.1024}], "t0": -0.2946, "ias_kt": 208.4, "date": "2026-07-23"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Microsoft Vision Jet.*</model>
+		<value>Follows Trim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Microsoft Vision Jet.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>spring_mode</name>
+		<model>Microsoft Vision Jet.*</model>
+		<value>BASIC</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -20082,6 +20480,7 @@
 		<value>TaogH500Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the TaogH500Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -20295,6 +20694,7 @@
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Autopilot following is disabled by default because this aircraft's auto-rudder implementation interferes badly with autopilot following.</notes>
 	</models>
 	<models>
 		<name>elevator_droop_moment</name>
@@ -20373,6 +20773,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 		</models>
 	<models>
 		<name>elevator_droop_moment</name>
@@ -20409,6 +20810,7 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>The flaps motion effect is disabled by default because this aircraft has no flaps.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -20553,6 +20955,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -20560,6 +20963,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -20603,6 +21007,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work. The force trim reset command is disabled by default because it conflicts with CowanSim's force trim implementation on this model.</notes>
 	</models>
 	<models>
 		<name>force_trim_send_reset</name>
@@ -20742,6 +21147,7 @@
 		<value>SASHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom SASHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the SASHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -20936,6 +21342,7 @@
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>This profile reads the aircraft's force trim switch state directly via its custom simulation variable, so force trim follows the in-cockpit switch. Spring mode defaults to FORCETRIM to match.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -21092,6 +21499,7 @@
 		<value>XAW109Helicopter</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+		<notes>This aircraft uses the custom XAW109Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the XAW109Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.&lt;br&gt;&lt;br&gt;The profile has axis control disabled because the aircraft does not honor the dataref write.  You will need to bind your controls in the sim to use this Aircraft.</notes>
 	</models>
 	<models>
 		<name>force_trim_enabled</name>
@@ -21150,11 +21558,25 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
+		<name>joystick_trim_follow_curve_y</name>
 		<model>Cessna Skyhawk.*</model>
-		<value>PropellerAircraft</value>
+		<value>{"curves": [{"points": [{"t": 0.043, "offs": 0.0176}, {"t": 0.103, "offs": 0.0422}, {"t": 0.163, "offs": 0.0683}, {"t": 0.223, "offs": 0.0963}, {"t": 0.283, "offs": 0.1258}, {"t": 0.343, "offs": 0.1588}, {"t": 0.403, "offs": 0.1891}, {"t": 0.463, "offs": 0.2155}, {"t": 0.523, "offs": 0.2436}, {"t": 0.583, "offs": 0.2671}, {"t": 0.643, "offs": 0.289}, {"t": 0.703, "offs": 0.3102}, {"t": 0.763, "offs": 0.3304}, {"t": 0.823, "offs": 0.3498}, {"t": 0.883, "offs": 0.3685}], "t0": 0.463, "ias_kt": 58.7, "date": "2026-07-21"}, {"points": [{"t": -0.465, "offs": -0.1876}, {"t": -0.405, "offs": -0.1667}, {"t": -0.345, "offs": -0.1449}, {"t": -0.285, "offs": -0.1219}, {"t": -0.225, "offs": -0.0976}, {"t": -0.165, "offs": -0.0718}, {"t": -0.105, "offs": -0.0473}, {"t": -0.045, "offs": -0.0258}, {"t": 0.015, "offs": 0.0086}, {"t": 0.075, "offs": 0.0355}, {"t": 0.135, "offs": 0.0632}, {"t": 0.195, "offs": 0.0887}, {"t": 0.255, "offs": 0.113}, {"t": 0.315, "offs": 0.1358}, {"t": 0.375, "offs": 0.1576}], "t0": -0.045, "ias_kt": 89.0, "date": "2026-07-21"}, {"points": [{"t": -0.816, "offs": -0.3428}, {"t": -0.756, "offs": -0.3248}, {"t": -0.696, "offs": -0.3059}, {"t": -0.636, "offs": -0.2862}, {"t": -0.576, "offs": -0.2655}, {"t": -0.516, "offs": -0.2439}, {"t": -0.456, "offs": -0.221}, {"t": -0.396, "offs": -0.1933}, {"t": -0.336, "offs": -0.1639}, {"t": -0.276, "offs": -0.1297}, {"t": -0.216, "offs": -0.0987}, {"t": -0.156, "offs": -0.0689}, {"t": -0.096, "offs": -0.041}, {"t": -0.036, "offs": -0.0149}, {"t": 0.024, "offs": 0.0099}], "t0": -0.396, "ias_kt": 115.0, "date": "2026-07-21"}]}</value>
 		<sim>XPLANE</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cessna Skyhawk.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Cessna Skyhawk.*</model>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -21164,11 +21586,25 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
-		<model>Cirrus personal jet</model>
-		<value>JetAircraft</value>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Cirrus SR-22.*</model>
+		<value>{"curves": [{"points": [{"t": -0.104, "offs": -0.0412}, {"t": -0.044, "offs": -0.0187}, {"t": 0.016, "offs": 0.0068}, {"t": 0.076, "offs": 0.0399}, {"t": 0.136, "offs": 0.0757}, {"t": 0.196, "offs": 0.1159}, {"t": 0.256, "offs": 0.1535}, {"t": 0.316, "offs": 0.2091}, {"t": 0.376, "offs": 0.2427}, {"t": 0.436, "offs": 0.2704}, {"t": 0.496, "offs": 0.2977}, {"t": 0.556, "offs": 0.3234}, {"t": 0.616, "offs": 0.3477}, {"t": 0.676, "offs": 0.3707}, {"t": 0.736, "offs": 0.3925}], "t0": 0.316, "ias_kt": 90.3, "date": "2026-07-22"}, {"points": [{"t": -0.362, "offs": -0.149}, {"t": -0.302, "offs": -0.1273}, {"t": -0.242, "offs": -0.1046}, {"t": -0.182, "offs": -0.0805}, {"t": -0.122, "offs": -0.055}, {"t": -0.062, "offs": -0.0282}, {"t": -0.002, "offs": -0.0013}, {"t": 0.058, "offs": 0.0385}, {"t": 0.118, "offs": 0.0772}, {"t": 0.178, "offs": 0.1091}, {"t": 0.238, "offs": 0.1398}, {"t": 0.298, "offs": 0.1684}, {"t": 0.358, "offs": 0.1952}, {"t": 0.418, "offs": 0.2204}, {"t": 0.478, "offs": 0.2442}], "t0": 0.058, "ias_kt": 125.7, "date": "2026-07-22"}, {"points": [{"t": -0.54, "offs": -0.2348}, {"t": -0.48, "offs": -0.2143}, {"t": -0.42, "offs": -0.1928}, {"t": -0.36, "offs": -0.1703}, {"t": -0.3, "offs": -0.1466}, {"t": -0.24, "offs": -0.1215}, {"t": -0.18, "offs": -0.0949}, {"t": -0.12, "offs": -0.0618}, {"t": -0.06, "offs": -0.028}, {"t": 0.0, "offs": -0.0}, {"t": 0.06, "offs": 0.035}, {"t": 0.12, "offs": 0.0665}, {"t": 0.18, "offs": 0.096}, {"t": 0.24, "offs": 0.1236}, {"t": 0.3, "offs": 0.1493}], "t0": -0.12, "ias_kt": 160.6, "date": "2026-07-22"}]}</value>
 		<sim>XPLANE</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cirrus SR-22.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Cirrus SR-22.*</model>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -21176,6 +21612,14 @@
 		<value>PropellerAircraft</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Cirrus Vision SF50.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+		<notes>Overrides the JetAircraft class default (Stays Centered): the Vision Jet uses conventional mechanical (pushrod/cable) flight controls, not FBW or a boosted artificial-feel system, despite being a jet.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -21239,6 +21683,7 @@
 		<value>GliderAircraft</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+		<notes>Aileron (X axis) trim following is disabled by default because this glider has no aileron trim.</notes>
 	</models>
 	<models>
 		<name>rotor_blade_count</name>
@@ -21262,11 +21707,68 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>Van's RV-10.*</model>
+		<value>{"curves": [{"points": [{"t": 0.165, "offs": 0.0567}, {"t": 0.225, "offs": 0.0773}, {"t": 0.285, "offs": 0.0991}, {"t": 0.345, "offs": 0.122}, {"t": 0.405, "offs": 0.146}, {"t": 0.465, "offs": 0.172}, {"t": 0.525, "offs": 0.1973}, {"t": 0.585, "offs": 0.2033}, {"t": 0.645, "offs": 0.2297}, {"t": 0.705, "offs": 0.2487}, {"t": 0.765, "offs": 0.2679}, {"t": 0.825, "offs": 0.2863}, {"t": 0.885, "offs": 0.3039}, {"t": 0.945, "offs": 0.321}], "t0": 0.585, "ias_kt": 80.9, "date": "2026-07-22"}, {"points": [{"t": -0.195, "offs": -0.068}, {"t": -0.135, "offs": -0.0482}, {"t": -0.075, "offs": -0.0275}, {"t": -0.015, "offs": -0.0057}, {"t": 0.045, "offs": 0.0172}, {"t": 0.105, "offs": 0.0409}, {"t": 0.165, "offs": 0.0654}, {"t": 0.225, "offs": 0.0894}, {"t": 0.285, "offs": 0.1119}, {"t": 0.345, "offs": 0.1314}, {"t": 0.405, "offs": 0.1505}, {"t": 0.465, "offs": 0.1688}, {"t": 0.525, "offs": 0.1864}, {"t": 0.585, "offs": 0.2034}, {"t": 0.645, "offs": 0.2197}], "t0": 0.225, "ias_kt": 109.8, "date": "2026-07-22"}, {"points": [{"t": -0.465, "offs": -0.1661}, {"t": -0.405, "offs": -0.1481}, {"t": -0.345, "offs": -0.1293}, {"t": -0.285, "offs": -0.1095}, {"t": -0.225, "offs": -0.089}, {"t": -0.165, "offs": -0.0678}, {"t": -0.105, "offs": -0.0463}, {"t": -0.045, "offs": -0.0198}, {"t": 0.015, "offs": 0.0066}, {"t": 0.075, "offs": 0.0277}, {"t": 0.135, "offs": 0.0488}, {"t": 0.195, "offs": 0.0691}, {"t": 0.255, "offs": 0.0884}, {"t": 0.315, "offs": 0.107}, {"t": 0.375, "offs": 0.1248}], "t0": -0.045, "ias_kt": 140.2, "date": "2026-07-22"}]}</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>Van's RV-10.*</model>
+		<value>Follows Trim</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>Van's RV-10.*</model>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Van's RV-10.*</model>
 		<value>PropellerAircraft</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Airbus A330-300.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Boeing 737-800.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>McDonnell Douglas MD-82.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>ALIA 250.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_stick_position</name>
+		<model>ALIA 250.*</model>
+		<value>Stays Centered</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+		<notes>All-electric fly-by-wire eVTOL; classed PropellerAircraft for propulsion-effect defaults (no afterburner), but the trim feel is FBW-centered, not tab/cable.</notes>
 	</models>
 	<classes>
 		<sim>DCS</sim>

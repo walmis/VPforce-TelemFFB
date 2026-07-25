@@ -180,15 +180,49 @@ class BaseTelemetryData:
     """
 
     Vle: Optional[float]
-    """Maximum landing-gear-extended speed.  
-    Currently not populated by any sim.  
+    """Maximum landing-gear-extended speed.
+    XP: Read from the X-Plane plugin (acf_Vle, converted kt -> m/s).
+    Other sims: not available.
+    """
+
+    Vfe: Optional[float]
+    """Maximum flaps-extended speed.
+    XP: Read from the X-Plane plugin (acf_Vfe, converted kt -> m/s).
+    Other sims: not available.
+    """
+
+    Vno: Optional[float]
+    """Maximum structural cruising speed (level-flyable in smooth air).
+    XP: Read from the X-Plane plugin (acf_Vno, converted kt -> m/s).
+    Other sims: not available (MSFS has no equivalent; DESIGN SPEED VC is
+    the closest level-flight ceiling).
+    """
+
+    Vs: Optional[float]
+    """Clean-configuration stall speed.
+    XP: Read from the X-Plane plugin (acf_Vs, converted kt -> m/s).
+    MSFS: not populated — use DesignSpeed[2] (VS1).
     """
 
     Vne: Optional[float]
-    """Never-exceed speed.  
-    MSFS: Computed from DESIGN SPEED VC × 1.4 via barometric formula in _calculate_vne_and_gains().  
-    XP: Read directly from X-Plane plugin dataref.  
-    Can be overridden via vne_override XML setting per aircraft.  
+    """Never-exceed speed.
+    MSFS: Computed from DESIGN SPEED VC × 1.4 via barometric formula in _calculate_vne_and_gains().
+    XP: Read directly from X-Plane plugin dataref.
+    Can be overridden via vne_override XML setting per aircraft.
+    """
+
+    RefMaxIAS: Optional[float]
+    """Aircraft-declared maximum indicated airspeed (Vne-equivalent).
+    MSFS: REFERENCE SPEED MAX IAS SimVar — m/s. Reported by the aircraft's
+    own reference data, unlike Vne which is estimated from DESIGN SPEED VC;
+    when present it is the more authoritative red-line figure.
+    """
+
+    RefMaxIAS_kt: Optional[float]
+    """Aircraft-declared maximum indicated airspeed (Vne-equivalent).
+    MSFS: REFERENCE SPEED MAX IAS SimVar — knots. Reported by the aircraft's
+    own reference data, unlike Vne which is estimated from DESIGN SPEED VC;
+    when present it is the more authoritative red-line figure.
     """
 
     Vne_ms_calc: Optional[float]
@@ -543,8 +577,16 @@ class BaseTelemetryData:
     """
 
     ElevDeflPctLR: Optional[Tuple[float, float]]
-    """Elevator deflection percentage per side [left, right].  
-    MSFS: ELEVATOR DEFLECTION PCT LR SimVars when available.  
+    """Elevator deflection percentage per side [left, right].
+    MSFS: ELEVATOR DEFLECTION PCT LR SimVars when available.
+    """
+
+    ElevPos: Optional[float]
+    """Elevator INPUT position (control-side, not the surface).
+    MSFS: ELEVATOR POSITION SimVar — -1.0 to +1.0, 0 at neutral.
+    Comparing this against the commanded axis separates input-layer
+    mangling (Just Flight-style event mishandling) from genuine aero
+    response, and measures speed-scaled input attenuation (C208B class).
     """
 
     ElevTrim: Optional[float]
@@ -635,11 +677,19 @@ class BaseTelemetryData:
     """
 
     EngRPM: Optional[Union[float, List[float]]]
-    """Engine RPM as percentage of max.  
-    DCS: LoGetEngineInfo().RPM — list per engine.  
-    MSFS: GENERAL ENG PCT MAX RPM SimVar — list per engine.  
-    BMS: engine_rpm + engine_rpm2 — list RPM %.  
-    IL2: not available (use RPM field instead).  
+    """Engine RPM as percentage of max.
+    DCS: LoGetEngineInfo().RPM — list per engine.
+    MSFS: GENERAL ENG PCT MAX RPM SimVar — list per engine.
+    BMS: engine_rpm + engine_rpm2 — list RPM %.
+    IL2: not available (use RPM field instead).
+    """
+
+    ThrottlePct: Optional[List[float]]
+    """Throttle lever positions, engines 1-4.
+    MSFS: GENERAL ENG THROTTLE LEVER POSITION SimVars — 0-100 percent per
+    lever; slots for engines the aircraft does not have are pinned at 0.
+    Used by the trim calibrator's throttle-movement tracker to distinguish
+    a real power change from airspeed drifting on its own.
     """
 
     ActualRPM: Optional[Union[float, List[float]]]

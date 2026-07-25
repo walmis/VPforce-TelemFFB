@@ -17,6 +17,7 @@
 #
 
 
+import html
 import inspect
 import json
 import logging
@@ -54,6 +55,7 @@ from telemffb.DevicePanel import DeviceIconPanel
 from telemffb.ExceptionTracker import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
+from telemffb.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.SettingsLayout import SettingsLayout
 # from telemffb.UserModelDialog import UserModelDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
@@ -387,6 +389,7 @@ class MainWindow(QMainWindow):
         status_layout.addWidget(self.status_container)
 
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
+        self.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.status_container.sim_status_label.set_waiting()
 
         def on_sims_changed(sim: SimTelemListener):
@@ -437,28 +440,62 @@ class MainWindow(QMainWindow):
         """ Create new craft button - pops when unknown aircraft is detected """
 
         new_craft_layout = QVBoxLayout()
-        self.new_craft_button = QPushButton('Create/clone config for new aircraft')
-        ncb_css = """QPushButton {
-                            background-color: #ab37c8;
-                            border-style: outset;
-                            border-width: 1px;
-                            border-radius: 10px;
-                            border-color: black;
-                            color: white;
-                            font: bold 14px;
-                            min-width: 10em;
-                            padding: 5px;
-                        }"""
-        self.new_craft_button.setStyleSheet(ncb_css)
-        self.new_craft_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        new_craft_layout.addWidget(self.new_craft_button)
+        # Pill-and-pulse prompts are QLabels with an embedded link, not
+        # QPushButtons: rich text allows partial emphasis (bold aircraft
+        # name, medium-weight fixed words) which buttons cannot render.
+        # The link spans the whole text, so the entire pill is clickable
+        # and Qt supplies the hand cursor.
+        self.new_craft_button = QLabel()
+        self.new_craft_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        # Red fill breathing dim<->bright, white text/border, content-sized
+        # and centered (the old full-width slab was routinely missed
+        # despite its size). The animation runs only while visible.
+        self._new_craft_anim = QtCore.QVariantAnimation(self)
+        self._new_craft_anim.setStartValue(0.0)
+        self._new_craft_anim.setKeyValueAt(0.5, 1.0)
+        self._new_craft_anim.setEndValue(0.0)
+        self._new_craft_anim.setDuration(2600)
+        self._new_craft_anim.setLoopCount(-1)
+        self._new_craft_anim.valueChanged.connect(self._style_new_craft_button)
+        self._style_new_craft_button(0.0)
+        new_craft_layout.addWidget(self.new_craft_button,
+                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         new_craft_layout.addSpacing(7)
 
+        # Trim-calibration discovery prompt: shares the new-craft button's
+        # space (the two are mutually exclusive — no matched profile means
+        # nowhere to save a calibration). The calibration settings live
+        # three prereqs deep under Axis Control; this puts the feature in
+        # front of the user when an aircraft loads without one. Styled as an
+        # outlined notice card — content-sized and centered — so it pops
+        # without impersonating the solid new-craft action button.
+        self.trim_cal_prompt_button = QLabel()
+        self.trim_cal_prompt_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self.trim_cal_prompt_button.setText(
+            "<a href='#trimcal' style='color:black; text-decoration:none;'>"
+            "<span style='font-weight:500;'>No Trim Calibration Found for this "
+            "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
+            " to Set Up Realistic Trim</span></a>")
+        self.trim_cal_prompt_button.linkActivated.connect(
+            lambda _: self.open_trim_calibration_dialog())
+        # Slow breathing pulse (fill + border alpha) while visible — started
+        # and stopped with visibility so it costs nothing when hidden.
+        self._trim_prompt_anim = QtCore.QVariantAnimation(self)
+        self._trim_prompt_anim.setStartValue(0.0)
+        self._trim_prompt_anim.setKeyValueAt(0.5, 1.0)
+        self._trim_prompt_anim.setEndValue(0.0)
+        self._trim_prompt_anim.setDuration(2600)
+        self._trim_prompt_anim.setLoopCount(-1)
+        self._trim_prompt_anim.valueChanged.connect(self._style_trim_cal_prompt)
+        self._style_trim_cal_prompt(0.0)
+        new_craft_layout.addWidget(self.trim_cal_prompt_button,
+                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
 
         """ Add new craft button to main layout """
 
         layout.addLayout(new_craft_layout)
         self.new_craft_button.hide()
+        self.trim_cal_prompt_button.hide()
 
 
         """ Create offline config control area QWidget """
@@ -1624,12 +1661,22 @@ class MainWindow(QMainWindow):
             # reset the craft area text to default
             self.status_container.reset()
             self.settings_layout.reload_caller()
+            # go_online restored the pre-offline context; re-evaluate the
+            # notes button against it (dedupe dropped so a re-load of the
+            # same context still refreshes)
+            self._profile_notes_shown = None
+            self.refresh_profile_notes_button()
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
             self.status_container.set_offline("None")
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
+
+            # Nothing is selected in the offline editor yet; disable the notes
+            # button until force_sim_aircraft establishes an offline scope
+            self._profile_notes_shown = None
+            self.status_container.set_notes_state(False)
 
             # Block signals so we don't trigger text change on .clear() calls
             self.offline_name.blockSignals(True)
@@ -1851,6 +1898,9 @@ class MainWindow(QMainWindow):
         G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
         G.settings_mgr.active_profile = self.offline_profile.currentText()
         self.settings_layout.reload_caller()
+        # reload_caller resolves current_pattern; refresh the notes button for
+        # the newly selected offline scope (no telemetry loop runs it here)
+        self.refresh_profile_notes_button()
 
 
     def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
@@ -1860,7 +1910,7 @@ class MainWindow(QMainWindow):
         if wizard.exec():
             try:
                 # make sure no other calls are connected to avoid stacking lambda calls if user cancels and doesn't add new aircraft
-                self.new_craft_button.clicked.disconnect()
+                self.new_craft_button.linkActivated.disconnect()
             except TypeError:
                 pass  # No handler connected yet
 
@@ -1992,6 +2042,22 @@ class MainWindow(QMainWindow):
         explanation) when nothing is loaded or the active aircraft is for a
         different simulator.
         """
+        # Offline editing with no aircraft selected: the settings manager
+        # still carries the ONLINE aircraft's identity and offline writes go
+        # nowhere (scope fall-through) — the dialog would show a misleading
+        # limbo state. Refuse with directions instead.
+        if getattr(G.settings_mgr, "offline_mode", False):
+            from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+            if not TrimCalibrationDialog._offline_target_valid():
+                QMessageBox.information(
+                    self, "Elevator Trim Calibration",
+                    "Offline editing mode is active but no aircraft is "
+                    "selected.\n\nChoose a Sim, Class and Aircraft in the "
+                    "Offline Editor Setup panel first, then open the "
+                    "Elevator Trim Calibration tool to view or import its "
+                    "calibrations.")
+                return
+
         sim = (G.settings_mgr.current_sim or "").upper()
         if sim not in ("MSFS", "XPLANE"):
             if sim in ("", "NOTHING"):
@@ -2010,6 +2076,8 @@ class MainWindow(QMainWindow):
             # a fresh one against the then-current aircraft.
             self.trim_cal_dialog = TrimCalibrationDialog(self)
             self.trim_cal_dialog.result_saved.connect(self.settings_layout.save_trim_calibration)
+            self.trim_cal_dialog.position_mode_changed.connect(
+                self.settings_layout.save_trim_position_mode)
             self.trim_cal_dialog.destroyed.connect(
                 lambda: setattr(self, 'trim_cal_dialog', None))
         self.trim_cal_dialog.raise_()
@@ -2264,6 +2332,12 @@ class MainWindow(QMainWindow):
                 self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         else:
             xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, profile_name)
+            # Keep the in-memory active profile in sync with the mapping we
+            # just wrote (the Add New path already does this). Without it, the
+            # timed-out reload below re-reads settings through the STALE
+            # profile filter — so the form never appears to change while the
+            # sim is paused — and the notes dialog targets the old profile.
+            G.settings_mgr.update_state_vars(active_profile=profile_name)
             if G.telem_manager.timed_out:
                 self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=profile_name)
         if G.telem_manager.timed_out:
@@ -2284,6 +2358,9 @@ class MainWindow(QMainWindow):
         logging.info(f"Application Status: clearing display after {src} exit")
         self.lbl_effects_data.setText("")
         self.status_container.reset_sim_state(src)
+        # reset_sim_state disabled the notes button; drop the dedupe context
+        # so the next aircraft load re-evaluates it even if identical.
+        self._profile_notes_shown = None
         self.settings_layout.clear_layout()
         self.telemetry_timed_out = False
 
@@ -2446,10 +2523,17 @@ class MainWindow(QMainWindow):
                 new_sim = data.get('src', None)
                 new_aircraft = data.get('N', None)
                 new_class = G.settings_mgr.current_class
+                self.trim_cal_prompt_button.hide()  # profile creation first
                 if G.master_instance:
                     if not self.new_craft_button.isVisible():
-                        self.new_craft_button.clicked.connect(lambda: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
+                        self.new_craft_button.setText(
+                            "<a href='#newcraft' style='color:white; text-decoration:none;'>"
+                            "<span style='font-weight:500;'>No Profile Found for </span>"
+                            f"<b>{html.escape(str(new_aircraft or ''))}</b>"
+                            "<span style='font-weight:500;'> — Click Here to Create a New Profile</span></a>")
+                        self.new_craft_button.linkActivated.connect(lambda _: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
                         self.new_craft_button.show()
+                        self._new_craft_anim.start()
 
                     if not data.get('STOP', False):
                         if not self.new_craft_notification_sent:
@@ -2465,8 +2549,11 @@ class MainWindow(QMainWindow):
 
 
             else:
-                self.new_craft_button.hide()
+                if self.new_craft_button.isVisible():
+                    self.new_craft_button.hide()
+                    self._new_craft_anim.stop()
                 self.new_craft_notification_sent = False
+                self._update_trim_cal_prompt()
 
             # Update the status labels and profile selection box
             self.status_container.set_fullname(data.get('N', ''))
@@ -2528,10 +2615,114 @@ class MainWindow(QMainWindow):
         self.status_container.cur_craft_label.setText(craft)
         self.status_container.cur_pattern_label.setText(pattern)
         self.status_container.active_profile_label.setText(profile)
+        self.refresh_profile_notes_button()
+
+    def refresh_profile_notes_button(self):
+        """Update the profile-notes button (enabled + notes-exist tint) for
+        the current aircraft/profile context. Runs from the telemetry update
+        path, so repeat contexts are deduplicated to avoid re-reading the
+        XML tables every frame."""
+        sim = G.settings_mgr.current_sim
+        aircraft = G.settings_mgr.current_aircraft_name
+        pattern = G.settings_mgr.current_pattern
+        profile = G.settings_mgr.active_profile
+        ctx = (sim, aircraft, pattern, profile)
+        if ctx == getattr(self, '_profile_notes_shown', None):
+            return
+        self._profile_notes_shown = ctx
+        enabled = bool(aircraft) and sim not in ('', 'nothing')
+        has_notes = False
+        if enabled:
+            target = profile if profile and str(profile).lower() not in ('none', 'built-in', 'default') else 'Auto User'
+            # Same tiers the dialog shows: curated defaults type notes, user
+            # default (user config type row) notes, and the active profile's
+            # own note — never another profile's.
+            has_notes = bool(
+                xmlutils.read_default_model_notes(sim, aircraft, prefer_pattern=pattern)
+                or xmlutils.read_user_default_model_notes(sim, pattern)
+                or xmlutils.read_user_model_notes(sim, pattern, target))
+        self.status_container.set_notes_state(enabled, has_notes)
+
+    def open_profile_notes_dialog(self):
+        dlg = ProfileNotesDialog(self)
+
+        def on_saved():
+            # Force a re-read so the button tint reflects the new note state.
+            self._profile_notes_shown = None
+            self.refresh_profile_notes_button()
+
+        dlg.notes_saved.connect(on_saved)
+        dlg.show()
 
     def new_ac_wizard_finished(self):
         self.new_craft_button.setVisible(False)
+        self._new_craft_anim.stop()
         self.settings_layout.reload_layout(None)
+
+    def _update_trim_cal_prompt(self):
+        """Show the trim-calibration discovery prompt when the loaded
+        MSFS/X-Plane aircraft has a matched profile, its config RESOLVES the
+        trim-curve setting, and no calibration is stored.
+
+        Availability is stamped ONCE per aircraft load by
+        TelemManager._stamp_trim_cal_availability from the "!class"
+        exclusion markers in defaults.xml — the same data that hides the
+        curve settings rows for helicopter classes — so this method only
+        reads two attributes per pass. Prereq VALUES are deliberately not
+        part of availability: trim_following defaults off, and users who
+        have not enabled it yet are exactly the audience this prompt exists
+        for (the calibration dialog's banner walks them through enabling).
+
+        Self-maintaining thereafter: a saved (or imported) calibration
+        populates the aircraft's parsed curve family and hides the prompt;
+        deleting the last calibration brings it back."""
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        show = (G.master_instance and G.device_type == "joystick"
+                and ac is not None
+                and getattr(ac, "_trim_cal_available", False)
+                and getattr(ac, "_trim_curve_y_fam", None) is None)
+        if show != self.trim_cal_prompt_button.isVisible():
+            self.trim_cal_prompt_button.setVisible(show)
+            if show:
+                self._trim_prompt_anim.start()
+            else:
+                self._trim_prompt_anim.stop()
+
+    def _style_new_craft_button(self, v):
+        """One pulse frame for the new-aircraft prompt: a red pill breathing
+        dim<->bright, white text and border (weights come from the rich
+        text — bold aircraft name, medium fixed words)."""
+        r = int(150 + (225 - 150) * v)
+        g = int(28 + (45 - 28) * v)
+        b = int(28 + (45 - 28) * v)
+        self.new_craft_button.setStyleSheet(f"""QLabel {{
+                            background-color: rgb({r}, {g}, {b});
+                            border: 3px solid white;
+                            border-radius: 17px;
+                            color: white;
+                            padding: 8px 18px;
+                        }}
+                        QLabel:hover {{
+                            background-color: #ef5350;
+                        }}""")
+
+    def _style_trim_cal_prompt(self, v):
+        """One pulse frame for the discovery prompt: a mustard pill (same
+        family as the Paused status badge) breathing between dim and bright,
+        solid fill so the black text keeps contrast throughout."""
+        r = int(130 + (242 - 130) * v)
+        g = int(100 + (180 - 100) * v)
+        b = int(12 + (34 - 12) * v)
+        self.trim_cal_prompt_button.setStyleSheet(f"""QLabel {{
+                            background-color: rgb({r}, {g}, {b});
+                            border: 3px solid black;
+                            border-radius: 17px;
+                            color: black;
+                            padding: 8px 18px;
+                        }}
+                        QLabel:hover {{
+                            background-color: #f5bc28;
+                        }}""")
 
 
     def perform_update(self, auto=True):

@@ -32,6 +32,11 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
     joystick_ap_follow_gain_virtual_y = 0.5
     trim_following = False
 
+    # When True, AP-following drives the elevator (Y) axis to the aircraft's
+    # elevator DEFLECTION rather than its trim — for aircraft whose autopilot
+    # commands the elevator directly instead of via trim. Ignored while a
+    # calibrated curve is active (the curve owns the resting geometry). This
+    # was dead from dea669a (2025-04-30) until restored; see update_fbw_...().
     joystick_ap_y_follow_axis = False
 
     joystick_ap_x_follow_deadzone = 0.05
@@ -135,27 +140,67 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
                 elev_trim = clamp(t_damp * self.joystick_trim_follow_gain_physical_y, -1, 1)
                 # Calibrated curve when enabled, else the legacy static gain.
-                virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim)
+                virtual_stick_y_offs = self._trim_follow_virtual_offset_y(t_damp, elev_trim, telem_data)
 
-                phys_stick_y_offs = int(elev_trim * 4096)
+                # Curve mode walks the spring center along the measured curve
+                # (axis units) so held-stick force trims off at the aircraft's
+                # true rate; legacy mode keeps the raw-trim center.
+                center_y = self._trim_follow_center_y(elev_trim, virtual_stick_y_offs)
+                phys_stick_y_offs = int(center_y * 4096)
+
+                # With a calibrated curve active, the AP-follow branches below
+                # must NOT overwrite the curve-aware Y center/virtual offset
+                # with their pre-calibration raw-trim formulas — doing so
+                # snapped the spring center off the curve the moment the AP
+                # engaged (and back off it at disengage). Legacy (no-curve)
+                # aircraft keep the formulas byte-identical.
+                curve_active = self.joystick_trim_follow_use_curve_y and \
+                    self._trim_curve_y_fam is not None
+
+                # Transition log (field diagnosis for "stick jumped when the
+                # AP engaged" reports): which Y-center source AP follow used.
+                ap_on = bool(self.ap_following and ap_active)
+                prev_ap = getattr(self, "_ap_follow_seen", False)
+                if ap_on and not prev_ap:
+                    logging.info("AP following engaged: Y center from "
+                                 + ("the calibrated trim curve" if curve_active
+                                    else "raw trim (no curve)"))
+                elif prev_ap and not ap_on:
+                    logging.info("AP following released")
+                self._ap_follow_seen = ap_on
 
                 if self.ap_following and ap_active:
                     phys_x, phys_y = self._get_device_axes()
                     if self._sim_is_msfs():
                         aileron_pos = telem_data.AileronDeflPctLR or (0, 0)
                         telem_data.phys_x_aileron = aileron_pos[0]
-                        if self.joystick_ap_y_follow_axis:
-                            elevator_pos = telem_data.ElevDeflPct or 0
+                        if curve_active:
+                            # Calibrated curve owns the center: AP-follow Y
+                            # sources the same trim signal the curve maps, so
+                            # the curve values ARE the follow targets. The
+                            # follow-axis toggle is ignored here — the curve
+                            # already defines the resting geometry. Only the
+                            # deadzone reference needs the center normalized.
+                            elevator_pos = center_y
+                        elif self.joystick_ap_y_follow_axis:
+                            # Follow the elevator DEFLECTION — the surface the
+                            # AP actually commands — rather than the trim.
+                            # This is the setting's original intent (a27a7f4),
+                            # dead since dea669a (2025-04-30) unconditionally
+                            # overwrote it with the trim value. Restored here
+                            # for the no-curve case.
+                            elevator_pos = clamp((telem_data.ElevDeflPct or 0)
+                                                 * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                            virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
+                            phys_stick_y_offs = int(elevator_pos * 4096)
                         else:
-                            elevator_pos = telem_data.ElevTrimPct or 0
-
-                        elevator_pos = telem_data.ElevTrimPct or 0
-                        elevator_pos = self.elev_trim_dampener.update(
-                            elevator_pos, derivative_hz=5, derivative_k=0.15
-                        )
-                        elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
-                        virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
-                        phys_stick_y_offs = int(elevator_pos * 4096)
+                            # Follow the trim (default). Reuse this frame's
+                            # dampened trim (t_damp) — the pre-refactor path
+                            # ran the same dampener a SECOND time here,
+                            # double-filtering it and corrupting its state.
+                            elevator_pos = clamp(t_damp * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                            virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
+                            phys_stick_y_offs = int(elevator_pos * 4096)
 
                         if isinstance(aileron_pos, (list, tuple)):
                             aileron_pos = aileron_pos[0] if aileron_pos else 0
@@ -180,7 +225,18 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             aileron_pos, derivative_hz=5, derivative_k=0.15
                         )
                         elevator_pos = telem_data.APPitchServo or 0
-                        phys_stick_y_offs = int(elevator_pos * 4096)
+                        if curve_active:
+                            # Trimmed rest point plus the AP's commanded
+                            # deviation: the pitch servo reads ~0 once the AP
+                            # has the aircraft in trim, so the stick rests
+                            # exactly where trimmed hand-flying rests it (no
+                            # snap at engage/disengage), and the delivered
+                            # input (center minus the curve virtual offset)
+                            # equals the servo command.
+                            phys_stick_y_offs = int(clamp(
+                                center_y + elevator_pos, -1, 1) * 4096)
+                        else:
+                            phys_stick_y_offs = int(elevator_pos * 4096)
 
                     phys_stick_x_offs = int(aileron_pos * 4096)
                     if self.invert_ap_x_axis:

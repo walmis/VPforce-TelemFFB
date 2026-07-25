@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import html
+import logging
 import os.path
 from typing import Optional
 
@@ -28,7 +29,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayo
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
-    QLinearGradient, QFont
+    QLinearGradient, QFont, QIcon
 from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
 
 from PyQt6.QtCore import Qt
@@ -151,6 +152,51 @@ class DetachedTabWindow(QtWidgets.QMainWindow):
             self.reattachRequested.emit(self._title)
         super().closeEvent(e)
 
+def svg_icon(svg_name, color="#d0d0d0", disabled_color="#707070", size=20):
+    """Build a QIcon from a ``currentColor`` SVG, rendered at explicit
+    colors — standalone SVG rendering resolves currentColor to black, which
+    is invisible on the dark theme. One source file yields the normal and
+    disabled variants, crisp at 2x for scaled displays.
+
+    Loads from the compiled Qt resource (":/image/<name>") when present so
+    frozen builds work once the SVG is added to the resource file, falling
+    back to the source tree (utils.get_resource_path) for dev runs.
+    """
+    from PyQt6.QtCore import QFile, QIODevice
+    from PyQt6.QtSvg import QSvgRenderer
+    data = None
+    qf = QFile(f":/image/{svg_name}")
+    if qf.exists() and qf.open(QIODevice.OpenModeFlag.ReadOnly):
+        data = bytes(qf.readAll())
+        qf.close()
+    else:
+        import telemffb.utils as _utils  # local: avoids import cycle
+        try:
+            with open(_utils.get_resource_path(f"image/{svg_name}"), "rb") as f:
+                data = f.read()
+        except OSError as e:
+            logging.warning(f"svg_icon: could not load {svg_name} ({e})")
+            return QIcon()
+    # Render at the APPLICATION's device-pixel ratio (the HiDpiPixmap
+    # pattern) — a hardcoded ratio draws oversized/clipped on displays
+    # running a different scale.
+    app = QGuiApplication.instance()
+    ratio = app.devicePixelRatio() if app is not None else 1.0
+    icon = QIcon()
+    for col, mode in ((color, QIcon.Mode.Normal),
+                      (disabled_color, QIcon.Mode.Disabled)):
+        svg = data.replace(b'fill="currentColor"', f'fill="{col}"'.encode())
+        renderer = QSvgRenderer(svg)
+        pm = QPixmap(round(size * ratio), round(size * ratio))
+        pm.setDevicePixelRatio(ratio)
+        pm.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pm)
+        renderer.render(painter)
+        painter.end()
+        icon.addPixmap(pm, mode)
+    return icon
+
+
 class ElidedLabel(QLabel):
     """QLabel that elides its text at a fixed pixel budget so long values
     can't grow the surrounding layout. When elided, the full text is shown
@@ -177,6 +223,7 @@ class AppStatusWidget(QWidget):
     request_set_active_configurator = pyqtSignal(bool, bool)
     request_flag_error = pyqtSignal(str)
     request_clear_error = pyqtSignal()
+    profile_notes_clicked = pyqtSignal()
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -233,7 +280,7 @@ class AppStatusWidget(QWidget):
         value_font.setWeight(QFont.Weight.DemiBold)
         self.cur_craft_label = ElidedLabel("None Detected", max_text_px=260)
         self.cur_pattern_label = ElidedLabel("(No Match)", max_text_px=260)
-        self.active_profile_label = ElidedLabel("(None)", max_text_px=180)
+        self.active_profile_label = ElidedLabel("(None)", max_text_px=150)
         for lbl in (self.cur_craft_label, self.cur_pattern_label, self.active_profile_label):
             lbl.setFont(value_font)
         # Pill styling for the vpconf/override labels; also used for the
@@ -325,8 +372,26 @@ class AppStatusWidget(QWidget):
         profile_row_layout.setContentsMargins(0, 0, 0, 0)
         profile_row_layout.setSpacing(6)
         profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.btn_profile_notes = QtWidgets.QToolButton()
+        # currentColor SVG rendered at explicit colors: muted glyph when no
+        # notes exist, full-contrast (white on dark / black on light) when
+        # notes are present.
+        if G.useDarkMode:
+            notes_plain_color, notes_active_color = '#d0d0d0', '#ffffff'
+        else:
+            notes_plain_color, notes_active_color = '#707070', '#000000'
+        self._notes_icon_plain = svg_icon('profile-notes.svg', color=notes_plain_color)
+        self._notes_icon_active = svg_icon('profile-notes.svg', color=notes_active_color)
+        self.btn_profile_notes.setIcon(self._notes_icon_plain)
+        self.btn_profile_notes.setIconSize(QSize(20, 20))
+        self.btn_profile_notes.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_profile_notes.setToolTip('View or edit notes for this aircraft profile')
+        self.btn_profile_notes.setEnabled(False)
+        self.btn_profile_notes.clicked.connect(self.profile_notes_clicked.emit)
+
         profile_row_layout.addWidget(self.active_profile_label)
         profile_row_layout.addWidget(self.cb_selectProfileCombo)
+        profile_row_layout.addWidget(self.btn_profile_notes)
         # Absorb the value column's spare width so the combo keeps its natural
         # size instead of stretching to fill the (fixed-width) cell.
         profile_row_layout.addStretch(1)
@@ -440,7 +505,23 @@ class AppStatusWidget(QWidget):
         self.cur_craft_label.setText("None Detected")
         self.cur_pattern_label.setText("(No Match)")
         self.active_profile_label.setText("(None)")
+        self.set_notes_state(False)
         self.set_waiting(src)
+
+    def set_notes_state(self, enabled, has_notes=False):
+        """Enable/disable the profile-notes button. When notes exist (curated
+        or user) the icon glyph goes full-contrast (white on dark / black on
+        light theme) and the button pulses green briefly — same flash as the
+        vpconf/configurator pills — so notes are discoverable at a glance."""
+        self.btn_profile_notes.setEnabled(enabled)
+        if has_notes:
+            self.btn_profile_notes.setIcon(self._notes_icon_active)
+            self.btn_profile_notes.setToolTip('Notes exist for this aircraft profile - click to view or edit')
+            self.pulse_label(self.btn_profile_notes, color=QColor(0, 200, 0))
+        else:
+            self.pulse_label(self.btn_profile_notes, stop=True)
+            self.btn_profile_notes.setIcon(self._notes_icon_plain)
+            self.btn_profile_notes.setToolTip('View or edit notes for this aircraft profile')
 
     @pyqtSlot(str, bool)
     def set_active_vpconf(self, file, row_visible=True):
@@ -765,6 +846,12 @@ class NoWheelSlider(QSlider):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        # The groove and handle are painted manually, so the standard disabled
+        # palette never applies — dim the whole render when disabled so a
+        # greyed-out row actually looks greyed.
+        if not self.isEnabled():
+            painter.setOpacity(0.4)
+
         # --- Draw groove manually ---
         groove_rect = QRectF()
         if self.orientation() == Qt.Orientation.Horizontal:
@@ -924,6 +1011,12 @@ class NoWheelNumberSlider(NoWheelSlider):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # The groove and handle are painted manually, so the standard disabled
+        # palette never applies — dim the whole render when disabled so a
+        # greyed-out row actually looks greyed.
+        if not self.isEnabled():
+            painter.setOpacity(0.4)
 
         # --- Draw groove manually ---
         groove_rect = QRectF()
@@ -2710,17 +2803,22 @@ class TrimCurveWidget(CurveWidget):
         self.curve_polyline = []         # sorted samples joined = the calibrated curve
         self.extrap_tails = []           # dashed edge-slope segments beyond the band
         self.live_point = None           # QPointF(trim%, elevator%) or None
+        self.family_polylines = []       # ghosted stored-family curves ([QPointF] each)
         self.points = []                 # unused; keeps base paint helpers safe
 
     # ---- data API -----------------------------------------------------------
 
-    def set_result(self, samples, slope, intercept, flagged=None):
+    def set_result(self, samples, slope, intercept, flagged=None, show_fit=True):
         """Populate from calibration output.
 
         Args:
             samples: list of (trim_frac, u_elev_frac), both normalized [-1, 1].
             slope, intercept: linear fit of u_elev vs trim (normalized units).
             flagged: sample indices accepted with a VS residual (drawn amber).
+            show_fit: draw the dotted linear-fit reference line. True for
+                fresh results (it is that run's own fit, paired with the R²
+                readout); the stored-family view passes False — a stale
+                static-gain tangent among several curves reads as noise.
         """
         self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
         self.flagged_indices = set(flagged or [])
@@ -2749,14 +2847,26 @@ class TrimCurveWidget(CurveWidget):
 
         xmin, xmax = min(xs), max(xs)
         self.x_min, self.x_max = xmin - ext - 1.0, xmax + ext + 1.0
+        # A ghosted stored family widens the view (never shrinks it) so all
+        # speeds stay visible around the highlighted/new curve.
+        fam_x = [p.x() for c in self.family_polylines for p in c]
+        fam_y = [p.y() for c in self.family_polylines for p in c]
+        if fam_x:
+            self.x_min = min(self.x_min, min(fam_x) - 2.0)
+            self.x_max = max(self.x_max, max(fam_x) + 2.0)
 
-        y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
-        y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
-        self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
+        if show_fit:
+            y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
+            y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
+            self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
+        else:
+            self.fit_line = None
+            y1 = y2 = 0.0
 
         tail_ys = [p.y() for seg in self.extrap_tails for p in seg]
         ylim = max(max((abs(v) for v in ys), default=0.0),
                    max((abs(v) for v in tail_ys), default=0.0),
+                   max((abs(v) for v in fam_y), default=0.0),
                    abs(y1), abs(y2), 5.0) * 1.2
         self.y_min, self.y_max = -ylim, ylim
         self.update()
@@ -2778,6 +2888,29 @@ class TrimCurveWidget(CurveWidget):
         self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
         self.update()
 
+    def set_family(self, curves):
+        """Ghost-overlay the STORED multi-speed calibration family.
+
+        ``curves`` is a list of point-lists [(trim_frac, u_frac), ...] in
+        display space (the dialog mirrors stored offsets back to measured-
+        axis space). Ghosts render behind everything; the selected/new curve
+        is drawn on top through the normal :meth:`set_result` path. When no
+        result is loaded the view fits the family; a later set_result()
+        re-fits around its own data and widens for the ghosts.
+        """
+        self.family_polylines = [
+            sorted((QPointF(t * 100.0, u * 100.0) for t, u in c),
+                   key=lambda p: p.x())
+            for c in curves if len(c) >= 2
+        ]
+        if self.family_polylines and not self.curve_polyline:
+            xs = [p.x() for c in self.family_polylines for p in c]
+            ys = [p.y() for c in self.family_polylines for p in c]
+            self.x_min, self.x_max = min(xs) - 4.0, max(xs) + 4.0
+            ylim = max(max(abs(v) for v in ys), 5.0) * 1.2
+            self.y_min, self.y_max = -ylim, ylim
+        self.update()
+
     def clear(self):
         self.sample_points = []
         self.flagged_indices = set()
@@ -2785,6 +2918,7 @@ class TrimCurveWidget(CurveWidget):
         self.curve_polyline = []
         self.extrap_tails = []
         self.live_point = None
+        self.family_polylines = []
         # Back to the stable full-scale measuring view (a previous result may
         # have zoomed the axes to its data).
         self.x_min, self.x_max = -100.0, 100.0
@@ -2864,6 +2998,15 @@ class TrimCurveWidget(CurveWidget):
         self._draw_zero_axes(painter)
         self.draw_axis_labels(painter)
 
+        # Stored family ghosts: behind everything, translucent — context for
+        # the highlighted/new curve drawn through the normal layers on top.
+        if self.family_polylines:
+            painter.setPen(QPen(QColor(128, 128, 128, 110), 1))
+            for poly in self.family_polylines:
+                wpts = [self.map_to_widget_space(p) for p in poly]
+                for a, b in zip(wpts, wpts[1:]):
+                    painter.drawLine(a, b)
+
         # Static best-fit: dotted, de-emphasized — the calibrated curve is the
         # recommended output; the fit is the legacy single-gain reference.
         if self.fit_line is not None:
@@ -2904,10 +3047,37 @@ class TrimCurveWidget(CurveWidget):
         if not self._enabled:
             self.apply_disabled_overlay(painter)
 
-    # ---- read-only: disable point editing -----------------------------------
+    # ---- read-only: no point editing; right-click hits family curves --------
+
+    # Emitted with the family-polyline index under a right-click; the dialog
+    # owns the context menu and the delete flow (with all its gating).
+    curve_context_requested = pyqtSignal(int)
+
+    def _family_hit_test(self, wp, radius=6.0):
+        """Index of the family polyline within ``radius`` px of widget-space
+        point ``wp`` (nearest point-to-segment distance), or None."""
+        best, best_d = None, radius
+        for i, poly in enumerate(self.family_polylines):
+            pts = [self.map_to_widget_space(p) for p in poly]
+            for a, b in zip(pts, pts[1:]):
+                dx, dy = b.x() - a.x(), b.y() - a.y()
+                seg2 = dx * dx + dy * dy
+                if seg2 <= 1e-9:
+                    px, py = a.x(), a.y()
+                else:
+                    t = ((wp.x() - a.x()) * dx + (wp.y() - a.y()) * dy) / seg2
+                    t = max(0.0, min(1.0, t))
+                    px, py = a.x() + t * dx, a.y() + t * dy
+                d = ((wp.x() - px) ** 2 + (wp.y() - py) ** 2) ** 0.5
+                if d < best_d:
+                    best, best_d = i, d
+        return best
 
     def mousePressEvent(self, event):
-        pass
+        if event.button() == Qt.MouseButton.RightButton and self.family_polylines:
+            idx = self._family_hit_test(QPointF(event.position()))
+            if idx is not None:
+                self.curve_context_requested.emit(idx)
 
     def mouseMoveEvent(self, event):
         pass
@@ -2970,3 +3140,77 @@ class ExceptionStatusWidget(QWidget):
 
 
 
+
+
+class IasTrendWidget(QWidget):
+    """Tiny vertical trend arrow for an airspeed readout.
+
+    The arrow grows with the rate of change — square-root scaled, because
+    the interesting regime is slow creep (MSFS takes a minute-plus to
+    asymptote after a power change) which linear scaling would render as an
+    invisible nub — points up/down with the sign, and shifts green -> amber
+    -> red with magnitude. A flat green dash means the airspeed is truly
+    static; blank means no rate is known (no telemetry).
+    """
+
+    FULL_SCALE_KTS = 1.5   # kt/s at full arrow length
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Line-height sized: the indicator must not change the row's
+        # geometry (a taller widget shifted every other status column).
+        self.setFixedSize(14, 20)
+        self._rate = None
+        self._static = False
+
+    def set_rate(self, kt_per_s, static=False):
+        """Update the display. ``static`` is the caller's verdict that the
+        speed is truly settled (accumulation-aware, not just instantaneous
+        rate); None blanks the indicator."""
+        if kt_per_s == self._rate and static == self._static:
+            return
+        self._rate = kt_per_s
+        self._static = static
+        self.setToolTip("" if kt_per_s is None
+                        else f"Airspeed trend: {kt_per_s:+.2f} kt/s")
+        self.update()
+
+    @staticmethod
+    def _blend(c1, c2, f):
+        f = max(0.0, min(1.0, f))
+        return QColor(int(c1.red() + (c2.red() - c1.red()) * f),
+                      int(c1.green() + (c2.green() - c1.green()) * f),
+                      int(c1.blue() + (c2.blue() - c1.blue()) * f))
+
+    def paintEvent(self, event):
+        if self._rate is None:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        cx, cy = w / 2.0, h / 2.0
+
+        if self._static:
+            p.setPen(QPen(QColor(51, 170, 51), 3))
+            p.drawLine(QPointF(2.0, cy), QPointF(w - 2.0, cy))
+            return
+
+        frac = min(abs(self._rate) / self.FULL_SCALE_KTS, 1.0) ** 0.5
+        green = QColor(51, 170, 51)
+        amber = QColor(230, 168, 23)
+        red = QColor(204, 51, 51)
+        color = self._blend(green, amber, frac / 0.5) if frac < 0.5 \
+            else self._blend(amber, red, (frac - 0.5) / 0.5)
+
+        length = max(6.0, frac * (cy - 2.0))
+        d = 1.0 if self._rate > 0 else -1.0     # positive rate draws UP
+        tip_y = cy - d * length
+        base_y = cy + d * length * 0.5
+        p.setPen(QPen(color, 2.2))
+        p.drawLine(QPointF(cx, base_y), QPointF(cx, tip_y + d * 4.0))
+        head = QtGui.QPolygonF([QPointF(cx, tip_y),
+                                QPointF(cx - 3.5, tip_y + d * 5.0),
+                                QPointF(cx + 3.5, tip_y + d * 5.0)])
+        p.setBrush(QBrush(color))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawPolygon(head)

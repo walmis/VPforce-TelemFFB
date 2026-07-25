@@ -47,6 +47,13 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     telemffb_controls_axes: bool = False
     use_firmware_axis_override: bool = False
     joystick_trim_follow_use_curve_y: bool = False
+    # Where the trimmed stick RESTS in curve mode: "Follows Trim" (tab/cable
+    # aircraft — rest position rides the measured elevator-equivalent of the
+    # trim state, aft when trimmed slow) or "Stays Centered" (stabilizer/
+    # FBW/spring-cartridge — trim re-rigs the feel datum). Force behavior is
+    # identical in both; only the resting geometry differs. Class-defaulted
+    # (JetAircraft => Stays Centered) in defaults.xml.
+    joystick_trim_follow_stick_position: str = "Follows Trim"
     _xplane_event_states: dict = {}
     # end of user parameters
 
@@ -56,7 +63,9 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self.__xplane_axis_override_active = False
         self.__xplane_addr = ("127.0.0.1", 34391)
         self._trim_curve_y_json: Optional[str] = None
-        self._trim_curve_y_pts = None   # (xs, ys) parsed lookup arrays
+        self._trim_curve_y_fam = None   # parsed multi-speed family (utils.parse_trim_follow_family)
+        self._trim_curve_y_pts = None   # transitional single-curve view (median entry) for display
+        self._trim_blend_last_v = None  # last valid IAS (kt) fed to the blend — in-frame dropout guard
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
 
     @property
@@ -65,63 +74,118 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
 
     @joystick_trim_follow_curve_y.setter
     def joystick_trim_follow_curve_y(self, value):
-        """Assigned a JSON-encoded calibration curve or 'none' via the settings
-        subsystem. Parsed ONCE here into sorted lookup arrays — never in the
-        telemetry hot path. Invalid/short curves are ignored (runtime falls
+        """Assigned a JSON-encoded calibration curve family (or a legacy
+        single curve, or 'none') via the settings subsystem. Parsed ONCE here
+        into anchor-referenced lookup structures — never in the telemetry hot
+        path. The parse/rebase/positional-track convention lives in
+        :func:`telemffb.utils.parse_trim_follow_family` (shared with the
+        calibration dialog). Invalid/short curves are ignored (runtime falls
         back to the static virtual gain).
         """
+        prev_json = self._trim_curve_y_json
         self._trim_curve_y_json = None
+        self._trim_curve_y_fam = None
         self._trim_curve_y_pts = None
-        if not value or value == 'none':
+        self._trim_blend_last_v = None
+        fam = utils.parse_trim_follow_family(value)
+        if fam is None:
+            # Log only a real clear (had curves, now none) — every uncurved
+            # aircraft passes through here on load and would spam otherwise.
+            if prev_json is not None:
+                logging.info("Trim calibration curves cleared")
             return
-        try:
-            data = json.loads(value) if isinstance(value, str) else value
-            pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
-            xs, ys = [], []
-            for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
-                if xs and abs(t - xs[-1]) < 1e-9:
-                    ys[-1] = o
-                else:
-                    xs.append(t)
-                    ys.append(o)
-            if len(xs) < 2:
-                logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
-                return
-            self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
-            self._trim_curve_y_pts = (xs, ys)
-        except (ValueError, KeyError, TypeError) as e:
-            logging.warning(f"Invalid trim-follow curve setting; ignoring ({e})")
+        self._trim_curve_y_json = value if isinstance(value, str) else json.dumps(value)
+        self._trim_curve_y_fam = fam
+        mid = fam[len(fam) // 2]
+        self._trim_curve_y_pts = (mid["xs"], mid["ys"])
+        if self._trim_curve_y_json != prev_json:
+            speeds = ", ".join(f"{e['ias_kt']:.0f}" for e in fam)
+            logging.info(f"Trim calibration curves loaded: {len(fam)} "
+                         f"speed{'s' if len(fam) != 1 else ''} ({speeds} kt)")
 
     def _trim_curve_offset(self, t: float) -> Optional[float]:
-        """Calibrated virtual-offset lookup at trim ``t`` (ElevTrimPct space),
-        or None when no curve is loaded."""
+        """Single-curve virtual-offset lookup at trim ``t`` (the family's
+        median entry), or None when no curve is loaded. Display/legacy view —
+        the runtime path is the speed-blended lookup in
+        :meth:`_trim_follow_virtual_offset_y`."""
         if self._trim_curve_y_pts is None:
             return None
         xs, ys = self._trim_curve_y_pts
         return utils.clamp(utils.piecewise_linear(xs, ys, t), -1.0, 1.0)
 
-    def _trim_follow_virtual_offset_y(self, t_damp: float, elev_trim: float) -> float:
+    def _trim_follow_virtual_offset_y(self, t_damp: float, elev_trim: float,
+                                      telem_data=None) -> float:
         """Virtual stick offset for elevator trim-following.
 
-        Calibrated curve (absolute axis units, independent of the physical
-        gain) when enabled and loaded; else the legacy static-gain formula.
+        Calibrated curve family (absolute axis units, independent of the
+        physical gain) when enabled and loaded — blended across the stored
+        calibration speeds by the current IAS (anchor-aligned; exact nearest
+        entry beyond the calibrated speed range), with the positional track
+        folded in unless the aircraft's trimmed-stick-position mode is
+        "Stays Centered". Else the legacy static-gain formula.
         Enabled-but-missing curve flags a UI error each frame (the standing
         convention: the notification lives while the misconfiguration does)
         and falls back to the static gain.
 
+        In-frame IAS guard: a frame that arrives with a missing/zero IAS
+        reuses the last valid speed instead of snapping the blend to the
+        slowest entry (a real delivered-axis step mid-flight). Full
+        telemetry loss stops the whole loop, so no further guard is needed.
+
         :param t_damp: dampened raw ElevTrimPct (curve lookup space)
         :param elev_trim: t_damp scaled by the physical gain and clamped
             (legacy formula / spring-center space)
+        :param telem_data: current frame (for IAS); None (tests, callers
+            without a frame) behaves like a missing-IAS frame
         """
         if self.joystick_trim_follow_use_curve_y:
-            offs = self._trim_curve_offset(t_damp)
-            if offs is not None:
-                return offs
+            fam = self._trim_curve_y_fam
+            if fam is not None:
+                ias = getattr(telem_data, "IAS", None) if telem_data is not None else None
+                if ias:
+                    v = ias * 1.94384  # m/s -> kt, the family's speed unit
+                    self._trim_blend_last_v = v
+                else:
+                    v = self._trim_blend_last_v
+                    if v is None:
+                        v = fam[0]["ias_kt"]
+                include_r = \
+                    self.joystick_trim_follow_stick_position != "Stays Centered"
+                return utils.trim_follow_blend(fam, t_damp, v, include_r)
             self.flag_error(
                 "'Use Calibrated Trim Curve' is enabled but no calibration is stored "
                 "for this aircraft.\nRun the Elevator Trim Calibration or disable the "
                 "option.\nUsing the static Y Trim Gain Virtual value instead.")
         return elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+
+    def _trim_follow_center_y(self, elev_trim: float, virt_offs: float) -> float:
+        """Spring-center position for elevator trim-following.
+
+        Curve mode: the center walks the measured level-hold curve in AXIS
+        units — center(T) = clamp(P * offs(T)) — so trimming relieves a held
+        stick's force at the aircraft's true trim-vs-elevator authority rate
+        (real trim replaces elevator 1:1 in elevator units). The raw-trim
+        center (P * T) under-relieved by the aircraft's slope k:
+        imperceptible at k~1 (standard aircraft, where this reduces to ~P*T)
+        but a dead trim wheel at k~19 (Hawk T1).
+
+        The curve is anchor-referenced at parse time (offs(t0) == 0), which
+        makes one invariant exact everywhere: trimmed for level => stick at
+        physical center, zero force, zero delivered input; deviation from
+        center = the un-trimmed load. Position and force both mean "how out
+        of trim you are", at any speed.
+
+        Legacy/static mode (or curve enabled but missing): the raw-trim
+        center, unchanged.
+
+        :param elev_trim: legacy center — t_damp scaled by the physical gain
+        :param virt_offs: this frame's virtual offset (the curve lookup when
+            the curve is active — reused so the hot path adds no lookup)
+        """
+        if self.joystick_trim_follow_use_curve_y and self._trim_curve_y_fam is not None:
+            return utils.clamp(
+                virt_offs * self.joystick_trim_follow_gain_physical_y, -1.0, 1.0)
+        return elev_trim
 
     @property
     def _simconnect(self) -> SimConnectManager:
