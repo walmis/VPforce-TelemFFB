@@ -444,6 +444,9 @@ class SettingsLayout(QGridLayout):
         # stack = inspect.stack()
         # for frame_info in stack:
         #     dbprint("green", f"Function {frame_info.function} in {frame_info.filename} at line {frame_info.lineno}")
+        # Remember where the user was looking so the rebuilt form lands back at the
+        # same row, instead of drifting by the pixel height of whatever changed above.
+        scroll_anchor = self._capture_scroll_anchor()
         self.clear_layout(show_empty_notice=False)
         # Clear unit tracking when reloading layout
         self.unit_previous_values = {}
@@ -453,8 +456,105 @@ class SettingsLayout(QGridLayout):
             G.settings_mgr.current_pattern = pat
         if result:
             self.build_rows(result)
+            # Restore once the event loop has applied the freshly built geometry.
+            QtCore.QTimer.singleShot(0, lambda: self._restore_scroll_anchor(scroll_anchor))
         else:
             self._build_empty_notice()
+
+    def _settings_scroll_area(self):
+        """The QScrollArea hosting this settings layout, or None when it is not
+        reachable (headless child instance, teardown, detached-tab edge cases)."""
+        mw = getattr(self, 'mainwindow', None)
+        if mw is None:
+            return None
+        return getattr(mw, 'settings_area', None)
+
+    def _capture_scroll_anchor(self):
+        """Before a rebuild, pick a setting row to keep visually pinned and record
+        where it currently sits in the viewport.
+
+        Hybrid choice of anchor:
+          1. the row under the mouse cursor -- the one being edited, i.e. "keep it
+             where my mouse is";
+          2. failing that (cursor not over the form), the top-most row visible in
+             the viewport.
+
+        Returns (setting_name, viewport_y) or None if there is nothing to anchor to.
+        The raw scrollbar value is deliberately NOT used: it is a pixel offset, so
+        any change in the height of content above the viewport shifts every row.
+        """
+        try:
+            area = self._settings_scroll_area()
+            if area is None:
+                return None
+            viewport = area.viewport()
+            rows = []
+            for i in range(self.count()):
+                w = self.itemAt(i).widget()
+                if w is None or not w.isVisible():
+                    continue
+                obj = w.objectName()
+                if not obj.startswith('namelabel_'):
+                    continue
+                y = w.mapTo(viewport, QtCore.QPoint(0, 0)).y()
+                rows.append((obj[len('namelabel_'):], y))
+            if not rows:
+                return None
+            vp_h = viewport.height()
+            cur = viewport.mapFromGlobal(QCursor.pos())
+            if 0 <= cur.x() <= viewport.width() and 0 <= cur.y() <= vp_h:
+                # The row the cursor is in = greatest label-top not below the cursor.
+                at_or_above = [r for r in rows if r[1] <= cur.y()]
+                if at_or_above:
+                    return max(at_or_above, key=lambda r: r[1])
+            # Fallback: the row closest to the top edge of the viewport.
+            in_view = [r for r in rows if 0 <= r[1] <= vp_h]
+            return min(in_view or rows, key=lambda r: abs(r[1]))
+        except Exception:
+            logging.exception("scroll-anchor capture failed")
+            return None
+
+    def _restore_scroll_anchor(self, anchor, _prev_y=None, _tries=0):
+        """After the rebuild, scroll so the anchored setting is back at the same
+        viewport offset it had before. No-op if the setting is gone (e.g. it was
+        hidden by the very change that triggered the reload).
+
+        Freshly built rows are not positioned synchronously: Qt performs the grid
+        layout on a later event-loop pass, and until it does a new row's
+        mapTo(content) reports y=0 (activate()/adjustSize() do NOT force it). If we
+        committed the scroll then, the target would clamp to the wrong row -- the
+        "jumps a row" bug, which only surfaced once the form was tall enough that
+        the correct offset was non-zero. So re-post via singleShot until the
+        measured position is stable across two passes, then set the scrollbar
+        exactly once: correct, and without a visible flicker to a wrong spot.
+        """
+        if not anchor:
+            return
+        try:
+            name, target_y = anchor
+            area = self._settings_scroll_area()
+            if area is None:
+                return
+            content = area.widget()
+            if content is None:
+                return
+            target = None
+            for i in range(self.count()):
+                w = self.itemAt(i).widget()
+                if w is not None and w.objectName() == f'namelabel_{name}':
+                    target = w
+                    break
+            if target is None or not target.isVisible():
+                return
+            new_y = target.mapTo(content, QtCore.QPoint(0, 0)).y()
+            if new_y != _prev_y and _tries < 8:
+                # Layout not settled yet -- wait one more pass before committing.
+                QtCore.QTimer.singleShot(
+                    0, lambda: self._restore_scroll_anchor(anchor, new_y, _tries + 1))
+                return
+            area.verticalScrollBar().setValue(new_y - target_y)
+        except Exception:
+            logging.exception("scroll-anchor restore failed")
 
     def _build_empty_notice(self):
         """Populate the (empty) layout with guidance instead of leaving the
