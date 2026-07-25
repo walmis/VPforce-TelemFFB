@@ -846,6 +846,12 @@ class NoWheelSlider(QSlider):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        # The groove and handle are painted manually, so the standard disabled
+        # palette never applies — dim the whole render when disabled so a
+        # greyed-out row actually looks greyed.
+        if not self.isEnabled():
+            painter.setOpacity(0.4)
+
         # --- Draw groove manually ---
         groove_rect = QRectF()
         if self.orientation() == Qt.Orientation.Horizontal:
@@ -1005,6 +1011,12 @@ class NoWheelNumberSlider(NoWheelSlider):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # The groove and handle are painted manually, so the standard disabled
+        # palette never applies — dim the whole render when disabled so a
+        # greyed-out row actually looks greyed.
+        if not self.isEnabled():
+            painter.setOpacity(0.4)
 
         # --- Draw groove manually ---
         groove_rect = QRectF()
