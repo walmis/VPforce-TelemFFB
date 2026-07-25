@@ -9,6 +9,16 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Support bundle improvements: now includes DCS logs and Export.lua; switched to LZMA compression for smaller archives
   - Automatic error deduplication prevents repeated alerts for the same issue
   - Child instance exceptions are forwarded to the master instance so all errors are visible in one place
+- **NEW: Aircraft profile notes**
+  - Many curated aircraft profiles now ship with notes explaining their quirks - why certain effects are disabled, control-system oddities, and custom-class aircraft where liveries must be cloned from the default profile rather than created new
+  - You can also add your own notes to any profile
+  - A notes button lives next to the Active Profile display and flashes green when the loaded aircraft has notes - click it to view/edit
+- Settings page usability improvements
+  - The settings page no longer creeps/jumps its scroll position when you change a setting - the row you are working on now stays put under your mouse across the form refresh
+- Application Status panel stability
+   - The panel no longer resizes and shifts around when switching between device scopes
+   - Any active 'vpconf profile' or 'configurator gain override' for a child instance device are now displayed when you change the config scope to that device
+- The Settings tab now shows helpful guidance when it is empty (start a sim and load an aircraft, or open the offline editor) instead of a blank page - including a scope explainer when using the offline editor
 - Settings QoL: changing a setting back to its inherited/default value now automatically removes the user override (and the circle-x revert button) instead of leaving a redundant entry in your config
 - Master instance now mirrors child device status (active vpconf profile / configurator overrides) when switching the device config scope
 - Curve editor usability improvements (Advanced Spring / Advanced G-Force widgets): smarter curve bounds checking, fixed point-insert resetting the first point, better endpoint drag behavior
@@ -42,9 +52,18 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Trim following has always assumed a 1:1 relationship between trim position and the elevator input needed to stay level - many aircraft (especially 3rd party) are far from 1:1, causing the nose to wander when trimming with the stick held
   - The new calibration tool flies a short automated routine (trim neutralization, then a sweep across the trim range) and measures the actual elevator input required to hold level flight at each trim position
   - Produces a calibrated non-linear trim-following curve plus a (legacy) equivalent static gain value - with the curve enabled, the virtual stick tracks your aircraft's real trim response across the whole band
+  - Multi-speed calibration: run the routine at more than one airspeed and the results are blended into a single curve for better trim response across the speed range
+  - Trimmed stick position modes: choose how the stick rests when the aircraft is trimmed - 'Follows Trim' (cable/trim-tab aircraft: the stick rides the trim position like the real linkage) or 'Stays Centered' (airliners, FBW, and boosted-control aircraft: trimmed flight always re-centers the stick). Jets default to centered automatically; either way, out-of-trim force behavior is identical
+  - Glider support: gliders can't hold level flight, so the calibration holds a steady descent instead - pick a target sink rate, and adjust it live while the assistant holds to change your test airspeed (a glider's speed follows its sink rate)
   - Results are plotted in the dialog; you can Apply and test live in the sim before saving to the aircraft profile
+  - Wizard-style guided flow walks you through the whole calibration process step by step, with step indicators showing when TelemFFB is flying and when it's waiting on you
+  - Review and manage your stored calibration speeds from the dialog - page through them on the graph, delete individual speeds, or clear the set
+  - Suggested calibration speeds are derived automatically from the aircraft's own speed envelope (guidance only, not required calibration speed)
+  - Calibration sets can be exported/imported for sharing between users
+  - When an aircraft with no stored calibration loads, a prompt appears in the main window offering one-click access to the calibration tool
+  - Factory calibrations included out of the box for several default aircraft (MSFS 2024: C172, C152, C208B, SR22T, Citation, Vision Jet, DG-1001E Neo | X-Plane 12: C172, SR22, RV-10)
   - Control Response selector (Normal/Reduced/Minimal) tames the routine on pitch-sensitive aircraft
-  - NOTE: Some aircraft have proven to be non-calibratable - e.g. trim authority that overpowers full elevator deflection, or extreme trim sensitivity.  The tool will tell you when a run fails and why.
+  - NOTE: Some advanced or quirky aircraft have proven to be non-calibratable - e.g. trim authority that overpowers full elevator deflection, or extreme trim sensitivity or enbedded computer systems which manipulate the trim automatically and can not be disabled.
 
 ## MSFS
 - **NEW: Control lock feature added for Fixed wing and Helicopter aircraft:**
@@ -56,6 +75,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - **NEW: 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)**
 - HPG Pedals: Added force trim button option
 - HPG Collective: Sends axis position while vertical mode is active to avoid an axis snap when disengaging the autopilot
+- Fix: the 'AP Pitch - Follow axis instead of trim' setting had no effect (broken since mid-2025) - when enabled, autopilot following now correctly moves the stick with the elevator position instead of the trim
 - Fix: restored CowanSim and Taog H500 helicopter features that had been inadvertently dropped
 - Fix heli trim following issue (MSFS/X-Plane)
 - Fix: intermittent stale/missing aircraft display when starting TelemFFB while the sim was already running (telemetry frame arriving during startup could be silently dropped)
