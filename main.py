@@ -299,9 +299,39 @@ def _setup_config_paths():
     elif G.beta_build:
         G.vpf_logo = ":/image/BETAlogo.png"
         _setup_standard_config_paths()
+        _backup_userconfig_for_beta()
 
     else:
         _setup_standard_config_paths()
+
+
+def _backup_userconfig_for_beta():
+    """Snapshot the user's config before a beta build touches it.
+
+    Betas can write settings the release version does not understand, so a
+    frozen beta keeps a one-time copy of the config as it was BEFORE the
+    beta first ran - an easy path back to the release version.
+
+    Only the master instance writes it (children share the same file), and
+    only if the backup does not already exist: on later runs the live config
+    may already carry beta edits, and overwriting would destroy the very
+    snapshot this exists to preserve.
+    """
+    if not getattr(sys, 'frozen', False) or not G.master_instance:
+        return
+    try:
+        if not os.path.isfile(G.userconfig_path):
+            return  # fresh install, nothing to preserve
+        tag = re.sub(r'[<>:"/\\|?*]', '_', G.beta_build_str).strip()
+        backup_path = os.path.join(
+            G.userconfig_rootpath, f'userconfig_v2_pre-{tag}_backup.xml')
+        if os.path.exists(backup_path):
+            return  # already snapshotted before this beta's first run
+        shutil.copy2(G.userconfig_path, backup_path)
+        logging.info(f"Beta build: backed up pre-beta user config to {backup_path}")
+    except OSError as e:
+        # Never block startup over a backup failure.
+        logging.error(f"Beta build: could not back up user config: {e}")
 
 def _setup_dev_userconfig_paths():
     """Setup development userconfig paths."""
