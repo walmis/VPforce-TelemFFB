@@ -54,6 +54,15 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     # identical in both; only the resting geometry differs. Class-defaulted
     # (JetAircraft => Stays Centered) in defaults.xml.
     joystick_trim_follow_stick_position: str = "Follows Trim"
+    # Curve-mode stick travel ("Calibrated Trim Stick Travel"): scales the
+    # spring CENTER only, so it sets how far the stick sits from center for a
+    # given out-of-trim state — i.e. the force you hold against. 1.0 = the
+    # aircraft's measured response. Deliberately NOT the legacy
+    # joystick_trim_follow_gain_physical_y: that one is signed (-100..100,
+    # inverted trim following) and drives the legacy center, while this is
+    # 0..200 and only meaningful with a calibration loaded. See
+    # :meth:`_trim_follow_center_y` for what values != 1.0 cost.
+    joystick_trim_follow_curve_gain_y: float = 1.0
     _xplane_event_states: dict = {}
     # end of user parameters
 
@@ -123,6 +132,17 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         entry beyond the calibrated speed range), with the positional track
         folded in unless the aircraft's trimmed-stick-position mode is
         "Stays Centered". Else the legacy static-gain formula.
+
+        This value is deliberately UNSCALED by the physical gain, and must
+        stay that way: it is the measured elevator-equivalent of the trim,
+        so subtracting it is exactly what cancels the trim's effect on the
+        aircraft. That is the feature's primary invariant — trim with the
+        stick HELD and the nose does not move. Scaling it by a gain P
+        cancels P times the trim's effect, so at P=2 trimming drives the
+        nose the wrong way (field report 2026-07-26). The physical gain
+        therefore only scales the spring CENTER (see
+        :meth:`_trim_follow_center_y`), and in curve mode any value other
+        than 1.0 trades one invariant for the other — see that method.
         Enabled-but-missing curve flags a UI error each frame (the standing
         convention: the notification lives while the misconfiguration does)
         and falls back to the static gain.
@@ -169,6 +189,35 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         imperceptible at k~1 (standard aircraft, where this reduces to ~P*T)
         but a dead trim wheel at k~19 (Hawk T1).
 
+        STICK TRAVEL (``joystick_trim_follow_curve_gain_y``, P) — what it
+        does and what it costs. P scales the CENTER only; the delivered-input
+        datum (the virtual offset) is never scaled. What P reaches depends on
+        the position mode, because the trimmed rest position differs:
+          * Stays Centered: trimmed rest is 0 at every speed, so P scales
+            ONLY the out-of-trim displacement (and thus the force).
+          * Follows Trim: trimmed rest is R(v), so P scales the out-of-trim
+            force AND how far the resting stick rides with airspeed —
+            the reason lowering it reclaims aft travel in slow flight.
+        Two invariants are in play, and P == 1.0 (the default) is the only
+        value satisfying both everywhere:
+          * stick HELD, trim changed -> nose must not move (the feature's
+            primary invariant). Holds EXACTLY at ANY P: delivered input
+            never involves P.
+          * hands OFF -> the resting stick must deliver zero. The stick
+            rests at P*offs but the datum is offs, so rest delivers
+            offs*(P-1): zero only at P == 1, or wherever offs == 0.
+        So P is a usable feel knob — it directly scales the out-of-trim
+        force, |x - P*offs|*coeff — at a bounded, known cost: hands-off
+        accuracy. How bounded depends on the position mode:
+          * Stays Centered: trimmed offs == 0 at every speed, so the leak
+            exists only while OUT of trim (transient states).
+          * Follows Trim: trimmed offs == R(v), nonzero away from the
+            middle calibration speed — at P != 1 a TRIMMED hands-off
+            aircraft drifts at speed extremes. The costlier mode for P != 1.
+        The cost-free way to heavier out-of-trim force is the elevator
+        SPRING GAIN: force = (x - center)*coefficient changes feel without
+        moving the neutral point either invariant depends on.
+
         The curve is anchor-referenced at parse time (offs(t0) == 0), which
         makes one invariant exact everywhere: trimmed for level => stick at
         physical center, zero force, zero delivered input; deviation from
@@ -184,7 +233,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         """
         if self.joystick_trim_follow_use_curve_y and self._trim_curve_y_fam is not None:
             return utils.clamp(
-                virt_offs * self.joystick_trim_follow_gain_physical_y, -1.0, 1.0)
+                virt_offs * self.joystick_trim_follow_curve_gain_y, -1.0, 1.0)
         return elev_trim
 
     @property

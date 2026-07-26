@@ -2071,7 +2071,23 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2405.3</order>
+		<order>2405.4</order>
+		<name>joystick_trim_follow_curve_gain_y</name>
+		<displayname>Calibrated Trim Stick Travel</displayname>
+		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<info>How far the stick sits from center for a given amount of out-of-trim - which sets how much force you feel holding against it. 100% is the aircraft's measured response, exactly as the calibration recorded it.&lt;br&gt;&lt;br&gt;In 'Stays Centered' this affects out-of-trim force only; trimmed flight always rests the stick at center.&lt;br&gt;&lt;br&gt;In 'Follows Trim' it also scales how far the resting position rides with airspeed. Raise it to exaggerate that trim-position cue, or lower it if the stick sits so far aft in slow flight that you run out of usable travel.&lt;br&gt;&lt;br&gt;It does not change the calibration or the trim curve - trimming with the stick held never moves the nose, at any setting. Away from 100% a released stick delivers a small residual input, so a hands-off aircraft will not follow its trim quite exactly; in 'Follows Trim' this also shows up as slow drift when trimmed at the extremes of your calibrated speed range.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2405.6</order>
 		<name>joystick_trim_follow_stick_position</name>
 		<displayname>Trimmed Stick Position</displayname>
 		<prereq>joystick_trim_follow_use_curve_y</prereq>
@@ -2117,6 +2133,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
 		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>

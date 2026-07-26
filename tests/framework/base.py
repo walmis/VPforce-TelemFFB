@@ -492,12 +492,17 @@ class BaseTelemetryEffectTestCase:
                 self.aoa_effect_gain = 0.5
                 # self.steering_friction = 0
                 # self.steering_friction_spring = 0
-                self.joystick_trim_follow_gain_physical_x = 0
-                self.joystick_trim_follow_gain_physical_y = 0
-                self.joystick_trim_follow_gain_virtual_x = 0
-                self.joystick_trim_follow_gain_virtual_y = 0
-                self.rudder_trim_follow_gain_physical_x = 0
-                self.rudder_trim_follow_gain_virtual_x = 0
+                # Trim-following gains mirror the SHIPPED defaults
+                # (defaults.xml), not zero: a test that does not set them
+                # should exercise the configuration users actually fly.
+                # Zeroes silently scaled trim-following contributions to
+                # nothing, which read as passing tests for the wrong reason.
+                self.joystick_trim_follow_gain_physical_x = 1.0
+                self.joystick_trim_follow_gain_physical_y = 1.0
+                self.joystick_trim_follow_gain_virtual_x = 0.2
+                self.joystick_trim_follow_gain_virtual_y = 0.2
+                self.rudder_trim_follow_gain_physical_x = 1.0
+                self.rudder_trim_follow_gain_virtual_x = 0.2
                 self.joystick_x_axis_scale = 1.0
                 self.joystick_y_axis_scale = 1.0
                 self.rudder_x_axis_scale = 1.0

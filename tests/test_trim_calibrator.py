@@ -13,6 +13,7 @@ import pytest
 import telemffb.globals as G
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.TrimCalibrator import TrimCalibrator, CalState
+from telemffb.utils import clamp
 
 pytestmark = [pytest.mark.unit, pytest.mark.msfs, pytest.mark.joystick]
 
@@ -1287,6 +1288,8 @@ class TestTrimCurve:
         harness.setup_method()
         try:
             inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            # Explicit: the expected values below assume unity gain.
+            inst.joystick_trim_follow_gain_physical_y = 1.0
             inst.joystick_trim_follow_gain_virtual_y = 0.5
 
             # legacy formula when no curve / disabled
@@ -1367,13 +1370,97 @@ class TestTrimCurve:
             assert offs == pytest.approx(0.19)
             # 1% trim -> 19% center walk (t0=0 anchor contributes nothing).
             assert inst._trim_follow_center_y(0.01, offs) == pytest.approx(0.19)
-            # Physical gain scales the walk.
-            inst.joystick_trim_follow_gain_physical_y = 0.5
+            # Stick travel scales the walk (the CENTER only). Curve mode uses
+            # its own setting, NOT the legacy signed physical gain.
+            inst.joystick_trim_follow_gain_physical_y = 0.25   # legacy: ignored
+            inst.joystick_trim_follow_curve_gain_y = 0.5
             assert inst._trim_follow_center_y(0.01, offs) == pytest.approx(0.095)
-            # Beyond the band the walk clamps at full deflection.
             inst.joystick_trim_follow_gain_physical_y = 1.0
+            # Beyond the band the walk clamps at full deflection.
+            inst.joystick_trim_follow_curve_gain_y = 1.0
             offs_far = inst._trim_curve_offset(0.10)
             assert inst._trim_follow_center_y(0.10, offs_far) == pytest.approx(1.0)
+        finally:
+            harness.teardown_method()
+
+    def test_delivered_datum_is_never_scaled_by_physical_gain(self):
+        # THE primary invariant: trim with the stick HELD and the nose must
+        # not move. The delivered input is (stick - virtual_offset), and the
+        # virtual offset is the measured elevator-equivalent of the trim, so
+        # subtracting it cancels the trim's effect EXACTLY. Scaling it by the
+        # physical gain cancels gain-times the effect: at 200% physical,
+        # trimming drove the nose the wrong way (field report 2026-07-26).
+        # The gain may move the spring CENTER; it must never touch this.
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_use_curve_y = True
+            inst.joystick_trim_follow_curve_y = _json.dumps(
+                {"points": [{"t": -0.5, "offs": -0.2}, {"t": 0.5, "offs": 0.2}],
+                 "t0": 0.0})
+
+            baseline = {t: inst._trim_curve_offset(t)
+                        for t in (-0.4, -0.1, 0.0, 0.25, 0.45)}
+            for gain in (0.25, 0.5, 1.0, 1.5, 2.0):
+                inst.joystick_trim_follow_gain_physical_y = gain
+                for t, want in baseline.items():
+                    got = inst._trim_follow_virtual_offset_y(t, clamp(t * gain, -1, 1), None)
+                    assert got == pytest.approx(want, abs=1e-12), \
+                        f"gain {gain}: datum moved with gain ({got} != {want})"
+
+                # Held stick: the delivered input must track the elevator the
+                # aircraft needs at each trim, so trimming leaves pitch alone.
+                held = 0.0
+                for t in (0.1, 0.2, 0.3):
+                    delivered = held - inst._trim_follow_virtual_offset_y(
+                        t, clamp(t * gain, -1, 1), None)
+                    assert delivered == pytest.approx(-inst._trim_curve_offset(t),
+                                                      abs=1e-12)
+        finally:
+            harness.teardown_method()
+
+    def test_curve_stick_travel_is_its_own_setting(self):
+        # Curve mode reads joystick_trim_follow_curve_gain_y (0..200%), never
+        # the legacy signed joystick_trim_follow_gain_physical_y (-100..100).
+        # A user with an inverted or reduced legacy gain must not have it
+        # silently applied to a calibrated curve.
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+        import json as _json
+
+        harness = BaseTelemetryEffectTestCase()
+        harness.setup_method()
+        try:
+            inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            inst.joystick_trim_follow_use_curve_y = True
+            inst.joystick_trim_follow_curve_y = _json.dumps(
+                {"points": [{"t": -0.5, "offs": -0.2}, {"t": 0.5, "offs": 0.2}],
+                 "t0": 0.0})
+            offs = inst._trim_curve_offset(0.5)
+            assert offs == pytest.approx(0.2)
+
+            # Legacy gain swept (including inverted): curve center unmoved.
+            inst.joystick_trim_follow_curve_gain_y = 1.0
+            for legacy in (-1.0, 0.0, 0.3, 2.0):
+                inst.joystick_trim_follow_gain_physical_y = legacy
+                assert inst._trim_follow_center_y(0.5, offs) == pytest.approx(0.2), \
+                    f"legacy gain {legacy} leaked into curve mode"
+
+            # The new setting is what scales it — including above 100%.
+            for travel, want in ((0.0, 0.0), (0.5, 0.1), (1.0, 0.2), (2.0, 0.4)):
+                inst.joystick_trim_follow_curve_gain_y = travel
+                assert inst._trim_follow_center_y(0.5, offs) == pytest.approx(want)
+
+            # Legacy mode still uses the legacy gain (via the caller's
+            # elev_trim), untouched by the new setting.
+            inst.joystick_trim_follow_use_curve_y = False
+            inst.joystick_trim_follow_curve_gain_y = 2.0
+            assert inst._trim_follow_center_y(0.35, offs) == pytest.approx(0.35)
         finally:
             harness.teardown_method()
 
@@ -1409,12 +1496,12 @@ class TestTrimCurve:
             assert offs_near == pytest.approx(-0.22, abs=1e-3)
             assert inst._trim_follow_center_y(-0.2, offs_near) == \
                 pytest.approx(-0.22, abs=1e-3)
-            # Physical gain scales the walk but leaves the anchor at center.
-            inst.joystick_trim_follow_gain_physical_y = 0.5
+            # Stick travel scales the walk but leaves the anchor at center.
+            inst.joystick_trim_follow_curve_gain_y = 0.5
             assert inst._trim_follow_center_y(-0.1, 0.0) == pytest.approx(0.0, abs=1e-9)
             assert inst._trim_follow_center_y(-0.2, offs_near) == \
                 pytest.approx(-0.11, abs=1e-3)
-            inst.joystick_trim_follow_gain_physical_y = 1.0
+            inst.joystick_trim_follow_curve_gain_y = 1.0
 
             # Curves saved before t0 existed rebase at the band midpoint.
             curve_old = {"points": [{"t": -0.37, "offs": -0.814},
@@ -1458,6 +1545,8 @@ class TestTrimCurve:
         harness.setup_method()
         try:
             inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            # Explicit: the expected values below assume unity gain.
+            inst.joystick_trim_follow_gain_physical_y = 1.0
             inst.joystick_trim_follow_use_curve_y = True
             # 100 kt: slope 2 anchored at +0.1; 200 kt: slope 2 anchored at
             # -0.1 (SR22T-style translation). r = [+0.4, 0].
@@ -1499,6 +1588,8 @@ class TestTrimCurve:
         harness.setup_method()
         try:
             inst = harness.create_test_instance(MsfsXpFlightControlsMixIn)
+            # Explicit: the expected values below assume unity gain.
+            inst.joystick_trim_follow_gain_physical_y = 1.0
             inst.joystick_trim_follow_use_curve_y = True
             inst.joystick_trim_follow_curve_y = _json.dumps(
                 {"points": [{"t": -0.37, "offs": -0.814}, {"t": 0.03, "offs": 0.066}],
