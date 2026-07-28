@@ -1166,6 +1166,248 @@ class TestRemoveDictsByNames:
 
 
 # ─────────────────────────────────────────────────────────────
+# Profile management: add_new_model, add_new_profile, rename_profile
+# ─────────────────────────────────────────────────────────────
+
+class TestAddNewModel:
+    """add_new_model creates a type row in userconfig."""
+
+    def test_creates_type_row_in_userconfig(self, xml_tmpdir):
+        xmlutils.add_new_model("MSFS", "PropellerAircraft", "TestPlane.*", "Auto User")
+        xmlutils.update_roots()
+        entry = xmlutils.auto_user_root.find(
+            'models[sim="MSFS"][model="TestPlane.*"][name="type"][profile="Auto User"]')
+        assert entry is not None
+        assert entry.findtext('value') == "PropellerAircraft"
+
+    def test_no_duplicate_on_second_call(self, xml_tmpdir):
+        xmlutils.add_new_model("MSFS", "PropellerAircraft", "TestPlane.*", "Auto User")
+        xmlutils.add_new_model("MSFS", "PropellerAircraft", "TestPlane.*", "Auto User")
+        xmlutils.update_roots()
+        entries = xmlutils.auto_user_root.findall(
+            'models[sim="MSFS"][model="TestPlane.*"][name="type"]')
+        assert len(entries) == 1
+
+
+class TestAddNewProfile:
+    """add_new_profile creates a profile row without duplicating."""
+
+    def test_creates_profile_row(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Race Config")
+        xmlutils.update_roots()
+        entry = xmlutils.auto_user_root.find(
+            'models[sim="MSFS"][model="TestPlane.*"][name="profile"][profile="Race Config"]')
+        assert entry is not None
+
+    def test_skips_if_profile_already_exists(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Race Config")
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Race Config")
+        xmlutils.update_roots()
+        entries = xmlutils.auto_user_root.findall(
+            'models[sim="MSFS"][model="TestPlane.*"][name="profile"][profile="Race Config"]')
+        assert len(entries) == 1
+
+
+class TestRenameProfile:
+    """rename_profile updates all model rows and profileMappings."""
+
+    def test_renames_profile_in_model_rows(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Old Name")
+        xmlutils.write_models_to_xml("MSFS", "TestPlane.*", "0.5", "some_setting",
+                                     the_device="joystick", profile_name="Old Name")
+        xmlutils.rename_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Old Name", "New Name")
+        xmlutils.update_roots()
+        old_entries = xmlutils.auto_user_root.findall(
+            'models[sim="MSFS"][model="TestPlane.*"][profile="Old Name"]')
+        new_entries = xmlutils.auto_user_root.findall(
+            'models[sim="MSFS"][model="TestPlane.*"][profile="New Name"]')
+        assert len(old_entries) == 0
+        assert len(new_entries) >= 1
+
+    def test_renames_in_profile_mappings(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Old Name")
+        xmlutils.update_active_profile_entry("MSFS", "PropellerAircraft", "TestPlane.*", "Old Name")
+        xmlutils.rename_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Old Name", "New Name")
+        xmlutils.update_roots()
+        pm = xmlutils.auto_user_root.find(
+            'profileMappings[sim="MSFS"][model="TestPlane.*"]')
+        assert pm is not None
+        assert pm.findtext('active_profile') == "New Name"
+
+
+# ─────────────────────────────────────────────────────────────
+# erase_aircraft_profiles, erase_model_profile
+# ─────────────────────────────────────────────────────────────
+
+class TestEraseAircraftProfiles:
+    def test_removes_all_model_rows_for_pattern(self, xml_tmpdir):
+        xmlutils.add_new_model("MSFS", "PropellerAircraft", "TestPlane.*", "Auto User")
+        xmlutils.write_models_to_xml("MSFS", "TestPlane.*", "0.5", "some_setting",
+                                     the_device="joystick", profile_name="Auto User")
+        xmlutils.erase_aircraft_profiles("MSFS", "PropellerAircraft", "TestPlane.*")
+        xmlutils.update_roots()
+        remaining = xmlutils.auto_user_root.findall('models[sim="MSFS"][model="TestPlane.*"]')
+        assert len(remaining) == 0
+
+
+class TestEraseModelProfile:
+    def test_removes_single_profile_rows(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Profile A")
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Profile B")
+        xmlutils.write_models_to_xml("MSFS", "TestPlane.*", "0.5", "some_setting",
+                                     the_device="joystick", profile_name="Profile A")
+        xmlutils.erase_model_profile("MSFS", "TestPlane.*", "Profile A")
+        xmlutils.update_roots()
+        a_entries = xmlutils.auto_user_root.findall(
+            'models[sim="MSFS"][model="TestPlane.*"][profile="Profile A"]')
+        b_entries = xmlutils.auto_user_root.findall(
+            'models[sim="MSFS"][model="TestPlane.*"][profile="Profile B"]')
+        assert len(a_entries) == 0
+        assert len(b_entries) == 1
+
+
+# ─────────────────────────────────────────────────────────────
+# clone_profile_entry, clone_whole_model
+# ─────────────────────────────────────────────────────────────
+
+class TestCloneProfileEntry:
+    def test_clones_settings_to_new_profile(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Source")
+        xmlutils.write_models_to_xml("MSFS", "TestPlane.*", "0.7", "some_setting",
+                                     the_device="joystick", profile_name="Source")
+        xmlutils.clone_profile_entry("MSFS", "PropellerAircraft", "TestPlane.*",
+                                     "Source", "Destination")
+        xmlutils.update_roots()
+        dst = xmlutils.auto_user_root.find(
+            'models[sim="MSFS"][model="TestPlane.*"][name="some_setting"][profile="Destination"]')
+        assert dst is not None
+        assert dst.findtext('value') == "0.7"
+
+    def test_skips_profile_rows_in_source(self, xml_tmpdir):
+        """Profile name='profile' rows should not be cloned as settings."""
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "Source")
+        xmlutils.write_models_to_xml("MSFS", "TestPlane.*", "0.3", "gain",
+                                     the_device="joystick", profile_name="Source")
+        xmlutils.clone_profile_entry("MSFS", "PropellerAircraft", "TestPlane.*",
+                                     "Source", "Dest")
+        xmlutils.update_roots()
+        cloned_gain = xmlutils.auto_user_root.findall(
+            'models[sim="MSFS"][model="TestPlane.*"][name="gain"][profile="Dest"]')
+        assert len(cloned_gain) >= 1
+
+
+class TestCloneWholeModel:
+    def test_clones_defaults_and_user_data(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "OldProf")
+        xmlutils.write_models_to_xml("MSFS", "TestPlane.*", "0.9", "user_gain",
+                                     the_device="joystick", profile_name="OldProf")
+        xmlutils.clone_whole_model("MSFS", "TestPlane.*", "NewPlane.*", "OldProf", "NewProf")
+        xmlutils.update_roots()
+        new_entry = xmlutils.auto_user_root.find(
+            'models[sim="MSFS"][model="NewPlane.*"][profile="NewProf"]')
+        assert new_entry is not None
+
+
+# ─────────────────────────────────────────────────────────────
+# Raw XPath helpers: get_sim_defaults, get_class_defaults, etc.
+# ─────────────────────────────────────────────────────────────
+
+class TestGetSimDefaults:
+    def test_returns_user_sim_settings(self, xml_tmpdir):
+        xmlutils.write_sim_to_xml("MSFS", "42", "test_sim_setting", the_device="joystick")
+        result = xmlutils.get_sim_defaults("MSFS", "joystick")
+        assert len(result) >= 1
+        tags = [e.findtext('name') for e in result]
+        assert 'test_sim_setting' in tags
+
+
+class TestGetClassDefaults:
+    def test_returns_user_class_settings(self, xml_tmpdir):
+        xmlutils.write_class_to_xml("MSFS", "PropellerAircraft", "99", "test_cls_setting",
+                                    the_device="joystick")
+        result = xmlutils.get_class_defaults("MSFS", "PropellerAircraft", "joystick")
+        assert len(result) >= 1
+        names = [e.findtext('name') for e in result]
+        assert 'test_cls_setting' in names
+
+
+class TestGetModelProfile:
+    def test_returns_model_profile_elements(self, xml_tmpdir):
+        xmlutils.add_new_profile("MSFS", "PropellerAircraft", "TestPlane.*", "MyProf")
+        xmlutils.write_models_to_xml("MSFS", "TestPlane.*", "0.1", "setting_x",
+                                     the_device="joystick", profile_name="MyProf")
+        result = xmlutils.get_model_profile("MSFS", "TestPlane.*", "MyProf", "joystick")
+        names = [e.findtext('name') for e in result]
+        assert 'setting_x' in names
+
+
+class TestGetScOverride:
+    def test_returns_sc_overrides_for_model(self, xml_tmpdir):
+        xmlutils.write_sc_override_to_xml("TestPlane.*", "L:Custom.Var", "my_override")
+        result = xmlutils.get_sc_override("TestPlane.*")
+        assert len(result) >= 1
+        names = [e.findtext('name') for e in result]
+        assert 'my_override' in names
+
+
+class TestGetModelType:
+    def test_returns_type_element_from_user(self, xml_tmpdir):
+        xmlutils.add_new_model("MSFS", "PropellerAircraft", "TestPlane.*", "Auto User")
+        result = xmlutils.get_model_type("MSFS", "TestPlane.*", "PropellerAircraft")
+        assert result is not None
+
+    def test_returns_none_for_unknown_model(self, xml_tmpdir):
+        result = xmlutils.get_model_type("MSFS", "NonExistent.*", "JetAircraft")
+        assert result is None
+
+
+# ─────────────────────────────────────────────────────────────
+# Internal helpers: get_craft_attributes, read_models_sc_overrides
+# ─────────────────────────────────────────────────────────────
+
+class TestGetCraftAttributes:
+    def test_returns_first_matching_model_attrs(self, xml_tmpdir):
+        xmlutils.update_roots()
+        # get_craft_attributes uses @sim attribute syntax; inject matching element
+        root = xmlutils.auto_defaults_root
+        m = ET.SubElement(root, 'models', {'sim': 'MSFS'})
+        for tag, val in [('model', 'TestPlane.*'), ('name', 'type'),
+                         ('value', 'PropellerAircraft'), ('device', 'joystick')]:
+            c = ET.SubElement(m, tag)
+            c.text = val
+        attrs = xmlutils.get_craft_attributes(root, "MSFS", "joystick")
+        assert attrs is not None
+        assert attrs['model'] == 'TestPlane.*'
+
+    def test_returns_none_for_no_match(self, xml_tmpdir):
+        xmlutils.update_roots()
+        attrs = xmlutils.get_craft_attributes(xmlutils.auto_defaults_root, "FAKE_SIM_XYZ", "joystick")
+        assert attrs is None
+
+    def test_returns_none_for_no_match(self, xml_tmpdir):
+        xmlutils.update_roots()
+        attrs = xmlutils.get_craft_attributes(xmlutils.auto_defaults_root, "FAKE_SIM_XYZ", "joystick")
+        assert attrs is None
+
+
+class TestReadModelsScOverrides:
+    def test_reads_overrides_from_root(self, xml_tmpdir):
+        xmlutils.write_sc_override_to_xml("TestPlane.*", "L:Test.Var", "test_ovr")
+        xmlutils.update_roots()
+        overrides = xmlutils.read_models_sc_overrides(
+            xmlutils.auto_user_root, "TestPlane.*", "user")
+        assert len(overrides) >= 1
+        assert overrides[0]['source'] == 'user'
+        assert overrides[0]['name'] == 'test_ovr'
+
+    def test_returns_empty_for_no_match(self, xml_tmpdir):
+        xmlutils.update_roots()
+        overrides = xmlutils.read_models_sc_overrides(
+            xmlutils.auto_user_root, "NonExistent.*", "default")
+        assert overrides == []
+
+
+# ─────────────────────────────────────────────────────────────
 # prior_value / prior_unit tracking in update_data_with_models
 # ─────────────────────────────────────────────────────────────
 
