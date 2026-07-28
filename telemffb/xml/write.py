@@ -58,10 +58,17 @@ class ConfigWriter:
         if is_profile and profile_name is not None:
             xpath += f'[profile="{profile_name}"]'
 
+        # For profile rows, also try without device filter (existing row may use a different device)
+        profile_fallback_xpath = None
+        if name == 'profile' and profile_name is not None:
+            profile_fallback_xpath = f'.//models[sim="{sim}"][model="{model}"][name="profile"][profile="{profile_name}"]'
+
         root = self._store.user_root
         if root is None:
             return
         elem = root.find(xpath)
+        if elem is None and profile_fallback_xpath is not None:
+            elem = root.find(profile_fallback_xpath)
         if elem is not None:
             for child in elem:
                 if child.tag == 'value':

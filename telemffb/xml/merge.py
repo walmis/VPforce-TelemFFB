@@ -113,19 +113,25 @@ def eliminate_no_prereq(datalist: list[DefaultDataRow]) -> list[DefaultDataRow]:
     an unbroken chain of satisfied parents up to a root. For a config with no such
     orphans the first pass is already stable, so valid trees are unaffected.
     """
-    newlist: list[DefaultDataRow] = []
-    for child in datalist:
-        add = True
-        if child['prereq'] != '':
-            add = False
-            for parent in datalist:
-                if parent['name'] in child['prereq'] and (parent['value'].lower() == 'true' or '.0' in parent['order']):
-                    if parent['name'] == child['prereq'] or '.' in child['prereq']:
-                        add = True
-                        break
-        if add:
-            newlist.append(child)
-    return newlist
+    working = datalist[:]
+    while True:
+        newlist: list[DefaultDataRow] = []
+        for child in working:
+            add = True
+            if child['prereq'] != '':
+                add = False
+                for parent in working:
+                    if parent['name'] == child['name']:
+                        continue
+                    if parent['name'] in child['prereq'] and (parent['value'].lower() == 'true' or '.0' in parent['order']):
+                        if parent['name'] == child['prereq'] or '.' in child['prereq']:
+                            add = True
+                            break
+            if add:
+                newlist.append(child)
+        if len(newlist) == len(working):
+            return newlist
+        working = newlist
 
 
 def filter_rows(data_list: list[DefaultDataRow]) -> list[DefaultDataRow]:
