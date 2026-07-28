@@ -83,6 +83,9 @@ auto_user_tree: Optional[ET.ElementTree] = None
 auto_defaults_root: Optional[ET.Element] = None
 
 # ── Singleton manager ──────────────────────────────────────────────
+# NOTE: Not thread-safe. xmlutils is only called from the main thread in
+# TelemFFB, so this is safe in practice. Do not call update_vars/_get_mgr
+# concurrently from multiple threads.
 _mgr: Optional[tuple[XmlStore, ConfigResolver, ConfigWriter]] = None
 
 
@@ -327,7 +330,7 @@ def read_user_class_data(the_sim: str, crafttype: str, instance_device: str = ''
     return _resolver().read_user_class_data(the_sim, crafttype, instance_device)
 
 
-def read_user_models(sim: str, cls: str, default_only: bool = False, user_only: bool = True, both: bool = False) -> list[str]:
+def read_user_models(sim: str, cls: str, default_only: bool = False, user_only: bool = True, both: bool = False) -> list[tuple[str, ...]]:
     """List user-created model entries for a sim/class.
 
     Args:

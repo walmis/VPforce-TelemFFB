@@ -114,7 +114,10 @@ def eliminate_no_prereq(datalist: list[DefaultDataRow]) -> list[DefaultDataRow]:
     orphans the first pass is already stable, so valid trees are unaffected.
     """
     working = datalist[:]
-    while True:
+    max_iterations = len(datalist) + 1
+    iterations = 0
+    while iterations < max_iterations:
+        iterations += 1
         newlist: list[DefaultDataRow] = []
         for child in working:
             add = True
@@ -132,6 +135,8 @@ def eliminate_no_prereq(datalist: list[DefaultDataRow]) -> list[DefaultDataRow]:
         if len(newlist) == len(working):
             return newlist
         working = newlist
+    # Safety net: return current state if fixed-point not reached
+    return working
 
 
 def filter_rows(data_list: list[DefaultDataRow]) -> list[DefaultDataRow]:

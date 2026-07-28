@@ -70,12 +70,12 @@ if _IS_WINDOWS:
 class NamedMutex:
     """A named, system-wide Win32 mutex.
 
-    Raises :exc:`RuntimeError` on non-Windows platforms.
+    Raises :exc:`RuntimeError` at construction time on non-Windows platforms.
+    Note: importing this module does NOT fail on non-Windows — only
+    instantiating ``NamedMutex`` does, so ``FileLock`` remains usable.
     """
 
     def __init__(self, name: str, acquired: bool = False, timeout: Optional[float] = None) -> None:
-        if not _IS_WINDOWS:
-            raise RuntimeError("NamedMutex requires Windows")
         self.name = name
         self.acquired = acquired
         ret = _CreateMutex(None, False, name)  # type: ignore[possibly-undefined]
@@ -143,8 +143,9 @@ class NamedMutex:
 class FileLock:
     """Cross-platform file-level lock using a named mutex per file path.
 
-    * **Windows**: backed by a Win32 named mutex (SHA-256 hashed path).
-      Reader-writer distinction is not supported — all locks are exclusive.
+    * **Windows**: backed by Win32 named mutexes (SHA-256 hashed path).
+      Shared (read) locks use a two-mutex reader-writer scheme allowing
+      concurrent readers; exclusive (write) locks block all other access.
     * **Linux / Unix**: backed by ``fcntl.flock()`` on a companion .lock file.
       Shared (read) and exclusive (write) modes are fully supported.
 
@@ -167,10 +168,9 @@ class FileLock:
         timeout: Maximum seconds to wait for the lock.  ``None`` waits
             indefinitely.  On timeout the context manager raises
             :class:`TimeoutError`.
-        shared: If ``True``, acquire a shared (read) lock on POSIX platforms.
-            Multiple processes may hold shared locks concurrently; an
-            exclusive (write) lock blocks until all shared locks are released.
-            On Windows this flag is ignored (always exclusive).
+        shared: If ``True``, acquire a shared (read) lock.  Multiple
+            processes may hold shared locks concurrently; an exclusive
+            (write) lock blocks until all shared locks are released.
 
     Raises:
         TimeoutError: If *timeout* elapsed before the lock was acquired.
@@ -203,6 +203,8 @@ class FileLock:
     # ── Windows implementation ──────────────────────────────────
 
     def _acquire_win(self) -> bool:
+        if self.shared:
+            return self._acquire_win_shared()
         self._mutex = NamedMutex(self._safe_name(self.file_path))
         ok = self._mutex.acquire(timeout=self.timeout)
         if not ok:
@@ -211,12 +213,70 @@ class FileLock:
         return ok
 
     def _release_win(self) -> None:
+        if self.shared:
+            self._release_win_shared()
+            return
         if self._mutex is not None:
             try:
                 self._mutex.release()
             finally:
                 self._mutex.close()
                 self._mutex = None
+
+    def _rw_reader_mutex_name(self) -> str:
+        return f"r_{self._safe_name(self.file_path)}"
+
+    def _rw_writer_mutex_name(self) -> str:
+        return f"w_{self._safe_name(self.file_path)}"
+
+    def _acquire_win_shared(self) -> bool:
+        """Acquire a shared (read) lock using two Win32 mutexes.
+
+        Uses a readers-mutex to count concurrent readers and a writer-mutex
+        to block writers while any reader holds the lock.
+        """
+        reader_mutex = NamedMutex(self._rw_reader_mutex_name())
+        if not reader_mutex.acquire(timeout=self.timeout):
+            reader_mutex.close()
+            return False
+
+        # Bump reader count
+        self._reader_count = getattr(self, '_reader_count', 0) + 1
+        first_reader = self._reader_count == 1
+
+        if first_reader:
+            # First reader blocks writers
+            writer_mutex = NamedMutex(self._rw_writer_mutex_name())
+            if not writer_mutex.acquire(timeout=self.timeout):
+                reader_mutex.release()
+                reader_mutex.close()
+                self._reader_count -= 1
+                return False
+            object.__setattr__(self, '_writer_mutex', writer_mutex)
+        else:
+            object.__setattr__(self, '_writer_mutex', None)
+
+        reader_mutex.release()
+        reader_mutex.close()
+        return True
+
+    def _release_win_shared(self) -> None:
+        """Release a shared (read) lock."""
+        reader_mutex = NamedMutex(self._rw_reader_mutex_name())
+        reader_mutex.acquire(timeout=self.timeout)
+
+        self._reader_count -= 1
+        last_reader = self._reader_count == 0
+
+        if last_reader:
+            writer_mutex = getattr(self, '_writer_mutex', None)
+            if writer_mutex is not None:
+                writer_mutex.release()
+                writer_mutex.close()
+            object.__setattr__(self, '_writer_mutex', None)
+
+        reader_mutex.release()
+        reader_mutex.close()
 
     # ── POSIX implementation ─────────────────────────────────────
 
