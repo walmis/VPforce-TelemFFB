@@ -146,6 +146,33 @@ class Aircraft(AircraftBase):
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
+    @staticmethod
+    def _il2_engine_value(val) -> float:
+        """Reduce an IL-2 per-engine indicator (ENG_RPM, ENG_SHAKE_FRQ, ...) to one float.
+
+        The sim sends one value per engine slot, but the slot count is not stable across
+        sim builds: 4.003 sent Values_count=1 for the single-engine F-51D, a later build
+        sends 3 zero-padded slots for the same aircraft.  The telemetry string pipeline
+        then collapses a one-element array back to a bare scalar (TelemManager only builds
+        a list when len(values) > 1), and to_number() passes through the original string
+        when it can't parse it.  So this can legitimately arrive as a float, a list, or ''
+        before the first indicator has been received.  Normalize every shape, and treat
+        anything non-finite or unparseable as 0 so the caller's zero-check catches it.
+        """
+        def num(x) -> float:
+            try:
+                x = float(x)
+            except (TypeError, ValueError):
+                return 0.0
+            return x if math.isfinite(x) else 0.0
+
+        if isinstance(val, (list, tuple)):
+            # Coerce per element, not after max():  a NaN slot round-trips as the
+            # string 'nan', which would make this a mixed str/float list and blow
+            # up the comparison inside max().
+            return max((num(x) for x in val), default=0.0)
+        return num(val)
+
     def il2_update_engine_shake(self, telem_data: BaseTelemetryData):
         """Alternative engine shake using harmonic ratios, amplitude taper, and direction spread.
 
@@ -171,8 +198,8 @@ class Aircraft(AircraftBase):
         else:
             return
 
-        frequency = telem_data.get('EngineShakeFrequency', 0)
-        amplitude = telem_data.get('EngineShakeAmplitude', 0)
+        frequency = self._il2_engine_value(telem_data.get('EngineShakeFrequency'))
+        amplitude = self._il2_engine_value(telem_data.get('EngineShakeAmplitude'))
 
         if not frequency or not amplitude:
             return
