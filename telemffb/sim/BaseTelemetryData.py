@@ -175,8 +175,10 @@ class BaseTelemetryData:
     """
 
     WarnAlpha: Optional[float]
-    """Warning alpha (approach-to-stall AoA threshold).  
-    Currently not populated by any sim.  
+    """Warning alpha (approach-to-stall AoA threshold) — degrees.
+    XP: Read from the X-Plane plugin (sim/aircraft/overflow/acf_stall_warn_alpha,
+    the author-set stall-warning AoA). Used as the buffet onset threshold.
+    Other sims: not available (MSFS uses StallAoA instead).
     """
 
     Vle: Optional[float]
