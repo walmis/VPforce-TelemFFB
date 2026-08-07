@@ -6,9 +6,9 @@
 -->
 <TelemFFB>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>Basic</grouping>
 		<order>50.0</order>
+		<datatype>group</datatype>
 		<name>basic_group</name>
 		<displayname>Basic Settings</displayname>
 		<any>true</any>
@@ -24,10 +24,10 @@
 		<value>true</value>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>100</order>
+		<datatype>list</datatype>
 		<name>type</name>
 		<displayname>Class</displayname>
 		<prereq>basic_group</prereq>
@@ -40,10 +40,10 @@
 		<validvalues>PropellerAircraft,JetAircraft,TurbopropAircraft,Helicopter</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>100</order>
+		<datatype>list</datatype>
 		<name>type</name>
 		<displayname>Class</displayname>
 		<prereq>basic_group</prereq>
@@ -56,10 +56,10 @@
 		<validvalues>JetAircraft</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>100</order>
+		<datatype>list</datatype>
 		<name>type</name>
 		<displayname>Class</displayname>
 		<prereq>basic_group</prereq>
@@ -72,10 +72,10 @@
 		<validvalues>PropellerAircraft,JetAircraft</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>100</order>
+		<datatype>list</datatype>
 		<name>type</name>
 		<displayname>Class</displayname>
 		<prereq>basic_group</prereq>
@@ -89,10 +89,10 @@
 		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter,CowanSimHelicopter,TaogH500Helicopter</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>100</order>
+		<datatype>list</datatype>
 		<name>type</name>
 		<displayname>Class</displayname>
 		<prereq>basic_group</prereq>
@@ -106,10 +106,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>200.0</order>
+		<datatype>enumlist</datatype>
 		<name>spring_mode</name>
 		<displayname>Joystick Spring Mode</displayname>
 		<prereq>basic_group</prereq>
@@ -122,10 +122,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>200.0</order>
+		<datatype>enumlist</datatype>
 		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<prereq>basic_group</prereq>
@@ -138,10 +138,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>200.0</order>
+		<datatype>enumlist</datatype>
 		<name>spring_mode</name>
 		<displayname>Collective Spring Mode</displayname>
 		<prereq>basic_group</prereq>
@@ -153,10 +153,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>n_float</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>200.2</order>
+		<datatype>n_float</datatype>
 		<name>max_aileron_coeff</name>
 		<displayname>Aileron Max Force</displayname>
 		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
@@ -169,10 +169,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>advspr</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>310.2</order>
+		<datatype>advspr</datatype>
 		<name>adv_spr_gains</name>
 		<displayname>Advanced Spring Mapping</displayname>
 		<prereq>spring_mode.ADVANCED</prereq>
@@ -184,10 +184,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>420.2</order>
+		<datatype>d_float</datatype>
 		<name>aileron_expo</name>
 		<displayname>Aileron Expo</displayname>
 		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
@@ -200,10 +200,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>n_float</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>430.2</order>
+		<datatype>n_float</datatype>
 		<name>max_elevator_coeff</name>
 		<displayname>Elevator Max Force</displayname>
 		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
@@ -216,10 +216,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>440.2</order>
+		<datatype>d_float</datatype>
 		<name>elevator_expo</name>
 		<displayname>Elevator Expo</displayname>
 		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
@@ -232,10 +232,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>n_float</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>450.2</order>
+		<datatype>n_float</datatype>
 		<name>max_rudder_coeff</name>
 		<displayname>Rudder Max Force</displayname>
 		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
@@ -248,10 +248,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>460.2</order>
+		<datatype>d_float</datatype>
 		<name>rudder_expo</name>
 		<displayname>Rudder Expo</displayname>
 		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
@@ -264,10 +264,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>anyfloat</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>470.2</order>
+		<datatype>anyfloat</datatype>
 		<name>vne_override</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Override&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
@@ -282,10 +282,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>550.2</order>
+		<datatype>float</datatype>
 		<name>aileron_spring_gain</name>
 		<displayname>Base Aileron Spring Gain</displayname>
 		<prereq>spring_mode.CENTER.CNTR_FT</prereq>
@@ -299,10 +299,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>550.3</order>
+		<datatype>float</datatype>
 		<name>elevator_spring_gain</name>
 		<displayname>Base Elevator Spring Gain</displayname>
 		<prereq>spring_mode.CENTER.CNTR_FT</prereq>
@@ -316,10 +316,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>550.4</order>
+		<datatype>float</datatype>
 		<name>rudder_spring_gain</name>
 		<displayname>Base Rudder Spring Gain</displayname>
 		<prereq>spring_mode.CENTER.CNTR_FT</prereq>
@@ -333,10 +333,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>FlyByWire</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>600.2</order>
+		<datatype>float</datatype>
 		<name>fbw_aileron_gain</name>
 		<displayname>FBW Aileron Gain</displayname>
 		<prereq>spring_mode.FBW</prereq>
@@ -349,10 +349,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>FlyByWire</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>600.3</order>
+		<datatype>float</datatype>
 		<name>fbw_elevator_gain</name>
 		<displayname>FBW Elevator Gain</displayname>
 		<prereq>spring_mode.FBW</prereq>
@@ -365,10 +365,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>FlyByWire</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>600.4</order>
+		<datatype>float</datatype>
 		<name>fbw_rudder_gain</name>
 		<displayname>FBW Rudder Gain</displayname>
 		<prereq>spring_mode.FBW</prereq>
@@ -383,10 +383,10 @@
 	<defaults><order>699</order></defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
+		<datatype>enumlist</datatype>
 		<name>spring_mode</name>
 		<displayname>Joystick Spring Mode</displayname>
 		<DCS>true</DCS>
@@ -396,10 +396,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
+		<datatype>enumlist</datatype>
 		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<DCS>true</DCS>
@@ -409,10 +409,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
+		<datatype>enumlist</datatype>
 		<name>spring_mode</name>
 		<displayname>Collective Spring Mode</displayname>
 		<DCS>true</DCS>
@@ -447,10 +447,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>700.3</order>
+		<datatype>float</datatype>
 		<name>pedal_spring_gain</name>
 		<displayname>Pedal Spring Gain</displayname>
 		<prereq>spring_mode.STATIC.DYNAMIC.CUSTOM</prereq>
@@ -464,10 +464,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>anyfloat</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>750.2</order>
+		<datatype>anyfloat</datatype>
 		<name>aircraft_vs_speed</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Stall Speed V&lt;span style=" vertical-align:sub;"&gt;S&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
@@ -483,10 +483,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>750.3</order>
+		<datatype>float</datatype>
 		<name>aircraft_vs_gain</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;S&lt;/span&gt; Gain&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
@@ -500,10 +500,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>anyfloat</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>750.4</order>
+		<datatype>anyfloat</datatype>
 		<name>aircraft_vne_speed</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Never Exceed Speed V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
@@ -519,10 +519,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>750.5</order>
+		<datatype>float</datatype>
 		<name>aircraft_vne_gain</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Gain&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
@@ -536,10 +536,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>advspr</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>770</order>
+		<datatype>advspr</datatype>
 		<name>adv_spr_gains</name>
 		<displayname>Advanced Spring Override</displayname>
 		<prereq>spring_mode.ADVANCED</prereq>
@@ -552,10 +552,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>770.3</order>
+		<datatype>bool</datatype>
 		<name>adv_spr_use_hardware_trim</name>
 		<displayname>Use Hardware Trim</displayname>
 		<exclusive_with>pedal_trimming_enabled</exclusive_with>
@@ -583,11 +583,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>770.34</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -598,11 +598,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>770.36</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -613,11 +613,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>770.38</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_left</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -629,11 +629,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>770.40</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_right</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -645,11 +645,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>d_int</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>770.42</order>
+		<IL2>true</IL2>
+		<datatype>d_int</datatype>
 		<name>override_spring_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -664,10 +664,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>780</order>
+		<datatype>bool</datatype>
 		<name>pedal_trimming_enabled</name>
 		<displayname>Pedal Trimming</displayname>
 		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
@@ -678,11 +678,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>float</datatype>
 		<grouping>Sim Options</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>800.2</order>
+		<IL2>true</IL2>
+		<datatype>float</datatype>
 		<name>override_spring_gain</name>
 		<displayname>Override Spring Gain</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
@@ -694,11 +694,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>bool</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900</order>
+		<IL2>true</IL2>
+		<datatype>bool</datatype>
 		<name>override_spring_ft_enabled</name>
 		<displayname>Hardware Force Trim</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
@@ -710,10 +710,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.2</order>
+		<datatype>button</datatype>
 		<name>override_spring_trim_release</name>
 		<displayname>Trim Release</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -724,10 +724,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.3</order>
+		<datatype>float</datatype>
 		<name>override_spring_tr_damper</name>
 		<displayname>Trim Release Damper</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -740,11 +740,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.4</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_reset</name>
 		<displayname>Trim Reset</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -755,11 +755,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.5</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -770,11 +770,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.6</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -785,11 +785,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.7</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_left</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -800,11 +800,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.8</order>
+		<IL2>true</IL2>
+		<datatype>button</datatype>
 		<name>override_spring_trim_right</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -815,11 +815,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<IL2>true</IL2>
-		<datatype>d_int</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>900.9</order>
+		<IL2>true</IL2>
+		<datatype>d_int</datatype>
 		<name>override_spring_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -839,10 +839,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>FFB</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1000</order>
+		<datatype>bool</datatype>
 		<name>force_disable_collective_gain</name>
 		<displayname>Disable Collective Spring</displayname>
 		<prereq>basic_group</prereq>
@@ -855,10 +855,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1100</order>
+		<datatype>bool</datatype>
 		<name>dcs_tr_damper_enabled</name>
 		<displayname>Trim Release Damper</displayname>
 		<prereq>spring_mode.NONE</prereq>
@@ -868,10 +868,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1100.2</order>
+		<datatype>button</datatype>
 		<name>dcs_tr_button</name>
 		<displayname>In Game TR Button</displayname>
 		<prereq>dcs_tr_damper_enabled</prereq>
@@ -882,10 +882,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1100.3</order>
+		<datatype>float</datatype>
 		<name>dcs_tr_damper_force</name>
 		<displayname>Damper Intensity</displayname>
 		<prereq>dcs_tr_damper_enabled</prereq>
@@ -897,21 +897,21 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1200</order>
+		<datatype>bool</datatype>
 		<name>force_trim_enabled</name>
 		<displayname>Force Trim</displayname>
 		<prereq>do_not_show</prereq>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<value>.5</value>
-		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1200</order>
+		<value>.5</value>
+		<datatype>float</datatype>
 		<name>cyclic_spring_gain</name>
 		<displayname>Cyclic Spring Gain</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -923,10 +923,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1205</order>
+		<datatype>bool</datatype>
 		<name>elevator_force_trim</name>
 		<displayname>Elevator Axis</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -937,10 +937,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1210</order>
+		<datatype>bool</datatype>
 		<name>aileron_force_trim</name>
 		<displayname>Aileron Axis</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -951,10 +951,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1215</order>
+		<datatype>bool</datatype>
 		<name>collective_ft_use_master_buttons</name>
 		<displayname>Use buttons from master device</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -966,10 +966,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1220</order>
+		<datatype>button</datatype>
 		<name>force_trim_button</name>
 		<displayname>Force Trim Release Button</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -981,10 +981,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1225</order>
+		<datatype>button</datatype>
 		<name>force_trim_button</name>
 		<displayname>Trim Release Button</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -995,10 +995,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1230</order>
+		<datatype>button</datatype>
 		<name>force_trim_reset_button</name>
 		<displayname>Force Trim Reset Button</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -1023,11 +1023,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<value>0</value>
-		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1235</order>
+		<value>0</value>
+		<datatype>float</datatype>
 		<name>trim_release_spring_gain</name>
 		<displayname>Trim Release Damper</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -1040,10 +1040,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1240</order>
+		<datatype>bool</datatype>
 		<name>custom_ft_sw_var_enabled</name>
 		<displayname>Force Trim Switch Simvar</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
@@ -1053,10 +1053,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>anylist</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1240.1</order>
+		<datatype>anylist</datatype>
 		<name>custom_ft_sw_var</name>
 		<displayname>Force Trim Switch Simvar</displayname>
 		<prereq>custom_ft_sw_var_enabled</prereq>
@@ -1081,10 +1081,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1300</order>
+		<datatype>bool</datatype>
 		<name>collective_ft_ovd_enabled</name>
 		<displayname>Collective Force Trim</displayname>
 		<prereq>do_not_show</prereq>
@@ -1092,10 +1092,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1300</order>
+		<datatype>float</datatype>
 		<name>collective_ft_ovd_spring_gain</name>
 		<displayname>Spring Gain</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1110,10 +1110,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1305</order>
+		<datatype>float</datatype>
 		<name>collective_ft_ovd_tr_damper</name>
 		<displayname>Trim Release Damper Gain</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1128,10 +1128,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1315</order>
+		<datatype>button</datatype>
 		<name>collective_ft_ovd_release</name>
 		<displayname>Trim Release Button</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1145,10 +1145,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1320</order>
+		<datatype>button</datatype>
 		<name>collective_ft_ovd_reset</name>
 		<displayname>Trim Reset Button (full down)</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1162,10 +1162,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1325</order>
+		<datatype>button</datatype>
 		<name>collective_ft_ovd_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1178,10 +1178,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1330</order>
+		<datatype>button</datatype>
 		<name>collective_ft_ovd_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1194,10 +1194,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1335</order>
+		<datatype>d_int</datatype>
 		<name>collective_ft_ovd_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1213,10 +1213,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1340</order>
+		<datatype>bool</datatype>
 		<name>custom_ft_sw_var_enabled</name>
 		<displayname>Force Trim Switch Simvar</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1226,10 +1226,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>anylist</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1340.1</order>
+		<datatype>anylist</datatype>
 		<name>custom_ft_sw_var</name>
 		<displayname>Force Trim Switch Simvar</displayname>
 		<prereq>custom_ft_sw_var_enabled</prereq>
@@ -1253,10 +1253,10 @@
 		<datatype>d_int</datatype>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>TrimWheel</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1400</order>
+		<datatype>bool</datatype>
 		<name>trimwheel_use_master_buttons</name>
 		<displayname>Use buttons from Master device</displayname>
 		<prereq>basic_group</prereq>
@@ -1266,10 +1266,10 @@
 		<trimwheel>true</trimwheel>
 	</defaults>
 	<defaults>
-		<datatype>button</datatype>
 		<grouping>TrimWheel</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1500</order>
+		<datatype>button</datatype>
 		<name>trimwheel_elev_dn_button</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>basic_group</prereq>
@@ -1279,10 +1279,10 @@
 		<trimwheel>true</trimwheel>
 	</defaults>
 	<defaults>
-		<datatype>button</datatype>
 		<grouping>TrimWheel</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1600</order>
+		<datatype>button</datatype>
 		<name>trimwheel_elev_up_button</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>basic_group</prereq>
@@ -1293,10 +1293,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1700</order>
+		<datatype>bool</datatype>
 		<name>trim_workaround</name>
 		<displayname>Trim Workaround</displayname>
 		<prereq>basic_group</prereq>
@@ -1306,10 +1306,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1900</order>
+		<datatype>bool</datatype>
 		<name>pedal_force_trim_enabled</name>
 		<displayname>Pedal Force Trim</displayname>
 		<prereq>basic_group</prereq>
@@ -1319,10 +1319,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1905</order>
+		<datatype>bool</datatype>
 		<name>pedal_ft_use_master_buttons</name>
 		<displayname>Use buttons from master device</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1336,10 +1336,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1910</order>
+		<datatype>button</datatype>
 		<name>pedal_ft_release_button</name>
 		<displayname>Trim Release Button</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1352,10 +1352,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1915</order>
+		<datatype>button</datatype>
 		<name>pedal_ft_reset_button</name>
 		<displayname>Trim Reset Button</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1368,10 +1368,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1920</order>
+		<datatype>float</datatype>
 		<name>pedal_spring_gain</name>
 		<displayname>Pedal Spring Gain</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1385,10 +1385,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1950</order>
+		<datatype>bool</datatype>
 		<name>pedal_ft_damper_enabled</name>
 		<displayname>Trim Release Damper</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1402,10 +1402,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1950.1</order>
+		<datatype>float</datatype>
 		<name>pedal_ft_damper_force</name>
 		<displayname>Trim Release Damper</displayname>
 		<prereq>pedal_ft_damper_enabled</prereq>
@@ -1420,10 +1420,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1955</order>
+		<datatype>bool</datatype>
 		<name>custom_ft_sw_var_enabled</name>
 		<displayname>Force Trim Switch Simvar</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1447,11 +1447,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<XPLANE>true</XPLANE>
-		<datatype>d_int</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>1960</order>
+		<XPLANE>true</XPLANE>
+		<datatype>d_int</datatype>
 		<name>afcs_motion_rate</name>
 		<displayname>AFCS Response Rate</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
@@ -1475,10 +1475,10 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Buffeting</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000</order>
+		<datatype>bool</datatype>
 		<name>il2_shake_master</name>
 		<displayname>IL2 Shake Master</displayname>
 		<prereq>basic_group</prereq>
@@ -1491,10 +1491,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Buffeting</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.2</order>
+		<datatype>bool</datatype>
 		<name>il2_enable_buffet</name>
 		<displayname>Buffeting</displayname>
 		<prereq>il2_shake_master</prereq>
@@ -1507,10 +1507,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Buffeting</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.21</order>
+		<datatype>float</datatype>
 		<name>il2_buffeting_factor</name>
 		<displayname>Buffeting</displayname>
 		<prereq>il2_enable_buffet</prereq>
@@ -1524,10 +1524,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Movement</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.3</order>
+		<datatype>bool</datatype>
 		<name>il2_enable_runway_rumble</name>
 		<displayname>Runway Rumble</displayname>
 		<prereq>il2_shake_master</prereq>
@@ -1539,10 +1539,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Movement</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.31</order>
+		<datatype>float</datatype>
 		<name>il2_runway_rumble_intensity</name>
 		<displayname>Runway Rumble</displayname>
 		<prereq>il2_enable_runway_rumble</prereq>
@@ -1556,10 +1556,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.4</order>
+		<datatype>bool</datatype>
 		<name>il2_enable_weapons</name>
 		<displayname>Weapon Effects</displayname>
 		<prereq>il2_shake_master</prereq>
@@ -1571,10 +1571,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.42</order>
+		<datatype>bool</datatype>
 		<name>il2_dynamic_gunfire_mode</name>
 		<displayname>Dynamic Gunfire Mode</displayname>
 		<prereq>il2_enable_weapons</prereq>
@@ -1587,10 +1587,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.43</order>
+		<datatype>float</datatype>
 		<name>il2_weapon_release_intensity</name>
 		<displayname>Gunfire</displayname>
 		<prereq>il2_enable_weapons</prereq>
@@ -1604,10 +1604,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.44</order>
+		<datatype>float</datatype>
 		<name>il2_bomb_release_intensity</name>
 		<displayname>Bombs</displayname>
 		<prereq>il2_enable_weapons</prereq>
@@ -1621,10 +1621,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.45</order>
+		<datatype>float</datatype>
 		<name>il2_rocket_release_intensity</name>
 		<displayname>Rockets</displayname>
 		<prereq>il2_enable_weapons</prereq>
@@ -1637,10 +1637,10 @@
 		<value>0.3</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100</order>
+		<datatype>bool</datatype>
 		<name>telemffb_controls_axes</name>
 		<displayname>Axis Control</displayname>
 		<prereq>basic_group</prereq>
@@ -1654,10 +1654,10 @@
 		<value>true</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100</order>
+		<datatype>bool</datatype>
 		<name>telemffb_controls_axes</name>
 		<displayname>Axis Control</displayname>
 		<prereq>basic_group</prereq>
@@ -1672,10 +1672,10 @@
 	</defaults>
 	<defaults>
 		<debug_only>true</debug_only>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.3</order>
+		<datatype>bool</datatype>
 		<name>use_firmware_axis_override</name>
 		<displayname>Use Firmware Axis Override</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1689,10 +1689,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.2</order>
+		<datatype>bool</datatype>
 		<name>local_disable_axis_control</name>
 		<displayname>Disable for this device</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1706,10 +1706,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.4</order>
+		<datatype>float</datatype>
 		<name>joystick_x_axis_scale</name>
 		<displayname>X Axis Scale</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1721,10 +1721,10 @@
 		<value>1.0</value>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.5</order>
+		<datatype>float</datatype>
 		<name>joystick_y_axis_scale</name>
 		<displayname>Y Axis Scale</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1737,10 +1737,10 @@
 		<value>1.0</value>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.6</order>
+		<datatype>float</datatype>
 		<name>rudder_x_axis_scale</name>
 		<displayname>Rudder (X) Axis Scale</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1752,10 +1752,10 @@
 		<value>1.0</value>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.72</order>
+		<datatype>float</datatype>
 		<name>hands_on_deadzone</name>
 		<displayname>Hands On Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1765,10 +1765,10 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.73</order>
+		<datatype>float</datatype>
 		<name>hands_off_deadzone</name>
 		<displayname>Hands Off Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1778,10 +1778,10 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.74</order>
+		<datatype>bool</datatype>
 		<name>handson_force_mode</name>
 		<displayname>Force Mode ( &lt;b&gt;Experimental&lt;/b&gt;)</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1789,11 +1789,11 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
-	<defaults><joystick>true</joystick>
-		<datatype>pct_float</datatype>
+	<defaults>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.75</order>
+		<order>2100.75</order><joystick>true</joystick>
+		<datatype>pct_float</datatype>
 		<name>hands_on_force_threshold</name>
 		<displayname>Hands On Force Threshold</displayname>
 		<prereq>handson_force_mode</prereq>
@@ -1804,11 +1804,11 @@
 		<value>0.03</value>
 	</defaults>
 	<defaults>
-		<info>Time (ms) duration below hands-on threshold to consider "hands-off"</info>
-		<datatype>d_int</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.76</order>
+		<info>Time (ms) duration below hands-on threshold to consider "hands-off"</info>
+		<datatype>d_int</datatype>
 		<name>handsoff_force_duration</name>
 		<displayname>Hands Off Hysteresis Time (ms)</displayname>
 		<prereq>handson_force_mode</prereq>
@@ -1817,10 +1817,10 @@
 		<validvalues>0,1500</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.77</order>
+		<datatype>bool</datatype>
 		<name>handson_force_debug</name>
 		<displayname>Debug Logging</displayname>
 		<prereq>handson_force_mode</prereq>
@@ -1830,10 +1830,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.82</order>
+		<datatype>float</datatype>
 		<name>feet_on_deadzone</name>
 		<displayname>Feet On Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1843,10 +1843,10 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.83</order>
+		<datatype>float</datatype>
 		<name>feet_off_deadzone</name>
 		<displayname>Feet Off Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1856,10 +1856,10 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.84</order>
+		<datatype>bool</datatype>
 		<name>trimwheel_use_axis</name>
 		<displayname>Use Axis instead of Direct</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1869,10 +1869,10 @@
 		<trimwheel>true</trimwheel>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.85</order>
+		<datatype>bool</datatype>
 		<name>trimwheel_axis_invert</name>
 		<displayname>Elevator Trim Axis Invert</displayname>
 		<prereq>trimwheel_use_axis</prereq>
@@ -1882,10 +1882,10 @@
 		<trimwheel>true</trimwheel>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2200</order>
+		<datatype>bool</datatype>
 		<name>enable_custom_x_axis</name>
 		<displayname>Custom Simconnect X Variable</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1896,10 +1896,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>anylist</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2200.2</order>
+		<datatype>anylist</datatype>
 		<name>custom_x_axis</name>
 		<displayname>Custom Simconnect X Var Name</displayname>
 		<prereq>enable_custom_x_axis</prereq>
@@ -1910,10 +1910,10 @@
 		<value>AXIS_AILERONS_SET</value>
 	</defaults>
 	<defaults>
-		<datatype>anylist</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2200.2</order>
+		<datatype>anylist</datatype>
 		<name>custom_x_axis</name>
 		<displayname>Custom Simconnect X Var Name</displayname>
 		<prereq>enable_custom_x_axis</prereq>
@@ -1924,10 +1924,10 @@
 		<value>AXIS_RUDDER_SET</value>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2200.3</order>
+		<datatype>list</datatype>
 		<name>raw_x_axis_scale</name>
 		<displayname>Bit Range X Scaling</displayname>
 		<prereq>enable_custom_x_axis</prereq>
@@ -1939,10 +1939,10 @@
 		<value>16384</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2300</order>
+		<datatype>bool</datatype>
 		<name>enable_custom_y_axis</name>
 		<displayname>Custom Simconnect Y Variable</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1953,10 +1953,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2300</order>
+		<datatype>bool</datatype>
 		<name>enable_custom_y_axis</name>
 		<displayname>Custom Simconnect Y Variable</displayname>
 		<prereq>trimwheel_use_axis</prereq>
@@ -1966,10 +1966,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>anylist</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2300.2</order>
+		<datatype>anylist</datatype>
 		<name>custom_y_axis</name>
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<prereq>enable_custom_y_axis</prereq>
@@ -1980,10 +1980,10 @@
 		<value>AXIS_ELEVATOR_SET</value>
 	</defaults>
 	<defaults>
-		<datatype>anylist</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2300.2</order>
+		<datatype>anylist</datatype>
 		<name>custom_y_axis</name>
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<prereq>enable_custom_y_axis</prereq>
@@ -1994,10 +1994,10 @@
 		<value>AXIS_COLLECTIVE_SET</value>
 	</defaults>
 	<defaults>
-		<datatype>anylist</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2300.2</order>
+		<datatype>anylist</datatype>
 		<name>custom_y_axis</name>
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<prereq>enable_custom_y_axis</prereq>
@@ -2008,10 +2008,10 @@
 		<value>AXIS_ELEV_TRIM_SET</value>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2300.3</order>
+		<datatype>list</datatype>
 		<name>raw_y_axis_scale</name>
 		<displayname>Bit Range Y Scaling</displayname>
 		<prereq>enable_custom_y_axis</prereq>
@@ -2025,10 +2025,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2400</order>
+		<datatype>bool</datatype>
 		<name>trim_following</name>
 		<displayname>Trim / AP Following</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -2101,10 +2101,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2410</order>
+		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<displayname>X Trim Gain Physical</displayname>
 		<prereq>trim_following</prereq>
@@ -2117,10 +2117,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2415</order>
+		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<displayname>X Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
@@ -2133,11 +2133,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
-		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2420</order>
+		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
+		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<displayname>Y Trim Gain Physical</displayname>
 		<prereq>trim_following</prereq>
@@ -2150,10 +2150,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2425</order>
+		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<displayname>Y Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
@@ -2167,10 +2167,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2430</order>
+		<datatype>negfloat</datatype>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<prereq>trim_following</prereq>
@@ -2183,10 +2183,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>negfloat</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2435</order>
+		<datatype>negfloat</datatype>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<prereq>trim_following</prereq>
@@ -2198,10 +2198,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450</order>
+		<datatype>bool</datatype>
 		<name>ap_following</name>
 		<displayname>Autopilot Following</displayname>
 		<prereq>trim_following</prereq>
@@ -2213,10 +2213,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.2</order>
+		<datatype>float</datatype>
 		<name>joystick_ap_x_follow_deadzone</name>
 		<displayname>    Roll Deadzone</displayname>
 		<prereq>ap_following</prereq>
@@ -2228,10 +2228,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.3</order>
+		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_physical_x</name>
 		<displayname>    AP Roll Physical Gain</displayname>
 		<prereq>ap_following</prereq>
@@ -2243,10 +2243,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.4</order>
+		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_virtual_x</name>
 		<displayname>    AP Roll Virtual Gain</displayname>
 		<prereq>ap_following</prereq>
@@ -2256,10 +2256,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.5</order>
+		<datatype>bool</datatype>
 		<name>invert_ap_x_axis</name>
 		<displayname>    Invert Aileron Autopilot Axis</displayname>
 		<prereq>ap_following</prereq>
@@ -2268,10 +2268,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.6</order>
+		<datatype>float</datatype>
 		<name>joystick_ap_y_follow_deadzone</name>
 		<displayname>    Pitch Deadzone</displayname>
 		<prereq>ap_following</prereq>
@@ -2282,10 +2282,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.7</order>
+		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_physical_y</name>
 		<displayname>    AP Pitch Physical Gain</displayname>
 		<prereq>ap_following</prereq>
@@ -2297,10 +2297,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.8</order>
+		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_virtual_y</name>
 		<displayname>    AP Pitch Virtual Gain</displayname>
 		<prereq>ap_following</prereq>
@@ -2310,10 +2310,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2450.9</order>
+		<datatype>bool</datatype>
 		<name>joystick_ap_y_follow_axis</name>
 		<displayname>    AP Pitch - Follow axis instead of trim</displayname>
 		<prereq>ap_following</prereq>
@@ -2325,10 +2325,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2600</order>
+		<datatype>float</datatype>
 		<name>collective_ap_spring_gain</name>
 		<displayname>Collective Spring Gain</displayname>
 		<prereq>basic_group</prereq>
@@ -2340,10 +2340,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2700</order>
+		<datatype>float</datatype>
 		<name>collective_dampening_gain</name>
 		<displayname>Collective Dampening Gain</displayname>
 		<prereq>basic_group</prereq>
@@ -2351,10 +2351,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2800</order>
+		<datatype>float</datatype>
 		<name>hpg_pedal_spring_gain</name>
 		<displayname>Pedal Spring Gain</displayname>
 		<prereq>basic_group</prereq>
@@ -2366,10 +2366,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>3100</order>
+		<datatype>bool</datatype>
 		<name>cp_spr_override_enabled</name>
 		<displayname>Co-Pilot/RIO Spring Override</displayname>
 		<prereq>basic_group</prereq>
@@ -2380,10 +2380,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>list</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>3100.2</order>
+		<datatype>list</datatype>
 		<name>cp_spr_override_pilot_seat_id</name>
 		<displayname>Pilot Seat ID</displayname>
 		<prereq>cp_spr_override_enabled</prereq>
@@ -2395,10 +2395,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>3150</order>
+		<datatype>bool</datatype>
 		<name>ap_active_deadzone_enabled</name>
 		<displayname>Autopilot Deadzone</displayname>
 		<prereq>basic_group</prereq>
@@ -2409,10 +2409,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>3150.1</order>
+		<datatype>float</datatype>
 		<name>ap_active_deadzone</name>
 		<displayname>Autopilot Deadzone</displayname>
 		<prereq>ap_active_deadzone_enabled</prereq>
@@ -2424,10 +2424,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>3200</order>
+		<datatype>float</datatype>
 		<name>cp_spr_override_spring_gain</name>
 		<displayname>Spring Gain</displayname>
 		<prereq>cp_spr_override_enabled</prereq>
@@ -2439,10 +2439,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>3300</order>
+		<datatype>bool</datatype>
 		<name>cp_spr_override_button_enabled</name>
 		<displayname>Only on Button Press</displayname>
 		<prereq>cp_spr_override_enabled</prereq>
@@ -2453,10 +2453,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>3400</order>
+		<datatype>button</datatype>
 		<name>cp_spr_override_button</name>
 		<displayname>Override Button</displayname>
 		<prereq>cp_spr_override_button_enabled</prereq>
@@ -2466,9 +2466,9 @@
 		<value>0</value>
 	</defaults>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>Airflow</grouping>
 		<order>10000</order>
+		<datatype>group</datatype>
 		<name>airflow_group</name>
 		<displayname>Aerodynamics</displayname>
 		<any>true</any>
@@ -2482,10 +2482,10 @@
 		<collective>true</collective>
 		<value>true</value>
 	</defaults>
-	<defaults><parentgroup>aerodynamics</parentgroup>
-		<datatype>anyfloat</datatype>
-		<grouping>Info</grouping>
+	<defaults>
+		<grouping>Info</grouping><parentgroup>aerodynamics</parentgroup>
 		<order>10050</order>
+		<datatype>anyfloat</datatype>
 		<name>prop_diameter</name>
 		<displayname>Prop Diameter</displayname>
 		<prereq>airflow_group</prereq>
@@ -2500,10 +2500,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10100</order>
+		<datatype>bool</datatype>
 		<name>aoa_reduction_effect_enabled</name>
 		<displayname>AoA Reduction</displayname>
 		<prereq>airflow_group</prereq>
@@ -2516,10 +2516,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10100.1</order>
+		<datatype>float</datatype>
 		<name>aoa_reduction_max_force</name>
 		<displayname>AoA Reduction Max Force</displayname>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -2534,10 +2534,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10100.2</order>
+		<datatype>d_int</datatype>
 		<name>critical_aoa_max</name>
 		<displayname>Critical AoA Max</displayname>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -2553,10 +2553,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10100.3</order>
+		<datatype>d_int</datatype>
 		<name>critical_aoa_start</name>
 		<displayname>Critical AoA Start</displayname>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -2572,10 +2572,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10200.1</order>
+		<datatype>float</datatype>
 		<name>max_aoa_cf_force</name>
 		<displayname>AoA Effect Max Force</displayname>
 		<prereq>aoa_effect_enabled</prereq>
@@ -2589,10 +2589,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10300</order>
+		<datatype>bool</datatype>
 		<name>elevator_droop_enabled</name>
 		<displayname>Elevator Droop</displayname>
 		<prereq>airflow_group</prereq>
@@ -2604,10 +2604,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10300.1</order>
+		<datatype>float</datatype>
 		<name>elevator_droop_force</name>
 		<displayname>Elevator Droop</displayname>
 		<prereq>elevator_droop_enabled</prereq>
@@ -2622,10 +2622,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10400</order>
+		<datatype>float</datatype>
 		<name>elevator_droop_moment</name>
 		<displayname>Elevator Droop Moment</displayname>
 		<prereq>airflow_group</prereq>
@@ -2636,10 +2636,10 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10500</order>
+		<datatype>float</datatype>
 		<name>elevator_prop_flow_ratio</name>
 		<displayname>Elevator Prop Flow</displayname>
 		<prereq>airflow_group</prereq>
@@ -2650,10 +2650,10 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10600</order>
+		<datatype>float</datatype>
 		<name>rudder_prop_flow_ratio</name>
 		<displayname>Rudder Prop Flow</displayname>
 		<prereq>airflow_group</prereq>
@@ -2665,10 +2665,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10700</order>
+		<datatype>bool</datatype>
 		<name>aoa_effect_enabled</name>
 		<displayname>AoA Effect</displayname>
 		<prereq>airflow_group</prereq>
@@ -2679,10 +2679,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10700.1</order>
+		<datatype>float</datatype>
 		<name>aoa_effect_gain</name>
 		<displayname>AoA Effect Gain</displayname>
 		<prereq>aoa_effect_enabled</prereq>
@@ -2694,10 +2694,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>ETL</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10800</order>
+		<datatype>bool</datatype>
 		<name>etl_effect_enable</name>
 		<displayname>ETL Effect</displayname>
 		<prereq>airflow_group</prereq>
@@ -2712,10 +2712,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>ETL</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10800.1</order>
+		<datatype>float</datatype>
 		<name>etl_effect_intensity</name>
 		<displayname>ETL Effect</displayname>
 		<prereq>etl_effect_enable</prereq>
@@ -2731,10 +2731,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>ETL</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10800.2</order>
+		<datatype>int</datatype>
 		<name>etl_start_speed</name>
 		<displayname>ETL Start Speed</displayname>
 		<prereq>etl_effect_enable</prereq>
@@ -2751,10 +2751,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>ETL</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10800.3</order>
+		<datatype>int</datatype>
 		<name>etl_stop_speed</name>
 		<displayname>ETL Stop Speed</displayname>
 		<prereq>etl_effect_enable</prereq>
@@ -2771,10 +2771,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>VRS</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10900</order>
+		<datatype>bool</datatype>
 		<name>vrs_effect_enable</name>
 		<displayname>VRS Effect</displayname>
 		<prereq>airflow_group</prereq>
@@ -2789,10 +2789,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>VRS</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10900.1</order>
+		<datatype>float</datatype>
 		<name>vrs_effect_intensity</name>
 		<displayname>VRS Max Intensity</displayname>
 		<prereq>vrs_effect_enable</prereq>
@@ -2809,10 +2809,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>VRS</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10900.3</order>
+		<datatype>int</datatype>
 		<name>vrs_threshold_speed</name>
 		<displayname>VRS Airspeed Threshold</displayname>
 		<prereq>vrs_effect_enable</prereq>
@@ -2828,10 +2828,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>VRS</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10900.4</order>
+		<datatype>int</datatype>
 		<name>vrs_vs_onset</name>
 		<displayname>VRS Onset Vertical Speed </displayname>
 		<prereq>vrs_effect_enable</prereq>
@@ -2847,10 +2847,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>VRS</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>10900.5</order>
+		<datatype>int</datatype>
 		<name>vrs_vs_max</name>
 		<displayname>VRS Full Vertical Speed </displayname>
 		<prereq>vrs_effect_enable</prereq>
@@ -2866,10 +2866,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11000</order>
+		<datatype>bool</datatype>
 		<name>aoa_buffeting_enabled</name>
 		<displayname>AoA/Stall Buffeting</displayname>
 		<prereq>airflow_group</prereq>
@@ -2884,10 +2884,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11000.1</order>
+		<datatype>float</datatype>
 		<name>buffeting_intensity</name>
 		<displayname>AoA/Stall Buffeting</displayname>
 		<prereq>aoa_buffeting_enabled</prereq>
@@ -2904,14 +2904,32 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11000.2</order>
+		<name>stall_buffet_style</name>
+		<displayname>Buffet Style</displayname>
+		<prereq>aoa_buffeting_enabled</prereq>
+		<info>How stall buffeting is rendered.&lt;br&gt;&lt;br&gt;'Classic': steady single-frequency shake - the original effect.&lt;br&gt;&lt;br&gt;'Dynamic': irregular, gusty shaking that surges and ebbs like real separated-flow buffet, growing heavier and slower as the stall deepens.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>Classic</value>
+		<validvalues>Classic,Dynamic</validvalues>
+		<datatype>list</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Vibration</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>11000.3</order>
+		<datatype>d_int</datatype>
 		<name>aoa_buffet_freq</name>
 		<displayname>Buffeting Frequency</displayname>
 		<prereq>aoa_buffeting_enabled</prereq>
-		<info>Frequency of buffeting effect (Hz)</info>
+		<info>Frequency of the buffeting effect (Hz).&lt;br&gt;&lt;br&gt;In 'Dynamic' buffet style this anchors the character sweep: the shake runs slightly above this frequency at buffet onset and slides a few Hz below it as the stall deepens.</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
@@ -2925,10 +2943,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
-		<order>11000.3</order>
+		<order>11000.4</order>
+		<datatype>d_int</datatype>
 		<name>buffet_aoa</name>
 		<displayname>Buffet Onset Aoa</displayname>
 		<prereq>aoa_buffeting_enabled</prereq>
@@ -2944,10 +2962,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
-		<order>11000.4</order>
+		<order>11000.5</order>
+		<datatype>d_int</datatype>
 		<name>stall_aoa</name>
 		<displayname>Stall AoA</displayname>
 		<prereq>aoa_buffeting_enabled</prereq>
@@ -2963,10 +2981,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11100</order>
+		<datatype>bool</datatype>
 		<name>overspeed_effect_enable</name>
 		<displayname>Overpeed Shake </displayname>
 		<prereq>airflow_group</prereq>
@@ -2980,10 +2998,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11100.1</order>
+		<datatype>float</datatype>
 		<name>overspeed_shake_intensity</name>
 		<displayname>Overpeed Shake </displayname>
 		<prereq>overspeed_effect_enable</prereq>
@@ -2999,10 +3017,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11100.2</order>
+		<datatype>int</datatype>
 		<name>overspeed_shake_start</name>
 		<displayname>Overpeed Shake Start Speed</displayname>
 		<prereq>overspeed_effect_enable</prereq>
@@ -3019,10 +3037,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11200</order>
+		<datatype>bool</datatype>
 		<name>turbulence_effect_enable</name>
 		<displayname>Turbulence Effect &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
 		<prereq>airflow_group</prereq>
@@ -3033,10 +3051,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11200.2</order>
+		<datatype>float</datatype>
 		<name>turbulence_hpf_alpha</name>
 		<displayname>Gust Memory</displayname>
 		<prereq>turbulence_effect_enable</prereq>
@@ -3049,10 +3067,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11200.3</order>
+		<datatype>float</datatype>
 		<name>turbulence_smoothing_alpha</name>
 		<displayname>Attack Speed</displayname>
 		<prereq>turbulence_effect_enable</prereq>
@@ -3065,10 +3083,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11200.4</order>
+		<datatype>float</datatype>
 		<name>turbulence_sensitivity</name>
 		<displayname>Sensitivity</displayname>
 		<prereq>turbulence_effect_enable</prereq>
@@ -3081,10 +3099,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Airflow</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11200.5</order>
+		<datatype>float</datatype>
 		<name>turbulence_intensity</name>
 		<displayname>Intensity</displayname>
 		<prereq>turbulence_effect_enable</prereq>
@@ -3097,10 +3115,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11300</order>
+		<datatype>bool</datatype>
 		<name>wind_effect_enabled</name>
 		<displayname>Wind Effect</displayname>
 		<prereq>airflow_group</prereq>
@@ -3111,10 +3129,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11300.1</order>
+		<datatype>float</datatype>
 		<name>wind_effect_max_intensity</name>
 		<displayname>Wind Effect</displayname>
 		<prereq>wind_effect_enabled</prereq>
@@ -3128,10 +3146,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11300.2</order>
+		<datatype>float</datatype>
 		<name>wind_effect_scaling</name>
 		<displayname>Wind Effect Scaling</displayname>
 		<prereq>wind_effect_enabled</prereq>
@@ -3149,9 +3167,9 @@
 		<order>19999</order>
 	</defaults>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>Acceleration</grouping>
 		<order>20000</order>
+		<datatype>group</datatype>
 		<name>inertial_group</name>
 		<displayname>Inertial</displayname>
 		<any>true</any>
@@ -3167,10 +3185,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20100.0</order>
+		<datatype>enumlist</datatype>
 		<name>gforce_effect_mode</name>
 		<displayname>G-Force Effect</displayname>
 		<prereq>inertial_group</prereq>
@@ -3182,10 +3200,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>enumlist</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20100.0</order>
+		<datatype>enumlist</datatype>
 		<name>gforce_effect_mode</name>
 		<displayname>G-Force Effect</displayname>
 		<prereq>inertial_group</prereq>
@@ -3198,10 +3216,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20110.22</order>
+		<datatype>float</datatype>
 		<name>gforce_effect_max_intensity</name>
 		<displayname>Max Intensity</displayname>
 		<prereq>gforce_effect_mode.LEGACY</prereq>
@@ -3215,10 +3233,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20110.23</order>
+		<datatype>d_float</datatype>
 		<name>gforce_effect_curvature</name>
 		<displayname>G Force Curvature</displayname>
 		<prereq>gforce_effect_mode.LEGACY</prereq>
@@ -3233,10 +3251,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20110.24</order>
+		<datatype>d_float</datatype>
 		<name>gforce_min_gs</name>
 		<displayname>Minimum Gs</displayname>
 		<prereq>gforce_effect_mode.LEGACY</prereq>
@@ -3251,10 +3269,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20110.25</order>
+		<datatype>d_float</datatype>
 		<name>gforce_max_gs</name>
 		<displayname>Maximum Gs</displayname>
 		<prereq>gforce_effect_mode.LEGACY</prereq>
@@ -3269,10 +3287,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20120.2</order>
+		<datatype>float</datatype>
 		<name>new_gforce_effect_max_intensity</name>
 		<displayname>Maximum Intensity</displayname>
 		<prereq>gforce_effect_mode.NEW</prereq>
@@ -3288,10 +3306,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20120.3</order>
+		<datatype>d_float</datatype>
 		<name>new_gforce_min_gs</name>
 		<displayname>Start Gs</displayname>
 		<prereq>gforce_effect_mode.NEW</prereq>
@@ -3308,10 +3326,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20120.4</order>
+		<datatype>d_float</datatype>
 		<name>new_gforce_max_gs</name>
 		<displayname>Maximum Gs</displayname>
 		<prereq>gforce_effect_mode.NEW</prereq>
@@ -3328,10 +3346,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20120.5</order>
+		<datatype>float</datatype>
 		<name>new_gforce_effect_deflection_factor</name>
 		<displayname>Y-Axis Max Point</displayname>
 		<prereq>gforce_effect_mode.NEW</prereq>
@@ -3347,10 +3365,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>advgs</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20130.2</order>
+		<datatype>advgs</datatype>
 		<name>gforce_effect_adv_curve</name>
 		<displayname>Advanced</displayname>
 		<prereq>gforce_effect_mode.ADVANCED</prereq>
@@ -3364,10 +3382,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20140</order>
+		<datatype>bool</datatype>
 		<name>new_gforce_enable_neg_gs</name>
 		<displayname>Enable Negative Gs</displayname>
 		<prereq>gforce_effect_mode.NEW</prereq>
@@ -3382,10 +3400,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20140.2</order>
+		<datatype>float</datatype>
 		<name>new_gforce_effect_max_intensity_neg</name>
 		<displayname>Maximum Intensity (Neg)</displayname>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -3401,10 +3419,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20140.3</order>
+		<datatype>d_float</datatype>
 		<name>new_gforce_min_gs_neg</name>
 		<displayname>Start Gs (Neg)</displayname>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -3421,10 +3439,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20140.4</order>
+		<datatype>d_float</datatype>
 		<name>new_gforce_max_gs_neg</name>
 		<displayname>Maximum Gs (Neg)</displayname>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -3441,10 +3459,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>negfloat</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20140.5</order>
+		<datatype>negfloat</datatype>
 		<name>new_gforce_effect_deflection_factor_neg</name>
 		<displayname>Y-Axis Max Point (Neg)</displayname>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -3460,10 +3478,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20150</order>
+		<datatype>bool</datatype>
 		<name>deceleration_effect_enable</name>
 		<displayname>Deceleration Effect</displayname>
 		<prereq>inertial_group</prereq>
@@ -3478,10 +3496,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20150.1</order>
+		<datatype>float</datatype>
 		<name>deceleration_max_force</name>
 		<displayname>Deceleration Max Force</displayname>
 		<prereq>deceleration_effect_enable</prereq>
@@ -3496,10 +3514,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20150.2</order>
+		<datatype>d_float</datatype>
 		<name>decel_scale_factor</name>
 		<displayname>Deceleration Scale Factor</displayname>
 		<prereq>deceleration_effect_enable</prereq>
@@ -3515,10 +3533,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20150.3</order>
+		<datatype>bool</datatype>
 		<name>decel_invert_force</name>
 		<displayname>Invert Force</displayname>
 		<prereq>deceleration_effect_enable</prereq>
@@ -3532,10 +3550,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20150.4</order>
+		<datatype>bool</datatype>
 		<name>decel_airborne_disable</name>
 		<displayname>Disable while Airborne</displayname>
 		<prereq>deceleration_effect_enable</prereq>
@@ -3549,10 +3567,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20160</order>
+		<datatype>bool</datatype>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<displayname>Simulated Lateral Force</displayname>
 		<prereq>inertial_group</prereq>
@@ -3563,10 +3581,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20160.1</order>
+		<datatype>float</datatype>
 		<name>lateral_force_gain</name>
 		<displayname>Simulated Lateral Force Gain</displayname>
 		<prereq>uncoordinated_turn_effect_enabled</prereq>
@@ -3580,9 +3598,9 @@
 	<defaults><order>29999</order></defaults>
 	<defaults><order>29999</order></defaults>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>Ground</grouping>
 		<order>30000</order>
+		<datatype>group</datatype>
 		<name>ground_group</name>
 		<displayname>Ground</displayname>
 		<any>true</any>
@@ -3598,10 +3616,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30100</order>
+		<datatype>bool</datatype>
 		<name>runway_rumble_enabled</name>
 		<displayname>Runway Rumble</displayname>
 		<prereq>ground_group</prereq>
@@ -3616,10 +3634,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30100.1</order>
+		<datatype>float</datatype>
 		<name>runway_rumble_intensity</name>
 		<displayname>Runway Rumble</displayname>
 		<prereq>runway_rumble_enabled</prereq>
@@ -3636,10 +3654,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30200</order>
+		<datatype>bool</datatype>
 		<name>touchdown_effect_enabled</name>
 		<displayname>Touch-Down Effect</displayname>
 		<prereq>ground_group</prereq>
@@ -3652,10 +3670,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30200.1</order>
+		<datatype>float</datatype>
 		<name>touchdown_effect_max_force</name>
 		<displayname>Touch-Down Max Force</displayname>
 		<prereq>touchdown_effect_enabled</prereq>
@@ -3670,10 +3688,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30200.2</order>
+		<datatype>d_float</datatype>
 		<name>touchdown_effect_max_gs</name>
 		<displayname>Touch-Down Max G's</displayname>
 		<prereq>touchdown_effect_enabled</prereq>
@@ -3689,10 +3707,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30300</order>
+		<datatype>bool</datatype>
 		<name>nosewheel_shimmy</name>
 		<displayname>Nosewheel Shimmy</displayname>
 		<prereq>ground_group</prereq>
@@ -3703,10 +3721,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30300.1</order>
+		<datatype>float</datatype>
 		<name>nosewheel_shimmy_intensity</name>
 		<displayname>Nosewheel Shimmy</displayname>
 		<prereq>nosewheel_shimmy</prereq>
@@ -3719,10 +3737,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30300.2</order>
+		<datatype>float</datatype>
 		<name>nosewheel_shimmy_min_brakes</name>
 		<displayname>Nosewheel Shimmy min brakes</displayname>
 		<prereq>nosewheel_shimmy</prereq>
@@ -3735,10 +3753,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30300.3</order>
+		<datatype>int</datatype>
 		<name>nosewheel_shimmy_min_speed</name>
 		<displayname>Nosewheel Shimmy min speed</displayname>
 		<prereq>nosewheel_shimmy</prereq>
@@ -3752,10 +3770,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>friction</effecttype>
-		<datatype>bool</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30400</order>
+		<datatype>bool</datatype>
 		<name>steering_friction</name>
 		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
 		<prereq>ground_group</prereq>
@@ -3767,10 +3785,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>friction</effecttype>
-		<datatype>n_float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30400.1</order>
+		<datatype>n_float</datatype>
 		<name>steering_friction_intensity</name>
 		<displayname>Steering Friction Intensity</displayname>
 		<prereq>steering_friction</prereq>
@@ -3783,10 +3801,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>friction</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30400.2</order>
+		<datatype>d_float</datatype>
 		<name>steering_friction_expo</name>
 		<displayname>Steering Friction Expo</displayname>
 		<prereq>steering_friction</prereq>
@@ -3800,10 +3818,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>friction</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ground</parentgroup>
 		<order>30400.3</order>
+		<datatype>float</datatype>
 		<name>steering_friction_spring</name>
 		<displayname>Steering Gear Spring</displayname>
 		<prereq>steering_friction</prereq>
@@ -3817,9 +3835,9 @@
 	<defaults><order>39999</order></defaults>
 	<defaults><order>39999</order></defaults>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>Mechanical</grouping>
 		<order>40000</order>
+		<datatype>group</datatype>
 		<name>mechanical_group</name>
 		<displayname>Mechanical\Airframe</displayname>
 		<any>true</any>
@@ -3834,9 +3852,9 @@
 		<value>true</value>
 	</defaults>
 	<defaults>
-		<datatype>list</datatype>
 		<grouping>Info</grouping>
 		<order>40050</order>
+		<datatype>list</datatype>
 		<name>rotor_blade_count</name>
 		<displayname>Rotor Blade Count</displayname>
 		<any>true</any>
@@ -3901,10 +3919,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40100</order>
+		<datatype>bool</datatype>
 		<name>engine_rotor_rumble_enabled</name>
 		<displayname>Heli Engine/Rotor Rumble</displayname>
 		<prereq>mechanical_group</prereq>
@@ -3918,10 +3936,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40100.1</order>
+		<datatype>float</datatype>
 		<name>heli_engine_rumble_intensity</name>
 		<displayname>Heli Engine/Rotor Rumble</displayname>
 		<prereq>engine_rotor_rumble_enabled</prereq>
@@ -3939,10 +3957,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40200</order>
+		<datatype>bool</datatype>
 		<name>afterburner_effect_enabled</name>
 		<displayname>Afterburner Rumble</displayname>
 		<prereq>mechanical_group</prereq>
@@ -3958,10 +3976,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40200.1</order>
+		<datatype>float</datatype>
 		<name>afterburner_effect_intensity</name>
 		<displayname>Afterburner Rumble</displayname>
 		<prereq>afterburner_effect_enabled</prereq>
@@ -4028,14 +4046,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40300</order>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<datatype>bool</datatype>
-		<grouping>Rumble</grouping>
-		<parentgroup>mechanical</parentgroup>
-		<order>40300</order>
 		<name>engine_prop_rumble_enabled</name>
 		<displayname>Propeller Rumble</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4046,10 +4064,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40300.2</order>
+		<datatype>d_int</datatype>
 		<name>engine_rumble_lowrpm</name>
 		<displayname>Engine Rumble Low RPM</displayname>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -4068,10 +4086,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40300.3</order>
+		<datatype>float</datatype>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<displayname>Engine Rumble Low Intensity</displayname>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -4090,10 +4108,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40300.4</order>
+		<datatype>d_int</datatype>
 		<name>engine_rumble_highrpm</name>
 		<displayname>Engine Rumble High RPM</displayname>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -4112,10 +4130,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40300.5</order>
+		<datatype>float</datatype>
 		<name>engine_rumble_highrpm_intensity</name>
 		<displayname>Engine Rumble High Intensity</displayname>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -4167,11 +4185,11 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<exclusive_with>il2_jet_eng_shake_enabled</exclusive_with>
-		<datatype>bool</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40400</order>
+		<exclusive_with>il2_jet_eng_shake_enabled</exclusive_with>
+		<datatype>bool</datatype>
 		<name>engine_jet_rumble_enabled</name>
 		<displayname>Jet Engine Rumble</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4186,10 +4204,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40400.1</order>
+		<datatype>float</datatype>
 		<name>jet_engine_rumble_intensity</name>
 		<displayname>Jet Engine Rumble</displayname>
 		<prereq>engine_jet_rumble_enabled</prereq>
@@ -4207,10 +4225,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40400.2</order>
+		<datatype>d_int</datatype>
 		<name>jet_engine_rumble_freq</name>
 		<displayname>Jet Engine Rumble Freq</displayname>
 		<prereq>engine_jet_rumble_enabled</prereq>
@@ -4229,10 +4247,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40500</order>
+		<datatype>bool</datatype>
 		<name>canopy_motion_effect_enabled</name>
 		<displayname>Canopy Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4245,10 +4263,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40500.1</order>
+		<datatype>float</datatype>
 		<name>canopy_motion_intensity</name>
 		<displayname>Canopy Motion</displayname>
 		<prereq>canopy_motion_effect_enabled</prereq>
@@ -4264,10 +4282,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40600</order>
+		<datatype>bool</datatype>
 		<name>damage_effect_enabled</name>
 		<displayname>Damage Effect</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4281,10 +4299,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40600.1</order>
+		<datatype>float</datatype>
 		<name>damage_effect_intensity</name>
 		<displayname>Damage Effect</displayname>
 		<prereq>damage_effect_enabled</prereq>
@@ -4300,10 +4318,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40700</order>
+		<datatype>bool</datatype>
 		<name>flaps_motion_effect_enabled</name>
 		<displayname>Flaps Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4318,10 +4336,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40700.1</order>
+		<datatype>float</datatype>
 		<name>flaps_motion_intensity</name>
 		<displayname>Flaps Motion</displayname>
 		<prereq>flaps_motion_effect_enabled</prereq>
@@ -4340,10 +4358,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40800</order>
+		<datatype>bool</datatype>
 		<name>fuelboom_motion_effect_enabled</name>
 		<displayname>Fuel Boom/Door Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4353,10 +4371,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40800.1</order>
+		<datatype>float</datatype>
 		<name>fuelboom_motion_intensity</name>
 		<displayname>Fuel Boom/Door Motion</displayname>
 		<prereq>fuelboom_motion_effect_enabled</prereq>
@@ -4369,10 +4387,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40900</order>
+		<datatype>bool</datatype>
 		<name>gear_buffet_effect_enabled</name>
 		<displayname>Gear Buffet</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4387,10 +4405,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40900.1</order>
+		<datatype>float</datatype>
 		<name>gear_buffet_intensity</name>
 		<displayname>Gear Buffet</displayname>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -4408,10 +4426,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40900.2</order>
+		<datatype>d_int</datatype>
 		<name>gear_buffet_freq</name>
 		<displayname>Buffeting Frequency</displayname>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -4429,10 +4447,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40900.3</order>
+		<datatype>int</datatype>
 		<name>gear_buffet_speed_low</name>
 		<displayname>Min Intensity Speed</displayname>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -4447,10 +4465,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>40900.4</order>
+		<datatype>int</datatype>
 		<name>gear_buffet_speed_high</name>
 		<displayname>Max Intensity Speed</displayname>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -4465,10 +4483,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41000</order>
+		<datatype>bool</datatype>
 		<name>gear_motion_effect_enabled</name>
 		<displayname>Gear Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4484,10 +4502,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41000.1</order>
+		<datatype>float</datatype>
 		<name>gear_motion_intensity</name>
 		<displayname>Gear Motion</displayname>
 		<prereq>gear_motion_effect_enabled</prereq>
@@ -4506,10 +4524,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41100</order>
+		<datatype>bool</datatype>
 		<name>speedbrake_buffet_effect_enabled</name>
 		<displayname>Speedbrake Buffet</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4522,10 +4540,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41100.1</order>
+		<datatype>float</datatype>
 		<name>speedbrake_buffet_intensity</name>
 		<displayname>Speedbrake Buffet</displayname>
 		<prereq>speedbrake_buffet_effect_enabled</prereq>
@@ -4542,10 +4560,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41200</order>
+		<datatype>bool</datatype>
 		<name>speedbrake_motion_effect_enabled</name>
 		<displayname>Speedbrake Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4558,10 +4576,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41200.1</order>
+		<datatype>float</datatype>
 		<name>speedbrake_motion_intensity</name>
 		<displayname>Speedbrake Motion</displayname>
 		<prereq>speedbrake_motion_effect_enabled</prereq>
@@ -4578,10 +4596,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41300</order>
+		<datatype>bool</datatype>
 		<name>spoiler_buffet_effect_enabled</name>
 		<displayname>Spoiler Buffet</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4595,10 +4613,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41300.1</order>
+		<datatype>float</datatype>
 		<name>spoiler_buffet_intensity</name>
 		<displayname>Spoiler Buffet</displayname>
 		<prereq>spoiler_buffet_effect_enabled</prereq>
@@ -4616,10 +4634,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41400</order>
+		<datatype>bool</datatype>
 		<name>spoiler_motion_effect_enabled</name>
 		<displayname>Spoiler Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4632,10 +4650,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41400.1</order>
+		<datatype>float</datatype>
 		<name>spoiler_motion_intensity</name>
 		<displayname>Spoiler Motion</displayname>
 		<prereq>spoiler_motion_effect_enabled</prereq>
@@ -4652,10 +4670,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41500</order>
+		<datatype>bool</datatype>
 		<name>enable_stick_shaker</name>
 		<displayname>Stick Shaker</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4665,10 +4683,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41500</order>
+		<datatype>bool</datatype>
 		<name>enable_stick_shaker</name>
 		<displayname>AoA Stick Shaker</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4679,10 +4697,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41500</order>
+		<datatype>bool</datatype>
 		<name>enable_stick_shaker</name>
 		<displayname>AoA Pedal Shaker</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4693,10 +4711,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41500.1</order>
+		<datatype>float</datatype>
 		<name>stick_shaker_intensity</name>
 		<displayname>Stick Shaker Intensity</displayname>
 		<prereq>enable_stick_shaker</prereq>
@@ -4708,10 +4726,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41500.2</order>
+		<datatype>float</datatype>
 		<name>stick_shaker_intensity</name>
 		<displayname>Shaker Intensity</displayname>
 		<prereq>enable_stick_shaker</prereq>
@@ -4725,10 +4743,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>anyfloat</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41500.3</order>
+		<datatype>anyfloat</datatype>
 		<name>stick_shaker_aoa</name>
 		<displayname>Shaker AoA Threshold</displayname>
 		<prereq>enable_stick_shaker</prereq>
@@ -4743,10 +4761,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41500.4</order>
+		<datatype>d_int</datatype>
 		<name>stick_shaker_frequency</name>
 		<displayname>Shaker Freqency (Hz)</displayname>
 		<prereq>enable_stick_shaker</prereq>
@@ -4760,10 +4778,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41600</order>
+		<datatype>bool</datatype>
 		<name>tailhook_motion_effect_enabled</name>
 		<displayname>Tailhook Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4774,10 +4792,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41600.1</order>
+		<datatype>float</datatype>
 		<name>tailhook_motion_intensity</name>
 		<displayname>Tailhook Motion</displayname>
 		<prereq>tailhook_motion_effect_enabled</prereq>
@@ -4791,10 +4809,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41700</order>
+		<datatype>bool</datatype>
 		<name>wingfold_motion_effect_enabled</name>
 		<displayname>Wing Fold Motion</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4804,10 +4822,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41700.1</order>
+		<datatype>float</datatype>
 		<name>wingfold_motion_intensity</name>
 		<displayname>Wing Fold Motion</displayname>
 		<prereq>wingfold_motion_effect_enabled</prereq>
@@ -4820,10 +4838,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
-		<datatype>bool</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41800</order>
+		<datatype>bool</datatype>
 		<name>enable_hydraulic_loss_effect</name>
 		<displayname>Low Hydraulic Pressure Effect&lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4838,10 +4856,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41800.2</order>
+		<datatype>float</datatype>
 		<name>hydraulic_loss_threshold</name>
 		<displayname>Hydraulic System Threshold</displayname>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -4857,10 +4875,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41800.3</order>
+		<datatype>float</datatype>
 		<name>hydraulic_loss_damper</name>
 		<displayname>Damper</displayname>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -4876,10 +4894,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41800.4</order>
+		<datatype>float</datatype>
 		<name>hydraulic_loss_inertia</name>
 		<displayname>Inertia</displayname>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -4895,10 +4913,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>41800.5</order>
+		<datatype>float</datatype>
 		<name>hydraulic_loss_friction</name>
 		<displayname>Friction</displayname>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -4914,10 +4932,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>42000</order>
+		<datatype>bool</datatype>
 		<name>FI_vibration_enable</name>
 		<displayname>Vibration from Telemetry</displayname>
 		<prereq>mechanical_group</prereq>
@@ -4929,10 +4947,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>42000.1</order>
+		<datatype>float</datatype>
 		<name>FI_vibration_intensity</name>
 		<displayname>Vibration Intensity</displayname>
 		<prereq>FI_vibration_enable</prereq>
@@ -4945,10 +4963,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>d_float</datatype>
 		<grouping>Vibration</grouping>
 		<parentgroup>mechanical</parentgroup>
 		<order>42000.2</order>
+		<datatype>d_float</datatype>
 		<name>FI_vibration_expo</name>
 		<displayname>Vibration Expo</displayname>
 		<prereq>FI_vibration_enable</prereq>
@@ -4963,9 +4981,9 @@
 	<defaults><order>49999</order></defaults>
 	<defaults><order>49999</order></defaults>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>Weapons</grouping>
 		<order>50000</order>
+		<datatype>group</datatype>
 		<name>weapons_group</name>
 		<displayname>Weapons</displayname>
 		<info>Weapons effects max intensity controlled by Periodic slider in Configurator</info>
@@ -4979,10 +4997,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50100</order>
+		<datatype>bool</datatype>
 		<name>countermeasure_effect_enabled</name>
 		<displayname>Countermeasures</displayname>
 		<prereq>weapons_group</prereq>
@@ -4995,10 +5013,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50100.1</order>
+		<datatype>float</datatype>
 		<name>cm_vibration_intensity</name>
 		<displayname>Countermeasure Release</displayname>
 		<prereq>countermeasure_effect_enabled</prereq>
@@ -5013,10 +5031,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50200</order>
+		<datatype>bool</datatype>
 		<name>gunfire_effect_enabled</name>
 		<displayname>Gunfire</displayname>
 		<prereq>weapons_group</prereq>
@@ -5029,10 +5047,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50200.1</order>
+		<datatype>float</datatype>
 		<name>gun_vibration_intensity</name>
 		<displayname>Gun Vibration</displayname>
 		<prereq>gunfire_effect_enabled</prereq>
@@ -5047,10 +5065,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50300</order>
+		<datatype>bool</datatype>
 		<name>weapon_release_effect_enabled</name>
 		<displayname>Weapons Release</displayname>
 		<prereq>weapons_group</prereq>
@@ -5063,10 +5081,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50300.1</order>
+		<datatype>float</datatype>
 		<name>weapon_release_intensity</name>
 		<displayname>Weapon Release</displayname>
 		<prereq>weapon_release_effect_enabled</prereq>
@@ -5081,10 +5099,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50400</order>
+		<datatype>bool</datatype>
 		<name>dummy_weapon_direction</name>
 		<displayname>Weapon Effects Direction</displayname>
 		<prereq>weapons_group</prereq>
@@ -5097,10 +5115,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>d_int</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>weapons</parentgroup>
 		<order>50400.1</order>
+		<datatype>d_int</datatype>
 		<name>weapon_effect_direction</name>
 		<displayname>Weapon Effects Direction</displayname>
 		<prereq>dummy_weapon_direction</prereq>
@@ -5116,9 +5134,9 @@
 	<defaults><order>59000</order></defaults>
 	<defaults><order>59000</order></defaults>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>FFB Overrides</grouping>
 		<order>60000</order>
+		<datatype>group</datatype>
 		<name>ffb_group</name>
 		<displayname>Basic FFB Effects</displayname>
 		<any>true</any>
@@ -5135,10 +5153,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
-		<datatype>bool</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60100</order>
+		<datatype>bool</datatype>
 		<name>enable_damper_ovd</name>
 		<displayname>Damper Override</displayname>
 		<prereq>ffb_group</prereq>
@@ -5156,10 +5174,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60100.1</order>
+		<datatype>float</datatype>
 		<name>damper_force</name>
 		<displayname>Damper Effect</displayname>
 		<prereq>enable_damper_ovd</prereq>
@@ -5178,10 +5196,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>inertia</effecttype>
-		<datatype>bool</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60200</order>
+		<datatype>bool</datatype>
 		<name>enable_inertia_ovd</name>
 		<displayname>Inertia Override</displayname>
 		<prereq>ffb_group</prereq>
@@ -5199,10 +5217,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>inertia</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60200.1</order>
+		<datatype>float</datatype>
 		<name>inertia_force</name>
 		<displayname>Inertia Effect</displayname>
 		<prereq>enable_inertia_ovd</prereq>
@@ -5221,10 +5239,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>friction</effecttype>
-		<datatype>bool</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60300</order>
+		<datatype>bool</datatype>
 		<name>enable_friction_ovd</name>
 		<displayname>Friction Override</displayname>
 		<prereq>ffb_group</prereq>
@@ -5242,10 +5260,10 @@
 	</defaults>
 	<defaults>
 		<effecttype>friction</effecttype>
-		<datatype>float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60300.1</order>
+		<datatype>float</datatype>
 		<name>friction_force</name>
 		<displayname>Friction Effect</displayname>
 		<prereq>enable_friction_ovd</prereq>
@@ -5263,10 +5281,10 @@
 		<value>0</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60400</order>
+		<datatype>bool</datatype>
 		<name>enable_deadzone</name>
 		<displayname>Enable Configurator Deadzone</displayname>
 		<prereq>ffb_group</prereq>
@@ -5282,10 +5300,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>d_float</datatype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>ffb</parentgroup>
 		<order>60400.1</order>
+		<datatype>d_float</datatype>
 		<name>deadzone_base_pct</name>
 		<displayname>Deadzone %</displayname>
 		<prereq>enable_deadzone</prereq>
@@ -5306,9 +5324,9 @@
 	<defaults><order>69999</order></defaults>
 	<defaults><order>69999</order></defaults>
 	<defaults>
-		<datatype>group</datatype>
 		<grouping>System</grouping>
 		<order>80000</order>
+		<datatype>group</datatype>
 		<name>system_group</name>
 		<displayname>System</displayname>
 		<any>true</any>
@@ -5324,10 +5342,10 @@
 		<value>true</value>
 	</defaults>
 	<defaults>
-		<datatype>text</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80100</order>
+		<datatype>text</datatype>
 		<name>telemffb_profile</name>
 		<displayname>TelemFFB Profile</displayname>
 		<prereq>system_group</prereq>
@@ -5343,10 +5361,10 @@
 		<trimwheel>true</trimwheel>
 	</defaults>
 	<defaults>
-		<datatype>path</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80200</order>
+		<datatype>path</datatype>
 		<name>vpconf</name>
 		<displayname>Configurator File</displayname>
 		<prereq>system_group</prereq>
@@ -5362,10 +5380,10 @@
 		<value>-</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80300</order>
+		<datatype>bool</datatype>
 		<name>configurator_override_enabled</name>
 		<displayname>Override Configurator Sliders</displayname>
 		<prereq>system_group</prereq>
@@ -5382,10 +5400,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>configurator</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80300.1</order>
+		<datatype>configurator</datatype>
 		<name>configurator_gains</name>
 		<displayname>Override Configurator Sliders</displayname>
 		<prereq>configurator_override_enabled</prereq>
@@ -5403,10 +5421,10 @@
 		<value>none</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80400</order>
+		<datatype>bool</datatype>
 		<name>command_runner_enabled</name>
 		<displayname>Command Runner</displayname>
 		<prereq>system_group</prereq>
@@ -5422,10 +5440,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>text</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80400.2</order>
+		<datatype>text</datatype>
 		<name>command_runner_command</name>
 		<displayname>Command Runner String</displayname>
 		<prereq>command_runner_enabled</prereq>
@@ -5442,10 +5460,10 @@
 		<value>Enter full path as if running from command prompt...</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80500</order>
+		<datatype>bool</datatype>
 		<name>center_spring_on_pause</name>
 		<displayname>Center on Pause/Slew</displayname>
 		<prereq>system_group</prereq>
@@ -5458,10 +5476,10 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
-		<datatype>bool</datatype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80600</order>
+		<datatype>bool</datatype>
 		<name>keep_forces_on_pause</name>
 		<displayname>Keep Forces on Pause/Slew</displayname>
 		<prereq>system_group</prereq>
@@ -5485,18 +5503,18 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
 		<order>91089</order>
+		<datatype>convert</datatype>
 		<name>gforce_effect_advanced_enabled</name>
 		<displayname>Advanced G Force Effect</displayname>
 		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
 		<order>91090</order>
+		<datatype>convert</datatype>
 		<name>gforce_effect_master</name>
 		<displayname>G-Force Effect</displayname>
 		<info>Master control for all G Effects</info>
@@ -5504,9 +5522,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
 		<order>91091</order>
+		<datatype>convert</datatype>
 		<name>gforce_effect_enable</name>
 		<displayname>G Force Effect (Legacy)</displayname>
 		<info>See manual for details</info>
@@ -5519,9 +5537,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
 		<order>91092</order>
+		<datatype>convert</datatype>
 		<name>new_gforce_effect_enable</name>
 		<displayname>G Force Effect (Legacy **New**)</displayname>
 		<info>Alternate G Force Effec - Enabling will override legacy G Force Effect&lt;br&gt;&lt;br&gt;See manual for details</info>
@@ -5534,27 +5552,27 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>convert</datatype>
 		<grouping>SpringCenter</grouping>
 		<order>91093</order>
+		<datatype>convert</datatype>
 		<name>pedal_spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<info>Pedal spring mode.  See manual for use.</info>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>convert</datatype>
 		<grouping>Spring Override</grouping>
 		<order>91094</order>
+		<datatype>convert</datatype>
 		<name>adv_spr_override_enabled</name>
 		<displayname>Advanced Spring Override</displayname>
 		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>convert</datatype>
 		<grouping>Sim Options</grouping>
 		<order>91095</order>
+		<datatype>convert</datatype>
 		<name>override_spring_enabled</name>
 		<displayname>Override DCS Spring</displayname>
 		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
@@ -5562,9 +5580,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
 		<order>91990</order>
+		<datatype>bool</datatype>
 		<name>pedal_mode_dummy</name>
 		<displayname>Pedal Mode Settings</displayname>
 		<prereq>	do not show</prereq>
@@ -5572,9 +5590,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
 		<order>91991</order>
+		<datatype>bool</datatype>
 		<name>pedal_advanced_dummy</name>
 		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
 		<prereq>	do not show</prereq>
@@ -5583,9 +5601,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<order>99300</order>
+		<datatype>bool</datatype>
 		<name>dummy_dynamic_spring_settings</name>
 		<displayname>Dynamic Spring Settings</displayname>
 		<prereq>	do not show</prereq>
@@ -5596,9 +5614,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>convert</datatype>
 		<grouping>Spring Override</grouping>
 		<order>99310</order>
+		<datatype>convert</datatype>
 		<name>adv_spr_override_enabled</name>
 		<displayname>Advanced Spring Mapping</displayname>
 		<MSFS>true</MSFS>
@@ -5609,9 +5627,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
 		<grouping>Dynamic Forces</grouping>
 		<order>99400</order>
+		<datatype>bool</datatype>
 		<name>dummy_basic_spring_settings</name>
 		<displayname>Basic Settings</displayname>
 		<prereq>	do not show</prereq>
@@ -5637,9 +5655,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>convert</datatype>
 		<grouping>SpringCenter</grouping>
 		<order>99500</order>
+		<datatype>convert</datatype>
 		<name>aircraft_is_spring_centered</name>
 		<displayname>Spring Centering (not FBW)</displayname>
 		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>

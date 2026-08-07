@@ -170,9 +170,29 @@ class BaseTelemetryData:
     """
 
     StallWarning: Optional[Union[bool, int]]
-    """Stall warning indicator active.  
-    MSFS: STALL WARNING SimVar — bool.  
+    """Stall warning indicator active.
+    MSFS: STALL WARNING SimVar — bool.
+    XP: sim/cockpit2/annunciators/stall_warning via the plugin — int 0/1.
     """
+
+    StallFracL: Optional[float]
+    """Fraction of the LEFT main-wing's active elements currently stalled,
+    0.0–1.0 (~10% span resolution).
+    XP: sim/flightmodel2/wing/elements/element_is_stalled (documented
+    wing1L,1R..4L,4R indexing), normalized to elements that exist per
+    element_MAC_mtr, plugin-computed. Drives asymmetric stall buffet
+    (wing-drop cue): compare against StallFracR.
+    Other sims: not available.
+    """
+
+    StallFracR: Optional[float]
+    """Fraction of the RIGHT main-wing's active elements currently stalled,
+    0.0–1.0. XP only; see StallFracL."""
+
+    StallFrac: Optional[float]
+    """Fraction of ALL active aerosurface elements (wings + stabs + rudders
+    + misc wings) currently stalled, 0.0–1.0 — the overall separation-depth
+    signal. XP only; see StallFracL."""
 
     WarnAlpha: Optional[float]
     """Warning alpha (approach-to-stall AoA threshold) — degrees.
@@ -269,10 +289,18 @@ class BaseTelemetryData:
     """
 
     SideSlip: Optional[float]
-    """Sideslip angle (beta).  
-    DCS: computed from velocity vectors in TelemFFB.lua — degrees.  
-    MSFS: INCIDENCE BETA SimVar — degrees.  
-    IL2/BMS: not available.  
+    """Sideslip angle (beta).
+    DCS: computed from velocity vectors in TelemFFB.lua — degrees.
+    MSFS: INCIDENCE BETA SimVar — degrees.
+    IL2/BMS: not available.
+    """
+
+    VelRotBody: Optional[List[float]]
+    """Body-axis rotation velocities [X, Y, Z] — degrees per second.
+    MSFS: ROTATION VELOCITY BODY X/Y/Z SimVars. X = pitch axis, Y = yaw
+    axis, Z = roll (longitudinal) axis — Z drives the wing-drop buffet
+    asymmetry proxy.
+    Other sims: not available.
     """
 
     Incidence: Optional[List[float]]

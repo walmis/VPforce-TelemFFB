@@ -136,6 +136,94 @@ class TestBuffetingEffect(BaseTelemetryEffectTestCase):
                                              Vs=30.0))
         assert self.mock_effects.get("buffeting") is None
 
+    # ---- renderer styles -------------------------------------------------
+
+    def _freq_mag(self, inst, telem):
+        inst.ac_update_buffeting(telem)
+        eff = self.mock_effects.get("buffeting")
+        assert eff is not None and eff._periodic is not None
+        return eff._periodic[0], eff._periodic[1]
+
+    def test_classic_style_is_unchanged(self):
+        inst = self._inst(msfs=False)
+        inst.stall_buffet_style = "Classic"
+        f, m = self._freq_mag(inst, self._telem(AoA=14.4, TAS=30,
+                                                WarnAlpha=12.0, Vs=30.0))
+        assert f == inst.aoa_buffet_freq
+        assert m == pytest.approx(0.2, abs=1e-4)
+
+    def test_dynamic_style_envelope_and_frequency(self):
+        import random as _random
+        _random.seed(42)
+        inst = self._inst(msfs=False)
+        inst.stall_buffet_style = "Dynamic"
+        # Force per-frame gust re-picks so a fast test loop sees variation.
+        inst.DYN_ENV_PERIOD = (0.0, 1e-6)
+        inst.DYN_ENV_TAU = 1e-9
+
+        telem = self._telem(AoA=14.4, TAS=30, WarnAlpha=12.0, Vs=30.0)
+        base = 0.2  # estimator magnitude at full ramp, own stall speed
+        mags, freqs = [], []
+        for _ in range(60):
+            f, m = self._freq_mag(inst, telem)
+            mags.append(m)
+            freqs.append(f)
+        # Envelope: within [floor, peak] x RMS compensation, varying, and
+        # MEAN-NEUTRAL in PERCEIVED terms: the triangle carrier is ~18%
+        # quieter RMS than Classic's sine, so commanded magnitude runs
+        # base * DYN_WAVEFORM_RMS_COMP on average — equal felt level.
+        comp = inst.DYN_WAVEFORM_RMS_COMP
+        assert min(mags) >= base * inst.DYN_ENV_FLOOR * comp - 1e-6
+        assert max(mags) <= base * inst.DYN_ENV_PEAK * comp + 1e-6
+        assert max(mags) - min(mags) > 0.02 * base, "envelope never varied"
+        mean = sum(mags) / len(mags)
+        assert mean == pytest.approx(base * comp, rel=0.25), \
+            f"envelope not mean-neutral (mean {mean} vs {base * comp})"
+        # Dynamic renders a triangle carrier; Classic stays on default sine.
+        from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE
+        kwargs = self.mock_effects["buffeting"]._periodic[3]
+        assert kwargs.get("effect_type") == EFFECT_TRIANGLE
+        # Depth 1.0 -> deep-stall frequency: slider + DEEP_DELTA (13-4=9).
+        f_deep = inst.aoa_buffet_freq + inst.DYN_FREQ_DEEP_DELTA
+        assert all(f == pytest.approx(f_deep) for f in freqs)
+
+        # Shallow depth -> higher frequency (light onset nibble).
+        onset_telem = self._telem(AoA=10.5, TAS=30, WarnAlpha=12.0, Vs=30.0)
+        f_shallow, _ = self._freq_mag(inst, onset_telem)
+        assert f_shallow > f_deep
+        assert f_shallow <= inst.aoa_buffet_freq + inst.DYN_FREQ_ONSET_DELTA
+
+        # The Buffeting Frequency slider anchors the whole sweep in Dynamic
+        # mode too (it is not a Classic-only control).
+        inst.aoa_buffet_freq = 20
+        f, _ = self._freq_mag(inst, telem)  # depth 1.0
+        assert f == pytest.approx(20 + inst.DYN_FREQ_DEEP_DELTA)
+        inst.aoa_buffet_freq = 5   # sweep floor engages
+        f, _ = self._freq_mag(inst, telem)
+        assert f == pytest.approx(inst.DYN_FREQ_MIN)
+
+    def test_dynamic_style_aims_single_axis_devices(self):
+        # Pedals feel only X (90/270) and collective only Y (0/180): Dynamic
+        # aims the carrier along the felt axis there — the random walk would
+        # project into amplitude noise that masks the gust envelope.
+        import telemffb.utils as utils
+        for ffb, want in (("pedals", 90), ("collective", 0)):
+            inst = self._inst(msfs=False)
+            inst.stall_buffet_style = "Dynamic"
+            telem = self._telem(AoA=14.4, TAS=30, WarnAlpha=12.0, Vs=30.0,
+                                FFBType=ffb)
+            inst._telem_data = telem
+            inst.ac_update_buffeting(telem)
+            assert self.mock_effects["buffeting"]._periodic[2] == want
+        # Joysticks keep the random-direction walk.
+        inst = self._inst(msfs=False)
+        inst.stall_buffet_style = "Dynamic"
+        telem = self._telem(AoA=14.4, TAS=30, WarnAlpha=12.0, Vs=30.0)
+        inst._telem_data = telem
+        inst.ac_update_buffeting(telem)
+        assert (self.mock_effects["buffeting"]._periodic[2]
+                is utils.RandomDirectionModulator)
+
     def test_on_ground_disposes(self):
         inst = self._inst(msfs=False)
         assert self._mag(inst, self._telem(AoA=15.0, TAS=30, WarnAlpha=12.0,
