@@ -286,12 +286,21 @@ class TrimCalibrationDialog(QDialog):
         self._is_glider = False
         self._set_glider_row_visible(False)
 
-        # Debug-only controls (system settings 'debug' flag): trim write
-        # method override + per-run diagnostic trace, for problem-aircraft
-        # reports. Direct SimVar writes are the tested-primary method; the
-        # axis event stays selectable in case an aircraft ever requires it.
-        self._debug = bool(getattr(G, "system_settings", None)
-                           and G.system_settings.get("debug", False))
+        # Debug-only controls: trim write method override + per-run
+        # diagnostic trace, for problem-aircraft reports. Direct SimVar
+        # writes are the tested-primary method; the axis event stays
+        # selectable in case an aircraft ever requires it. Visible when
+        # debug mode is active by EITHER route: the registry 'debug' flag
+        # or the session Debug menu summoned with Alt+D — so a remote
+        # tester can be talked through enabling the trace without editing
+        # the registry. Evaluated at construction; the dialog destroys on
+        # close, so Alt+D followed by reopening the tool picks it up.
+        debug_flag = bool(getattr(G, "system_settings", None)
+                          and G.system_settings.get("debug", False))
+        main_menu = getattr(getattr(G, "main_window", None), "menu", None)
+        debug_menu_active = bool(main_menu) and any(
+            a.text() == "Debug" for a in main_menu.actions())
+        self._debug = debug_flag or debug_menu_active
         self.cmb_trim_method = None
         self.chk_trace = None
         if self._debug:
@@ -299,8 +308,10 @@ class TrimCalibrationDialog(QDialog):
             lbl_trim_method = InfoLabel(
                 text="Trim write method:",
                 tooltip=(
-                    "Debug options — this row is only visible when the Debug Mode "
-                    "system setting is enabled.\n\n"
+                    "Debug options — this row is visible when debug mode is "
+                    "active: either the Debug Mode system setting, or the Debug "
+                    "menu shown with Alt+D (reopen this dialog after pressing "
+                    "it).\n\n"
                     "Trim write method: how calibration commands the sim's elevator "
                     "trim (MSFS).\n"
                     "• Direct (default) — writes the ELEVATOR TRIM POSITION SimVar "
