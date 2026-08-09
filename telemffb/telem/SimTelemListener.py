@@ -131,7 +131,9 @@ class SimIL2(SimTelemListener):
             logging.info("Validating IL2 Sturmovik Telemetry Config")
             utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Sturmovik")
         if G.system_settings.get('validateIL2_K'):
-            il2_path = os.path.join(G.system_settings.get('pathIL2_K'), 'game\\data\\startup.cfg')
+            # Standalone: <root>\game\data; Steam (IL2Series): <root>\data.
+            game_root = utils.il2_korea_game_root(G.system_settings.get('pathIL2_K'))
+            il2_path = os.path.join(game_root, 'data', 'startup.cfg')
             logging.info("Validating IL2 Korea Telemetry Config")
             utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Korea", korea=True)
 
