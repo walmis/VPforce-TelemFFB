@@ -2986,7 +2986,7 @@
 		<order>11100</order>
 		<datatype>bool</datatype>
 		<name>overspeed_effect_enable</name>
-		<displayname>Overpeed Shake </displayname>
+		<displayname>Overspeed Shake </displayname>
 		<prereq>airflow_group</prereq>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -3003,7 +3003,7 @@
 		<order>11100.1</order>
 		<datatype>float</datatype>
 		<name>overspeed_shake_intensity</name>
-		<displayname>Overpeed Shake </displayname>
+		<displayname>Overspeed Shake </displayname>
 		<prereq>overspeed_effect_enable</prereq>
 		<info>Maximum overspeed shake intensity</info>
 		<DCS>true</DCS>
@@ -3022,7 +3022,7 @@
 		<order>11100.2</order>
 		<datatype>int</datatype>
 		<name>overspeed_shake_start</name>
-		<displayname>Overpeed Shake Start Speed</displayname>
+		<displayname>Overspeed Shake Start Speed</displayname>
 		<prereq>overspeed_effect_enable</prereq>
 		<info>Threshold at which overspeed shake will start to ramp up</info>
 		<DCS>true</DCS>
