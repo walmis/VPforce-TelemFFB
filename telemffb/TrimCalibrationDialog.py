@@ -1535,7 +1535,10 @@ class TrimCalibrationDialog(QDialog):
         else:
             self._ias_hist.clear()
         self.ias_trend.set_rate(rate, static)
-        ias_txt = fmt(ias, MS_TO_KT, " kt")
+        # Tenths: during the assistant hold the user is WATCHING the speed
+        # settle toward the readiness gate; whole knots hide the trend the
+        # gate reacts to (power-user field request).
+        ias_txt = fmt(ias, MS_TO_KT, " kt", nd=1)
         ias_style = ""
         if ias_ref and ias:
             drift = (ias - ias_ref) / ias_ref

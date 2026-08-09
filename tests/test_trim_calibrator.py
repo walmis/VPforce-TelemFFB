@@ -1874,6 +1874,79 @@ class TestTrimAssistant:
         cal.update(ac.telem())
         assert not cal.assist_stable
 
+    def test_overshoot_pingpong_inflates_slope(self, clock, caplog):
+        # SR22T field case: relief verdicts on a slow-responding aircraft
+        # under-measure the slope, Newton steps overshoot through zero, and
+        # every overshoot re-verifies "relieved" with the same wrong slope.
+        # Three alternating similar-magnitude premove loads must inflate
+        # the slope (halving the steps) and log the diagnosis.
+        import logging as _logging
+        ac, cal = self._start_assist(clock, coupling=0.5)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 120)
+        cal._trim_slope_est = -0.8
+        cal._assist_move_hist.clear()
+        now = time.perf_counter()
+        with caplog.at_level(_logging.WARNING):
+            assert not cal._detect_overshoot_cycle(now, +0.07)
+            assert not cal._detect_overshoot_cycle(now + 10, -0.08)
+            assert cal._detect_overshoot_cycle(now + 20, +0.065)
+        assert cal._trim_slope_est == pytest.approx(-1.6)
+        assert any("oscillating" in r.message for r in caplog.records)
+        # History cleared on detection: no immediate re-fire.
+        assert not cal._detect_overshoot_cycle(now + 30, -0.05)
+
+    def test_overshoot_detector_rejects_benign_patterns(self, clock):
+        ac, cal = self._start_assist(clock, coupling=0.5)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 120)
+        cal._trim_slope_est = -0.8
+        cal._assist_move_hist.clear()
+        now = time.perf_counter()
+        # Same-sign run (chasing a power change): never fires.
+        for i, u in enumerate((+0.08, +0.07, +0.09, +0.08)):
+            assert not cal._detect_overshoot_cycle(now + i * 5, u)
+        cal._assist_move_hist.clear()
+        # Alternating but rapidly shrinking (healthy convergence): the
+        # magnitude-similarity band rejects it.
+        assert not cal._detect_overshoot_cycle(now + 40, +0.10)
+        assert not cal._detect_overshoot_cycle(now + 45, -0.03)
+        assert not cal._detect_overshoot_cycle(now + 50, +0.01)
+        cal._assist_move_hist.clear()
+        # Stale moves outside the window don't combine with fresh ones.
+        assert not cal._detect_overshoot_cycle(now + 100, +0.07)
+        assert not cal._detect_overshoot_cycle(now + 200, -0.07)
+        assert not cal._detect_overshoot_cycle(now + 205, +0.07)
+        assert cal._trim_slope_est == pytest.approx(-0.8)
+
+    def test_ready_gate_hysteresis_rides_boundary_hover(self, clock):
+        # Field case (SR22T): a value hovering just past an arming threshold
+        # flapped the Start button with the throttle untouched. Once armed,
+        # the value gates release only at ASSIST_READY_HYST x the arming
+        # threshold — boundary hover cannot flap a band.
+        ac, cal = self._start_assist(clock, coupling=0.5)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+
+        dt = 1 / 30.0
+
+        def drift_frame(rate):
+            ac.ias += rate * dt
+            clock.advance(dt)
+            cal.update(ac.telem())
+            ac.step(dt)
+
+        # Drift IAS at 1.2x the arming limit: inside the band, must HOLD.
+        for _ in range(int(6 / dt)):
+            drift_frame(cal.ASSIST_IAS_RATE_MAX * 1.2)
+            assert cal.assist_stable, "gate flapped inside the hysteresis band"
+
+        # Past the release threshold (2.0x > 1.5x) it must still disarm.
+        for _ in range(int(6 / dt)):
+            drift_frame(cal.ASSIST_IAS_RATE_MAX * 2.0)
+            if not cal.assist_stable:
+                break
+        assert not cal.assist_stable, "gate never released past the band"
+
     def test_gate_flap_logging_aggregates_reasons(self, clock, caplog):
         # Power-user field report: the Start button flickers armed/disarmed
         # too fast to click. The old flap guard demoted every rapid

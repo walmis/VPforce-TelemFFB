@@ -237,6 +237,35 @@ class TrimCalibrator:
     # only after a sustained calm window.
     ASSIST_STABLE_HOLD_S = 3.0     # calm must persist this long before "stable"
     ASSIST_IAS_RATE_MAX = 0.15     # m/s per s (~0.3 kt/s); IAS still trending = not stable
+    # Schmitt band on the VALUE gates (load, IAS rate): once armed they
+    # release only at this multiple of their arming threshold. Field case
+    # (SR22T 2026-08-09, flap-summary logging): the load mean wandered
+    # against the 0.03 tolerance with the throttle untouched, and every
+    # brief poke past the line disarmed the Start button mid-click —
+    # boundary hover flaps a single threshold, it cannot flap a band. A
+    # mistimed click stays safe regardless: begin_sweep routes through the
+    # confirmation settle. Disturbance gates (retrimming, VS/roll) keep
+    # their instant single-threshold disarm.
+    ASSIST_READY_HYST = 1.5
+    # Overshoot limit-cycle detector: on aircraft with a slow speed-mediated
+    # response tail (SR22T class — a trim move shifts speed, and the level
+    # point migrates with speed for many seconds) a relief verdict samples
+    # only PART of the move's effect, learning a slope a fraction of truth.
+    # Newton steps then overshoot through zero, and each overshoot
+    # re-verifies "relieved" and re-learns the same wrong slope — a
+    # self-confirming ping-pong that flaps the ready gate indefinitely
+    # (field: three SR22T reproductions 2026-08-09, step/load ratio locked
+    # near 1.5 against a true slope of ~-2.4). Signature: consecutive
+    # retrim moves whose PRE-move loads alternate sign at similar
+    # magnitude. Response: inflate |slope| (halve the steps) and converge
+    # from the safe side. A healthy sequence occasionally caught by the
+    # pattern just takes a few slower moves — the cost asymmetry is
+    # decisive, since the cycle itself never self-heals.
+    ASSIST_PINGPONG_MOVES = 3        # alternating premove loads to conclude
+    ASSIST_PINGPONG_MAG_LO = 0.4     # magnitude-similarity band: ratio of
+    ASSIST_PINGPONG_MAG_HI = 2.5     #   consecutive premove loads
+    ASSIST_PINGPONG_WINDOW_S = 60.0  # moves older than this don't count
+    ASSIST_SLOPE_INFLATE = 2.0       # |slope| multiplier per detection
     ASSIST_IAS_RATE_WINDOW_S = 2.0 # IAS rate measured across this window — a per-frame
                                    # derivative amplifies telemetry jitter ~30x and kept
                                    # resetting the calm window on a pegged airspeed
@@ -530,6 +559,7 @@ class TrimCalibrator:
         self.assist_stable = False
         self._assist_sweep_started = False   # begin_sweep() accepted; route onward
         self._assist_unverified_rails = 0    # inert-trim evidence counter
+        self._assist_move_hist = []          # (t, premove load) for ping-pong detect
         self._cancel_deadline = None         # soft-cancel settle deadline (hold only)
         self._cancel_reason = None
         self._assist_stable_since = None     # calm-window start (hysteresis)
@@ -1343,6 +1373,36 @@ class TrimCalibrator:
         if now - self._neut_start_t > self.NEUT_TIMEOUT_S:
             self._neutral_give_up(telem_data, "Trim neutralization timed out")
 
+    def _detect_overshoot_cycle(self, now, u):
+        """Record a retrim move's pre-move load; detect the overshoot
+        ping-pong (see ASSIST_PINGPONG_*). Returns True after inflating the
+        slope estimate, so the caller re-sizes the pending step."""
+        hist = self._assist_move_hist
+        hist.append((now, u))
+        hist[:] = [(ts, uu) for ts, uu in hist
+                   if now - ts <= self.ASSIST_PINGPONG_WINDOW_S]
+        del hist[:-self.ASSIST_PINGPONG_MOVES]
+        if len(hist) < self.ASSIST_PINGPONG_MOVES or self._trim_slope_est is None:
+            return False
+        vals = [uu for _, uu in hist]
+        alternating = all(a * b < 0 for a, b in zip(vals, vals[1:]))
+        similar = all(
+            self.ASSIST_PINGPONG_MAG_LO <= abs(b) / abs(a) <= self.ASSIST_PINGPONG_MAG_HI
+            for a, b in zip(vals, vals[1:]))
+        if not (alternating and similar):
+            return False
+        old = self._trim_slope_est
+        self._trim_slope_est = clamp(
+            old * self.ASSIST_SLOPE_INFLATE, -20.0, 20.0)
+        hist.clear()
+        logger.warning(
+            f"Assist hold oscillating: retrim moves alternating direction at "
+            f"similar load ({', '.join(f'{v:+.3f}' for v in vals)}) — move "
+            "overshoot suspected (relief verdicts under-measure the slope on "
+            f"slow-responding aircraft). Slope {old:+.2f} -> "
+            f"{self._trim_slope_est:+.2f}; retrim steps halved.")
+        return True
+
     def _inert_trim_reason(self, t_lo, t_hi):
         return (
             f"Trim commands have no measurable effect on this aircraft: the "
@@ -1421,6 +1481,7 @@ class TrimCalibrator:
         self.assist_stable = False
         self._assist_stable_since = None
         self._assist_unverified_rails = 0
+        self._assist_move_hist = []
         self._assist_ias_hist = []
         self._assist_u_hist = []
         self._assist_u_mean = self._neut_u_final
@@ -1670,6 +1731,9 @@ class TrimCalibrator:
                         step = None
                 if step is not None:
                     self._assist_railed = False
+                    if self._detect_overshoot_cycle(now, u):
+                        # Slope just inflated: re-size this pending move.
+                        step = self._assist_step_from(u)
                     self._assist_premove = (u, step)
                     if self._assist_seq0 is None:
                         # Baseline for judging the coming run of moves as a
@@ -1700,10 +1764,14 @@ class TrimCalibrator:
 
         # Readiness with asymmetric hysteresis: distrust instantly, trust
         # only after a sustained calm window. Trimmed reads the same windowed
-        # mean the mover uses — one estimator, one truth.
+        # mean the mover uses — one estimator, one truth. The value gates
+        # widen by ASSIST_READY_HYST while armed (Schmitt band) so a mean
+        # hovering at the threshold cannot flap the Start button.
+        hyst = self.ASSIST_READY_HYST if self.assist_stable else 1.0
         trimmed = self._assist_u_mean is not None and \
-            abs(self._assist_u_mean) <= self.NEUT_U_TOL
-        calm = at_target and level and trimmed and abs(ias_rate) <= self.ASSIST_IAS_RATE_MAX
+            abs(self._assist_u_mean) <= self.NEUT_U_TOL * hyst
+        calm = at_target and level and trimmed and \
+            abs(ias_rate) <= self.ASSIST_IAS_RATE_MAX * hyst
         was_stable = self.assist_stable
         if calm:
             if self._assist_stable_since is None:
