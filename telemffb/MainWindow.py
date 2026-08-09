@@ -1502,7 +1502,8 @@ class MainWindow(QMainWindow):
             self._update_available = True
             logging.info(f"<<<<Update available - new version={vers}>>>>")
 
-            status_text = f"New version <a href='{url}'><b>{vers}</b></a> is available!"
+            status_text = (f"New version <a href='{url}'><b>{vers}</b></a> is available! "
+                           f"(<a href='{G.release_notes_url}'>release notes</a>)")
             self.update_action.setDisabled(False)
             self.update_action.setText("Install Latest TelemFFB")
             self.version_label.setToolTip(url)
@@ -2750,8 +2751,17 @@ class MainWindow(QMainWindow):
         if self._update_available:
             update_ans = QMessageBox.StandardButton.Yes
             if auto:
+                # Rich text so the release-notes link is clickable; clicking
+                # it opens the browser without closing the dialog.
                 update_ans = QMessageBox.information(self, "Update Available!!",
-                                                     f"A new version of TelemFFB is available ({self.latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
+                                                     f"A new version of TelemFFB is available (<b>{self.latest_version}</b>).<br><br>"
+                                                     f"<a href='{G.release_notes_url}'>View the release notes</a> to see what's new.<br><br>"
+                                                     f"Would you like to automatically download and install it now?<br><br>"
+                                                     f"You may also update later from the Utilities menu, or the "
+                                                     f"next time TelemFFB starts.<br><br>"
+                                                     f"~~ Note ~~ If you no longer wish to see this message on startup, "
+                                                     f"you may enable `ignore_auto_updates` in your user config. "
+                                                     f"You will still be able to update via the Utilities menu",
                                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
             if update_ans == QMessageBox.StandardButton.Yes:

@@ -67,6 +67,9 @@ allow_multi_instance: bool = False
 
 vpf_logo: str = ":/image/TelemFFB_Logo.png"
 
+release_notes_url: str = "https://docs.vpforce.eu/telemffb/latest/"
+"""Stable release-notes URL: the docs site redirects /telemffb/latest/ to the newest release's entry on the release-notes page"""
+
 # UI components
 main_window :  'MainWindow' 
 settings_mgr : 'SettingsManager'
