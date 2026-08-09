@@ -203,6 +203,22 @@ class TrimCalibrator:
     NEUT_MAX_STEPS = 10
     NEUT_TIMEOUT_S = 60.0        # overall cap; proceed (with warning) if hit
 
+    # Inert-trim detection (field case: Hot Start Challenger 650, X-Plane —
+    # its plugin drives the real stabilizer itself, so the standard trim
+    # variable accepts writes and reads back faithfully while having ZERO
+    # aerodynamic effect; the assistant walked the trim rail-to-rail for 21
+    # minutes with the held load frozen at +0.15). Two independent
+    # detectors, both requiring wide provably-covered range:
+    #   Neutralization — step cap reached with NO slope ever learned and a
+    #   wide span traversed => abort honestly instead of declaring a fake
+    #   natural point.
+    #   Assist hold — repeated unverified rail reversals with the load
+    #   unchanged across each full traverse => the whole range is proven
+    #   dead; abort instead of ping-ponging forever.
+    NEUT_INERT_SPAN = 0.5        # trim span walked with zero response
+    ASSIST_INERT_RAILS = 2       # qualifying rail reversals to conclude
+    ASSIST_INERT_DU = 0.05       # "unchanged" load across a full traverse
+
     # Hold at the natural trim point before a manual (non-assistant) sweep,
     # giving the airspeed time to stabilize at the current throttle/trim so
     # the sweep measures at (and drift-checks against) the equilibrium
@@ -513,6 +529,7 @@ class TrimCalibrator:
         # trim-assistant state
         self.assist_stable = False
         self._assist_sweep_started = False   # begin_sweep() accepted; route onward
+        self._assist_unverified_rails = 0    # inert-trim evidence counter
         self._cancel_deadline = None         # soft-cancel settle deadline (hold only)
         self._cancel_reason = None
         self._assist_stable_since = None     # calm-window start (hysteresis)
@@ -1214,6 +1231,12 @@ class TrimCalibrator:
         self._neut_prev = None
         self._neut_start_t = time.perf_counter()
         self._neut_u_final = self._u_elev
+        # Inert-trim evidence across the phase: widest span visited and
+        # whether any step ever taught a slope (du above the noise floor).
+        self._neut_slope_learned = False
+        t_start = telem_data.ElevTrimPct or 0.0
+        self._neut_t_lo = t_start
+        self._neut_t_hi = t_start
         # First "step" is the current trim: measure u here, then probe.
         self._begin_neut_step(telem_data.ElevTrimPct or 0.0)
         self.status_message = "Centering the elevator axis…"
@@ -1264,7 +1287,19 @@ class TrimCalibrator:
                 t = telem_data.ElevTrimPct or self._neut_target
                 u = sum(self._neut_u_samples) / len(self._neut_u_samples)
                 self._neut_u_final = u
+                self._neut_t_lo = min(self._neut_t_lo, t)
+                self._neut_t_hi = max(self._neut_t_hi, t)
                 if abs(u) <= self.NEUT_U_TOL or self._neut_steps >= self.NEUT_MAX_STEPS:
+                    span = self._neut_t_hi - self._neut_t_lo
+                    if abs(u) > self.NEUT_U_TOL and not self._neut_slope_learned \
+                            and span >= self.NEUT_INERT_SPAN:
+                        # Every step measured zero response across a wide
+                        # range: the trim variable is disconnected from the
+                        # airframe. Say so instead of declaring a fake
+                        # natural point and ping-ponging in the hold.
+                        self._abort(self._inert_trim_reason(
+                            self._neut_t_lo, self._neut_t_hi))
+                        return
                     logger.info(f"Natural trim point found at {t:+.3f} "
                                 f"(steady elevator {u:+.3f}, {self._neut_steps} steps)")
                     self._finish_neutral(telem_data, centered=abs(u) <= self.NEUT_U_TOL)
@@ -1288,6 +1323,7 @@ class TrimCalibrator:
                             # +0.067, seeding the assistant's relief direction
                             # backwards.
                             self._trim_slope_est = (u - u0) / (t - t0)
+                            self._neut_slope_learned = True
                         else:
                             slope_note = (f" (du {u - u0:+.3f} below noise "
                                           "floor; slope not learned)")
@@ -1305,6 +1341,14 @@ class TrimCalibrator:
 
         if now - self._neut_start_t > self.NEUT_TIMEOUT_S:
             self._neutral_give_up(telem_data, "Trim neutralization timed out")
+
+    def _inert_trim_reason(self, t_lo, t_hi):
+        return (
+            f"Trim commands have no measurable effect on this aircraft: the "
+            f"trim was moved from {100 * t_lo:+.0f}% to {100 * t_hi:+.0f}% "
+            "(movement confirmed by read-back) while the held elevator never "
+            "changed. The aircraft likely manages pitch trim through its own "
+            "systems and cannot be auto-calibrated.")
 
     def _neutral_give_up(self, telem_data, what):
         """Neutralization deadline/timeout: degrade or abort, honestly.
@@ -1375,6 +1419,7 @@ class TrimCalibrator:
         self._set_state(CalState.ASSIST_HOLD, "holding for the user's test speed")
         self.assist_stable = False
         self._assist_stable_since = None
+        self._assist_unverified_rails = 0
         self._assist_ias_hist = []
         self._assist_u_hist = []
         self._assist_u_mean = self._neut_u_final
@@ -1523,6 +1568,7 @@ class TrimCalibrator:
                     self._assist_worsen = 0
                     self._assist_sized = True
                     self._assist_dir_proven = True
+                    self._assist_unverified_rails = 0
                     self._assist_seq0 = None
                     self._assist_seq_n = 0
                     s = (self._assist_u_mean - pre_u) / prev_step
@@ -1581,6 +1627,23 @@ class TrimCalibrator:
                 if abs(t) >= self.TRIM_CMD_CLAMP - self.TRIM_STATION_TOL \
                         and t * step > 0:
                     if not self._assist_dir_proven:
+                        # A rail with the load unchanged across the whole
+                        # traverse is a full-range zero-response measurement;
+                        # two of them (opposite directions) prove the entire
+                        # trim range dead — the CL650 signature. The load
+                        # comparison excludes the masked-relief case (power
+                        # changes suppressing verification while trim was in
+                        # fact working: there the load would have moved).
+                        seq = self._assist_seq0
+                        if seq is not None and \
+                                abs(u - seq[1]) <= self.ASSIST_INERT_DU:
+                            self._assist_unverified_rails += 1
+                        else:
+                            self._assist_unverified_rails = 0
+                        if self._assist_unverified_rails >= self.ASSIST_INERT_RAILS:
+                            self._abort(self._inert_trim_reason(
+                                -self.TRIM_CMD_CLAMP, self.TRIM_CMD_CLAMP))
+                            return
                         # This direction never once relieved and the trim ran
                         # out of range trying: it cannot get worse than a
                         # rail — reverse.

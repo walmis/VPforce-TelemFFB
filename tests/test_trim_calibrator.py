@@ -164,6 +164,11 @@ class FakePlantAircraft:
         """Trim->pitch coupling; override for nonlinear/kinked aircraft."""
         return self.coupling
 
+    def pitch_input(self, trim_eff):
+        """Trim's contribution to the pitch balance; override to model
+        aircraft whose trim variable is disconnected from the airframe."""
+        return self.effective_coupling(trim_eff) * trim_eff
+
     def _trimwheel_trim_limits(self, telem_data):
         # aircraft interface used by the calibrator's direct write method
         if not self.report_limits:
@@ -204,7 +209,7 @@ class FakePlantAircraft:
         self._simconnect.sim_data.clear()
 
         trim_eff = self.trim - self.trim_natural
-        target_vs = self.K_E * (self.cmd_elev + self.effective_coupling(trim_eff) * trim_eff)
+        target_vs = self.K_E * (self.cmd_elev + self.pitch_input(trim_eff))
         beta = min(dt / self.vs_tau, 1.0)
         self.vs += (target_vs - self.vs) * beta
         self.roll += (self.K_A * self.cmd_ail + self.roll_bias_rate) * dt
@@ -776,6 +781,21 @@ class TestSafety:
         cal.update(ac.telem(SimPaused=1))
         assert cal.state == CalState.ABORT
         assert "paused" in cal.abort_reason.lower()
+
+
+class InertTrimPlant(FakePlantAircraft):
+    """CL650-class aircraft (field case 2026-08): the trim variable accepts
+    writes and reads back faithfully, but a plugin drives the real
+    stabilizer, so trim position has ZERO aerodynamic effect. The leveling
+    elevator must hold ``standing_load`` forever; no trim setting relieves
+    it."""
+
+    def __init__(self, load=0.15, **kw):
+        super().__init__(coupling=0.0, **kw)
+        self.standing_load = load
+
+    def pitch_input(self, trim_eff):
+        return self.standing_load
 
 
 # --------------------------------------------------------------------------- #
@@ -2867,3 +2887,56 @@ class TestGliderDescent:
         assert cal._vs_err(-0.5) == pytest.approx(0.0)
         assert cal._vs_err(0.0) == pytest.approx(0.5)
         assert cal._vs_err(None) == pytest.approx(0.5)
+
+
+# --------------------------------------------------------------------------- #
+#  Inert-trim detection (CL650 class: trim variable disconnected from airframe)
+# --------------------------------------------------------------------------- #
+
+class TestInertTrimDetection:
+    def test_standing_load_run_aborts_with_inert_trim_reason(self, clock):
+        # Field log (Hot Start CL650): every neutralization step measured du
+        # below the noise floor, then the hold ping-ponged the trim
+        # rail-to-rail for 21 minutes with the load frozen. Whichever
+        # detector layer fires first (neutralization span or hold rail
+        # traverses), the run must end in the honest inert-trim abort. The
+        # user was hand-holding the load pre-start (their log: takeover
+        # baseline +0.14), mirrored here via the physical stick.
+        ac = InertTrimPlant(load=0.15)
+        ac.phys_stick = (0.0, -0.15)
+        ac.cmd_elev = -0.15
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.ABORT, f"ended in {state} ({cal.abort_reason})"
+        assert "no measurable effect" in cal.abort_reason
+        assert "read-back" in cal.abort_reason
+
+    def test_assist_hold_aborts_after_two_dead_rail_traverses(self, clock):
+        # The aircraft starts in trim (no standing load), so neutralization
+        # converges immediately and never sees the inertness. The load then
+        # appears in the hold (power-change analog); the assistant walks the
+        # trim stop-to-stop without effect. After the second unverified rail
+        # with the load unchanged across the traverse, the full range is
+        # proven dead: abort, not an endless ping-pong.
+        ac = InertTrimPlant(load=0.0)
+        cal = TrimCalibrator(ac)
+        cal.start(assist=True)
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ASSIST_HOLD, 120), \
+            f"never reached ASSIST_HOLD ({cal.state}, {cal.abort_reason})"
+        ac.standing_load = 0.15
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.ABORT, 900), \
+            f"never aborted (state {cal.state}, trim {ac.trim:+.3f})"
+        assert "no measurable effect" in cal.abort_reason
+
+    def test_responsive_aircraft_never_trips_the_detector(self, clock):
+        # Guard the other direction: a weak-but-working trim (the detector's
+        # nearest neighbor) must still calibrate, not abort.
+        ac = FakePlantAircraft(coupling=0.5, trim_natural=0.1)
+        ac.trim = 0.4
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
