@@ -386,6 +386,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 cb.setCurrentIndex(found_index)
                 cb._prev_index = found_index
                 cb.blockSignals(False)
+                # The change handler is suppressed above, so mirror its PID
+                # sync here: the PID field must show the auto-selected
+                # device's actual product id — a DIY Rhino on a non-default
+                # PID otherwise keeps the stored/default value (2055) and
+                # the next connection attempt fails.
+                sel_dev = model.data(model.index(found_index, 0),
+                                     Qt.ItemDataRole.UserRole)
+                if sel_dev is not None:
+                    cb._tb_box.setText(format(sel_dev.product_id, 'x'))
 
         # Helper: persist a combobox selection into G.system_settings
         def persist_combobox_selection(cb, role_name):

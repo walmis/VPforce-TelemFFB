@@ -357,6 +357,25 @@ def _setup_standard_config_paths():
     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
 
+def _device_is_configured() -> bool:
+    """True if any STORED system setting assigns this instance's device
+    (PID or device path, instance-scoped or global).
+
+    A first launch has neither — G.device_usbpid then only holds the
+    built-in default (2055), which is wrong for any DIY/non-default
+    device. In that state the connection attempt is skipped entirely (no
+    error dialog) and the System Settings dialog opens for first-time
+    setup instead.
+    """
+    pid_key = f'pid{G.device_type.capitalize()}'
+    path_key = f'devpath_{G.device_type}'
+    for key in (pid_key, path_key,
+                f'{G.device_type}/{pid_key}', f'{G.device_type}/{path_key}'):
+        if G.system_settings.value(key) not in (None, ''):
+            return True
+    return False
+
+
 def _initialize_device_connection():
     """
     Initialize connection to the Rhino device and check firmware.
@@ -381,10 +400,39 @@ def _initialize_device_connection():
     # except Exception:
     #     return dev, dev_serial, dev_firmware_version
 
+    # First-launch probe BEFORE auto-assign below writes devpath settings:
+    # only pre-existing stored configuration counts as "configured".
+    device_configured = _device_is_configured()
+
     devs = _enumerate_and_log_devices()
 
     # Attempt to auto-assign unconfigured devpath_* settings based on discovered devices
     _auto_assign_devices(devs)
+
+    if G.args.device is None and not device_configured:
+        # Nothing stored for this device: don't guess at the default PID
+        # and raise a connection error on a brand-new install. The
+        # System Settings dialog opens later in startup
+        # (_check_system_settings_required) regardless of whether the
+        # auto-assign above identified the device — first launch always
+        # gets the settings page so the user can review and save all
+        # preferences.
+        auto_assigned = G.system_settings.value(
+            f'devpath_{G.device_type}') not in (None, '')
+        G.first_launch_autoconfig = auto_assigned
+        if auto_assigned:
+            logging.warning(
+                f"First launch: no stored configuration for "
+                f"'{G.device_type}'; the device was auto-configured by "
+                "name. Skipping connection — System Settings will open "
+                "for the user to review and save.")
+        else:
+            logging.warning(
+                f"First launch: no stored configuration for "
+                f"'{G.device_type}' and the device could not be "
+                "determined by name from the connected devices. Skipping "
+                "connection — System Settings will open for setup.")
+        return dev, dev_serial, dev_firmware_version
 
     try:
         dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
@@ -469,6 +517,19 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
             0x2052: 'trimwheel',
         }
 
+        # Paths already holding a role (stored settings): a device may hold
+        # at most ONE role. Without this, a device whose role was assigned
+        # on a previous launch falls straight through the name pass (its
+        # own role reads as "existing") and the PID fallback re-assigns
+        # the SAME device into a different empty slot — field case: pedals
+        # stored as devpath_pedals on first launch, then re-assigned to
+        # devpath_trimwheel by the 0x2052 fallback on the next one.
+        assigned_paths = set()
+        for role in role_keywords:
+            p = G.system_settings.get(f'devpath_{role}', None)
+            if p:
+                assigned_paths.add(str(p))
+
         # Build reverse lookup from product_string/ident to role
         for devinfo in devs:
             try:
@@ -477,6 +538,9 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                 # prefer ident (configurator name) if present
                 label = ident.lower()
                 devpath = devinfo.path.decode()
+
+                if devpath in assigned_paths:
+                    continue
 
                 assigned = False
                 for role, keywords in role_keywords.items():
@@ -491,6 +555,7 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                             logging.info(f"Auto-assigning {key} -> {devpath} (matched '{kw}' in '{label}')")
                             try:
                                 G.system_settings.setValue(key, devpath)
+                                assigned_paths.add(devpath)
                                 if role == G.device_type:
                                     G.device_devpath = devpath
                             except Exception:
@@ -502,8 +567,12 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                         # move to next device if already assigned by name match
                         break
 
-                # If not matched by product string/name, try VID:PID mapping
-                if not assigned:
+                # If not matched by product string/name, try VID:PID mapping —
+                # but never for a device whose NAME identifies a known role:
+                # if its named slot is taken, re-routing it by PID into a
+                # different role would contradict what the device says it is.
+                if not assigned and not any(
+                        kw in label for kws in role_keywords.values() for kw in kws):
                     try:
                         pid = int(devinfo.product_id)
                         role = vidpid_role_map.get(pid, None)
@@ -514,6 +583,7 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                                 logging.info(f"Auto-assigning {key} -> {devpath} (matched pid 0x{pid:04X})")
                                 try:
                                     G.system_settings.setValue(key, devpath)
+                                    assigned_paths.add(devpath)
                                     if role == G.device_type:
                                         G.device_devpath = devpath
                                 except Exception:
@@ -701,10 +771,29 @@ def _check_version_update():
 def _check_system_settings_required():
     """Check if system settings dialog should be opened."""
 
-    #for key in ["devpath_joystick", "devpath_pedals", "devpath_collective", "devpath_trimwheel"]:
-    #    if G.system_settings.get(key, None):
+    dev_cap = G.device_type.capitalize()
+    if G.first_launch_autoconfig is not None:
+        # First launch (no stored device configuration): the settings page
+        # always opens so the user can review device assignments and the
+        # rest of their preferences, whether or not auto-config succeeded.
+        if G.first_launch_autoconfig:
+            msg = (f"First launch: the {dev_cap} device was automatically "
+                   "configured from the connected devices.\n\n"
+                   "Please review the device assignment and your other "
+                   "preferences in System Settings, then save to complete "
+                   "setup.")
+        else:
+            msg = (f"First launch: the {dev_cap} device could not be "
+                   "determined by name from the connected devices.\n\n"
+                   "Please assign your device and review your preferences "
+                   "in System Settings.")
+        QMessageBox.information(None, "System Settings Required", msg)
+        if G.child_instance:
+            G.ipc_instance.send_message("SHOW SETTINGS")
+        else:
+            G.main_window.open_system_settings_dialog()
+        return
 
-    #        return
     if G.device_devpath is None:
         QMessageBox.information(None, "System Settings Required",
                                 f"VPforce Device for {G.device_type} is not assigned.  Please assign a device in System Settings.")

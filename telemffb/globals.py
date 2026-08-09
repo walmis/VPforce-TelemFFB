@@ -104,6 +104,14 @@ device_firmware_version : str
 device_connection_status: bool = False
 """status of HID connection to device"""
 
+first_launch_autoconfig: Optional[bool] = None
+"""First-launch device setup outcome. None = not a first launch (stored
+configuration existed). True = no stored config, but the device for this
+instance was auto-configured by name from the connected devices. False =
+no stored config and the device could not be determined by name. Non-None
+suppresses the startup connection attempt and forces the System Settings
+dialog to open."""
+
 il2_ffb_device_ordinal: Optional[int] = None
 """This instance's device ordinal ('lastAttachedId') as resolved from IL-2 Korea's
 known.devices.json, used to match the 'devNo' field in FFB telemetry records.
