@@ -2120,6 +2120,25 @@ def _il2_config_diff_table(section_name, existing: dict, proposed: dict) -> str:
     """
 
 
+def il2_korea_game_root(root_path):
+    """Resolve IL-2 Korea's game directory under the configured install root.
+
+    The standalone release nests the game one level down
+    (``<root>/game/data/startup.cfg``); the Steam release ("IL2Series")
+    drops that level (``<root>/data/startup.cfg``). Returns whichever
+    layout actually contains ``data/startup.cfg``; a user pointing at the
+    standalone ``game`` folder itself also resolves. Falls back to the
+    historical standalone layout so error messages keep naming the
+    expected default location.
+    """
+    root_path = root_path or ''
+    for sub in ('game', ''):
+        candidate = os.path.join(root_path, sub) if sub else root_path
+        if os.path.isfile(os.path.join(candidate, 'data', 'startup.cfg')):
+            return candidate
+    return os.path.join(root_path, 'game')
+
+
 def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
     """
     Look up this device's DirectInput-style attach ordinal from IL-2 Korea's
@@ -2131,7 +2150,8 @@ def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
 
     Returns None if the file is missing, malformed, or no entry matches the given VID/PID.
     """
-    known_devices_path = os.path.join(il2_korea_path, 'game\\data\\Input\\known.devices.json')
+    known_devices_path = os.path.join(
+        il2_korea_game_root(il2_korea_path), 'data', 'Input', 'known.devices.json')
     if not os.path.exists(known_devices_path):
         logging.warning(f"IL2 Korea known.devices.json not found at: {known_devices_path}")
         return None

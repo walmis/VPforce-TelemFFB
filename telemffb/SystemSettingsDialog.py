@@ -803,10 +803,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                                     "IL2 Auto Telemetry is enabled but the path is invalid\n\n\\data\\startup.cfg not found at path")
                 return False
         if self.validateIL2_K.isChecked():
-            file_path = os.path.join(self.pathIL2_K.text(), "game\\data\\startup.cfg")
+            # Standalone nests the game under <root>\game\data; the Steam
+            # release (IL2Series) uses <root>\data — accept either layout.
+            game_root = utils.il2_korea_game_root(self.pathIL2_K.text())
+            file_path = os.path.join(game_root, "data", "startup.cfg")
             if not os.path.exists(file_path):
                 QMessageBox.warning(self, "Config Error",
-                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n\\game\\data\\startup.cfg not found at path")
+                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n"
+                                    "startup.cfg not found under '\\game\\data' (standalone) "
+                                    "or '\\data' (Steam) at the configured path")
                 return False
         return True
 
