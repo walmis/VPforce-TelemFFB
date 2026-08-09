@@ -74,18 +74,39 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         modulation_neg = 1
         frequency2 = frequency + median_modulation
 
-        r1_modulation = utils.sine_point_in_time(3, 10000)
-        r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
+        # The detuned twins tenderize the low end but curse the high end:
+        # each pair (tone + equal-amplitude twin) beats at FULL depth
+        # (0..2x) regardless of how small the detune is, so at cruise any
+        # detune at all reads as a slow wah-wah undertone (field reports
+        # 2026-08 — first the fixed +-3 Hz sweep, then, with only the
+        # sweep RATE tapered, a slower but still full-depth beat). Both
+        # the detune (beat rate) AND the twin amplitude (beat depth) now
+        # taper inversely with frequency above the user's Low RPM point:
+        # identity at and below it (the chunky recip throb at idle is
+        # untouched), fading to a steady hum at cruise. The main tones
+        # get an RMS compensation as the twins fade so the felt level
+        # tracks the intensity taper — the factor is exactly 1.0 at full
+        # depth, leaving the low end bit-identical.
+        f_ref = max(self.engine_rumble_lowrpm, 60) / 60.0
+        detune_scale = utils.clamp(f_ref / frequency, 0.0, 1.0)
+        beat_depth = detune_scale ** 2
+
+        r1_modulation = utils.sine_point_in_time(3 * detune_scale, 10000)
+        r2_modulation = utils.sine_point_in_time(3 * detune_scale, 17500, phase_offset_deg=45)
 
         if frequency > 0:
             force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
             dynamic_rumble_intensity = utils.clamp(self.ac_calc_engine_intensity(rpm), 0, force_limit)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
-            self.effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()
-            self.effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()
-            self.effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()
-            self.effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()
+            main_mag = utils.clamp(
+                dynamic_rumble_intensity * (2.0 - beat_depth ** 2) ** 0.5, 0.0, 1.0)
+            twin_mag = dynamic_rumble_intensity * beat_depth
+
+            self.effects["prop_rpm0-1"].periodic(frequency, main_mag, 0).start()
+            self.effects["prop_rpm0-2"].periodic(frequency + r1_modulation, twin_mag, 0).start()
+            self.effects["prop_rpm1-1"].periodic(frequency2, main_mag, 90).start()
+            self.effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, twin_mag, 90).start()
         else:
             self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
 
