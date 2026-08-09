@@ -4,48 +4,47 @@ This is not an exhaustive change log (see github for that).  This file only outl
 ##  July 2026 - Draft
 ############################################
 ## Platform
+- **NEW: Aircraft profile notes**
+  - Many curated aircraft profiles now ship with notes explaining their quirks - why certain effects are disabled, control-system oddities, and custom-class aircraft where liveries must be cloned from the default profile rather than created new
+  - You can also add your own notes to any profile
+  - A notes button lives next to the Active Profile display and flashes green when the loaded aircraft has notes - click it to view/edit
 - Exception tracking and reporting system
   - New runtime exception tracker with UI viewer showing recent error history
   - Support bundle improvements: now includes DCS logs and Export.lua; switched to LZMA compression for smaller archives
   - Automatic error deduplication prevents repeated alerts for the same issue
   - Child instance exceptions are forwarded to the master instance so all errors are visible in one place
-- **NEW: Aircraft profile notes**
-  - Many curated aircraft profiles now ship with notes explaining their quirks - why certain effects are disabled, control-system oddities, and custom-class aircraft where liveries must be cloned from the default profile rather than created new
-  - You can also add your own notes to any profile
-  - A notes button lives next to the Active Profile display and flashes green when the loaded aircraft has notes - click it to view/edit
-- Settings page usability improvements
-  - The settings page no longer creeps/jumps its scroll position when you change a setting - the row you are working on now stays put under your mouse across the form refresh
-- Application Status panel stability
-   - The panel no longer resizes and shifts around when switching between device scopes
-   - Any active 'vpconf profile' or 'configurator gain override' for a child instance device are now displayed when you change the config scope to that device
-- The Settings tab now shows helpful guidance when it is empty (start a sim and load an aircraft, or open the offline editor) instead of a blank page - including a scope explainer when using the offline editor
-- Settings QoL: changing a setting back to its inherited/default value now automatically removes the user override (and the circle-x revert button) instead of leaving a redundant entry in your config
-- Master instance now mirrors child device status (active vpconf profile / configurator overrides) when switching the device config scope
-- Curve editor usability improvements (Advanced Spring / Advanced G-Force widgets): smarter curve bounds checking, fixed point-insert resetting the first point, better endpoint drag behavior
-- Fix: configurator gain overrides not being applied when TelemFFB started with the sim already loaded into an aircraft
-- Fix: master instance was incorrectly validating child device PID when selecting per-aircraft vpconf profiles
-- Fix: IPC telemetry datagrams could be dropped under load in multi-device setups causing erroneous device icon failure status changes
+- In-app updater rewritten for reliability: per-phase progress (download/backup/extract), live status log, and auto-close-and-launch option
 - FFB Device Management enhancements
   - Auto-assign device paths for unconfigured slots on startup; selections are persisted in system settings
   - Improved USB device selector in System Settings — prevents duplicate device assignments across slots
-- UI: Fix cyclic spring gain not displaying in settings panel
-- Fix error condition on app exit and SimConnect session halt
-- Fix error handling when launching VPforce Configurator from the app
-- In-app updater rewritten for reliability: per-phase progress (download/backup/extract), live status log, and auto-close-and-launch option
-- Fix crash when telemetry startup is interrupted by a plugin update prompt
+- Settings page usability improvements
+  - The settings page no longer creeps/jumps its scroll position when you change a setting - the row you are working on now stays put under your mouse across the form refresh
+- The Settings tab now shows helpful guidance when it is empty (start a sim and load an aircraft, or open the offline editor) instead of a blank page - including a scope explainer when using the offline editor
+- Settings QoL: changing a setting back to its inherited/default value now automatically removes the user override (and the circle-x revert button) instead of leaving a redundant entry in your config
+- Application Status panel stability
+   - The panel no longer resizes and shifts around when switching between device scopes
+   - Any active 'vpconf profile' or 'configurator gain override' for a child instance device are now displayed when you change the config scope to that device
+- Curve editor usability improvements (Advanced Spring / Advanced G-Force widgets): smarter curve bounds checking, fixed point-insert resetting the first point, better endpoint drag behavior
 - TelemFFB now detects when a sim process exits and automatically resets telemetry listeners and UI state
+- Fix: configurator gain overrides not being applied when TelemFFB started with the sim already loaded into an aircraft
+- Fix: master instance was incorrectly validating child device PID when selecting per-aircraft vpconf profiles
+- Fix: IPC telemetry datagrams could be dropped under load in multi-device setups causing erroneous device icon failure status changes
+- Fix: cyclic spring gain not displaying in settings panel
+- Fix: error condition on app exit and SimConnect session halt
+- Fix: error handling when launching VPforce Configurator from the app
+- Fix: crash when telemetry startup is interrupted by a plugin update prompt
 
 ## XPlane
-- Updated plugin adhering to new stricter coding requirements
 - **NEW: X-Trident AW109 special implementation - WIP Implementation**
   - KNOWN ISSUE: Must map controls in-game and disable "Axis Control" in TelemFFB - Aircraft does not honor axis override dataref nor properly accept external axis control inputs
   - 4-Axis AFCS integration: cyclic trim rate control, force trim release, and autopilot following
   - Pedal/rudder trim integration
     - KNOWN ISSUE: Pedal AFCS is not as active as would be expected in real aircraft.. this is due to telemetry limitations from the aircraft
   - Collective spring gain and force trim release
+- **NEW: 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with MSFS)**
+- Updated plugin adhering to new stricter coding requirements
 - X-Plane plugin: Added dataref write and command write support for expanded aircraft control
 - X-Plane plugin: now exports vertical speed and pitch/roll rate data (used by the new trim calibration and future effects)
-- New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with MSFS)
 
 ## MSFS / X-Plane
 - **NEW: Automated Elevator Trim-Following Calibration** (fixed wing)
@@ -64,20 +63,25 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Factory calibrations included out of the box for several default aircraft (MSFS 2024: C172, C152, C208B, SR22T, Citation, Vision Jet, DG-1001E Neo | X-Plane 12: C172, SR22, RV-10)
   - Control Response selector (Normal/Reduced/Minimal) tames the routine on pitch-sensitive aircraft
   - NOTE: Some advanced or quirky aircraft have proven to be non-calibratable - e.g. trim authority that overpowers full elevator deflection, or extreme trim sensitivity or enbedded computer systems which manipulate the trim automatically and can not be disabled.
+- **NEW: 'Dynamic' stall buffet style**
+  - New Buffet Style selector for the AoA/Stall Buffeting effect ('Classic', the original effect, remains the default)
+  - Dynamic renders irregular, gusty shaking that surges and ebbs like real separated-flow buffet, growing heavier and slower as the stall deepens
+  - Available on joystick, pedals and collective (a seat-mounted collective makes a good buffet shaker)
+  - Both styles: buffet onset and strength now key to each aircraft's own stall speed and stall/warning AoA - slow aircraft are no longer muted at their own stall, accelerated stalls buffet harder, and X-Plane buffet now builds as the stall horn fires instead of arriving well after it
 
 ## MSFS
 - **NEW: Control lock feature added for Fixed wing and Helicopter aircraft:**
   - Saab 340, PC-6 Porter, Wilga, Beechcraft A36 Bonanza, Beechcraft B58 Baron, A2A Comanche PA-24, Cessna 414, Beechcraft Duke
   - Taog H500
 - **NEW: Taog H500/OH6 special implementation with optimized spring and trim configuration**
+- **NEW: 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)**
 - CowanSim S76: Updated default profile; added option to disable ROTOR TRIM RESET command
 - FlyInsideHeli: Engine vibrations now mapped to pedals and collective axes
-- **NEW: 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)**
 - HPG Pedals: Added force trim button option
 - HPG Collective: Sends axis position while vertical mode is active to avoid an axis snap when disengaging the autopilot
 - Fix: the 'AP Pitch - Follow axis instead of trim' setting had no effect (broken since mid-2025) - when enabled, autopilot following now correctly moves the stick with the elevator position instead of the trim
 - Fix: restored CowanSim and Taog H500 helicopter features that had been inadvertently dropped
-- Fix heli trim following issue (MSFS/X-Plane)
+- Fix: heli trim following issue (MSFS/X-Plane)
 - Fix: intermittent stale/missing aircraft display when starting TelemFFB while the sim was already running (telemetry frame arriving during startup could be silently dropped)
 
 
@@ -95,19 +99,20 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - KNOWN ISSUE:  IL-2 Korea is not outputting any engine RPM info, therefore the RPM-based engine rumble effects are non-functional (see the new alternative engine shake effect below)
 - IL-2 Korea: default aircraft profiles included with starter Advanced Spring curves
 - IL-2 Korea: new spring override option leveraging the 'ffbdevice' telemetry stream (stream is configured automatically by auto-setup)
-- Advanced Spring Override enhancements
-  - Game-supplied spring center ('ffb telemetry') can now stack with a custom spring gain curve - the sim controls the center while your curve controls the force
-  - New trim reset button binding
 - **NEW: Alternative engine shake effect driven by raw engine shake frequency/amplitude data from the FFB telemetry stream**
   - provides engine vibration feel on aircraft/titles where RPM telemetry is unavailable
 - **NEW: forward raw IL-2 telemetry, motion, and FFB UDP streams to one or more external IP/port destinations, with each destination independently choosing which stream(s) to receive (System Settings > IL2)**
-- Fix telemetry pause/flicker during multiplayer menus; removed unreliable window-focus-based pause detection
-- Fix airborne deceleration effect
-- Fix g-force effect activating incorrectly on aircraft that report weight-on-wheels while airborne (now treated as airborne when all gear are retracted)
+- Advanced Spring Override enhancements
+  - Game-supplied spring center ('ffb telemetry') can now stack with a custom spring gain curve - the sim controls the center while your curve controls the force
+  - New trim reset button binding
+- Fix: telemetry pause/flicker during multiplayer menus; removed unreliable window-focus-based pause detection
+- Fix: airborne deceleration effect
+- Fix: g-force effect activating incorrectly on aircraft that report weight-on-wheels while airborne (now treated as airborne when all gear are retracted)
 
 ## Effects
 - New envelope and detent effect support in HapticEffect
   - Attack envelope on constant force effects — reduces the risk of jarring axis slam on initial activation
+- Propeller engine rumble: smoother at high RPM (all sims) - the detune 'wobble' that gives the rumble its chunky character at idle now fades as RPM rises, instead of persisting as a wah-wah undertone at cruise; the low-RPM feel is unchanged
 
 ############################################
 ##  October 29, 2025
