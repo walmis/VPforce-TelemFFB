@@ -549,7 +549,8 @@ class TrimCalibrator:
         self._assist_seq_n = 0               # verdict-eligible moves in that run
         self._assist_railed = False          # proven direction but trim pinned at its
                                              # limit: out of trim authority
-        self._assist_gate_log_t = None       # ready-gate log flap guard
+        self._assist_gate_log_t = None       # last INFO gate report (flap window)
+        self._assist_gate_flaps = {}         # disarm reason -> count in window
         # throttle-movement tracking (decision-log context)
         self._thr_ref = None                 # settled lever position reference (pct)
         self._thr_last = None                # previous frame's lever position (pct)
@@ -1713,11 +1714,41 @@ class TrimCalibrator:
             self._assist_stable_since = None
             self.assist_stable = False
         if self.assist_stable != was_stable:
-            # Flapping guard: in bumpy air the gate can blink on every VS
-            # bump — demote rapid arm/disarm pairs to debug.
-            log = logger.info if self._assist_gate_log_t is None or \
-                now - self._assist_gate_log_t >= 10.0 else logger.debug
-            self._assist_gate_log_t = now
+            # Flapping guard with AGGREGATION: in bumpy air (or with a gate
+            # tuned too tight for the aircraft) the button can blink
+            # per-second. The old guard demoted every transition inside the
+            # window to debug AND re-armed the window each time, so
+            # sustained flicker left ONE line in a field log — invisible.
+            # Now the window anchors to the last INFO report; transitions
+            # inside it count disarms per reason category, and the next
+            # transition after rollover emits a summary naming which gate
+            # dominated — the diagnosis, one line per ~10 s.
+            why_key = None
+            if not self.assist_stable:
+                why_key = ("retrimming" if not at_target
+                           else "VS/roll disturbed" if not level
+                           else "load measurement restarting" if self._assist_u_mean is None
+                           else "load over tolerance" if not trimmed
+                           else "airspeed trending")
+            in_window = self._assist_gate_log_t is not None and \
+                now - self._assist_gate_log_t < 10.0
+            if in_window:
+                if why_key is not None:
+                    self._assist_gate_flaps[why_key] = \
+                        self._assist_gate_flaps.get(why_key, 0) + 1
+                log = logger.debug
+            else:
+                if self._assist_gate_flaps:
+                    total = sum(self._assist_gate_flaps.values())
+                    parts = ", ".join(
+                        f"{n}x {k}" for k, n in sorted(
+                            self._assist_gate_flaps.items(),
+                            key=lambda kv: -kv[1]))
+                    logger.info(f"Assist ready gate flapped: disarmed "
+                                f"{total}x since the last report ({parts})")
+                    self._assist_gate_flaps = {}
+                self._assist_gate_log_t = now
+                log = logger.info
             if self.assist_stable:
                 log(f"Assist READY: level, trimmed (load "
                     f"{self._assist_u_mean:+.3f}), speed steady at "

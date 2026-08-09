@@ -1874,6 +1874,36 @@ class TestTrimAssistant:
         cal.update(ac.telem())
         assert not cal.assist_stable
 
+    def test_gate_flap_logging_aggregates_reasons(self, clock, caplog):
+        # Power-user field report: the Start button flickers armed/disarmed
+        # too fast to click. The old flap guard demoted every rapid
+        # transition to debug AND re-armed its window each time, so
+        # sustained flicker left ~nothing in a field log. Rapid disarms must
+        # now be counted per reason and surfaced in an INFO summary when the
+        # report window rolls over.
+        import logging as _logging
+        ac, cal = self._start_assist(clock, coupling=0.5)
+        assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
+
+        def flap_once():
+            ac.vs = 2.0  # one disturbed frame disarms instantly
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            assert not cal.assist_stable
+            assert run_until(cal, ac, clock, lambda: cal.assist_stable, 60)
+
+        with caplog.at_level(_logging.INFO):
+            flap_once()   # inside the window opened by the first READY
+            flap_once()   # counted disarms accumulate
+            # Quiet stretch rolls the window past 10 s with no transitions.
+            run_until(cal, ac, clock, lambda: False, 12)
+            flap_once()   # first transition after rollover emits the summary
+        summaries = [r.message for r in caplog.records
+                     if "Assist ready gate flapped" in r.message]
+        assert summaries, "no flap summary was emitted at INFO"
+        assert "VS/roll disturbed" in summaries[0]
+
     def test_assist_begin_sweep_completes_calibration(self, clock):
         ac, cal = self._start_assist(clock, coupling=0.5, physical_y=1.0)
         assert run_until(cal, ac, clock, lambda: cal.assist_stable, 180)
