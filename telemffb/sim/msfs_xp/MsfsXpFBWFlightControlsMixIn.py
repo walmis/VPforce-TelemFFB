@@ -295,11 +295,31 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     # "send_flags" will be false if autopilot is engaged and physical control is within deadzone
                     # once deadzone is breached for an axis, position will be sent
                     # if AP is not active, flags are always True
+                    #
+                    # Inside the deadzone ZERO is sent EVERY frame — do not
+                    # "optimize" this again (cb1576b, reverted after two
+                    # field regressions, 2026-08):
+                    #  - Sending NOTHING: an MSFS axis event latches until
+                    #    replaced, so the last-sent deflection stood as a
+                    #    phantom input the AP trimmed against; the
+                    #    trim-following spring center migrated with it and
+                    #    the stick parked off-center ("stuck in mud").
+                    #  - Sending one zero on deadzone entry: the AP-follow
+                    #    center tracks the surface — a consequence of our
+                    #    own sent input — so input/center/deadzone form a
+                    #    feedback relay. Switching it per-frame (continuous
+                    #    zeros) keeps the ripple at telemetry rate,
+                    #    imperceptible; switching it once per entry made the
+                    #    relay flip at the aircraft's response timescale — a
+                    #    slow visible left/right walk of the spring center.
                     if ap_send_flag_x:
                         self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-
+                    else:
+                        self._simconnect.send_event_to_msfs(x_var, 0)
                     if ap_send_flag_y:
                         self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    else:
+                        self._simconnect.send_event_to_msfs(y_var, 0)
 
             # update spring data
             if self.ap_following and ap_active:

@@ -260,6 +260,55 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
                 "Axis should be near zero within deadzone"
             )
     
+    def test_autopilot_deadzone_sends_zero_every_frame(self):
+        """Inside the AP deadzone a ZERO must be sent EVERY frame.
+
+        Pins the b7e0ce8/release behavior against two field-tested
+        alternatives (cb1576b and its one-shot repair): sending nothing
+        leaves the last deflection latched in MSFS as a phantom input the
+        AP trims against ("stuck in mud"); a single zero on deadzone entry
+        turns the input/center/deadzone feedback relay into a slow visible
+        spring-center oscillation. Continuous zeros keep the relay at
+        telemetry rate where it is imperceptible.
+        """
+        instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.trim_following = True
+        instance.ap_following = True
+        instance.telemffb_controls_axes = True
+        instance._simconnect = self.mock_simconnect
+        instance.joystick_ap_y_follow_deadzone = 0.05
+        instance.joystick_ap_follow_gain_physical_y = 1.0
+
+        telem = (
+            TelemetryDataBuilder()
+            .ffb_type("joystick")
+            .autopilot(True)
+            .elevator_trim(0.0)
+            .build()
+        )
+        self.set_telemetry(instance, telem)
+
+        def elevator_events():
+            return [e for e in self.mock_simconnect.sent_events
+                    if e[0] == "AXIS_ELEVATOR_SET"]
+
+        # Deflected against the AP (outside deadzone): position is sent.
+        self.mock_device._input_data.set_axis(x=0.0, y=0.4)
+        instance.update_fbw_flight_controls(telem)
+        assert elevator_events(), "deflection past deadzone must be sent"
+        assert elevator_events()[-1][1] != 0
+
+        # Released inside the deadzone: a zero EVERY frame (clears the
+        # latched deflection and keeps the follow relay at frame rate).
+        self.mock_simconnect.sent_events.clear()
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        for _ in range(5):
+            instance.update_fbw_flight_controls(telem)
+        evts = elevator_events()
+        assert len(evts) == 5, f"expected a zero per frame, got {evts}"
+        assert all(v == 0 for _, v in evts), "in-deadzone sends must be zero"
+
     def test_fbw_spring_coefficients_joystick(self):
         """Test that FBW gain parameters set spring coefficients correctly."""
         # Arrange
