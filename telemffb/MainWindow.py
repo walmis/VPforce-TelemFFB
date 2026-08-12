@@ -266,6 +266,22 @@ class MainWindow(QMainWindow):
         reload_action.triggered.connect(self.force_reload_aircraft)
         utilities_menu.addAction(reload_action)
 
+        sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
+
+        def do_open_sc_override_dialog():
+            dialog = SCOverridesEditor(self)
+            # Overrides save immediately in the editor; refresh the status
+            # pill once the dialog closes so it reflects any changes.
+            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
+            dialog.raise_()
+            dialog.activateWindow()
+            dialog.show()
+
+        # dialog.exec_()
+        sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
+        utilities_menu.addAction(sc_overrides_action)
+
+
         trim_cal_action = QAction('Elevator Trim Calibration...', self)
         trim_cal_action.triggered.connect(self.open_trim_calibration_dialog)
         utilities_menu.addAction(trim_cal_action)
@@ -1304,6 +1320,9 @@ class MainWindow(QMainWindow):
         sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
         def do_open_sc_override_dialog():
             dialog = SCOverridesEditor(self)
+            # Overrides save immediately in the editor; refresh the status
+            # pill once the dialog closes so it reflects any changes.
+            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
             dialog.raise_()
             dialog.activateWindow()
             dialog.show()
@@ -2618,11 +2637,48 @@ class MainWindow(QMainWindow):
         self.status_container.active_profile_label.setText(profile)
         self.refresh_profile_notes_button()
 
+    def refresh_telem_override_pill(self, force=False):
+        """Update the telemetry-override pill in the status area for the
+        current aircraft context. SimConnect/Dataref overrides are
+        aircraft-scoped (every device instance subscribes the same set), so
+        unlike the vpconf/gains indicators there is no per-device scope or
+        IPC handling. Rides the same telemetry-update cadence as the
+        profile-notes button, with the same context deduplication so the
+        XML is not re-read every frame."""
+        sim = G.settings_mgr.current_sim
+        aircraft = G.settings_mgr.current_aircraft_name
+        ctx = (sim, aircraft, G.settings_mgr.current_pattern)
+        if not force and ctx == getattr(self, '_telem_ovd_shown', None):
+            return
+        self._telem_ovd_shown = ctx
+        text, tip = '', ''
+        if sim in ('MSFS', 'XPLANE') and aircraft:
+            try:
+                overrides = xmlutils.read_sc_overrides(aircraft)
+            except Exception:
+                logging.exception('Failed to read sc_overrides for status pill')
+                overrides = []
+            if overrides:
+                n_def = sum(1 for o in overrides if o.get('source') == 'defaults')
+                n_usr = len(overrides) - n_def
+                parts = ([f'Default ({n_def})'] if n_def else []) + \
+                        ([f'User ({n_usr})'] if n_usr else [])
+                text = ' + '.join(parts)
+                lines = [f"{o['name']}  ←  {o['var']}   [{o['source']}]"
+                         for o in overrides[:15]]
+                if len(overrides) > 15:
+                    lines.append(f"... and {len(overrides) - 15} more")
+                tip = ('Active SimConnect/Dataref overrides for this aircraft\n'
+                       '(Utilities → SimConnect/Dataref Overrides Editor):\n\n'
+                       + '\n'.join(lines))
+        self.status_container.request_set_telem_overrides.emit(text, tip)
+
     def refresh_profile_notes_button(self):
         """Update the profile-notes button (enabled + notes-exist tint) for
         the current aircraft/profile context. Runs from the telemetry update
         path, so repeat contexts are deduplicated to avoid re-reading the
         XML tables every frame."""
+        self.refresh_telem_override_pill()
         sim = G.settings_mgr.current_sim
         aircraft = G.settings_mgr.current_aircraft_name
         pattern = G.settings_mgr.current_pattern

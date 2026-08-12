@@ -8,6 +8,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Many curated aircraft profiles now ship with notes explaining their quirks - why certain effects are disabled, control-system oddities, and custom-class aircraft where liveries must be cloned from the default profile rather than created new
   - You can also add your own notes to any profile
   - A notes button lives next to the Active Profile display and flashes green when the loaded aircraft has notes - click it to view/edit
+- Application Status panel: new 'Telem Ovd' indicator shows when the loaded aircraft has active SimConnect/Dataref telemetry overrides, with counts by tier (shipped default vs user-configured) and the full override list in the tooltip
 - Exception tracking and reporting system
   - New runtime exception tracker with UI viewer showing recent error history
   - Support bundle improvements: now includes DCS logs and Export.lua; switched to LZMA compression for smaller archives
@@ -68,6 +69,10 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Dynamic renders irregular, gusty shaking that surges and ebbs like real separated-flow buffet, growing heavier and slower as the stall deepens
   - Available on joystick, pedals and collective (a seat-mounted collective makes a good buffet shaker)
   - Both styles: buffet onset and strength now key to each aircraft's own stall speed and stall/warning AoA - slow aircraft are no longer muted at their own stall, accelerated stalls buffet harder, and X-Plane buffet now builds as the stall horn fires instead of arriving well after it
+- **NEW: Telemetry Overrides editor in the Utilities menu** (SimConnect/Dataref Overrides)
+  - Per-aircraft overrides that re-source a telemetry item from an addon's custom variable (SimVar/LVar or dataref) or subscribe to additional telemetry items - useful for sophisticated addons whose systems don't drive the standard variables (autopilot state, custom engine/flight models)
+  - Optional scale/transform converts the replacement value into the units the effects expect; changes save and apply immediately, verifiable in the Monitor tab
+  - See the 'Telemetry Overrides' section of the documentation for details
 
 ## MSFS
 - **NEW: Control lock feature added for Fixed wing and Helicopter aircraft:**

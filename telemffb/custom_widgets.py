@@ -221,6 +221,7 @@ class ElidedLabel(QLabel):
 class AppStatusWidget(QWidget):
     request_set_active_vpconf = pyqtSignal(str, bool)
     request_set_active_configurator = pyqtSignal(bool, bool)
+    request_set_telem_overrides = pyqtSignal(str, str)
     request_flag_error = pyqtSignal(str)
     request_clear_error = pyqtSignal()
     profile_notes_clicked = pyqtSignal()
@@ -235,6 +236,7 @@ class AppStatusWidget(QWidget):
         # connect signal to slot (QueuedConnection by default across threads)
         self.request_set_active_vpconf.connect(self.set_active_vpconf)
         self.request_set_active_configurator.connect(self.set_active_configurator)
+        self.request_set_telem_overrides.connect(self.set_telem_overrides)
         # flag_error/clear_error mutate the notification widget, a one-shot
         # change that never repaints if called from the telemetry thread.
         # Route through signals so the mutation runs on the GUI thread.
@@ -305,6 +307,23 @@ class AppStatusWidget(QWidget):
         self.active_configurator_label.setStyleSheet(self._chip_style)
         self.active_configurator_label.hide()
         self.active_configurator_header.hide()
+
+        self.telem_ovd_header = InfoLabel()
+        self.telem_ovd_header.text_label.setText('Telem Ovd')
+        self.telem_ovd_header.text_label.setStyleSheet(dim_label_style)
+        self.telem_ovd_header.setToolTip(
+            'Active SimConnect/Dataref telemetry overrides for the loaded aircraft,\n'
+            'counted by tier (shipped Default vs User). Hover the value for the full\n'
+            'list, and edit via Utilities -> SimConnect/Dataref Overrides Editor.\n\n'
+            'IMPORTANT: overrides belong to the matched model profile. If you create\n'
+            'an additional profile for this aircraft (a non-matching livery, for\n'
+            'example), you must CLONE it from the default profile — an entry created\n'
+            'from scratch will NOT pick up the overrides.'
+        )
+        self.telem_ovd_label = QLabel('')
+        self.telem_ovd_label.setStyleSheet(self._chip_style)
+        self.telem_ovd_label.hide()
+        self.telem_ovd_header.hide()
 
         self.notification_label = QLabel('')
         self.notification_label.setWordWrap(True)
@@ -408,6 +427,10 @@ class AppStatusWidget(QWidget):
         grid.addWidget(self.active_configurator_label, row, 1, alignment=value_align)
         row += 1
 
+        grid.addWidget(self.telem_ovd_header, row, 0, alignment=label_align)
+        grid.addWidget(self.telem_ovd_label, row, 1, alignment=value_align)
+        row += 1
+
         grid.addWidget(self.message_container, row, 0, 1, 2)
 
         if not master_instance:
@@ -506,6 +529,7 @@ class AppStatusWidget(QWidget):
         self.cur_pattern_label.setText("(No Match)")
         self.active_profile_label.setText("(None)")
         self.set_notes_state(False)
+        self.set_telem_overrides('', '')
         self.set_waiting(src)
 
     def set_notes_state(self, enabled, has_notes=False):
@@ -550,6 +574,26 @@ class AppStatusWidget(QWidget):
         self.active_vpconf_header.setVisible(True)
         self.active_vpconf_label.setVisible(True)
         self.pulse_label(self.active_vpconf_label, color=QColor(0, 200, 0))
+
+    @pyqtSlot(str, str)
+    def set_telem_overrides(self, text, tooltip=''):
+        """Show/hide the telemetry-override pill. ``text`` describes the
+        active SimConnect/Dataref overrides for the loaded aircraft by tier
+        (e.g. "Default (4) + User (2)"); empty text hides the row entirely —
+        the overrides are aircraft-scoped, so unlike the vpconf/gains rows
+        there is no per-device placeholder state to hold geometry for."""
+        if not text:
+            self.pulse_label(self.telem_ovd_label, stop=True)
+            self.telem_ovd_header.setVisible(False)
+            self.telem_ovd_label.setVisible(False)
+            return
+        changed = self.telem_ovd_label.text() != text
+        self.telem_ovd_label.setText(text)
+        self.telem_ovd_label.setToolTip(tooltip)
+        self.telem_ovd_header.setVisible(True)
+        self.telem_ovd_label.setVisible(True)
+        if changed:
+            self.pulse_label(self.telem_ovd_label, color=QColor(0, 200, 0))
 
     @pyqtSlot(bool, bool)
     def set_active_configurator(self, active=True, row_visible=True):
