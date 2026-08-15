@@ -1248,6 +1248,22 @@ _UNIT_CONVERSIONS = {
     "in": conv.in2m,
 }
 
+def convert_between_units(value: float, from_unit: str, to_unit: str):
+    """Convert ``value`` between two units of the same dimension using the
+    canonical ``_UNIT_CONVERSIONS`` factors (each maps its unit to base SI).
+
+    Returns the converted float, or None when either unit is unknown so the
+    caller can leave the original value untouched.  Rows only ever offer
+    same-dimension unit choices in their validvalues, so no dimensional
+    checking is needed here.
+    """
+    f = _UNIT_CONVERSIONS.get(from_unit)
+    t = _UNIT_CONVERSIONS.get(to_unit)
+    if not f or not t:
+        return None
+    return value * f / t
+
+
 def to_number(v: str):
     """Try to convert string to number
     If unable, return the original string

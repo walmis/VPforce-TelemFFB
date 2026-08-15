@@ -1660,91 +1660,64 @@ class SettingsLayout(QGridLayout):
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
-    def convert_unit_value(self, value_str, from_unit, to_unit):
+    @staticmethod
+    def convert_unit_value(value_str, from_unit, to_unit):
         """
-        Convert a value from one unit to another.
-        Returns the converted value as a string, or the original if conversion not supported.
+        Convert a value from one unit to another using the canonical
+        utils._UNIT_CONVERSIONS factors (the same table the load-time value
+        parser uses).
+        Returns the converted value as a string, or the original if the
+        conversion is not supported.
         """
         try:
             value = float(value_str)
         except (ValueError, TypeError):
             return value_str
-        
-        # Define conversion factors (all to base unit)
-        # Length conversions (base: meters)
-        length_to_meters = {
-            'm': 1.0,
-            'ft': 0.3048,
-            'km': 1000.0,
-            'mi': 1609.34,
-            'nm': 1852.0,  # nautical miles
-        }
-        
-        # Speed conversions (base: m/s)
-        speed_to_ms = {
-            'm/s': 1.0,
-            'ft/s': 0.3048,
-            'km/h': 0.277778,
-            'kts': 0.514444,
-            'mph': 0.44704,
-        }
-        
-        # Try length conversion
-        if from_unit in length_to_meters and to_unit in length_to_meters:
-            # Convert from_unit to meters, then meters to to_unit
-            value_in_meters = value * length_to_meters[from_unit]
-            converted_value = value_in_meters / length_to_meters[to_unit]
-            # Preserve reasonable precision
-            if abs(converted_value) < 10:
-                return f"{converted_value:.3f}"
-            elif abs(converted_value) < 100:
-                return f"{converted_value:.2f}"
-            else:
-                return f"{converted_value:.1f}"
-        
-        # Try speed conversion
-        if from_unit in speed_to_ms and to_unit in speed_to_ms:
-            value_in_ms = value * speed_to_ms[from_unit]
-            converted_value = value_in_ms / speed_to_ms[to_unit]
-            if abs(converted_value) < 10:
-                return f"{converted_value:.3f}"
-            elif abs(converted_value) < 100:
-                return f"{converted_value:.2f}"
-            else:
-                return f"{converted_value:.1f}"
-        
-        # No conversion available, return original
-        return value_str
+
+        converted_value = utils.convert_between_units(value, from_unit, to_unit)
+        if converted_value is None:
+            return value_str
+
+        # Tenths are plenty: the telemetry these values compare against isn't
+        # meaningful below that, and one decimal keeps conversion round trips
+        # stable (7 m/s -> 13.6 kt -> 7 m/s).
+        formatted = f"{converted_value:.1f}"
+        # trim trailing zeros so "14.0" writes as "14"
+        return formatted.rstrip('0').rstrip('.') or '0'
 
     def unit_dropbox_changed(self):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('ud_', '')
         line_edit_name = 'vle_' + self.sender().objectName().replace('ud_', '')
         line_edit = self.mainwindow.findChild(QLineEdit, line_edit_name)
-        value = ''
         new_unit = self.sender().currentText()
-        
+
         # Get the previous unit for this setting
         old_unit = self.unit_previous_values.get(setting_name, new_unit)
-        
-        if line_edit is not None:
-            old_value = line_edit.text()
-            
-            # Convert value if units changed
-            if old_unit != new_unit:
-                converted_value = self.convert_unit_value(old_value, old_unit, new_unit)
-                value = converted_value
-                # Update the line edit with converted value
-                line_edit.blockSignals(True)
-                line_edit.setText(value)
-                line_edit.blockSignals(False)
-                logging.debug(f"Unit conversion: {old_value}{old_unit} → {value}{new_unit}")
-            else:
-                value = old_value
-        
+
+        if line_edit is None:
+            # No text-entry widget for this row (no such rows exist today):
+            # record the unit but never write an empty value over the setting.
+            self.unit_previous_values[setting_name] = new_unit
+            logging.warning(f"Unit change on {setting_name} has no value widget; not writing")
+            return
+
+        old_value = line_edit.text()
+
+        # Convert value if units changed
+        if old_unit != new_unit:
+            value = self.convert_unit_value(old_value, old_unit, new_unit)
+            # Update the line edit with converted value
+            line_edit.blockSignals(True)
+            line_edit.setText(value)
+            line_edit.blockSignals(False)
+            logging.debug(f"Unit conversion: {old_value}{old_unit} -> {value}{new_unit}")
+        else:
+            value = old_value
+
         # Store the current unit for next time
         self.unit_previous_values[setting_name] = new_unit
-        
+
         logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{new_unit}")
         self.write_or_revert(setting_name, value, new_unit)
         if G.settings_mgr.timed_out:
