@@ -340,6 +340,7 @@ effect.stop()  # Frees device resource
 1. **Don't use global variables as default args** — see `dev_guidelines.md` line 91-108
 2. **Watch for XML file locking** in multi-instance scenarios — use `try_parse()` with retries
 3. **Effect names must be unique** within an aircraft instance — `G.effects` is a dict-based Dispenser
+   - **Every new effect name must also be registered in the effects translator** — `effect_dict` in `telemffb/utils.py` (~line 318): maps an effect-name pattern (regex supported, e.g. `"blade_slap.*"`) to `["Human Readable Name", "intensity_setting_name"]`. This drives the readable name in the effects panel AND links the effect to its settings slider (green-highlight / % force display). An unregistered effect shows up as its raw internal name.
 4. **Always check `G.master_instance` vs `G.child_instance`** when implementing features that differ per instance type
 5. **FFBRhino device communication is USB-latency sensitive** — batch HID updates when possible
 6. **GUI updates from worker threads** — use `utils.schedule_on_main_thread()` or Qt signals
@@ -394,3 +395,4 @@ parameters, or telemetry variables. Note caveats, TODOs, or known limitations.
 - Does this touch the GUI from a background thread? Use `schedule_on_main_thread()`
 - Are all `super()` calls present in the MixIn chain?
 - Is the effect name unique within the aircraft instance?
+- Is every new effect name registered in the effects translator (`effect_dict` in `telemffb/utils.py`) with a display name and its intensity setting?

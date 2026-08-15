@@ -62,6 +62,8 @@ The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficient
 
 `G.effects` is a `Dispenser` — accessing `G.effects["name"]` lazily creates the effect on first use, then returns the cached instance. Effect names must be unique per aircraft.
 
+When you create a new effect, register its name in the effects translator: `effect_dict` in `telemffb/utils.py`. Each entry maps an effect-name pattern (regex supported, e.g. `"blade_slap.*"`) to `["Human Readable Name", "intensity_setting_name"]`. The translator supplies the readable name shown in the effects panel, and the setting-name half is how the UI links an active effect to its slider (green highlight and live % force display). An unregistered effect still works but appears in the panel under its raw internal name with no slider linkage.
+
 ## Aircraft Class Resolution
 
 When a new aircraft name appears, `TelemManager` looks it up in `defaults.xml`. If not found (MSFS/X-Plane only), it falls back to SimConnect category + engine type to pick a class:
