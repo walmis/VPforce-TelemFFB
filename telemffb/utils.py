@@ -582,23 +582,40 @@ def classify_http_exception(exc):
 #     except WindowsError:
 #         return None
 
-def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=None):
+def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=None, user_info=None):
     """Internal helper to create a support bundle zip file.
-    
+
     Args:
         zip_file_path: Output path for the zip file
         userconfig_rootpath: Path to user config directory
         exceptions: Optional list of ExceptionRecord objects to include
+        user_info: Optional dict from the report dialog
+            ('discord_username', 'notes') — written as the FIRST archive
+            entry so support can map the bundle to a user at a glance
     """
     from datetime import datetime
     import telemffb.winpaths as winpaths
 
-    
+
     # Get the system settings
     sys_dict = read_all_system_settings()
-    
+
     # Create the support zip file directly
     with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_LZMA, compresslevel=9) as support_zip:
+        # User-supplied report context first: bundle-to-user mapping and
+        # the reporter's own words are the highest-value triage data.
+        if user_info is not None:
+            lines = [
+                f"Report created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Device instance: {getattr(G, 'device_type', 'unknown')}",
+                f"Discord username: {user_info.get('discord_username') or '(not provided)'}",
+                "",
+                "Additional information from the user:",
+                user_info.get('notes') or '(none)',
+                "",
+            ]
+            support_zip.writestr("user_report.txt", "\n".join(lines))
+
         # Add userconfig_v2.xml
         userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
         legacy_userconfig_path = os.path.join(userconfig_rootpath, "userconfig.xml")
@@ -663,22 +680,24 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
             pass
 
 
-def create_support_bundle_data(userconfig_rootpath, exceptions=None):
+def create_support_bundle_data(userconfig_rootpath, exceptions=None, user_info=None):
     """Create support bundle as bytes (in memory) for API upload.
-    
+
     Args:
         userconfig_rootpath: Path to user config directory
         exceptions: Optional list of ExceptionRecord objects to include
-        
+        user_info: Optional dict from the report dialog (see
+            _create_support_bundle_zip)
+
     Returns:
         bytes: Support bundle as zip file data
     """
     # Use a temporary file to create the zip, then read it into memory
     with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp:
         tmp_path = tmp.name
-    
+
     try:
-        _create_support_bundle_zip(tmp_path, userconfig_rootpath, exceptions)
+        _create_support_bundle_zip(tmp_path, userconfig_rootpath, exceptions, user_info=user_info)
         with open(tmp_path, 'rb') as f:
             return f.read()
     finally:
@@ -705,24 +724,56 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
     
     exceptions_list = G.exception_tracker.get_exceptions()
 
-    # Confirm upload
-    reply = QMessageBox.question(
-        parent_widget,
-        "Report Exceptions",
-        (
-            f"Upload Support Bundle to VPforce support?\n\n"
-            f"This will include:\n"
-            f"  • Exception details and tracebacks\n"
-            f"  • System configuration\n"
-            f"  • Application logs\n\n"
-            f"You will need to complete a verification challenge."
-        ),
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        QMessageBox.StandardButton.Yes,
-    )
+    # Confirmation dialog with optional reporter context. The Discord
+    # username lets support map an uploaded bundle to the person asking
+    # about it on the VPforce Discord. It is remembered for THIS SESSION
+    # only (module attribute) — deliberately never persisted to the
+    # registry/disk: it is personal data the user types for a support
+    # interaction, not configuration. Both fields land in user_report.txt
+    # at the top of the bundle.
+    from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QLabel,
+                                 QLineEdit, QPlainTextEdit, QVBoxLayout)
+    dlg = QDialog(parent_widget)
+    dlg.setWindowTitle("Report Exceptions")
+    dlg_layout = QVBoxLayout(dlg)
+    dlg_layout.addWidget(QLabel(
+        "Upload Support Bundle to VPforce support?\n\n"
+        "This will include:\n"
+        "  • Exception details and tracebacks\n"
+        "  • System configuration\n"
+        "  • Application logs"
+    ))
+    dlg_layout.addSpacing(8)
+    dlg_layout.addWidget(QLabel(
+        "Discord username (optional) — lets support match this bundle to "
+        "you\non the VPforce Discord:"))
+    tb_discord = QLineEdit()
+    tb_discord.setPlaceholderText("your Discord username")
+    tb_discord.setText(getattr(report_exceptions, '_session_discord_username', ''))
+    dlg_layout.addWidget(tb_discord)
+    dlg_layout.addWidget(QLabel(
+        "Additional information (optional) — what were you doing when the\n"
+        "problem occurred, or anything else support should know:"))
+    tb_notes = QPlainTextEdit()
+    tb_notes.setPlaceholderText("Describe what happened…")
+    tb_notes.setMinimumHeight(90)
+    dlg_layout.addWidget(tb_notes)
+    dlg_layout.addWidget(QLabel(
+        "You will need to complete a verification challenge."))
+    dlg_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+    dlg_buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Upload")
+    dlg_buttons.accepted.connect(dlg.accept)
+    dlg_buttons.rejected.connect(dlg.reject)
+    dlg_layout.addWidget(dlg_buttons)
 
-    if reply != QMessageBox.StandardButton.Yes:
+    if dlg.exec() != QDialog.DialogCode.Accepted:
         return False
+
+    discord_username = tb_discord.text().strip()
+    user_notes = tb_notes.toPlainText().strip()
+    report_exceptions._session_discord_username = discord_username
+    user_info = {'discord_username': discord_username, 'notes': user_notes}
 
     # Progress dialog (indeterminate)
     progress = QProgressDialog("Creating support bundle and uploading to server...", None, 0, 0, parent_widget)
@@ -736,20 +787,33 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
     class UploadWorker(QObject):
         finished = pyqtSignal(bool, dict)
 
-        def __init__(self, api_url: str, userconfig_rootpath: str, exceptions_list):
+        def __init__(self, api_url: str, userconfig_rootpath: str, exceptions_list, user_info=None):
             super().__init__()
             self.api_url = api_url
             self.userconfig_rootpath = userconfig_rootpath
             self.exceptions_list = exceptions_list
+            self.user_info = user_info
 
         def run(self):
             try:
                 # Create bundle in memory
-                bundle = create_support_bundle_data(self.userconfig_rootpath, self.exceptions_list)
+                bundle = create_support_bundle_data(self.userconfig_rootpath, self.exceptions_list,
+                                                    user_info=self.user_info)
+
+                # Embed the (sanitized) Discord username in the uploaded
+                # filename: if the support server passes the client filename
+                # through to the Discord attachment, the bundle-to-user
+                # mapping becomes visible right in the automated message —
+                # no server change needed. Falls back to the plain name.
+                filename = 'support_bundle.zip'
+                uname = (self.user_info or {}).get('discord_username') or ''
+                uname = re.sub(r'[^A-Za-z0-9_.-]', '', uname)[:48]
+                if uname:
+                    filename = f'support_bundle_{uname}.zip'
 
                 status_code, response_text = post_multipart_url(
                     self.api_url,
-                    files=[('bundle', 'support_bundle.zip', bundle, 'application/zip')],
+                    files=[('bundle', filename, bundle, 'application/zip')],
                     timeout=30,
                 )
 
@@ -771,7 +835,7 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
 
     # Prepare thread and worker
     thread = QThread(parent_widget)
-    worker = UploadWorker(api_url, userconfig_rootpath, exceptions_list)
+    worker = UploadWorker(api_url, userconfig_rootpath, exceptions_list, user_info=user_info)
     worker.moveToThread(thread)
 
     # Connect signals
