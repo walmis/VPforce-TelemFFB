@@ -1466,7 +1466,7 @@ class SettingsLayout(QGridLayout):
                 label.clicked.connect(lambda parent_name=parent: self.expander_hyperlink_clicked(parent_name))
 
     def expander_hyperlink_clicked(self, parent):
-        dbprint("red", f"EXPANDER: {parent}")
+        # dbprint("red", f"EXPANDER: {parent}")
         parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
         if parent_expand_button is not None:
             parent_expand_button.click()
