@@ -98,6 +98,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Fixed rudder control surface telemetry
 - DCS start/stop event handling: TelemFFB UI now responds earlier when the DCS export module loads or unloads
 - TelemFFB will now log a (non blocking) exception if DCS Realistic or SimHaptic are installed with the autostart feature enabled in export.lua (breaks DCS FFB)
+- Hardware force trim modes (joystick, pedals, collective) now honor the in-cockpit force trim switch for UH1/OH58
 
 ## IL2
 - **NEW: IL-2 Korea support**
