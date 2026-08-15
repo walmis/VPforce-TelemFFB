@@ -10175,7 +10175,7 @@
 		<classdefaults_XPLANE>
 			<name>afcs_threshold_value</name>
 			<type>XAW109Helicopter</type>
-			<value>0.3</value>
+			<value>0.15</value>
 			<sim>XPLANE</sim>
 			<device>pedals</device>
 		</classdefaults_XPLANE>

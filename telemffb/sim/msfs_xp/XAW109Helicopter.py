@@ -49,7 +49,10 @@ class XAW109Helicopter(Helicopter):
     vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
     afcs_motion_rate: int = 4
-    afcs_threshold_value: float = 0.4
+    # Schmitt enter threshold for the pedal AFCS follower (field-tuned
+    # 2026-08: 0.15 tracks the pedal migration through cruise; 0.6
+    # reproduces the certified sim's near-motionless pedals).
+    afcs_threshold_value: float = 0.15
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -99,19 +102,43 @@ class XAW109Helicopter(Helicopter):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
 
+        # ---- Pedal AFCS following: modeled parallel trim ----------------------
+    # The aircraft's own yaw servo (AW109_rudder_trim_rate) only commands
+    # pedal motion when |trim_zero + coarse + fine| exceeds the certified
+    # thresholds (hi = 0.6) — in an instrumented 4.5-minute flight that
+    # fired ONCE, which is the "pedals feel dead" known issue. A real 109SP
+    # pilot's flight test (x-plane.org topic 318989) shows the pedals
+    # visibly tracking the anti-torque requirement: ~2 in of left pedal in
+    # a heavy hover, migrating to ~1 in of RIGHT pedal by 135 kt, and
+    # responding to power changes with feet off. This renderer models that
+    # parallel trim by proportionally unwinding the LOW-PASSED trim demand
+    # (zero + coarse; 'fine' excluded per the developer's anti-oscillation
+    # advice) through a Schmitt deadband, with the rate faded as IAS rises.
+    # A previous proportional attempt oscillated in yaw above ~70 kt: the
+    # low-pass, the hysteresis band, and the IAS fade each attack that loop
+    # (filtering cuts gain at the oscillation frequency; hysteresis stops
+    # boundary chatter; the fade tames the stiff-weathervane regime).
+    # The plugin's own rudder_trim_rate commands (upper modes at the
+    # certified thresholds) remain authoritative whenever nonzero.
+    # User knobs (existing settings, no new ones): afcs_threshold_value =
+    # the Schmitt ENTER threshold (0.6 reproduces certified deadness; the
+    # developer blessed 0.4; lower = livelier pedals), afcs_motion_rate =
+    # step scale, same semantics as the cyclic follow.
+    PEDAL_AFCS_EXIT_RATIO = 0.4     # Schmitt exit = enter threshold x this
+    PEDAL_AFCS_LPF_TAU = 1.5        # s; trim-demand low-pass
+    PEDAL_AFCS_IAS_FADE_KT = (60.0, 100.0)   # fade band (real 109: feet on
+    PEDAL_AFCS_IAS_GAIN = (1.0, 0.4)         #   pedals below ~60 kt anyway)
+    PEDAL_AFCS_PROP_CAP = 1.5       # max proportional step, x afcs_motion_rate
+
     def msfs_update_pedals(self, telem_data: BaseTelemetryData):
 
         if telem_data.FFBType != 'pedals':
             return
 
-        # if self.telemffb_controls_axes and not self.local_disable_axis_control:
         phys_x, phys_y = self._get_device_axes()
         telem_data.phys_x = phys_x
         telem_data.pedal_position = phys_x
         telem_data.IAS_kt = (telem_data.IAS or 0) * ms2kt
-        # if self.pedal_ft_release_button:
-        #     state = input_data.isButtonPressed(self.pedal_ft_release_button)
-        #     self.trigger_xp_event("SPECIAL/buttons/cmd_ft_ped_rel", state=state, type="track")
 
         self._spring_handle.name = "pedal_ap_spring"
 
@@ -121,106 +148,6 @@ class XAW109Helicopter(Helicopter):
             if telem_data.get("SimOnGround", 1):
                 self.cpO_x = 0
             else:
-                # print(f"last_colelctive_y={self.last_collective_y}")
-                self.cpO_x = round(4096 * self.last_pedal_x)
-
-            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(
-                4096 * utils.clamp(self.pedal_spring_gain, 0, 1))
-
-            self.spring_x.cpOffset = self.cpO_x
-
-            self._spring_handle.setCondition(self.spring_x)
-            # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
-            self._spring_handle.start()
-            logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
-            if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
-                # dont start sending position until physical pedals have centered
-                self.pedals_init = 1
-                logging.info("Pedals Initialized")
-            else:
-                return
-            self.running_trim_total = 0
-
-
-        pedal_ft_released = telem_data.AW109_ped_force_trim_release_pressed or 0
-
-
-        trim_coarse = telem_data.AW109_rud_trim_coarse or 0
-        trim_fine = telem_data.AW109_rud_trim_fine or 0
-        trim_zero = telem_data.AW109_rud_trim_zero or 0
-
-        trim_total = trim_coarse + trim_zero + trim_fine
-        trim_total_abs = abs(trim_total)
-        telem_data._AW109_rud_trim_total = trim_total
-        telem_data._AW109_rud_trim_total_abs = trim_total_abs
-
-        # trim_threshold_high = telem_data.AW109_rud_trim_thresh_hi or 0
-        trim_threshold = self.afcs_threshold_value
-        telem_data._AW109_rud_trim_threshold = trim_threshold
-
-        trim_required_calc = trim_total_abs > trim_threshold
-        telem_data._AW109_rud_trim_required_calc = trim_required_calc
-
-        trim_step_size = self.afcs_motion_rate
-        trim_step_size = -trim_step_size if trim_total < 0 else trim_step_size
-
-
-        if pedal_ft_released:
-            if self.pedal_ft_damper_enabled:
-                force = int(self.pedal_ft_damper_force * 4096)
-            else:
-                force = 0
-            self.cpO_x = round(4096 * utils.clamp(phys_x, -1, 1))
-            # print(self.cpO_y)
-            self.spring_x.cpOffset = self.cpO_x
-
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = force
-
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.start()
-        else:
-            if trim_required_calc:
-                self.cpO_x += trim_step_size
-                telem_data._telemffb_moving_rud = True
-            else:
-                telem_data._telemffb_moving_rud = False
-
-
-
-
-            force = round(4096 * self.pedal_spring_gain)
-            self.spring_x.cpOffset = round(self.cpO_x)
-            self.spring_y.cpOffset = 0
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = int(self.pedal_spring_gain * force)
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.setCondition(self.spring_y)
-            self._spring_handle.start()
-
-
-        self.last_pedal_x = phys_x
-
-    def _tst_msfs_update_pedals(self, telem_data: BaseTelemetryData):
-
-        if telem_data.FFBType != 'pedals':
-            return
-
-        phys_x, phys_y = self._get_device_axes()
-        telem_data.phys_x = phys_x
-        telem_data.pedal_position = phys_x
-        telem_data.IAS_kt = (telem_data.IAS or 0) * ms2kt
-        # if self.pedal_ft_release_button:
-        #     state = input_data.isButtonPressed(self.pedal_ft_release_button)
-        #     self.trigger_xp_event("SPECIAL/buttons/cmd_ft_ped_rel", state=state, type="track")
-
-        self._spring_handle.name = "pedal_ap_spring"
-
-        if not self.pedals_init:
-
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
-            if telem_data.get("SimOnGround", 1):
-                self.cpO_x = -1500
-            else:
                 self.cpO_x = round(4096 * self.last_pedal_x)
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(
                 4096 * utils.clamp(self.pedal_spring_gain, 0, 1))
@@ -233,12 +160,8 @@ class XAW109Helicopter(Helicopter):
                 self.pedals_init = 1
             else:
                 return
-            self.running_trim_total = 0
 
         pedal_ft_released = telem_data.get("AW109_ped_force_trim_release_pressed", 0)
-        trim_req = telem_data.get("AW109_rudder_trim_req", 0)
-        damper = telem_data.get("AW109_yaw_damper", 0)
-        delta = 0
 
         if pedal_ft_released:
             if self.pedal_ft_damper_enabled:
@@ -250,33 +173,55 @@ class XAW109Helicopter(Helicopter):
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = force
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
-        elif telem_data.get("SimOnGround", 1):
-            self.cpO_x = -1600
-            # pedal_logger.info(f"trim_req = {trim_req} | damper={damper: .4f} | delta = {delta} | cpO_x={self.cpO_x}")
+            # Feet-on: the demand estimate is stale the moment the pilot
+            # overrides; restart it clean on release.
+            self._pedal_afcs_s = None
         else:
+            rate_cmd = telem_data.get("AW109_rudder_trim_rate", 0) or 0
 
-            if not hasattr(self, 'last_trim_req'):
-                self.last_trim_req = 0.0
-
-            derivative_trim = trim_req - self.last_trim_req
-
-            if abs(damper) < 0.01:  # 0.008
-                delta = 0
-                magnitude = 0
-            elif abs(trim_req) > 0.30 and abs(damper) > 0.49:
-                magnitude = round(abs(damper) * 80)
-            elif abs(trim_req) > 0.1:
-                magnitude = round(abs(damper) * 70)  # 60
+            # Trim demand: abs-of-sum semantics per the developer ("the sum
+            # of values is the usable trim"); 'fine' deliberately excluded.
+            s_raw = (telem_data.get("AW109_rud_trim_zero", 0) or 0) + \
+                    (telem_data.get("AW109_rud_trim_coarse", 0) or 0)
+            now = time.perf_counter()
+            dt = utils.clamp(now - getattr(self, '_pedal_afcs_t', now), 0.0, 0.2)
+            self._pedal_afcs_t = now
+            s_prev = getattr(self, '_pedal_afcs_s', None)
+            if s_prev is None:
+                s = s_raw
+            elif self.PEDAL_AFCS_LPF_TAU > 0:
+                s = s_prev + (s_raw - s_prev) * utils.clamp(
+                    dt / self.PEDAL_AFCS_LPF_TAU, 0.0, 1.0)
             else:
-                magnitude = round(abs(damper) * 60)  # 40
+                s = s_raw
+            self._pedal_afcs_s = s
 
-            delta = magnitude if damper > 0 else -magnitude
+            enter = self.afcs_threshold_value or 0.15
+            exit_th = enter * self.PEDAL_AFCS_EXIT_RATIO
+            active = getattr(self, '_pedal_afcs_active', False)
+            if abs(s) > enter:
+                active = True
+            elif abs(s) < exit_th:
+                active = False
+            self._pedal_afcs_active = active
 
-            if abs(derivative_trim) > 0.004 and abs(damper) > 0.4:
-                delta = round(-damper * 500)
-            delta = max(-150, min(150, delta))
-            self.cpO_x = max(-4096, min(4096, self.cpO_x + delta))
-            self.last_trim_req = trim_req
+            step = 0.0
+            if rate_cmd:
+                # Authoritative upper-mode servo command: bang-bang +/-1,
+                # scaled exactly like the cyclic follow.
+                step = rate_cmd * self.afcs_motion_rate
+            elif active:
+                ias_kt = (telem_data.IAS or 0) * ms2kt
+                ias_gain = utils.scale_clamp(
+                    ias_kt, self.PEDAL_AFCS_IAS_FADE_KT, self.PEDAL_AFCS_IAS_GAIN)
+                mag = utils.clamp(abs(s) / enter, 0.0, self.PEDAL_AFCS_PROP_CAP)
+                step = math.copysign(
+                    self.afcs_motion_rate * mag * ias_gain, s)
+
+            self.cpO_x = utils.clamp(self.cpO_x + step, -4096, 4096)
+            telem_data._telemffb_moving_rud = bool(step)
+            telem_data._pedal_afcs_demand = s
+            telem_data._pedal_afcs_active = active
 
             force = round(4096 * self.pedal_spring_gain)
             self.spring_x.cpOffset = round(self.cpO_x)
@@ -286,8 +231,6 @@ class XAW109Helicopter(Helicopter):
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
             self._spring_handle.start()
-
-            # pedal_logger.info(f"trim_req = {trim_req} | damper={damper: .4f} | deriv_trim = {derivative_trim:.1f}| delta = {delta} | cpO_x={self.cpO_x}")
 
         self.last_pedal_x = phys_x
 
@@ -328,7 +271,11 @@ class XAW109Helicopter(Helicopter):
 
             self._spring_handle.setCondition(self.spring_y)
 
-            self._spring_handle.start()
+            # override: init spring needs exclusive authority to drive the
+            # lever to the init point (matches HPG collective and the base
+            # no-spring fork; a plain start leaves other effects fighting
+            # the spring and the lever stalls short of the init gate)
+            self._spring_handle.start(override=True)
 
             if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
                 # Check if phys y position is within %10 of init point
