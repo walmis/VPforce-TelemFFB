@@ -515,12 +515,18 @@ class Aircraft(AircraftBase, DCSCommands):
         self.telem_data._ovrd_spr_dt = dt
 
         if self.override_spring_ft_enabled:
+            # DCS UH1 and OH58 export "ForceTrimSwitch" indicating the position of the cockpit master force trim switch.
+            # If switch telemetry is present, and switch is off, ac_update_pedal_force_trim will follow path as if the
+            # FT button is depressed, simulating the system being disabled.  Default value is True ("switch on") if the
+            # telemetry key is absent (as will be for all other helicopters).
+            ft_switch_state = self.telem_data.get('ForceTrimSW', True)
+
             input_data = self._get_device_report()
             x, y = self._get_device_axes()
             current_buttons = input_data.getPressedButtons() if input_data is not None else []
             # print(f"BUTTONS:>{current_buttons}<")
             # decide what to do depending on which button is pressed
-            if self.override_spring_trim_release and self.override_spring_trim_release in current_buttons:
+            if (self.override_spring_trim_release and self.override_spring_trim_release in current_buttons) or not ft_switch_state:
                 # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
                 # as it is moved while spring force is enabled.
                 # return from method so default spring gains do not get applied at the end of the method

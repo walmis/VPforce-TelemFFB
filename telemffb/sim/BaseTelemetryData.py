@@ -1042,7 +1042,8 @@ class BaseTelemetryData:
 
     ForceTrimSW: Optional[bool]
     """Force trim switch state (helicopter force-trim / SAS release).  
-    MSFS: L:TelemFFBHeliFT — custom local SimVar (bool).  
+    MSFS: L:TelemFFBHeliFT — custom local SimVar (bool). 
+    DCS: Current state of force trim switch in UH1, OH58 - not present for helicopters with no switch 
     Default when absent: True (use .get("ForceTrimSW", True)).  
     """
 

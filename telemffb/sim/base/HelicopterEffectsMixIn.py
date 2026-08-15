@@ -257,7 +257,6 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # button (unlike pedals, where an unbound button is a valid
             # configuration). Flagged per-frame so the message persists while
             # the condition exists and clears once a button is bound.
-            logging.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             self.flag_error("Collective force trim enabled but the trim release button is not configured")
             return
 
@@ -270,7 +269,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         _, y = self._get_device_axes()
         current_buttons = input_data.getPressedButtons()
 
-        force_trim_active = telem_data.ForceTrimSW
+        force_trim_active = telem_data.get("ForceTrimSW", True)
         if force_trim_active is None:
             force_trim_active = True
 

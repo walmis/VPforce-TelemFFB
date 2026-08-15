@@ -145,7 +145,11 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
                 self.ac_update_pedal_trim(telem_data)
 
         elif self.spring_mode_is(SpringModeEnum.FORCETRIM):
-            if not self.ac_update_pedal_force_trim(telem_data):
+            # DCS UH1 and OH58 export "ForceTrimSwitch" indicating the position of the cockpit master force trim switch.
+            # If switch telemetry is present, and switch is off, ac_update_pedal_force_trim will follow path as if the
+            # FT button is depressed, simulating the system being disabled.  Default value is True ("switch on") if the
+            # telemetry key is absent (as will be for all other helicopters).
+            if not self.ac_update_pedal_force_trim(telem_data, ft_active=telem_data.get('ForceTrimSW', True)):
                 spring_coeff = utils.clamp(self.pedal_spring_gain, 0, 1.0)
                 self.spring_x.set_coefficient(spring_coeff)
 
