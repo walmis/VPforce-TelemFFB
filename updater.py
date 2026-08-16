@@ -24,6 +24,7 @@ import ssl
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 from zipfile import ZipFile
 
@@ -118,6 +119,43 @@ def _resolve_app_path(debugpath=None):
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _move_with_retry(src, dst, log=None, attempts=6, delay=0.5):
+    """Move src to dst via os.rename, retrying transient locks.
+
+    Fresh installs in OneDrive-synced folders (Desktop/Documents) and
+    antivirus scans hold files for moments at a time - a retried rename
+    rides those out.  Deliberately NEVER falls back to copy-then-delete
+    the way shutil.move does: on a locked tree that fallback deletes what
+    it can and dies on what it can't, gutting the installation
+    (field-observed on Qt6Core.dll).  Raises the last OSError instead so
+    the caller can roll back cleanly.
+    """
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            os.rename(src, dst)
+            return
+        except OSError as e:
+            last_error = e
+            if log and attempt < attempts - 1:
+                log(f"  Locked: {os.path.basename(src)} - retrying "
+                    f"({attempt + 1}/{attempts - 1})...")
+            time.sleep(delay)
+    raise last_error
+
+
+def _rollback_moves(moved, log=None):
+    """Undo a partial backup: move (backup_path, original_path) pairs home,
+    newest first.  Best-effort - logs anything it cannot restore."""
+    for backup_path, original_path in reversed(moved):
+        try:
+            os.rename(backup_path, original_path)
+        except OSError:
+            if log:
+                log(f"  ROLLBACK FAILED for {original_path} - restore it "
+                    f"manually from {BACKUP_FOLDER}")
+
+
 def fetch_latest_version(current_version):
     """Returns (latest_version, download_url), or raises RuntimeError."""
     send_url = DOWNLOAD_URL_BASE + LATEST_JSON
@@ -154,6 +192,7 @@ class UpdateWorker(QThread):
         try:
             zip_path = self._download()
             self.progress.emit(0)
+            self._wait_for_app_exit()
             self._backup()
             self.progress.emit(0)
             self._extract(zip_path)
@@ -196,6 +235,33 @@ class UpdateWorker(QThread):
         self.log.emit(f"Download complete ({received:,} bytes).")
         return zip_path
 
+    def _wait_for_app_exit(self, timeout=20):
+        """Wait for all TelemFFB instances (master and children) to exit
+        before touching the installation - a running instance holds every
+        DLL in the install tree.  Aborts cleanly (nothing modified) if one
+        is still alive after the timeout."""
+        self.status.emit("Waiting for TelemFFB to close...")
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                result = subprocess.run(
+                    ["tasklist", "/FI", f"IMAGENAME eq {EXECUTABLE_NAME}"],
+                    capture_output=True, text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except Exception:
+                return  # cannot check; proceed rather than block updates
+            if EXECUTABLE_NAME.lower() not in result.stdout.lower():
+                self.log.emit("All TelemFFB instances have exited.")
+                return
+            time.sleep(0.5)
+        raise RuntimeError(
+            f"{EXECUTABLE_NAME} is still running after {timeout} seconds.\n\n"
+            "Close all TelemFFB instances (including child device instances) "
+            "and run the update again.\n\n"
+            "No changes have been made to your installation."
+        )
+
     def _backup(self):
         self.status.emit("Backing up current version...")
         backup_path = os.path.join(self.app_path, BACKUP_FOLDER)
@@ -205,18 +271,37 @@ class UpdateWorker(QThread):
         self.log.emit(f"Backing up to {backup_path}")
 
         items = [n for n in self._folder_snapshot if n not in ("updater.exe", BACKUP_FOLDER)]
-        for i, name in enumerate(items):
-            src = os.path.join(self.app_path, name)
-            dst = os.path.join(backup_path, name)
-            if name.endswith(".ini") and name != "config.ini":
-                self.status.emit(f"Preserving: {name}")
-                shutil.copy(src, dst)
-                self.log.emit(f"  Preserved (copy): {name}")
-            else:
-                self.status.emit(f"Backing up: {name}")
-                shutil.move(src, dst)
-                self.log.emit(f"  Backed up: {name}")
-            self.progress.emit(int((i + 1) / len(items) * 100))
+        moved = []  # (backup_path, original_path) for rollback
+        try:
+            for i, name in enumerate(items):
+                src = os.path.join(self.app_path, name)
+                dst = os.path.join(backup_path, name)
+                if name.endswith(".ini") and name != "config.ini":
+                    self.status.emit(f"Preserving: {name}")
+                    shutil.copy(src, dst)
+                    self.log.emit(f"  Preserved (copy): {name}")
+                else:
+                    self.status.emit(f"Backing up: {name}")
+                    _move_with_retry(src, dst, log=self.log.emit)
+                    moved.append((dst, src))
+                    self.log.emit(f"  Backed up: {name}")
+                self.progress.emit(int((i + 1) / len(items) * 100))
+        except OSError as e:
+            locked = getattr(e, "filename", None) or "a file in the installation"
+            self.status.emit("Update aborted - restoring files...")
+            self.log.emit(f"Backup failed on {locked}; rolling back.")
+            _rollback_moves(moved, log=self.log.emit)
+            self.log.emit("Rollback complete - installation unchanged.")
+            raise RuntimeError(
+                f"Could not back up the current installation:\n\n{locked}\n"
+                "is locked by another program.\n\n"
+                "Common causes: the installation is in a OneDrive-synced folder "
+                "(such as Desktop or Documents) still syncing recently added "
+                "files, an antivirus scan in progress, or another TelemFFB "
+                "instance still running.\n\n"
+                "Your installation has been restored - wait a moment and try "
+                "the update again."
+            ) from e
 
     def _extract(self, zip_path):
         self.status.emit("Extracting update...")
@@ -377,7 +462,8 @@ class UpdaterWindow(QMainWindow):
         QMessageBox.critical(
             self, "Update Failed",
             f"The update did not complete:\n\n{message}\n\n"
-            f"Your previous installation has been backed up to {BACKUP_FOLDER}."
+            f"Any files that were moved aside during the update are in the "
+            f"{BACKUP_FOLDER} folder."
         )
 
     def _finish(self):
