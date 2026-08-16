@@ -34,6 +34,7 @@ def _make_install(tmp_path):
     assets = app / "assets"
     (assets / "PyQt6").mkdir(parents=True)
     (assets / "PyQt6" / "Qt6Core.dll").write_text("dll")
+    (assets / "base_library.zip").write_text("stdlib")
     (app / "config.ini").write_text("cfg")
     (app / "userconfig.ini").write_text("user")
     return app
@@ -95,6 +96,32 @@ class TestBackupRollback:
         backup = app / updater.BACKUP_FOLDER
         assert (backup / "assets" / "PyQt6" / "Qt6Core.dll").exists()
         assert not (app / "assets").exists()  # emptied tree removed
+
+    def test_runtime_held_base_library_is_preserved_not_moved(self, tmp_path, monkeypatch):
+        # THE field failure: the updater's own bootloader holds
+        # assets/base_library.zip open - rename denied through every retry,
+        # while read (for the backup copy) and overwrite remain permitted.
+        # The backup must complete with the file left in place.
+        app = _make_install(tmp_path)
+        w = self._worker(app)
+        base_lib = app / "assets" / "base_library.zip"
+        assets_path = str(app / "assets")
+        real_rename = os.rename
+
+        def rename_blocking(src, dst, *a, **k):
+            # both the dir rename and the held file's rename are denied
+            if os.path.normpath(src) in (os.path.normpath(assets_path),
+                                         os.path.normpath(str(base_lib))):
+                raise PermissionError(5, "Access is denied", src)
+            return real_rename(src, dst)
+
+        monkeypatch.setattr(updater.os, "rename", rename_blocking)
+        with open(base_lib, "r"):  # real held handle, like the bootloader's
+            w._backup()
+        backup = app / updater.BACKUP_FOLDER
+        assert base_lib.exists()                          # left for the runtime
+        assert (backup / "assets" / "base_library.zip").exists()  # backed up by copy
+        assert (backup / "assets" / "PyQt6" / "Qt6Core.dll").exists()
 
     def test_locked_file_aborts_and_restores_install(self, tmp_path):
         app = _make_install(tmp_path)

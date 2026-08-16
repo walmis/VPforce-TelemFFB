@@ -156,6 +156,12 @@ def _move_tree_per_file(src, dst, log=None, moved=None):
 
     Appends every completed rename to ``moved`` as (dst, src) so the caller
     can roll back.  Raises OSError on a file that stays locked.
+
+    base_library.zip is COPIED and left in place, never moved: the running
+    updater's bootloader holds it open with sharing flags that permit
+    overwrite but forbid rename (field-diagnosed - the CI-built bootloader
+    locked it through every retry).  The extraction phase overwrites it
+    with the new version, which the held handle does allow.
     """
     for root, dirs, files in os.walk(src):
         rel = os.path.relpath(root, src)
@@ -164,10 +170,16 @@ def _move_tree_per_file(src, dst, log=None, moved=None):
         for fname in files:
             f_src = os.path.join(root, fname)
             f_dst = os.path.join(target_root, fname)
+            if fname == "base_library.zip":
+                shutil.copy2(f_src, f_dst)
+                if log:
+                    log(f"  Preserved in place (runtime-held): {fname}")
+                continue
             _move_with_retry(f_src, f_dst, log=log)
             if moved is not None:
                 moved.append((f_dst, f_src))
-    # remove the now-empty source tree (only empty dirs remain)
+    # remove the now-emptied source tree; base_library.zip (and anything
+    # else undeletable) is deliberately left behind for the runtime
     shutil.rmtree(src, ignore_errors=True)
 
 
