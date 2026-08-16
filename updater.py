@@ -144,11 +144,39 @@ def _move_with_retry(src, dst, log=None, attempts=6, delay=0.5):
     raise last_error
 
 
+def _move_tree_per_file(src, dst, log=None, moved=None):
+    """Move a directory by walking it and renaming individual files.
+
+    The all-or-nothing directory rename fails if ANY handle exists anywhere
+    in the tree - and on freshly-downloaded installs, antivirus (Mark-of-
+    the-Web scanning) or OneDrive sync hold handles somewhere in the tree
+    almost continuously.  Per-file renames only contend with the one file a
+    scanner is touching at that moment, so retries actually succeed (this is
+    how the old flat-layout updater survived Desktop installs for years).
+
+    Appends every completed rename to ``moved`` as (dst, src) so the caller
+    can roll back.  Raises OSError on a file that stays locked.
+    """
+    for root, dirs, files in os.walk(src):
+        rel = os.path.relpath(root, src)
+        target_root = dst if rel == "." else os.path.join(dst, rel)
+        os.makedirs(target_root, exist_ok=True)
+        for fname in files:
+            f_src = os.path.join(root, fname)
+            f_dst = os.path.join(target_root, fname)
+            _move_with_retry(f_src, f_dst, log=log)
+            if moved is not None:
+                moved.append((f_dst, f_src))
+    # remove the now-empty source tree (only empty dirs remain)
+    shutil.rmtree(src, ignore_errors=True)
+
+
 def _rollback_moves(moved, log=None):
     """Undo a partial backup: move (backup_path, original_path) pairs home,
     newest first.  Best-effort - logs anything it cannot restore."""
     for backup_path, original_path in reversed(moved):
         try:
+            os.makedirs(os.path.dirname(original_path), exist_ok=True)
             os.rename(backup_path, original_path)
         except OSError:
             if log:
@@ -280,6 +308,18 @@ class UpdateWorker(QThread):
                     self.status.emit(f"Preserving: {name}")
                     shutil.copy(src, dst)
                     self.log.emit(f"  Preserved (copy): {name}")
+                elif os.path.isdir(src):
+                    self.status.emit(f"Backing up: {name}")
+                    try:
+                        # fast path: whole-directory rename
+                        _move_with_retry(src, dst, log=None, attempts=2, delay=0.25)
+                        moved.append((dst, src))
+                    except OSError:
+                        # tree is being held open somewhere (AV scanning the
+                        # fresh download, OneDrive sync) - move file-by-file
+                        self.log.emit(f"  {name} is busy - moving file-by-file...")
+                        _move_tree_per_file(src, dst, log=self.log.emit, moved=moved)
+                    self.log.emit(f"  Backed up: {name}")
                 else:
                     self.status.emit(f"Backing up: {name}")
                     _move_with_retry(src, dst, log=self.log.emit)

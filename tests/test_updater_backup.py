@@ -76,6 +76,26 @@ class TestBackupRollback:
         assert (app / "userconfig.ini").exists() and (backup / "userconfig.ini").exists()
         assert not (app / "assets").exists()
 
+    def test_dir_lock_falls_back_to_per_file_move(self, tmp_path, monkeypatch):
+        # the field case: the assets DIRECTORY rename fails persistently
+        # (AV/OneDrive handle somewhere in the tree) but individual files
+        # are movable - the per-file walk must complete the backup
+        app = _make_install(tmp_path)
+        w = self._worker(app)
+        assets_path = str(app / "assets")
+        real_rename = os.rename
+
+        def rename_blocking_dir(src, dst, *a, **k):
+            if os.path.normpath(src) == os.path.normpath(assets_path):
+                raise PermissionError(5, "Access is denied", src)
+            return real_rename(src, dst)
+
+        monkeypatch.setattr(updater.os, "rename", rename_blocking_dir)
+        w._backup()
+        backup = app / updater.BACKUP_FOLDER
+        assert (backup / "assets" / "PyQt6" / "Qt6Core.dll").exists()
+        assert not (app / "assets").exists()  # emptied tree removed
+
     def test_locked_file_aborts_and_restores_install(self, tmp_path):
         app = _make_install(tmp_path)
         w = self._worker(app)
@@ -90,6 +110,20 @@ class TestBackupRollback:
         assert (app / "defaults.xml").exists()
         assert (app / "config.ini").exists()
         assert locked.exists()
+
+    def test_locked_file_inside_dir_aborts_and_restores(self, tmp_path):
+        # per-file fallback hits a file that stays locked: abort + full
+        # restore, including files already renamed out of the tree
+        app = _make_install(tmp_path)
+        w = self._worker(app)
+        locked = app / "assets" / "PyQt6" / "locked.dll"
+        locked.write_text("busy")
+        with open(locked, "r"):
+            with pytest.raises(RuntimeError, match="locked by another program"):
+                w._backup()
+        assert (app / "assets" / "PyQt6" / "Qt6Core.dll").exists()
+        assert locked.exists()
+        assert (app / "defaults.xml").exists()
 
 
 class TestWaitForAppExit:
