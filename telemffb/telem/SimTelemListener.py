@@ -18,20 +18,20 @@
 
 
 import logging
-from typing import List, Optional
+import os
+from typing import List, Optional, override
 
 from PyQt6 import QtCore
 
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb.sim.aircrafts_msfs_xp import Aircraft
-from telemffb.telem.IL2Manager import IL2Manager
+from telemffb.telem.IL2Manager import IL2TelemParser
 from telemffb.telem.NetworkThread import NetworkThread
+from telemffb.telem.UDPForwarder import IL2PacketForwarder
 from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.telem.BMSTelemManager import BMSManager
-from telemffb.utils import overrides
 
 
 class SimTelemListener(QtCore.QObject):
@@ -87,42 +87,71 @@ class SimTelemListener(QtCore.QObject):
 class SimIL2(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("IL2")
+        self._forwarder = IL2PacketForwarder()
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
 
-        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp, telem_parser=IL2Manager())
+        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp, telem_parser=IL2TelemParser(),
+                                    raw_packet_hook=self._forwarder.forward)
 
         if self.do_validate() is False:
             logging.warning(
                 "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
 
+        if self.telem is None:  # stopped during validation (e.g. another sim won the race)
+            return
+
         logging.info("Starting IL2 Telemetry Listener")
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
-    def validate(self):
-        il2_path = G.system_settings.get('pathIL2')
-        logging.info("Validating IL2 Config")
-        utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
+        if G.system_settings.get('validateIL2_K') and G.device_info:
+            G.il2_ffb_device_ordinal = utils.resolve_il2_ffb_device_ordinal(
+                G.system_settings.get('pathIL2_K'), G.device_info.vendor_id, G.device_info.product_id
+            )
 
-    @overrides(SimTelemListener)
+    @override
+    def do_validate(self) -> bool:
+        if G.child_instance:
+            return None
+        sturmovik = G.system_settings.get('validateIL2')
+        korea = G.system_settings.get('validateIL2_K')
+        if sturmovik or korea:
+            self.validate()
+            return True
+        return False
+
+    @override
+    def validate(self):
+        if G.system_settings.get('validateIL2'):
+            il2_path = os.path.join(G.system_settings.get('pathIL2'), 'data\\startup.cfg')
+            logging.info("Validating IL2 Sturmovik Telemetry Config")
+            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Sturmovik")
+        if G.system_settings.get('validateIL2_K'):
+            # Standalone: <root>\game\data; Steam (IL2Series): <root>\data.
+            game_root = utils.il2_korea_game_root(G.system_settings.get('pathIL2_K'))
+            il2_path = os.path.join(game_root, 'data', 'startup.cfg')
+            logging.info("Validating IL2 Korea Telemetry Config")
+            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Korea", korea=True)
+
+    @override
     def stop(self):
         logging.info("Stopping IL2 Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
             self.started = False
+        self._forwarder.close()
 
 
 class SimBMS(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("BMS")
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -131,11 +160,11 @@ class SimBMS(SimTelemListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         return
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping BMS Telemetry Listener")
         if self.telem:
@@ -150,7 +179,7 @@ class SimDCS(SimTelemListener):
         self.telem_ipc : Optional[DcsIpcThread] = None
         self.telem_udp : Optional[NetworkThread] = None # deprecated
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -159,12 +188,16 @@ class SimDCS(SimTelemListener):
         self.telem_ipc = DcsIpcThread(G.telem_manager)
 
         self.do_validate()
+
+        if self.telem_ipc is None or self.telem_udp is None:  # stopped during validation (e.g. another sim won the race)
+            return
+
         logging.info("Starting DCS Telemetry Listener")
         self.telem_ipc.start()
         self.telem_udp.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         # check and install/update export lua script
         logging.info("Checking DCS export script")
@@ -178,7 +211,7 @@ class SimDCS(SimTelemListener):
         else:
             utils.install_dcs_export_module_lua(G.main_window)
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping DCS Telemetry Listener")
         if self.telem_udp:
@@ -194,7 +227,7 @@ class SimXPLANE(SimTelemListener):
         super().__init__("XPLANE")
         self.telem : Optional[NetworkThread] = None
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -202,18 +235,22 @@ class SimXPLANE(SimTelemListener):
         self.telem = NetworkThread(G.telem_manager, host='127.0.0.1', port=34390)
 
         self.do_validate()
+
+        if self.telem is None:
+            return
+
         logging.info("Starting XPlane Telemetry Listener")
 
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         logging.info("Checking XPlane Plugin")
         xplane_path = G.system_settings.get('pathXPLANE', '')
         utils.install_xplane_plugin(xplane_path, G.main_window)
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping XPlane Telemetry Listener")
         if self.telem:
@@ -226,7 +263,7 @@ class SimMSFS(SimTelemListener):
         super().__init__("MSFS")
         self.telem : Optional[SimConnectSock] = None
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -236,7 +273,7 @@ class SimMSFS(SimTelemListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping MSFS Telemetry Listener")
         if self.telem:
@@ -244,7 +281,7 @@ class SimMSFS(SimTelemListener):
             self.telem = None
             self.started = False
     
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         return
 

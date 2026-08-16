@@ -20,19 +20,21 @@
 import logging
 import socket
 import threading
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.telem.TelemParserBase import TelemParserBase
 
 class NetworkThread(threading.Thread):
-    def __init__(self, telemetry: TelemManager, host: str = "", port: int = 34380, telem_parser: Optional[TelemParserBase] = None) -> None:
+    def __init__(self, telemetry: TelemManager, host: str = "", port: int = 34380, telem_parser: Optional[TelemParserBase] = None,
+                 raw_packet_hook: Optional[Callable[[bytes], None]] = None) -> None:
         super().__init__()
         self._run: bool = False
         self._port: int = port
         self._host: str = host
         self._telem: TelemManager = telemetry
         self._telem_parser: Optional[TelemParserBase] = telem_parser
+        self._raw_packet_hook: Optional[Callable[[bytes], None]] = raw_packet_hook
 
     def run(self) -> None:
         self._run = True
@@ -49,8 +51,15 @@ class NetworkThread(threading.Thread):
                 data: bytes
                 sender: Tuple[str, int]
                 data, sender = s.recvfrom(65535)
+                if self._raw_packet_hook is not None:
+                    try:
+                        self._raw_packet_hook(data)
+                    except Exception:
+                        logging.exception("raw_packet_hook failed")
                 if self._telem_parser is not None:
                     data = self._telem_parser.process_packet(data)
+                    if data is None:
+                        continue
 
                 self._telem.submit_frame(data)
             except ConnectionResetError:

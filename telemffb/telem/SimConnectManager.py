@@ -35,11 +35,13 @@ License: GPL-3.0
 from simconnect import *
 from ctypes import byref, cast, sizeof
 from telemffb.utils import dbprint
+from telemffb.util.TransformExpr import TransformExpr
 import time
 import threading
 import logging
 import os
 import telemffb.globals as G
+from enum import IntEnum
 
 surface_types = {
     0: "Concrete",
@@ -68,6 +70,52 @@ surface_types = {
     23: "Tarmac",
     24: "Wright flyer track",
 }
+
+class SimConnectException(IntEnum):
+    NONE = 0
+    ERROR = 1
+    SIZE_MISMATCH = 2
+    UNRECOGNIZED_ID = 3
+    UNOPENED = 4
+    VERSION_MISMATCH = 5
+    TOO_MANY_GROUPS = 6
+    NAME_UNRECOGNIZED = 7
+    TOO_MANY_EVENT_NAMES = 8
+    EVENT_ID_DUPLICATE = 9
+    TOO_MANY_MAPS = 10
+    TOO_MANY_OBJECTS = 11
+    TOO_MANY_REQUESTS = 12
+    WEATHER_INVALID_PORT = 13
+    WEATHER_INVALID_METAR = 14
+    WEATHER_UNABLE_TO_GET_OBSERVATION = 15
+    WEATHER_UNABLE_TO_CREATE_STATION = 16
+    WEATHER_UNABLE_TO_REMOVE_STATION = 17
+    INVALID_DATA_TYPE = 18
+    INVALID_DATA_SIZE = 19
+    DATA_ERROR = 20
+    INVALID_ARRAY = 21
+    CREATE_OBJECT_FAILED = 22
+    LOAD_FLIGHTPLAN_FAILED = 23
+    OPERATION_INVALID_FOR_OBJECT_TYPE = 24
+    ILLEGAL_OPERATION = 25
+    ALREADY_SUBSCRIBED = 26
+    INVALID_ENUM = 27
+    DEFINITION_ERROR = 28
+    DUPLICATE_ID = 29
+    DATUM_ID = 30
+    OUT_OF_BOUNDS = 31
+    ALREADY_CREATED = 32
+    OBJECT_OUTSIDE_REALITY_BUBBLE = 33
+    OBJECT_CONTAINER = 34
+    OBJECT_AI = 35
+    OBJECT_ATC = 36
+    OBJECT_SCHEDULE = 37
+    JETWAY_DATA = 38
+    ACTION_NOT_FOUND = 39
+    NOT_AN_ACTION = 40
+    INCORRECT_ACTION_PARAMS = 41
+    GET_INPUT_EVENT_FAILED = 42
+    SET_INPUT_EVENT_FAILED = 43
 
 class SimVar:
     """
@@ -113,6 +161,21 @@ class SimVar:
         self.index = None # index for multivariable simvars
         if self.sc_unit.lower() in ["bool", "enum"]:
             self.datatype = DATATYPE_INT32
+        self._scale_transform = None
+
+    def _build_scale_transform(self):
+        """
+        Convert the public 'scale' value into a Transform instance.
+        """
+        if isinstance(self.scale, TransformExpr):
+            return self.scale
+
+        if isinstance(self.scale, (int, float, str)):
+            return TransformExpr(self.scale)
+
+        raise TypeError(
+            f"Invalid scale type for SimVar '{self.name}': {type(self.scale)}"
+        )
 
     def _calculate(self, input):
         """
@@ -126,8 +189,12 @@ class SimVar:
         """
         if self.mutator:
             input = self.mutator(input)
-        if self.scale:
-            input = input*self.scale
+
+        if self.scale is not None:
+            if self._scale_transform is None:
+                self._scale_transform = self._build_scale_transform()
+            input = self._scale_transform.apply(input)
+
         return input
 
     def __repr__(self) -> str:
@@ -240,6 +307,8 @@ EV_PAUSED = 65499 # id for paused event
 EV_STARTED = 65498 # id for started event
 EV_STOPPED = 65497  # id for stopped event
 EV_SIMSTATE = 65496
+
+
 class SimConnectManager(threading.Thread):
     """
     Manages SimConnect communication with Microsoft Flight Simulator.
@@ -281,8 +350,10 @@ class SimConnectManager(threading.Thread):
         SimVar("SideSlip", "INCIDENCE BETA", "degrees"),
         SimVar("ElevDefl", "ELEVATOR DEFLECTION", "degrees"),
         SimVar("ElevDeflPct", "ELEVATOR DEFLECTION PCT", "Percent Over 100"),
+        SimVar("ElevPos", "ELEVATOR POSITION", "Percent Over 100"),
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
         SimVar("ElevTrimPct", "ELEVATOR TRIM PCT", "Percent Over 100"),
+        SimVar("ElevTrimPct_ex1", "ELEVATOR TRIM PCT EX1", "Percent Over 100", scale="(2 * x) - 1"),
         SimVar("ElevTrimDnLmt", "ELEVATOR TRIM DOWN LIMIT", "degrees"),
         SimVar("ElevTrimUpLmt", "ELEVATOR TRIM UP LIMIT", "degrees"),
         SimVar("ElevTrimNeutral", "ELEVATOR TRIM NEUTRAL", "degrees"),
@@ -308,6 +379,8 @@ class SimConnectManager(threading.Thread):
         SimVarArray("VelRotBody", "ROTATION VELOCITY BODY <>", "degrees per second", keywords=("X", "Y", "Z")),
         SimVarArray("AccRotBody", "ROTATION ACCELERATION BODY <>", "degrees per second squared", keywords=("X", "Y", "Z")),
         SimVarArray("DesignSpeed", "DESIGN SPEED <>", "meter/second", keywords=("VC", "VS0", "VS1")),
+        SimVar("RefMaxIAS", "REFERENCE SPEED MAX IAS", "meter/second"),
+        SimVar("RefMaxIAS_kt", "REFERENCE SPEED MAX IAS", "knots"),
         SimVar("VerticalSpeed", "VERTICAL SPEED", "meter/second"),
         SimVarArray("Brakes", "BRAKE <> POSITION", "Position", keywords=("LEFT", "RIGHT")),
         #SimVar("LinearCLAlpha", "LINEAR CL ALPHA", "Per Radian"),
@@ -320,6 +393,7 @@ class SimConnectManager(threading.Thread):
         SimVar("SimconnectCategory", "CATEGORY", "", datatype=DATATYPE_STRING128),
         SimVar("EngineType", "ENGINE TYPE", "Enum"),
         SimVarArray("EngRPM", "GENERAL ENG PCT MAX RPM", "percent", min=1, max=4),
+        SimVarArray("ThrottlePct", "GENERAL ENG THROTTLE LEVER POSITION", "percent", min=1, max=4),
         SimVar("NumEngines", "NUMBER OF ENGINES", "Number", datatype=DATATYPE_INT32),
         SimVarArray("AmbWind", "AMBIENT WIND <>", "meter/second", keywords= ("X", "Y", "Z")),
         SimVarArray("RelWind", "RELATIVE WIND VELOCITY BODY <>", "meter/second", keywords= ("X", "Y", "Z")),
@@ -658,7 +732,7 @@ class SimConnectManager(threading.Thread):
             recv = ReceiverInstance.cast_recv(pRecv)
             #print(f"got {recv.__class__.__name__}")
             if isinstance(recv, RECV_EXCEPTION):
-                logging.error(f"SimConnect exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
+                logging.warning(f"SimConnect exception [magenta]{SimConnectException(recv.dwException).name}[/magenta], sendID {recv.dwSendID}, index {recv.dwIndex}")
             elif isinstance(recv, RECV_QUIT):
                 logging.info("Quit received")
                 self.emit_event("Quit")

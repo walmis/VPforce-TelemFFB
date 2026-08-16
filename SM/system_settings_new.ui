@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>627</height>
+    <width>705</width>
+    <height>785</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -20,6 +20,34 @@
    <string>System Settings</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <item row="1" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_25">
+     <item>
+      <widget class="QPushButton" name="resetButton">
+       <property name="text">
+        <string>Reset to  Defaults</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="buttonChildSettings">
+       <property name="text">
+        <string>Open Child Instance Settings</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDialogButtonBox" name="buttonBox">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="standardButtons">
+        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
    <item row="0" column="0">
     <widget class="QTabWidget" name="tabWidget">
      <property name="sizePolicy">
@@ -29,7 +57,7 @@
       </sizepolicy>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab_System">
       <attribute name="title">
@@ -889,7 +917,7 @@ Minimized:</string>
           <enum>QTabWidget::West</enum>
          </property>
          <property name="currentIndex">
-          <number>4</number>
+          <number>3</number>
          </property>
          <widget class="QWidget" name="tab_DCS">
           <attribute name="title">
@@ -1251,13 +1279,13 @@ Minimized:</string>
           <attribute name="title">
            <string>IL2</string>
           </attribute>
-          <layout class="QGridLayout" name="gridLayout_9">
+          <layout class="QGridLayout" name="gridLayout_18">
            <item row="0" column="0">
             <layout class="QHBoxLayout" name="horizontalLayout_11">
              <item>
               <widget class="QLabel" name="label_6">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;IL-2 Sturmovik&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;IL-2 Series&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1300,52 +1328,14 @@ Minimized:</string>
              </item>
             </layout>
            </item>
-           <item row="2" column="0" colspan="2">
-            <widget class="Line" name="line">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0">
-            <layout class="QHBoxLayout" name="horizontalLayout_13">
-             <item>
-              <widget class="QLabel" name="label_7">
-               <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer_14">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </item>
-           <item row="4" column="0" colspan="2">
+           <item row="2" column="0">
             <widget class="LabeledToggle" name="focus_pauseIL2">
              <property name="text">
               <string>Pause IL-2 Effects on Focus Loss 🛈</string>
              </property>
             </widget>
            </item>
-           <item row="5" column="0" colspan="2">
-            <widget class="LabeledToggle" name="validateIL2">
-             <property name="text">
-              <string>Auto IL-2 Telemetry setup 🛈</string>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="0" colspan="2">
+           <item row="3" column="0">
             <layout class="QHBoxLayout" name="horizontalLayout_7">
              <item>
               <widget class="QLabel" name="lab_portIL2">
@@ -1379,8 +1369,111 @@ Minimized:</string>
              </item>
             </layout>
            </item>
-           <item row="7" column="0" colspan="2">
+           <item row="4" column="0" colspan="2">
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_13">
+             <item>
+              <spacer name="horizontalSpacer_32">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>10</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QLabel" name="lab_IL2_S">
+               <property name="text">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;IL2 Sturmovik Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_14">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item row="6" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_5">
+             <item>
+              <spacer name="horizontalSpacer_37">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="LabeledToggle" name="validateIL2">
+               <property name="text">
+                <string>Auto Telemetry setup 🛈</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_38">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item row="7" column="0">
             <layout class="QHBoxLayout" name="horizontalLayout_8">
+             <item>
+              <spacer name="horizontalSpacer_35">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
              <item>
               <widget class="QLabel" name="lab_pathIL2">
                <property name="sizePolicy">
@@ -1412,7 +1505,291 @@ Minimized:</string>
              </item>
             </layout>
            </item>
-           <item row="8" column="1">
+           <item row="8" column="0" colspan="2">
+            <widget class="Line" name="line_7">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="9" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_14">
+             <item>
+              <spacer name="horizontalSpacer_34">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>10</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QLabel" name="lab_IL2_K">
+               <property name="text">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;IL2 Korea Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_30">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item row="10" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_3">
+             <item>
+              <spacer name="horizontalSpacer_36">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="LabeledToggle" name="validateIL2_K">
+               <property name="text">
+                <string>Auto Telemetry setup 🛈</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_39">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item row="11" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_10">
+             <item>
+              <spacer name="horizontalSpacer_33">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QLabel" name="lab_pathIL2_2">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>98</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>IL-2 Install Path:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="pathIL2_K"/>
+             </item>
+             <item>
+              <widget class="QToolButton" name="browseIL2_K">
+               <property name="text">
+                <string>...</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="12" column="0" colspan="2">
+            <widget class="Line" name="line_8">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="13" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_15">
+             <item>
+              <widget class="QLabel" name="label_7">
+               <property name="text">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;Telemetry Forwarding&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="LabeledToggle" name="il2_fwd_enable">
+               <property name="text">
+                <string>Enable</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_40">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item row="14" column="0">
+            <layout class="QGridLayout" name="gridLayout_9">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_15">
+               <property name="text">
+                <string>IP: </string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLineEdit" name="udp_ip"/>
+             </item>
+             <item row="0" column="2">
+              <widget class="QLabel" name="label_18">
+               <property name="text">
+                <string>UDP Port: </string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="3">
+              <widget class="QLineEdit" name="udp_port">
+               <property name="minimumSize">
+                <size>
+                 <width>50</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>50</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="4">
+              <widget class="QCheckBox" name="cb_telem">
+               <property name="toolTip">
+                <string>Telemetry received from the 'telemetrydevice' stream from IL-2</string>
+               </property>
+               <property name="text">
+                <string>Telemetry</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="5">
+              <widget class="QCheckBox" name="cb_motion">
+               <property name="toolTip">
+                <string>Telemetry received from the 'motiondevice' stream from IL-2</string>
+               </property>
+               <property name="text">
+                <string>Motion</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="6">
+              <widget class="QCheckBox" name="cb_ffb">
+               <property name="toolTip">
+                <string>Telemetry received from the 'ffbdevice' stream from IL-2 (Korea Only)</string>
+               </property>
+               <property name="text">
+                <string>FFB</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="7">
+              <widget class="QPushButton" name="pb_add_dest">
+               <property name="text">
+                <string>Add</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="8">
+              <spacer name="horizontalSpacer_41">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="1" column="0" colspan="8">
+              <widget class="QTableView" name="il2_fwd_table"/>
+             </item>
+             <item row="2" column="0" colspan="7">
+              <spacer name="horizontalSpacer_42">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>418</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="2" column="7">
+              <widget class="QPushButton" name="pb_delete_dest">
+               <property name="text">
+                <string>Delete Entry</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="15" column="1">
             <spacer name="verticalSpacer_2">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1779,34 +2156,6 @@ Minimized:</string>
      </widget>
     </widget>
    </item>
-   <item row="1" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_25">
-     <item>
-      <widget class="QPushButton" name="resetButton">
-       <property name="text">
-        <string>Reset to  Defaults</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="buttonChildSettings">
-       <property name="text">
-        <string>Open Child Instance Settings</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDialogButtonBox" name="buttonBox">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="standardButtons">
-        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
   </layout>
  </widget>
  <customwidgets>
@@ -1816,6 +2165,85 @@ Minimized:</string>
    <header>telemffb.custom_widgets</header>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>tabWidget</tabstop>
+  <tabstop>logLevel</tabstop>
+  <tabstop>telemTimeout</tabstop>
+  <tabstop>ignoreUpdate</tabstop>
+  <tabstop>cb_logPrune</tabstop>
+  <tabstop>combo_logPrune</tabstop>
+  <tabstop>rb_LightTheme</tabstop>
+  <tabstop>rb_DarkTheme</tabstop>
+  <tabstop>rb_SystemTheme</tabstop>
+  <tabstop>cb_al_enable</tabstop>
+  <tabstop>rb_master_j</tabstop>
+  <tabstop>tb_pid_j</tabstop>
+  <tabstop>cb_select_j</tabstop>
+  <tabstop>cb_al_enable_j</tabstop>
+  <tabstop>cb_min_enable_j</tabstop>
+  <tabstop>cb_headless_j</tabstop>
+  <tabstop>rb_master_p</tabstop>
+  <tabstop>tb_pid_p</tabstop>
+  <tabstop>cb_select_p</tabstop>
+  <tabstop>cb_al_enable_p</tabstop>
+  <tabstop>cb_min_enable_p</tabstop>
+  <tabstop>cb_headless_p</tabstop>
+  <tabstop>rb_master_c</tabstop>
+  <tabstop>tb_pid_c</tabstop>
+  <tabstop>cb_select_c</tabstop>
+  <tabstop>cb_al_enable_c</tabstop>
+  <tabstop>cb_min_enable_c</tabstop>
+  <tabstop>cb_headless_c</tabstop>
+  <tabstop>rb_master_t</tabstop>
+  <tabstop>tb_pid_t</tabstop>
+  <tabstop>cb_select_t</tabstop>
+  <tabstop>cb_al_enable_t</tabstop>
+  <tabstop>cb_min_enable_t</tabstop>
+  <tabstop>cb_headless_t</tabstop>
+  <tabstop>simTabWidget</tabstop>
+  <tabstop>enableIL2</tabstop>
+  <tabstop>focus_pauseIL2</tabstop>
+  <tabstop>portIL2</tabstop>
+  <tabstop>validateIL2</tabstop>
+  <tabstop>pathIL2</tabstop>
+  <tabstop>browseIL2</tabstop>
+  <tabstop>validateIL2_K</tabstop>
+  <tabstop>pathIL2_K</tabstop>
+  <tabstop>browseIL2_K</tabstop>
+  <tabstop>il2_fwd_enable</tabstop>
+  <tabstop>udp_ip</tabstop>
+  <tabstop>udp_port</tabstop>
+  <tabstop>cb_telem</tabstop>
+  <tabstop>cb_motion</tabstop>
+  <tabstop>cb_ffb</tabstop>
+  <tabstop>pb_add_dest</tabstop>
+  <tabstop>browseVPConfStartup</tabstop>
+  <tabstop>enableVPConfGlobalDefault</tabstop>
+  <tabstop>enableVPConfExit</tabstop>
+  <tabstop>pathVPConfExit</tabstop>
+  <tabstop>browseVPConfExit</tabstop>
+  <tabstop>enableResetGainsExit</tabstop>
+  <tabstop>cb_startWithWindows</tabstop>
+  <tabstop>cb_masterStartMin</tabstop>
+  <tabstop>cb_startToTray</tabstop>
+  <tabstop>cb_closeToTray</tabstop>
+  <tabstop>cb_save_geometry</tabstop>
+  <tabstop>cb_save_view</tabstop>
+  <tabstop>resetButton</tabstop>
+  <tabstop>buttonChildSettings</tabstop>
+  <tabstop>pathXPLANE</tabstop>
+  <tabstop>browseXPLANE</tabstop>
+  <tabstop>tb_logPrune</tabstop>
+  <tabstop>enableDCS</tabstop>
+  <tabstop>enableMSFS</tabstop>
+  <tabstop>validateDCS</tabstop>
+  <tabstop>enableXPLANE</tabstop>
+  <tabstop>validateXPLANE</tabstop>
+  <tabstop>enableBMS</tabstop>
+  <tabstop>enableVPConfStartup</tabstop>
+  <tabstop>il2_fwd_table</tabstop>
+  <tabstop>pathVPConfStartup</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
  <buttongroups>

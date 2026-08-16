@@ -44,13 +44,14 @@ import pygetwindow as get_focus_window
 
 from telemffb.utils import hexdump
 import json
+from telemffb.util import conversions as conv
 
-
-knots = 0.514444
-kmh = 1.0 / 3.6
+# use centralized conversion constants
+knots = conv.kt2ms
+kmh = conv.kmh2ms
 deg = math.pi / 180
-fpss2gs = 1 / 32.17405
-mpss2gs = 1 / 9.81
+fpss2gs = conv.fpss2gs
+mpss2gs = conv.mpss2gs
 
 dbg_en = 0
 dbg_lvl = 0
@@ -128,17 +129,19 @@ class BinaryDataReader:
 class StateType(IntEnum):
     RPM = 0
     ManifoldPressure = 1
-    Val2 = 2
-    Val3 = 3
+    EngineShakeFrequency = 2
+    EngineShakeAmplitude = 3
     LandingGearPosition = 4
     LandingGearPressure = 5
     IndicatedAirspeed = 6
-    Val7 = 7
+    AOA = 7
     Acceleration = 8
     StallBuffet = 9
     AGL = 10
     FlapsPosition = 11
     AirBrakePosition = 12
+    AOS = 13
+    VerticalSpeed = 14
 
 class EventType(IntEnum):
     VehicleName = 0
@@ -157,19 +160,27 @@ class EventType(IntEnum):
     Event14 = 14
 
 
+class ForceType(IntEnum):
+    Spring = 0
+    Const = 1
+    Damper = 2
+
+
 class StateDataStructure:
     tick: int = 0
     paused: int = 0
     engine_count: int = 0
     rpm: list = [0.0]
     intake_manifold_pressure_pa: list[float] = []
-    val2: list[float] = []
-    val3: float = 0.0
+    engine_shake_frequency: list[float] = []
+    engine_shake_amplitude: list[float] = []
     landing_gear_count: int = 0
     landing_gear_position: list[float] = [1,1,1]
     landing_gear_pressure: list[float] = [0,0,0]
     indicated_air_speed_metres_second: float = 0.0
-    val7: float = 0.0
+    angle_of_attack_rad: float = 0.0
+    angle_of_sideslip_rad: float = 0.0
+    vertical_speed_metres_second: float = 0.0
     acceleration: list[float] = [0,0,0]
     acceleration_Gs: list[float] = [0,0,0]
     stall_buffet_frequency: float = 0.0
@@ -179,7 +190,7 @@ class StateDataStructure:
     air_brake_position: float = 0.0
 
 
-class IL2Manager(TelemParserBase):
+class IL2TelemParser(TelemParserBase):
     def __init__(self):
         self.ac_name: str = ""
         self.engine_info: list = []
@@ -203,6 +214,9 @@ class IL2Manager(TelemParserBase):
         self.ev_damage_data: list = []
         self.damage_events: int = 0
         self.seat_data: list = []
+        self.unknown_states: dict = {}
+        self._unknown_state_warned: set = set()
+        self.ffb_records: list = []
 
         self.acceleration_Gs: list = []
         self.acc_vectors: list = []
@@ -212,6 +226,8 @@ class IL2Manager(TelemParserBase):
         self._changes = {}
         self._change_counter = {}
         self.last_paused_data: list = []
+        self._stale_count: int = 0
+        self._il2_stop_state: bool = False
         self.telem_data = {"src": "IL2", "N": "", "AircraftClass": "unknown"}
 
         self.state = StateDataStructure()
@@ -232,6 +248,10 @@ class IL2Manager(TelemParserBase):
         elif packet_header == 0x494C0100:
             ## Motion telemetry (aircraft orientation, rotational vectors, etc) have a different header signature
             self.decode_motion(data)
+
+        elif packet_header == 0x494D0100:
+            ## FFB device packet (IL-2 Korea) - raw per-axis force commands (spring/const/damper)
+            self.decode_ffb(data)
 
         else:
             logging.error(f'Unknown packet type:  Header=0x{packet_header:X}')
@@ -274,28 +294,56 @@ class IL2Manager(TelemParserBase):
         self.telem_data["Hits"] = self.hit_events
         self.telem_data["Damage"] = self.damage_events
         self.telem_data["SeatData"] = self.seat_data
-        self.telem_data['unknown_data_2'] = list(self.state.val2)
-        self.telem_data['unknown_data_3'] = self.state.val3
+        self.telem_data['EngineShakeFrequency'] = list(self.state.engine_shake_frequency)
+        self.telem_data['EngineShakeAmplitude'] = list(self.state.engine_shake_amplitude)
+        self.telem_data['AOA_rad'] = self.state.angle_of_attack_rad
+        self.telem_data['AOS_rad'] = self.state.angle_of_sideslip_rad
+        self.telem_data['AOA'] = self.state.angle_of_attack_rad * conv.rad2deg
+        self.telem_data['AOS'] = self.state.angle_of_sideslip_rad * conv.rad2deg
+        self.telem_data['VerticalSpeed'] = self.state.vertical_speed_metres_second
         self.telem_data['unknown_evt_6'] = self.ev6_data
-        self.telem_data['unknown_data_7'] = self.state.val7
         self.telem_data['unknown_evt_13'] = self.ev13_data
         self.telem_data['unknown_evt_14'] = self.ev14_data
         self.telem_data['acc_vectors'] = self.acc_vectors
         self.telem_data['rot_velocity'] = self.rot_velocity
         self.telem_data['rot_accel'] = self.rot_accel
+        for state_type, values in self.unknown_states.items():
+            self.telem_data[f'unknown_state_{state_type}'] = values
+        if G.il2_ffb_device_ordinal is not None:
+            self.telem_data['FFBOrdinal'] = G.il2_ffb_device_ordinal
+            my_records = [r for r in self.ffb_records if r['dev'] == G.il2_ffb_device_ordinal]
+            self.telem_data['FFBRecordsCount'] = len(my_records) if my_records else 0
+        else:
+            my_records = self.ffb_records
+        # Serialize as JSON (ForceType enum → int) so it survives the string telemetry pipeline
+        self.telem_data['FFBRecords'] = json.dumps([{**r, 'type': int(r['type'])} for r in my_records])
 
         # create structure of the most real-time data to determine if updated telemetry is flowing.  If not, consider
         # the sim paused.  This avoids effects continuing to play when in multiplayer map or after crash since IL-2 never stops sending
-        # stale frames.
-        paused_data = [self.state.acceleration_Gs, self.state.above_ground_level_metres,self.state.rpm, self.rot_accel, self.rot_velocity]
+        # stale frames.  Require 5 consecutive identical frames to avoid false positives during steady flight.
+        paused_data = [
+            list(self.state.acceleration_Gs),
+            self.state.above_ground_level_metres,
+            list(self.state.rpm),
+        ]
         if paused_data == self.last_paused_data:
-            self.telem_data['MPMenu'] = True
+            self._stale_count += 1
         else:
-            self.telem_data['MPMenu'] = False
+            self._stale_count = 0
+        self.telem_data['MPMenu'] = (self._stale_count >= 5)
         self.last_paused_data = paused_data
 
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in self.telem_data.items()]), "utf-8")
-        return packet
+
+        # When MPMenu or focus-loss is detected, stop submitting frames so TelemManager
+        # times out naturally (same pattern as SimConnectManager for MSFS pause states).
+        should_stop = self.telem_data.get('MPMenu', False) or not self.telem_data.get('Focus', 1)
+        if should_stop:
+            self._il2_stop_state = True
+            return None
+        else:
+            self._il2_stop_state = False
+            return packet
 
     def decode_motion(self, data : BinaryDataReader):
         tick = data.get_uint32()
@@ -306,6 +354,36 @@ class IL2Manager(TelemParserBase):
         self.rot_accel = data.get_vector3f()
 
         dbg(1,"acc", self.acc_vectors)
+
+    def decode_ffb(self, data: BinaryDataReader):
+        tick = data.get_uint32()
+        n_records = data.get_uint32()
+
+        records = []
+        for _ in range(n_records):
+            axis = data.get_uint8()
+            dev_no = data.get_uint8()
+            force_type_raw = data.get_uint8()
+            try:
+                force_type = ForceType(force_type_raw)
+            except ValueError:
+                force_type = force_type_raw
+            pos = data.get_float()
+            force = data.get_float()
+            amp = data.get_float()
+            freq = data.get_float()
+            records.append({
+                'axis': axis,
+                'dev': dev_no,
+                'type': force_type,
+                'pos': pos,
+                'force': force,
+                'amp': amp,
+                'freq': freq,
+            })
+
+        dbg(1, "FFB records", records)
+        self.ffb_records = records
 
     def decode_telem(self, data: BinaryDataReader):
         packet_size = data.get_uint16()
@@ -319,20 +397,20 @@ class IL2Manager(TelemParserBase):
         else:
             self.telem_data["SimPaused"] = 0
 
-        try:
-            focus_window = get_focus_window.getActiveWindow().title
-        except:
-            focus_window = "unknown"
-        if G.system_settings.get('focus_pauseIL2', True):
-            if "Il-2" in focus_window:
-                self.telem_data["Focus"] = 1
-                self.telem_data["SimPaused"] = 0
-            else:
-                self.telem_data["Focus"] = 0
-                self.telem_data["SimPaused"] = 1
-        else:
-            self.telem_data["Focus"] = 1
-            self.telem_data["SimPaused"] = 0
+        # try:
+        #     focus_window = get_focus_window.getActiveWindow().title
+        # except:
+        #     focus_window = "unknown"
+        # if G.system_settings.get('focus_pauseIL2', True):
+        #     if "Il-2" in focus_window:
+        #         self.telem_data["Focus"] = 1
+        #         self.telem_data["SimPaused"] = 0
+        #     else:
+        #         self.telem_data["Focus"] = 0
+        #         self.telem_data["SimPaused"] = 1
+        # else:
+        #     self.telem_data["Focus"] = 1
+        #     self.telem_data["SimPaused"] = 0
 
         dbg(1,f"telem tick {tick} size {packet_size}")
 
@@ -349,7 +427,8 @@ class IL2Manager(TelemParserBase):
             state_type = data.get_uint16()
             state_length = data.get_uint8()
 
-            dbg(1,StateType(state_type), "len",  state_length)
+            state_type_name = StateType(state_type) if state_type in StateType._value2member_map_ else f"Unknown({state_type})"
+            dbg(1, state_type_name, "len", state_length)
             
             get_state_floats = lambda: [data.get_float() for i in range(0, state_length)]
 
@@ -360,11 +439,11 @@ class IL2Manager(TelemParserBase):
             elif state_type == StateType.ManifoldPressure:
                 self.state.intake_manifold_pressure_pa = get_state_floats()
 
-            elif state_type == StateType.Val2:
-                self.state.val2 = get_state_floats()
+            elif state_type == StateType.EngineShakeFrequency:
+                self.state.engine_shake_frequency = get_state_floats()
 
-            elif state_type == StateType.Val3:
-                self.state.val3 = get_state_floats()
+            elif state_type == StateType.EngineShakeAmplitude:
+                self.state.engine_shake_amplitude = get_state_floats()
 
             elif state_type == StateType.LandingGearPosition:
                 self.state.landing_gear_count = state_length
@@ -377,8 +456,8 @@ class IL2Manager(TelemParserBase):
             elif state_type == StateType.IndicatedAirspeed:
                 self.state.indicated_air_speed_metres_second = data.get_float()
 
-            elif state_type == StateType.Val7:
-                self.state.val7 = data.get_float()
+            elif state_type == StateType.AOA:
+                self.state.angle_of_attack_rad = data.get_float()
 
             elif state_type == StateType.Acceleration:
                 self.state.acceleration = get_state_floats()
@@ -397,8 +476,17 @@ class IL2Manager(TelemParserBase):
             elif state_type == StateType.AirBrakePosition:
                 self.state.air_brake_position = data.get_float()
 
+            elif state_type == StateType.AOS:
+                self.state.angle_of_sideslip_rad = data.get_float()
+
+            elif state_type == StateType.VerticalSpeed:
+                self.state.vertical_speed_metres_second = data.get_float()
+
             else:
-                logging.error(f"Unknown state type: {state_type}")
+                if state_type not in self._unknown_state_warned:
+                    logging.warning(f"Unknown state type: {state_type}, storing as unknown_state_{state_type}")
+                    self._unknown_state_warned.add(state_type)
+                self.unknown_states[state_type] = get_state_floats()
 
         b = data.get_uint8()
         dbg(1,"last byte", b)
@@ -567,7 +655,7 @@ def log_il2_trace():
     s.bind(("", 34385))
     s.settimeout(1)
 
-    il2 = IL2Manager()
+    il2 = IL2TelemParser()
 
     tbase = time.time()
 
@@ -595,7 +683,7 @@ def test_il2_trace():
     import gzip
     import base64
 
-    il2 = IL2Manager()
+    il2 = IL2TelemParser()
 
     f = gzip.open('il2_test_data.gz', 'r')
     while True:

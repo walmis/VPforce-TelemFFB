@@ -17,7 +17,7 @@
 #
 
 
-from typing import Optional, List
+from typing import Optional, List, Literal
 import argparse
 
 class CmdLineArgs:
@@ -44,8 +44,8 @@ class CmdLineArgs:
     sim: str
     """Simulator type (DCS|MSFS|IL2)"""
     
-    type: Optional[str]
-    """FFB Device Type (joystick|pedals|collective)"""
+    type: Optional[Literal["joystick", "pedals", "collective", "trimwheel"]]
+    """FFB Device Type (joystick|pedals|collective|trimwheel)"""
     
     headless: Optional[bool]
     """Flag to run in headless mode"""

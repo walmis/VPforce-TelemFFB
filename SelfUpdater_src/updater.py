@@ -3,9 +3,8 @@ import logging
 import shutil
 import ssl
 import tempfile
-import urllib
+import urllib.request
 
-import requests
 import os
 from zipfile import ZipFile
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
@@ -47,9 +46,23 @@ if args.debugzip is not None:
 
 
 g_folder_contents = os.listdir(g_application_path)
+
+
+def create_ssl_context():
+    return ssl._create_unverified_context()
+
+
+def open_url(url, timeout=30):
+    return urllib.request.urlopen(url, context=create_ssl_context(), timeout=timeout)
+
+
+def fetch_json_url(url, timeout=30):
+    with open_url(url, timeout=timeout) as req:
+        return json.loads(req.read().decode())
+
+
 def fetch_latest_version():
     global g_url_is_good
-    ctx = ssl._create_unverified_context()
 
     current_version = args.current_version
     latest_version = None
@@ -59,10 +72,9 @@ def fetch_latest_version():
     send_url = url + file
 
     try:
-        with urllib.request.urlopen(send_url, context=ctx) as req:
-            latest = json.loads(req.read().decode())
-            latest_version = latest["version"]
-            latest_url = url + latest["filename"]
+        latest = fetch_json_url(send_url)
+        latest_version = latest["version"]
+        latest_url = url + latest["filename"]
     except Exception as e:
         logging.exception(f"Error checking latest version status: {url}\n{e}")
         g_url_is_good = e
@@ -91,12 +103,14 @@ class Downloader(QThread):
 
     def download(self):
         if args.debugzip is None:
-            response = requests.get(self.url, stream=True)
-            if response.status_code != 200:
+            try:
+                response = open_url(self.url)
+            except Exception:
                 QMessageBox.critical(None, "Error downloading latest version info",
-                                     f"There was an error downloading the latest version:\n\nHTTP Status Code:  {response}\n\nThe updater will now exit")
+                                     f"There was an error downloading the latest version:\n\nThe updater will now exit")
                 sys.exit(-1)
-            total_size = int(response.headers.get('content-length', 0))
+
+            total_size = int(response.headers.get('Content-Length', 0))
             current_size = 0
             self.update_status_label.emit("Downloading Update:")
 
@@ -104,14 +118,15 @@ class Downloader(QThread):
 
 
             with open(zip_path, "wb") as zip_file:
-                for chunk in response.iter_content(chunk_size=1024):
-
+                chunk = response.read(1024)
+                while chunk:
                     if chunk:
                         print(f"Downloading {zip_path}......")
                         current_size += len(chunk)
-                        progress_percentage = int((current_size / total_size) * 100)
+                        progress_percentage = int((current_size / total_size) * 100) if total_size else 0
                         self.update_progress.emit(progress_percentage)
                         zip_file.write(chunk)
+                    chunk = response.read(1024)
         else:
             zip_path = args.debugzip
         self.update_progress.emit(100)

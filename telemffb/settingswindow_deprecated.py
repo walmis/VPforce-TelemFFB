@@ -24,6 +24,7 @@ import re
 import shutil
 import sys
 from datetime import datetime
+from typing import override
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -35,7 +36,6 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
 
 import telemffb.utils as utils
 import telemffb.globals as G
-from telemffb.utils import overrides
 from . import xmlutils
 # from .UserModelDialog import UserModelDialog
 from .ui.Ui_SettingsWindow import Ui_SettingsWindow
@@ -140,7 +140,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # self.clear_propmgr()
         self.reload_table()
 
-    @overrides(QtWidgets.QMainWindow)
+    @override
     def show(self):
         super().show()
         logging.debug(f"# toggle settings window   sim:'{self.current_sim}' ac:'{self.current_aircraft_name}'")

@@ -30,35 +30,36 @@ SYNCHRONIZE = 0x00100000
 MESSAGE_BUFFER_SIZE = 65000
 SHARED_DATA_VERSION = 1
 
-# Load Windows API functions
-kernel32 = ctypes.windll.kernel32
+_kernel32 = None
 
-# Define function prototypes
-kernel32.OpenFileMappingA.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.c_char_p]
-kernel32.OpenFileMappingA.restype = ctypes.wintypes.HANDLE
-
-kernel32.MapViewOfFile.argtypes = [ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD, 
-                                   ctypes.wintypes.DWORD, ctypes.wintypes.DWORD, ctypes.c_size_t]
-kernel32.MapViewOfFile.restype = ctypes.wintypes.LPVOID
-
-kernel32.UnmapViewOfFile.argtypes = [ctypes.wintypes.LPVOID]
-kernel32.UnmapViewOfFile.restype = ctypes.wintypes.BOOL
-
-kernel32.CreateEventA.argtypes = [ctypes.wintypes.LPVOID, ctypes.wintypes.BOOL, ctypes.wintypes.BOOL, ctypes.c_char_p]
-kernel32.CreateEventA.restype = ctypes.wintypes.HANDLE
-
-kernel32.WaitForMultipleObjects.argtypes = [ctypes.wintypes.DWORD, ctypes.POINTER(ctypes.wintypes.HANDLE),
-                                            ctypes.wintypes.BOOL, ctypes.wintypes.DWORD]
-kernel32.WaitForMultipleObjects.restype = ctypes.wintypes.DWORD
-
-kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
-kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
-
-kernel32.WaitForSingleObject.argtypes = [ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD]
-kernel32.WaitForSingleObject.restype = ctypes.wintypes.DWORD
-
-kernel32.OpenEventA.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.c_char_p]
-kernel32.OpenEventA.restype = ctypes.wintypes.HANDLE
+def _get_kernel32():
+    """Lazy-load kernel32 to allow module import on non-Windows platforms."""
+    global _kernel32
+    if _kernel32 is not None:
+        return _kernel32
+    if sys.platform != "win32":
+        raise OSError("SharedMemReader requires Windows")
+    _kernel32 = ctypes.windll.kernel32
+    # Define function prototypes
+    _kernel32.OpenFileMappingA.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.c_char_p]
+    _kernel32.OpenFileMappingA.restype = ctypes.wintypes.HANDLE
+    _kernel32.MapViewOfFile.argtypes = [ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD,
+                                        ctypes.wintypes.DWORD, ctypes.wintypes.DWORD, ctypes.c_size_t]
+    _kernel32.MapViewOfFile.restype = ctypes.wintypes.LPVOID
+    _kernel32.UnmapViewOfFile.argtypes = [ctypes.wintypes.LPVOID]
+    _kernel32.UnmapViewOfFile.restype = ctypes.wintypes.BOOL
+    _kernel32.CreateEventA.argtypes = [ctypes.wintypes.LPVOID, ctypes.wintypes.BOOL, ctypes.wintypes.BOOL, ctypes.c_char_p]
+    _kernel32.CreateEventA.restype = ctypes.wintypes.HANDLE
+    _kernel32.WaitForMultipleObjects.argtypes = [ctypes.wintypes.DWORD, ctypes.POINTER(ctypes.wintypes.HANDLE),
+                                                 ctypes.wintypes.BOOL, ctypes.wintypes.DWORD]
+    _kernel32.WaitForMultipleObjects.restype = ctypes.wintypes.DWORD
+    _kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
+    _kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
+    _kernel32.WaitForSingleObject.argtypes = [ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD]
+    _kernel32.WaitForSingleObject.restype = ctypes.wintypes.DWORD
+    _kernel32.OpenEventA.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.c_char_p]
+    _kernel32.OpenEventA.restype = ctypes.wintypes.HANDLE
+    return _kernel32
 
 class WindowsEvent:
     """Wrapper for Windows Event objects"""
@@ -74,12 +75,12 @@ class WindowsEvent:
         
     def _create(self, access: int) -> bool:
         """Create or open existing event"""
-        self.handle = kernel32.CreateEventA(None, self.manual_reset, False, self.name)
+        self.handle = _get_kernel32().CreateEventA(None, self.manual_reset, False, self.name)
         return self.handle is not None
         
     def _open(self, access: int) -> bool:
         """Open existing event"""
-        self.handle = kernel32.OpenEventA(access, False, self.name)
+        self.handle = _get_kernel32().OpenEventA(access, False, self.name)
         return self.handle is not None
         
     def is_valid(self) -> bool:
@@ -89,7 +90,7 @@ class WindowsEvent:
     def close(self):
         """Close event handle"""
         if self.handle:
-            kernel32.CloseHandle(self.handle)
+            _get_kernel32().CloseHandle(self.handle)
             self.handle = None
 
     def wait(self, timeout: Optional[int] = None) -> bool:
@@ -100,7 +101,7 @@ class WindowsEvent:
         if timeout is None:
             timeout = INFINITE
             
-        result = kernel32.WaitForSingleObject(self.handle, timeout)
+        result = _get_kernel32().WaitForSingleObject(self.handle, timeout)
         
         if result == WAIT_OBJECT_0:
             return True
@@ -124,11 +125,11 @@ class SharedMemoryMapping:
         
     def _open(self, access: int) -> bool:
         """Open existing shared memory mapping"""
-        self.h_map_file = kernel32.OpenFileMappingA(access, False, self.name)
+        self.h_map_file = _get_kernel32().OpenFileMappingA(access, False, self.name)
         if not self.h_map_file:
             return False
             
-        self.p_data = kernel32.MapViewOfFile(
+        self.p_data = _get_kernel32().MapViewOfFile(
             self.h_map_file, access, 0, 0, self.size
         )
         return self.p_data is not None
@@ -144,11 +145,11 @@ class SharedMemoryMapping:
     def close(self):
         """Close mapping and file handle"""
         if self.p_data:
-            kernel32.UnmapViewOfFile(self.p_data)
+            _get_kernel32().UnmapViewOfFile(self.p_data)
             self.p_data = None
             
         if self.h_map_file:
-            kernel32.CloseHandle(self.h_map_file)
+            _get_kernel32().CloseHandle(self.h_map_file)
             self.h_map_file = None
             
     def __del__(self):
@@ -165,7 +166,7 @@ class MultiEventWaiter:
         
     def wait(self, timeout_ms: int = INFINITE) -> int:
         """Wait for any event to be signaled. Returns event index or -1 on error/timeout"""
-        result = kernel32.WaitForMultipleObjects(
+        result = _get_kernel32().WaitForMultipleObjects(
             len(self.events), self.event_handles, False, timeout_ms
         )
         

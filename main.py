@@ -1,3 +1,21 @@
+#
+# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
+# Copyright (c) 2023 Valmantas Palikša.
+# Copyright (c) 2023 Micah Frisby
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
 """
 TelemFFB Main Application Entry Point
 
@@ -20,24 +38,6 @@ Application Flow:
 13. Cleanup on exit
 """
 
-#
-# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
-# Copyright (c) 2023 Valmantas Palikša.
-# Copyright (c) 2023 Micah Frisby
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, version 3.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-
 import sys
 # import faulthandler
 # faulthandler.enable()
@@ -58,10 +58,11 @@ import shutil
 import subprocess
 import traceback
 from datetime import datetime
+from typing import List, Optional
 
 from PyQt6 import QtCore, QtWidgets, QtGui
-from PyQt6.QtCore import QCoreApplication, Qt
-from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
+from PyQt6.QtCore import QCoreApplication, Qt, QTimer
+from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit, QProgressDialog
 
 
 import resources
@@ -91,7 +92,7 @@ def send_test_message():
             G.ipc_instance.send_message("TEST MESSAGE")
 
 def _launch_children():
-    if not G.system_settings.get('autolaunchMaster'):
+    if not G.system_settings.autolaunchMaster:
         return
     if not G.master_instance:
         return
@@ -144,21 +145,24 @@ def _setup_device_configuration():
     3. Set global device variables for use throughout application
     """
     if G.args.device is None:
-        mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
-        master_rb = G.system_settings.get('masterInstance', 1)
+        dev_mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
+        master_rb = G.system_settings.masterInstance
+        devname = dev_mapping.get(master_rb, "joystick")
+            
+        G.device_usbpid = '2055'
+        G.device_type = 'joystick'
+        
+        devpath = G.system_settings.get(f'devpath_{devname}', None)
+        if devpath:
+            G.device_devpath = devpath
 
-        try:
-            d = mapping[master_rb]
-            G.device_usbpid = str(G.system_settings.get(f'pid{d.capitalize()}', "2055"))
-            G.device_type = d
-        except KeyError:
-            G.device_usbpid = '2055'
-            G.device_type = 'joystick'
+        G.device_usbpid = str(G.system_settings.get(f'pid{devname.capitalize()}', "2055"))
+        G.device_type = devname
+
 
         if not G.device_usbpid: # check empty string
             G.device_usbpid = '2055'
 
-        G.device_usbvidpid = f"FFFF:{G.device_usbpid}"
         G.args.type = G.device_type
     else:
         if G.args.type is None:
@@ -167,8 +171,9 @@ def _setup_device_configuration():
         else:
             G.device_type = str.lower(G.args.type)
 
+        devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
+        G.device_devpath = devpath
         G.device_usbpid = G.args.device.split(":")[1]
-        G.device_usbvidpid = G.args.device
         
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
 
@@ -291,8 +296,42 @@ def _setup_config_paths():
             _setup_dev_userconfig_paths()
         else:
             _setup_standard_config_paths()
+    elif G.beta_build:
+        G.vpf_logo = ":/image/BETAlogo.png"
+        _setup_standard_config_paths()
+        _backup_userconfig_for_beta()
+
     else:
         _setup_standard_config_paths()
+
+
+def _backup_userconfig_for_beta():
+    """Snapshot the user's config before a beta build touches it.
+
+    Betas can write settings the release version does not understand, so a
+    frozen beta keeps a one-time copy of the config as it was BEFORE the
+    beta first ran - an easy path back to the release version.
+
+    Only the master instance writes it (children share the same file), and
+    only if the backup does not already exist: on later runs the live config
+    may already carry beta edits, and overwriting would destroy the very
+    snapshot this exists to preserve.
+    """
+    if not getattr(sys, 'frozen', False) or not G.master_instance:
+        return
+    try:
+        if not os.path.isfile(G.userconfig_path):
+            return  # fresh install, nothing to preserve
+        tag = re.sub(r'[<>:"/\\|?*]', '_', G.beta_build_str).strip()
+        backup_path = os.path.join(
+            G.userconfig_rootpath, f'userconfig_v2_pre-{tag}_backup.xml')
+        if os.path.exists(backup_path):
+            return  # already snapshotted before this beta's first run
+        shutil.copy2(G.userconfig_path, backup_path)
+        logging.info(f"Beta build: backed up pre-beta user config to {backup_path}")
+    except OSError as e:
+        # Never block startup over a backup failure.
+        logging.error(f"Beta build: could not back up user config: {e}")
 
 def _setup_dev_userconfig_paths():
     """Setup development userconfig paths."""
@@ -318,6 +357,25 @@ def _setup_standard_config_paths():
     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
 
+def _device_is_configured() -> bool:
+    """True if any STORED system setting assigns this instance's device
+    (PID or device path, instance-scoped or global).
+
+    A first launch has neither — G.device_usbpid then only holds the
+    built-in default (2055), which is wrong for any DIY/non-default
+    device. In that state the connection attempt is skipped entirely (no
+    error dialog) and the System Settings dialog opens for first-time
+    setup instead.
+    """
+    pid_key = f'pid{G.device_type.capitalize()}'
+    path_key = f'devpath_{G.device_type}'
+    for key in (pid_key, path_key,
+                f'{G.device_type}/{pid_key}', f'{G.device_type}/{path_key}'):
+        if G.system_settings.value(key) not in (None, ''):
+            return True
+    return False
+
+
 def _initialize_device_connection():
     """
     Initialize connection to the Rhino device and check firmware.
@@ -337,15 +395,57 @@ def _initialize_device_connection():
     dev_firmware_version = 'ERROR'
     dev = None
 
-    try:
-        vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
-    except Exception:
+    # try:
+    #     vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
+    # except Exception:
+    #     return dev, dev_serial, dev_firmware_version
+
+    # First-launch probe BEFORE auto-assign below writes devpath settings:
+    # only pre-existing stored configuration counts as "configured".
+    device_configured = _device_is_configured()
+
+    devs = _enumerate_and_log_devices()
+
+    # Attempt to auto-assign unconfigured devpath_* settings based on discovered devices
+    _auto_assign_devices(devs)
+
+    if G.args.device is None and not device_configured:
+        # Nothing stored for this device: don't guess at the default PID
+        # and raise a connection error on a brand-new install. The
+        # System Settings dialog opens later in startup
+        # (_check_system_settings_required) regardless of whether the
+        # auto-assign above identified the device — first launch always
+        # gets the settings page so the user can review and save all
+        # preferences.
+        auto_assigned = G.system_settings.value(
+            f'devpath_{G.device_type}') not in (None, '')
+        G.first_launch_autoconfig = auto_assigned
+        if auto_assigned:
+            logging.warning(
+                f"First launch: no stored configuration for "
+                f"'{G.device_type}'; the device was auto-configured by "
+                "name. Skipping connection — System Settings will open "
+                "for the user to review and save.")
+        else:
+            logging.warning(
+                f"First launch: no stored configuration for "
+                f"'{G.device_type}' and the device could not be "
+                "determined by name from the connected devices. Skipping "
+                "connection — System Settings will open for setup.")
         return dev, dev_serial, dev_firmware_version
 
-    _enumerate_and_log_devices()
-
     try:
-        dev = HapticEffect.open(vid_pid[0], vid_pid[1])
+        dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+
+        def connect_signals():
+            dev.deviceConnected.connect(G.main_window.update_device_status)
+            dev.buttonPressed.connect(G.main_window.get_active_buttons)
+            dev.buttonReleased.connect(G.main_window.get_active_buttons)
+        # Use QTimer.singleShot to connect signals after event loop starts
+        QTimer.singleShot(0, connect_signals)
+
+        G.device_info = dev.info
+
         if G.args.reset:
             dev.reset_effects()
         dev_firmware_version = dev.get_firmware_version()
@@ -363,12 +463,12 @@ def _initialize_device_connection():
         G.device_connection_status = False
         logging.exception("Exception")
         QMessageBox.warning(None, "Cannot connect to Rhino",
-                          f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\n"
+                          f"Unable to open device: {G.device_type}\nError: {e}\n\n"
                           "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
 
     return dev, dev_serial, dev_firmware_version
 
-def _enumerate_and_log_devices():
+def _enumerate_and_log_devices() -> List[DeviceInfo]:
     """Enumerate and log available Rhino devices."""
     devs = FFBRhino.enumerate()
     logging.info("Available Rhino Devices:")
@@ -382,6 +482,119 @@ def _enumerate_and_log_devices():
             G.instance_dev_dict[devinfo.product_id] = devinfo
 
     logging.info("-------")
+    return devs
+
+
+def _auto_assign_devices(devs: List[DeviceInfo]):
+    """Auto-assign system_settings devpath_* entries for unassigned device slots.
+
+    This inspects the enumerated devices and, for each device whose
+    `ident` or `product_string` indicates a known role (Joystick, Pedals,
+    Collective, Trimwheel), it will assign the system setting key
+    `devpath_<role>` to the device path if that key is not already set.
+
+    Only runs assignments when this process is the master instance to avoid
+    races between multiple instances. Assignments are written via
+    `G.system_settings.setValue` so they persist in the system settings.
+    """
+    try:
+        if not G.master_instance:
+            return
+
+        # Map normalized role keywords to devpath keys
+        role_keywords = {
+            'joystick': ['joystick'],
+            'pedals': ['pedal', 'pedals'],
+            'collective': ['collective'],
+            'trimwheel': ['trimwheel', 'trim']
+        }
+
+        # VID:PID fallback mapping (product_id hex -> role)
+        vidpid_role_map = {
+            0x2055: 'joystick',
+            0x2054: 'pedals',
+            0x2053: 'collective',
+            0x2052: 'trimwheel',
+        }
+
+        # Paths already holding a role (stored settings): a device may hold
+        # at most ONE role. Without this, a device whose role was assigned
+        # on a previous launch falls straight through the name pass (its
+        # own role reads as "existing") and the PID fallback re-assigns
+        # the SAME device into a different empty slot — field case: pedals
+        # stored as devpath_pedals on first launch, then re-assigned to
+        # devpath_trimwheel by the 0x2052 fallback on the next one.
+        assigned_paths = set()
+        for role in role_keywords:
+            p = G.system_settings.get(f'devpath_{role}', None)
+            if p:
+                assigned_paths.add(str(p))
+
+        # Build reverse lookup from product_string/ident to role
+        for devinfo in devs:
+            try:
+                # DeviceInfo.ident property exists and returns cleaned product string
+                ident = devinfo.ident
+                # prefer ident (configurator name) if present
+                label = ident.lower()
+                devpath = devinfo.path.decode()
+
+                if devpath in assigned_paths:
+                    continue
+
+                assigned = False
+                for role, keywords in role_keywords.items():
+                    key = f'devpath_{role}'
+                    # Only assign if not already configured
+                    existing = G.system_settings.get(key, None) is not None
+                    if existing:
+                        continue
+
+                    for kw in keywords:
+                        if kw in label:
+                            logging.info(f"Auto-assigning {key} -> {devpath} (matched '{kw}' in '{label}')")
+                            try:
+                                G.system_settings.setValue(key, devpath)
+                                assigned_paths.add(devpath)
+                                if role == G.device_type:
+                                    G.device_devpath = devpath
+                            except Exception:
+                                logging.exception(f"Failed to set system setting {key}")
+                            # once assigned for this device, don't try other roles
+                            assigned = True
+                            break
+                    if assigned:
+                        # move to next device if already assigned by name match
+                        break
+
+                # If not matched by product string/name, try VID:PID mapping —
+                # but never for a device whose NAME identifies a known role:
+                # if its named slot is taken, re-routing it by PID into a
+                # different role would contradict what the device says it is.
+                if not assigned and not any(
+                        kw in label for kws in role_keywords.values() for kw in kws):
+                    try:
+                        pid = int(devinfo.product_id)
+                        role = vidpid_role_map.get(pid, None)
+                        if role:
+                            key = f'devpath_{role}'
+                            existing = G.system_settings.get(key, None) is not None
+                            if not existing:
+                                logging.info(f"Auto-assigning {key} -> {devpath} (matched pid 0x{pid:04X})")
+                                try:
+                                    G.system_settings.setValue(key, devpath)
+                                    assigned_paths.add(devpath)
+                                    if role == G.device_type:
+                                        G.device_devpath = devpath
+                                except Exception:
+                                    logging.exception(f"Failed to set system setting {key}")
+                    except Exception:
+                        logging.exception("Error matching device by pid for auto-assign")
+            except Exception:
+                logging.exception("Error while attempting to auto-assign device")
+
+    except Exception:
+        logging.exception("_auto_assign_devices failure")
 
 def _check_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
@@ -488,6 +701,8 @@ def _setup_ipc_and_connections():
     """
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
     G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
+    G.ipc_instance.child_exception_signal.connect(G.main_window.on_child_exception)
+    G.ipc_instance.child_status_signal.connect(G.main_window.refresh_scope_status_indicators)
     G.ipc_instance.exit_signal.connect(exit_application)
     G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
     G.ipc_instance.show_signal.connect(G.main_window.show)
@@ -507,23 +722,17 @@ def _setup_ipc_and_connections():
     G.ipc_instance.show_offline_model_signal.connect(G.main_window.load_single_offline_model)
     G.ipc_instance.start()
 
-def _setup_device_button_connections():
-    """Setup device button event connections."""
-    try:
-        HapticEffect.device.buttonPressed.connect(G.main_window.get_active_buttons)
-        HapticEffect.device.buttonReleased.connect(G.main_window.get_active_buttons)
-    except:
-        pass
 
-def _setup_device_connect_status():
-    """Setup device disconnect/reconnect status signals"""
-    try:
-        HapticEffect.device.deviceConnected.connect(G.main_window.update_device_status)
-    except:
-        pass
 def _sim_connected_events():
     G.sim_listeners.allStarted.connect(G.telem_manager.reset_sim_connected)
     G.telem_manager.first_frame_received.connect(G.sim_listeners.stop_inactive)
+    # When the first frame from a (new) sim arrives, flip the status widget to Running.
+    # first_frame_received fires once per restart cycle (reset_sim_connected resets the flag),
+    # so this fires on initial startup AND after each sim_exited → restart_all() cycle.
+    # on_first_sim_frame guards against clobbering an error the same frame raised.
+    G.telem_manager.first_frame_received.connect(G.main_window.on_first_sim_frame)
+    G.telem_manager.sim_exited.connect(lambda src: G.sim_listeners.restart_all())
+    G.telem_manager.sim_exited.connect(G.main_window.on_sim_exited)
 
 def _handle_window_display(headless_mode):
     """Handle initial window display based on configuration."""
@@ -538,40 +747,97 @@ def _handle_window_display(headless_mode):
 
 def _check_version_update():
     """Check for version updates if not release or dev build."""
-    if not G.release_version and not G.dev_build:
-        utils.FetchLatestVersion(G.main_window.update_version_result,
-                                lambda error_message: logging.error("Error in thread: %s", error_message))
+    if G.master_instance and not G.release_version and not (G.dev_build or G.beta_build) and getattr(sys, 'frozen', False):
+        logging.info("Checking for version updates...")
+        dlg = QProgressDialog("Checking for updates...", "Skip", 0, 0, G.main_window)
+        dlg.setWindowTitle("TelemFFB")
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        dlg.show()
+
+        worker = utils.FetchLatestVersion(
+            G.main_window.update_version_result,
+            G.main_window.on_version_check_error
+        )
+
+        G.main_window._version_check_dialog = dlg
+        dlg.canceled.connect(G.main_window.on_version_check_cancelled)
+    else:
+        # Version checking is disabled; emit immediately so sim listeners can start.
+        G.main_window._emit_version_check_complete()
 
 def _check_system_settings_required():
     """Check if system settings dialog should be opened."""
-    if (not G.system_settings.get("pidJoystick", None) and
-        not G.system_settings.get("pidPedals", None) and
-        not G.system_settings.get("pidCollective", None) and
-        not G.system_settings.get("pidTrimWheel", None)):
-        G.main_window.open_system_settings_dialog()
 
-def _setup_async_initialization(dev, dev_serial):
+    dev_cap = G.device_type.capitalize()
+    if G.first_launch_autoconfig is not None:
+        # First launch (no stored device configuration): the settings page
+        # always opens so the user can review device assignments and the
+        # rest of their preferences, whether or not auto-config succeeded.
+        if G.first_launch_autoconfig:
+            msg = (f"First launch: the {dev_cap} device was automatically "
+                   "configured from the connected devices.\n\n"
+                   "Please review the device assignment and your other "
+                   "preferences in System Settings, then save to complete "
+                   "setup.")
+        else:
+            msg = (f"First launch: the {dev_cap} device could not be "
+                   "determined by name from the connected devices.\n\n"
+                   "Please assign your device and review your preferences "
+                   "in System Settings.")
+        QMessageBox.information(None, "System Settings Required", msg)
+        if G.child_instance:
+            G.ipc_instance.send_message("SHOW SETTINGS")
+        else:
+            G.main_window.open_system_settings_dialog()
+        return
+
+    if G.device_devpath is None:
+        QMessageBox.information(None, "System Settings Required",
+                                f"VPforce Device for {G.device_type} is not assigned.  Please assign a device in System Settings.")
+        if G.child_instance:
+            G.ipc_instance.send_message("SHOW SETTINGS")
+        else:
+            G.main_window.open_system_settings_dialog()
+
+def _setup_async_initialization(dev : FFBRhino, dev_serial):
     """Setup background initialization that doesn't block main window appearance."""
     @utils.threaded()
     def init_async():
         try:
-            G.startup_configurator_gains = dev.get_gains()
+            if dev:
+                G.startup_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
-        if G.system_settings.get('enableVPConfStartup', False):
-            logging.info(f'Starting aysnc "startup vpconf" config push: {G.system_settings.get('pathVPConfStartup', '')}')
-            G.vpconf_init_pending = True # True flag delays telemetry process until async process completed by upload_vpconf_profile
+        if G.system_settings.enableVPConfStartup:
+            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
             try:
-                upload_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
+                upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
             except Exception:
-                G.vpconf_init_pending = False # allow telem processing if config push fails
                 logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
-            G.vpconf_configurator_gains = dev.get_gains()
+            if dev:
+                G.vpconf_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
+
+        # Startup race: when the sim is already running with an aircraft loaded,
+        # the sim-listener thread loads that aircraft and applies its vpconf /
+        # configurator-override layer BEFORE this async init establishes the
+        # device's startup state — and the startup vpconf push above can wipe it.
+        # If an aircraft is already loaded, force a clean reload so its config is
+        # re-applied on top, exactly as the normal aircraft-change path does.
+        # No-op when nothing is loaded yet (the common start-before-sim case).
+        tm = G.telem_manager
+        if tm is not None and tm.currentAircraftName is not None:
+            logging.info("Async device init finished after an aircraft was already "
+                         "loaded; forcing a config reload to re-apply its settings/overrides")
+            G.force_reload_aircraft_trigger = True
+            tm.currentAircraftName = None
 
     init_async()
 
@@ -594,18 +860,64 @@ def _cleanup_on_exit(dev_serial):
     G.sim_listeners.stop_all()
     G.telem_manager.quit()
 
-    if G.system_settings.get('enableVPConfExit', False):
+    if G.system_settings.enableVPConfExit:
         try:
-            upload_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
+            upload_vpconf_profile(G.system_settings.pathVPConfExit, dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
 
-    if G.system_settings.get('enableResetGainsExit', False):
+    if G.system_settings.enableResetGainsExit:
         try:
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
         except:
             pass
-    HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
+        
+    if HapticEffect.device:
+        try:
+            HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
+        except Exception:
+            logging.error("Unable to reset device deadzone.. device likely disconnected")
+
+def _init_excepthooks():
+    orig_stdout = sys.stdout
+    # Configure global exception handler for better error reporting
+    def excepthook(exc_type, exc_value, exc_tb):
+        if exc_type == KeyboardInterrupt:
+            utils.exit_application()
+            return
+        # Log the unhandled exception including the full traceback via the logging module
+        logging.getLogger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
+        # Also write the formatted traceback to stdout for the in-app log window
+        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        orig_stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
+        # Optionally exit the Qt application:
+        # QtWidgets.QApplication.quit()
+    sys.excepthook = excepthook
+
+    # Configure threading exception handler to catch exceptions in threads (Python 3.8+)
+    # This must be set up AFTER logging is initialized so the handler can log properly
+    def threading_excepthook(args):
+        """Handle uncaught exceptions in threads."""
+        exc_type = args.exc_type
+        exc_value = args.exc_value
+        exc_tb = args.exc_traceback
+        thread = args.thread
+        
+        # Log the exception - this will be captured by ExceptionTracker
+        logging.getLogger().error(
+            f"Uncaught exception in thread {thread.name}",
+            exc_info=(exc_type, exc_value, exc_tb)
+        )
+        # Also write to stdout for visibility in log window
+        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        orig_stdout.write(
+            f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}] Exception in thread {thread.name}{AnsiColors.WHITE}\n{tb}{AnsiColors.END}"
+        )
+    
+    # Set threading exception hook (available in Python 3.8+)
+    import threading
+    if hasattr(threading, 'excepthook'):
+        threading.excepthook = threading_excepthook
 
 def main():
     """
@@ -687,6 +999,8 @@ def main():
     else:
         appmode = 'Source'
 
+    _init_excepthooks()
+
     # ============================================================================
     # PHASE 5: Logging and Debug Setup
     # ============================================================================
@@ -702,16 +1016,7 @@ def main():
         logging.info(f"Using {G.args.teleplot} for plotting")
         utils.teleplot.configure(G.args.teleplot)
 
-    # Configure global exception handler for better error reporting
-    def excepthook(exc_type, exc_value, exc_tb):
-        if exc_type == KeyboardInterrupt:
-            utils.exit_application()
 
-        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
-        #QtWidgets.QApplication.quit()
-        # or QtWidgets.QApplication.exit(0)
-    sys.excepthook = excepthook
 
     # ============================================================================
     # PHASE 6: UI and Logging Window Setup
@@ -723,6 +1028,19 @@ def main():
     G.log_window = LogWindow()
     _init_logging(G.log_window.widget)
     G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
+
+    # ============================================================================
+    # PHASE 6.5: Exception Tracking Setup
+    # ============================================================================
+    # Initialize exception tracker for logging and user notification
+    from telemffb.ExceptionTracker import ExceptionTracker
+    G.exception_tracker = ExceptionTracker()
+    
+    # Add exception tracking handler to the logger
+    exception_handler = G.exception_tracker.get_handler()
+    logging.getLogger().addHandler(exception_handler)
+    
+    logging.info("Exception tracking initialized")
 
     # ============================================================================
     # PHASE 7: Convert Legacy userconfig to new format
@@ -737,14 +1055,15 @@ def main():
 
     logging.info(f"TelemFFB (version {version}) Starting")
 
+    # Set logging level based on system settings
+    _setup_logging_level()
+
     # ============================================================================
     # PHASE 9: Device Connection and Firmware Validation
     # ============================================================================
     # Connect to Rhino FFB device and validate firmware version
     dev, dev_serial, dev_firmware_version = _initialize_device_connection()
 
-    # Set logging level based on system settings
-    _setup_logging_level()
 
     # ============================================================================
     # PHASE 10: Core Component Initialization
@@ -765,11 +1084,7 @@ def main():
     # Setup IPC for master-child instance communication and connect all signals
     _setup_ipc_and_connections()
 
-    # Connect device button events to main window handlers
-    _setup_device_button_connections()
 
-    # Connect device status events to main window handler:
-    _setup_device_connect_status()
 
     # Connect sim start/stop signals
     _sim_connected_events()
@@ -785,6 +1100,10 @@ def main():
     # ============================================================================
     # Show main window based on configuration (minimized, tray, normal)
     _handle_window_display(headless_mode)
+
+    # Sim listeners start only after version check resolves (or is skipped),
+    # preventing plugin dialogs from racing with the app-update prompt.
+    G.main_window.version_check_complete.connect(G.sim_listeners.start_all)
 
     # Check for version updates in background (non-release builds)
     _check_version_update()
@@ -805,8 +1124,7 @@ def main():
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop
     # ============================================================================
-    # Start all simulation listeners to begin telemetry processing
-    G.sim_listeners.start_all()
+    # replaced by G.main_window.version_check_complete.connect(G.sim_listeners.start_all) above
 
     # Enter Qt application event loop - application runs until user exits
     app.exec()
@@ -819,16 +1137,23 @@ def main():
 
 def _init_logging(log_widget : QPlainTextEdit):
     log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
-    
-    sys.stdout = utils.OutLog(log_widget, sys.stdout)
-    sys.stderr = utils.OutLog(log_widget, sys.stderr)
+
+    # Capture original streams so logging StreamHandlers can write to the
+    # real console. We still route stdout/stderr to the UI via OutLog, but
+    # ensure the logging StreamHandler writes to the original streams to
+    # avoid duplicate writes through OutLog -> original_out.
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+
+    sys.stdout = utils.OutLog(log_widget, orig_stdout)
+    sys.stderr = utils.OutLog(log_widget, orig_stderr)
 
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
 
     date_str = datetime.now().strftime("%Y%m%d")
 
-    logname = "".join(["TelemFFB", "_", G.device_usbvidpid.replace(":", "-"), '_', G.device_type, "_", date_str, ".log"])
+    logname = "".join(["TelemFFB", "_", G.device_type, "_", date_str, ".log"])
     log_file = os.path.join(log_folder, logname)
 
     # Create a logger instance
@@ -841,18 +1166,123 @@ def _init_logging(log_widget : QPlainTextEdit):
     logging.addLevelName(logging.WARNING, f'{AnsiColors.YELLOW}WARNING{AnsiColors.END}')
 
     # remove ansi escape strings
-    class MyFormatter(logging.Formatter):
+    class AnsiRemoverFormatter(logging.Formatter):
         def format(self, record):
             s = super().format(record)
             p = utils.parseAnsiText(s)
             return "".join([txt[0] for txt in p])
-            
+
+
+    class _ValueColorFilter(logging.Filter):
+        """Logging filter that colorizes numeric and boolean literals in the log record's message.
+
+        This filter wraps matched tokens in ANSI color codes. It is safe to add to a logger
+        because it does not modify the record object except for the 'msg' and 'message' text.
+        The regex is conservative to avoid matching inside words.
+        """
+        import re
+        _re_float = re.compile(r"(?<![\w.-])(-?\d+\.\d+)(?![\w.])")
+        _re_int = re.compile(r"(?<![\w.-])(-?\d+)(?![\w.])")
+        _re_bool = re.compile(r"\b(True|False)\b")
+
+
+
+        def filter(self, record: logging.LogRecord) -> bool:
+            try:
+                msg = str(record.getMessage())
+            except Exception:
+                # If formatting fails, leave record untouched
+                return True
+            # ANSI color codes used for simple terminal highlighting of values in log messages
+            # These are intentionally lightweight and only applied when the terminal supports ANSI.
+            _ANSI_RESET = "\x1b[0m"
+            _ANSI_BLUE = "\x1b[34m"   # integers
+            _ANSI_CYAN = "\x1b[36m"   # floats
+            _ANSI_MAGENTA = "\x1b[35m" # booleans
+            # First colorize floats, then ints (so we don't double-color the float's integer part)
+            msg = self._re_float.sub(lambda m: f"{_ANSI_CYAN}{m.group(1)}{_ANSI_RESET}", msg)
+            msg = self._re_int.sub(lambda m: f"{_ANSI_BLUE}{m.group(1)}{_ANSI_RESET}", msg)
+            msg = self._re_bool.sub(lambda m: f"{_ANSI_MAGENTA}{m.group(1)}{_ANSI_RESET}", msg)
+
+            # Expand custom bracket tags like [b]...[/b], [i], [u], [dim], and colors [red]...[/red]
+            # into ANSI SGR sequences so terminals that support ANSI will render them.
+            def _expand_bracket_tags(s: str) -> str:
+                if not s:
+                    return s
+
+                open_map = {
+                    'b': '\x1b[1m',      # bold
+                    'i': '\x1b[3m',      # italic
+                    'u': '\x1b[4m',      # underline
+                    'dim': '\x1b[2m',    # faint/dim
+                    'reset': '\x1b[0m',
+                    'black': '\x1b[30m',
+                    'red': '\x1b[31m',
+                    'green': '\x1b[32m',
+                    'yellow': '\x1b[33m',
+                    'blue': '\x1b[34m',
+                    'magenta': '\x1b[35m',
+                    'cyan': '\x1b[36m',
+                    'white': '\x1b[97m',
+                    'gray': '\x1b[90m',
+                }
+
+                close_map = {
+                    'b': '\x1b[22m',
+                    'i': '\x1b[23m',
+                    'u': '\x1b[24m',
+                    'dim': '\x1b[22m',
+                    'reset': '\x1b[0m',
+                    'black': '\x1b[39m',
+                    'red': '\x1b[39m',
+                    'green': '\x1b[39m',
+                    'yellow': '\x1b[39m',
+                    'blue': '\x1b[39m',
+                    'magenta': '\x1b[39m',
+                    'cyan': '\x1b[39m',
+                    'white': '\x1b[39m',
+                    'gray': '\x1b[39m',
+                }
+
+                def repl(m: re.Match) -> str:
+                    slash = m.group(1)
+                    tag = (m.group(2) or '').lower()
+                    if not tag:
+                        return m.group(0)
+                    if slash:
+                        return close_map.get(tag) or m.group(0)
+                    else:
+                        return open_map.get(tag) or m.group(0)
+
+                return re.sub(r"\[(/?)([a-zA-Z]+)\]", repl, s)
+
+            try:
+                msg = _expand_bracket_tags(msg)
+            except Exception:
+                # keep original message on any failure
+                pass
+
+            # assign colored message back to the record. Some logging handlers use record.message
+            # or re-format using record.msg and record.args; update both when applicable.
+            try:
+                record.msg = msg
+                # if a formatted 'message' attr exists, update it too
+                if hasattr(record, 'message'):
+                    record.message = msg
+            except Exception:
+                # never fail logging
+                pass
+
+            return True
+        
     # Create a formatter for the log messages
     fmt_string = f'{utils.AnsiColors.DARK_GRAY}%(asctime)s.%(msecs)03d - {G.device_type}{utils.AnsiColors.END} - %(levelname)s - %(message)s'
     formatter = logging.Formatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
-    formatter_file = MyFormatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
+    formatter_file = AnsiRemoverFormatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
 
-    # Create a StreamHandler to log messages to the console
+    # Create a StreamHandler to log messages to the real console (orig_stdout).
+    # Important: use the original stdout so the handler doesn't write into OutLog
+    # which would then forward back to original stdout and cause duplicate output.
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(formatter)
@@ -862,9 +1292,13 @@ def _init_logging(log_widget : QPlainTextEdit):
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter_file)
 
-    # Add the handlers to the logger
-    #logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    # Wrap handlers with a DedupHandler so repeated identical messages are suppressed
+    # Clear any pre-existing root handlers to avoid duplicate outputs
+    logger.handlers.clear()
+    from telemffb.utils import DedupHandler
+    dedup = DedupHandler(handlers=[console_handler, file_handler])
+    # Attach the dedup handler to the root logger. Individual handlers are still owned by DedupHandler.
+    logger.addHandler(dedup)
 
     # Create a list of keywords to filter
     log_filter_strings = [
@@ -880,8 +1314,13 @@ def _init_logging(log_widget : QPlainTextEdit):
     console_handler.addFilter(log_filter)
     file_handler.addFilter(log_filter)
 
-    logging.getLogger().handlers[0].setStream(sys.stdout)
-    logging.getLogger().handlers[0].setFormatter(formatter)
+    #console_handler.addFilter(_ValueColorFilter())
+    #file_handler.addFilter(_ValueColorFilter())
+
+    logger.addFilter(_ValueColorFilter())
+
+    # DedupHandler wraps the console and file handlers; no need to manipulate
+    # logging.getLogger().handlers[0] directly anymore.
 
     if not G.child_instance:
         try:    # in case other instance tries doing at the same time

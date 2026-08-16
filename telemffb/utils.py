@@ -1,25 +1,6 @@
 #
 # This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
 # Copyright (c) 2023 Valmantas Palikša.
-# Copyright (c) 2023 Micah Frisby
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, version 3.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-
-
-#
-# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
-# Copyright (c) 2023 Valmantas Palikša.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -34,6 +15,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import hashlib
+import html
 import inspect
 from datetime import datetime, timedelta
 import math
@@ -41,7 +23,9 @@ import os
 import random
 import re
 import shutil
+import tempfile
 import typing
+from typing import override
 import zipfile
 from collections import defaultdict, deque
 import threading
@@ -50,12 +34,15 @@ import select
 import logging
 import sys
 
-import winreg
 import socket
+import bisect
 import time
+import traceback
+import urllib.error
+import urllib.request
+import uuid
 import zlib
 import subprocess
-import urllib.request
 import json
 import ssl
 import xml.etree.ElementTree as ET
@@ -63,25 +50,81 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import akima
 
-from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt
+from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt, QMetaObject, pyqtSlot
 from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
 
 from PyQt6 import QtCore, QtGui
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QProgressDialog
 import stransi
 
 from enum import Enum, auto
 
 import telemffb.globals as G
-import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
-from .namedmutex import NamedMutex
+from .util import conversions as conv
 
 def check_min_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
     minver = re.sub(r'\D', '', min_firmware_version)
     devver = re.sub(r'\D', '', dev_firmware_version)
     return devver >= minver
+
+
+def schedule_on_main_thread(func):
+    """
+    Schedule a callable to execute in the main Qt thread.
+    
+    This is essential when calling GUI methods from worker threads (e.g., threading.Thread).
+    Qt GUI objects must only be accessed from the thread they were created in (main thread).
+    
+    Args:
+        func: A callable (lambda or function) to execute in the main thread
+    
+    Examples:
+        # Lambda (simple and clean):
+        schedule_on_main_thread(lambda: G.main_window.update_sim_indicators("dcs", True))
+        schedule_on_main_thread(lambda: some_widget.setText("Hello"))
+        
+        # Function reference:
+        def update_ui():
+            G.main_window.statusBar().showMessage("Updated")
+        schedule_on_main_thread(update_ui)
+    """
+    class CallableWrapper(QObject):
+        # Keep references to wrapper objects to prevent garbage collection
+        _scheduled_wrappers = []
+
+        def __init__(self, func):
+            super().__init__()
+            # Keep a reference to prevent garbage collection before execution
+            self._scheduled_wrappers.append(self)
+            # Clean up old wrappers if list gets too long (prevent memory leak)
+            if len(self._scheduled_wrappers) > 100:
+                self._scheduled_wrappers[:] = self._scheduled_wrappers[-50:]
+
+            self.func = func
+            # Move to main thread
+            if QCoreApplication.instance():
+                self.moveToThread(QCoreApplication.instance().thread())
+        
+        @pyqtSlot()
+        def execute(self):
+            try:
+                self.func()
+            finally:
+                # Remove from references list after execution
+                try:
+                    self._scheduled_wrappers.remove(self)
+                except (ValueError, AttributeError):
+                    pass
+    
+    wrapper = CallableWrapper(func)
+
+    QMetaObject.invokeMethod(
+        wrapper,
+        "execute",
+        Qt.ConnectionType.QueuedConnection
+    )
 
 
 def dbprint(color, msg, instance=None):
@@ -140,14 +183,6 @@ def debug_caller_args(color):
     arg_list = ", ".join(f"{arg}={repr(values[arg])}" for arg in args)
 
     dbprint(color, f'"{callee}" called by "{caller}" Args: {arg_list}')
-
-def overrides(interface_class):
-    """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
-
-    def overrider(method):
-        assert method.__name__ in dir(interface_class)
-        return method
-    return overrider
 
 def millis() -> int:
     """return millisecond timer
@@ -281,9 +316,13 @@ class EffectTranslator:
         'adv_spr': ["Advanced Spring Override", ""],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
         "ap_spring": ["Autopilot Spring", ""],
+        "adv_gforce_constant": ["G-Force Loading (Advanced)", ""],
+        "blade_slap.*": ["Blade Slap", "blade_slap_intensity"],
         "buffeting": ["AoA/Stall Buffeting", "buffeting_intensity"],
         "bombs": ["Bomb Release", "weapon_release_intensity"],
+        "canopyclunk": ["Canopy Clunk", "canopy_motion_intensity"],
         "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
+        "clunk": ["Tail Hook Clunk", "tailhook_motion_intensity"],
         "collective_ap_spring": ["Collective Spring", "collective_ap_spring_gain"],
         "collective_damper": ["Collective Dampening Force", "collective_dampening_gain"],
         "collective_ft": ["Collective Force Trim", "collective_ft_ovd_spring_gain"],
@@ -293,7 +332,8 @@ class EffectTranslator:
         "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],
         "damage": ["Aircraft Damage Event", "damage_effect_intensity"],
         "damper": ["Damper Override", "damper_force"],
-        "dcs_spr_override": ["DCS Spring Override", ""],
+        "dcs_spr_override": ["Spring Override", ""],
+        "il2_spr_override": ["Spring Override", ""],
         "decel": ["Decelleration Force", "deceleration_max_force"],
         "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
         "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
@@ -304,6 +344,7 @@ class EffectTranslator:
         "friction": ["Friction Override", "friction_force"],
         "boommovement" : ["Fuel Boom/Door","fuelboom_motion_intensity"],
         "gearbuffet.*": ["Gear Drag Buffeting", "gear_buffet_intensity"],
+        "gearclunk": ["Gear Clunk", "gear_motion_intensity"],
         "gearmovement.*": ["Gear Motion", "gear_motion_intensity"],
         "gforce": ["G-Force Loading", "gforce_effect_max_intensity"],
         "new_gforce": ["G-Force Loading V2", "new_gforce_effect_max_intensity"],
@@ -314,6 +355,13 @@ class EffectTranslator:
         "il2_gunfire.*": ["Gunfire Rumble", "il2_weapon_release_intensity"],
         "il2_bombs": ["Bomb Release", "il2_bomb_release_intensity"],
         "il2_rockets": ["Rocket Fire", "il2_rocket_release_intensity"],
+        "il2_ffb_spring": ["FFB Telemetry Spring Override", ""],
+        "il2_eng_shk1": ["IL2 Prop Eng Shake (Telemetry)", ""],
+        "il2_eng_shk2": ["IL2 Prop Eng Shake (Telemetry)", ""],
+        "il2_eng_shk3": ["IL2 Prop Eng Shake (Telemetry)", ""],
+        "il2_eng_shk4": ["IL2 Prop Eng Shake (Telemetry)", ""],
+        "il2_jet_shk1": ["IL2 Jet Eng Shake (Telemetry)", ""],
+        "il2_jet_shk2": ["IL2 Jet Eng Shake (Telemetry)", ""],
         "inertia": ["Inertia Override", "inertia_force"],
         "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
         "overspeed.*": ["Overspeed Shake", "overspeed_shake_intensity"],
@@ -334,7 +382,10 @@ class EffectTranslator:
         "stick_shaker.*" : ["Stick Shaker","stick_shaker_intensity"],
         "hookmovement" : ["Tail Hook","tailhook_motion_intensity"],
         "touchdown": ["Touch-down Effect", "touchdown_effect_max_force"],
+        "trim_cal_spring": ["Trim Calibration Spring", ""],
         "trim_spring": ["Trim Override Spring", ""],
+        "trimwheel_ap_spring": ["Trimwheel AP Spring", "trimwheel_ap_spring_gain"],
+        "turbulence": ["Turbulence", "turbulence_intensity"],
         "control_weight": ["Control Weight", ""],
         "vrs_buffet.*": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
         "wnd": ["Wind Effect", "wind_effect_max_intensity"],
@@ -342,6 +393,8 @@ class EffectTranslator:
         "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
         "hyd_loss_inertia": ["Low Hydraulic Inertia", "hydraulic_loss_inertia"],
         "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
+        "lock_1": ["Controls Lock Lower Bound", ""],
+        "lock_2": ["Controls Lock Upper Bound", ""],
     }
     @classmethod
     def get_translation(cls, key):
@@ -373,7 +426,7 @@ def archive_logs(directory):
                 logging.info(f"Archiving logs from {readable_date} into {zip_filename}")
                 zip_path = os.path.join(directory, zip_filename)
 
-                with zipfile.ZipFile(zip_path, 'a') as zip_file:
+                with zipfile.ZipFile(zip_path, 'a', compression=zipfile.ZIP_LZMA, compresslevel=9) as zip_file:
                     log_file_path = os.path.join(directory, filename)
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
@@ -414,6 +467,82 @@ def prune_log_files(path, number, unit):
             if file_date < cutoff_date:
                 os.remove(os.path.join(path, filename))
                 logging.info(f'Deleting log archive: {filename} as it has exceeded the pruning threshold of {num_days} Days')
+
+
+def create_ssl_context():
+    return ssl._create_unverified_context()
+
+
+def _decode_http_response(response):
+    return response.read().decode("utf-8", errors="replace")
+
+
+def open_url(url, data=None, headers=None, timeout=30, method=None):
+    request = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    return urllib.request.urlopen(request, context=create_ssl_context(), timeout=timeout)
+
+
+def fetch_json_url(url, timeout=30):
+    with open_url(url, timeout=timeout) as response:
+        return json.loads(_decode_http_response(response))
+
+
+def _encode_multipart_formdata(fields=None, files=None):
+    boundary = f"----TelemFFBBoundary{uuid.uuid4().hex}"
+    body = bytearray()
+
+    for name, value in fields or []:
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"))
+        if isinstance(value, bytes):
+            body.extend(value)
+        else:
+            body.extend(str(value).encode("utf-8"))
+        body.extend(b"\r\n")
+
+    for name, filename, content, content_type in files or []:
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode("utf-8")
+        )
+        body.extend(f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"))
+        body.extend(content)
+        body.extend(b"\r\n")
+
+    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+    return bytes(body), f"multipart/form-data; boundary={boundary}"
+
+
+def post_multipart_url(url, files, fields=None, timeout=30):
+    data, content_type = _encode_multipart_formdata(fields=fields, files=files)
+    headers = {
+        "Content-Type": content_type,
+        "Content-Length": str(len(data)),
+        "Accept": "application/json",
+    }
+    with open_url(url, data=data, headers=headers, timeout=timeout, method="POST") as response:
+        return response.status, _decode_http_response(response)
+
+
+def classify_http_exception(exc):
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            text = _decode_http_response(exc)
+        except Exception:
+            text = str(exc)
+        return {"status_code": exc.code, "text": text}
+
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return {"error": "timeout"}
+
+    reason = getattr(exc, "reason", None)
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return {"error": "timeout"}
+
+    if isinstance(exc, urllib.error.URLError):
+        return {"error": "connection"}
+
+    return {"error": str(exc), "traceback": traceback.format_exc()}
 
 # def set_reg(name, value):
 #     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
@@ -461,57 +590,438 @@ def prune_log_files(path, number, unit):
 #     except WindowsError:
 #         return None
 
-def create_support_bundle(userconfig_rootpath):
-    # Get the  system settings
+def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=None, user_info=None):
+    """Internal helper to create a support bundle zip file.
+
+    Args:
+        zip_file_path: Output path for the zip file
+        userconfig_rootpath: Path to user config directory
+        exceptions: Optional list of ExceptionRecord objects to include
+        user_info: Optional dict from the report dialog
+            ('discord_username', 'notes') — written as the FIRST archive
+            entry so support can map the bundle to a user at a glance
+    """
+    from datetime import datetime
+    import telemffb.winpaths as winpaths
+
+
+    # Get the system settings
     sys_dict = read_all_system_settings()
 
+    # Create the support zip file directly
+    with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_LZMA, compresslevel=9) as support_zip:
+        # User-supplied report context first: bundle-to-user mapping and
+        # the reporter's own words are the highest-value triage data.
+        if user_info is not None:
+            lines = [
+                f"Report created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Device instance: {getattr(G, 'device_type', 'unknown')}",
+                f"Discord username: {user_info.get('discord_username') or '(not provided)'}",
+                "",
+                "Additional information from the user:",
+                user_info.get('notes') or '(none)',
+                "",
+            ]
+            support_zip.writestr("user_report.txt", "\n".join(lines))
+
+        # Add userconfig_v2.xml
+        userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
+        legacy_userconfig_path = os.path.join(userconfig_rootpath, "userconfig.xml")
+
+        if os.path.exists(userconfig_path):
+            support_zip.write(userconfig_path, "userconfig_v2.xml")
+
+        if os.path.exists(legacy_userconfig_path):
+            support_zip.write(userconfig_path, "userconfig.xml")
+
+        # Add log files
+        log_folder = os.path.join(userconfig_rootpath, "log")
+        if os.path.exists(log_folder):
+            for folder_name, subfolders, filenames in os.walk(log_folder):
+                for filename in filenames:
+                    file_path = os.path.join(folder_name, filename)
+                    arcname = os.path.relpath(file_path, userconfig_rootpath)
+                    support_zip.write(file_path, arcname)
+        
+        # Add system settings
+        cfg_content = "\n".join(f"{key}={value}" for key, value in sys_dict.items())
+        support_zip.writestr("system_settings.cfg", cfg_content)
+        
+        # Add exception details if provided
+        if exceptions:
+            exc_content = []
+            exc_content.append(f"Exception Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            exc_content.append(f"Total Exceptions: {len(exceptions)}\n")
+            exc_content.append("=" * 80 + "\n\n")
+            
+            for i, exc in enumerate(exceptions, 1):
+                exc_content.append(f"Exception {i}/{len(exceptions)}\n")
+                exc_content.append("-" * 80 + "\n")
+                exc_content.append(exc.format_full())
+                exc_content.append("\n" + "=" * 80 + "\n\n")
+            
+            support_zip.writestr("exceptions.txt", "".join(exc_content))
+        
+        # Add DCS files if available
+        try:
+            saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
+            if saved_games:
+                dcs_variant = get_dcs_variant()
+                dcs_folders = ['DCS', 'DCS.openbeta']
+                if dcs_variant and f'DCS.{dcs_variant}' not in dcs_folders:
+                    dcs_folders.append(f'DCS.{dcs_variant}')
+                
+                for dcs_folder in dcs_folders:
+                    dcs_path = os.path.join(saved_games, dcs_folder)
+                    if os.path.exists(dcs_path):
+                        # Add DCS log file
+                        dcs_log = os.path.join(dcs_path, "Logs", "dcs.log")
+                        if os.path.exists(dcs_log):
+                            support_zip.write(dcs_log, f"{dcs_folder}/Logs/dcs.log")
+                        
+                        # Add Export.lua if present
+                        export_lua = os.path.join(dcs_path, "Scripts", "Export.lua")
+                        if os.path.exists(export_lua):
+                            support_zip.write(export_lua, f"{dcs_folder}/Scripts/Export.lua")
+        except Exception as e:
+            # If DCS detection fails, continue without DCS files
+            pass
+
+
+def create_support_bundle_data(userconfig_rootpath, exceptions=None, user_info=None):
+    """Create support bundle as bytes (in memory) for API upload.
+
+    Args:
+        userconfig_rootpath: Path to user config directory
+        exceptions: Optional list of ExceptionRecord objects to include
+        user_info: Optional dict from the report dialog (see
+            _create_support_bundle_zip)
+
+    Returns:
+        bytes: Support bundle as zip file data
+    """
+    # Use a temporary file to create the zip, then read it into memory
+    with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        _create_support_bundle_zip(tmp_path, userconfig_rootpath, exceptions, user_info=user_info)
+        with open(tmp_path, 'rb') as f:
+            return f.read()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+
+def report_exceptions(parent_widget=None, on_complete_callback=None):
+    """Report exceptions by uploading support bundle to API.
+    
+    This function runs bundle creation and HTTP POST in a background QThread
+    so the Qt event loop (UI) remains responsive. It includes user prompts
+    and confirmation dialogs.
+    
+    Args:
+        parent_widget: Parent QWidget for dialog boxes (can be None)
+        on_complete_callback: Optional callback function to call when upload completes (success or failure)
+    
+    Returns:
+        bool: True if upload process started, False if user cancelled or no exceptions
+    """
+    
+    exceptions_list = G.exception_tracker.get_exceptions()
+
+    # Confirmation dialog with optional reporter context. The Discord
+    # username lets support map an uploaded bundle to the person asking
+    # about it on the VPforce Discord. It is remembered for THIS SESSION
+    # only (module attribute) — deliberately never persisted to the
+    # registry/disk: it is personal data the user types for a support
+    # interaction, not configuration. Both fields land in user_report.txt
+    # at the top of the bundle.
+    from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QLabel,
+                                 QLineEdit, QPlainTextEdit, QVBoxLayout)
+    dlg = QDialog(parent_widget)
+    dlg.setWindowTitle("Report Exceptions")
+    dlg_layout = QVBoxLayout(dlg)
+    dlg_layout.addWidget(QLabel(
+        "Upload Support Bundle to VPforce support?\n\n"
+        "This will include:\n"
+        "  • Exception details and tracebacks\n"
+        "  • System configuration\n"
+        "  • Application logs"
+    ))
+    dlg_layout.addSpacing(8)
+    dlg_layout.addWidget(QLabel(
+        "Discord username (optional) — lets support match this bundle to "
+        "you\non the VPforce Discord:"))
+    tb_discord = QLineEdit()
+    tb_discord.setPlaceholderText("your Discord username")
+    tb_discord.setText(getattr(report_exceptions, '_session_discord_username', ''))
+    dlg_layout.addWidget(tb_discord)
+    dlg_layout.addWidget(QLabel(
+        "Additional information (optional) — what were you doing when the\n"
+        "problem occurred, or anything else support should know:"))
+    tb_notes = QPlainTextEdit()
+    tb_notes.setPlaceholderText("Describe what happened…")
+    tb_notes.setMinimumHeight(90)
+    dlg_layout.addWidget(tb_notes)
+    dlg_layout.addWidget(QLabel(
+        "You will need to complete a verification challenge."))
+    dlg_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+    dlg_buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Upload")
+    dlg_buttons.accepted.connect(dlg.accept)
+    dlg_buttons.rejected.connect(dlg.reject)
+    dlg_layout.addWidget(dlg_buttons)
+
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return False
+
+    discord_username = tb_discord.text().strip()
+    user_notes = tb_notes.toPlainText().strip()
+    report_exceptions._session_discord_username = discord_username
+    user_info = {'discord_username': discord_username, 'notes': user_notes}
+
+    # Progress dialog (indeterminate)
+    progress = QProgressDialog("Creating support bundle and uploading to server...", None, 0, 0, parent_widget)
+    progress.setWindowTitle("Uploading...")
+    progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+    progress.setCancelButton(None)
+    progress.setMinimumDuration(0)
+    progress.show()
+
+    # Worker that runs in background thread
+    class UploadWorker(QObject):
+        finished = pyqtSignal(bool, dict)
+
+        def __init__(self, api_url: str, userconfig_rootpath: str, exceptions_list, user_info=None):
+            super().__init__()
+            self.api_url = api_url
+            self.userconfig_rootpath = userconfig_rootpath
+            self.exceptions_list = exceptions_list
+            self.user_info = user_info
+
+        def run(self):
+            try:
+                # Create bundle in memory
+                bundle = create_support_bundle_data(self.userconfig_rootpath, self.exceptions_list,
+                                                    user_info=self.user_info)
+
+                # Embed the (sanitized) Discord username in the uploaded
+                # filename: if the support server passes the client filename
+                # through to the Discord attachment, the bundle-to-user
+                # mapping becomes visible right in the automated message —
+                # no server change needed. Falls back to the plain name.
+                filename = 'support_bundle.zip'
+                uname = (self.user_info or {}).get('discord_username') or ''
+                uname = re.sub(r'[^A-Za-z0-9_.-]', '', uname)[:48]
+                if uname:
+                    filename = f'support_bundle_{uname}.zip'
+
+                status_code, response_text = post_multipart_url(
+                    self.api_url,
+                    files=[('bundle', filename, bundle, 'application/zip')],
+                    timeout=30,
+                )
+
+                if status_code == 200:
+                    try:
+                        payload = json.loads(response_text) if response_text else {'challenge_url': None}
+                    except Exception:
+                        payload = {'challenge_url': None}
+                    self.finished.emit(True, payload)
+                else:
+                    self.finished.emit(False, {'status_code': status_code, 'text': response_text})
+
+            except Exception as e:
+                self.finished.emit(False, classify_http_exception(e))
+
+    # Build API URL and capture userconfig path now
+    userconfig_rootpath = G.userconfig_rootpath
+    api_url = 'https://vpforce.eu/telemffb/api/upload'
+
+    # Prepare thread and worker
+    thread = QThread(parent_widget)
+    worker = UploadWorker(api_url, userconfig_rootpath, exceptions_list, user_info=user_info)
+    worker.moveToThread(thread)
+
+    # Connect signals
+    thread.started.connect(worker.run)
+
+    def on_finished(success: bool, payload: dict):
+        try:
+            progress.close()
+        except Exception:
+            pass
+
+        if success:
+            challenge_url = payload.get('challenge_url') if isinstance(payload, dict) else None
+            if challenge_url:
+                # Open challenge URL in browser from main thread
+                import webbrowser
+                webbrowser.open(challenge_url)
+                QMessageBox.information(
+                    parent_widget,
+                    "Verification Required",
+                    "A verification page has been opened in your browser.\n\nPlease complete the challenge to submit your report.",
+                )
+            else:
+                QMessageBox.warning(parent_widget, "Upload Error", "Server did not return a challenge URL.")
+        else:
+            # Handle common errors
+            if payload.get('error') == 'connection':
+                QMessageBox.critical(
+                    parent_widget,
+                    "Connection Error",
+                    "Could not connect to the support server.\n\nPlease check your internet connection and try again.",
+                )
+            elif payload.get('error') == 'timeout':
+                QMessageBox.critical(parent_widget, "Timeout Error", "Upload timed out.\n\nPlease try again later.")
+            else:
+                # Show server response if available
+                status = payload.get('status_code')
+                text = payload.get('text') or payload.get('error') or ''
+                if status:
+                    QMessageBox.critical(
+                        parent_widget,
+                        "Upload Failed",
+                        f"Failed to upload support bundle.\n\nStatus: {status}\nMessage: {text[:200]}",
+                    )
+                else:
+                    QMessageBox.critical(
+                        parent_widget,
+                        "Upload Error",
+                        f"An error occurred while uploading:\n\n{text}",
+                    )
+
+        # Clean up thread and worker
+        try:
+            thread.quit()
+            thread.wait(2000)
+        except Exception:
+            pass
+
+        worker.deleteLater()
+        thread.deleteLater()
+        
+        # Call completion callback if provided
+        if on_complete_callback:
+            try:
+                on_complete_callback(success, payload)
+            except Exception:
+                pass
+
+    worker.finished.connect(on_finished)
+    # Ensure we stop the thread if it finishes
+    worker.finished.connect(thread.quit)
+    thread.start()
+    
+    return True
+
+
+def create_support_bundle(userconfig_rootpath):
+    """Create a support bundle with a file save dialog, showing progress during creation.
+    
+    This function runs bundle creation in a background QThread with an indeterminate
+    progress dialog, keeping the UI responsive during the zip operation.
+    
+    Args:
+        userconfig_rootpath: Path to user config directory
+    """
     # Prompt the user for the destination and filename for the zip file
     file_dialog = QFileDialog()
     file_dialog.setFileMode(QFileDialog.FileMode.AnyFile)
     file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
     file_dialog.setNameFilter("Zip Files (*.zip)")
 
-    if file_dialog.exec():
-        # Get the selected file path
-        zip_file_path = file_dialog.selectedFiles()[0]
+    if not file_dialog.exec():
+        return
 
-        # Create a temporary folder to store files
-        temp_folder = "temp_support_bundle"
-        os.makedirs(temp_folder, exist_ok=True)
+    # Get the selected file path
+    zip_file_path = file_dialog.selectedFiles()[0]
 
+    # Progress dialog (indeterminate)
+    progress = QProgressDialog("Creating support bundle...", None, 0, 0)
+    progress.setWindowTitle("Creating Support Bundle")
+    progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+    progress.setCancelButton(None)
+    progress.setMinimumDuration(0)
+    progress.show()
+
+    # Worker to perform the zip creation in background
+    class BundleWorker(QObject):
+        finished = pyqtSignal(bool, dict)
+
+        def __init__(self, userconfig_rootpath, zip_file_path):
+            super().__init__()
+            self.userconfig_rootpath = userconfig_rootpath
+            self.zip_file_path = zip_file_path
+
+        def run(self):
+            try:
+                _create_support_bundle_zip(self.zip_file_path, self.userconfig_rootpath)
+                # Success
+                self.finished.emit(True, {"path": self.zip_file_path})
+            except Exception as e:
+                # Report error
+                try:
+                    self.finished.emit(False, {"error": str(e)})
+                except Exception:
+                    pass
+
+    # Prepare thread and worker
+    thread = QThread()
+    worker = BundleWorker(userconfig_rootpath, zip_file_path)
+    worker.moveToThread(thread)
+
+    # Connect signals
+    thread.started.connect(worker.run)
+
+    def _on_finished(success: bool, payload: dict):
         try:
-            # Save userconfig_v2.xml to the temporary folder
-            userconfig_path = os.path.join(temp_folder, "userconfig_v2.xml")
-            shutil.copy(os.path.join(userconfig_rootpath, "userconfig_v2.xml"), userconfig_path)
+            progress.close()
+        except Exception:
+            pass
 
-            # Save the contents of the 'log' folder to the temporary folder
-            log_folder_path = os.path.join(temp_folder, "log")
-            shutil.copytree(os.path.join(userconfig_rootpath, "log"), log_folder_path)
+        if success:
+            try:
+                QMessageBox.information(
+                    None, 
+                    "Support Bundle Created", 
+                    f"Support bundle saved to:\n{payload.get('path')}"
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                QMessageBox.critical(
+                    None, 
+                    "Error", 
+                    f"Failed to create support bundle:\n{payload.get('error')}"
+                )
+            except Exception:
+                pass
 
-            # Save system settings to a temporary .cfg file
-            cfg_file_path = os.path.join(temp_folder, "system_settings.cfg")
-            with open(cfg_file_path, "w") as cfg_file:
-                # Write each key-value pair as 'key=value' on a new line
-                for key, value in sys_dict.items():
-                    cfg_file.write(f"{key}={value}\n")
+        # Cleanup
+        try:
+            thread.quit()
+            thread.wait(2000)
+        except Exception:
+            pass
 
-            # Create the support zip file
-            with zipfile.ZipFile(zip_file_path, 'w') as support_zip:
-                # Add userconfig_v2.xml, log folder, and system settings .cfg file to the zip
-                support_zip.write(userconfig_path, "userconfig_v2.xml")
-                for folder_name, subfolders, filenames in os.walk(log_folder_path):
-                    for filename in filenames:
-                        file_path = os.path.join(folder_name, filename)
-                        arcname = os.path.relpath(file_path, temp_folder)
-                        support_zip.write(file_path, os.path.join("log", arcname))
-                support_zip.write(cfg_file_path, "system_settings.cfg")
+        worker.deleteLater()
+        thread.deleteLater()
 
-        finally:
-            # Clean up the temporary folder
-            shutil.rmtree(temp_folder)
+    worker.finished.connect(_on_finished)
+    # Ensure thread stops when finished
+    worker.finished.connect(thread.quit)
+    thread.start()
 
 
 def read_all_system_settings():
+    import winreg
+
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
 
     settings_dict = {}
@@ -544,6 +1054,48 @@ def read_all_system_settings():
 
 
 class SystemSettings(QSettings):
+    # Type hints for common settings to improve IDE autocompletion and discovery
+    # These are intentionally class-level annotations (no runtime effect) so editors can
+    # surface available settings via dot-completion (e.g. settings.logLevel)
+    logLevel: str
+    telemTimeout: int
+    saveWindow: bool
+    saveLastTab: bool
+    enableVPConfStartup: bool
+    pathVPConfStartup: str
+    enableVPConfExit: bool
+    enableVPConfGlobalDefault: bool
+    pathVPConfExit: str
+    enableResetGainsExit: bool
+
+    pruneLogs: bool
+    pruneLogsNum: int
+    pruneLogsUnit: str
+    ignoreUpdate: bool
+    startToTray: bool
+    closeToTray: bool
+    enableDCS: bool
+    enableMSFS: bool
+    enableXPLANE: bool
+    validateXPLANE: bool
+    pathXPLANE: str
+    validateIL2: bool
+    pathIL2: str
+    portIL2: int
+    enableBMS: bool
+    masterInstance: int
+    autolaunchMaster: bool
+    autolaunchJoystick: bool
+    autolaunchPedals: bool
+    autolaunchCollective: bool
+    startMinJoystick: bool
+    startMinPedals: bool
+    startMinCollective: bool
+    startHeadlessJoystick: bool
+    startHeadlessPedals: bool
+    startHeadlessCollective: bool
+    debug: bool
+
     default_inst = {
         'logLevel': 'INFO',
         'telemTimeout': 200,
@@ -555,6 +1107,8 @@ class SystemSettings(QSettings):
         'enableVPConfGlobalDefault': False,
         'pathVPConfExit': '',
         'enableResetGainsExit': False,
+        'teleplotPort': '',
+        'teleplotVars': ''
     }
 
     globl_sys_dict = {
@@ -575,6 +1129,8 @@ class SystemSettings(QSettings):
         'validateDCS': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
         'portIL2': 34385,
+        'il2_fwd_enable': False,
+        'il2_fwd_destinations': '[]',
         'enableBMS': False,
         'masterInstance': 1,
         'autolaunchMaster': False,
@@ -600,14 +1156,56 @@ class SystemSettings(QSettings):
     def __init__(self, pid=None, tp=None):
         super().__init__('VPforce', 'TelemFFB')
         #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
-        pass
+        # No additional initialization required. Keep QSettings initialization intact.
+        return
 
-    @overrides(QSettings)
+    @override
     def setValue(self, key: str, value, instance=None) -> None:
         if instance:
             super().setValue(f"{instance}/{key}", value)
         else:
             super().setValue(key, value)
+
+    def __getattr__(self, name: str):
+        """Allow dot-access to settings, e.g. settings.someOption
+
+        If the setting does not exist in QSettings, the default from
+        SystemSettings.defaults (if any) or None is returned.
+        """
+        # Only handle attribute-style access for settings keys. Let Python
+        # raise AttributeError for truly missing attributes.
+        try:
+            return self.get(name)
+        except Exception:
+            raise AttributeError(name)
+
+    def __setattr__(self, name: str, value):
+        """Assigning to attributes will persist the value to QSettings unless
+        it's an internal attribute (starts with '_') or a real class attribute.
+        """
+        # Allow normal attribute behavior for internals and attributes that
+        # already exist on the instance/class (to avoid interfering with QSettings internals)
+        if name.startswith('_') or name in self.__dict__ or hasattr(type(self), name):
+            object.__setattr__(self, name, value)
+            return
+
+        # Otherwise persist via QSettings
+        try:
+            # store as instance/global agnostic key; setValue will handle saving
+            # under instance-specific key when appropriate elsewhere
+            self.setValue(name, value)
+        except Exception:
+            # Fallback: if persistence fails, store as a regular attribute
+            object.__setattr__(self, name, value)
+
+    def __dir__(self):
+        # Include known setting keys from defaults to improve autocompletion in REPLs and editors
+        extra = []
+        try:
+            extra = list(self.defaults.keys())
+        except Exception:
+            extra = []
+        return sorted(set(super().__dir__() + extra))
 
     def get(self, name, default=None):       
         # check instance params
@@ -641,29 +1239,56 @@ class SystemSettings(QSettings):
 def mix(a, b, val):
     return a * (1 - val) + b * (val)
 
+_TRUE_SET = frozenset(["true", "yes", "on", "enable", "enabled"])
+_FALSE_SET = frozenset(["false", "no", "off", "disable", "disabled"])
+_UNIT_CONVERSIONS = {
+    "%": conv.percent,
+    "kt": conv.kt2ms,
+    "kph": conv.kmh2ms,
+    "fpm": 0.00508,
+    "m/s": 1,
+    "mph": conv.mph2ms,
+    "deg": 1,
+    "ms": 1,
+    "hz": 1,
+    "m": 1,
+    "ft": conv.ft2m,
+    "in": conv.in2m,
+}
+
+def convert_between_units(value: float, from_unit: str, to_unit: str):
+    """Convert ``value`` between two units of the same dimension using the
+    canonical ``_UNIT_CONVERSIONS`` factors (each maps its unit to base SI).
+
+    Returns the converted float, or None when either unit is unknown so the
+    caller can leave the original value untouched.  Rows only ever offer
+    same-dimension unit choices in their validvalues, so no dimensional
+    checking is needed here.
+    """
+    f = _UNIT_CONVERSIONS.get(from_unit)
+    t = _UNIT_CONVERSIONS.get(to_unit)
+    if not f or not t:
+        return None
+    return value * f / t
+
 
 def to_number(v: str):
     """Try to convert string to number
     If unable, return the original string
     """
     orig_v = v
-    if isinstance(v, (bool, int)):
+    if isinstance(v, (bool, int, float)):
         return v
 
     v_lower = v.lower()
-    if v_lower in ["true", "yes", "on", "enable", "enabled"]:
+    if v_lower in _TRUE_SET:
         return True
-    if v_lower in ["false", "no", "off", "disable", "disabled"]:
+    if v_lower in _FALSE_SET:
         return False
 
     scale = 1
-    unit_conversions = {
-        "%": 0.01, "kt": 0.51444, "kph": 1 / 3.6, "fpm": 0.00508, "m/s": 1,
-        "mph": 0.44704, "deg": 1, "ms": 1, "hz": 1, "m": 1, "ft": 0.3048,
-        "in": 0.0254, "m^2": 1, "ft^2": 0.092903
-    }
 
-    for unit, factor in unit_conversions.items():
+    for unit, factor in _UNIT_CONVERSIONS.items():
         if v_lower.endswith(unit) or v_lower.startswith(unit):
             scale = factor
             v = v.strip(unit)
@@ -767,11 +1392,268 @@ def scale(val, src: tuple, dst: tuple, return_round=False, return_int=False):
 
 def scale_clamp(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
-    Scale the given value from the scale of src to the scale of dst. 
+    Scale the given value from the scale of src to the scale of dst.
     and clamp the result to dst
     """
     v = scale(val, src, dst, return_round=return_round, return_int=return_int)
     return clamp(v, dst[0], dst[1])
+
+
+def piecewise_linear(xs, ys, x):
+    """Piecewise-linear lookup with edge-slope extrapolation.
+
+    :param xs: sample x values, strictly increasing
+    :param ys: sample y values, same length as xs (>= 2 points)
+    :param x: lookup position
+    :returns: interpolated y inside [xs[0], xs[-1]]; outside that range the
+        nearest edge segment's slope is continued linearly (a flat clamp would
+        silently stop correcting past the sampled band).
+    """
+    i = bisect.bisect_left(xs, x)
+    if i <= 0:
+        i = 1
+    elif i >= len(xs):
+        i = len(xs) - 1
+    x0, x1 = xs[i - 1], xs[i]
+    y0, y1 = ys[i - 1], ys[i]
+    slope = (y1 - y0) / (x1 - x0) if x1 != x0 else 0.0
+    return y0 + slope * (x - x0)
+
+
+def _parse_trim_curve_entry(data):
+    """Parse ONE stored curve entry into an anchor-referenced dict, or None.
+
+    Points are sorted and deduped on trim, then REBASED so offs(t0) == 0:
+    t0 from the payload, falling back to the measured band's midpoint for
+    curves saved before t0 existed (the sweep centers its band on the
+    natural point). The rebase is idempotent. This pins the runtime
+    invariant "trimmed for level => stick at physical center, zero force,
+    zero delivered input" and keeps every lookup band-internal regardless
+    of where the trim gauge's zero lies.
+    """
+    pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
+    xs, ys = [], []
+    for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
+        if xs and abs(t - xs[-1]) < 1e-9:
+            ys[-1] = o
+        else:
+            xs.append(t)
+            ys.append(o)
+    if len(xs) < 2:
+        logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
+        return None
+    t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
+    ref = piecewise_linear(xs, ys, t0)
+    return {
+        "ias_kt": float(data.get("ias_kt") or 0.0),
+        "t0": t0,
+        "date": data.get("date"),
+        # Provenance only (glider runs): the sink held while measuring.
+        # Displayed in the stored-curve description; never used at runtime.
+        "vs_fpm": data.get("vs_fpm"),
+        "xs": xs,
+        "ys": [y - ref for y in ys],
+    }
+
+
+def parse_trim_follow_family(value):
+    """Parse the stored trim-calibration setting into a speed-sorted family.
+
+    Single source of truth for the curve convention — the runtime property
+    setter AND any display/offline reader must go through here (hand-rolled
+    re-derivations of the runtime's math have rotted before: the takeover
+    baseline computed a false value for months).
+
+    Accepts the family form ``{"curves": [entry, ...]}``, the legacy
+    single-curve blob ``{"points": ...}``, a JSON string of either, or
+    'none'/empty. Returns a list of entries ``{ias_kt, t0, date, xs, ys, r}``
+    sorted by ias_kt (ys anchor-rebased per entry, see
+    :func:`_parse_trim_curve_entry`), or None when nothing is usable.
+    Entries within 0.5 kt of each other dedupe to the later one in payload
+    order (re-calibration semantics).
+
+    ``r`` is the positional track R(v) at each entry — where the trimmed
+    stick RESTS in follows-trim mode. Per adjacent speed pair the
+    displacement is the AVERAGE of the two curves' independent estimates of
+    the elevator-equivalent between their anchors (field data: the two
+    estimates agree within ~2%); the chain is normalized to 0 at the
+    median-index entry (the reference constant is sim-invisible — it rides
+    identically in the virtual offset and the spring center) and clamped to
+    +-1 WITH a warning: an extreme aircraft's follows-trim rest position
+    truncates at the stick limits rather than silently changing behavior.
+    """
+    if not value or value == 'none':
+        return None
+    try:
+        data = json.loads(value) if isinstance(value, str) else value
+        raw_entries = data["curves"] if "curves" in data else [data]
+        entries = []
+        for raw in raw_entries:
+            parsed = _parse_trim_curve_entry(raw)
+            if parsed is not None:
+                entries.append(parsed)
+    except (ValueError, KeyError, TypeError) as e:
+        logging.warning(f"Invalid trim-follow curve setting; ignoring ({e})")
+        return None
+    if not entries:
+        return None
+
+    # Sort by speed; near-identical speeds keep the later payload entry
+    # (stable sort preserves payload order within equal keys).
+    entries.sort(key=lambda e: e["ias_kt"])
+    deduped = []
+    for e in entries:
+        if deduped and abs(e["ias_kt"] - deduped[-1]["ias_kt"]) < 0.5:
+            deduped[-1] = e
+        else:
+            deduped.append(e)
+    entries = deduped
+
+    # Positional track: chain the averaged inter-anchor displacements.
+    # xs are absolute trim, ys anchor-rebased, so offs_a evaluated at b's
+    # anchor IS the displacement estimate S_a(t0_b - t0_a).
+    chain = [0.0]
+    for a, b in zip(entries, entries[1:]):
+        est_a = piecewise_linear(a["xs"], a["ys"], b["t0"])
+        est_b = -piecewise_linear(b["xs"], b["ys"], a["t0"])
+        chain.append(chain[-1] + (est_a + est_b) / 2.0)
+    ref = chain[len(entries) // 2]
+    for e, c in zip(entries, chain):
+        r = c - ref
+        if abs(r) > 1.0:
+            logging.warning(
+                f"Trim-follow positional track clamped at the stick limits "
+                f"for the {e['ias_kt']:.0f} kt calibration (R={r:+.2f}) — "
+                f"the follows-trim rest position truncates there")
+            r = clamp(r, -1.0, 1.0)
+        e["r"] = r
+    return entries
+
+
+def parse_trim_follow_curve(value):
+    """Legacy single-curve view of the stored setting: the median-speed
+    entry's anchor-referenced ``(xs, ys)``, or None. Superseded by
+    :func:`parse_trim_follow_family`; kept for transitional callers."""
+    fam = parse_trim_follow_family(value)
+    if fam is None:
+        return None
+    mid = fam[len(fam) // 2]
+    return mid["xs"], mid["ys"]
+
+
+def suggest_calibration_speeds(telem_data, sim):
+    """Suggest 2-3 trim-calibration speeds (knots, rounded to 5) from the
+    aircraft's declared speed envelope, or [] when the data is implausible.
+
+    Anchors (clean configuration — calibrations are config-specific):
+    LOW = 1.3 x clean stall (approach-margin factor: safely level-flyable,
+    solidly in the nose-up trim region). HIGH = the max LEVEL-FLIGHT speed,
+    not the red-line (most aircraft cannot hold Vne level): MSFS design
+    cruise VC capped at 0.85 x the red-line, X-Plane Vno capped the same
+    way. MIDDLE = the midpoint, only when the envelope is wide enough to
+    need it (high/low > 1.6). All telemetry sources are m/s (the sims'
+    kt/ft-per-s units are normalized upstream).
+
+    Guards degrade to fewer (or no) suggestions rather than ever returning
+    a confidently wrong number: MSFS's VS1 defaults to 0 when absent from
+    the flightmodel, VC can be an internal estimate, and X-Plane datarefs
+    can hold junk on oddball aircraft.
+    """
+    def pos(v):
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return None
+        return v if v > 0 else None
+
+    kt = 1.94384  # m/s -> knots
+    vs = level_max = redline = None
+    if sim == "MSFS":
+        ds = getattr(telem_data, "DesignSpeed", None)
+        if ds is not None and len(ds) >= 3:
+            level_max = pos(ds[0])   # VC (design cruise) — TAS-referenced
+            vs = pos(ds[2])          # VS1 (clean stall) — indicated
+        # VC (flightmodel.cfg cruise_speed) is TAS at the design cruise
+        # altitude, but suggestions are IAS targets: scale by the LIVE
+        # IAS/TAS ratio — the exact conversion for the air currently being
+        # flown in, no assumed altitude (and correctly altitude-aware:
+        # achievable IAS falls as the user climbs). Guarded to a sane band;
+        # outside it (or on the ground) the raw value stands, which field
+        # data shows is a good low-altitude approximation for GA anyway.
+        ratio = 1.0
+        ias = pos(getattr(telem_data, "IAS", None))
+        tas = pos(getattr(telem_data, "TAS", None))
+        if ias and tas and tas > 5.0 and 0.5 <= ias / tas <= 1.05:
+            ratio = ias / tas
+        if level_max is not None:
+            level_max *= ratio
+        redline = pos(getattr(telem_data, "RefMaxIAS", None))  # indicated: no scaling
+        if redline is None:
+            # The estimated Vne is VC-derived, so it is TAS-referenced too.
+            vne_kt = pos(getattr(telem_data, "Vne_kt", None))
+            redline = (vne_kt / kt) * ratio if vne_kt else None
+    elif sim == "XPLANE":
+        vs = pos(getattr(telem_data, "Vs", None))
+        # Vno is a structural LIMIT (top of the green arc), not a
+        # performance capability — draggy GA aircraft often cannot hold it
+        # in level flight (X-Plane's C172 tops out well below it). 0.9x
+        # errs conservative: an unreachable suggestion strands the user
+        # chasing a number; a slightly low one costs a few knots the
+        # blend's edge-clamping absorbs.
+        vno = pos(getattr(telem_data, "Vno", None))
+        level_max = 0.9 * vno if vno is not None else None
+        redline = pos(getattr(telem_data, "Vne", None))
+    if vs is None or level_max is None:
+        return []
+
+    low = 1.3 * vs * kt
+    high = level_max * kt
+    if redline:
+        high = min(high, 0.85 * redline * kt)
+    if low < 40.0 or high <= low * 1.15:
+        return []
+    speeds = [low, high]
+    if high / low > 1.6:
+        speeds.insert(1, (low + high) / 2.0)
+    rounded = [int(round(s / 5.0) * 5) for s in speeds]
+    out = [rounded[0]]
+    for s in rounded[1:]:
+        if s - out[-1] >= 15:   # comfortably clear of the replace window
+            out.append(s)
+    return out if len(out) >= 2 else []
+
+
+def trim_follow_blend(fam, t, ias_kt, include_r=True):
+    """Evaluate the multi-speed trim-follow offset at trim ``t`` (ElevTrimPct
+    space) and speed ``ias_kt`` (knots).
+
+    Bracketing interpolation between the two nearest calibrated speeds in
+    ANCHOR-ALIGNED space: the anchor t0(v) lerps, each bracket's shape is
+    looked up at the same anchor-relative position, and the shapes lerp —
+    which reconstructs translating-knee aircraft exactly where absolute-trim
+    lerping smears them (SR22T: 2.5x under-correction). Beyond the
+    calibrated speed range the exact lowest/highest calibration applies (no
+    extrapolation across speed; per-curve edge-slope extrapolation across
+    TRIM is unchanged). ``include_r`` folds in the positional track
+    (follows-trim mode); centered mode passes False. Result clamped +-1.
+    """
+    lo = hi = fam[-1]
+    w = 0.0
+    for i, e in enumerate(fam):
+        if ias_kt <= e["ias_kt"]:
+            hi = e
+            lo = fam[i - 1] if i > 0 else e
+            span = hi["ias_kt"] - lo["ias_kt"]
+            w = (ias_kt - lo["ias_kt"]) / span if span > 1e-9 else 0.0
+            break
+    t0v = lo["t0"] + w * (hi["t0"] - lo["t0"])
+    x = t - t0v   # anchor-relative position, shared by both brackets
+    s = piecewise_linear(lo["xs"], lo["ys"], lo["t0"] + x)
+    if hi is not lo:
+        s += w * (piecewise_linear(hi["xs"], hi["ys"], hi["t0"] + x) - s)
+    if include_r:
+        s += lo["r"] + w * (hi["r"] - lo["r"])
+    return clamp(s, -1.0, 1.0)
 
 
 def non_linear_scaling(x, min_val, max_val, curvature=1.0):
@@ -834,7 +1716,7 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     smooth_curve_enabled = curve_dict.get("smooth_curve_enabled", False)
 
     # Extract x and y values from points
-    x_values = np.array([p["x"] for p in points]) / conversion_factor  # Convert on factor
+    x_values = np.array([p["x"] for p in points]) * conversion_factor  # Convert curve points from user units to m/s
     y_values = np.array([p["y"] for p in points])
 
     # Handle out-of-bounds x_values
@@ -858,8 +1740,14 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     return float(interpolation(input_x))
 
 
-def get_gain_from_gs(json_string, input_gs):
-    settings = json.loads(json_string)
+def get_gain_from_gs(curve_settings, input_gs):
+    if isinstance(curve_settings, str):
+        settings = json.loads(curve_settings)
+    elif isinstance(curve_settings, dict):
+        settings = curve_settings
+    else:
+        raise ValueError("Invalid input: must be a JSON string or a dictionary.")
+
     curve_pos = settings.get("curve_pos", {})
     curve_neg = settings.get("curve_neg", {})
     gain_pos = settings.get('gain_pos') / 100
@@ -868,10 +1756,10 @@ def get_gain_from_gs(json_string, input_gs):
     interpolated_pos = round(float(interpolate_curve_y_point(curve_pos, input_gs) / 100) * gain_pos, 3)
     interpolated_neg = round(float(interpolate_curve_y_point(curve_neg, input_gs) / 100) * gain_neg, 3)
 
-    return {"pos": interpolated_pos, "neg": interpolated_neg}
+    return interpolated_pos, interpolated_neg
 
 
-def get_gain_from_speed(json_string, input_airspeed_ms):
+def get_gain_from_speed(curve_settings : str | dict, input_airspeed_ms):
     """
     Interpolates the % force input airspeed and the advanced spring curve settings passed.
 
@@ -882,16 +1770,20 @@ def get_gain_from_speed(json_string, input_airspeed_ms):
     Returns:
         dict: A dictionary containing the interpolated X and Y gain values as a factor (0...1).
     """
-    # Unit conversion factors
+    # Unit conversion factors (to m/s)
     UNIT_CONVERSIONS = {
-        "kt": 1.94384,
-        "mph": 2.23694,
-        "kph": 3.6,
+        "kt": conv.kt2ms,
+        "mph": conv.mph2ms,
+        "kph": conv.kmh2ms,
         "m/s": 1.0,
     }
 
-    # Parse JSON string
-    settings = json.loads(json_string)
+    if isinstance(curve_settings, dict):
+        settings = curve_settings
+    else:
+        # Parse JSON string
+        settings = json.loads(curve_settings)
+    assert settings is not None, "Invalid settings for speed curve."
 
     # Extract curves and units
     curve_x = settings.get("curve_x", {})
@@ -1053,6 +1945,110 @@ class Derivative:
         var += derivative
 
         return var
+    
+class Dampener(Derivative):
+    def __init__(self, filter_hz=5, k=0.1):
+        super().__init__(filter_hz)
+        self.k = k
+
+    def update(self, value, derivative_hz=5, derivative_k=0.1):
+        # update filters if needed
+        if self.lpf:
+            if self.lpf.cutoff_freq_hz != derivative_hz:
+                self.lpf.cutoff_freq_hz = derivative_hz
+        if derivative_k != self.k:
+            self.k = derivative_k
+
+        derivative = -super().update(value) * self.k
+        value += derivative
+        return value
+
+
+class PID:
+    """Minimal dt-aware PID controller.
+
+    Written for the trim-calibration leveling loops but generic. Pass ``dt``
+    explicitly to :meth:`update` for deterministic stepping (fixed-rate loops or
+    unit tests); leave it ``None`` to measure wall-clock dt via
+    ``time.perf_counter()``.
+
+    Features:
+      - output clamping (``output_limits``)
+      - conditional-integration anti-windup: the integral only accumulates when
+        doing so would not drive an already-saturated output further into
+        saturation
+      - optional low-pass filtered derivative-on-error term
+    """
+
+    def __init__(self, kp=0.0, ki=0.0, kd=0.0, output_limits=(-1.0, 1.0),
+                 integral_limit=None, derivative_lpf_hz=None):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.output_limits = output_limits
+        # Optional symmetric clamp on the integral term contribution (ki * integral).
+        self.integral_limit = integral_limit
+        self._d_lpf = LowPassFilter(derivative_lpf_hz) if derivative_lpf_hz else None
+        self.reset()
+
+    def reset(self):
+        self._integral = 0.0
+        self._prev_error = None
+        self._prev_time = None
+        self.output = 0.0
+
+    def set_gains(self, kp, ki, kd, preserve_integral_term=True):
+        """Change gains in place (e.g. adaptive backoff on a live loop).
+
+        With ``preserve_integral_term`` the integral state is rescaled so the
+        integral's output contribution (``ki * integral``) does not step when
+        ``ki`` changes — that contribution typically carries the steady-state
+        component holding the plant, and a step there jolts the output.
+        """
+        if preserve_integral_term and self.ki != ki:
+            if ki:
+                self._integral *= self.ki / ki
+            else:
+                self._integral = 0.0
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+
+    def update(self, error, dt=None):
+        now = time.perf_counter()
+        if dt is None:
+            dt = 0.0 if self._prev_time is None else now - self._prev_time
+        self._prev_time = now
+        dt = max(dt, 0.0)
+
+        p_term = self.kp * error
+
+        # Derivative on error (optionally low-pass filtered).
+        if self._prev_error is None or dt <= 0:
+            d_raw = 0.0
+        else:
+            d_raw = (error - self._prev_error) / dt
+        self._prev_error = error
+        if self._d_lpf is not None:
+            d_raw = self._d_lpf.update(d_raw)
+        d_term = self.kd * d_raw
+
+        pd = p_term + d_term
+        new_integral = self._integral + error * dt
+        lo, hi = self.output_limits
+
+        # Conditional-integration anti-windup: predict saturation from the full
+        # output; only commit the new integral if it would not push a saturated
+        # output further out.
+        raw = pd + self.ki * new_integral
+        if not ((raw > hi and error > 0) or (raw < lo and error < 0)):
+            self._integral = new_integral
+            if self.integral_limit is not None and self.ki:
+                max_i = abs(self.integral_limit / self.ki)
+                self._integral = clamp(self._integral, -max_i, max_i)
+
+        self.output = clamp(pd + self.ki * self._integral, lo, hi)
+        return self.output
 
 
 class DirectionModulator:
@@ -1152,6 +2148,7 @@ class Dispenser:
 class Teleplot:
     def __init__(self):
         self.sock = None
+        self.enabled = False
 
     def configure(self, address: str):
         try:
@@ -1181,12 +2178,96 @@ class Teleplot:
 teleplot = Teleplot()
 
 
-def analyze_il2_config(path, port=34385, window=None):
+def _il2_config_diff_table(section_name, existing: dict, proposed: dict) -> str:
+    # existing is None when the section was missing entirely from startup.cfg
+    keys = list(proposed.keys())
+    if existing:
+        keys += [k for k in existing.keys() if k not in keys]
+
+    rows = ""
+    for k in keys:
+        old_v = existing.get(k, "<i>(missing)</i>") if existing else "<i>(missing)</i>"
+        new_v = html.escape(str(proposed.get(k, "-")))
+        old_v = old_v if old_v.startswith("<i>") else html.escape(str(old_v))
+        changed = existing is None or k not in existing or existing.get(k) != proposed.get(k)
+        style = "color:#e08a2b; font-weight:bold;" if changed else ""
+        rows += (
+            f"<tr><td style='padding:2px 8px;'>{html.escape(k)}</td>"
+            f"<td style='padding:2px 8px;'>{old_v}</td>"
+            f"<td style='padding:2px 8px;{style}'>&rarr;&nbsp;{new_v}</td></tr>"
+        )
+
+    return f"""
+    <p style='margin-top:10px; margin-bottom:2px;'><b>'{section_name}'</b></p>
+    <table cellspacing='0' style='font-family:Consolas,monospace; font-size:9.5pt;'>
+        <tr><th align='left' style='padding:2px 8px;'>Key</th>
+            <th align='left' style='padding:2px 8px;'>Existing</th>
+            <th align='left' style='padding:2px 8px;'>Proposed</th></tr>
+        {rows}
+    </table>
+    """
+
+
+def il2_korea_game_root(root_path):
+    """Resolve IL-2 Korea's game directory under the configured install root.
+
+    The standalone release nests the game one level down
+    (``<root>/game/data/startup.cfg``); the Steam release ("IL2Series")
+    drops that level (``<root>/data/startup.cfg``). Returns whichever
+    layout actually contains ``data/startup.cfg``; a user pointing at the
+    standalone ``game`` folder itself also resolves. Falls back to the
+    historical standalone layout so error messages keep naming the
+    expected default location.
+    """
+    root_path = root_path or ''
+    for sub in ('game', ''):
+        candidate = os.path.join(root_path, sub) if sub else root_path
+        if os.path.isfile(os.path.join(candidate, 'data', 'startup.cfg')):
+            return candidate
+    return os.path.join(root_path, 'game')
+
+
+def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
+    """
+    Look up this device's DirectInput-style attach ordinal from IL-2 Korea's
+    'known.devices.json', for matching the 'devNo' field in FFB telemetry records.
+
+    known.devices.json entries carry an 'ident' field formatted as '<vid>_<pid>' (lowercase
+    hex, no separators) and a 'lastAttachedId' which reflects the device's enumeration order -
+    this is distinct from 'deviceId', which is the user-facing control-mapping slot in IL-2.
+
+    Returns None if the file is missing, malformed, or no entry matches the given VID/PID.
+    """
+    known_devices_path = os.path.join(
+        il2_korea_game_root(il2_korea_path), 'data', 'Input', 'known.devices.json')
+    if not os.path.exists(known_devices_path):
+        logging.warning(f"IL2 Korea known.devices.json not found at: {known_devices_path}")
+        return None
+
+    try:
+        with open(known_devices_path, 'r', encoding='utf-8') as f:
+            known_devices = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logging.warning(f"Unable to read IL2 Korea known.devices.json: {e}")
+        return None
+
+    target_ident = f"{vendor_id:04x}_{product_id:04x}"
+    for guid, entry in known_devices.get('knownDevices', {}).items():
+        if entry.get('ident') == target_ident:
+            return entry.get('lastAttachedId')
+
+    logging.warning(f"No matching entry for device {target_ident} in IL2 Korea known.devices.json")
+    return None
+
+
+def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2", korea=False):
     config_data = defaultdict(dict)
-    file_path = os.path.join(path, "data\\startup.cfg")
+
+    # file_path = os.path.join(path, "data\\startup.cfg")
+    # file_path_k = os.path.join(path, "game\\data\\startup.cfg")
     if not os.path.exists(file_path):
         QMessageBox.warning(window, "TelemFFB IL-2 Config Check",
-                            f"Unable to find Il-2 configuration file at: {path}\n\nPlease verify the installed path and update the TelemFFB configuration file")
+                            f"Unable to find Il-2 configuration file at: <{path}>\n\nPlease verify the installed path and update the IL2 system settings")
         return
     current_section = None
     ref_addr = '127.255.255.255'
@@ -1196,6 +2277,7 @@ def analyze_il2_config(path, port=34385, window=None):
     ref_port = f'{port}'
     telem_proposed = {}
     motion_proposed = {}
+    ffb_proposed = {}
     telemetry_reference = {
         'addr': '127.255.255.255',
         'decimation': '1',
@@ -1208,8 +2290,15 @@ def analyze_il2_config(path, port=34385, window=None):
         'enable': 'true',
         'port': f'{port}'
     }
+    ffb_reference = {
+        'addr': '127.255.255.255',
+        'decimation': '1',
+        'enable': 'true',
+        'port': f'{port}'
+    }
     telem_config = None
     motion_config = None
+    ffb_config = None
     with open(file_path, 'r', encoding="utf-8") as config_file:
         lines = config_file.readlines()
 
@@ -1316,38 +2405,82 @@ def analyze_il2_config(path, port=34385, window=None):
                         motion_proposed = insert_dict_item(motion_proposed, 'enable', f'true', 'port', before=True)
                         motion_match = 0
 
-    if telem_match and motion_match:
+    ffb_match = 1
+    ffb_exists = 0
+    if korea:
+        ffb_exists = 0
+        if "ffbdevice" not in config_data:
+            ffb_proposed = ffb_reference
+            ffb_match = 0
+        else:
+            ffb_match = 1
+            ffb_exists = 1
+            ignore_port = False
+            ffb_config = config_data["ffbdevice"]
+            ffb_proposed = {}
+            for k, v in ffb_config.items():
+                ffb_proposed[k] = v.strip("\'\"")
+                ffb_config[k] = v.strip("\'\"")
+
+            for k, v in ffb_proposed.items():
+                ref_v = ffb_reference.get(k, 'null')
+                if v != ref_v:
+                    if k == 'addr':
+                        cur_addr1 = ffb_proposed.get("addr1", "null")
+                        if cur_addr1 != ref_addr1:
+                            if "addr1" in ffb_proposed:
+                                ffb_proposed["addr1"] = ref_addr1
+                            else:
+                                ffb_proposed = insert_dict_item(ffb_proposed, 'addr1', ref_addr1, 'addr', before=False)
+                            ffb_match = 0
+                        ignore_port = True
+                    if k == 'port' and not ignore_port:
+                        if ffb_proposed[k] != ref_port:
+                            ffb_proposed["port"] = ref_port
+                            ffb_match = 0
+                    if k == 'decimation':
+                        if ffb_proposed[k] != ref_decimation:
+                            ffb_proposed = insert_dict_item(ffb_proposed, 'decimation', '1', 'enable', before=True)
+                            ffb_match = 0
+                    if k == 'enable':
+                        if ffb_proposed[k] != ref_enable:
+                            ffb_proposed = insert_dict_item(ffb_proposed, 'enable', 'true', 'port', before=True)
+                            ffb_match = 0
+
+    if telem_match and motion_match and ffb_match:
         return
     else:
         telem_message = QMessageBox(parent=window)
         telem_message.setIcon(QMessageBox.Icon.Question)
         telem_message.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        telem_message.setWindowTitle("TelemFFB IL-2 Config")
+        telem_message.setWindowTitle(f"TelemFFB {sim_name} Config")
 
-        if not telem_match or not motion_match:
+        if not telem_match or not motion_match or not ffb_match:
             pop = f"""
-            The telemetry and/or motion device configuration in the IL-2 startup.cfg is missing or incorrect and may prohibit TelemFFB from receiving data
-    
-            Would you like to automatically adjust the configuration per the following?
+            <p>The telemetry, motion and/or FFB device configuration in the <b>{html.escape(sim_name)}</b> <b>startup.cfg</b>
+            is missing or incorrect and may prohibit TelemFFB from receiving data.</p>
+            <p style='font-family:Consolas,monospace; font-size:9pt;'>File = {html.escape(file_path)}</p>
+            <p>Would you like to automatically adjust the configuration per the following?</p>
             """
 
             if not telem_match or not telem_exists:
-                pop = pop + f"""
-                Existing \'telemetrydevice\': {telem_config}
-                Proposed \'telemetrydevice\': {telem_proposed}
-                """
+                pop += _il2_config_diff_table('telemetrydevice', telem_config, telem_proposed)
 
             if not motion_match or not motion_exists:
-                pop = pop + f"""
-                Existing \'motiondevice\': {motion_config}
-                Proposed \'motiondevice\': {motion_proposed}
-                """
-            pop = pop + "\n\n***** - Please ensure Il-2 is not running before selecting 'Yes' - *****"
+                pop += _il2_config_diff_table('motiondevice', motion_config, motion_proposed)
+
+            if korea and (not ffb_match or not ffb_exists):
+                pop += _il2_config_diff_table('ffbdevice', ffb_config, ffb_proposed)
+
+            pop += "<p style='color:#d9534f; font-weight:bold; margin-top:12px;'>Please ensure IL-2 is not running before selecting 'Yes'</p>"
+        telem_message.setTextFormat(Qt.TextFormat.RichText)
         telem_message.setText(pop)
         ans = telem_message.exec()
         if ans == QMessageBox.StandardButton.Yes:
             config_data['telemetrydevice'] = telem_proposed
             config_data['motiondevice'] = motion_proposed
+            if korea:
+                config_data['ffbdevice'] = ffb_proposed
             try:
                 write_il2_config(file_path, config_data)
             except Exception as e:
@@ -1430,6 +2563,8 @@ def get_dcs_variant():
     Returns:
         str | None
     """
+    import winreg
+
     logging.info("DCS Variant Check: Starting variant discovery via registry and dcs_variant.txt")
 
     # Try OpenBeta first, then Stable.
@@ -1484,7 +2619,25 @@ def get_dcs_variant():
     return None
 
 
+def _check_dcrealistic_autostart(export_data, export_lua_path, window):
+    """Warn if DCRealistic or Simhaptic (rkApps) autostart is active in Export.lua (known to break FFB spring effects in DCS)."""
+    for line in export_data.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("--"):
+            continue
+        if "DCREALISTIC_AUTOSTART" in stripped or "SIMHAPTIC_AUTOSTART" in stripped:
+            logging.error(
+                f"The DCRealistic or SimHaptic autostart feature is enabled in:\n{export_lua_path}\n\n"
+                "This is known to cause FFB spring effects to fail on aircraft load in DCS.\n\n"
+                "If you experience issues with the spring effect not starting after loading into "
+                "an aircraft in DCS, disable the DCRealistic autostart option in the DCRealistic "
+                "settings.\n\n"
+                "This is a warning and does not affect the operation of TelemFFB."
+            )
+
 def _prepare_dcs_export_context():
+    import telemffb.winpaths as winpaths
+
     """Resolve shared paths and targets for DCS export integration."""
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
     logging.info(f"DCS Export Installer: Saved Games directory detected: {saved_games}")
@@ -1550,6 +2703,8 @@ def install_dcs_export_module_lua(window):
         except FileNotFoundError:
             export_data = ""
             logging.info(f"DCS Export Installer: No Export.lua found at {export_lua_path}; will create if needed")
+
+        _check_dcrealistic_autostart(export_data, export_lua_path, window)
 
         updated = False
 
@@ -1698,6 +2853,8 @@ def install_dcs_export_module_dll(window):
         except FileNotFoundError:
             export_data = ""
             logging.info(f"DCS Export Installer: No Export.lua found at {export_lua_path}; will create if needed")
+
+        _check_dcrealistic_autostart(export_data, export_lua_path, window)
 
         updated = False
 
@@ -1890,19 +3047,33 @@ def parseAnsiText(ansi_text):
     output = []
     for i in parsed.instructions():
         if isinstance(i, stransi.SetColor):
-            rgb = i.color.hex
-            if i.role == stransi.color.ColorRole.BACKGROUND:
-                current_format.setBackground(QColor(rgb.hex_code))
-            elif i.role ==  stransi.color.ColorRole.FOREGROUND:
-                current_format.setForeground(QColor(rgb.hex_code))
+            if not i.color:
+                current_format = QTextCharFormat()
+            else:
+                rgb = i.color.hex
+                if i.role == stransi.color.ColorRole.BACKGROUND:
+                    current_format.setBackground(QColor(rgb.hex_code))
+                elif i.role ==  stransi.color.ColorRole.FOREGROUND:
+                    current_format.setForeground(QColor(rgb.hex_code))
         elif isinstance(i, stransi.SetAttribute):
             match i.attribute:
                 case stransi.attribute.Attribute.BOLD:
                     current_format.setFontWeight(100)
+                case stransi.attribute.Attribute.DIM:
+                    cl = current_format.foreground().color()
+                    cl.setAlpha(128)
+                    current_format.setForeground(cl)
+                case stransi.attribute.Attribute.NEITHER_BOLD_NOR_DIM:
+                    current_format.clearProperty(QTextCharFormat.Property.FontWeight)
+                    current_format.clearForeground()
                 case stransi.attribute.Attribute.ITALIC:
-                    current_format.setFontItalic(i.is_on())
+                    current_format.setFontItalic(True)
+                case stransi.attribute.Attribute.NOT_ITALIC:
+                    current_format.setFontItalic(False)
                 case stransi.attribute.Attribute.UNDERLINE:
-                    current_format.setFontUnderline(i.is_on())
+                    current_format.setFontUnderline(True)
+                case stransi.attribute.Attribute.NOT_UNDERLINE:
+                    current_format.setFontUnderline(False)
                 case stransi.attribute.Attribute.NORMAL:
                     current_format = QTextCharFormat()
         else:
@@ -1963,6 +3134,166 @@ class OutLog(QtCore.QObject):
     def flush(self):
         pass
 
+
+class DedupHandler(logging.Handler):
+    """Handler that suppresses immediate duplicate log records and emits
+    a summary when a different message arrives or periodically while the
+    same message keeps repeating.
+
+    It forwards records to one or more inner handlers passed during
+    construction. Thread-safe.
+    """
+
+    def __init__(self, handlers=None, period_seconds: float = 5.0):
+        super().__init__()
+        self.handlers = handlers or []
+        self._lock = threading.Lock()
+        self._last_key = None
+        self._count = 0
+        self._last_record = None
+        self._first_ts = 0.0
+        self._last_periodic_emit_ts = 0.0
+        self.period_seconds = float(period_seconds)
+
+    def _normalize_message(self, record: logging.LogRecord) -> str:
+        """
+        Return a normalized, *uncolored* message string for de-duplication.
+
+        - First attempt to collapse msg+args via record.getMessage().
+        - If that fails (e.g. bad % formatting), fall back to record.msg.
+        - In either case, clear record.args so future getMessage() calls are safe.
+        """
+        # First, try to safely collapse msg+args into a single string
+        try:
+            txt = record.getMessage() or ""
+            # Now that we've successfully formatted, freeze it and drop args
+            record.msg = txt
+            record.args = ()
+        except Exception as e:
+            # getMessage() itself failed (e.g. "not all arguments converted")
+            # Fall back to the raw msg, but still clear args so it can't blow up later.
+            record.args = ()
+            try:
+                txt = str(record.msg) if record.msg is not None else ""
+            except Exception:
+                # Last-resort fallback
+                txt = f"<unformattable log message: {e}>"
+
+        # At this point txt is *some* string, args is empty, so no more % formatting.
+        parts = parseAnsiText(txt)
+        return "".join(t for t, _ in parts)
+
+    def _make_key(self, record: logging.LogRecord):
+        # Key by level, logger name and normalized message
+        return (record.levelno, record.name, self._normalize_message(record))
+
+    def _make_summary_record(self, base_record: logging.LogRecord, repeated_count: int, periodic: bool = False) -> logging.LogRecord:
+        if periodic:
+            msg = f"{self._normalize_message(base_record)} (message repeated {repeated_count} times so far)"
+        else:
+            msg = f"{self._normalize_message(base_record)} (message repeated {repeated_count} times)"
+        new_rec = logging.LogRecord(
+            name=base_record.name,
+            level=base_record.levelno,
+            pathname=base_record.pathname,
+            lineno=base_record.lineno,
+            msg=msg,
+            args=(),
+            exc_info=None,
+            func=base_record.funcName,
+        )
+        # preserve timestamp
+        new_rec.created = base_record.created
+        return new_rec
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            key = self._make_key(record)
+            now = time.time()
+            with self._lock:
+                if key == self._last_key:
+                    # same as previous: increment and buffer
+                    self._count += 1
+                    self._last_record = record
+
+                    # On first repeat, set first timestamp if not set
+                    if not self._first_ts:
+                        self._first_ts = now
+
+                    # If enough time passed since last periodic emit, emit a periodic summary
+                    if self.period_seconds and (now - self._last_periodic_emit_ts) >= self.period_seconds and self._count > 1:
+                        summary = self._make_summary_record(self._last_record, self._count, periodic=True)
+                        for h in self.handlers:
+                            try:
+                                h.emit(summary)
+                            except Exception:
+                                pass
+                        self._last_periodic_emit_ts = now
+
+                    return
+
+                # Different message: if previous one was repeated, emit final summary
+                if self._count > 1 and self._last_record is not None:
+                    summary = self._make_summary_record(self._last_record, self._count, periodic=False)
+                    for h in self.handlers:
+                        try:
+                            h.emit(summary)
+                        except Exception:
+                            pass
+
+                # Forward current record to inner handlers
+                for h in self.handlers:
+                    try:
+                        h.emit(record)
+                    except Exception:
+                        pass
+
+                # update tracking state
+                self._last_key = key
+                self._count = 1
+                self._last_record = record
+                self._first_ts = now
+                self._last_periodic_emit_ts = now
+        except Exception:
+            # In case of any failure in dedup logic, fallback to best-effort forwarding
+            for h in self.handlers:
+                try:
+                    h.emit(record)
+                except Exception:
+                    pass
+
+    def flush(self):
+        # flush inner handlers if they support flush
+        for h in self.handlers:
+            try:
+                h.flush()
+            except Exception:
+                pass
+
+    def close(self):
+        # Emit pending summary if any
+        try:
+            with self._lock:
+                if self._count > 1 and self._last_record is not None:
+                    summary = self._make_summary_record(self._last_record, self._count)
+                    for h in self.handlers:
+                        try:
+                            h.emit(summary)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        # close inner handlers
+        for h in self.handlers:
+            try:
+                h.close()
+            except Exception:
+                pass
+
+        super().close()
+
+
 class FetchLatestVersion(QThread):
     workers = []
 
@@ -1980,8 +3311,6 @@ class FetchLatestVersion(QThread):
 
     def run(self):
         try:
-            ctx = ssl._create_unverified_context()
-
             current_version = get_version()
             latest_version = None
             latest_url = None
@@ -1993,10 +3322,9 @@ class FetchLatestVersion(QThread):
                 logging.info("Running from source with locally modified files, skipping version check")
             else:
                 try:
-                    with urllib.request.urlopen(send_url, context=ctx, ) as req:
-                        latest = json.loads(req.read().decode())
-                        latest_version = latest["version"]
-                        latest_url = url + latest["filename"]
+                    latest = fetch_json_url(send_url, timeout=10)
+                    latest_version = latest["version"]
+                    latest_url = url + latest["filename"]
                 except Exception as e:
                     logging.exception(f"Error checking latest version status: {url}")
                     self.error_signal.emit(str(e))
@@ -2048,6 +3376,8 @@ def get_version():
         return G.release_version_str
     if G.dev_build:
         return G.dev_build_str
+    if G.beta_build:
+        return G.beta_build_str
 
     ver = "UNKNOWN"
     try:
@@ -2350,18 +3680,28 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
 
 
     def _get_current_device_ident(pid):
-        """Get the device identifier for the current device.
-        
+        """Get the device identifier for the device with the given USB PID.
+
+        `G.device_info` only describes the device bound to *this* process/instance.
+        When the master instance is validating a profile for a different device type
+        (e.g. a child instance's pedals while the master owns the joystick), the
+        target device's ident has to come from `G.instance_dev_dict`, which the
+        master populates at startup from a system-wide enumeration of all connected
+        Rhino devices (see `_enumerate_and_log_devices` in main.py) and is keyed by
+        USB PID, not by which process opened the device.
+
         Args:
             pid (int): Device PID
             
         Returns:
             str: Device identifier
         """
-        if G.master_instance:
-            return G.instance_dev_dict[pid].ident
-        else:
-            return G.device_ident
+        dev_info = G.instance_dev_dict.get(pid)
+        if dev_info is not None:
+            return dev_info.ident
+        if G.device_info and G.device_info.product_id == pid:
+            return G.device_info.ident
+        return G.device_info.ident if G.device_info else "UnknownDevice"
 
 
     def _show_error_message(title, message, silent, window):
@@ -2400,13 +3740,15 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
     
     # Step 3: Validate PID matching
     if cfg_pid != pid:
+        target_device_ident = _get_current_device_ident(pid)
         error_msg = (
             f"The VPforce Configurator file does not match the target device:\n\n"
             f"File: {file_path}\n\n"
-            f"Current device:\n"
+            f"Target device:\n"
             f"  Type: {dev_type}\n"
-            f"  PID: {pid:04X}\n\n"
-            f"Profile device:\n"
+            f"  PID: {pid:04X}\n"
+            f"  Name: {target_device_ident}\n\n"
+            f"Profile settings:\n"
             f"  PID: {cfg_pid:04X}\n"
             f"  Name: {cfg_device_name}\n"
             f"  Serial: {cfg_serial}"
@@ -2485,6 +3827,8 @@ def load_custom_userconfig(new_path=""):
 
 
 def upload_vpconf_profile(config_filepath, serial):
+    from .namedmutex import NamedMutex
+
     settings = QSettings("VPforce", "RhinoFFB")
     vpconf_path = settings.value("path")
 
@@ -2496,23 +3840,40 @@ def upload_vpconf_profile(config_filepath, serial):
         if not os.path.isfile(config_filepath):
             logging.error(f"Error loading VPforce Configurator Profile: ({config_filepath}) - The file does not exist! ")
             return
-
-        if not validate_vpconf_profile(config_filepath, G.device_usbpid, G.device_type, silent=True):
+        
+        assert G.device_info is not None, "Device info must be set before uploading profile"
+        if not validate_vpconf_profile(config_filepath, G.device_info.product_id, G.device_type, silent=True):
             logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
             return
 
         logging.info(f"upload_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
         G.current_vpconf_profile = config_filepath
-        G.main_window.status_container.request_set_active_vpconf.emit(config_filepath)
+        # Scope-aware: only updates the indicator if this device is the
+        # selected config scope (a master scoped to a child keeps showing the
+        # child's reported state; ours shows when the user switches back).
+        if G.main_window is not None:
+            G.main_window.refresh_scope_status_indicators(force=True)
 
         def exec():
             # Use NamedMutex to ensure only one instance of the configurator is executed at a time
             # This might help prevent issues with libusb race conditions when configurator tries to enumerate devices
-            with NamedMutex("vpconf_mutex", acquired=True):
-                ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
-                logging.info(f"VPForce Configurator exited with code {ret}")
+            try:
+                with NamedMutex("vpconf_mutex", acquired=True):
+                    G.vpconf_init_pending = True
+                    ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+                    logging.info(f"VPForce Configurator exited with code {ret}")
+            finally:
                 G.vpconf_init_pending = False
-
+                # Deliver any telemetry frame that arrived while frames were
+                # suspended — in the MSFS menus it is the ONLY frame there is
+                # (stop latch), and losing it meant no aircraft until a
+                # camera-state change.
+                tm = getattr(G, "telem_manager", None)
+                if tm is not None:
+                    try:
+                        tm.flush_deferred_startup_frame()
+                    except Exception:
+                        logging.exception("deferred startup frame flush failed")
 
         thread = threading.Thread(target=exec)
         thread.start()
@@ -2736,3 +4097,20 @@ def hexdump(src, length=16, sep='.'):
 
     return ("\n".join(lines))
 
+def expocurve(x, k):
+    # expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))
+    #       for negative k: y = (1+k)x + -k(e^(a(x-1))-e^(-a)) / (1-e^(-a))
+    #   x = orig pct_max
+    #   y = new pct_max
+    #   k = expo value 0-1
+    #   a = alpha, controls how much to bend the curve.
+    #       a=5.5 gives approx 2x increase at 25% orig pct_max with k=0.5, 3x at 25% with k=1
+    #               and 1/2x decrease with k=-0.5, 1/3x with k=-1 at 75%
+    newvalue = 0
+    expo_a = 5.5  # alpha
+    if k >= 0:
+        newvalue = (1 - k) * x + k * (1 - math.exp(-expo_a * x)) / (1 - math.exp(-expo_a))
+    else:
+        newvalue = (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
+    #print(f'expo input:{x} k:{k} output:{newvalue}')
+    return newvalue

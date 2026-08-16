@@ -17,20 +17,22 @@
 #
 
 
+import ipaddress
 import json
 import logging
 import os
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIntValidator, QIcon, QPixmap
-from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption
+from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
+from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption
 
 from . import globals as G
 from . import utils
 from .ui.Ui_SystemDialog import Ui_SystemDialog
 from .utils import validate_vpconf_profile, HiDpiPixmap
-
+from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
+from .custom_widgets import FFBDeviceListModel
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None,):
@@ -49,12 +51,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.addButton(self.rb_master_c, id=3)
         self.master_button_group.addButton(self.rb_master_t, id=4)
 
+        # depreciate this option
+        self.focus_pauseIL2.setChecked(False)
+        self.focus_pauseIL2.setVisible(False)
+
         # Add tooltips
         self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
         self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
-        self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
+        # self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
         self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
         self.lab_pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
+        self.pathIL2_K.setToolTip('The root path where IL-2 Korea is installed')
+        self.lab_pathIL2_2.setToolTip('The root path where IL-2 Korea is installed')
         self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
         self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
         self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
@@ -88,7 +96,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.setTabIcon(self.XPLANE_TAB, self.XPLANE_ICON_DISABLED)
 
         # IL2
-        IL2_PIXMAP = HiDpiPixmap(':/image/icon_IL2.png')
+        IL2_PIXMAP = HiDpiPixmap(':/image/icon_IL2.png') if G.useDarkMode else HiDpiPixmap(':/image/icon_IL2_lm.png')
         self.IL2_ICON_ENABLED, self.IL2_ICON_DISABLED = self.make_icons(IL2_PIXMAP, style)
         self.IL2_TAB = self.simTabWidget.indexOf(self.tab_IL2)
         self.simTabWidget.setTabText(self.IL2_TAB, "")
@@ -146,6 +154,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.tabWidget.setCurrentIndex(0)
         self.simTabWidget.setCurrentIndex(0)
+        
 
         # Connect signals to slots
         self.cb_logPrune.stateChanged.connect(self.toggle_log_prune_widgets)
@@ -156,6 +165,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableBMS.stateChanged.connect(self.toggle_bms_widgets)
         self.browseXPLANE.clicked.connect(self.select_xplane_directory)
         self.browseIL2.clicked.connect(self.select_il2_directory)
+        self.browseIL2_K.clicked.connect(self.select_il2_directory)
         self.buttonBox.accepted.connect(self.save_settings)
         self.resetButton.clicked.connect(self.reset_settings)
         self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
@@ -165,6 +175,26 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
         self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
+
+        self.validateIL2.clicked.connect(self.toggle_il2_path)
+        self.validateIL2_K.clicked.connect(self.toggle_il2_path)
+
+        self.il2_fwd_model = QStandardItemModel(0, 5, self)
+        self.il2_fwd_model.setHorizontalHeaderLabels(["IP", "Port", "Telem", "Motion", "FFB"])
+        self.il2_fwd_table.setModel(self.il2_fwd_model)
+        self.il2_fwd_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.il2_fwd_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.il2_fwd_table.horizontalHeader().setStretchLastSection(True)
+        self.pb_add_dest.clicked.connect(self.add_il2_fwd_dest)
+        self.pb_delete_dest.clicked.connect(self.delete_il2_fwd_dest)
+        self.il2_fwd_table.selectionModel().selectionChanged.connect(self.update_il2_fwd_delete_enabled)
+        self.udp_ip.textChanged.connect(self.update_il2_fwd_add_enabled)
+        self.udp_port.textChanged.connect(self.update_il2_fwd_add_enabled)
+        self.cb_telem.stateChanged.connect(self.update_il2_fwd_add_enabled)
+        self.cb_motion.stateChanged.connect(self.update_il2_fwd_add_enabled)
+        self.cb_ffb.stateChanged.connect(self.update_il2_fwd_add_enabled)
+        self.il2_fwd_enable.stateChanged.connect(self.toggle_il2_fwd_widgets)
+
         for button in self.buttonBox.buttons():
             button.setMinimumWidth(60)
 
@@ -172,12 +202,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.buttonChildSettings.setVisible(False)
 
         # Set initial state
-        self.toggle_log_prune_widgets()
-        self.toggle_dcs_widgets()
-        self.toggle_il2_widgets()
-        self.toggle_xplane_widgets()
-        self.toggle_msfs_widgets()
-        self.toggle_al_widgets()
+        # self.toggle_log_prune_widgets()
+        # self.toggle_dcs_widgets()
+        # self.toggle_il2_widgets()
+        # self.toggle_xplane_widgets()
+        # self.toggle_msfs_widgets()
+        # self.toggle_al_widgets()
+
         self.parent_window = parent
         # Load settings from the registry and update widget states
         self.current_al_dict = {}
@@ -189,6 +220,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.themeButtonGroup.setId(self.rb_SystemTheme, 2)
 
         self.load_settings()
+
+        self.toggle_log_prune_widgets()
+        self.toggle_dcs_widgets()
+        self.toggle_il2_widgets()
+        self.toggle_xplane_widgets()
+        self.toggle_msfs_widgets()
+        self.toggle_al_widgets()
 
         int_validator = QIntValidator()
         self.tb_logPrune.setValidator(int_validator)
@@ -216,6 +254,28 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_t.setObjectName('headless_t')
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
+
+        # add PID textboxes as attribute to device selection combos
+        self.cb_select_j._tb_box = self.tb_pid_j
+        self.cb_select_p._tb_box = self.tb_pid_p
+        self.cb_select_c._tb_box = self.tb_pid_c
+        self.cb_select_t._tb_box = self.tb_pid_t
+
+        self.cb_select_j._autolaunch_cb = self.cb_al_enable_j
+        self.cb_select_p._autolaunch_cb = self.cb_al_enable_p
+        self.cb_select_c._autolaunch_cb = self.cb_al_enable_c
+        self.cb_select_t._autolaunch_cb = self.cb_al_enable_t
+
+        self.cb_select_j._startmin_cb = self.cb_min_enable_j
+        self.cb_select_p._startmin_cb = self.cb_min_enable_p
+        self.cb_select_c._startmin_cb = self.cb_min_enable_c
+        self.cb_select_t._startmin_cb = self.cb_min_enable_t
+
+        self.cb_select_j._headless_cb = self.cb_headless_j
+        self.cb_select_p._headless_cb = self.cb_headless_p
+        self.cb_select_c._headless_cb = self.cb_headless_c
+        self.cb_select_t._headless_cb = self.cb_headless_t
+
 
 
 
@@ -260,6 +320,211 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.tabBar().setDocumentMode(True)
 
         self.select_enabled_sim()
+
+        # pending device path changes (only written on Save)
+        self._pending_devpaths = {}
+
+        self.populateUSBSelectors()
+
+    def populateUSBSelectors(self):
+        # Populate the USB device selectors with currently connected devices
+        devices = FFBRhino.enumerate()
+
+        combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
+
+        model = FFBDeviceListModel(devices)
+        for cb in combo_boxes:
+            cb.setModel(model)
+            # Ensure the combobox shows the display role text but we can fetch the DeviceInfo from the model via UserRole
+            cb.setModelColumn(0)
+            # clear any existing items so the view updates cleanly
+            # (when using setModel, clear isn't necessary but keep for safety)
+            # store a reference so the model isn't garbage-collected
+            cb._ffb_device_model = model
+
+        # Track previous index so we can revert on cancel
+        for cb in combo_boxes:
+            cb._prev_index = cb.currentIndex()
+
+        # Try to select initial devices based on saved system settings devpath_{role}
+        # mapping of combobox to device role name in settings
+        dev_map = {
+            self.cb_select_j: 'joystick',
+            self.cb_select_p: 'pedals',
+            self.cb_select_c: 'collective',
+            self.cb_select_t: 'trimwheel',
+        }
+
+        for cb, short in dev_map.items():
+            try:
+                saved_key = f"devpath_{short}"
+                saved_path = G.system_settings.get(saved_key, '')
+            except Exception:
+                saved_path = ''
+
+            if not saved_path:
+                continue
+
+            model = cb.model()
+            found_index = -1
+            # iterate through model rows to find a matching device.path
+            row_count = model.rowCount()
+            for row in range(row_count):
+                item_index = model.index(row, 0)
+                dev : DeviceInfo = model.data(item_index, Qt.ItemDataRole.UserRole)
+                if dev is None:
+                    continue
+                # some DeviceInfo objects may expose different path attributes
+                dev_path = dev.path
+                if dev_path and saved_path and dev_path.decode() == str(saved_path):
+                    found_index = row
+                    break
+
+            if found_index >= 0:
+                # block signals to avoid triggering change handlers
+                cb.blockSignals(True)
+                cb.setCurrentIndex(found_index)
+                cb._prev_index = found_index
+                cb.blockSignals(False)
+                # The change handler is suppressed above, so mirror its PID
+                # sync here: the PID field must show the auto-selected
+                # device's actual product id — a DIY Rhino on a non-default
+                # PID otherwise keeps the stored/default value (2055) and
+                # the next connection attempt fails.
+                sel_dev = model.data(model.index(found_index, 0),
+                                     Qt.ItemDataRole.UserRole)
+                if sel_dev is not None:
+                    cb._tb_box.setText(format(sel_dev.product_id, 'x'))
+
+        # Helper: persist a combobox selection into G.system_settings
+        def persist_combobox_selection(cb, role_name):
+            model = cb.model()
+            sel_index = cb.currentIndex()
+            if sel_index < 0:
+                # clear saved setting
+                try:
+                    self._pending_devpaths[f'devpath_{role_name}'] = ''
+                except Exception:
+                    logging.exception('Failed to clear devpath setting')
+                return
+
+            dev = model.data(model.index(sel_index, 0), Qt.ItemDataRole.UserRole)
+            if dev is None:
+                try:
+                    self._pending_devpaths[f'devpath_{role_name}'] = ''
+                except Exception:
+                    logging.exception('Failed to clear devpath setting')
+                return
+
+            # prefer device.path (bytes) decode
+            dev_path = getattr(dev, 'path', None)
+            if isinstance(dev_path, (bytes, bytearray)):
+                try:
+                    dev_path = dev_path.decode()
+                except Exception:
+                    dev_path = str(dev_path)
+
+            try:
+                self._pending_devpaths[f'devpath_{role_name}'] = dev_path
+            except Exception:
+                logging.exception('Failed to persist devpath setting')
+
+
+
+        # Handler to enforce uniqueness across combo boxes
+        def on_device_changed(index, changed_cb= None):
+            # map combobox to role name for persistence
+            cb_role_map = {
+                self.cb_select_j: 'joystick',
+                self.cb_select_p: 'pedals',
+                self.cb_select_c: 'collective',
+                self.cb_select_t: 'trimwheel',
+            }
+            # when model includes dummy at 0, index 0 means None
+            if changed_cb is None:
+                return
+
+            # get selected device object
+            model = changed_cb.model()
+            dev = None
+            if index >= 0:
+                dev = model.data(model.index(index, 0), Qt.ItemDataRole.UserRole)
+
+            # if no device selected, persist cleared selection and accept
+            if dev is None:
+                changed_cb._prev_index = index
+                role = cb_role_map.get(changed_cb, None)
+                if role:
+                    persist_combobox_selection(changed_cb, role)
+                changed_cb._tb_box.setText("")  # update PID textbox
+                changed_cb._autolaunch_cb.setChecked(False)
+                changed_cb._startmin_cb.setChecked(False)
+                changed_cb._headless_cb.setChecked(False)
+                return
+
+            # check if any other combobox already has this device
+            for other in combo_boxes:
+                if other is changed_cb:
+                    continue
+                other_idx = other.currentIndex()
+                if other_idx < 0:
+                    continue
+                other_dev = other.model().data(other.model().index(other_idx, 0), Qt.ItemDataRole.UserRole)
+                if other_dev is not None and getattr(other_dev, 'serial_number', None) == getattr(dev, 'serial_number', None) and getattr(other_dev, 'path', None) == getattr(dev, 'path', None):
+                    # conflict detected
+                    msg = QMessageBox(self)
+                    msg.setWindowTitle('Device Conflict')
+                    msg.setText('The selected device is already assigned to another instance.')
+                    msg.setInformativeText('Do you want to override the other assignment (clear it) or cancel this selection?')
+                    override_btn = msg.addButton('Override', QMessageBox.ButtonRole.AcceptRole)
+                    cancel_btn = msg.addButton('Cancel', QMessageBox.ButtonRole.RejectRole)
+                    msg.setDefaultButton(cancel_btn)
+                    msg.exec()
+
+                    if msg.clickedButton() == override_btn:
+                        # clear other combobox selection (set to index 0 = None)
+                        other.setCurrentIndex(0)
+                        other._tb_box.setText('') # clear overidden PID textbox
+                        # accept new selection
+                        changed_cb._prev_index = index
+                        changed_cb._tb_box.setText(format(dev.product_id, "x")) # update PID textbox
+                        return
+                    else:
+                        # revert selection on changed_cb
+                        # block signals to avoid recursion
+                        changed_cb.blockSignals(True)
+                        changed_cb.setCurrentIndex(changed_cb._prev_index)
+                        changed_cb.blockSignals(False)
+                        return
+
+            # no conflicts, commit
+            changed_cb._prev_index = index
+            changed_cb._tb_box.setText(format(dev.product_id, "x"))   # update PID textbox
+
+
+            # After successful change, persist the selection for this combobox's role
+            # map combobox to role name
+            cb_role_map = {
+                self.cb_select_j: 'joystick',
+                self.cb_select_p: 'pedals',
+                self.cb_select_c: 'collective',
+                self.cb_select_t: 'trimwheel',
+            }
+
+            role = cb_role_map.get(changed_cb, None)
+            if role:
+                persist_combobox_selection(changed_cb, role)
+
+        # connect signals
+        for cb in combo_boxes:
+            # use lambda binding to capture cb in the handler
+            cb.currentIndexChanged.connect(lambda idx, _cb=cb: on_device_changed(idx, changed_cb=_cb))
+
+        # Additionally, ensure that when selection is cleared (index 0 / None) the setting is persisted.
+        # The on_device_changed handler will call persist after committing the change, but if a selection
+        # was reverted by conflict resolution it will also update the persisted value when appropriate.
+
+
 
     def select_enabled_sim(self):
         for sim in ('DCS', 'MSFS', 'XPLANE', 'IL2', 'BMS'):
@@ -450,6 +715,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.portIL2.setEnabled(il2_enabled)
         icon = self.IL2_ICON_ENABLED if il2_enabled else self.IL2_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.IL2_TAB, icon)
+        self.lab_pathIL2_2.setEnabled(il2_enabled)
+        self.pathIL2_K.setEnabled(il2_enabled)
+        self.browseIL2_K.setEnabled(il2_enabled)
+        self.validateIL2_K.setEnabled(il2_enabled)
+        self.lab_IL2_S.setEnabled(il2_enabled)
+        self.lab_IL2_K.setEnabled(il2_enabled)
+
+        self.browseIL2.setEnabled(self.validateIL2.isChecked())
+        self.pathIL2.setEnabled(self.validateIL2.isChecked())
+        self.browseIL2_K.setEnabled(self.validateIL2_K.isChecked())
+        self.pathIL2_K.setEnabled(self.validateIL2_K.isChecked())
+
+
+    def toggle_il2_path(self):
+        auto_config = self.validateIL2.isChecked() if self.sender() == self.validateIL2 else self.validateIL2_K.isChecked()
+        if self.sender() == self.validateIL2:
+            self.browseIL2.setEnabled(auto_config)
+            self.pathIL2.setEnabled(auto_config)
+        else:
+            self.browseIL2_K.setEnabled(auto_config)
+            self.pathIL2_K.setEnabled(auto_config)
 
     def toggle_bms_widgets(self):
         bms_enabled = self.enableBMS.isChecked()
@@ -472,7 +758,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Open a directory dialog and set the result in the pathIL2 QLineEdit
         directory = QFileDialog.getExistingDirectory(self, "Select IL-2 Install Path", "")
         if directory:
-            self.pathIL2.setText(directory)
+            if self.sender() == self.browseIL2:
+                self.pathIL2.setText(directory)
+            elif self.sender() == self.browseIL2_K:
+                self.pathIL2_K.setText(directory)
 
     def toggle_launchmode_cbs(self):
         """
@@ -505,6 +794,105 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_headless_t.setChecked(False)
                 self.cb_startToTray.setChecked(False)
         logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
+
+    def validate_il2_path(self):
+        if self.validateIL2.isChecked():
+            file_path = os.path.join(self.pathIL2.text(), "data\\startup.cfg")
+            if not os.path.exists(file_path):
+                QMessageBox.warning(self, "Config Error",
+                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n\\data\\startup.cfg not found at path")
+                return False
+        if self.validateIL2_K.isChecked():
+            # Standalone nests the game under <root>\game\data; the Steam
+            # release (IL2Series) uses <root>\data — accept either layout.
+            game_root = utils.il2_korea_game_root(self.pathIL2_K.text())
+            file_path = os.path.join(game_root, "data", "startup.cfg")
+            if not os.path.exists(file_path):
+                QMessageBox.warning(self, "Config Error",
+                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n"
+                                    "startup.cfg not found under '\\game\\data' (standalone) "
+                                    "or '\\data' (Steam) at the configured path")
+                return False
+        return True
+
+    def _add_il2_fwd_row(self, addr, port, telem, motion, ffb):
+        ip_item = QStandardItem(str(addr))
+        port_item = QStandardItem(str(port))
+        telem_item = QStandardItem("Yes" if telem else "No")
+        motion_item = QStandardItem("Yes" if motion else "No")
+        ffb_item = QStandardItem("Yes" if ffb else "No")
+        for item, value in ((telem_item, bool(telem)), (motion_item, bool(motion)), (ffb_item, bool(ffb))):
+            item.setData(value, Qt.ItemDataRole.UserRole)
+        for item in (ip_item, port_item, telem_item, motion_item, ffb_item):
+            item.setEditable(False)
+        self.il2_fwd_model.appendRow([ip_item, port_item, telem_item, motion_item, ffb_item])
+
+    def add_il2_fwd_dest(self):
+        addr = self.udp_ip.text().strip()
+        port = self.udp_port.text().strip()
+        telem = self.cb_telem.isChecked()
+        motion = self.cb_motion.isChecked()
+        ffb = self.cb_ffb.isChecked()
+
+        self._add_il2_fwd_row(addr, port, telem, motion, ffb)
+
+    def delete_il2_fwd_dest(self):
+        selected_rows = sorted({idx.row() for idx in self.il2_fwd_table.selectionModel().selectedRows()}, reverse=True)
+        for row in selected_rows:
+            self.il2_fwd_model.removeRow(row)
+
+    def _il2_fwd_ip_is_valid(self) -> bool:
+        try:
+            ipaddress.ip_address(self.udp_ip.text().strip())
+            return True
+        except ValueError:
+            return False
+
+    def _il2_fwd_port_is_valid(self) -> bool:
+        port = self.udp_port.text().strip()
+        return port.isdigit() and 1 <= int(port) <= 65535
+
+    def update_il2_fwd_add_enabled(self):
+        valid = (
+            self.il2_fwd_enable.isChecked()
+            and self._il2_fwd_ip_is_valid()
+            and self._il2_fwd_port_is_valid()
+            and (self.cb_telem.isChecked() or self.cb_motion.isChecked() or self.cb_ffb.isChecked())
+        )
+        self.pb_add_dest.setEnabled(valid)
+
+    def update_il2_fwd_delete_enabled(self):
+        has_selection = bool(self.il2_fwd_table.selectionModel().selectedRows())
+        self.pb_delete_dest.setEnabled(self.il2_fwd_enable.isChecked() and has_selection)
+
+    def toggle_il2_fwd_widgets(self):
+        enabled = self.il2_fwd_enable.isChecked()
+        for widget in (self.udp_ip, self.udp_port, self.cb_telem, self.cb_motion, self.cb_ffb, self.il2_fwd_table):
+            widget.setEnabled(enabled)
+        self.update_il2_fwd_add_enabled()
+        self.update_il2_fwd_delete_enabled()
+
+    def get_il2_fwd_destinations(self):
+        destinations = []
+        for row in range(self.il2_fwd_model.rowCount()):
+            addr = self.il2_fwd_model.item(row, 0).text()
+            port = self.il2_fwd_model.item(row, 1).text()
+            telem = self.il2_fwd_model.item(row, 2).data(Qt.ItemDataRole.UserRole)
+            motion = self.il2_fwd_model.item(row, 3).data(Qt.ItemDataRole.UserRole)
+            ffb = self.il2_fwd_model.item(row, 4).data(Qt.ItemDataRole.UserRole)
+            destinations.append({"addr": addr, "port": port, "telem": bool(telem), "motion": bool(motion), "ffb": bool(ffb)})
+        return destinations
+
+    def load_il2_fwd_destinations(self, destinations_json):
+        self.il2_fwd_model.removeRows(0, self.il2_fwd_model.rowCount())
+        try:
+            destinations = json.loads(destinations_json) if destinations_json else []
+        except (TypeError, ValueError):
+            logging.exception("Failed to parse il2_fwd_destinations setting")
+            destinations = []
+        for dest in destinations:
+            self._add_il2_fwd_row(dest.get('addr', ''), dest.get('port', ''), dest.get('telem', False),
+                                   dest.get('motion', False), dest.get('ffb', False))
 
     def validate_settings(self):
         master = self.master_button_group.checkedId()
@@ -556,6 +944,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 return False
             if not validate_vpconf_profile(self.pathVPConfExit.text(), G.device_usbpid, G.device_type):
                 return False
+
+        if self.enableIL2.isChecked():
+            if not self.validate_il2_path():
+                return False
+
+        if self.il2_fwd_enable.isChecked() and self.il2_fwd_model.rowCount() == 0:
+            QMessageBox.warning(self, "Config Error",
+                                 "IL2 Telemetry Forwarding is enabled but no destinations have been added.\n\n"
+                                 "Please add at least one destination or disable forwarding.")
+            return False
         return True
 
     def save_settings(self):
@@ -574,9 +972,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "pathXPLANE": self.pathXPLANE.text(),
             "enableIL2": self.enableIL2.isChecked(),
             "validateIL2": self.validateIL2.isChecked(),
+            "validateIL2_K": self.validateIL2_K.isChecked(),
             "focus_pauseIL2": self.focus_pauseIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
             "portIL2": str(self.portIL2.text()),
+            "pathIL2_K": self.pathIL2_K.text(),
+            "il2_fwd_enable": self.il2_fwd_enable.isChecked(),
+            "il2_fwd_destinations": json.dumps(self.get_il2_fwd_destinations()),
             'enableBMS': self.enableBMS.isChecked(),
             'masterInstance': self.master_button_group.checkedId(),
             'autolaunchMaster': self.cb_al_enable.isChecked(),
@@ -646,14 +1048,21 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if self.current_al_dict != saved_al_dict:
             QMessageBox.information(self, "Restart Required", "The Auto-Launch or Master Device settings have changed.  Please restart TelemFFB.")
 
+        if not self.validate_settings():
+            return
+
         for k,v in global_settings_dict.items():
             G.system_settings.setValue(f"{k}", v)
 
         for k,v in instance_settings_dict.items():
             G.system_settings.setValue(f"{G.device_type}/{k}", v)
 
-        if not self.validate_settings():
-            return
+        # Persist any pending devpath selections that were changed while the dialog was open
+        try:
+            for k, v in getattr(self, '_pending_devpaths', {}).items():
+                G.system_settings.setValue(k, v)
+        except Exception:
+            logging.exception('Failed to write pending devpath settings')
 
         G.sim_listeners.restart_all()
 
@@ -734,11 +1143,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableIL2.setChecked(settings_dict.get('enableIL2', False))
         self.toggle_il2_widgets()
 
-        self.validateIL2.setChecked(settings_dict.get('validateIL2', True))
+        self.validateIL2.setChecked(settings_dict.get('validateIL2', False))
+        self.validateIL2_K.setChecked(settings_dict.get('validateIL2_K', False))
 
-        self.focus_pauseIL2.setChecked(settings_dict.get('focus_pauseIL2', True))
+        self.focus_pauseIL2.setChecked(settings_dict.get('focus_pauseIL2', False))
 
         self.pathIL2.setText(settings_dict.get('pathIL2', 'C:/Program Files/IL-2 Sturmovik Great Battles'))
+        self.pathIL2_K.setText(settings_dict.get('pathIL2_K', ''))
+        self.il2_fwd_enable.setChecked(settings_dict.get('il2_fwd_enable', False))
+        self.load_il2_fwd_destinations(settings_dict.get('il2_fwd_destinations', '[]'))
+        self.toggle_il2_fwd_widgets()
 
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
 

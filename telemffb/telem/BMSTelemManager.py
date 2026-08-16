@@ -49,13 +49,14 @@ from .BMSSharedMem import BMSSharedMemory, FlightData, FlightData2, IVibeData, L
 from .TelemParserBase import TelemParserBase
 import telemffb.globals as G
 import telemffb.utils as utils
+from telemffb.util import conversions as conv
 
 logger = logging.getLogger(__name__)
 
 # Conversion constants
-knots_to_ms = 0.514444
-ft_to_m = 0.3048
-fpss2gs = 1 / 32.17405
+knots_to_ms = conv.kt2ms
+ft_to_m = conv.ft2m
+fpss2gs = conv.fpss2gs
 
 
 class BMSManager(TelemParserBase):

@@ -3,10 +3,34 @@ import math
 deg = 180 / math.pi
 slugft3 = 0.00194032  # SI to slugft3
 rad = 0.0174532925
-ft = 3.28084  # m to ft
-kt = 1.94384  # ms to kt
+rad2deg = 180 / math.pi  # multiply radians by this to get degrees
+deg2rad = math.pi / 180  # multiply degrees by this to get radians
+ft = 3.28084  # m to ft (multiply meters by this to get feet)
+
+# Velocity conversions
+# NOTE: names indicate direction: kt2ms = knots -> meters/second
 kt2ms = 0.514444  # knots to m/s
-ms2kt = 1.943844  # m/s to knot
-vsound = 290.07 # m/s, speed of sound at sea level in ISA condition
-P0 = 101325 # Pa, ISA static pressure at sealevel
-std_air_pressure = 1.225  # kg/m^3
+ms2kt = 1.943844  # m/s to knots
+kmh2ms = 1.0 / 3.6  # km/h to m/s
+ms2kmh = 3.6  # m/s to km/h
+mph2ms = 0.44704  # miles per hour to m/s
+ms2mph = 2.2369362920544  # m/s to mph (approx)
+
+# Length conversions to SI (meters)
+ft2m = 0.3048
+in2m = 0.0254
+
+# Common gravity/time conversions
+fpss2gs = 1 / 32.17405  # feet per second^2 to g's (approx)
+mpss2gs = 1 / 9.81      # meters per second^2 to g's
+
+# TODO: vsound = 290.07 may be incorrect; ISA sea-level value is 340.29 m/s (sqrt(γRT₀), T₀=288.15 K).
+# Changing this affects Vne calculation and therefore all spring force gains (~27% weaker).
+# Assess user impact before updating.
+vsound = 290.07  # m/s
+P0 = 101325  # Pa, ISA static pressure at sealevel
+rho0 = 1.225  # kg/m^3, ISA air density at sea level
+std_air_pressure = rho0  # legacy alias kept for compatibility
+
+# Convenience
+percent = 0.01

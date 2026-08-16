@@ -33,7 +33,7 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
         super(TeleplotSetupDialog, self).__init__(parent)
 
         if G.args.teleplot is None:
-            self.telem_port = ''
+            self.telem_port = G.system_settings.get('teleplotPort', '')
         elif isinstance(G.args.teleplot, str):
             if ':' in G.args.teleplot:
                 self.telem_port = G.args.teleplot.split(':')[1]
@@ -42,20 +42,27 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
 
         if G.args.plot is None:
             G.args.plot = []
-        self.telem_vars = ' '.join(G.args.plot)
+            self.telem_vars = G.system_settings.get('teleplotVars', '')
+        else:
+            self.telem_vars = ' '.join(G.args.plot)
 
         self.setupUi(self)
         self.retranslateUi(self)
+        self.cb_send.setEnabled(utils.teleplot.enabled)
+        self.cb_send.checkStateChanged.connect(self.cb_send_checked)
+        self.pb_Save.setEnabled(False)
         self.parent = parent
         int_validator = QIntValidator()
         self.tb_port.setValidator(int_validator)
-        self.buttonBox.accepted.connect(self.save_teleplot)
-        self.buttonBox.rejected.connect(self.close)
+        self.pb_Save.clicked.connect(self.save_teleplot)
+        self.pb_Cancel.clicked.connect(self.close)
         self.pb_clear.clicked.connect(self.clear_form)
         self.pb_Select.clicked.connect(self.select_active_telemetry)
-        self.tb_port.setText(self.telem_port)
-        self.tb_vars.setPlainText(str(self.telem_vars))
         self.telem_data = parent.lbl_telem_data.text()
+        self.tb_port.textChanged.connect(self.setsendflag)
+        self.tb_vars.textChanged.connect(self.setsendflag)
+        self.tb_port.setText(str(self.telem_port))
+        self.tb_vars.setPlainText(str(self.telem_vars))
 
         # Teleplot Link
         bookmarked_section =  "https://teleplot.fr"
@@ -97,16 +104,37 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
             self.parent.tb_vars.setPlainText(str.rstrip(" "))
             self.accept()
         def refresh_keys(self):
+            self.list_widget.clear()
             self.list_widget.addItems(self.get_active_keys())
         def get_active_keys(self):
             text = self.parent.parent.lbl_telem_data.text()
             keys = [line.split(':')[0].strip() for line in text.split('\n') if line.strip()]
+            if keys[0] == 'Waiting for data...':
+                keys = ['Sim not running']
             return keys
         def selectedKeys(self):
             return [item.text() for item in self.list_widget.selectedItems()]
 
         def clearSelection(self):
             self.list_widget.clearSelection()
+
+    def setsendflag(self):
+        #allow save and send when both have text
+        if (self.tb_port.text() != '' and self.tb_vars.toPlainText() !=''):
+            self.cb_send.setEnabled(True)
+            self.pb_Save.setEnabled(True)
+        else:
+            self.cb_send.setEnabled(False)
+            self.cb_send.setChecked(False)
+            self.pb_Save.setEnabled(False)
+
+        # allow save when all empty
+        if (self.tb_port.text() == '' and self.tb_vars.toPlainText() ==''):
+            self.pb_Save.setEnabled(True)
+
+    def cb_send_checked(self):
+        utils.teleplot.enabled = self.cb_send.isChecked()
+
     def select_active_telemetry(self):
         self._telem_selection_window = self.KeySelectionDialog(parent=self)
         self._telem_selection_window.exec()
@@ -120,12 +148,17 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
                 address = f"teleplot.fr:{str(self.tb_port.text())}"
                 utils.teleplot.configure(address)
                 G.args.plot = self.tb_vars.toPlainText().split()
+                G.system_settings.setValue(f"{G.device_type}/teleplotVars", self.tb_vars.toPlainText())
                 G.args.teleplot = str(self.tb_port.text())
+                G.system_settings.setValue(f"{G.device_type}/teleplotPort", str(self.tb_port.text()))
                 self.accept()
+
 
     def clear_form(self):
         self.tb_port.clear()
         self.tb_vars.clear()
+        self.cb_send.setChecked(False)
+        self.cb_send.setEnabled(False)
 
     def validate_text(self):
         regex_string = r"[a-zA-Z_][a-zA-Z0-9_ ]*"
@@ -134,18 +167,20 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
         validator = QRegularExpressionValidator(regex)
         pos = 0
         state, valid_text, pos = validator.validate(current_text, pos)
-        if self.tb_port.text() == '':
-            if current_text == '':
-                # remove all teleplot
-                return True
-            elif current_text != '':
-                QMessageBox.warning(self, "Error", "Please enter a port number or remove the telemetry variables to stop sending")
-                return False
 
-        if current_text == '':
-            if self.tb_port.text() != '':
-                QMessageBox.warning(self, "Error", "Please enter telemetry variables to monitor or remove the port to stop sending")
-                return False
+        # should be unnecessary with save button disabling:
+        # if self.tb_port.text() == '':
+        #     if current_text == '':
+        #         # remove all teleplot
+        #         return True
+        #     elif current_text != '':
+        #         QMessageBox.warning(self, "Error", "Please enter a port number or remove the telemetry variables to stop sending")
+        #         return False
+        #
+        # if current_text == '':
+        #     if self.tb_port.text() != '':
+        #         QMessageBox.warning(self, "Error", "Please enter telemetry variables to monitor or remove the port to stop sending")
+        #         return False
 
         if state == QRegularExpressionValidator.State.Acceptable or current_text == '':
             return True

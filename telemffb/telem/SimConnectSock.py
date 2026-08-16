@@ -19,7 +19,7 @@
 
 from telemffb.telem.SimConnectManager import SimConnectManager
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.utils import overrides
+from typing import override
 import telemffb.globals as G
 
 from telemffb.telem.TelemManager import TelemManager
@@ -39,22 +39,22 @@ class SimConnectSock(SimConnectManager):
             return "~".join([str(x) for x in val])
         return val
     
-    @overrides(SimConnectManager)
+    @override
     def emit_packet(self, data):
         data["src"] = "MSFS"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
         self._telem.submit_frame(packet)
     
-    @overrides(SimConnectManager)
+    @override
     def emit_event(self, event, *args):
         # special handling of Open event
         if event == "Open":
             # Reset all FFB effects on device, ensure we have a clean start
-            HapticEffect.device.reset_effects()
+            if HapticEffect.device is not None:
+                HapticEffect.device.reset_effects()
 
         if event == "Quit":
-            # Restart sim listeners on MSFS quit, TODO: Why?
-            G.sim_listeners.restart_all()
+            pass
 
         args = [str(x) for x in args]
         self._telem.submit_frame(f"Ev={event};" + ";".join(args))

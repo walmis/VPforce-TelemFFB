@@ -448,8 +448,8 @@ enable=
 [METHOD_ARGS]
 
 # List of qualified names (i.e., library.method) which require a timeout
-# parameter e.g. 'requests.api.get,requests.api.post'
-timeout-methods=requests.api.delete,requests.api.get,requests.api.head,requests.api.options,requests.api.patch,requests.api.post,requests.api.put,requests.api.request
+# parameter e.g. 'urllib.request.urlopen'
+timeout-methods=urllib.request.urlopen
 
 
 [MISCELLANEOUS]

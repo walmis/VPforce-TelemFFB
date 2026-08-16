@@ -6,15 +6,22 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>728</width>
+    <width>927</width>
     <height>409</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>SimConnect Overrides</string>
+   <string>SimConnect/Dataref Overrides</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
+  <layout class="QGridLayout" name="gridLayout_2">
+   <item row="0" column="0">
+    <widget class="QLabel" name="lb_InfoLabel">
+     <property name="text">
+      <string>Info Label</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <property name="topMargin">
       <number>1</number>
@@ -46,6 +53,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="pb_Refresh">
+       <property name="text">
+        <string>Refresh</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
@@ -67,7 +81,7 @@
      </item>
     </layout>
    </item>
-   <item>
+   <item row="2" column="0">
     <layout class="QGridLayout" name="gridLayout">
      <property name="topMargin">
       <number>5</number>
@@ -82,14 +96,17 @@
      <item row="0" column="3">
       <widget class="QLabel" name="label_3">
        <property name="text">
-        <string>SC Unit</string>
+        <string>Unit</string>
        </property>
       </widget>
      </item>
      <item row="0" column="4">
-      <widget class="QLabel" name="label_4">
+      <widget class="InfoLabel" name="lb_transform">
+       <property name="toolTip">
+        <string/>
+       </property>
        <property name="text">
-        <string>Scale</string>
+        <string>Transform/Scale</string>
        </property>
       </widget>
      </item>
@@ -119,9 +136,12 @@
       <widget class="QLineEdit" name="tb_scale">
        <property name="maximumSize">
         <size>
-         <width>50</width>
+         <width>16777215</width>
          <height>16777215</height>
         </size>
+       </property>
+       <property name="toolTip">
+        <string/>
        </property>
        <property name="inputMethodHints">
         <set>Qt::ImhFormattedNumbersOnly</set>
@@ -198,7 +218,7 @@
      </item>
     </layout>
    </item>
-   <item>
+   <item row="3" column="0">
     <widget class="QTableWidget" name="tableWidget">
      <column>
       <property name="text">
@@ -207,27 +227,27 @@
      </column>
      <column>
       <property name="text">
-       <string>SC Variable</string>
+       <string>Variable</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>SC Unit</string>
+       <string>Unit</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>Scale</string>
+       <string>Transform/Scale</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>source</string>
+       <string>Source</string>
       </property>
      </column>
     </widget>
    </item>
-   <item>
+   <item row="4" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <property name="topMargin">
       <number>0</number>
@@ -248,7 +268,7 @@
         </size>
        </property>
        <property name="text">
-        <string>SimConnect overrides are for MSFS only.</string>
+        <string>Overrides are for MSFS/X-Plane only.</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>
@@ -269,6 +289,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>InfoLabel</class>
+   <extends>QLabel</extends>
+   <header location="global">telemffb.custom_widgets.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>

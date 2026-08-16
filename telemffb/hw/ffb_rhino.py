@@ -23,18 +23,17 @@ with additional FFB effects.
 """
 
 import ctypes
+import functools
 import inspect
 import logging
 import os
 import time
 import weakref
 from dataclasses import dataclass
-from typing import List, Self
+from typing import List, Optional, Self, override
 
 import usb1
 from PyQt6.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
-
-from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides, millis
 
 paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
 for p in paths:
@@ -42,9 +41,10 @@ for p in paths:
        ctypes.cdll.LoadLibrary(p)
        break
     except:
-        pass 
+        pass
 
 import telemffb.hw.hid as hid
+from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
 
 USB_REQTYPE_DEVICE_TO_HOST = 0x80
 USB_REQTYPE_VENDOR = 0x40
@@ -70,6 +70,8 @@ HID_REPORT_ID_DEVICE_CONTROL = 112
 HID_REPORT_ID_DEVICE_GAIN = 113
 HID_REPORT_ID_SET_CUSTOM_FORCE_OUTPUT_DATA = 114
 HID_REPORT_ID_SET_DEADZONE = 115
+HID_REPORT_ID_SET_LEDS = 116
+HID_REPORT_ID_AXIS_OVERRIDE = 117
 
 HID_REPORT_ID_PID_STATE_REPORT = 2
 HID_REPORT_ID_CREATE_EFFECT = 5
@@ -167,12 +169,13 @@ class FFBReport_SetEffect(BaseStructure):
                 ("samplePeriod", ctypes.c_uint16),
                 ("gain", ctypes.c_uint16),
                 ("triggerButton", ctypes.c_uint8),
-                ("axesEnable", ctypes.c_uint8), # bit 0: x_axis_enble, bit 1: y_axis_enable, bit 2: direction_enable
+                ("axesEnable", ctypes.c_uint8, 3), # bit 0: x_axis_enble, bit 1: y_axis_enable, bit 2: direction_enable
+                ("effectSource", ctypes.c_uint8, 1), # bit 0: effect_source : 0 - game, 1 - telemFFB
                 ("directionX", ctypes.c_uint8),
                 ("directionY", ctypes.c_uint8),
                 ("startDelay", ctypes.c_uint16)
                ]
-    _defaults_ = {"reportId": HID_REPORT_ID_SET_EFFECT, "gain":4096}
+    _defaults_ = {"reportId": HID_REPORT_ID_SET_EFFECT, "gain":4096, "effectSource": 1}
 
 
 class FFBReport_SetDeadzone(BaseStructure):
@@ -182,6 +185,19 @@ class FFBReport_SetDeadzone(BaseStructure):
             ("deadzone", ctypes.c_uint16),
         ]
     _defaults_ = {"reportId": HID_REPORT_ID_SET_DEADZONE, "deadzone": 0}
+
+
+class FFBReport_AxisOverride_Output(BaseStructure):
+    _pack_ = 1
+    _fields_ = [
+            ("reportId", ctypes.c_uint8),
+            ("x_mode", ctypes.c_uint8),
+            ("x_value", ctypes.c_int16),
+            ("y_mode", ctypes.c_uint8),
+            ("y_value", ctypes.c_int16),
+            ("watchdog_ms", ctypes.c_uint16),
+        ]
+    _defaults_ = {"reportId": HID_REPORT_ID_AXIS_OVERRIDE, "watchdog_ms": 1000}
 
 
 class FFBReport_EffectOperation(BaseStructure):
@@ -251,7 +267,7 @@ class FFBReport_SetCondition(BaseStructure):
                ]
     _defaults_ = { "reportId": HID_REPORT_ID_SET_CONDITION }
 
-    def set_offset(self, offset: (int|float)) -> None:
+    def set_offset(self, offset: (int|float)) -> Self:
         """
         Set the center position offset for the FFB device.
         
@@ -273,11 +289,14 @@ class FFBReport_SetCondition(BaseStructure):
             - The processed offset is stored in the cpOffset attribute
         """
         if isinstance(offset, float):
-            offset = round(offset * 4096)
-        offset = clamp(offset, -4096, 4096)
-        self.cpOffset = offset
+            val = round(offset * 4096)
+        else:
+            val = int(offset)
+        val = clamp(val, -4096, 4096)
+        self.cpOffset = val
+        return self
 
-    def set_saturation(self, saturation: (int|float), do_clamp: bool = True) -> None:
+    def set_saturation(self, saturation: (int|float), do_clamp: bool = True) -> Self:
         """
         Sets the positive and negative saturation based on the input saturation value.
 
@@ -288,13 +307,16 @@ class FFBReport_SetCondition(BaseStructure):
             None
         """
         if isinstance(saturation, float):
-            saturation = round(saturation * 4096)
+            val = round(saturation * 4096)
+        else:
+            val = int(saturation)
         if do_clamp:
-            saturation = clamp(saturation, 0, 4096)
-        self.positiveSaturation = saturation
-        self.negativeSaturation = saturation
+            val = clamp(val, 0, 4096)
+        self.positiveSaturation = val
+        self.negativeSaturation = val
+        return self
 
-    def set_coefficient(self, coefficient: (int|float), do_clamp: bool = True) -> None:
+    def set_coefficient(self, coefficient: (int|float), do_clamp: bool = True) -> Self:
         """
         Sets the positive and negative coefficients based on the input coefficient value.
 
@@ -305,13 +327,17 @@ class FFBReport_SetCondition(BaseStructure):
             None
         """
         if isinstance(coefficient, float):
-            coefficient = round(coefficient * 4096)
-        if do_clamp:
-            coefficient = clamp(coefficient, 0, 4096)
-        self.positiveCoefficient = coefficient
-        self.negativeCoefficient = coefficient
+            val = round(coefficient * 4096)
+        else:
+            val = int(coefficient)
 
-    def set_coefficients(self, positive, negative):
+        if do_clamp:
+            val = clamp(val, 0, 4096)
+        self.positiveCoefficient = val
+        self.negativeCoefficient = val
+        return self
+
+    def set_coefficients(self, positive, negative) -> Self:
         """
         Sets the positive and negative coefficients of the object.
 
@@ -324,6 +350,7 @@ class FFBReport_SetCondition(BaseStructure):
         """
         self.positiveCoefficient = positive
         self.negativeCoefficient = negative
+        return self
 
 class FFBReport_SetEnvelope(BaseStructure):
     """
@@ -332,27 +359,27 @@ class FFBReport_SetEnvelope(BaseStructure):
     Attributes:
         reportId (int): The report ID.
         effectBlockIndex (int): The effect block index.
-        attackLevel (int): The attack level, relative to the baseline, in the range from 0 through 4096.
-        fadeLevel (int): The fade level, relative to the baseline, in the range from 0 through 4096.
+        attackFromForce (int): The attack level (force to start from), relative to the baseline, in the range from 0 through 4096.
+        decayToForce (int): The decay level (force to decay to), relative to the baseline, in the range from 0 through 4096.
         attackTime (int): The time, in milliseconds, to reach the sustain level.
-        fadeTime (int): The time, in milliseconds, to reach the fade level.
+        decayTime (int): The time, in milliseconds, to reach the decay level.
     """
 
     reportId: int               # uint8_t reportId
     effectBlockIndex: int       # uint8_t effectBlockIndex
-    attackLevel: int            # uint16_t attackLevel
-    fadeLevel: int              # uint16_t fadeLevel
+    attackFromForce: int        # uint16_t attackLevel (firmware: attackFromForce)
+    decayToForce: int           # uint16_t fadeLevel (firmware: decayToForce)
     attackTime: int             # uint16_t attackTime
-    fadeTime: int               # uint16_t fadeTime
+    decayTime: int              # uint16_t fadeTime (firmware: decayTime)
 
     _pack_ = 1
     _fields_ = [
         ("reportId", ctypes.c_uint8),        # uint8_t reportId
         ("effectBlockIndex", ctypes.c_uint8),# uint8_t effectBlockIndex
-        ("attackLevel", ctypes.c_uint16),    # uint16_t attackLevel
-        ("fadeLevel", ctypes.c_uint16),      # uint16_t fadeLevel
+        ("attackFromForce", ctypes.c_uint16),# uint16_t attackLevel
+        ("decayToForce", ctypes.c_uint16),   # uint16_t fadeLevel
         ("attackTime", ctypes.c_uint16),     # uint16_t attackTime
-        ("fadeTime", ctypes.c_uint16)        # uint16_t fadeTime
+        ("decayTime", ctypes.c_uint16)       # uint16_t fadeTime
     ]
     _defaults_ = { "reportId": HID_REPORT_ID_SET_ENVELOPE }
 
@@ -379,6 +406,9 @@ class FFBReport_Input(BaseStructure):
     CP_offsetY: int
     ForceX: int # force output (sping + friction), for improved hands-on detection
     ForceY: int
+    RawX: int
+    RawY: int
+    status: int
 
     _pack_ = 1
     _fields_ = [
@@ -398,6 +428,9 @@ class FFBReport_Input(BaseStructure):
                 ("CP_offsetY", ctypes.c_int16), # added in fw v1.0.17
                 ("ForceX", ctypes.c_int16), # added in fw v1.0.17b13
                 ("ForceY", ctypes.c_int16), # added in fw v1.0.17b13
+                ("RawX", ctypes.c_int16), # added for axis override support
+                ("RawY", ctypes.c_int16),
+                ("status", ctypes.c_uint8),
                ]
     _defaults_ = {}
 
@@ -481,6 +514,18 @@ class FFBReport_Input(BaseStructure):
         Returns the main X and Y axis values as a tuple of two floats in the range [-1.0 .. 1.0]
         """
         return (self.X/4096.0, self.Y/4096.0)
+
+    def rawAxisXY(self) -> tuple[float, float]:
+        """
+        Returns the post-curve, pre-override axis values as a tuple of floats.
+        """
+        return (self.RawX/4096.0, self.RawY/4096.0)
+
+    def axisOverrideActive(self) -> bool:
+        """
+        Returns True when either axis is currently overridden by firmware.
+        """
+        return bool(self.status & 0x03)
     
     def CP_XY(self) -> tuple[float, float]:
         """
@@ -503,7 +548,7 @@ class FFBReport_Input(BaseStructure):
         Returns scaled axis x/y values in the range [-1.0 .. 1.0]  using the current CP_offset as a center reference
         Output is scaled 0 to +/-1 in any direction from spring center.
         """
-        X, Y = self.axisXY()
+        X, Y = self.rawAxisXY() if self.axisOverrideActive() else self.axisXY()
         cpX, cpY = self.CP_XY()
         # Scale X based on cpX as the zero reference
         if cpX is None:
@@ -701,6 +746,17 @@ class FFBEffectHandle:
         if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
             self.ffb.write(data)
 
+    def setEnvelope(self, envelope: FFBReport_SetEnvelope):
+        """Set envelope parameters for the effect.
+        
+        Args:
+            envelope: An instance of FFBReport_SetEnvelope with envelope parameters.
+        """
+        envelope.effectBlockIndex = self.effect_id
+        data = bytes(envelope)
+        if self._data_changed("setEnvelope", data):
+            self.ffb.write(data)
+
     def setPeriodic(self, freq, magnitude, direction, duration=0, **kwargs):
         assert(self.type in PERIODIC_EFFECTS)
         assert(magnitude >= 0 and magnitude <= 1.0)
@@ -726,7 +782,7 @@ class FFBEffectHandle:
 class DeviceInfo:
     interface_number: int
     manufacturer_string: str
-    path: str
+    path: bytes
     product_id: int
     product_string: str
     release_number: int
@@ -734,6 +790,10 @@ class DeviceInfo:
     usage: int
     usage_page: int
     vendor_id: int
+
+    def vidpid(self) -> str:
+        """Returns the device VID:PID string"""
+        return f"{self.vendor_id:04X}:{self.product_id:04X}"
 
     @property
     def ident(self) -> str:
@@ -745,24 +805,26 @@ class FFBRhino(QObject):
     buttonReleased = pyqtSignal(int)
     deviceConnected = pyqtSignal(bool)
 
-    def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> None:
+    def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path : Optional[str] = None) -> None:
 
         self.vid = vid
         self.pid = pid
-        self.info : DeviceInfo = None
-        self.firmware_version : str = None
+        self.info : DeviceInfo 
+        self.firmware_version : Optional[str] = None
         self._button_state : int = 0
         self._prev_hats = 0xFFFF
 
         if not path:
             devs = FFBRhino.enumerate(pid)
-            if serial:
-                devs = list(filter(lambda x: x.serial_number == serial, devs))
-            if path:
-                devs = list(filter(lambda x: x.path == path, devs))
-            if not devs:
-                raise hid.HIDException('unable to open device')
-            self.info = devs[0]
+        else:
+            devs = FFBRhino.enumerate()
+        if serial:
+            devs = list(filter(lambda x: x.serial_number == serial, devs))
+        if path:
+            devs = list(filter(lambda x: x.path == bytes(path, 'utf-8'), devs))
+        if not devs:
+            raise hid.HIDException('unable to open device')
+        self.info = devs[0]
 
         self._in_reports = {}
         self._effect_handles : List[FFBEffectHandle] = []
@@ -777,18 +839,24 @@ class FFBRhino(QObject):
         if self._dev:
             self._dev.close()
             self._dev = None
-        
+
         self._dev = hid.Device(path=self.info.path)
         self._dev.nonblocking = True
 
     @property
     def serial(self):
+        if not self._dev:
+            return None
         return self._dev.serial
     @property
     def product(self):
+        if not self._dev:
+            return None
         return self._dev.product
     @property
     def manufacturer(self):
+        if not self._dev:
+            return None
         return self._dev.manufacturer
     
     @staticmethod
@@ -811,13 +879,14 @@ class FFBRhino(QObject):
 
     # Get global effect slider values as seen in VPConfigurator
     def get_gains(self) -> FFBReport_Get_Gains_Feature_Data:
+        assert(self._dev)
         d = self._dev.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
         data = FFBReport_Get_Gains_Feature_Data.from_buffer_copy(d)
         return data
     
     # Set global effect class gain, same as in VPConfigurator sliders
     def set_gain(self, slider_id, value):
-        assert(value >= 0 and value <= 100)
+        assert(self._dev and value >= 0 and value <= 100)
         data = FFBReport_Set_Gain_Feature_Data_t()
         data.reportId = HID_REPORT_FEATURE_ID_SET_GAIN
         data.gain_id = slider_id
@@ -830,12 +899,37 @@ class FFBRhino(QObject):
 
         :param deadzone: Deadzone value in the range 0-4096.
         """
-        assert(0 <= deadzone <= 4096)
+        assert(self._dev and 0 <= deadzone <= 4096)
         data = FFBReport_SetDeadzone(deadzone=deadzone)
         self._dev.write(bytes(data))
 
+    def supports_axis_override(self) -> bool:
+        data = self._in_reports.get(HID_REPORT_ID_INPUT, None)
+        return bool(data and len(data) >= ctypes.sizeof(FFBReport_Input))
+
+    def send_axis_override(
+        self,
+        x_mode: int = 0,
+        x_value: int = 0,
+        y_mode: int = 0,
+        y_value: int = 0,
+        watchdog_ms: int = 1000,
+    ):
+        assert self._dev
+        data = FFBReport_AxisOverride_Output(
+            x_mode=x_mode,
+            x_value=x_value,
+            y_mode=y_mode,
+            y_value=y_value,
+            watchdog_ms=watchdog_ms,
+        )
+        self.write(bytes(data))
+
+    def clear_axis_override(self):
+        self.send_axis_override(watchdog_ms=0)
+
     # runs on mainThread
-    @overrides(QObject)
+    @override
     def timerEvent(self, a0: QTimerEvent) -> None:
         try:
             self.read_reports()
@@ -902,7 +996,7 @@ class FFBRhino(QObject):
             report = self.get_report(HID_REPORT_ID_PID_STATE_REPORT)
             #print(report)
             if report.deviceResetEvent:
-                logging.info("Device FFB reset event: Invalidating all effects")
+                logging.info("Device FFB state was reset, telemFFB will recreate all effects")
                 for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
                     effect.invalidate()
@@ -937,11 +1031,13 @@ class FFBRhino(QObject):
         return None
 
     def reset_effects(self):
+        assert(self._dev)
         logging.info("FFB: Reset device effects")
         self._dev.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
         time.sleep(0.01)
 
     def create_effect(self, type) -> FFBEffectHandle:
+        assert(self._dev)
         self._dev.send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
         r = bytearray(self._dev.get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
 
@@ -958,6 +1054,7 @@ class FFBRhino(QObject):
         return handle
     
     def write(self, data):
+        assert(self._dev)
         if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
@@ -981,7 +1078,11 @@ class FFBRhino(QObject):
         data = self._in_reports.get(report_id, None)
         if data:
             try:
-                return input_report_handlers[report_id].from_buffer_copy(data)
+                report_type = input_report_handlers[report_id]
+                expected_size = ctypes.sizeof(report_type)
+                if len(data) < expected_size:
+                    data = bytes(data) + bytes(expected_size - len(data))
+                return report_type.from_buffer_copy(data)
             except KeyError as err:
                 logging.exception(f'ERROR GETTING HID REPORT: {err}')
                 return data
@@ -994,133 +1095,539 @@ class FFBRhino(QObject):
 
 # Higher level effect interface
 class HapticEffect(Destroyable):
-    device : FFBRhino = None
+    """High-level wrapper for a single haptic effect on a Rhino device.
+
+    This class provides a lazy, convenient API to create, configure and
+    control Force Feedback (FFB) effects on the `FFBRhino` device. Effects
+    may be created lazily and configured before they are actually allocated
+    on the hardware; pending creation and pending condition updates are
+    stored and applied when the effect is first used.
+
+    Attributes:
+        device: Class-level reference to the opened `FFBRhino` device.
+    """
+
+    device : Optional[FFBRhino] = None
 
     def __init__(self):
-        self.name = None
+        """Create a new HapticEffect controller.
+
+        The effect is not allocated on the device immediately. Callers can
+        chain configuration methods (for example `.spring(...)` or
+        `.constant(...)`) and then call `.start()` to ensure allocation and
+        playback.
+        """
+        self.name : Optional[str] = None
         self._stopped_time : int = 0
-        self._h_effect : FFBEffectHandle = None
-        self.modulator = None
-        self.effect_type = None
-        self._conds = {}
+        self._h_effect : Optional[FFBEffectHandle] = None
+        self.modulator : Optional[FFBReport_SetCondition] = None
+        self.effect_type : Optional[int] = None
+        # Lazy initialization state
+        self._pending_create = None  # function for creating the effect (lazy initialization)
+        self._pending_conditions = {} # functions for setting condition (lazy initialization)
+        self._pending_envelope : Optional[FFBReport_SetEnvelope] = None  # envelope to apply once on creation
+        self._envelope_applied : bool = False  # track if envelope has been applied
+        self._envelope_once : bool = False  # track if envelope should be cleared after first use  # track if envelope was explicitly set via .envelope()  # track if envelope has been applied
 
     def __repr__(self):
-        return f"HapticEffect({self._h_effect})"
+        """Return a short representation including the underlying handle."""
+        return f"HapticEffect({self._h_effect}) at {hex(id(self))}"
     
     @property
     def id(self):
+        """Return the numeric device effect id if allocated, otherwise None."""
         return self._h_effect.effect_id if self._h_effect else None
 
-    # Open defaut Rhino device, specific devices can be specified using serial or path arguments
-    # path example: \\\\?\\HID#VID_FFFF&PID_2055&MI_00#9&3450694a&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
-    # path can be obtained using FFBRhino.enumerate function
     @classmethod
     def open(cls, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> FFBRhino:
+        """Open and attach a `FFBRhino` device for all HapticEffect instances.
+
+        This is a convenience to set the class-level `device` reference used
+        when effects are created. The arguments are forwarded to the
+        `FFBRhino` constructor/selector.
+
+        Args:
+            vid: USB vendor id (default 0xFFFF for VPforce devices).
+            pid: USB product id (default 0x2055 for Rhino).
+            serial: Optional device serial to select a specific unit.
+            path: Optional device path to select a specific unit.
+
+        Returns:
+            The opened `FFBRhino` instance.
+        """
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
         cls.device = FFBRhino(vid, pid, serial, path)
         logging.info(f"Successfully opened HID '{cls.device.info.path.decode('utf-8')}'")
 
         return cls.device
 
+    def _ensure_effect_created(self):
+        """Allocate the underlying effect on the device if it hasn't been yet.
+
+        If this object was configured before allocation, the pending create
+        function and any pending condition setters will be executed. Raises
+        an AssertionError if the effect was previously destroyed.
+        """
+        if not self._h_effect:
+            assert self._pending_create is not None
+            # Execute the pending create function
+            self._pending_create()
+            # If there are pending conditions to set, do it now
+            for val in self._pending_conditions.values():
+                val()
+            self._pending_conditions.clear()
+            # Apply envelope if pending and not yet applied
+            if self._h_effect and self._pending_envelope and not self._envelope_applied:
+                self._h_effect.setEnvelope(self._pending_envelope)
+                self._envelope_applied = True
+
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
+        """Set condition parameters for condition-style effects.
+
+        Condition effects include spring, damper, inertia, friction and the
+        spring adjuster. If the underlying device effect is not yet
+        allocated the condition will be queued and applied after allocation.
+
+        Args:
+            cond: An instance of `FFBReport_SetCondition` describing the
+                parameter block to apply.
+
+        Returns:
+            Self to allow method chaining.
+        """
         assert self.effect_type in [
             EFFECT_SPRING,
             EFFECT_DAMPER,
             EFFECT_INERTIA,
             EFFECT_FRICTION,
             EFFECT_SPRING_ADJUSTER,
+            EFFECT_DETENT,
         ]
 
-        if not self._h_effect:
-            self._conditional_effect(self.effect_type)
-
-        self._h_effect.setCondition(cond)
-
-        return self
-
-    def _conditional_effect(self, effect_type, coef_x = None, coef_y= None) -> Self:
-        if not self._h_effect:
-            self._h_effect = self.device.create_effect(effect_type)
-            self.effect_type = effect_type
-            if not self._h_effect:
-                return self
-            self._h_effect.setEffect() # initialize defaults
-
-        if coef_x is not None:
-            cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                            positiveCoefficient=int(coef_x),
-                                            negativeCoefficient=int(coef_x))
-            self._h_effect.setCondition(cond_x)
-
-        if coef_y is not None:
-            cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                            positiveCoefficient=int(coef_y),
-                                            negativeCoefficient=int(coef_y))
-            self._h_effect.setCondition(cond_y)
+        if self._h_effect:
+            self._h_effect.setCondition(cond)
+        else:
+            # Queue the condition for application once effect is created
+            self._pending_conditions[cond.effectBlockIndex] = lambda: self._h_effect.setCondition(cond)
 
         return self
 
-    def inertia(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_INERTIA, coef_x, coef_y)
+    def _conditional_effect(self, effect_type, coef_x = None, coef_y= None, sat_x = None, sat_y = None) -> Self:
+        """Common helper for condition-style effects.
 
-    def damper(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_DAMPER, coef_x, coef_y)
+        Configures positive/negative coefficients and saturation for X and Y
+        parameter blocks. If the effect is not yet allocated the creation
+        function will be stored for lazy allocation.
 
-    def friction(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_FRICTION, coef_x, coef_y) 
+        Keyword Args:
+            coef_x (int|float|None): Positive/negative coefficient for the X axis.
+                If a float is provided it is scaled internally where appropriate.
+            coef_y (int|float|None): Positive/negative coefficient for the Y axis.
+            sat_x (int|float|None): Positive/negative saturation for the X axis.
+            sat_y (int|float|None): Positive/negative saturation for the Y axis.
 
-    def spring(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y) 
-    
-    def spring_adjuster(self, coef_x = 4096, coef_y = 4096):
-        return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x, coef_y) 
+        Returns:
+            Self for chaining.
+        """
+        self.effect_type = effect_type
+
+        def set_conditions():
+            assert self._h_effect is not None, "Effect must be created before setting condition"
+
+            if coef_x is not None or sat_x is not None:
+                cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
+                                                positiveCoefficient=int(coef_x or 0),
+                                                negativeCoefficient=int(coef_x or 0),
+                                                positiveSaturation=int(sat_x or 0),
+                                                negativeSaturation=int(sat_x or 0))
+                self._h_effect.setCondition(cond_x)
+
+            if coef_y is not None or sat_y is not None:
+                cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
+                                                positiveCoefficient=int(coef_y or 0),
+                                                negativeCoefficient=int(coef_y or 0),
+                                                positiveSaturation=int(sat_y or 0),
+                                                negativeSaturation=int(sat_y or 0))
+                self._h_effect.setCondition(cond_y)
+
+        if not self._h_effect:
+            # Store the creation function
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(effect_type)
+                if not self._h_effect:
+                    return False
+                self._h_effect.setEffect() # initialize defaults
+
+                set_conditions()
+                return True
+
+            self._pending_create = create_and_setup
+        else:
+            # Effect already exists, update coefficients directly
+            set_conditions()
+
+        return self
+
+    def inertia(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as an inertia effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_INERTIA, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def damper(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a damper effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_DAMPER, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def friction(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a friction effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_FRICTION, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def spring(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a spring effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_SPRING, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def spring_adjuster(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a spring adjuster effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def detent(self, position_x=0, position_y=0, peak_x=None, peak_y=None, 
+               range_x=None, range_y=None, gate_pos_x=None, gate_neg_x=None,
+               gate_pos_y=None, gate_neg_y=None, deadband_x=None, deadband_y=None) -> Self:
+        """Configure this object as a detent effect.
+        
+        A detent effect creates a "notch" or "valley" at a specified position,
+        providing tactile feedback when the control passes through that position.
+        The effect automatically includes 400-unit edge smoothing and -1000 damping.
+        
+        Firmware Parameter Mapping:
+        ---------------------------
+        Python Parameter    | Firmware Code         | Description
+        --------------------|----------------------|----------------------------------
+        position_x, _y      | e->cp.x, e->cp.y     | Center position of detent
+        peak_x, peak_y      | e->coef.pos.x, .y    | Detent size/peak strength
+        range_x, range_y    | e->coef.neg.x, .y    | Detent range/width
+        gate_pos_x, _y      | e->saturation.pos.x/y| Upper gate/bound position
+        gate_neg_x, _y      | e->saturation.neg.x/y| Lower gate/bound position
+        deadband_x, _y      | e->deadband.x, .y    | Deadband size on X/Y axis
+        
+        Args:
+            position_x (int, optional): Center position of detent on X-axis (default: 0).
+                Firmware: e->cp.x
+            position_y (int, optional): Center position of detent on Y-axis (default: 0).
+                Firmware: e->cp.y
+            peak_x (int, optional): Detent size/peak strength on X-axis.
+                Firmware: e->coef.pos.x (e.g., groove_detent_size = 2500)
+            peak_y (int, optional): Detent size/peak strength on Y-axis.
+                Firmware: e->coef.pos.y (e.g., latch_detent_size = 1500)
+            range_x (int, optional): Detent range/width on X-axis.
+                Firmware: e->coef.neg.x (e.g., groove_detent_range = 3000)
+            range_y (int, optional): Detent range/width on Y-axis.
+                Firmware: e->coef.neg.y (e.g., latch_detent_range = 2000)
+            gate_pos_x (int, optional): Upper gate/bound position on X-axis.
+                Firmware: e->saturation.pos.x
+            gate_neg_x (int, optional): Lower gate/bound position on X-axis.
+                Firmware: e->saturation.neg.x
+            gate_pos_y (int, optional): Upper gate/bound position on Y-axis.
+                Firmware: e->saturation.pos.y (e.g., -400 for shifter groove)
+            gate_neg_y (int, optional): Lower gate/bound position on Y-axis.
+                Firmware: e->saturation.neg.y (e.g., -10000 for shifter groove)
+            deadband_x (int, optional): Deadband size on X-axis (default: None).
+                Firmware: e->deadband.x
+            deadband_y (int, optional): Deadband size on Y-axis (default: None).
+                Firmware: e->deadband.y
+        
+        Returns:
+            Self for chaining.
+            
+        Note:
+            The firmware implementation includes automatic features:
+            - 400-unit smoothing range at the edges of the saturation bounds
+            - -1000 damping coefficient applied when force is active
+            - Cross-axis gain modulation based on position within smoothing range
+            
+        Example - Vertical groove detent (from firmware init_hshifter):
+            >>> # Vertical groove at x=2000
+            >>> effect = HapticEffect().detent(
+            ...     position_x=2000,          # e->cp.x = 2000
+            ...     peak_x=2500,              # e->coef.pos.x = groove_detent_size
+            ...     range_x=3000,             # e->coef.neg.x = groove_detent_range
+            ...     gate_pos_y=-400,          # e->saturation.pos.y = -400
+            ...     gate_neg_y=-10000         # e->saturation.neg.y = -10000
+            ... )
+            >>> effect.start()
+            
+        Example - Latch detent (from firmware):
+            >>> effect = HapticEffect().detent(
+            ...     position_y=-3000,         # e->cp.y = -3000
+            ...     peak_y=1500,              # e->coef.pos.y = latch_detent_size
+            ...     range_y=2000,             # e->coef.neg.y = latch_detent_range
+            ...     position_x=2000,          # e->cp.x = 2000
+            ...     peak_x=2500,              # e->coef.pos.x = groove_detent_size
+            ...     range_x=3000,             # e->coef.neg.x = groove_detent_range
+            ...     gate_pos_y=-400,
+            ...     gate_neg_y=-10000
+            ... )
+            >>> effect.start()
+        """
+        self.effect_type = EFFECT_DETENT
+
+        def set_conditions():
+            assert self._h_effect is not None, "Effect must be created before setting condition"
+
+            # X-axis configuration
+            if peak_x is not None or range_x is not None or gate_pos_x is not None or gate_neg_x is not None or deadband_x is not None:
+                cond_x = FFBReport_SetCondition(
+                    parameterBlockOffset=0,
+                    cpOffset=int(position_x),               # e->cp.x
+                    positiveCoefficient=int(peak_x or 0),   # e->coef.pos.x (detent size/peak)
+                    negativeCoefficient=int(range_x or 0),  # e->coef.neg.x (detent range/width)
+                    positiveSaturation=int(gate_pos_x or 0),  # e->saturation.pos.x
+                    negativeSaturation=int(gate_neg_x or 0),   # e->saturation.neg.x
+                    deadBand=int(deadband_x or 0)           # e->deadband.x
+                )
+                self._h_effect.setCondition(cond_x)
+
+            # Y-axis configuration
+            if peak_y is not None or range_y is not None or gate_pos_y is not None or gate_neg_y is not None or deadband_y is not None:
+                cond_y = FFBReport_SetCondition(
+                    parameterBlockOffset=1,
+                    cpOffset=int(position_y),               # e->cp.y
+                    positiveCoefficient=int(peak_y or 0),   # e->coef.pos.y
+                    negativeCoefficient=int(range_y or 0),  # e->coef.neg.y
+                    positiveSaturation=int(gate_pos_y or 0),  # e->saturation.pos.y
+                    negativeSaturation=int(gate_neg_y or 0),   # e->saturation.neg.y
+                    deadBand=int(deadband_y or 0)           # e->deadband.y
+                )
+                self._h_effect.setCondition(cond_y)
+
+        if not self._h_effect:
+            # Store the creation function for lazy initialization
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(EFFECT_DETENT)
+                if not self._h_effect:
+                    return False
+                self._h_effect.setEffect()  # Initialize defaults
+                set_conditions()
+                return True
+
+            self._pending_create = create_and_setup
+        else:
+            # Effect already exists, update parameters directly
+            set_conditions()
+
+        return self
 
     def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
-        if not self._h_effect:
-            self._h_effect = self.device.create_effect(effect_type)
-            self.effect_type = effect_type
-            if not self._h_effect: 
-                return self
+        """Create or update a periodic effect (sine/square/triangle/etc.).
 
+        Direction may be a numeric angle in degrees or a DirectionModulator
+        class; when a modulator class is given it will be instantiated and
+        queried for an updated direction value.
+
+        Args:
+            frequency: Frequency in Hz.
+            magnitude: Magnitude in range [0.0, 1.0].
+            direction: Direction in degrees or a DirectionModulator subclass.
+            effect_type: One of PERIODIC_EFFECTS (defaults to sine).
+            duration: Duration in milliseconds (0 for infinite/continuous).
+
+        Returns:
+            Self for chaining.
+        """
+        # Handle direction modulator
         if isinstance(direction, type) and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+        if not self._h_effect:
+            # Store the creation and setup function
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(effect_type)
+                self.effect_type = effect_type
+                if not self._h_effect: 
+                    return False
+                self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+                return True
+            
+            self._pending_create = create_and_setup
+        else:
+            # Effect exists, update it directly
+            self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+
         return self
 
     def constant(self, magnitude:float, direction:float, *args, **kwargs):
-        """Create and manage CF FFB effect
+        """Create or update a constant (constant force) effect.
 
-        :param magnitude: Effect strength from 0.0 .. 1.0
-        :type magnitude: float
-        :param direction_deg: Angle in degrees
-        :type direction_deg: float
+        Direction may be a numeric angle in degrees or a DirectionModulator
+        class. If the underlying effect is not yet allocated the creation is
+        queued for lazy allocation.
+
+        Args:
+            magnitude: Float in range [0.0, 1.0] representing effect strength.
+            direction: Angle in degrees or a DirectionModulator subclass.
+
+        Returns:
+            Self for chaining.
         """
-        if not self._h_effect:
-            self._h_effect = self.device.create_effect(EFFECT_CONSTANT)
-            self.effect_type = EFFECT_CONSTANT
-            if not self._h_effect: return self
-
+        # Handle direction modulator
         if isinstance(direction, type) and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+        if not self._h_effect:
+            # Store the creation and setup function
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(EFFECT_CONSTANT)
+                self.effect_type = EFFECT_CONSTANT
+                if not self._h_effect: 
+                    return False
+                self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+                return True
+            
+            self._pending_create = create_and_setup
+        else:
+            # Effect exists, update it directly
+            self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+
+        return self
+
+    def envelope(self, attackFromForce=None, decayToForce=None, attackTime=None, decayTime=None, once=False, **kwargs) -> Self:
+        """Set or update envelope parameters for the effect.
+        
+        The envelope can be specified either as individual parameters or as a dict/FFBReport_SetEnvelope.
+        By default, explicitly set envelopes persist across start/stop cycles. Set once=True for one-time use.
+        
+        Args:
+            attackFromForce (int, optional): Force to start from (0-4096). Firmware: attackFromForce
+            decayToForce (int, optional): Force to decay to (0-4096). Firmware: decayToForce
+            attackTime (int, optional): Time in milliseconds to reach sustain level
+            decayTime (int, optional): Time in milliseconds to reach decay level
+            once (bool, optional): If True, envelope is cleared after first use (on stop). Default False.
+            **kwargs: Can include a dict or FFBReport_SetEnvelope instance as 'envelope' key
+        
+        Returns:
+            Self for chaining.
+            
+        Example - Persistent envelope:
+            >>> effect = HapticEffect()
+            >>> effect.constant(magnitude=0.5, direction=90).envelope(
+            ...     attackFromForce=2048, 
+            ...     decayToForce=512,
+            ...     attackTime=500,
+            ...     decayTime=300
+            ... ).start()
+            
+        Example - One-time envelope:
+            >>> effect.constant(magnitude=0.5, direction=90).envelope(
+            ...     attackFromForce=2048,
+            ...     decayToForce=512,
+            ...     attackTime=500,
+            ...     decayTime=300,
+            ...     once=True
+            ... ).start()
+        """
+        # Handle if full envelope object passed via kwargs
+        if 'envelope' in kwargs:
+            env = kwargs['envelope']
+            if isinstance(env, dict):
+                self._pending_envelope = FFBReport_SetEnvelope(**env)
+            elif isinstance(env, FFBReport_SetEnvelope):
+                self._pending_envelope = env
+        else:
+            # Build from individual parameters
+            params = {}
+            if attackFromForce is not None:
+                params['attackFromForce'] = attackFromForce
+            if decayToForce is not None:
+                params['decayToForce'] = decayToForce
+            if attackTime is not None:
+                params['attackTime'] = attackTime
+            if decayTime is not None:
+                params['decayTime'] = decayTime
+            
+            if params:
+                self._pending_envelope = FFBReport_SetEnvelope(**params)
+        
+        # Track if envelope should be cleared after first use
+        self._envelope_once = once
+        
+        # If effect already exists and envelope is set, apply envelope immediately
+        if self._h_effect and self._pending_envelope:
+            self._h_effect.setEnvelope(self._pending_envelope)
+            self._envelope_applied = True
+        
         return self
 
     @property
     def started(self) -> bool:
-        return self._h_effect and self._h_effect.started
+        """Return True when the underlying effect is currently playing."""
+        return bool(self._h_effect and self._h_effect.started)
 
     def start(self, force=False, **kw):
+        """Ensure effect is allocated and start playback.
+
+        Args:
+            force: If True, restart the effect even if it is already playing.
+            **kw: Forwarded to the underlying effect start call (for loopCount
+                or override behavior).
+
+        Returns:
+            Self for chaining.
+        """
+        # Ensure effect is created before starting
+        self._ensure_effect_created()
 
         if self._h_effect and (not self.started or force):
-            caller_frame = inspect.currentframe().f_back
-            caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                caller_frame = inspect.currentframe().f_back
+                caller_name = caller_frame.f_code.co_name
+                logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""
             logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.start(**kw)
@@ -1129,18 +1636,37 @@ class HapticEffect(Destroyable):
         return self
 
     def stop(self, destroy_after : int = 10000):
-        """Stop active effect
+        """Stop playback of the effect and optionally destroy it after a timeout.
 
-        :param destroy_after: Cleanup (destroy) effect if unused for x milliseconds
-        :type destroy_after: int, optional
+        Args:
+            destroy_after: If non-zero, the effect will be destroyed after this
+                many milliseconds of being stopped. Default is 10000 (10s).
+
+        Returns:
+            Self for chaining.
         """
         if self._h_effect and self._h_effect.started:
-            caller_frame = inspect.currentframe().f_back
-            caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                caller_frame = inspect.currentframe().f_back
+                caller_name = caller_frame.f_code.co_name
+                logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.stop()
+            
+            # Clear envelope if it was marked as one-time use
+            if self._envelope_once and self._pending_envelope:
+                clear_envelope = FFBReport_SetEnvelope(
+                    attackFromForce=0,
+                    decayToForce=0,
+                    attackTime=0,
+                    decayTime=0
+                )
+                self._h_effect.setEnvelope(clear_envelope)
+                self._pending_envelope = None
+                self._envelope_applied = False
+                self._envelope_once = False
+            
             if destroy_after:
                 if not self._stopped_time:
                     self._stopped_time = millis()
@@ -1152,16 +1678,23 @@ class HapticEffect(Destroyable):
         return self
 
     def destroy(self):
+        """Deallocate the underlying effect from the device immediately.
+
+        After calling this the effect handle is cleared and subsequent calls
+        that require an allocated effect will recreate it lazily.
+        """
         if self._h_effect:
-            caller_frame = inspect.currentframe().f_back
-            caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                caller_frame = inspect.currentframe().f_back
+                caller_name = caller_frame.f_code.co_name
+                logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.destroy()
             self._h_effect = None
 
     def __del__(self):
+        """Destructor helper to ensure resources are freed."""
         self.destroy()
 
 # unit test

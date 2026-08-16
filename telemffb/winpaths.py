@@ -17,7 +17,8 @@
 #
 
 
-import ctypes, sys
+import ctypes
+import sys
 from ctypes import windll, wintypes
 from uuid import UUID
 

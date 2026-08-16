@@ -1,10 +1,13 @@
 pyqt6==6.9.1
 configobj
+psutil
 pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.zip
-pyzmq
 stransi
 libusb1
 pygetwindow
-requests
 numpy==2.3.0
 akima
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0

@@ -40,10 +40,8 @@ class LogWindow(QMainWindow):
         self.widget = QPlainTextEdit(self.central_widget)
         self.widget.setMaximumBlockCount(20000)
         self.widget.setReadOnly(True)
-        font = QFont("Cascadia mono", 10)
-        font.setFamilies(["Cascadia Mono", "Courier New"])
 
-        self.widget.setFont(font)
+        self.widget.setStyleSheet("font-family: 'Cascadia Mono', 'Courier New', monospace; font-size: 10pt;")
 
         layout = QVBoxLayout(self.central_widget)
         layout.addWidget(self.widget)

@@ -1,0 +1,56 @@
+from typing import override
+import telemffb.utils as utils
+from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+
+
+import logging
+import math
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+
+
+class WindEffectMixIn(AircraftEffectUtilsBase):
+    """Local mixin to encapsulate wind effect state and logic."""
+
+    # user parameters
+    wind_effect_enabled: int = 0
+    wind_effect_scaling: int = 0
+    wind_effect_max_intensity: int = 0
+    # end of user parameters
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.__wind_hpf = utils.HighPassFilter(3)
+        self.__wind_lpf = utils.LowPassFilter(15)
+
+    def ac_update_wind_effect(self, telem_data: BaseTelemetryData):
+        """Apply constant force proportional to instantaneous wind gust speed.
+
+        Telemetry:
+            Read: Wind - Tuple[float, float, float] (m/s); [x, y, z] wind velocity vector;
+                          vector magnitude is HPF/LPF-filtered and scaled by
+                          wind_effect_scaling to produce effect intensity
+        """
+        if not self.is_joystick():
+            return
+        if not self.wind_effect_enabled:
+            self.effects.dispose("wnd")
+            return
+
+        wind = telem_data.Wind or (0, 0, 0)
+        wnd = math.sqrt(wind[0] ** 2 + wind[1] ** 2 + wind[2] ** 2)
+
+        v = self.__wind_hpf.update(wnd)
+        v = self.__wind_lpf.update(v)
+        v = utils.clamp(v, 0, self.wind_effect_max_intensity)
+        v = utils.clamp(v * self.wind_effect_scaling, 0.0, 1.0)
+        if v == 0:
+            self.effects.dispose("wnd")
+            return
+        logging.debug(f"Adding wind effect intensity:{v}")
+        self.effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
+
+    @override
+    def on_telemetry(self, telem_data: BaseTelemetryData):
+        super().on_telemetry(telem_data)
+        self.ac_update_wind_effect(telem_data)

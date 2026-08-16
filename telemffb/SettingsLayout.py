@@ -55,24 +55,39 @@ class SettingsLayout(QGridLayout):
 
     all_sliders = []
     incrvalue = 1
+
+    # Grid column of the value/entry widgets (sliders, dropdowns, buttons).
+    # Each indent level consumes one grid column to its left (expander,
+    # checkbox, label), so this value also sets how deep the row layout can
+    # nest: a label needs ENTRY_COL - 3 >= indent to keep a non-zero span.
+    # ENTRY_COL = 6 supports up to indent 3 (e.g. Axis Control > Trim Following
+    # > AP Following > child); generate_settings_row clamps anything deeper so
+    # labels never collapse to zero width. The value/erase/stretch columns are
+    # all derived from this, so it is the single knob for the entry position.
+    ENTRY_COL = 6
+
     def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
         self.exclusive_list = []
         self.parent_expander_dict = {}
+        self.revert_targets = {}  # per-setting: value the setting resolves to without the user override
         result = None
         if G.settings_mgr.current_sim != 'nothing':
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
 
         self.mainwindow = mainwindow
-        if result is not None:
+        if result:
             self.build_rows(result)
+        else:
+            self._build_empty_notice()
         self.device = HapticEffect()
-        self.setColumnMinimumWidth(7, 20)
+        self.setColumnMinimumWidth(self.ENTRY_COL + 2, 20)  # value column
         self.trigger_form_reload = True
         self.advanced_spring_settings = None
         self.adv_spr_dialog = None
         self.advanced_g_settings = None
         self.adv_g_dialog = None
+        self.unit_previous_values = {}  # Track previous unit for conversion
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -145,10 +160,27 @@ class SettingsLayout(QGridLayout):
                 else:
                     item['parent_expanded'] = 'false'
 
-    def is_top_level_expanded(self, item, datalist):
+    def is_top_level_expanded(self, item, datalist, _visited=None):
         """
         Recursively check if the top-level parent of `item` is in self.expanded_items.
+
+        `_visited` guards against cyclic / self-referential prereq chains. One can
+        arise when a mid-chain parent is dropped during the settings merge: e.g. with
+        `telemffb_controls_axes=false`, eliminate_no_prereq removes `enable_custom_x_axis`
+        but leaves its child `custom_x_axis` orphaned. The substring parent lookup below
+        then matches the orphan's prereq (`enable_custom_x_axis`) against the only
+        surviving name that is a substring of it -- `custom_x_axis` itself -- so the row
+        becomes its own parent. Without this guard that recurses until Python's limit and
+        takes the whole settings form down with a RecursionError (wiping every setting).
         """
+        if _visited is None:
+            _visited = set()
+        if item['name'] in _visited:
+            # Cycle / dangling self-reference: treat as not expanded so the orphaned
+            # row is simply hidden rather than crashing the form.
+            return False
+        _visited.add(item['name'])
+
         prereq = item.get('prereq', '')
         if not prereq:
             # Reached the top-level item
@@ -165,7 +197,7 @@ class SettingsLayout(QGridLayout):
             return False
 
         # Recurse upward
-        return self.is_top_level_expanded(parent_item, datalist)
+        return self.is_top_level_expanded(parent_item, datalist, _visited)
 
     def is_visible(self, datalist):
         for item in datalist:
@@ -212,6 +244,61 @@ class SettingsLayout(QGridLayout):
             # for things not showing debugging:
             # if iv.lower() == 'true':
             #     print (f"{item['displayname']} visible because {cond}")
+
+    def apply_conditional_gates(self, datalist):
+        """Apply the cross-tree `render_prereq` / `enable_prereq` gates.
+
+        Unlike `prereq` (which is both tree parentage and visibility), these
+        gate a setting on the current value of *other* bool settings anywhere
+        in the tree:
+
+          - `render_prereq` failing -> hide the row (is_visible = 'false').
+          - `enable_prereq` failing -> keep it visible but disabled, with an
+            explanatory tooltip stored on the item.
+
+        Grammar (both fields): comma-separated tokens; `name` requires that
+        setting be true, `!name` requires it false; ALL tokens must pass.
+        A referenced setting absent from the resolved set is treated as false.
+        Runs after is_visible() so it can override visibility, and before
+        eliminate_invisible() so hidden rows are dropped.
+        """
+        values = {it['name']: (it.get('value') or '') for it in datalist}
+        displaynames = {it['name']: (it.get('displayname') or it['name']).strip() for it in datalist}
+
+        def evaluate(expr):
+            """Return (passed, [(ref, is_true), ...failing tokens])."""
+            failing = []
+            for token in expr.split(','):
+                token = token.strip()
+                if not token:
+                    continue
+                want_true = not token.startswith('!')
+                ref = token[1:].strip() if token.startswith('!') else token
+                is_true = str(values.get(ref, 'false')).strip().lower() == 'true'
+                if is_true != want_true:
+                    failing.append((ref, is_true))
+            return (not failing), failing
+
+        def reason(failing):
+            parts = [f"{displaynames.get(ref, ref)} is {'enabled' if is_true else 'disabled'}"
+                     for ref, is_true in failing]
+            return "Disabled because " + " and ".join(parts)
+
+        for item in datalist:
+            item['force_disabled'] = False
+            item['disabled_reason'] = ''
+
+            render_expr = (item.get('render_prereq') or '').strip()
+            if render_expr and not evaluate(render_expr)[0]:
+                item['is_visible'] = 'false'
+
+            enable_expr = (item.get('enable_prereq') or '').strip()
+            if enable_expr and item.get('is_visible', 'false').lower() == 'true':
+                passed, failing = evaluate(enable_expr)
+                if not passed:
+                    item['force_disabled'] = True
+                    item['disabled_reason'] = reason(failing)
+        return datalist
 
     def eliminate_invisible(self, datalist):
         newlist = []
@@ -371,6 +458,7 @@ class SettingsLayout(QGridLayout):
         self.append_prereq_count(sorted_data)
         self.add_expanded(sorted_data)
         self.is_visible(sorted_data)
+        self.apply_conditional_gates(sorted_data)
         self.get_parent_indent(sorted_data)
         newlist = self.eliminate_invisible(sorted_data)
 
@@ -385,7 +473,7 @@ class SettingsLayout(QGridLayout):
         i = 0
         for item in newlist:
             bumped_up = item['order'][-1:] == '1' and '.' in item['order']
-            rowdisabled = False
+            rowdisabled = bool(item.get('force_disabled', False))
             addrow = False
             is_expnd = is_expanded(item)
             # print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
@@ -404,7 +492,7 @@ class SettingsLayout(QGridLayout):
 
         # Give entry column a high stretch factor, all others remain default 0.
         # When window is resized, the entry column will grow to take up all the new space
-        self.setColumnStretch(5, 10)
+        self.setColumnStretch(self.ENTRY_COL, 10)
 
         # print (f"{i} rows with {self.count()} widgets")
 
@@ -423,14 +511,158 @@ class SettingsLayout(QGridLayout):
         # stack = inspect.stack()
         # for frame_info in stack:
         #     dbprint("green", f"Function {frame_info.function} in {frame_info.filename} at line {frame_info.lineno}")
-        self.clear_layout()
+        # Remember where the user was looking so the rebuilt form lands back at the
+        # same row, instead of drifting by the pixel height of whatever changed above.
+        scroll_anchor = self._capture_scroll_anchor()
+        self.clear_layout(show_empty_notice=False)
+        # Clear unit tracking when reloading layout
+        self.unit_previous_values = {}
+        self.revert_targets = {}
         if result is None:
             cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name, G.settings_mgr.current_class)
             G.settings_mgr.current_pattern = pat
-        if result is not None:
+        if result:
             self.build_rows(result)
+            # Restore once the event loop has applied the freshly built geometry.
+            QtCore.QTimer.singleShot(0, lambda: self._restore_scroll_anchor(scroll_anchor))
+        else:
+            self._build_empty_notice()
 
-    def clear_layout(self):
+    def _settings_scroll_area(self):
+        """The QScrollArea hosting this settings layout, or None when it is not
+        reachable (headless child instance, teardown, detached-tab edge cases)."""
+        mw = getattr(self, 'mainwindow', None)
+        if mw is None:
+            return None
+        return getattr(mw, 'settings_area', None)
+
+    def _capture_scroll_anchor(self):
+        """Before a rebuild, pick a setting row to keep visually pinned and record
+        where it currently sits in the viewport.
+
+        Hybrid choice of anchor:
+          1. the row under the mouse cursor -- the one being edited, i.e. "keep it
+             where my mouse is";
+          2. failing that (cursor not over the form), the top-most row visible in
+             the viewport.
+
+        Returns (setting_name, viewport_y) or None if there is nothing to anchor to.
+        The raw scrollbar value is deliberately NOT used: it is a pixel offset, so
+        any change in the height of content above the viewport shifts every row.
+        """
+        try:
+            area = self._settings_scroll_area()
+            if area is None:
+                return None
+            viewport = area.viewport()
+            rows = []
+            for i in range(self.count()):
+                w = self.itemAt(i).widget()
+                if w is None or not w.isVisible():
+                    continue
+                obj = w.objectName()
+                if not obj.startswith('namelabel_'):
+                    continue
+                y = w.mapTo(viewport, QtCore.QPoint(0, 0)).y()
+                rows.append((obj[len('namelabel_'):], y))
+            if not rows:
+                return None
+            vp_h = viewport.height()
+            cur = viewport.mapFromGlobal(QCursor.pos())
+            if 0 <= cur.x() <= viewport.width() and 0 <= cur.y() <= vp_h:
+                # The row the cursor is in = greatest label-top not below the cursor.
+                at_or_above = [r for r in rows if r[1] <= cur.y()]
+                if at_or_above:
+                    return max(at_or_above, key=lambda r: r[1])
+            # Fallback: the row closest to the top edge of the viewport.
+            in_view = [r for r in rows if 0 <= r[1] <= vp_h]
+            return min(in_view or rows, key=lambda r: abs(r[1]))
+        except Exception:
+            logging.exception("scroll-anchor capture failed")
+            return None
+
+    def _restore_scroll_anchor(self, anchor, _prev_y=None, _tries=0):
+        """After the rebuild, scroll so the anchored setting is back at the same
+        viewport offset it had before. No-op if the setting is gone (e.g. it was
+        hidden by the very change that triggered the reload).
+
+        Freshly built rows are not positioned synchronously: Qt performs the grid
+        layout on a later event-loop pass, and until it does a new row's
+        mapTo(content) reports y=0 (activate()/adjustSize() do NOT force it). If we
+        committed the scroll then, the target would clamp to the wrong row -- the
+        "jumps a row" bug, which only surfaced once the form was tall enough that
+        the correct offset was non-zero. So re-post via singleShot until the
+        measured position is stable across two passes, then set the scrollbar
+        exactly once: correct, and without a visible flicker to a wrong spot.
+        """
+        if not anchor:
+            return
+        try:
+            name, target_y = anchor
+            area = self._settings_scroll_area()
+            if area is None:
+                return
+            content = area.widget()
+            if content is None:
+                return
+            target = None
+            for i in range(self.count()):
+                w = self.itemAt(i).widget()
+                if w is not None and w.objectName() == f'namelabel_{name}':
+                    target = w
+                    break
+            if target is None or not target.isVisible():
+                return
+            new_y = target.mapTo(content, QtCore.QPoint(0, 0)).y()
+            if new_y != _prev_y and _tries < 8:
+                # Layout not settled yet -- wait one more pass before committing.
+                QtCore.QTimer.singleShot(
+                    0, lambda: self._restore_scroll_anchor(anchor, new_y, _tries + 1))
+                return
+            area.verticalScrollBar().setValue(new_y - target_y)
+        except Exception:
+            logging.exception("scroll-anchor restore failed")
+
+    def _build_empty_notice(self):
+        """Populate the (empty) layout with guidance instead of leaving the
+        Settings tab an unexplained blank when there is nothing to edit."""
+        notice = QLabel()
+        notice.setTextFormat(Qt.TextFormat.RichText)
+        notice.setWordWrap(True)
+        if G.settings_mgr.offline_mode:
+            notice.setText(
+                "<h3>Offline editing mode</h3>"
+                "<p>Use the <i>Offline Editor Setup</i> panel above to choose what to edit — "
+                "the settings will appear here. The scope you select determines how widely "
+                "your changes apply:</p>"
+                "<ul>"
+                "<li><b>Sim only</b> — changes apply to every class and aircraft within that "
+                "sim, unless overridden at a lower level.</li>"
+                "<li><b>Sim and class</b> — changes apply to every aircraft of that class "
+                "within the sim, unless overridden for a specific aircraft.</li>"
+                "<li><b>Specific aircraft</b> — also select the profile you wish to edit; "
+                "changes apply to that aircraft/profile only.</li>"
+                "</ul>")
+        else:
+            text = (
+                "<h3>No aircraft loaded</h3>"
+                "<p>Settings are per-aircraft: start one of your enabled sims and load an "
+                "aircraft, and its settings will appear here automatically.</p>")
+            if G.master_instance:
+                text += (
+                    "<p>To view or edit profiles without running a sim, open the offline editor "
+                    "(<i>Profiles &rarr; Offline Profile\\Sim Default\\Class Default Mode</i>).</p>")
+            notice.setText(text)
+        self.addWidget(notice, 0, 1, 1, 6)
+        if not G.settings_mgr.offline_mode and G.master_instance and self.mainwindow is not None:
+            btn = QPushButton('Open Offline Editor')
+            btn.clicked.connect(lambda checked=False: self.mainwindow.toggle_offline_mode(True))
+            self.addWidget(btn, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.addItem(spacer, 2, 1)
+        self.setColumnStretch(self.ENTRY_COL, 10)
+
+    def clear_layout(self, show_empty_notice=True):
         layout = self.layout()
         if layout is not None:
             while layout.count():
@@ -443,6 +675,11 @@ class SettingsLayout(QGridLayout):
                     if sub_layout:
                         self._clear_sub_layout(sub_layout)
                         sub_layout.deleteLater()
+        # Direct clears (sim exit, offline transitions) leave the tab empty;
+        # show the guidance notice rather than a blank page. reload_layout
+        # passes False because it decides rows-vs-notice itself.
+        if show_empty_notice:
+            self._build_empty_notice()
 
     def _clear_sub_layout(self, layout):
         while layout.count():
@@ -493,7 +730,7 @@ class SettingsLayout(QGridLayout):
         exp_col = 0
         chk_col = 1
         lbl_col = 2
-        entry_col = 5
+        entry_col = self.ENTRY_COL
         unit_col = entry_col + 1
         val_col = unit_col + 1
         erase_col = val_col + 1
@@ -544,10 +781,16 @@ class SettingsLayout(QGridLayout):
             lbl_col = 0
             item['indent'] = -1
         else:
-            exp_col = item['indent']
+            # Each indent level shifts expander/checkbox/label one grid column
+            # right. Clamp so the label column can never reach entry_col (which
+            # would leave the label a zero-width, mis-rendered cell). Nesting
+            # deeper than the grid can show still reads via the leading-space
+            # indentation baked into the displayname.
+            eff_indent = min(item['indent'], entry_col - 3)
+            exp_col = eff_indent
             chk_col = exp_col + 1
             lbl_col = chk_col + 1
-        lbl_colspan = entry_col - lbl_col
+        lbl_colspan = max(1, entry_col - lbl_col)
 
 
         # booleans get a checkbox
@@ -582,6 +825,10 @@ class SettingsLayout(QGridLayout):
                 checkbox.setToolTip(f"{chk_col}")
             self.addWidget(checkbox, i, chk_col)
             checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
+            if item.get('force_disabled'):
+                # enable_prereq: the toggle is inert (another setting overrides
+                # it), so disable it too — rowdisabled only greys value widgets.
+                checkbox.setDisabled(True)
 
         if item['unit'] is not None and item['unit'] != '':
             entry_colspan = 1
@@ -601,6 +848,9 @@ class SettingsLayout(QGridLayout):
             self.addWidget(unit_dropbox, i, unit_col)
             unit_dropbox.blockSignals(False)
             unit_dropbox.setDisabled(rowdisabled)
+            
+            # Store the initial unit value for conversion tracking
+            self.unit_previous_values[item['name']] = item['unit']
 
 
         if item['order'][-1:] == '1' and '.' in item['order']:
@@ -609,7 +859,14 @@ class SettingsLayout(QGridLayout):
                 self.remove_widget(olditem)
 
         cdb = f"{lbl_col} {lbl_colspan} ind:{item['indent']} " if self.show_col_debug else ''
-        label.setToolTip(f"{cdb}{item['info']}")
+        tip = item['info']
+        if item.get('force_disabled') and item.get('disabled_reason'):
+            # While disabled, show ONLY the reason: the config info is moot when
+            # the setting is inert, and appending it (plain text) alongside the
+            # info's HTML <br> tags breaks Qt's tooltip rich-text detection so
+            # the <br>s render literally.
+            tip = item['disabled_reason']
+        label.setToolTip(f"{cdb}{tip}")
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
 
         slider = NoWheelSlider()
@@ -1009,6 +1266,16 @@ class SettingsLayout(QGridLayout):
             self.adv_spr_button.clicked.connect(lambda: self.advanced_spring_button_clicked(self.advanced_spring_settings))
             self.addWidget(self.adv_spr_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        if item['datatype'] == 'trimcal':
+            b_txt = 'Calibrate...' if item['value'] == "none" else "View / Recalibrate..."
+            self.trim_cal_button = QPushButton(b_txt)
+            self.trim_cal_button.setMinimumWidth(150)
+            self.trim_cal_button.setMinimumHeight(25)
+            self.trim_cal_button.setObjectName(f"trimcal_{item['name']}")
+            self.trim_cal_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.trim_cal_button.clicked.connect(self.trim_cal_button_clicked)
+            self.addWidget(self.trim_cal_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
+
         if item['datatype'] == 'configurator':
             self.configurator_button = QPushButton("Configure Gain Overrides")
 
@@ -1058,12 +1325,31 @@ class SettingsLayout(QGridLayout):
             expand_button.setVisible(False)
 
 
-        label.setDisabled(rowdisabled)
+        # Keep the InfoLabel enabled when force-disabled by enable_prereq so its
+        # info-icon tooltip still shows the reason on hover (disabled widgets
+        # swallow tooltip events); grey its text via stylesheet instead so it
+        # still reads as disabled. Normal (bool-off) rows disable it outright.
+        if item.get('force_disabled'):
+            label.setTextStyleSheet("color: #808080;")
+        else:
+            label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
         d_slider.setDisabled(rowdisabled)
         df_slider.setDisabled(rowdisabled)
         line_edit.setDisabled(rowdisabled)
         expand_button.setDisabled(rowdisabled)
+        # The +/- step buttons and value readout weren't disabled, so a
+        # "disabled" slider was still nudge-able and the value looked live.
+        m_butt.setDisabled(rowdisabled)
+        p_butt.setDisabled(rowdisabled)
+        value_label.setDisabled(rowdisabled)
+        if rowdisabled:
+            # Qt's default disabled frame looks bad on these borderless +/-
+            # glyphs; keep them borderless and just grey the glyph colour.
+            _pm_disabled_css = ('QPushButton[buttonType="p_m_button"] { color: #808080; '
+                                'border: none; background-color: transparent; }')
+            m_butt.setStyleSheet(_pm_disabled_css)
+            p_butt.setStyleSheet(_pm_disabled_css)
 
         self.parent().parent().parent().addSlider(slider)
         self.parent().parent().parent().addSlider(d_slider)
@@ -1126,6 +1412,20 @@ class SettingsLayout(QGridLayout):
         if include_action:
             action_item.setVisible(True)
 
+        # Remember what this setting would revert to if the user-scope override
+        # were erased, so write_or_revert() can auto-erase the override when the
+        # user dials the value back to it. Overridden rows revert to the value
+        # the merge stashed beneath the override; clean rows "revert" to their
+        # current value (writing that back would just create a redundant override).
+        # Only the action_item widget is in the layout, so when the row shows the
+        # sim/class override info icon instead of the erase button, toggling the
+        # icon requires a form rebuild - record which one this row got.
+        eb_in_layout = action_item is erase_button
+        if item['replaced'].lower() == replace_scope.lower():
+            self.revert_targets[item['name']] = (item.get('prior_value'), item.get('prior_unit', ''), True, eb_in_layout)
+        else:
+            self.revert_targets[item['name']] = (item['value'], item['unit'], False, eb_in_layout)
+
         self.setRowStretch(i, 0)
 
 
@@ -1134,12 +1434,16 @@ class SettingsLayout(QGridLayout):
             labeltext = item["name"] if self.show_settings_names else item["displayname"]
             if '.0' not in item['order']:
                 # label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
-                clickaction = "Expand" if item['name'] not in self.expanded_items else "Collapse"
+                can_expand = item['name'] not in self.expanded_items
+                clickaction = "Expand" if can_expand else "Collapse"
                 label.text_label.setToolTip(f'Click to {clickaction}')
                 label.setClickable(True)
                 label.clicked.connect(expand_button.click)
                 if item['datatype'] == 'group':
                     label.text_label.setStyleSheet(styles.GROUP_LABEL_STYLESHEET)
+                    symbol = "►" if can_expand else "▼"
+                    label.text_label.setText(f"{symbol} {labeltext}")
+
                 else:
                     label.text_label.setStyleSheet(styles.EXPAND_LABEL_STYLESHEET)
 
@@ -1162,7 +1466,7 @@ class SettingsLayout(QGridLayout):
                 label.clicked.connect(lambda parent_name=parent: self.expander_hyperlink_clicked(parent_name))
 
     def expander_hyperlink_clicked(self, parent):
-        dbprint("red", f"EXPANDER: {parent}")
+        # dbprint("red", f"EXPANDER: {parent}")
         parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
         if parent_expand_button is not None:
             parent_expand_button.click()
@@ -1182,6 +1486,62 @@ class SettingsLayout(QGridLayout):
             eb.setToolTip("Reset to Default")
         else:
             logging.info(f"Can't find erase button for '{setting}'.  Probably child device being configured via master")
+
+    def hide_erase_button(self, setting_name):
+        eb = self.mainwindow.findChild(QPushButton, f"eb_{setting_name}")
+        if eb is not None:
+            eb.setVisible(False)
+            eb.setToolTip("")
+        else:
+            logging.info(f"Can't find erase button for '{setting_name}'.  Probably child device being configured via master")
+
+    @staticmethod
+    def setting_values_equal(new_value, target_value):
+        if target_value is None:
+            return False
+        a = str(new_value).strip()
+        b = str(target_value).strip()
+        if a.lower() == b.lower():
+            return True
+        # settings are stored as strings; equal numbers can be formatted
+        # differently (e.g. '0.5' from a spinbox vs '0.50' in defaults)
+        try:
+            return float(a) == float(b)
+        except ValueError:
+            return False
+
+    def write_or_revert(self, setting_name, value, unit=''):
+        """Write the setting to the user config, unless the new value matches what
+        the setting would resolve to without the user-scope override - in that case
+        erase the override (or skip the redundant write) so the setting reverts to
+        its inherited/default value and the erase button disappears.
+        Returns True when the change was handled by erasing/skipping."""
+        target = self.revert_targets.get(setting_name)
+        if target is not None and setting_name != 'type':
+            t_value, t_unit, has_override, eb_in_layout = target
+            if (unit or '') == (t_unit or '') and self.setting_values_equal(value, t_value):
+                if has_override:
+                    logging.debug(f"Setting '{setting_name}' changed back to its inherited value '{t_value}' - erasing the override")
+                    G.settings_mgr.erase_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, setting_name)
+                    self.revert_targets[setting_name] = (t_value, t_unit, False, eb_in_layout)
+                    if eb_in_layout:
+                        self.hide_erase_button(setting_name)
+                    # rebuild the form (same as a manual erase click) so the
+                    # action icon reflects the layer now in effect, e.g. a
+                    # sim/class override icon hiding under the erased override
+                    self.trigger_form_reload = True
+                return True
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
+        if target is not None:
+            t_value, t_unit, _, eb_in_layout = target
+            self.revert_targets[setting_name] = (t_value, t_unit, True, eb_in_layout)
+            if not eb_in_layout:
+                # the row shows the sim/class override info icon instead of the
+                # erase button; only a form rebuild can swap in the erase button
+                self.trigger_form_reload = True
+                return False
+        self.show_erase_button(f'eb_{setting_name}')
+        return False
 
     def remove_widget(self, olditem):
         widget = olditem.widget()
@@ -1211,9 +1571,9 @@ class SettingsLayout(QGridLayout):
         if value == 'true' and enforce_list is not None:
             for exclusive in enforce_list:
                 #enforce_list is a list of settings that must not be true if 'value' is true (per exclusive attribute in defauls.xml)
-                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, "false", exclusive)
+                self.write_or_revert(exclusive, "false")
 
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, name)
+        self.write_or_revert(name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1248,9 +1608,7 @@ class SettingsLayout(QGridLayout):
 
             if validate_vpconf_profile(file_path, pid=usbpid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
-                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, file_path, 'vpconf')
-
-                self.show_erase_button('config_vpconf')
+                self.write_or_revert('vpconf', file_path)
                 self.vpconf_browse_button.setText(os.path.basename(file_path))
                 if G.settings_mgr.timed_out:
                     self.reload_caller()
@@ -1260,8 +1618,7 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('sb_', '')
         value = str(self.sender().value())
         logging.debug(f"Spin Box {setting_name} changed. New value: {value}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1270,8 +1627,7 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('le_', '')
         value = self.sender().text()
         logging.debug(f"Textbox {setting_name} changed. New value: {value}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1280,8 +1636,12 @@ class SettingsLayout(QGridLayout):
         sender = self.sender()
 
         if isinstance(sender, QtWidgets.QLineEdit):
-            # True when sender is a editable ComboBox (i.e. 'anylist')
-            combo = sender.parent()  # QComboBox is the parent of the QLineEdit
+            combo = sender.parent()  # QComboBox parent of QLineEdit
+
+            # If the popup is open, this "editingFinished" is just focus moving
+            # into the dropdown list — don't treat it as a commit.
+            if combo.view() is not None and combo.view().isVisible():
+                return
         else:
             combo = sender
 
@@ -1296,30 +1656,70 @@ class SettingsLayout(QGridLayout):
             value = combo.currentText()
 
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
-        G.settings_mgr.write_to_xml(
-            G.settings_mgr.current_sim,
-            G.settings_mgr.current_class,
-            G.settings_mgr.current_pattern,
-            value,
-            setting_name
-        )
-
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value)
         if G.settings_mgr.timed_out:
             self.reload_caller()
+
+    @staticmethod
+    def convert_unit_value(value_str, from_unit, to_unit):
+        """
+        Convert a value from one unit to another using the canonical
+        utils._UNIT_CONVERSIONS factors (the same table the load-time value
+        parser uses).
+        Returns the converted value as a string, or the original if the
+        conversion is not supported.
+        """
+        try:
+            value = float(value_str)
+        except (ValueError, TypeError):
+            return value_str
+
+        converted_value = utils.convert_between_units(value, from_unit, to_unit)
+        if converted_value is None:
+            return value_str
+
+        # Tenths are plenty: the telemetry these values compare against isn't
+        # meaningful below that, and one decimal keeps conversion round trips
+        # stable (7 m/s -> 13.6 kt -> 7 m/s).
+        formatted = f"{converted_value:.1f}"
+        # trim trailing zeros so "14.0" writes as "14"
+        return formatted.rstrip('0').rstrip('.') or '0'
 
     def unit_dropbox_changed(self):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('ud_', '')
         line_edit_name = 'vle_' + self.sender().objectName().replace('ud_', '')
         line_edit = self.mainwindow.findChild(QLineEdit, line_edit_name)
-        value = ''
-        unit = self.sender().currentText()
-        if line_edit is not None:
-            value = line_edit.text()
-        logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
-        self.show_erase_button()
+        new_unit = self.sender().currentText()
+
+        # Get the previous unit for this setting
+        old_unit = self.unit_previous_values.get(setting_name, new_unit)
+
+        if line_edit is None:
+            # No text-entry widget for this row (no such rows exist today):
+            # record the unit but never write an empty value over the setting.
+            self.unit_previous_values[setting_name] = new_unit
+            logging.warning(f"Unit change on {setting_name} has no value widget; not writing")
+            return
+
+        old_value = line_edit.text()
+
+        # Convert value if units changed
+        if old_unit != new_unit:
+            value = self.convert_unit_value(old_value, old_unit, new_unit)
+            # Update the line edit with converted value
+            line_edit.blockSignals(True)
+            line_edit.setText(value)
+            line_edit.blockSignals(False)
+            logging.debug(f"Unit conversion: {old_value}{old_unit} -> {value}{new_unit}")
+        else:
+            value = old_value
+
+        # Store the current unit for next time
+        self.unit_previous_values[setting_name] = new_unit
+
+        logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{new_unit}")
+        self.write_or_revert(setting_name, value, new_unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1333,8 +1733,7 @@ class SettingsLayout(QGridLayout):
             unit = unit_dropbox.currentText()
         value = self.sender().text()
         logging.debug(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
-        self.show_erase_button()
+        self.write_or_revert(setting_name, value, unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1381,8 +1780,7 @@ class SettingsLayout(QGridLayout):
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText(str(value))
         if str(value) != '0':
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(value), button_name)
-            self.show_erase_button(setting_name=f'pb_{button_name}')
+            self.write_or_revert(button_name, str(value))
         else:
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
@@ -1445,7 +1843,11 @@ class SettingsLayout(QGridLayout):
         else:
             G.gain_override_dialog.revert_gains()
             G.gain_override_dialog.reset_to_vpconf()
-            G.main_window.status_container.set_active_configurator(active=False)
+            # Keep the canonical flag in sync (children report it to the
+            # master over IPC) and refresh scope-aware rather than directly.
+            if G.telem_manager is not None:
+                G.telem_manager.gain_overrides_active = False
+            G.main_window.refresh_scope_status_indicators(force=True)
 
     def update_advanced_g_effect(self, g_effect_curves: str):
         self.trigger_form_reload = True
@@ -1456,6 +1858,75 @@ class SettingsLayout(QGridLayout):
         self.show_erase_button("config_gforce_effect_adv_curve")
         # self.adv_spr_button.setText("Edit Spring Gains")
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
+        self.reload_caller()
+
+    def trim_cal_button_clicked(self):
+        """Open the elevator trim calibration dialog from the settings row.
+
+        Reuses the MainWindow-owned dialog instance (created on first use)
+        so the settings-row button and the Utilities menu share one window.
+        """
+        G.main_window.open_trim_calibration_dialog()
+
+    def save_trim_calibration(self, payload_json: str):
+        """Persist the auto-calibration state for the current aircraft.
+
+        Connected to TrimCalibrationDialog.result_saved. The payload carries
+        the multi-speed curve family ("curves", written as the family JSON),
+        the use-curve choice, and optionally the trimmed-stick-position
+        mode. A legacy "curve" (single dict) payload is accepted and
+        wrapped. The static virtual_y gain is deliberately NOT written —
+        the curve is the product, and the gain is entangled with the
+        physical-gain setting at solve time. Mirrors the write + reload
+        pattern of the advanced spring editor.
+        """
+        try:
+            payload = json.loads(payload_json)
+        except json.JSONDecodeError:
+            logging.error("Invalid trim calibration payload; nothing saved")
+            return
+        self.trigger_form_reload = True
+        sim = G.settings_mgr.current_sim
+        cls = G.settings_mgr.current_class
+        pattern = G.settings_mgr.current_pattern
+        curves = payload.get("curves")
+        if curves is None:
+            curve = payload.get("curve")
+            curves = [curve] if curve else []
+        speeds = ", ".join(f"{float(c.get('ias_kt') or 0):.0f}" for c in curves)
+        logging.info(
+            f"Trim calibration saved: {len(curves)} speed(s) ({speeds} kt) "
+            f"for '{pattern}' [{sim}]"
+            + (f", stick position '{payload['stick_position']}'"
+               if payload.get("stick_position") else ""))
+        G.settings_mgr.write_to_xml(
+            sim, cls, pattern,
+            json.dumps({"curves": curves}) if curves else "none",
+            "joystick_trim_follow_curve_y")
+        G.settings_mgr.write_to_xml(
+            sim, cls, pattern,
+            "true" if payload.get("use_curve") else "false",
+            "joystick_trim_follow_use_curve_y")
+        if payload.get("stick_position"):
+            G.settings_mgr.write_to_xml(
+                sim, cls, pattern,
+                payload["stick_position"], "joystick_trim_follow_stick_position")
+        # Reveal the erase-override button on the curve row: with shipped
+        # default calibrations, erasing the user override means "revert to
+        # the factory calibration".
+        self.show_erase_button("config_joystick_trim_follow_curve_y")
+        self.reload_caller()
+
+    def save_trim_position_mode(self, value: str):
+        """Persist the trimmed-stick-position mode alone — the calibration
+        dialog's pulldown is usable post-calibration without a fresh run."""
+        self.trigger_form_reload = True
+        logging.info(f"Trimmed stick position set to '{value}' for "
+                     f"'{G.settings_mgr.current_pattern}'")
+        G.settings_mgr.write_to_xml(
+            G.settings_mgr.current_sim, G.settings_mgr.current_class,
+            G.settings_mgr.current_pattern, value,
+            "joystick_trim_follow_stick_position")
         self.reload_caller()
 
     def update_advanced_spring_gains(self, spring_gain_curves: str, scale: str, units: str):
@@ -1517,15 +1988,8 @@ class SettingsLayout(QGridLayout):
             )
 
         if write:
-            G.settings_mgr.write_to_xml(
-                G.settings_mgr.current_sim,
-                G.settings_mgr.current_class,
-                G.settings_mgr.current_pattern,
-                str(decimal_value),  # stored as decimal percent
-                setting_name,
-                unit
-            )
-            self.show_erase_button()
+            # stored as decimal percent
+            self.write_or_revert(setting_name, str(decimal_value), unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1547,8 +2011,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1568,8 +2031,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1595,8 +2057,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save, unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1622,8 +2083,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
-            self.show_erase_button()
+            self.write_or_revert(setting_name, value_to_save, unit)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
