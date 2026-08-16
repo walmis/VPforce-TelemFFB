@@ -1,7 +1,7 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  July 2026 - Draft
+##  August 2026 - Draft
 ############################################
 ## Platform
 - **NEW: Aircraft profile notes**
@@ -12,8 +12,6 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Exception tracking and reporting system
   - New runtime exception tracker with UI viewer showing recent error history
   - Support bundle improvements: now includes DCS logs and Export.lua; switched to LZMA compression for smaller archives
-  - Automatic error deduplication prevents repeated alerts for the same issue
-  - Child instance exceptions are forwarded to the master instance so all errors are visible in one place
 - In-app updater rewritten for reliability: per-phase progress (download/backup/extract), live status log, and auto-close-and-launch option
 - FFB Device Management enhancements
   - Auto-assign device paths for unconfigured slots on startup; selections are persisted in system settings
@@ -49,26 +47,15 @@ This is not an exhaustive change log (see github for that).  This file only outl
 
 ## MSFS / X-Plane
 - **NEW: Automated Elevator Trim-Following Calibration** (fixed wing)
-  - Trim following has always assumed a 1:1 relationship between trim position and the elevator input needed to stay level - many aircraft (especially 3rd party) are far from 1:1, causing the nose to wander when trimming with the stick held
-  - The new calibration tool flies a short automated routine (trim neutralization, then a sweep across the trim range) and measures the actual elevator input required to hold level flight at each trim position
-  - Produces a calibrated non-linear trim-following curve plus a (legacy) equivalent static gain value - with the curve enabled, the virtual stick tracks your aircraft's real trim response across the whole band
-  - Multi-speed calibration: run the routine at more than one airspeed and the results are blended into a single curve for better trim response across the speed range
-  - Trimmed stick position modes: choose how the stick rests when the aircraft is trimmed - 'Follows Trim' (cable/trim-tab aircraft: the stick rides the trim position like the real linkage) or 'Stays Centered' (airliners, FBW, and boosted-control aircraft: trimmed flight always re-centers the stick). Jets default to centered automatically; either way, out-of-trim force behavior is identical
-  - Glider support: gliders can't hold level flight, so the calibration holds a steady descent instead - pick a target sink rate, and adjust it live while the assistant holds to change your test airspeed (a glider's speed follows its sink rate)
-  - Results are plotted in the dialog; you can Apply and test live in the sim before saving to the aircraft profile
-  - Wizard-style guided flow walks you through the whole calibration process step by step, with step indicators showing when TelemFFB is flying and when it's waiting on you
-  - Review and manage your stored calibration speeds from the dialog - page through them on the graph, delete individual speeds, or clear the set
-  - Suggested calibration speeds are derived automatically from the aircraft's own speed envelope (guidance only, not required calibration speed)
-  - Calibration sets can be exported/imported for sharing between users
-  - When an aircraft with no stored calibration loads, a prompt appears in the main window offering one-click access to the calibration tool
-  - Factory calibrations included out of the box for several default aircraft (MSFS 2024: C172, C152, C208B, SR22T, Citation, Vision Jet, DG-1001E Neo | X-Plane 12: C172, SR22, RV-10)
-  - Control Response selector (Normal/Reduced/Minimal) tames the routine on pitch-sensitive aircraft
-  - NOTE: Some advanced or quirky aircraft have proven to be non-calibratable - e.g. trim authority that overpowers full elevator deflection, or extreme trim sensitivity or enbedded computer systems which manipulate the trim automatically and can not be disabled.
-- **NEW: 'Dynamic' stall buffet style**
-  - New Buffet Style selector for the AoA/Stall Buffeting effect ('Classic', the original effect, remains the default)
-  - Dynamic renders irregular, gusty shaking that surges and ebbs like real separated-flow buffet, growing heavier and slower as the stall deepens
-  - Available on joystick, pedals and collective (a seat-mounted collective makes a good buffet shaker)
-  - Both styles: buffet onset and strength now key to each aircraft's own stall speed and stall/warning AoA - slow aircraft are no longer muted at their own stall, accelerated stalls buffet harder, and X-Plane buffet now builds as the stall horn fires instead of arriving well after it
+  - Trim following has always assumed a 1:1 relationship between trim position and elevator - many aircraft (especially 3rd party) are far from 1:1, causing the nose to wander when trimming with the stick held
+  - A wizard-style assistant flies a short automated routine, measures your aircraft's real trim response, and produces a calibrated trim-following curve you can apply and test live in the sim before saving
+  - Run it at multiple airspeeds and the results blend into a single speed-aware curve; review, delete, export, and import stored calibrations from the dialog
+  - Trimmed stick position modes: 'Follows Trim' (cable/trim-tab aircraft: the stick rides the trim like the real linkage) or 'Stays Centered' (airliners/FBW - the jet default); out-of-trim force behavior is identical either way
+  - Glider support (steady-descent routine), suggested calibration speeds from each aircraft's own envelope, and a main-window prompt when an uncalibrated aircraft loads
+  - Factory calibrations included for several default aircraft (MSFS 2024: C172, C152, C208B, SR22T, Citation, Vision Jet, DG-1001E Neo | X-Plane 12: C172, SR22, RV-10)
+  - NOTE: some aircraft are non-calibratable - trim that overpowers full elevator, extreme trim sensitivity, or automatic trim systems that cannot be disabled
+- **NEW: 'Dynamic' stall buffet style** - irregular, gusty shaking that surges and grows heavier as the stall deepens ('Classic', the original steady shake, remains the default)
+  - Both styles now key buffet onset and strength to each aircraft's own stall speed and AoA - slow aircraft buffet fully at their own stall, and X-Plane buffet builds as the stall horn fires instead of arriving well after it
 - **NEW: Telemetry Overrides editor in the Utilities menu** (SimConnect/Dataref Overrides)
   - Per-aircraft overrides that re-source a telemetry item from an addon's custom variable (SimVar/LVar or dataref) or subscribe to additional telemetry items - useful for sophisticated addons whose systems don't drive the standard variables (autopilot state, custom engine/flight models)
   - Optional scale/transform converts the replacement value into the units the effects expect; changes save and apply immediately, verifiable in the Monitor tab
@@ -117,11 +104,9 @@ This is not an exhaustive change log (see github for that).  This file only outl
 
 ## Effects
 - **NEW: Helicopter Blade Slap effect (MSFS / X-Plane / DCS)**
-  - The signature 'wop-wop' of blade-vortex interaction, delivered as sharp kicks through the controls at blade-passage rate - felt where you hear it: shallow descents at moderate speed, decelerating approaches, flares, and loaded turns
-  - Rendered as a sharp sawtooth at rotor RPM x blade count - two-bladed teetering rotors (Huey, R22) slap hardest, higher blade counts get a faster, softer texture
-  - Available on joystick, pedals and collective - all three ride the same control-rod network in a real helicopter
-  - X-Plane: driven natively by the sim's own computed blade-slap signal, including tail rotor slap.  A 'Use Native Slap Telemetry' toggle can switch to the inferred method instead, which activates the tuning sliders
-  - MSFS / DCS: the signal is inferred from flight state (speed band, descent wake geometry, and G loading) with two tuners: 'Blade Slap Band Center' (the airspeed where response peaks - higher for heavily disc-loaded helicopters) and 'G-Induced Slap Factor' (how much flares/loaded turns contribute)
+  - The signature 'wop-wop' of blade-vortex interaction: sharp kicks at blade-passage rate, felt where you hear it - shallow descents, decelerating approaches, flares, and loaded turns - on joystick, pedals, and collective
+  - X-Plane drives it from the sim's own computed blade-slap signal (including tail rotor slap); MSFS and DCS infer it from flight state, tunable via 'Blade Slap Band Center' and 'G-Induced Slap Factor'
+  - Two-bladed teetering rotors (Huey, R22) slap hardest; per-model tuning ships for the default helicopter profiles
 - New envelope and detent effect support in HapticEffect
   - Attack envelope on constant force effects — reduces the risk of jarring axis slam on initial activation
 - Propeller engine rumble: smoother at high RPM (all sims) - the detune 'wobble' that gives the rumble its chunky character at idle now fades as RPM rises, instead of persisting as a wah-wah undertone at cruise; the low-RPM feel is unchanged
