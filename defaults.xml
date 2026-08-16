@@ -2865,6 +2865,135 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
+		<grouping>Blade Slap</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>10950</order>
+		<datatype>bool</datatype>
+		<name>blade_slap_enable</name>
+		<displayname>Blade Slap Effect</displayname>
+		<prereq>airflow_group</prereq>
+		<info>Sharp blade-passage kicks when the rotor flies through its own wake (blade-vortex interaction) - shallow descents at moderate speed, flares and loaded turns&lt;br&gt;&lt;br&gt;X-Plane provides the signal natively; MSFS and DCS infer it from flight state.  Uses the Rotor Blade Count setting for frequency</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Blade Slap</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>10950.1</order>
+		<value>0.15</value>
+		<datatype>float</datatype>
+		<name>blade_slap_intensity</name>
+		<displayname>Blade Slap Intensity</displayname>
+		<prereq>blade_slap_enable</prereq>
+		<info>Strength of the blade slap kicks</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<sliderfactor>0.5</sliderfactor>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Blade Slap</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>10950.15</order>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<name>blade_slap_use_native</name>
+		<displayname>Use Native Slap Telemetry</displayname>
+		<prereq>blade_slap_enable</prereq>
+		<info>Drive blade slap exclusively from X-Plane's own computed blade-slap signal (recommended)&lt;br&gt;&lt;br&gt;Disable to infer blade slap from flight state instead, which activates the tuning sliders below</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Blade Slap</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>10950.2</order>
+		<value>63</value>
+		<datatype>int</datatype>
+		<name>blade_slap_band_center</name>
+		<displayname>Blade Slap Band Center</displayname>
+		<prereq>blade_slap_enable</prereq>
+		<info>Airspeed where the blade slap response peaks.  Heavily disc-loaded helicopters slap at higher speeds; lightly loaded rotors lower</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<unit>kt</unit>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Blade Slap</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>10950.2</order>
+		<value>63</value>
+		<datatype>int</datatype>
+		<name>blade_slap_band_center</name>
+		<displayname>Blade Slap Band Center</displayname>
+		<prereq>blade_slap_enable</prereq>
+		<enable_prereq>!blade_slap_use_native</enable_prereq>
+		<info>Airspeed where the inferred blade slap response peaks.  Heavily disc-loaded helicopters slap at higher speeds; lightly loaded rotors lower</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<unit>kt</unit>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Blade Slap</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>10950.3</order>
+		<value>0.8</value>
+		<datatype>float</datatype>
+		<name>blade_slap_g_factor</name>
+		<displayname>G-Induced Slap Factor</displayname>
+		<prereq>blade_slap_enable</prereq>
+		<info>How much maneuvering load (flares, loaded turns) contributes to the blade slap signal&lt;br&gt;&lt;br&gt;0 = blade slap from descent wake geometry only</info>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Blade Slap</grouping>
+		<parentgroup>aerodynamics</parentgroup>
+		<order>10950.3</order>
+		<value>0.8</value>
+		<datatype>float</datatype>
+		<name>blade_slap_g_factor</name>
+		<displayname>G-Induced Slap Factor</displayname>
+		<prereq>blade_slap_enable</prereq>
+		<enable_prereq>!blade_slap_use_native</enable_prereq>
+		<info>How much maneuvering load (flares, loaded turns) contributes to the inferred blade slap signal&lt;br&gt;&lt;br&gt;0 = blade slap from descent wake geometry only</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
 		<grouping>Vibration</grouping>
 		<parentgroup>aerodynamics</parentgroup>
 		<order>11000</order>
@@ -6627,6 +6756,13 @@
 			<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
+			<name>blade_slap_enable</name>
+			<type>Helicopter</type>
+			<value>true</value>
+			<sim>DCS</sim>
+			<device>any</device>
+		</classdefaults_DCS>
+		<classdefaults_DCS>
 			<name>etl_effect_intensity</name>
 			<type>Helicopter</type>
 			<value>0.25</value>
@@ -8021,6 +8157,48 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>etl_effect_enable</name>
+			<type>TaogH500Helicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>blade_slap_enable</name>
+			<type>Helicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>blade_slap_enable</name>
+			<type>FlyInsideHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>blade_slap_enable</name>
+			<type>CowanSimHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>blade_slap_enable</name>
+			<type>HPGHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>blade_slap_enable</name>
+			<type>SASHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>blade_slap_enable</name>
 			<type>TaogH500Helicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -10622,6 +10800,20 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>etl_effect_enable</name>
+			<type>XAW109Helicopter</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>blade_slap_enable</name>
+			<type>Helicopter</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>blade_slap_enable</name>
 			<type>XAW109Helicopter</type>
 			<value>true</value>
 			<sim>XPLANE</sim>
@@ -21808,6 +22000,763 @@
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 		<notes>All-electric fly-by-wire eVTOL; classed PropellerAircraft for propulsion-effect defaults (no afterburner), but the trim feel is FBW-centered, not tab/cable.</notes>
+	</models>
+	<!-- Blade slap per-model tuning: band center by disc loading, G-factor by mission character -->
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>FlyInside B206.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>FlyInside B206.*</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>FlyInside - B206</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>FlyInside - B206</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>FlyInside B47.*</model>
+		<value>45</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>FlyInside B47.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>UH-1H</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>UH-1H</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_intensity</name>
+		<model>UH-1H</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>AH-64D_BLK_II</model>
+		<value>75</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.9</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>UH-60L</model>
+		<value>75</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>UH-60L</model>
+		<value>0.9</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Mi-24P</model>
+		<value>75</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Mi-24P</model>
+		<value>0.9</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Ka-50</model>
+		<value>65</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Ka-50</model>
+		<value>0.9</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>SA342.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>SA342.*</model>
+		<value>0.8</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>OH58.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>OH58.*</model>
+		<value>0.9</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>AH-6J</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>AH-6J</model>
+		<value>0.8</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>MH-6J</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>MH-6J</model>
+		<value>0.8</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>OH-6A</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>OH-6A</model>
+		<value>0.8</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>CH-47F</model>
+		<value>70</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>CH-47F</model>
+		<value>0.7</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Mi-8MT</model>
+		<value>70</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Mi-8MT</model>
+		<value>0.7</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>UH-1H.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>UH-1H.*</model>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_intensity</name>
+		<model>UH-1H.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>205-A1B.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>205-A1B.*</model>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_intensity</name>
+		<model>205-A1B.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Bell 47J.*</model>
+		<value>45</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Bell 47J.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>206B3.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>206B3.*</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>206L3.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>206L3.*</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>222B.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>222B.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>222UT.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>222UT.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Experimental Mini-500.*</model>
+		<value>50</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Experimental Mini-500.*</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>R22.*</model>
+		<value>50</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>R22.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Robinson R44.*</model>
+		<value>50</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Robinson R44.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>R66 Turbine.*</model>
+		<value>50</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>R66 Turbine.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>R66(?! Turbine).*</model>
+		<value>50</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>R66(?! Turbine).*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Asobo Cabri G2.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Asobo Cabri G2.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Cabri G2.*</model>
+		<value>55</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Cabri G2.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Schweizer S300CBi.*</model>
+		<value>50</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Schweizer S300CBi.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Bell 407.*</model>
+		<value>65</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Bell 407.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Bell 429.*</model>
+		<value>65</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Bell 429.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Simfocus B407.*</model>
+		<value>65</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Simfocus B407.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>H125 (?!AerialApp|Cargo|Passengers|Rescue).*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>H125 (?!AerialApp|Cargo|Passengers|Rescue).*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>H125 (AerialApp|Cargo|Passengers|Rescue).*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>H125 (AerialApp|Cargo|Passengers|Rescue).*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>H130.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>H130.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Airbus H135.*</model>
+		<value>65</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Airbus H135.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Lama SA315B.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Lama SA315B.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Airbus H145.*</model>
+		<value>70</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Airbus H145.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Airbus H160.*</model>
+		<value>70</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Airbus H160.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>S-76C++.*</model>
+		<value>70</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>S-76C++.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>FCP SA 342.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>FCP SA 342.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>500E.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>500E.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Shrike Simulations 530F.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Shrike Simulations 530F.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>H500C.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>H500C.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>OH6A.*</model>
+		<value>60</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>OH6A.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>CH47D.*</model>
+		<value>70</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>CH47D.*</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>S-64F.*</model>
+		<value>70</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>S-64F.*</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_band_center</name>
+		<model>Ka-10M.*</model>
+		<value>45</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>blade_slap_g_factor</name>
+		<model>Ka-10M.*</model>
+		<value>0.7</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</models>
 	<classes>
 		<sim>DCS</sim>

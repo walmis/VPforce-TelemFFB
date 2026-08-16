@@ -1,8 +1,9 @@
 import logging
+import math
 
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
-from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SQUARE, HapticEffect
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
@@ -29,6 +30,20 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
     overspeed_shake_start: float = 70.0
     overspeed_shake_intensity: float = 0.2
     overspeed_shake_frequency: float = 0.0
+
+    # Blade slap (blade-vortex interaction)
+    blade_slap_enable: bool = False
+    blade_slap_intensity: float = 0.15
+    blade_slap_use_native: bool = True    # XPLANE only: sim-computed signal, exclusively
+    blade_slap_band_center: float = 32.4  # m/s (63 kt); heuristic speed-band peak
+    blade_slap_g_factor: float = 0.8      # weight of maneuvering load in the inferred signal
+
+    # Band edges as ratios of the center: at the 63 kt default this spans
+    # ~19-107 kt, matching the original fixed band.  Scaling with the center
+    # keeps the response shape consistent and out of the hover regime when a
+    # user tunes the band down for a lightly-loaded rotor.
+    BLADE_SLAP_BAND_LO = 0.31
+    BLADE_SLAP_BAND_HI = 1.69
 
     # Vortex Ring State (VRS)
     vrs_effect_enable: bool = False
@@ -328,10 +343,111 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         # ensure spring is started with override = true
         spring.start(override=True)
 
+    def _blade_slap_signal(self, telem_data: BaseTelemetryData) -> float:
+        """Blade-vortex-interaction intensity, 0..1.
+
+        On X-Plane with blade_slap_use_native enabled, the
+        sim-computed signal (rotor_blade_slap_rat via the plugin) drives the
+        effect exclusively.  Everywhere else, and on X-Plane with the toggle
+        off, the signal is inferred from wake geometry: BVI happens when the rotor
+        flies through its own wake — moderate forward speed on a shallow
+        descent gradient, plus flares and loaded turns pushing the wake back
+        into the disc.
+
+        Telemetry:
+            Read: BladeSlap     - float (0..1, XPLANE plugin); native signal
+                  IAS           - float (m/s); speed band peaks at blade_slap_band_center
+                  VerticalSpeed - float (m/s); descent angle band peaks ~6 deg
+                  G             - float (MSFS/XP); loaded-flare/turn contribution
+                  ACCs          - List[float] (g, DCS/IL2); index [1] = normal
+                                  load factor, used when G is absent
+            Written: _blade_slap_src ("native" | "inferred"; active source)
+        """
+        if self._sim_is_xplane() and self.blade_slap_use_native:
+            telem_data._blade_slap_src = "native"
+            return utils.clamp(telem_data.get("BladeSlap", 0) or 0, 0.0, 1.0)
+        telem_data._blade_slap_src = "inferred"
+
+        ias = telem_data.IAS or 0
+        if ias < 5.0:
+            return 0.0
+        center = self.blade_slap_band_center or 32.4
+        speed_band = utils.gaussian_scaling(
+            ias, center * self.BLADE_SLAP_BAND_LO, center * self.BLADE_SLAP_BAND_HI,
+            peak_percentage=0.5, curve_width=0.8)
+
+        vs = telem_data.VerticalSpeed or 0
+        descent_deg = math.degrees(math.atan2(-vs, ias))
+        # Both gates must pass: the angle band (wake stays in the disc plane)
+        # AND a genuine sink rate.  At low band speeds a 1 deg "descent" is
+        # only ~50-150 fpm — the transient sink of an accelerating nose-down
+        # attitude — which is not wake re-entry and must stay silent.
+        if vs < -1.0 and 1.0 < descent_deg < 14.0:
+            descent_term = utils.gaussian_scaling(descent_deg, 0.0, 12.0,
+                                                  peak_percentage=0.5, curve_width=0.5)
+        else:
+            descent_term = 0.0
+
+        # G source differs per sim: MSFS/XP report G directly; DCS/IL2 ship
+        # the body acceleration vector (ACCs, normal axis at [1]) instead.
+        g_load = telem_data.G
+        if g_load is None:
+            accs = telem_data.ACCs
+            if isinstance(accs, (list, tuple)) and len(accs) > 1:
+                g_load = accs[1]
+        g_term = utils.clamp(((g_load or 1.0) - 1.15) * 1.5, 0.0, 1.0)
+
+        return utils.clamp(
+            speed_band * (descent_term + self.blade_slap_g_factor * g_term), 0.0, 1.0)
+
+    def ac_update_blade_slap(self, telem_data: BaseTelemetryData, blade_ct=None):
+        """Blade-slap kicks through the controls: a sharp sawtooth periodic at
+        blade-passage rate, gated by the BVI signal.  Two-bladed teetering
+        rotors slap loudest (blade-count character scale).
+
+        Telemetry:
+            Read: WeightOnWheels - List[float]; sum > 0 suppresses the effect
+                  PropRPM[0] (XPLANE) / RotorRPM (others) - rev rate for the
+                  blade-passage frequency
+            Written: _blade_slap_sig (float; debug - current signal value)
+        """
+        if not (self.blade_slap_enable and self.blade_slap_intensity):
+            self.effects.dispose("blade_slap_x", "blade_slap_y")
+            return
+        if sum(telem_data.WeightOnWheels or [0, 0, 0]) > 0:
+            self.effects.dispose("blade_slap_x", "blade_slap_y")
+            return
+
+        if self._sim_is_xplane():
+            rotor = telem_data.PropRPM or 0
+            if isinstance(rotor, list):
+                rotor = rotor[0]
+        else:
+            rotor = telem_data.RotorRPM or 0
+            if isinstance(rotor, list):
+                rotor = max(rotor)
+        blade_ct = blade_ct or 2
+        freq = (rotor / 60.0) * blade_ct
+
+        sig = self._blade_slap_signal(telem_data)
+        telem_data._blade_slap_sig = sig
+        if freq < 1.0 or sig < 0.05:
+            self.effects.dispose("blade_slap_x", "blade_slap_y")
+            return
+
+        mag = self.blade_slap_intensity * sig
+        # two-bladed rotors are the wop-wop kings; soften for higher counts
+        mag *= utils.clamp(2.0 / blade_ct, 0.6, 1.0)
+        mag = utils.clamp(mag, 0.0, 1.0)
+
+        self.effects["blade_slap_y"].periodic(freq, mag, 0, effect_type=EFFECT_SAWTOOTHDOWN).start()
+        self.effects["blade_slap_x"].periodic(freq, mag, 90, effect_type=EFFECT_SAWTOOTHDOWN).start()
+
     def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         if self.is_helicopter():
             self.ac_calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
             self.ac_update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
             self.ac_update_vrs_effect(telem_data)
+            self.ac_update_blade_slap(telem_data, blade_ct=self.rotor_blade_count)
     

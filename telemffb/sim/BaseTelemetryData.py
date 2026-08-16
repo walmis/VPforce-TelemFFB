@@ -1036,8 +1036,15 @@ class BaseTelemetryData:
     """
 
     CyclicTrimY: Optional[float]
-    """Cyclic trim position (longitudinal).  
-    MSFS: ROTOR LONGITUDINAL TRIM PCT SimVar — percent.  
+    """Cyclic trim position (longitudinal).
+    MSFS: ROTOR LONGITUDINAL TRIM PCT SimVar — percent.
+    """
+
+    BladeSlap: Optional[float]
+    """Rotor blade slap intensity ratio (0..1), computed by X-Plane.
+    XP: rotor_blade_slap_rat (plugin, engine 0).
+    Other sims: not available — the blade-slap effect infers it from wake
+    geometry (IAS/VerticalSpeed/G) instead.
     """
 
     ForceTrimSW: Optional[bool]

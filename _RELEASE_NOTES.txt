@@ -116,6 +116,12 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: g-force effect activating incorrectly on aircraft that report weight-on-wheels while airborne (now treated as airborne when all gear are retracted)
 
 ## Effects
+- **NEW: Helicopter Blade Slap effect (MSFS / X-Plane / DCS)**
+  - The signature 'wop-wop' of blade-vortex interaction, delivered as sharp kicks through the controls at blade-passage rate - felt where you hear it: shallow descents at moderate speed, decelerating approaches, flares, and loaded turns
+  - Rendered as a sharp sawtooth at rotor RPM x blade count - two-bladed teetering rotors (Huey, R22) slap hardest, higher blade counts get a faster, softer texture
+  - Available on joystick, pedals and collective - all three ride the same control-rod network in a real helicopter
+  - X-Plane: driven natively by the sim's own computed blade-slap signal, including tail rotor slap.  A 'Use Native Slap Telemetry' toggle can switch to the inferred method instead, which activates the tuning sliders
+  - MSFS / DCS: the signal is inferred from flight state (speed band, descent wake geometry, and G loading) with two tuners: 'Blade Slap Band Center' (the airspeed where response peaks - higher for heavily disc-loaded helicopters) and 'G-Induced Slap Factor' (how much flares/loaded turns contribute)
 - New envelope and detent effect support in HapticEffect
   - Attack envelope on constant force effects — reduces the risk of jarring axis slam on initial activation
 - Propeller engine rumble: smoother at high RPM (all sims) - the detune 'wobble' that gives the rumble its chunky character at idle now fades as RPM rises, instead of persisting as a wah-wah undertone at cruise; the low-RPM feel is unchanged

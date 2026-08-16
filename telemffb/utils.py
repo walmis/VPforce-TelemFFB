@@ -317,6 +317,7 @@ class EffectTranslator:
         "aoa": ["AoA Effect", "aoa_effect_gain"],
         "ap_spring": ["Autopilot Spring", ""],
         "adv_gforce_constant": ["G-Force Loading (Advanced)", ""],
+        "blade_slap.*": ["Blade Slap", "blade_slap_intensity"],
         "buffeting": ["AoA/Stall Buffeting", "buffeting_intensity"],
         "bombs": ["Bomb Release", "weapon_release_intensity"],
         "canopyclunk": ["Canopy Clunk", "canopy_motion_intensity"],
