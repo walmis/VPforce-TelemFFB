@@ -43,6 +43,7 @@ for p in paths:
     except:
         pass
 
+import telemffb.hw.ffb_backend as ffb_backend
 import telemffb.hw.hid as hid
 from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
 
@@ -629,7 +630,7 @@ input_report_handlers = {
     HID_REPORT_ID_PID_STATE_REPORT: FFBReport_PIDStatus_Input
 }
 
-class FFBEffectHandle:
+class FFBEffectHandle(ffb_backend.BaseEffectHandle):
     def __init__(self, device, effect_id, effect_type) -> None:
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
@@ -800,10 +801,12 @@ class DeviceInfo:
         """Returns the device name set in the VPforce Configurator"""
         return self.product_string.replace("Rhino FFB ", "").strip()
 
-class FFBRhino(QObject):
-    buttonPressed = pyqtSignal(int)
-    buttonReleased = pyqtSignal(int)
-    deviceConnected = pyqtSignal(bool)
+class FFBRhino(ffb_backend.BaseFFBDevice):
+    # signals (buttonPressed/buttonReleased/deviceConnected) are defined on
+    # BaseFFBDevice; the native VPforce backend carries the full capability set
+    @property
+    def caps(self) -> ffb_backend.DeviceCapabilities:
+        return ffb_backend.VPFORCE_CAPABILITIES
 
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path : Optional[str] = None) -> None:
 
@@ -830,7 +833,7 @@ class FFBRhino(QObject):
         self._effect_handles : List[FFBEffectHandle] = []
         self._dev = None
 
-        QObject.__init__(self)
+        super().__init__()
         self.startTimer(1) # start Qt timer to read HID reports every 1ms
 
         self.reconnect()

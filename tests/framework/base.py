@@ -72,10 +72,13 @@ class MockInputData:
 
 class MockFFBDevice:
     """Mock FFB device for testing."""
-    
+
     def __init__(self):
         self._input_data = MockInputData()
         self.axis_override_commands = []
+        # full native capability set: existing tests model the VPforce device
+        from telemffb.hw.ffb_backend import VPFORCE_CAPABILITIES
+        self.caps = VPFORCE_CAPABILITIES
     
     def get_input(self) -> MockInputData:
         """Return mock input data."""
