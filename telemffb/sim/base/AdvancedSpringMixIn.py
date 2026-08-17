@@ -95,6 +95,11 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
                 self.il2_ffb_spring(force=True)
             else:
                 self.effects['il2_ffb_spring'].stop()
+        caps = getattr(HapticEffect.device, 'caps', None)
+        if caps is not None and not caps.has_spring_adjuster:
+            self.flag_error('The Advanced/Custom Spring Override is not supported on this device.\n'
+                            'It requires the spring adjuster feature of VPforce hardware.')
+            return
         # Verify the device firmware meets the minimum version required to execute this effect
         # Flag error and abort if not met
         if self.__firmware_supported is None:

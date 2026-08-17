@@ -486,8 +486,19 @@ class TelemManager(QObject, threading.Thread):
 
         return Aircraft_Class
 
+    @staticmethod
+    def _device_has_gains() -> bool:
+        """VPConf profiles and Configurator gain overrides only apply to
+        devices with Configurator gain sliders (VPforce hardware)."""
+        caps = getattr(HapticEffect.device, 'caps', None)
+        return caps is None or caps.has_gains
+
     def _handle_vpconf_setup(self, params):
         """Handle VPConf profile setup for the aircraft."""
+        if not self._device_has_gains():
+            if "vpconf" in params:
+                logging.info("vpconf profile configured but this device has no Configurator gains; skipping")
+            return
         if "vpconf" in params:
             if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
                 upload_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
@@ -517,6 +528,10 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_configurator_overrides(self, params):
         """Handle configurator gain overrides for the aircraft."""
+        if not self._device_has_gains():
+            if params.get('configurator_override_enabled', False):
+                logging.info("configurator overrides enabled but this device has no Configurator gains; skipping")
+            return
         if params.get('configurator_override_enabled', False):
             state = params.get('configurator_gains', 'none')
             if state != "none":
@@ -588,6 +603,8 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_configurator_overrides_update(self, params):
         """Handle configurator overrides during config updates."""
+        if not self._device_has_gains():
+            return
         if params.get('configurator_override_enabled', False):
             state = params.get('configurator_gains', 'none')
             if state != "none":

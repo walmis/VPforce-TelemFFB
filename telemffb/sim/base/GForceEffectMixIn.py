@@ -99,6 +99,13 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
 
     def __check_firmware_support(self):
         if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
+            caps = getattr(HapticEffect.device, 'caps', None)
+            if caps is not None and not caps.has_spring_adjuster:
+                self.flag_error(
+                    "The Advanced/Custom Curve G-Force effect is not supported on this device.\n"
+                    "It requires the spring adjuster feature of VPforce hardware."
+                )
+                return False
             # Verify the device firmware meets the minimum version required to execute this portion of the effect
             # Flag error and abort if not met
             if self.__firmware_supported is None:

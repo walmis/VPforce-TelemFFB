@@ -3829,6 +3829,13 @@ def load_custom_userconfig(new_path=""):
 def upload_vpconf_profile(config_filepath, serial):
     from .namedmutex import NamedMutex
 
+    # central gate: VPConfigurator profiles only apply to VPforce hardware
+    # (covers aircraft-change, startup and exit pushes in one place)
+    caps = G.device_capabilities
+    if caps is not None and not caps.has_gains:
+        logging.info("vpconf push skipped: the connected device has no Configurator gains")
+        return
+
     settings = QSettings("VPforce", "RhinoFFB")
     vpconf_path = settings.value("path")
 
@@ -4050,7 +4057,12 @@ def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
 
         logging.info("Auto-Launch: starting instance: %s", args)
         proc = ChildPopen(args)
-        proc.udp_port = 60000 + int(usbpid)
+        try:
+            # pids are hex ('2055', or e.g. '1b' for a DirectInput device);
+            # QSettings may hand back digit-only values as int
+            proc.udp_port = 60000 + int(str(usbpid), 16)
+        except (ValueError, TypeError):
+            proc.udp_port = 60000
         G.launched_instances[dev_type] = proc
         return proc
 

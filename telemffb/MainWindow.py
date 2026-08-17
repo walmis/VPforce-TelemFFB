@@ -887,6 +887,9 @@ class MainWindow(QMainWindow):
         if not HapticEffect.device:
             f_vers = 'Device Disconnected'
             self.firmware_label.setText("Device Disconnected")
+        elif not HapticEffect.device.caps.has_firmware_version:
+            f_vers = 'DirectInput device'
+            self.firmware_label.setText('DirectInput device')
         else:
             try:
                 f_vers = HapticEffect.device.get_firmware_version()
@@ -1315,6 +1318,10 @@ class MainWindow(QMainWindow):
             dialog.activateWindow()
             dialog.show()
         configurator_settings_action.triggered.connect(do_open_configurator_dialog)
+        caps = getattr(HapticEffect.device, 'caps', None)
+        if caps is not None and not caps.has_gains:
+            configurator_settings_action.setEnabled(False)
+            configurator_settings_action.setToolTip('Not supported on this device (no Configurator gains)')
         debug_menu.addAction(configurator_settings_action)
 
         sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)

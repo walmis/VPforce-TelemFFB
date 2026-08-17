@@ -351,7 +351,11 @@ class AircraftEffectUtilsBase(object):
         input_data = device.get_input()
         if input_data is None:
             return 0.0, 0.0
-        return input_data.forceXY()
+        forces = input_data.forceXY()
+        if forces is None:
+            # no force output telemetry on this backend (generic DirectInput)
+            return 0.0, 0.0
+        return forces
     
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""
