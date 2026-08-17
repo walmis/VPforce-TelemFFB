@@ -1164,6 +1164,25 @@ class HapticEffect(Destroyable):
 
         return cls.device
 
+    @classmethod
+    def open_dinput(cls, guid: str):
+        """Open a generic DirectInput FFB device (via the DInput bridge DLL)
+        and attach it for all HapticEffect instances.
+
+        Args:
+            guid: The DirectInput instance GUID string of the device.
+
+        Returns:
+            The opened `DInputFFBDevice` instance.
+        """
+        # local import: ffb_dinput imports the effect constants from this module
+        from telemffb.hw.ffb_dinput import DInputFFBDevice
+        logging.info(f"Open DirectInput FFB device {guid}")
+        cls.device = DInputFFBDevice(guid)
+        logging.info(f"Successfully opened '{cls.device.info.product_string}' ({cls.device.info.vidpid()})")
+
+        return cls.device
+
     def _ensure_effect_created(self):
         """Allocate the underlying effect on the device if it hasn't been yet.
 
