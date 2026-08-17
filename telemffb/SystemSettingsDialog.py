@@ -959,13 +959,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if not os.path.isdir(pth):
                 QMessageBox.warning(self, "Config Error", 'Please enter the root X-Plane install path or disable auto X-plane setup')
                 return False
-        if self.enableVPConfStartup.isChecked():
+        # vpconf profiles are inert (and validated against a VPforce PID)
+        # when the device has no Configurator gains - don't let a profile
+        # stored for a VPforce device block saving under a DirectInput one
+        if self.enableVPConfStartup.isChecked() and self._device_has_gains():
             if not os.path.isfile(self.pathVPConfStartup.text()):
                 QMessageBox.warning(self, "Config Error", "Please select a valid 'on Startup' VPforce Configurator file")
                 return False
             if not validate_vpconf_profile(self.pathVPConfStartup.text(), G.device_usbpid, G.device_type):
                 return False
-        if self.enableVPConfExit.isChecked():
+        if self.enableVPConfExit.isChecked() and self._device_has_gains():
             if not os.path.isfile(self.pathVPConfExit.text()):
                 QMessageBox.warning(self, "Config Error", "Please select a valid 'on Exit' VPforce Configurator file")
                 return False
@@ -1249,6 +1252,29 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidTrimWheel': str(self.tb_pid_t.text()),
             'themeId': self.themeButtonGroup.checkedId(),
         }
+
+        self._apply_device_capability_gates()
+
+    @staticmethod
+    def _device_has_gains() -> bool:
+        return G.device_capabilities is None or G.device_capabilities.has_gains
+
+    def _apply_device_capability_gates(self):
+        """VPConf startup/exit/global-default profiles and the exit gain
+        reset push VPforce Configurator gains, which don't exist on a
+        generic DirectInput device.  Disable (without clearing) the
+        controls so stored settings survive a switch back to a VPforce
+        device; the runtime pushes are gated independently."""
+        if self._device_has_gains():
+            return
+        tip = ('Not available: the selected device is a generic DirectInput '
+               'device with no VPforce Configurator gains')
+        for widget in (self.enableVPConfStartup, self.pathVPConfStartup,
+                       self.browseVPConfStartup, self.enableVPConfExit,
+                       self.pathVPConfExit, self.browseVPConfExit,
+                       self.enableVPConfGlobalDefault, self.enableResetGainsExit):
+            widget.setEnabled(False)
+            widget.setToolTip(tip)
 
     def browse_vpconf(self, mode):
         options = QFileDialog.Option(0)
