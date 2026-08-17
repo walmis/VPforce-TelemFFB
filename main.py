@@ -155,6 +155,9 @@ def _setup_device_configuration():
         devpath = G.system_settings.get(f'devpath_{devname}', None)
         if devpath:
             G.device_devpath = devpath
+            # a DirectInput device selection is stored as 'dinput:{GUID}'
+            if str(devpath).startswith('dinput:'):
+                G.device_di_guid = str(devpath)[len('dinput:'):]
 
         G.device_usbpid = str(G.system_settings.get(f'pid{devname.capitalize()}', "2055"))
         G.device_type = devname
@@ -173,6 +176,8 @@ def _setup_device_configuration():
 
         devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
         G.device_devpath = devpath
+        if devpath and str(devpath).startswith('dinput:'):
+            G.device_di_guid = str(devpath)[len('dinput:'):]
         G.device_usbpid = G.args.device.split(":")[1]
         
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
@@ -435,7 +440,10 @@ def _initialize_device_connection():
         return dev, dev_serial, dev_firmware_version
 
     try:
-        dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+        if G.device_di_guid:
+            dev = HapticEffect.open_dinput(G.device_di_guid)
+        else:
+            dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
 
         def connect_signals():
             dev.deviceConnected.connect(G.main_window.update_device_status)
@@ -445,6 +453,7 @@ def _initialize_device_connection():
         QTimer.singleShot(0, connect_signals)
 
         G.device_info = dev.info
+        G.device_capabilities = dev.caps
 
         if G.args.reset:
             dev.reset_effects()
@@ -462,9 +471,9 @@ def _initialize_device_connection():
     except Exception as e:
         G.device_connection_status = False
         logging.exception("Exception")
-        QMessageBox.warning(None, "Cannot connect to Rhino",
+        QMessageBox.warning(None, "Cannot connect to FFB device",
                           f"Unable to open device: {G.device_type}\nError: {e}\n\n"
-                          "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
+                          "Please open the System Settings and verify the Master\ndevice configuration is correct")
 
     return dev, dev_serial, dev_firmware_version
 
@@ -812,12 +821,16 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
+        device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
         if G.system_settings.enableVPConfStartup:
-            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
-            try:
-                upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
-            except Exception:
-                logging.exception("Unable to set VPConfigurator startup profile")
+            if not device_has_gains:
+                logging.info("Startup vpconf profile configured but this device has no Configurator gains; skipping")
+            else:
+                logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
+                try:
+                    upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
+                except Exception:
+                    logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
             if dev:
@@ -860,13 +873,14 @@ def _cleanup_on_exit(dev_serial):
     G.sim_listeners.stop_all()
     G.telem_manager.quit()
 
-    if G.system_settings.enableVPConfExit:
+    device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
+    if G.system_settings.enableVPConfExit and device_has_gains:
         try:
             upload_vpconf_profile(G.system_settings.pathVPConfExit, dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
 
-    if G.system_settings.enableResetGainsExit:
+    if G.system_settings.enableResetGainsExit and device_has_gains:
         try:
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
         except:

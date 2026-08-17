@@ -96,6 +96,15 @@ device_info : Optional['DeviceInfo'] = None
 device_devpath : Optional[str] = None
 """System path to device, e.g. /dev/hidraw0 or \\?\\hid#vid_ffff&pid_2055&mi_00#7&2b3b4c3f&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"""
 
+device_di_guid : Optional[str] = None
+"""DirectInput instance GUID when this instance drives a generic DI FFB
+device (stored as 'dinput:{GUID}' in the devpath_* setting). None = native
+VPforce device."""
+
+device_capabilities = None
+"""ffb_backend.DeviceCapabilities of the connected device; feature-bearing
+UI and effects gate on these flags rather than probing the backend."""
+
 device_usbpid : str # deprecated
 
 device_ident : str

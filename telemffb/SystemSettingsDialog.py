@@ -326,21 +326,48 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.populateUSBSelectors()
 
+    @staticmethod
+    def _enumerate_dinput_devices():
+        """Generic DirectInput FFB devices, prepared for the selector model.
+
+        VPforce hardware also enumerates as a DI FFB device, so VID 0xFFFF is
+        filtered out — those entries come from the native HID enumeration.
+        The devpath encodes the backend ('dinput:{GUID}') so the selection
+        flows through the existing devpath_* persistence untouched.
+        """
+        try:
+            from telemffb.hw.ffb_dinput import DInputFFBDevice
+            di_devices = []
+            for dev in DInputFFBDevice.enumerate():
+                if dev.vendor_id == 0xFFFF:
+                    continue
+                dev.product_string = f"[DI] {dev.product_string}"
+                dev.path = f"dinput:{dev.guid}".encode()
+                di_devices.append(dev)
+            return di_devices
+        except Exception as e:
+            logging.info(f"DirectInput device enumeration unavailable: {e}")
+            return []
+
     def populateUSBSelectors(self):
         # Populate the USB device selectors with currently connected devices
         devices = FFBRhino.enumerate()
 
         combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
 
+        # Generic DirectInput FFB devices are joystick-role only for now, so
+        # the joystick combo gets its own extended model.
         model = FFBDeviceListModel(devices)
+        joystick_model = FFBDeviceListModel(list(devices) + self._enumerate_dinput_devices())
         for cb in combo_boxes:
-            cb.setModel(model)
+            cb_model = joystick_model if cb is self.cb_select_j else model
+            cb.setModel(cb_model)
             # Ensure the combobox shows the display role text but we can fetch the DeviceInfo from the model via UserRole
             cb.setModelColumn(0)
             # clear any existing items so the view updates cleanly
             # (when using setModel, clear isn't necessary but keep for safety)
             # store a reference so the model isn't garbage-collected
-            cb._ffb_device_model = model
+            cb._ffb_device_model = cb_model
 
         # Track previous index so we can revert on cancel
         for cb in combo_boxes:
