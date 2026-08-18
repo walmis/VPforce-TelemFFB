@@ -234,6 +234,7 @@ class TestEffectLifecycle:
 
     def test_override_start_downgrades_to_normal_start(self, device, bridge):
         handle = device.create_effect(EFFECT_SPRING)
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=2048))
         handle.start(override=True)
         assert handle.started
         assert handle.effect_id in bridge.started
@@ -251,6 +252,63 @@ class TestEffectLifecycle:
         assert params.condition_x.cp_offset == 2048
         device._poll_once()
         assert device.get_input().CP_XY()[0] == 0.5
+
+    def test_zero_coefficient_condition_is_muted_device_side(self, device, bridge):
+        """A playing zero-coefficient spring changes the back-drive feel on
+        consumer sticks (energized motors cog); zero force must render as no
+        effect at all, resuming transparently when force returns."""
+        handle = device.create_effect(EFFECT_SPRING)
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=0,
+                                           negativeCoefficient=0))
+        handle.start()
+        assert handle.started                      # logically started
+        assert handle.effect_id not in bridge.started  # muted on the device
+
+        # force returns -> device effect resumes without an app-level start
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=2048))
+        assert handle.effect_id in bridge.started
+
+        # back to zero (force trim held) -> muted again
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=0))
+        assert handle.effect_id not in bridge.started
+        assert handle.started
+
+        handle.stop()
+        assert not handle.started
+
+    def test_center_updates_flow_while_muted(self, device, bridge):
+        """Force-trim flow: while the spring is muted at 0%, center updates
+        must keep landing on the (stopped, not destroyed) device effect and
+        on the CP telemetry, so restoring the coefficient re-engages the
+        spring at the latest center.  Verified against real hardware:
+        SetParameters on a stopped effect renders on the next Start."""
+        handle = device.create_effect(EFFECT_SPRING)
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=0,
+                                           cpOffset=0))
+        handle.start()
+        assert handle.effect_id not in bridge.started
+
+        # center moves while muted (button held, stick moving)
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=0,
+                                           cpOffset=1500))
+        assert handle.effect_id in bridge.effects        # still downloaded
+        assert bridge.effects[handle.effect_id]["params"].condition_x.cp_offset == 1500
+        device._poll_once()
+        assert device.get_input().CP_XY()[0] is None     # coef 0: no center reported
+
+        # button released: coefficient restored -> plays at the muted-state center
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=2048,
+                                           cpOffset=1500))
+        assert handle.effect_id in bridge.started
+        assert bridge.effects[handle.effect_id]["params"].condition_x.cp_offset == 1500
+        device._poll_once()
+        assert device.get_input().CP_XY()[0] == pytest.approx(1500 / 4096)
+
+    def test_nonzero_condition_plays_normally(self, device, bridge):
+        handle = device.create_effect(EFFECT_SPRING)
+        handle.setCondition(make_condition(axis=0, positiveCoefficient=1000))
+        handle.start()
+        assert handle.effect_id in bridge.started
 
     def test_reset_effects_invalidates_handles(self, device, bridge):
         h1 = device.create_effect(EFFECT_SPRING)

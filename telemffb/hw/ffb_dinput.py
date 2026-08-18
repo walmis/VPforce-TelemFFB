@@ -39,6 +39,26 @@ Differences from the native VPforce backend, hidden behind the
   force model (tier 0), periodics are cues (tier 1).  When the device pool is
   full, the least-recently-started tier-1 effect is evicted and its
   HapticEffect lazily re-creates when it next starts.
+- Zero-coefficient condition effects are MUTED device-side (stopped, not
+  destroyed) - see ``DInputEffectHandle._sync_device_playing`` for the
+  field-tested rationale.
+
+Hardware quirks discovered in field testing (SideWinder Force Feedback 2,
+2026-08; each translated here or in the bridge DLL so app code stays
+device-agnostic):
+
+- The app's FFBReport_SetCondition objects default saturation to 0, which
+  VPforce firmware reads as "unlimited" but DirectInput reads as a
+  zero-force cap - untranslated, EVERY condition effect renders zero force.
+- DICONDITION.lOffset is silently dropped by the SideWinder driver unless
+  the effect uses DIEFF_POLAR coordinates (handled in the bridge DLL).
+- A PLAYING spring with zero coefficients is not force-free: the energized
+  drive stage adds cogging texture and even pulls the stick toward the stop
+  past ~half deflection (the mute behavior above).
+
+Debugging: set the DIB_TRACE=1 environment variable to log every bridge
+effect call (create/update/start/stop/destroy) with decoded parameters -
+the ground truth of what the device is actually told to render.
 """
 
 import ctypes
@@ -143,6 +163,23 @@ class DIBridgeError(Exception):
     pass
 
 
+def _describe_params(effect_type: int, params: DibEffectParams) -> str:
+    """One-line decode of DibEffectParams for the DIB_TRACE log."""
+    if effect_type in CONDITION_EFFECTS:
+        cx, cy = params.condition_x, params.condition_y
+        return (f"coefX={cx.positive_coefficient}/{cx.negative_coefficient}"
+                f" cpX={cx.cp_offset} satX={cx.positive_saturation}"
+                f" | coefY={cy.positive_coefficient}/{cy.negative_coefficient}"
+                f" cpY={cy.cp_offset} satY={cy.positive_saturation}")
+    if effect_type == EFFECT_CONSTANT:
+        return f"mag={params.constant_magnitude} dir={params.direction_deg}"
+    if effect_type in PERIODIC_EFFECTS:
+        return (f"mag={params.periodic_magnitude} period={params.periodic_period_ms}ms"
+                f" dir={params.direction_deg} dur={params.duration_ms}ms"
+                f" env={params.envelope_active}")
+    return "?"
+
+
 class DIBridge:
     """ctypes binding to dinput_ffb.dll.
 
@@ -170,6 +207,13 @@ class DIBridge:
         abi = self._dll.dib_abi_version()
         if abi != DIB_ABI_VERSION:
             raise DIBridgeError(f"dinput_ffb.dll ABI version {abi}, expected {DIB_ABI_VERSION}")
+
+        # DIB_TRACE=1 logs every effect call with decoded parameters - the
+        # ground truth of what the device is actually told to render
+        self._trace = bool(os.environ.get("DIB_TRACE"))
+        self._effect_types: Dict[int, int] = {}
+        if self._trace:
+            logging.info("DIB_TRACE enabled: logging all bridge effect calls")
 
     def last_error(self) -> str:
         buf = ctypes.create_string_buffer(512)
@@ -202,18 +246,36 @@ class DIBridge:
     def effect_create(self, device: int, effect_type: int, params: DibEffectParams) -> int:
         """Returns a positive effect id, or a negative DIB_ERR_* code
         (DEVICE_FULL is expected and drives eviction, so no exception)."""
-        return self._dll.dib_effect_create(device, effect_type, ctypes.byref(params))
+        effect_id = self._dll.dib_effect_create(device, effect_type, ctypes.byref(params))
+        if self._trace:
+            self._effect_types[effect_id] = effect_type
+            logging.info(f"DIB create #{effect_id} {effect_names.get(effect_type, effect_type)}: "
+                         f"{_describe_params(effect_type, params)}")
+        return effect_id
 
     def effect_update(self, effect: int, params: DibEffectParams) -> int:
-        return self._dll.dib_effect_update(effect, ctypes.byref(params))
+        rc = self._dll.dib_effect_update(effect, ctypes.byref(params))
+        if self._trace:
+            effect_type = self._effect_types.get(effect, 0)
+            logging.info(f"DIB update #{effect} {effect_names.get(effect_type, effect_type)} rc={rc}: "
+                         f"{_describe_params(effect_type, params)}")
+        return rc
 
     def effect_start(self, effect: int, iterations: int = 1) -> int:
-        return self._dll.dib_effect_start(effect, iterations, 0)
+        rc = self._dll.dib_effect_start(effect, iterations, 0)
+        if self._trace:
+            logging.info(f"DIB start #{effect} rc={rc}")
+        return rc
 
     def effect_stop(self, effect: int) -> int:
+        if self._trace:
+            logging.info(f"DIB stop #{effect}")
         return self._dll.dib_effect_stop(effect)
 
     def effect_destroy(self, effect: int) -> int:
+        if self._trace:
+            logging.info(f"DIB destroy #{effect}")
+            self._effect_types.pop(effect, None)
         return self._dll.dib_effect_destroy(effect)
 
 
@@ -333,6 +395,12 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         self._dirty = False
         self._pushed_hash = None
         self._override_warned = False
+        # condition effects: True while the DirectInput effect is actually
+        # playing.  A zero-coefficient condition is muted device-side (the
+        # effect is stopped) because an energized-but-zero spring changes
+        # the back-drive feel on consumer hardware (motor cogging/braking);
+        # zero force should feel like no effect at all.
+        self._device_playing = False
 
     def __bool__(self) -> bool:
         return bool(self.effect_id and self.type)
@@ -356,6 +424,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         the owning HapticEffect lazily re-creates on next start."""
         self.effect_id = 0
         self._started = False
+        self._device_playing = False
         self._pushed_hash = None
 
     def _push(self):
@@ -372,6 +441,51 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         else:
             logging.warning(f"effect_update failed ({rc}) for {self!r}")
 
+    def _is_zero_condition(self) -> bool:
+        """All coefficients zero: the effect commands no force at any
+        deflection, so the device effect can be muted entirely."""
+        if self.type not in CONDITION_EFFECTS:
+            return False
+        cx, cy = self.params.condition_x, self.params.condition_y
+        return not any((cx.positive_coefficient, cx.negative_coefficient,
+                        cy.positive_coefficient, cy.negative_coefficient))
+
+    def _sync_device_playing(self):
+        """Keep the DirectInput effect's play state matched to the logical
+        started state, muting zero-coefficient conditions device-side.
+
+        Why (field-tested on a SideWinder FFB 2, 2026-08): a PLAYING spring
+        with zero coefficients is not force-free on consumer hardware.  The
+        energized drive stage changes the back-drive feel (motor cogging),
+        and past ~half deflection the SideWinder actively pulls the stick
+        the rest of the way to the stop - felt as a phantom force in the
+        helicopter force-trim modes, whose "hold" state is exactly a
+        zero-coefficient spring whose center follows the stick.  Net-force
+        instrumentation reads ~0 for that state, so this only surfaces
+        under a human hand.  (DCS appears to have met the same issue: it
+        leaves a ~1% residual spring during trim release rather than
+        commanding a true zero.)
+
+        Muting means Stop, never destroy: the effect stays downloaded with
+        its slot held, and SetParameters keeps landing on the stopped
+        effect (hardware-verified), so per-frame center updates during a
+        force-trim hold accumulate and render the instant a nonzero
+        coefficient restarts the effect.  ``_started`` (the logical state
+        HapticEffect sees) is deliberately independent of
+        ``_device_playing`` (what the device renders)."""
+        if not self.effect_id:
+            return
+        should_play = self._started and not self._is_zero_condition()
+        if should_play and not self._device_playing:
+            rc = self.device.bridge.effect_start(self.effect_id, 1)
+            if rc == DIB_OK:
+                self._device_playing = True
+            else:
+                logging.warning(f"effect_start failed ({rc}) for {self!r}")
+        elif not should_play and self._device_playing:
+            self.device.bridge.effect_stop(self.effect_id)
+            self._device_playing = False
+
     def start(self, loopCount=1, override=False):
         if override and not self._override_warned:
             logging.info(f"{self!r}: override start not supported on DirectInput devices, starting normally")
@@ -380,18 +494,25 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             logging.warning(f"start on an invalidated effect ({self.name})")
             return self
         self._push()
+        if self.type in CONDITION_EFFECTS:
+            self._started = True
+            self.device.note_effect_started(self)
+            self._sync_device_playing()
+            return self
         rc = self.device.bridge.effect_start(self.effect_id, loopCount)
         if rc == DIB_OK:
             self._started = True
+            self._device_playing = True
             self.device.note_effect_started(self)
         else:
             logging.warning(f"effect_start failed ({rc}) for {self!r}")
         return self
 
     def stop(self):
-        if self.effect_id:
+        if self.effect_id and self._device_playing:
             self.device.bridge.effect_stop(self.effect_id)
         self._started = False
+        self._device_playing = False
         return self
 
     def destroy(self):
@@ -401,6 +522,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             self.type = 0
             self.effect_id = None
             self._started = False
+            self._device_playing = False
 
     def setEffect(self, **kwargs):
         # the Rhino handle uses this for the SET_EFFECT report; here only the
@@ -421,13 +543,17 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         block.cp_offset = clamp(cond.cpOffset, -4096, 4096)
         block.positive_coefficient = clamp(cond.positiveCoefficient, -4096, 4096)
         block.negative_coefficient = clamp(cond.negativeCoefficient, -4096, 4096)
-        # Rhino firmware convention: saturation 0 = unlimited (the app's
-        # condition objects default to 0).  DirectInput reads 0 as a
-        # zero-force cap, which silences the effect entirely.
+        # Rhino firmware convention: saturation 0 = unlimited, and the app's
+        # FFBReport_SetCondition objects default to 0 (most effect code
+        # never sets saturation at all).  DirectInput reads 0 as a
+        # zero-force CAP - passed through untranslated, every spring/damper
+        # in the app renders zero force (the first DI flight test flew with
+        # no spring at all because of this).  0 therefore maps to max.
         block.positive_saturation = clamp(cond.positiveSaturation, 0, 4096) or 4096
         block.negative_saturation = clamp(cond.negativeSaturation, 0, 4096) or 4096
         block.dead_band = clamp(cond.deadBand, 0, 4096)
         self._push()
+        self._sync_device_playing()
 
         if self.type == EFFECT_SPRING:
             self.device.note_spring_condition(axis, block.cp_offset, block.positive_coefficient)

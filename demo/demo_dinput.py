@@ -14,6 +14,12 @@ Usage:
     python demo_dinput.py <n> constant     - constant-force direction sweep
     python demo_dinput.py <n> periodic     - periodic waveform sweep
     python demo_dinput.py <n> input        - live axis/button/CP monitor
+    python demo_dinput.py <n> abtest       - zero-spring feel A/B: any stick
+                                             button toggles between a PLAYING
+                                             zero-coefficient spring (motors
+                                             energized) and NO effect
+                                             (freewheel) - move the stick and
+                                             compare the back-drive texture
 
 CAUTION: the selected device is acquired exclusively and will produce forces.
 Keep a hand on the stick, close other FFB software first.
@@ -40,8 +46,8 @@ logger = logging.getLogger(__name__)
 
 from PyQt6.QtCore import QCoreApplication
 
-from telemffb.hw.ffb_rhino import HapticEffect, EFFECT_SINE, EFFECT_SQUARE
-from telemffb.hw.ffb_dinput import DInputFFBDevice
+from telemffb.hw.ffb_rhino import HapticEffect, EFFECT_SINE, EFFECT_SPRING, EFFECT_SQUARE
+from telemffb.hw.ffb_dinput import DibEffectParams, DInputFFBDevice
 
 
 def list_devices():
@@ -136,8 +142,14 @@ def test_input(app, device):
     print("\n" + "=" * 60)
     print("INPUT MONITOR (10s): move axes, press buttons and hats")
     print("=" * 60)
-    device.buttonPressed.connect(lambda b: print(f"\n  button pressed:  {b} (0x{b:02X})"))
-    device.buttonReleased.connect(lambda b: print(f"\n  button released: {b} (0x{b:02X})"))
+    def _label(b):
+        # raw signal carries 0-based bit indices for plain buttons and
+        # 0x80|(hat<<4)|pos for hats; report plain buttons 1-based to match
+        # the app's binding/polling numbering (getPressedButtons)
+        return f"hat code 0x{b:02X}" if b & 0x80 else f"button {b + 1}"
+
+    device.buttonPressed.connect(lambda b: print(f"\n  pressed:  {_label(b)}"))
+    device.buttonReleased.connect(lambda b: print(f"\n  released: {_label(b)}"))
     end = time.monotonic() + 10
     while time.monotonic() < end:
         app.processEvents()
@@ -147,6 +159,65 @@ def test_input(app, device):
             print(f"  X={x:+.3f}  Y={y:+.3f}   ", end="\r")
         time.sleep(0.02)
     print("\ninput monitor done")
+
+
+def test_abtest(app, device):
+    print("\n" + "=" * 60)
+    print("ZERO-SPRING FEEL A/B/C (90s)")
+    print("=" * 60)
+    print("Move the stick around and press ANY stick button to cycle:")
+    print("  A: no effect                        (freewheel)")
+    print("  B: zero-coefficient spring PLAYING  (drive stage energized)")
+    print("  C: 1% spring (coef 41), center 0    (DCS-style residual)")
+    print("A and B command identical (zero) force - any difference is the")
+    print("device's energized-motor behavior.\n")
+
+    # raw bridge access: the backend now mutes zero-coefficient conditions
+    # automatically, so state B must be forced below the handle layer
+    def spring_params(coef):
+        p = DibEffectParams()
+        p.gain = 4096
+        for block in (p.condition_x, p.condition_y):
+            block.active = 1
+            block.positive_coefficient = coef
+            block.negative_coefficient = coef
+            block.positive_saturation = 4096
+            block.negative_saturation = 4096
+        return p
+
+    effect = device.bridge.effect_create(device._handle, EFFECT_SPRING, spring_params(0))
+    if effect <= 0:
+        print("could not create test spring")
+        return
+
+    states = [
+        ("A: no effect (freewheel)", None),
+        ("B: zero-coefficient spring PLAYING (energized)", 0),
+        ("C: 1% spring, center 0 (DCS-style residual)", 41),
+    ]
+    state = 0
+    prev_buttons = None
+    print(f">>> STATE {states[state][0]}")
+    end = time.monotonic() + 90
+    while time.monotonic() < end:
+        app.processEvents()
+        snapshot = device.get_input()
+        if snapshot is not None:
+            buttons = snapshot.buttons
+            if prev_buttons is not None and buttons & ~prev_buttons:
+                state = (state + 1) % len(states)
+                label, coef = states[state]
+                if coef is None:
+                    device.bridge.effect_stop(effect)
+                else:
+                    device.bridge.effect_update(effect, spring_params(coef))
+                    device.bridge.effect_start(effect, 1)
+                print(f">>> STATE {label}")
+            prev_buttons = buttons
+        time.sleep(0.01)
+
+    device.bridge.effect_destroy(effect)
+    print("abtest done")
 
 
 def main():
@@ -172,11 +243,13 @@ def main():
         "constant": test_constant,
         "periodic": test_periodic,
         "input": test_input,
+        "abtest": test_abtest,
     }
     try:
         if which == "all":
-            for fn in tests.values():
-                fn(app, device)
+            for name, fn in tests.items():
+                if name != "abtest":  # interactive - run explicitly
+                    fn(app, device)
         elif which in tests:
             tests[which](app, device)
         else:
