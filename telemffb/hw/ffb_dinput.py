@@ -16,10 +16,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Generic DirectInput FFB backend via the VPforce-DInput-Bridge DLL.
+"""Generic DirectInput FFB backend via the TelemFFB-DInput-Bridge DLL.
 
 Speaks to any DirectInput force-feedback device through ``dinput_ffb.dll``
-(separate repo: VPforce-DInput-Bridge).  All values cross the DLL boundary in
+(separate repo: TelemFFB-DInput-Bridge).  All values cross the DLL boundary in
 TelemFFB's native +-4096 units; the bridge converts to DirectInput's +-10000.
 
 Differences from the native VPforce backend, hidden behind the
