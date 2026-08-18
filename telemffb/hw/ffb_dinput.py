@@ -215,6 +215,51 @@ class DIBridge:
         if self._trace:
             logging.info("DIB_TRACE enabled: logging all bridge effect calls")
 
+        self.build_info = self._read_build_info()
+        self._log_build_identity()
+
+    def _read_build_info(self) -> dict:
+        """Version/built/expires of the loaded DLL.  The export is additive
+        in ABI 1, so older DLLs simply don't have it."""
+        try:
+            fn = self._dll.dib_build_info
+        except AttributeError:
+            return {}
+        buf = ctypes.create_string_buffer(256)
+        if fn(buf, len(buf)) <= 0:
+            return {}
+        try:
+            return json.loads(buf.value.decode(errors="replace"))
+        except ValueError:
+            return {}
+
+    def _log_build_identity(self):
+        """Log the DLL's identity for support, and warn ahead of a beta
+        build's expiry fuse instead of cliff-edge failing on launch day."""
+        if not self.build_info:
+            logging.info("DInput bridge loaded (no build info export - pre-0.9 build)")
+            return
+        version = self.build_info.get("version", "?")
+        built = self.build_info.get("built", "?")
+        expires = self.build_info.get("expires")
+        logging.info(f"DInput bridge {version} (ABI {self.build_info.get('abi', '?')}, built {built})")
+        if not expires:
+            return
+        try:
+            from datetime import date
+            days_left = (date.fromisoformat(expires) - date.today()).days
+        except ValueError:
+            logging.warning(f"DInput bridge BETA build with unparseable expiry '{expires}'")
+            return
+        if days_left < 0:
+            logging.error(f"DInput bridge BETA build EXPIRED {expires} - "
+                          "device connection will be refused; download the current build")
+        elif days_left <= 14:
+            logging.warning(f"DInput bridge BETA build expires in {days_left} day(s) "
+                            f"({expires}) - download the current build soon")
+        else:
+            logging.info(f"DInput bridge BETA build, expires {expires}")
+
     def last_error(self) -> str:
         buf = ctypes.create_string_buffer(512)
         self._dll.dib_last_error(buf, len(buf))
