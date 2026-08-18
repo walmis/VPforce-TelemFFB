@@ -399,6 +399,37 @@ class TestCapabilityGating:
         finally:
             HapticEffect.device = saved
 
+    def test_native_ffb_sims_gated_on_di_device(self):
+        """DCS/IL-2/BMS render native DirectInput FFB and cannot coexist
+        with the bridge's exclusive acquisition: their listeners must report
+        disabled while a DI device is selected, WITHOUT touching the stored
+        enable settings (soft gate - reselecting VPforce restores them)."""
+        from types import SimpleNamespace
+        import telemffb.globals as G
+        from telemffb.telem.SimTelemListener import SimTelemListener
+
+        saved = (getattr(G, 'system_settings', None), getattr(G, 'args', None),
+                 G.device_di_guid)
+        G.system_settings = {'enableDCS': True, 'enableIL2': True,
+                             'enableBMS': True, 'enableMSFS': True}
+        G.args = SimpleNamespace(sim=None)
+        try:
+            listeners = {name: SimTelemListener(name)
+                         for name in ('DCS', 'IL2', 'BMS', 'MSFS')}
+
+            G.device_di_guid = None                # VPforce device
+            assert all(sim.is_enabled for sim in listeners.values())
+
+            G.device_di_guid = '{SOME-GUID}'       # DirectInput device
+            assert not listeners['DCS'].is_enabled
+            assert not listeners['IL2'].is_enabled
+            assert not listeners['BMS'].is_enabled
+            assert listeners['MSFS'].is_enabled    # MSFS/X-Plane unaffected
+            # stored settings untouched by the gate
+            assert G.system_settings['enableDCS'] is True
+        finally:
+            G.system_settings, G.args, G.device_di_guid = saved
+
     def test_di_device_lacks_vpforce_features(self, device):
         caps = device.caps
         assert not caps.has_spring_adjuster   # Advanced Spring Override gate

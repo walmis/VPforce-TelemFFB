@@ -975,11 +975,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if not validate_vpconf_profile(self.pathVPConfExit.text(), G.device_usbpid, G.device_type):
                 return False
 
-        if self.enableIL2.isChecked():
+        # IL-2 checks are skipped for DirectInput devices: the sim is soft
+        # gated (settings preserved but inert), so a stored IL-2 config must
+        # not block saving under a DI device
+        if self.enableIL2.isChecked() and not G.device_di_guid:
             if not self.validate_il2_path():
                 return False
 
-        if self.il2_fwd_enable.isChecked() and self.il2_fwd_model.rowCount() == 0:
+        if self.il2_fwd_enable.isChecked() and self.il2_fwd_model.rowCount() == 0 and not G.device_di_guid:
             QMessageBox.warning(self, "Config Error",
                                  "IL2 Telemetry Forwarding is enabled but no destinations have been added.\n\n"
                                  "Please add at least one destination or disable forwarding.")
@@ -1265,16 +1268,30 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         generic DirectInput device.  Disable (without clearing) the
         controls so stored settings survive a switch back to a VPforce
         device; the runtime pushes are gated independently."""
-        if self._device_has_gains():
-            return
-        tip = ('Not available: the selected device is a generic DirectInput '
-               'device with no VPforce Configurator gains')
-        for widget in (self.enableVPConfStartup, self.pathVPConfStartup,
-                       self.browseVPConfStartup, self.enableVPConfExit,
-                       self.pathVPConfExit, self.browseVPConfExit,
-                       self.enableVPConfGlobalDefault, self.enableResetGainsExit):
-            widget.setEnabled(False)
-            widget.setToolTip(tip)
+        if not self._device_has_gains():
+            tip = ('Not available: the selected device is a generic DirectInput '
+                   'device with no VPforce Configurator gains')
+            for widget in (self.enableVPConfStartup, self.pathVPConfStartup,
+                           self.browseVPConfStartup, self.enableVPConfExit,
+                           self.pathVPConfExit, self.browseVPConfExit,
+                           self.enableVPConfGlobalDefault, self.enableResetGainsExit):
+                widget.setEnabled(False)
+                widget.setToolTip(tip)
+
+        # DCS/IL-2/BMS render their own native DirectInput FFB, which cannot
+        # coexist with the bridge's exclusive acquisition of a generic DI
+        # device.  Disable the whole sim tab (soft: checkbox states are
+        # preserved and saved through, so the sims come back the moment a
+        # VPforce device is reselected).  Runtime listeners are gated
+        # independently in SimTelemListener.is_enabled.
+        if G.device_di_guid:
+            tip = ('Not available with a DirectInput device: this sim renders '
+                   'its own native FFB, which conflicts with exclusive device '
+                   'access. Settings are preserved and reactivate when a '
+                   'VPforce device is reselected.')
+            for tab_index in (self.DCS_TAB, self.IL2_TAB, self.BMS_TAB):
+                self.simTabWidget.setTabEnabled(tab_index, False)
+                self.simTabWidget.setTabToolTip(tab_index, tip)
 
     def browse_vpconf(self, mode):
         options = QFileDialog.Option(0)

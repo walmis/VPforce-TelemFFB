@@ -101,11 +101,19 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
         if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
             caps = getattr(HapticEffect.device, 'caps', None)
             if caps is not None and not caps.has_spring_adjuster:
-                self.flag_error(
-                    "The Advanced/Custom Curve G-Force effect is not supported on this device.\n"
-                    "It requires the spring adjuster feature of VPforce hardware."
-                )
-                return False
+                # The Advanced curve itself is device-neutral: 'constant'
+                # output renders via a plain constant force and works on any
+                # backend.  Only the 'offset' output style needs the VPforce
+                # spring adjuster.
+                if self.g_effect_get_adv_mode() == "offset":
+                    self.flag_error(
+                        "The Advanced G-Force effect's 'offset' output mode is not supported on this device.\n"
+                        "It requires the spring adjuster feature of VPforce hardware.\n"
+                        "Switch the Advanced G-Force output mode to 'constant'."
+                    )
+                    return False
+                # no firmware on generic devices: skip the version check
+                return True
             # Verify the device firmware meets the minimum version required to execute this portion of the effect
             # Flag error and abort if not met
             if self.__firmware_supported is None:

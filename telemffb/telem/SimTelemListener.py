@@ -37,11 +37,18 @@ from telemffb.telem.BMSTelemManager import BMSManager
 class SimTelemListener(QtCore.QObject):
     stateChanged = QtCore.pyqtSignal(bool)
 
+    #: Sims whose FFB integration requires VPforce hardware: they render
+    #: their own native DirectInput FFB, which cannot coexist with the DI
+    #: bridge's exclusive acquisition of a generic device (and their
+    #: TelemFFB integrations assume the VPforce raw-HID side channel).
+    VPFORCE_ONLY_SIMS = ("DCS", "IL2", "BMS")
+
     def __init__(self, name : str):
         super().__init__()
         self.name : str = name
         self.telem : NetworkThread = None
         self._started = False
+        self._di_gate_logged = False
 
     def start(self):
         raise NotImplementedError
@@ -75,7 +82,17 @@ class SimTelemListener(QtCore.QObject):
 
     @property
     def is_enabled(self) -> bool:
-        return bool(G.system_settings.get(f'enable{self.name}') or G.args.sim == self.name)
+        enabled = bool(G.system_settings.get(f'enable{self.name}') or G.args.sim == self.name)
+        # Soft gate, mirroring the vpconf handling: the stored enable
+        # setting is preserved untouched so the sim comes back the moment
+        # a VPforce device is reselected for this instance.
+        if enabled and self.name in self.VPFORCE_ONLY_SIMS and G.device_di_guid:
+            if not self._di_gate_logged:
+                logging.info(f"{self.name} support requires VPforce hardware; "
+                             "disabled while a DirectInput device is selected (setting preserved)")
+                self._di_gate_logged = True
+            return False
+        return enabled
 
     @property
     def port_udp(self):
