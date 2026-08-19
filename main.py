@@ -964,6 +964,25 @@ def main():
     # Parse command line arguments to determine device type, ports, and operation mode
     G.args = CmdLineArgs.parse()
     G.is_exe = getattr(sys, 'frozen', False)
+
+    # Refuse to run from unsafe locations (Desktop, drive roots, Downloads,
+    # ...).  The auto-updater manages the ENTIRE folder containing the
+    # executable, so a shared folder would be swept wholesale into the
+    # update/backup process (field incident: a release unzipped straight
+    # onto the Desktop - the updater relocated the user's whole Desktop
+    # into the previous-version backup folder).
+    if G.is_exe:
+        unsafe_reason = utils.unsafe_install_location_reason(os.path.dirname(sys.executable))
+        if unsafe_reason:
+            QMessageBox.critical(
+                None, "Unsafe Install Location",
+                f"TelemFFB cannot run from this location: it is installed directly on {unsafe_reason}.\n\n"
+                "TelemFFB must live in its own dedicated folder (for example C:\\TelemFFB, "
+                "or a 'TelemFFB' folder on your Desktop), because the auto-updater manages "
+                "everything in the folder that contains VPforce-TelemFFB.exe.\n\n"
+                "Please move all TelemFFB files into their own folder and start it from there.")
+            sys.exit(1)
+
     headless_mode = G.args.headless
     G.master_instance = not G.args.child
 

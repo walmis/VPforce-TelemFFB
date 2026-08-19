@@ -70,6 +70,87 @@ def check_min_firmware_version(dev_firmware_version, min_firmware_version):
     return devver >= minver
 
 
+def _shared_shell_locations() -> dict:
+    """Shared user locations that must never BE the app's install folder.
+
+    Shell folders are resolved via the registry so folder redirection
+    (e.g. a OneDrive-synced Desktop) is handled correctly.  Values map a
+    human-readable label (used in the refusal message) to the folder path.
+    """
+    locations = {}
+    try:
+        import winreg
+        with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders") as key:
+            for label, value_name in (
+                    ("your Desktop", "Desktop"),
+                    ("your Documents folder", "Personal"),
+                    ("your Downloads folder", "{374DE290-123F-4565-9164-39C4925E467B}")):
+                try:
+                    locations[label] = winreg.QueryValueEx(key, value_name)[0]
+                except OSError:
+                    pass
+    except Exception:
+        logging.exception("Unable to resolve shell folders for the install-location check")
+
+    for label, env_var in (
+            ("your user profile folder", "USERPROFILE"),
+            ("the OneDrive root folder", "OneDrive"),
+            ("the Program Files folder", "ProgramFiles"),
+            ("the Program Files (x86) folder", "ProgramFiles(x86)"),
+            ("the Windows folder", "SystemRoot")):
+        value = os.environ.get(env_var)
+        if value:
+            locations[label] = value
+
+    public = os.environ.get("PUBLIC")
+    if public:
+        locations["the Public Desktop"] = os.path.join(public, "Desktop")
+
+    return locations
+
+
+def unsafe_install_location_reason(app_dir: str, locations: dict = None):
+    """Return a human-readable reason when app_dir is an unsafe place for a
+    TelemFFB installation, or None when it is acceptable.
+
+    The auto-updater manages the ENTIRE folder containing the executable
+    (backing up and replacing its contents), so running from a shared
+    location would sweep unrelated files into the update process.  Field
+    incident: a release unzipped directly onto the Desktop - the updater
+    moved the user's whole Desktop into the previous-version backup folder.
+
+    Subfolders of shared locations are fine (e.g. Desktop\\TelemFFB); only
+    the shared folder ITSELF (or a drive root, or anywhere under the temp
+    directory) is refused.
+    """
+    def norm(p):
+        return os.path.normcase(os.path.abspath(p)).rstrip('\\/')
+
+    root = norm(app_dir)
+
+    # drive roots (C:\, D:\, ...)
+    drive, tail = os.path.splitdrive(root)
+    if drive and not tail.strip('\\/'):
+        return f"the root of drive {drive.upper()}\\"
+
+    if locations is None:
+        locations = _shared_shell_locations()
+
+    for label, path in locations.items():
+        if path and root == norm(path):
+            return label
+
+    # anywhere under the temp directory usually means the executable was
+    # launched directly from inside the downloaded .zip
+    tmp = norm(tempfile.gettempdir())
+    if root == tmp or root.startswith(tmp + os.sep):
+        return "a temporary folder (was it started from inside the .zip file?)"
+
+    return None
+
+
 def schedule_on_main_thread(func):
     """
     Schedule a callable to execute in the main Qt thread.
@@ -748,6 +829,9 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
     dlg_layout = QVBoxLayout(dlg)
     dlg_layout.addWidget(QLabel(
         "Upload Support Bundle to VPforce support?\n\n"
+        "**Note** - this is not a replacement for posting your issue/question\n"
+        "in the VPforce discord.  Nobody is going to proactively reachout to you.\n"
+        "It will simply help associate your discord message with this support bundle.\n\n"
         "This will include:\n"
         "  • Exception details and tracebacks\n"
         "  • System configuration\n"
