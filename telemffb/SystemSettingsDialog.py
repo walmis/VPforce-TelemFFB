@@ -356,7 +356,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 di_devices.append(dev)
             return di_devices
         except Exception as e:
-            logging.info(f"DirectInput device enumeration unavailable: {e}")
+            # debug level: a stock install without the (optional, separately
+            # distributed) bridge DLL must look exactly like pre-DI TelemFFB -
+            # no log noise hinting at a "missing" component
+            logging.debug(f"DirectInput device enumeration unavailable: {e}")
             return []
 
     def populateUSBSelectors(self):
@@ -1293,7 +1296,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # device.  Disable the whole sim tab (soft: checkbox states are
         # preserved and saved through, so the sims come back the moment a
         # VPforce device is reselected).  Runtime listeners are gated
-        # independently in SimTelemListener.is_enabled.
+        # independently in SimTelemListener.is_enabled.  (IL-2 Korea nearly
+        # qualifies for an exception via its ffbdevice telemetry stream, but
+        # the game exclusive-acquires all controllers regardless of its FFB
+        # setting and only emits the records with FFB enabled - see
+        # SimTelemListener.is_enabled.)
         if G.device_di_guid:
             tip = ('Not available with a DirectInput device: this sim renders '
                    'its own native FFB, which conflicts with exclusive device '

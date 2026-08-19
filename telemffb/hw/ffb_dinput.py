@@ -551,6 +551,10 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             rc = self.device.bridge.effect_start(self.effect_id, 1)
             if rc == DIB_OK:
                 self._device_playing = True
+            elif rc == DIB_ERR_ACQUISITION:
+                # FFB priority held by another app: create_effect logs the
+                # condition once; per-frame retries stay quiet
+                logging.debug(f"effect_start blocked by FFB priority for {self!r}")
             else:
                 logging.warning(f"effect_start failed ({rc}) for {self!r}")
         elif not should_play and self._device_playing:
@@ -575,6 +579,8 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             self._started = True
             self._device_playing = True
             self.device.note_effect_started(self)
+        elif rc == DIB_ERR_ACQUISITION:
+            logging.debug(f"effect_start blocked by FFB priority for {self!r}")
         else:
             logging.warning(f"effect_start failed ({rc}) for {self!r}")
         return self
@@ -709,6 +715,9 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._start_seq = 0
         self._last_started: Dict[int, int] = {}  # id(handle) -> sequence
         self._reconnecting = False
+        # latch: log the FFB-priority-lost condition once instead of every
+        # frame (the lazy effect re-create retries continuously)
+        self._acquisition_warned = False
 
         self._handle = self.bridge.open(guid)
 
@@ -900,9 +909,25 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                     continue
                 logging.warning("Effects pool full, cannot create new effect")
                 return None
-            logging.warning(f"create_effect failed ({effect_id}): {effect_names.get(type, type)}")
+            if effect_id == DIB_ERR_ACQUISITION:
+                # a foreground app (typically the sim's own FFB) holds
+                # priority; effect ops fail until it releases the device.
+                # ERROR level so the exception tracker (which de-duplicates
+                # with a count) surfaces the condition in the UI; the
+                # per-frame lazy re-create doubles as automatic recovery.
+                logging.error(
+                    f"FFB effects blocked: {self.bridge.last_error()}. "
+                    "Close other FFB software / disable the sim's own force "
+                    "feedback - effects resume automatically once released.")
+                self._acquisition_warned = True
+                return None
+            logging.warning(f"create_effect failed ({effect_id}): {effect_names.get(type, type)} "
+                            f"- {self.bridge.last_error()}")
             return None
 
+        if self._acquisition_warned:
+            logging.info("FFB priority restored - effects resuming")
+            self._acquisition_warned = False
         handle = DInputEffectHandle(self, effect_id, type)
         self._effect_handles.append(weakref.ref(handle, lambda x: self._effect_handles.remove(x)))
         return handle

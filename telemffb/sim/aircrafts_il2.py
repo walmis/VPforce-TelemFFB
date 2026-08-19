@@ -361,6 +361,7 @@ class Aircraft(AircraftBase):
         # self._update_focus_loss(telem_data)
         self.il2_override_spring()
         self.il2_ffb_spring()
+        self.il2_ffb_forces()
         if self.damage_effect_intensity > 0:
             self.il2_update_damage(telem_data)
 
@@ -567,6 +568,80 @@ class Aircraft(AircraftBase):
                 self.telem_data['FFB_Y_Force'] = round(r['force'], 4)
                 self.telem_data['FFB_Y_Center'] = round(r['pos'], 4)
         spring.start(override=True)
+
+    def il2_ffb_forces(self):
+        """Render IL-2 Korea Const/Damper FFB records on generic DirectInput
+        devices.
+
+        On VPforce hardware these records are already rendered by the game
+        itself through its native DirectInput channel (TelemFFB rides the
+        separate raw-HID channel, so both coexist) - re-rendering them here
+        would double the forces.  A generic DirectInput device is held
+        exclusively by TelemFFB, so the game's own channel cannot reach it
+        and the records must be re-rendered from telemetry.
+
+        DORMANT as of 2026-08: field testing showed IL-2 Korea exclusive-
+        acquires every attached controller regardless of its force-feedback
+        setting AND only emits ffbdevice records while its FFB is enabled -
+        so on a DI device the game blocks TelemFFB's effects whenever it has
+        focus, and disabling the game's FFB stops the records.  The IL-2 sim
+        gate therefore remains fully closed for DI devices
+        (SimTelemListener.is_enabled).  This renderer is kept tested and
+        ready pending a game-side fix (non-exclusive acquisition when FFB is
+        disabled, or FFB-off record export).
+
+        Const and Damper records are treated as transient per-frame commands
+        (no caching, unlike the spring records): a stale constant-force
+        record must not keep pushing after the game stops commanding it.
+        Records also carry 'amp'/'freq' fields whose semantics are still
+        under observation; they are exposed in telemetry for discovery.
+        """
+        from telemffb.telem.IL2Manager import ForceType
+
+        if not G.device_di_guid:
+            return  # VPforce: the game renders these natively
+        if G.il2_ffb_device_ordinal is None:
+            return
+
+        raw = self.telem_data.FFBRecords
+        records = json.loads(raw) if isinstance(raw, str) and raw else []
+
+        const_recs = {}
+        damper_recs = {}
+        for r in records:
+            if r.get('dev') != G.il2_ffb_device_ordinal:
+                continue
+            if r.get('type') == ForceType.Const:
+                const_recs[r.get('axis')] = r
+            elif r.get('type') == ForceType.Damper:
+                damper_recs[r.get('axis')] = r
+
+        # --- constant force: combine per-axis commands into one vector ---
+        fx = utils.clamp((const_recs.get(0) or {}).get('force', 0.0), -1.0, 1.0)
+        fy = utils.clamp((const_recs.get(1) or {}).get('force', 0.0), -1.0, 1.0)
+        magnitude = min(math.sqrt(fx * fx + fy * fy), 1.0)
+        if magnitude >= 0.005:
+            # measured DirectInput polar convention: 0 deg pushes +Y,
+            # 90 -> -X, 180 -> -Y, 270 -> +X  =>  direction = atan2(-fx, fy)
+            direction = math.degrees(math.atan2(-fx, fy)) % 360
+            self.effects['il2_ffb_const'].constant(magnitude, direction).start()
+            for axis_name, rec in (('X', const_recs.get(0)), ('Y', const_recs.get(1))):
+                if rec:
+                    self.telem_data[f'FFB_Const{axis_name}'] = [
+                        round(rec.get('force', 0.0), 3),
+                        round(rec.get('amp', 0.0), 3),
+                        round(rec.get('freq', 0.0), 2)]
+        else:
+            self.effects['il2_ffb_const'].stop()
+
+        # --- damper: per-axis coefficients ---
+        dx = utils.clamp((damper_recs.get(0) or {}).get('force', 0.0), 0.0, 1.0)
+        dy = utils.clamp((damper_recs.get(1) or {}).get('force', 0.0), 0.0, 1.0)
+        if dx or dy:
+            self.effects['il2_ffb_damper'].damper(int(dx * 4096), int(dy * 4096)).start()
+            self.telem_data['FFB_Damper'] = [round(dx, 3), round(dy, 3)]
+        else:
+            self.effects['il2_ffb_damper'].stop()
 
 
 class PropellerAircraft(Aircraft):

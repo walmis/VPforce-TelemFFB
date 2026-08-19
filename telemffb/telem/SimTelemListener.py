@@ -87,6 +87,26 @@ class SimTelemListener(QtCore.QObject):
         # setting is preserved untouched so the sim comes back the moment
         # a VPforce device is reselected for this instance.
         if enabled and self.name in self.VPFORCE_ONLY_SIMS and G.device_di_guid:
+            # IL-2 Korea nearly qualifies for an exception (its ffbdevice
+            # telemetry stream lets TelemFFB render the game's FFB intent -
+            # see aircrafts_il2.il2_ffb_forces), but as of 2026-08 the game
+            # exclusive-acquires every attached controller regardless of its
+            # FFB setting AND only emits the records while its FFB is
+            # enabled - the two requirements can never hold simultaneously
+            # on a DI device.  Revisit if the game gains non-exclusive
+            # acquisition or FFB-off record export.
+            # DEBUG override for that ongoing investigation: registry value
+            # 'dinput_allow_il2' = 1 under HKCU\Software\VPforce\TelemFFB
+            # opens the IL-2 gate on a DI device (Korea path configured)
+            # so game-side workarounds (dinput proxy etc.) can be tested.
+            if self.name == "IL2" and G.system_settings.get('validateIL2_K'):
+                flag = str(G.system_settings.get('dinput_allow_il2', '')).strip().lower()
+                if flag in ('1', 'true', 'yes', 'on'):
+                    if not self._di_gate_logged:
+                        logging.warning("IL2 enabled on a DirectInput device via "
+                                        "'dinput_allow_il2' debug registry flag (testing mode)")
+                        self._di_gate_logged = True
+                    return True
             if not self._di_gate_logged:
                 logging.info(f"{self.name} support requires VPforce hardware; "
                              "disabled while a DirectInput device is selected (setting preserved)")

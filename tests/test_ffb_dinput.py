@@ -27,6 +27,7 @@ class FakeDIBridge:
 
     def __init__(self, capacity=10):
         self.capacity = capacity
+        self.create_error = None   # simulate e.g. DIB_ERR_ACQUISITION
         self.effects = {}          # id -> {"type": int, "params": DibEffectParams}
         self.started = set()
         self.update_calls = []     # (effect_id, params snapshot bytes)
@@ -62,7 +63,12 @@ class FakeDIBridge:
     def _copy_params(self, params):
         return DibEffectParams.from_buffer_copy(bytes(params))
 
+    def last_error(self):
+        return "fake bridge error detail"
+
     def effect_create(self, device, effect_type, params):
+        if self.create_error is not None:
+            return self.create_error
         if len(self.effects) >= self.capacity:
             return DIB_ERR_DEVICE_FULL
         effect_id = self._next_id
@@ -310,6 +316,33 @@ class TestEffectLifecycle:
         handle.start()
         assert handle.effect_id in bridge.started
 
+    def test_ffb_priority_loss_raises_error_and_recovers(self, device, bridge, caplog):
+        """When a foreground app (the sim's own FFB) holds priority, effect
+        creation fails continuously via the per-frame lazy re-create: the
+        condition is logged at ERROR level (captured and de-duplicated by
+        the exception tracker) with actionable advice and a stable message,
+        effects return None cleanly, and recovery is announced when creation
+        succeeds again."""
+        import logging as _logging
+        from telemffb.hw.ffb_dinput import DIB_ERR_ACQUISITION
+
+        bridge.create_error = DIB_ERR_ACQUISITION
+        with caplog.at_level(_logging.ERROR):
+            for _ in range(5):   # five telemetry frames of retries
+                assert device.create_effect(EFFECT_SPRING) is None
+        blocked = [r for r in caplog.records if "FFB effects blocked" in r.message]
+        assert blocked and all(r.levelno == _logging.ERROR for r in blocked)
+        assert "resume automatically" in blocked[0].message
+        # stable message text so the exception tracker's dedup groups them
+        assert len({r.message for r in blocked}) == 1
+
+        # priority released: creation succeeds and recovery is announced
+        bridge.create_error = None
+        with caplog.at_level(_logging.INFO):
+            handle = device.create_effect(EFFECT_SPRING)
+        assert handle is not None
+        assert any("FFB priority restored" in r.message for r in caplog.records)
+
     def test_reset_effects_invalidates_handles(self, device, bridge):
         h1 = device.create_effect(EFFECT_SPRING)
         h2 = device.create_effect(EFFECT_SINE)
@@ -368,6 +401,76 @@ class TestSlotBudgeting:
             assert cue.started
         finally:
             HapticEffect.device = saved
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
+class TestIL2KoreaForces:
+    """IL-2 Korea Const/Damper record rendering (il2_ffb_forces).
+
+    Rendered ONLY on generic DirectInput devices: on VPforce hardware the
+    game renders these itself through its native DirectInput channel, and
+    re-rendering would double the forces."""
+
+    ORDINAL = 2
+
+    def _make_instance(self, records):
+        import json as _json
+        import telemffb.globals as G
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from tests.framework.utils import TelemetryDataBuilder
+        from telemffb.sim.aircrafts_il2 import Aircraft as IL2Aircraft
+
+        case = BaseTelemetryEffectTestCase()
+        case.setup_method()
+        inst = case.create_aircraft_instance(IL2Aircraft, name="TestIL2")
+        inst._telem_data = (TelemetryDataBuilder()
+                            .with_field("FFBRecords", _json.dumps(records))
+                            .build())
+        G.il2_ffb_device_ordinal = self.ORDINAL
+        return case, inst
+
+    def _run(self, records, di_guid):
+        import telemffb.globals as G
+        saved = (G.device_di_guid, G.il2_ffb_device_ordinal)
+        case, inst = self._make_instance(records)
+        G.device_di_guid = di_guid
+        try:
+            inst.il2_ffb_forces()
+            return case.mock_effects
+        finally:
+            G.device_di_guid, G.il2_ffb_device_ordinal = saved
+
+    def test_const_and_damper_rendered_on_di_device(self):
+        effects = self._run([
+            {"axis": 0, "dev": self.ORDINAL, "type": 1, "pos": 0, "force": 0.5, "amp": 0, "freq": 0},
+            {"axis": 0, "dev": self.ORDINAL, "type": 2, "pos": 0, "force": 0.25, "amp": 0, "freq": 0},
+            {"axis": 1, "dev": self.ORDINAL, "type": 2, "pos": 0, "force": 0.5, "amp": 0, "freq": 0},
+            {"axis": 0, "dev": 9, "type": 1, "pos": 0, "force": 1.0, "amp": 0, "freq": 0},  # other device: ignored
+        ], di_guid='{GUID}')
+
+        const = effects.dict['il2_ffb_const']
+        assert const.started
+        assert const._magnitude == pytest.approx(0.5)
+        assert const._direction == pytest.approx(270)   # +X push (measured convention)
+
+        damper = effects.dict['il2_ffb_damper']
+        assert damper.started
+        assert damper._x_coefficient == 1024            # 0.25 * 4096
+        assert damper._y_coefficient == 2048            # 0.50 * 4096
+
+    def test_not_rendered_on_vpforce_device(self):
+        effects = self._run([
+            {"axis": 0, "dev": self.ORDINAL, "type": 1, "pos": 0, "force": 0.5, "amp": 0, "freq": 0},
+        ], di_guid=None)
+        assert 'il2_ffb_const' not in effects.dict
+        assert 'il2_ffb_damper' not in effects.dict
+
+    def test_transient_zero_stops_effects(self):
+        """No caching: absent/zero records mean the game stopped commanding
+        the force - the effects must stop rather than repeat stale kicks."""
+        effects = self._run([], di_guid='{GUID}')
+        assert not effects.dict['il2_ffb_const'].started
+        assert not effects.dict['il2_ffb_damper'].started
 
 
 # the simconnect package (pulled in via TelemManager) leaks a file handle at
@@ -473,9 +576,23 @@ class TestCapabilityGating:
 
             G.device_di_guid = '{SOME-GUID}'       # DirectInput device
             assert not listeners['DCS'].is_enabled
-            assert not listeners['IL2'].is_enabled
             assert not listeners['BMS'].is_enabled
             assert listeners['MSFS'].is_enabled    # MSFS/X-Plane unaffected
+
+            # IL-2 stays gated even with Korea configured: the game
+            # exclusive-acquires all controllers regardless of its FFB
+            # setting and only emits ffbdevice records with FFB enabled -
+            # revisit if the game changes (see SimTelemListener.is_enabled)
+            G.system_settings['validateIL2_K'] = True
+            assert not listeners['IL2'].is_enabled
+
+            # debug registry flag opens the gate for game-side workaround
+            # testing (dinput proxy investigations etc.)
+            G.system_settings['dinput_allow_il2'] = '1'
+            assert listeners['IL2'].is_enabled
+            del G.system_settings['dinput_allow_il2']
+            assert not listeners['IL2'].is_enabled
+
             # stored settings untouched by the gate
             assert G.system_settings['enableDCS'] is True
         finally:
