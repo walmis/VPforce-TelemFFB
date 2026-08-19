@@ -387,9 +387,17 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
                     cond_x = FFBReport_SetCondition(parameterBlockOffset=0)
                     cond_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
-                    # saturation > 0 means relative adjustment mode for spring adjuster
-                    cond_x.set_offset(0).set_coefficient(4096).set_saturation(1)
-                    cond_y.set_offset(adjuster_cpOy).set_coefficient(4096).set_saturation(1)
+                    # Adjuster parameters restored to the original pre-refactor
+                    # (field-proven) usage: coefficients stay 0 so the active
+                    # spring's gain is untouched, saturation stays full scale,
+                    # cpOffset carries the G-based center shift.  A refactor-era
+                    # change to coefficient=4096/saturation=1 clamped the
+                    # adjusted spring's output to ~zero - all spring force died
+                    # the moment the effect started.
+                    cond_x.set_offset(0)
+                    cond_x.positiveSaturation = cond_x.negativeSaturation = 4096
+                    cond_y.set_offset(adjuster_cpOy)
+                    cond_y.positiveSaturation = cond_y.negativeSaturation = 4096
 
                     offset_adjuster.setCondition(cond_y).setCondition(cond_x).start()
 
