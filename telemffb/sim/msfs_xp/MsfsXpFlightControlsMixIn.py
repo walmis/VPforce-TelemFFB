@@ -283,6 +283,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     def ac_modify_game_spring(self):
         """This function is not used in MSFS/X-Plane mixin."""
 
+    @override
+    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr=False):
+        """Dispatch straight to the base G-force implementation.
+
+        AdvancedSpringMixIn's override swallows the ADVANCED+offset G-force
+        call on the assumption that the advanced-spring adjuster processing
+        (ac_modify_game_spring) will run it with adv_spr=True.  That holds
+        for DCS/IL-2, but ac_modify_game_spring is a stub on MSFS/X-Plane -
+        without this bypass the offset-mode G effect silently never runs
+        here (on any device)."""
+        from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
+        return GForceEffectMixIn.ac_update_gforce_effect(self, telem_data, adv_spr=adv_spr)
+
     def get_trim_calibrator(self):
         """Get (lazily creating) the elevator virtual_y auto-calibration engine.
 
