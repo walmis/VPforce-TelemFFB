@@ -399,6 +399,57 @@ class TestCapabilityGating:
         finally:
             HapticEffect.device = saved
 
+    def test_gforce_offset_mode_flags_error_on_di_device(self):
+        """The Advanced G-Force gate is per OUTPUT MODE: 'offset' (spring
+        adjuster) flags an error on a DI device, 'constant' passes - the
+        Advanced curve itself is device-neutral.  (Advanced SPRING mode needs
+        no gate on MSFS/XP: its implementation there is plain-spring gain
+        shaping; the adjuster-based ac_modify_game_spring is DCS/IL-2 only.)"""
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from tests.framework.utils import TelemetryDataBuilder
+        from telemffb.sim.msfs_xp.Aircraft import Aircraft
+        from telemffb.SettingsManager import GEffectModeEnum
+
+        case = BaseTelemetryEffectTestCase()
+        case.setup_method()
+        try:
+            inst = case.create_aircraft_instance(
+                Aircraft, name="TestPlane", _test_sim_is_msfs=True,
+                _test_device_type="joystick")
+            inst.gforce_effect_mode = GEffectModeEnum.ADVANCED
+            inst._telem_data = (TelemetryDataBuilder().on_ground(False)
+                                .with_airspeed(50.0)
+                                .with_field("FFBType", "joystick").build())
+
+            class _DIDevice:
+                from telemffb.hw.ffb_dinput import DINPUT_CAPABILITIES as caps
+
+            saved = HapticEffect.device
+            HapticEffect.device = _DIDevice()
+            try:
+                inst.gforce_effect_adv_curve = {"mode": "offset", "scale": 1}
+                assert inst._GForceEffectMixIn__check_firmware_support() is False
+                assert "offset" in inst.telem_data.error
+
+                # end-to-end through the MRO: AdvancedSpringMixIn swallows
+                # the ADVANCED+offset call expecting the (DCS-only) adjuster
+                # path to run it; the MsfsXp mixin must bypass that so the
+                # effect - and this gate - actually execute on MSFS/X-Plane
+                inst._telem_data.error = None
+                inst.ac_update_gforce_effect(inst.telem_data)
+                assert inst.telem_data.error and "offset" in inst.telem_data.error
+
+                inst._telem_data.error = None
+                inst.gforce_effect_adv_curve = {"mode": "constant", "scale": 1}
+                assert inst._GForceEffectMixIn__check_firmware_support() is True
+                assert not inst.telem_data.error
+            finally:
+                HapticEffect.device = saved
+        finally:
+            teardown = getattr(case, 'teardown_method', None)
+            if teardown:
+                teardown()
+
     def test_native_ffb_sims_gated_on_di_device(self):
         """DCS/IL-2/BMS render native DirectInput FFB and cannot coexist
         with the bridge's exclusive acquisition: their listeners must report

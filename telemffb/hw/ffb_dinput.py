@@ -56,9 +56,15 @@ device-agnostic):
   drive stage adds cogging texture and even pulls the stick toward the stop
   past ~half deflection (the mute behavior above).
 
-Debugging: set the DIB_TRACE=1 environment variable to log every bridge
-effect call (create/update/start/stop/destroy) with decoded parameters -
-the ground truth of what the device is actually told to render.
+Debugging (registry values under HKCU\\Software\\VPforce\\TelemFFB):
+
+- 'dinput_trace' = 1 (or the DIB_TRACE=1 env var in dev runs): log every
+  bridge effect call (create/update/start/stop/destroy) with decoded
+  parameters - the ground truth of what the device is actually told to
+  render.
+- 'vpforce_as_dinput' = 1: list VPforce hardware as selectable [DI] devices
+  in System Settings, so a Rhino can exercise this backend end-to-end as a
+  second DirectInput test implementation.
 """
 
 import ctypes
@@ -163,6 +169,26 @@ class DIBridgeError(Exception):
     pass
 
 
+def _trace_enabled() -> bool:
+    """Bridge call tracing: DIB_TRACE=1 environment variable (dev runs), or
+    registry value 'dinput_trace' = 1 under HKCU\\Software\\VPforce\\TelemFFB
+    (compiled builds - same pattern as the 'debug' and 'vpforce_as_dinput'
+    toggles).  Read directly via winreg: the hw layer stays independent of
+    the app's settings machinery."""
+    def truthy(value) -> bool:
+        return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+    if truthy(os.environ.get("DIB_TRACE", "")):
+        return True
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\VPforce\TelemFFB") as key:
+            value, _ = winreg.QueryValueEx(key, "dinput_trace")
+        return truthy(value)
+    except OSError:
+        return False
+
+
 def _describe_params(effect_type: int, params: DibEffectParams) -> str:
     """One-line decode of DibEffectParams for the DIB_TRACE log."""
     if effect_type in CONDITION_EFFECTS:
@@ -208,12 +234,12 @@ class DIBridge:
         if abi != DIB_ABI_VERSION:
             raise DIBridgeError(f"dinput_ffb.dll ABI version {abi}, expected {DIB_ABI_VERSION}")
 
-        # DIB_TRACE=1 logs every effect call with decoded parameters - the
-        # ground truth of what the device is actually told to render
-        self._trace = bool(os.environ.get("DIB_TRACE"))
+        # trace logs every effect call with decoded parameters - the ground
+        # truth of what the device is actually told to render
+        self._trace = _trace_enabled()
         self._effect_types: Dict[int, int] = {}
         if self._trace:
-            logging.info("DIB_TRACE enabled: logging all bridge effect calls")
+            logging.info("DInput bridge trace enabled: logging all bridge effect calls")
 
         self.build_info = self._read_build_info()
         self._log_build_identity()

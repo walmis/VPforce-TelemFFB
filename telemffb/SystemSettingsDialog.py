@@ -332,14 +332,24 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         VPforce hardware also enumerates as a DI FFB device, so VID 0xFFFF is
         filtered out — those entries come from the native HID enumeration.
+        Debug override: list VPforce devices as [DI] entries too, so a Rhino
+        can be driven through the DirectInput backend as a second test
+        implementation (full generic-device behavior: capability gating,
+        CP emulation, no vpconf/firmware).  Enable via the registry value
+        'vpforce_as_dinput' = 1 under HKCU\\Software\\VPforce\\TelemFFB
+        (root, or the master instance's device subkey).
         The devpath encodes the backend ('dinput:{GUID}') so the selection
         flows through the existing devpath_* persistence untouched.
         """
         try:
             from telemffb.hw.ffb_dinput import DInputFFBDevice
+
+            # registry values arrive as strings; bool('0') is True
+            flag = str(G.system_settings.get('vpforce_as_dinput', '')).strip().lower()
+            include_vpforce = flag in ('1', 'true', 'yes', 'on')
             di_devices = []
             for dev in DInputFFBDevice.enumerate():
-                if dev.vendor_id == 0xFFFF:
+                if dev.vendor_id == 0xFFFF and not include_vpforce:
                     continue
                 dev.product_string = f"[DI] {dev.product_string}"
                 dev.path = f"dinput:{dev.guid}".encode()
