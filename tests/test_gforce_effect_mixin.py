@@ -197,3 +197,45 @@ class TestGForceEffectAllocation(BaseTelemetryEffectTestCase):
         assert isinstance(g_offset, int) or isinstance(g_offset, float), "G offset not present or invalid"
         # Ensure the 'gforce_spr' adjuster effect wasn't created by the dispenser in these modes
         assert 'gforce_spr' not in self.mock_effects.dict, f"'gforce_spr' was unexpectedly created for mode {inst.gforce_effect_mode}"
+class TestMsfsOffsetModeDispatch(BaseTelemetryEffectTestCase):
+    """ADVANCED+offset G-force must reach the base implementation on MSFS/XP.
+
+    AdvancedSpringMixIn's ac_update_gforce_effect override swallows the
+    ADVANCED+offset dispatch, expecting the game-spring adjuster processing
+    (ac_modify_game_spring) to run the effect with adv_spr=True.  That holds
+    for DCS/IL-2, but ac_modify_game_spring is a stub on MSFS/X-Plane, so
+    without the MsfsXpFlightControlsMixIn bypass the offset-mode G effect
+    silently never executes there (on any device).
+    """
+
+    def _make_instance(self, adv_mode):
+        from telemffb.sim.msfs_xp.Aircraft import Aircraft
+        inst = self.create_aircraft_instance(
+            Aircraft, name="TestPlane", _test_sim_is_msfs=True,
+            _test_device_type="joystick")
+        inst.gforce_effect_mode = GEffectModeEnum.ADVANCED
+        inst.gforce_effect_adv_curve = json.dumps({
+            "gain_pos": 100, "gain_neg": 100,
+            "curve_pos": {"points": [{"x": 0, "y": 0}, {"x": 5, "y": 100}], "smooth_curve_enabled": False},
+            "curve_neg": {"points": [{"x": 0, "y": 0}, {"x": 5, "y": 100}], "smooth_curve_enabled": False},
+            "mode": adv_mode,
+        })
+        return inst
+
+    def test_offset_mode_reaches_base_implementation(self):
+        from unittest.mock import patch
+        inst = self._make_instance("offset")
+        telem = TelemetryDataBuilder().set("FFBType", "joystick").build()
+        with patch.object(GForceEffectMixIn, 'ac_update_gforce_effect', autospec=True) as base:
+            inst.ac_update_gforce_effect(telem)
+        assert base.called, (
+            "MSFS/XP swallowed the ADVANCED+offset G-force dispatch - the "
+            "MsfsXpFlightControlsMixIn bypass of AdvancedSpringMixIn is broken")
+
+    def test_constant_mode_reaches_base_implementation(self):
+        from unittest.mock import patch
+        inst = self._make_instance("constant")
+        telem = TelemetryDataBuilder().set("FFBType", "joystick").build()
+        with patch.object(GForceEffectMixIn, 'ac_update_gforce_effect', autospec=True) as base:
+            inst.ac_update_gforce_effect(telem)
+        assert base.called
