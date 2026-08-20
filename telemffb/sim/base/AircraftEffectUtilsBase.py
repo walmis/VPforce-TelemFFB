@@ -142,7 +142,19 @@ class AircraftEffectUtilsBase(object):
                 logging.warning(f"Trying to assign unknown parameter {k} ")
                 continue
             logging.info(f" [cyan]set[/cyan]: {k} = {v}")
-            setattr(self, k, v)
+            try:
+                setattr(self, k, v)
+            except Exception:
+                # A setting that refuses its stored value must not take the
+                # rest of the aircraft down with it: the exception would
+                # escape the aircraft load, leaving a half-configured
+                # aircraft and no settings form to correct the value from.
+                logging.error(
+                    f"Could not apply setting '{k}' = {v!r}; it keeps its "
+                    "default for this session. Review this setting in the "
+                    "aircraft configuration.",
+                    exc_info=True,
+                )
 
     def has_changed(self, item: str, delta_ms=0, data=None) -> bool:
         """Check if a telemetry data item has changed since last call.

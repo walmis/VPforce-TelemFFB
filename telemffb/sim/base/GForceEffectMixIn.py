@@ -36,8 +36,15 @@ class GForceEffectProperties:
             if value in GEffectModeEnum.__members__:
                 self._gforce_effect_mode = GEffectModeEnum[value]
                 return
-            else:
-                raise ValueError(f"Invalid GEffectModeEnum mode string: {value}")
+            # Unknown name: see the spring_mode setter - fall back rather than
+            # raise, so a stale config cannot block the aircraft from loading.
+            logging.error(
+                f"Unknown G-force effect mode '{value}' in this aircraft's "
+                f"configuration - falling back to {GEffectModeEnum.DISABLED.name}. "
+                "Choose a mode in the settings to replace it."
+            )
+            self._gforce_effect_mode = GEffectModeEnum.DISABLED
+            return
         
         # Any other type is invalid
         raise ValueError("Invalid type for gforce_effect_mode")

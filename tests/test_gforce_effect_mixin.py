@@ -36,10 +36,12 @@ def test_set_gforce_mode_with_valid_string():
     assert d.gforce_effect_mode == GEffectModeEnum.NEW
 
 
-def test_set_gforce_mode_with_invalid_string_raises():
+def test_set_gforce_mode_with_unknown_name_falls_back():
+    """An unknown mode name comes from a config written by another build;
+    it must not raise (see tests/test_unknown_setting_values.py)."""
     d = DummyG()
-    with pytest.raises(ValueError):
-        d.gforce_effect_mode = 'INVALID'
+    d.gforce_effect_mode = 'INVALID'
+    assert d.gforce_effect_mode == GEffectModeEnum.DISABLED
 
 
 def test_set_gforce_mode_with_invalid_type_raises():
