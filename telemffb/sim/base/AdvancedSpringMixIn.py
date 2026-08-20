@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional, override
 
 import telemffb.utils as utils
@@ -63,8 +64,19 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             if value in SpringModeEnum.__members__:
                 self._spring_mode = SpringModeEnum[value]
                 return
-            else:
-                raise ValueError(f"Invalid spring mode string: {value}")
+            # Unknown name: a config written by a build that has modes this
+            # one does not.  Fall back to the least intrusive mode instead of
+            # raising - the exception would abort the aircraft load, and with
+            # it the settings form needed to correct the value.  The stored
+            # value is left untouched so it still resolves under the build
+            # that wrote it.
+            logging.error(
+                f"Unknown spring mode '{value}' in this aircraft's configuration - "
+                f"falling back to {SpringModeEnum.NONE.name} (game managed). "
+                "Choose a spring mode in the settings to replace it."
+            )
+            self._spring_mode = SpringModeEnum.NONE
+            return
 
         # Any other type is invalid
         raise ValueError("Invalid type for spring_mode")
