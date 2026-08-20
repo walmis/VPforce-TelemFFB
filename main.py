@@ -873,6 +873,17 @@ def _cleanup_on_exit(dev_serial):
             pass
         
     if HapticEffect.device:
+        # Hand the device back clean: effects we allocated would otherwise
+        # keep rendering after we are gone (the process exiting does not
+        # free them).  Each is released individually so effects the sim
+        # created on the same device are left alone.
+        try:
+            freed = HapticEffect.destroy_all()
+            if freed:
+                logging.info(f"Exit: freed {freed} effect(s) from the device")
+        except Exception:
+            logging.error("Unable to free effects on exit.. device likely disconnected")
+
         try:
             HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
         except Exception:

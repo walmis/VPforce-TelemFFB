@@ -1109,6 +1109,13 @@ class HapticEffect(Destroyable):
 
     device : Optional[FFBRhino] = None
 
+    #: Every effect this application has created, so a session can be torn
+    #: down completely.  Most effects live in the global `G.effects`
+    #: dispenser, but some are held directly on a mixin (the advanced spring
+    #: adjuster, the MSFS/X-Plane constant force) and would otherwise stay
+    #: allocated on the device after the sim or the app goes away.
+    _instances = weakref.WeakSet()
+
     def __init__(self):
         """Create a new HapticEffect controller.
 
@@ -1117,6 +1124,7 @@ class HapticEffect(Destroyable):
         `.constant(...)`) and then call `.start()` to ensure allocation and
         playback.
         """
+        HapticEffect._instances.add(self)
         self.name : Optional[str] = None
         self._stopped_time : int = 0
         self._h_effect : Optional[FFBEffectHandle] = None
@@ -1696,6 +1704,30 @@ class HapticEffect(Destroyable):
     def __del__(self):
         """Destructor helper to ensure resources are freed."""
         self.destroy()
+
+    @classmethod
+    def destroy_all(cls) -> int:
+        """Free every effect block this application allocated.
+
+        Deliberately per-effect: each one is released with its own block-free
+        so only blocks TelemFFB owns are touched.  A device-level reset would
+        be simpler but must never be used here - on VPforce hardware the sim
+        renders its own effects into the same device, and wiping those leaves
+        DCS unable to recreate its spring until the sim is restarted (the
+        same reason Utilities -> Reset carries a warning).
+
+        Returns the number of effects freed.
+        """
+        freed = 0
+        for effect in list(cls._instances):
+            if effect._h_effect is None:
+                continue
+            try:
+                effect.destroy()
+                freed += 1
+            except Exception:
+                logging.exception("Failed to destroy effect during teardown")
+        return freed
 
 # unit test
 if __name__ == "__main__":
