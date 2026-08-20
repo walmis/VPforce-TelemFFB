@@ -139,8 +139,11 @@ class SettingsLayout(QGridLayout):
             while parent_name in name_map:
                 parent = name_map[parent_name]
 
-                # If parent is a group, force indent = 0 and stop
-                if parent.get('datatype') == 'group':
+                # A top-level group is a flush-left section header, so its
+                # children start at indent 0. A nested group (one carrying a
+                # prereq of its own) renders as an ordinary indented row, so
+                # keep counting and climb through it like any other parent.
+                if parent.get('datatype') == 'group' and not parent.get('prereq'):
                     break
 
                 if not skip_increment:
@@ -777,7 +780,11 @@ class SettingsLayout(QGridLayout):
 
         #determine indentation
 
-        if item['datatype'] == 'group':
+        # Top-level groups are section headers pinned to column 0; a nested
+        # group is a collapsible sub-header that sits at its own indent
+        # level like any other row (its label lands where a sibling
+        # setting's label would, with children one level further right).
+        if item['datatype'] == 'group' and not item['prereq']:
             lbl_col = 0
             item['indent'] = -1
         else:
@@ -1320,8 +1327,11 @@ class SettingsLayout(QGridLayout):
                     if item['hasbump'].lower() != 'true':
                         row_count += 1
                     expand_button.setMaximumHeight(200)
-        # grouping collapsible header
-        if item['datatype'] == 'group':
+        # Top-level section headers carry their arrow as a ►/▼ glyph in the
+        # label text, so the button itself stays hidden (it remains the
+        # click target). A nested group is styled like an ordinary
+        # expandable row and uses the real arrow button.
+        if item['datatype'] == 'group' and not item['prereq']:
             expand_button.setVisible(False)
 
 
@@ -1439,12 +1449,14 @@ class SettingsLayout(QGridLayout):
                 label.text_label.setToolTip(f'Click to {clickaction}')
                 label.setClickable(True)
                 label.clicked.connect(expand_button.click)
-                if item['datatype'] == 'group':
+                if item['datatype'] == 'group' and not item['prereq']:
                     label.text_label.setStyleSheet(styles.GROUP_LABEL_STYLESHEET)
                     symbol = "►" if can_expand else "▼"
                     label.text_label.setText(f"{symbol} {labeltext}")
 
                 else:
+                    # nested groups included: they read as an expandable
+                    # setting row, not a section header
                     label.text_label.setStyleSheet(styles.EXPAND_LABEL_STYLESHEET)
 
             else:
