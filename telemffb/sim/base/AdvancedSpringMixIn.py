@@ -80,15 +80,13 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         # condition objects and adjuster used by the advanced spring override
         self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        # the spring_adjuster effect object (wrapper) from the global effects dispenser
-        self.spring_adjuster = HapticEffect().spring_adjuster()
 
     def spring_mode_is(self, mode : SpringModeEnum):
         return mode == self.spring_mode
 
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):
-            self.spring_adjuster.stop()
+            self.effects['adv_spr'].stop()
             return
         if self._sim_is_il2():
             if not self.adv_spr_use_hardware_trim:
@@ -110,7 +108,6 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
 
         gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.IAS or 0)
 
-        self.spring_adjuster.name = 'adv_spr'
         self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
         self.spring_adjuster_x.set_coefficient(gains.get('x', 0))
 
@@ -151,9 +148,10 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + g_y_offset))
         self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
 
-        self.spring_adjuster.setCondition(self.spring_adjuster_y)
-        self.spring_adjuster.setCondition(self.spring_adjuster_x)
-        self.spring_adjuster.start()
+        adjuster = self.effects['adv_spr'].spring_adjuster()
+        adjuster.setCondition(self.spring_adjuster_y)
+        adjuster.setCondition(self.spring_adjuster_x)
+        adjuster.start()
 
     @override
     def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr: bool = False) -> Optional[int]:

@@ -636,8 +636,8 @@ class TestMsfsXpFlightControlsPedals(BaseTelemetryEffectTestCase):
         
         # Assert
         # Constant force should be applied based on slip
-        # Note: const_force is applied in the instance, not in effects dict
-        assert instance.const_force is not None
+        assert 'rudder_const_force' in instance.effects
+        assert instance.effects['rudder_const_force'].started
     
     def test_pedals_trim_following_disabled_by_default(self):
         """Test that trim following doesn't activate when disabled."""

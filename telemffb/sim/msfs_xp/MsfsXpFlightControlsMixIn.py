@@ -63,7 +63,6 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.rudder_gain = 0.1
 
         self.rudder_force_dampener = utils.Dampener()
-        self.const_force = HapticEffect().constant(0, 0)
 
     def _sync_controls_lock_simvar(self):
         """Subscribe the ControlsLock simvar once and re-subscribe only when the binding changes."""
@@ -246,11 +245,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         Side effects
         ------------
         - Calls the parent implementation.
-        - Stops any active constant haptic force stored in `self.const_force`.
+        - Stops the active rudder constant force effect.
         """
 
         super().on_timeout()
-        self.const_force.stop()
+        self.effects['rudder_const_force'].stop()
         if self._use_firmware_axis_backend():
             self._clear_firmware_axis_override()
 
@@ -1023,7 +1022,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         self._send_rudder_axis_commands(telem_data, virtual_rudder_x_offs)
 
-        self.const_force.constant(rud_force, 270).start()
+        self.effects['rudder_const_force'].constant(rud_force, 270).start()
 
 
 
