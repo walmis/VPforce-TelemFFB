@@ -148,6 +148,16 @@ class TelemManager(QObject, threading.Thread):
         logging.info(f"Sim exit received from {src} - resetting sim listeners")
         if self.currentAircraft:
             self.currentAircraft.on_timeout()
+            # on_timeout() is *pause* semantics: with keep_forces_on_pause it
+            # deliberately leaves the condition effects running so the stick
+            # does not go limp mid-session.  A sim exit ends the session, and
+            # currentAircraft is dropped immediately below, so without this
+            # those forces would stay on the device with nothing left to
+            # manage them.  Frees each effect individually - never a device
+            # reset, which would also wipe effects the sim itself created.
+            freed = HapticEffect.destroy_all()
+            if freed:
+                logging.info(f"Sim exit: freed {freed} effect(s) from the device")
             self.currentAircraft = None
         self.currentAircraftName = None
         self.sim_exited.emit(src)
