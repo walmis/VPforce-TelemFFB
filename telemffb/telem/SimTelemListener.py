@@ -37,18 +37,11 @@ from telemffb.telem.BMSTelemManager import BMSManager
 class SimTelemListener(QtCore.QObject):
     stateChanged = QtCore.pyqtSignal(bool)
 
-    #: Sims whose FFB integration requires VPforce hardware: they render
-    #: their own native DirectInput FFB, which cannot coexist with the DI
-    #: bridge's exclusive acquisition of a generic device (and their
-    #: TelemFFB integrations assume the VPforce raw-HID side channel).
-    VPFORCE_ONLY_SIMS = ("DCS", "IL2", "BMS")
-
     def __init__(self, name : str):
         super().__init__()
         self.name : str = name
         self.telem : NetworkThread = None
         self._started = False
-        self._di_gate_logged = False
 
     def start(self):
         raise NotImplementedError
@@ -82,37 +75,14 @@ class SimTelemListener(QtCore.QObject):
 
     @property
     def is_enabled(self) -> bool:
-        enabled = bool(G.system_settings.get(f'enable{self.name}') or G.args.sim == self.name)
-        # Soft gate, mirroring the vpconf handling: the stored enable
-        # setting is preserved untouched so the sim comes back the moment
-        # a VPforce device is reselected for this instance.
-        if enabled and self.name in self.VPFORCE_ONLY_SIMS and G.device_di_guid:
-            # IL-2 Korea nearly qualifies for an exception (its ffbdevice
-            # telemetry stream lets TelemFFB render the game's FFB intent -
-            # see aircrafts_il2.il2_ffb_forces), but as of 2026-08 the game
-            # exclusive-acquires every attached controller regardless of its
-            # FFB setting AND only emits the records while its FFB is
-            # enabled - the two requirements can never hold simultaneously
-            # on a DI device.  Revisit if the game gains non-exclusive
-            # acquisition or FFB-off record export.
-            # DEBUG override for that ongoing investigation: registry value
-            # 'dinput_allow_il2' = 1 under HKCU\Software\VPforce\TelemFFB
-            # opens the IL-2 gate on a DI device (Korea path configured)
-            # so game-side workarounds (dinput proxy etc.) can be tested.
-            if self.name == "IL2" and G.system_settings.get('validateIL2_K'):
-                flag = str(G.system_settings.get('dinput_allow_il2', '')).strip().lower()
-                if flag in ('1', 'true', 'yes', 'on'):
-                    if not self._di_gate_logged:
-                        logging.warning("IL2 enabled on a DirectInput device via "
-                                        "'dinput_allow_il2' debug registry flag (testing mode)")
-                        self._di_gate_logged = True
-                    return True
-            if not self._di_gate_logged:
-                logging.info(f"{self.name} support requires VPforce hardware; "
-                             "disabled while a DirectInput device is selected (setting preserved)")
-                self._di_gate_logged = True
-            return False
-        return enabled
+        # No sim is gated for DirectInput devices: sims that render their
+        # own native FFB (DCS/IL-2/BMS) work on a DI device with the
+        # tap/sink dinput8 wrapper in the game folder (native FFB absorbed;
+        # tap mode mirrors the game spring for the 'FFB Telemetry (Game
+        # Managed)' spring mode).  Without the wrapper, the game taking
+        # foreground FFB priority surfaces as an actionable error in the
+        # exception tracker (see ffb_dinput's DIB_ERR_ACQUISITION handling).
+        return bool(G.system_settings.get(f'enable{self.name}') or G.args.sim == self.name)
 
     @property
     def port_udp(self):

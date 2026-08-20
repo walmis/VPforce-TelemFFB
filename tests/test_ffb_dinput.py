@@ -574,27 +574,12 @@ class TestCapabilityGating:
             G.device_di_guid = None                # VPforce device
             assert all(sim.is_enabled for sim in listeners.values())
 
+            # No sim is gated for DirectInput devices: native-FFB sims
+            # (DCS/IL-2/BMS) work on a DI device with the tap/sink dinput8
+            # wrapper in the game folder; without it, FFB priority loss
+            # surfaces as an actionable exception-tracker error
             G.device_di_guid = '{SOME-GUID}'       # DirectInput device
-            assert not listeners['DCS'].is_enabled
-            assert not listeners['BMS'].is_enabled
-            assert listeners['MSFS'].is_enabled    # MSFS/X-Plane unaffected
-
-            # IL-2 stays gated even with Korea configured: the game
-            # exclusive-acquires all controllers regardless of its FFB
-            # setting and only emits ffbdevice records with FFB enabled -
-            # revisit if the game changes (see SimTelemListener.is_enabled)
-            G.system_settings['validateIL2_K'] = True
-            assert not listeners['IL2'].is_enabled
-
-            # debug registry flag opens the gate for game-side workaround
-            # testing (dinput proxy investigations etc.)
-            G.system_settings['dinput_allow_il2'] = '1'
-            assert listeners['IL2'].is_enabled
-            del G.system_settings['dinput_allow_il2']
-            assert not listeners['IL2'].is_enabled
-
-            # stored settings untouched by the gate
-            assert G.system_settings['enableDCS'] is True
+            assert all(sim.is_enabled for sim in listeners.values())
         finally:
             G.system_settings, G.args, G.device_di_guid = saved
 

@@ -23,6 +23,7 @@ class SpringModeEnum(Enum):
     DYNAMIC = auto()
     CUSTOM = auto()
     FORCETRIM = auto()
+    DINPUT_TAP = auto()
 
 class GEffectModeEnum(Enum):
     DISABLED = auto()
@@ -193,6 +194,11 @@ class SettingsManager(QObject):
         SpringModeEnum.FORCETRIM: "Force Trim",
     }
 
+    # SpringModeEnum.DINPUT_TAP = "the game computes the spring, TelemFFB
+    # renders it from the DirectInput tap" (extended dinput8 wrapper's 'tap'
+    # device policy - see FfbTapMixIn / telemffb.hw.ffb_tap).
+    # SpringModeEnum.TELEM remains IL-2 Korea's native ffbdevice-records
+    # source - a separate mode and effect from the tap.
     IL2_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
@@ -205,6 +211,7 @@ class SettingsManager(QObject):
     IL2_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
@@ -219,12 +226,14 @@ class SettingsManager(QObject):
     }
     DCS_IL2_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
 
     DCS_HELI_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim"
     }
 

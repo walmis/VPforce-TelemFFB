@@ -398,6 +398,54 @@
 		<effecttype>spring</effecttype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>basic</parentgroup>
+		<order>700.02</order>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<name>tap_spring_swap_axes</name>
+		<displayname>Tap: Swap X/Y FFB Axes</displayname>
+		<prereq>spring_mode.DINPUT_TAP</prereq>
+		<info>Swap the X and Y axes of the game spring received via the DirectInput tap.&lt;br&gt;&lt;br&gt;Counterpart to in-game FFB tuning settings (e.g. DCS FFTune 'Swap Axes'): those alter the FFB the game emits and distort the tapped spring, so leave them at neutral in the game and apply any needed correction here instead.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.03</order>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<name>tap_spring_invert_x</name>
+		<displayname>Tap: Invert X Axis FFB</displayname>
+		<prereq>spring_mode.DINPUT_TAP</prereq>
+		<info>Invert the X (roll) direction of the game spring received via the DirectInput tap.&lt;br&gt;&lt;br&gt;Counterpart to in-game FFB tuning settings (e.g. DCS FFTune 'Invert X'): those alter the FFB the game emits and distort the tapped spring, so leave them at neutral in the game and apply any needed correction here instead.&lt;br&gt;&lt;br&gt;Use if the spring center moves the wrong way left/right when trimming.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.04</order>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<name>tap_spring_invert_y</name>
+		<displayname>Tap: Invert Y Axis FFB</displayname>
+		<prereq>spring_mode.DINPUT_TAP</prereq>
+		<info>Invert the Y (pitch) direction of the game spring received via the DirectInput tap.&lt;br&gt;&lt;br&gt;Counterpart to in-game FFB tuning settings (e.g. DCS FFTune 'Invert Y'): those alter the FFB the game emits and distort the tapped spring, so leave them at neutral in the game and apply any needed correction here instead.&lt;br&gt;&lt;br&gt;Use if the spring center moves the wrong way fore/aft when trimming.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
 		<datatype>enumlist</datatype>
 		<name>spring_mode</name>

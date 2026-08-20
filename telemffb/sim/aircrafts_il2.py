@@ -360,7 +360,8 @@ class Aircraft(AircraftBase):
         super().on_telemetry(telem_data)
         # self._update_focus_loss(telem_data)
         self.il2_override_spring()
-        self.il2_ffb_spring()
+        self.il2_ffb_spring()      # spring mode TELEM: Korea ffbdevice records
+        self.ffb_tap_spring()      # spring mode DINPUT_TAP: dinput8 wrapper tap
         self.il2_ffb_forces()
         if self.damage_effect_intensity > 0:
             self.il2_update_damage(telem_data)
@@ -580,15 +581,16 @@ class Aircraft(AircraftBase):
         exclusively by TelemFFB, so the game's own channel cannot reach it
         and the records must be re-rendered from telemetry.
 
-        DORMANT as of 2026-08: field testing showed IL-2 Korea exclusive-
-        acquires every attached controller regardless of its force-feedback
-        setting AND only emits ffbdevice records while its FFB is enabled -
-        so on a DI device the game blocks TelemFFB's effects whenever it has
-        focus, and disabling the game's FFB stops the records.  The IL-2 sim
-        gate therefore remains fully closed for DI devices
-        (SimTelemListener.is_enabled).  This renderer is kept tested and
-        ready pending a game-side fix (non-exclusive acquisition when FFB is
-        disabled, or FFB-off record export).
+        STATUS as of 2026-08: IL-2 Korea exclusive-acquires every attached
+        controller regardless of its force-feedback setting AND only emits
+        ffbdevice records while its FFB is enabled.  On a DI device both
+        problems are solved by the tap/sink dinput8 wrapper in the game
+        folder (game acquisition downgraded, its FFB output absorbed) -
+        but the current Korea build has a regression that stopped the
+        ffbdevice export entirely (bug reported), so these records are
+        absent until the game is fixed.  The wrapper's tap also mirrors
+        the game spring directly (see FfbTapMixIn), which does not
+        depend on the ffbdevice export.
 
         Const and Damper records are treated as transient per-frame commands
         (no caching, unlike the spring records): a stale constant-force

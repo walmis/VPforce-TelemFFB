@@ -437,6 +437,7 @@ class EffectTranslator:
         "il2_bombs": ["Bomb Release", "il2_bomb_release_intensity"],
         "il2_rockets": ["Rocket Fire", "il2_rocket_release_intensity"],
         "il2_ffb_spring": ["FFB Telemetry Spring Override", ""],
+        "ffb_tap_spring": ["FFB Telemetry Spring (DirectInput Tap)", ""],
         "il2_ffb_const": ["FFB Telemetry Constant Force", ""],
         "il2_ffb_damper": ["FFB Telemetry Damper", ""],
         "il2_eng_shk1": ["IL2 Prop Eng Shake (Telemetry)", ""],
