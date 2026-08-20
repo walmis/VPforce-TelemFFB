@@ -309,6 +309,12 @@ class MockEffectDispenser:
         if key not in self._effects:
             self._effects[key] = MockConditionEffect(key)
         return self._effects[key]
+
+    def __contains__(self, key: str) -> bool:
+        """Mirror the real Dispenser: membership checks the dict and must
+        not fall back to the legacy __getitem__(0), (1), ... iteration
+        protocol, which never terminates on a create-on-access mapping."""
+        return key in self._effects
     
     def get(self, key: str, default=None):
         """Get effect by name with optional default."""

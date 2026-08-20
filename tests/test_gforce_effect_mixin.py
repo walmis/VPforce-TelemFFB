@@ -187,8 +187,9 @@ class TestGForceEffectAllocation(BaseTelemetryEffectTestCase):
         inst.on_telemetry(telem)
 
         # Advanced spring adjuster should have been started via ac_modify_game_spring
-        adv_spr_effect = getattr(inst, 'spring_adjuster', None)
-        assert adv_spr_effect is not None, "Advanced spring adjuster effect not allocated on instance"
+        # (it lives in the effects dispenser under 'adv_spr', like every other effect)
+        assert 'adv_spr' in self.mock_effects.dict, "Advanced spring adjuster effect not allocated"
+        assert self.mock_effects.dict['adv_spr'].started, "Advanced spring adjuster not started"
 
         # advanced spring should have recorded offset in telem_data
         assert '_ovrd_spr_trim_pos' in inst.telem_data, "Advanced spring did not populate override trim position"

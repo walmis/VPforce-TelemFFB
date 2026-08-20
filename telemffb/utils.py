@@ -395,6 +395,7 @@ class EffectTranslator:
     effect_dict = {
         "ab_rumble_.*": ["Afterburner Rumble", "afterburner_effect_intensity"],
         'adv_spr': ["Advanced Spring Override", ""],
+        'rudder_const_force': ["Rudder Constant Force", ""],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
         "ap_spring": ["Autopilot Spring", ""],
         "adv_gforce_constant": ["G-Force Loading (Advanced)", ""],
