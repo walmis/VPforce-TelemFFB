@@ -407,12 +407,31 @@ File browse button for selecting a `.vpconf` VPforce Configurator profile.
 
 ### `group`
 
-Collapsible section header. Renders as a bold, clickable label with no value entry widget.
+Section header. Renders as a bold, clickable label with no value entry widget.
 Child settings reference this group's `name` via their `prereq` field.
 
-- Stored value: `"true"` — presence indicates the group header itself is enabled/shown
-- `order`: should use `.0` suffix (e.g., `50.0`) to mark it as a group container
+- Stored value: **must be** `"true"` — children are only retained (`eliminate_no_prereq`)
+  and revealed (`is_visible`) when their parent group's value is `true`.
 - A `group` item with no children pointing to it via `prereq` is automatically hidden.
+
+**Top-level vs nested groups.** A group with no `prereq` is a top-level section header
+(Aerodynamics, Inertial, …): it is pinned to column 0 and its children start at indent 0.
+A group that carries its own `prereq` is a *nested* sub-header — it renders as an ordinary
+indented row and its children indent one level further. Nested groups let a set of related
+settings collapse together without inventing a dummy `bool` toggle to hang them under.
+Example: `tap_axis_group` (`prereq=spring_mode.DINPUT_TAP`) collecting the three tap axis
+correction toggles.
+
+**Whether a group collapses is decided by `order`:**
+
+| Group `order` | Behavior |
+|---------------|----------|
+| Contains `.0` (e.g. `50.0`) | **Locked open** — no arrow; children always shown while the parent chain is satisfied (`basic_group`) |
+| Anything else (e.g. `10000`, `700.2`) | **Collapsible** — label gains a ►/▼ arrow that toggles its children |
+
+A nested group's children must dodge both magic suffixes themselves: no `.0` (that would
+make the child a locked group container) and no trailing `1` (bump-up). A workable set is
+group `700.2` with children `700.22`, `700.23`, `700.24`.
 
 ---
 
@@ -444,6 +463,13 @@ prereq = setting_name.VALUE1.VALUE2...
 Visibility is resolved recursively up the ancestor chain. A setting is visible only if:
 1. Its own `prereq` condition is satisfied, **and**
 2. Its parent (the setting named in `prereq`) is itself visible and expanded in the UI.
+
+> **Name-collision hazard:** the parent lookup is a *substring* match
+> (`parent_name in child_prereq`), not an equality test. A new setting whose name is a
+> substring of another setting's name — or of a value-qualified prereq string — can
+> resolve to the wrong parent, and a name that is a substring of its *own* prereq can
+> make a row its own parent (guarded against, but it renders as hidden). Keep new names
+> distinctive; `tests/test_settings_nested_groups.py` demonstrates the check.
 
 ---
 
