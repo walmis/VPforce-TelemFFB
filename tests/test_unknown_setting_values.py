@@ -29,11 +29,14 @@ class TestUnknownEnumValues:
     def test_unknown_spring_mode_falls_back(self, caplog):
         inst = AdvancedSpringMixIn()
         with caplog.at_level(logging.ERROR):
-            inst.spring_mode = "DINPUT_TAP"      # exists only in another build
+            # deliberately synthetic: a real mode name from another build
+            # (e.g. DINPUT_TAP) would be *valid* on that build, so this test
+            # would pass on one branch and fail on the other
+            inst.spring_mode = "MODE_FROM_ANOTHER_BUILD"
 
         assert inst.spring_mode == SpringModeEnum.NONE
         msg = " ".join(r.message for r in caplog.records)
-        assert "DINPUT_TAP" in msg
+        assert "MODE_FROM_ANOTHER_BUILD" in msg
         # ERROR so the exception tracker surfaces it: a silent fallback would
         # leave the user wondering why the spring stopped behaving
         assert any(r.levelno == logging.ERROR for r in caplog.records)
@@ -104,7 +107,8 @@ class TestApplySettingsIsResilient:
 
         inst = Aircraft()
         with caplog.at_level(logging.ERROR):
-            inst.apply_settings({"spring_mode": "DINPUT_TAP", "damper_force": 0.5})
+            inst.apply_settings({"spring_mode": "MODE_FROM_ANOTHER_BUILD",
+                                 "damper_force": 0.5})
 
         assert inst.spring_mode == SpringModeEnum.NONE
         assert inst.damper_force == 0.5      # the rest of the config still applied
