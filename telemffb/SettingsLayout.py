@@ -808,17 +808,10 @@ class SettingsLayout(QGridLayout):
                 if not pair in self.exclusive_list:
                     self.exclusive_list.append(pair)
             # print(item)
-            checkbox = Toggle(
-                checked_color=vpf_purple,
-                bar_color=t_purple
-            )
+            # the off-track colour now comes from the palette, so the
+            # switch follows the light/dark theme
+            checkbox = Toggle(checked_color=vpf_purple)
 
-            # checkbox = AnimatedToggle(
-            #     checked_color="#ab37c8",
-            #     pulse_checked_color="#44ab37c8"
-            # )
-            checkbox.setMaximumSize(QtCore.QSize(45, 30))
-            checkbox.setMinimumSize(QtCore.QSize(45, 30))
             checkbox.setObjectName(f"cb_{item['name']}")
             # checkbox.blockSignals(True)
             if item['value'].lower() == 'false':
