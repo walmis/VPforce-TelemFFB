@@ -25,12 +25,17 @@ import os
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption
+from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption, QTabWidget
 
 from . import globals as G
 from . import utils
 from .ui.Ui_SystemDialog import Ui_SystemDialog
-from .utils import validate_vpconf_profile, HiDpiPixmap
+from .InstanceSettingsPanel import (
+    STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
+)
+from .utils import (
+    device_display_name, device_pid_key, validate_vpconf_profile, HiDpiPixmap,
+)
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from .custom_widgets import FFBDeviceListModel
 
@@ -42,8 +47,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.setWindowTitle(f"System Settings ({G.device_type.capitalize()})")
 
 
-        # Add  "INFO" and "DEBUG" options to the logLevel combo box
-        self.logLevel.addItems(["INFO", "DEBUG"])
         self.master_button_group = QButtonGroup()
         self.master_button_group.setObjectName(u"master_button_group")
         self.master_button_group.addButton(self.rb_master_j, id=1)
@@ -66,11 +69,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
         self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
         self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
-        self.enableVPConfStartup.setToolTip('Select VPforce Configurator profile to load when TelemFFB Starts')
-        self.enableVPConfExit.setToolTip('Select VPforce Configurator profile to load when TelemFFB Exits')
         self.cb_logPrune.setToolTip('Auto delete archived logs after time frame')
-
-        self.lb_configProfile.setText(f'<b><u>Configurator Profile Options ({G.device_type.capitalize()})</u></b>')
 
         style = self.style()  # Grab the current style engine
 
@@ -170,10 +169,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.resetButton.clicked.connect(self.reset_settings)
         self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
         self.cb_al_enable.stateChanged.connect(self.toggle_al_widgets)
-        self.enableVPConfStartup.stateChanged.connect(self.toggle_vpconf_startup)
-        self.enableVPConfExit.stateChanged.connect(self.toggle_vpconf_exit)
-        self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
-        self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
 
         self.validateIL2.clicked.connect(self.toggle_il2_path)
@@ -198,8 +193,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         for button in self.buttonBox.buttons():
             button.setMinimumWidth(60)
 
-        self.buttonChildSettings.setEnabled(False)
-        self.buttonChildSettings.setVisible(False)
 
         # Set initial state
         # self.toggle_log_prune_widgets()
@@ -219,6 +212,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.themeButtonGroup.setId(self.rb_DarkTheme, 1)
         self.themeButtonGroup.setId(self.rb_SystemTheme, 2)
 
+        self._build_instance_panels()
+
         self.load_settings()
 
         self.toggle_log_prune_widgets()
@@ -230,11 +225,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         int_validator = QIntValidator()
         self.tb_logPrune.setValidator(int_validator)
-        self.telemTimeout.setValidator(int_validator)
-        self.tb_pid_j.setValidator(int_validator)
-        self.tb_pid_p.setValidator(int_validator)
-        self.tb_pid_c.setValidator(int_validator)
-        self.tb_pid_t.setValidator(int_validator)
 
         self.cb_min_enable_j.setObjectName('minimize_j')
         self.cb_min_enable_j.clicked.connect(self.toggle_launchmode_cbs)
@@ -255,11 +245,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
 
-        # add PID textboxes as attribute to device selection combos
-        self.cb_select_j._tb_box = self.tb_pid_j
-        self.cb_select_p._tb_box = self.tb_pid_p
-        self.cb_select_c._tb_box = self.tb_pid_c
-        self.cb_select_t._tb_box = self.tb_pid_t
 
         self.cb_select_j._autolaunch_cb = self.cb_al_enable_j
         self.cb_select_p._autolaunch_cb = self.cb_al_enable_p
@@ -280,35 +265,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
 
 
-        if (G.master_instance and G.launched_instances) or G.child_instance:
-            self.labelSystem.setText("System (Per Instance):")
+        if G.master_instance and G.launched_instances:
             self.labelLaunch.setText("Launch Options (Global):")
             # self.labelSim.setText("Sim Setup (Global):")
             # self.labelOther.setText("Other Settings (Per Instance):")
-
-        if G.master_instance and G.launched_instances:
-            self.buttonChildSettings.setVisible(True)
-            self.buttonChildSettings.setEnabled(True)
-            self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
-
-        if G.child_instance:
-            simtab = self.tabWidget.indexOf(self.tab_Simulators)
-            self.tabWidget.setTabVisible(simtab, False)
-            self.tab_Simulators.setVisible(False)
-            self.ignoreUpdate.setVisible(False)
-            self.cb_startWithWindows.setVisible(False)
-            self.cb_startToTray.setVisible(False)
-            self.cb_masterStartMin.setVisible(False)
-            self.cb_closeToTray.setVisible(False)
-            sp1 = self.themeOptions.sizePolicy()
-            sp1.setRetainSizeWhenHidden(False)
-            self.themeOptions.setSizePolicy(sp1)
-            self.themeOptions.setVisible(False)
-
-            sp2 = self.masterLaunchOptions.sizePolicy()
-            sp2.setRetainSizeWhenHidden(False)
-            self.masterLaunchOptions.setSizePolicy(sp2)
-            self.masterLaunchOptions.setVisible(False)
 
         # Enabling start with windows should force headless mode for children
         self.cb_startToTray.clicked.connect(self.toggle_headless)
@@ -325,6 +285,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._pending_devpaths = {}
 
         self.populateUSBSelectors()
+        # Runs after the selectors are filled and the saved assignments
+        # restored, so it sees what is actually assigned.
+        self.toggle_device_launch_widgets()
 
     @staticmethod
     def _enumerate_dinput_devices():
@@ -386,6 +349,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         for cb in combo_boxes:
             cb._prev_index = cb.currentIndex()
 
+        # Whatever ends up selected below decides which launch options mean
+        # anything; the sync at the end of this method applies that.
         # Try to select initial devices based on saved system settings devpath_{role}
         # mapping of combobox to device role name in settings
         dev_map = {
@@ -426,15 +391,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 cb.setCurrentIndex(found_index)
                 cb._prev_index = found_index
                 cb.blockSignals(False)
-                # The change handler is suppressed above, so mirror its PID
-                # sync here: the PID field must show the auto-selected
-                # device's actual product id — a DIY Rhino on a non-default
-                # PID otherwise keeps the stored/default value (2055) and
-                # the next connection attempt fails.
-                sel_dev = model.data(model.index(found_index, 0),
-                                     Qt.ItemDataRole.UserRole)
-                if sel_dev is not None:
-                    cb._tb_box.setText(format(sel_dev.product_id, 'x'))
 
         # Helper: persist a combobox selection into G.system_settings
         def persist_combobox_selection(cb, role_name):
@@ -496,10 +452,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 role = cb_role_map.get(changed_cb, None)
                 if role:
                     persist_combobox_selection(changed_cb, role)
-                changed_cb._tb_box.setText("")  # update PID textbox
+                # The user cleared this slot deliberately, so its launch
+                # options go with it.
                 changed_cb._autolaunch_cb.setChecked(False)
                 changed_cb._startmin_cb.setChecked(False)
                 changed_cb._headless_cb.setChecked(False)
+                self.toggle_device_launch_widgets()
                 return
 
             # check if any other combobox already has this device
@@ -524,10 +482,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     if msg.clickedButton() == override_btn:
                         # clear other combobox selection (set to index 0 = None)
                         other.setCurrentIndex(0)
-                        other._tb_box.setText('') # clear overidden PID textbox
                         # accept new selection
                         changed_cb._prev_index = index
-                        changed_cb._tb_box.setText(format(dev.product_id, "x")) # update PID textbox
+                        self.toggle_device_launch_widgets()
                         return
                     else:
                         # revert selection on changed_cb
@@ -539,8 +496,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
             # no conflicts, commit
             changed_cb._prev_index = index
-            changed_cb._tb_box.setText(format(dev.product_id, "x"))   # update PID textbox
-
 
             # After successful change, persist the selection for this combobox's role
             # map combobox to role name
@@ -554,6 +509,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             role = cb_role_map.get(changed_cb, None)
             if role:
                 persist_combobox_selection(changed_cb, role)
+
+            self.toggle_device_launch_widgets()
 
         # connect signals
         for cb in combo_boxes:
@@ -592,9 +549,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def accept(self):
         self.hide()
 
-    def launch_child_settings_windows(self):
-        G.main_window.show_child_settings()
-
     def reset_settings(self):
         # Load default settings and update widgets
         # default_settings = utils.get_default_sys_settings()
@@ -625,101 +579,59 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
 
     def change_master_widgets(self, button):
-        if button == self.rb_master_j:
-            self.cb_al_enable_j.setChecked(False)
-            self.cb_al_enable_j.setVisible(False)
-            self.cb_min_enable_j.setChecked(False)
-            self.cb_min_enable_j.setVisible(False)
-            self.cb_headless_j.setChecked(False)
-            self.cb_headless_j.setVisible(False)
-            self.cb_al_enable_c.setVisible(True)
-            self.cb_min_enable_c.setVisible(True)
-            self.cb_headless_c.setVisible(True)
-            self.cb_al_enable_p.setVisible(True)
-            self.cb_min_enable_p.setVisible(True)
-            self.cb_headless_p.setVisible(True)
-            self.cb_al_enable_t.setVisible(True)
-            self.cb_min_enable_t.setVisible(True)
-            self.cb_headless_t.setVisible(True)
-        elif button == self.rb_master_p:
-            self.cb_al_enable_p.setChecked(False)
-            self.cb_al_enable_p.setVisible(False)
-            self.cb_min_enable_p.setChecked(False)
-            self.cb_min_enable_p.setVisible(False)
-            self.cb_headless_p.setChecked(False)
-            self.cb_headless_p.setVisible(False)
-            self.cb_al_enable_c.setVisible(True)
-            self.cb_min_enable_c.setVisible(True)
-            self.cb_headless_c.setVisible(True)
-            self.cb_al_enable_j.setVisible(True)
-            self.cb_min_enable_j.setVisible(True)
-            self.cb_headless_j.setVisible(True)
-            self.cb_al_enable_t.setVisible(True)
-            self.cb_min_enable_t.setVisible(True)
-            self.cb_headless_t.setVisible(True)
-        elif button == self.rb_master_c:
-            self.cb_al_enable_c.setChecked(False)
-            self.cb_al_enable_c.setVisible(False)
-            self.cb_min_enable_c.setChecked(False)
-            self.cb_min_enable_c.setVisible(False)
-            self.cb_headless_c.setChecked(False)
-            self.cb_headless_c.setVisible(False)
-            self.cb_al_enable_j.setVisible(True)
-            self.cb_min_enable_j.setVisible(True)
-            self.cb_headless_j.setVisible(True)
-            self.cb_al_enable_p.setVisible(True)
-            self.cb_min_enable_p.setVisible(True)
-            self.cb_headless_p.setVisible(True)
-            self.cb_al_enable_t.setVisible(True)
-            self.cb_min_enable_t.setVisible(True)
-            self.cb_headless_t.setVisible(True)
-        elif button == self.rb_master_t:
-            self.cb_al_enable_t.setChecked(False)
-            self.cb_al_enable_t.setVisible(False)
-            self.cb_min_enable_t.setChecked(False)
-            self.cb_min_enable_t.setVisible(False)
-            self.cb_headless_c.setChecked(False)
-            self.cb_headless_c.setVisible(False)
-            self.cb_al_enable_j.setVisible(True)
-            self.cb_min_enable_j.setVisible(True)
-            self.cb_headless_j.setVisible(True)
-            self.cb_al_enable_p.setVisible(True)
-            self.cb_min_enable_p.setVisible(True)
-            self.cb_headless_p.setVisible(True)
-            self.cb_al_enable_c.setVisible(True)
-            self.cb_min_enable_c.setVisible(True)
-            self.cb_headless_c.setVisible(True)
+        """The master instance launches itself, so it has no launch options.
 
-    def toggle_vpconf_startup(self):
-        vpconf_startup_enabled = self.enableVPConfStartup.isChecked()
-        self.pathVPConfStartup.setEnabled(vpconf_startup_enabled)
-        self.browseVPConfStartup.setEnabled(vpconf_startup_enabled)
-        if not vpconf_startup_enabled:
-            self.enableVPConfGlobalDefault.setChecked(False)
-        self.enableVPConfGlobalDefault.setEnabled(vpconf_startup_enabled)
+        Only the clearing lives here; which row is hidden is worked out from
+        the current state by toggle_device_launch_widgets.
+        """
+        role = self.MASTER_ROLE_IDS.get(self.master_button_group.id(button))
+        if role:
+            for name in self.ROLE_LAUNCH_WIDGETS[role][1:]:
+                getattr(self, name).setChecked(False)
+        self.toggle_device_launch_widgets()
 
-    def toggle_vpconf_exit(self):
-        vpconf_exit_enabled = self.enableVPConfExit.isChecked()
-        self.pathVPConfExit.setEnabled(vpconf_exit_enabled)
-        self.browseVPConfExit.setEnabled(vpconf_exit_enabled)
+    #: Device roles by the id their master-instance radio carries.
+    MASTER_ROLE_IDS = {1: 'joystick', 2: 'pedals', 3: 'collective',
+                       4: 'trimwheel'}
+
+    #: Per device: the master radio, then auto-launch, start minimized
+    #: and start headless.
+    ROLE_LAUNCH_WIDGETS = {
+        'joystick': ('rb_master_j', 'cb_al_enable_j', 'cb_min_enable_j', 'cb_headless_j'),
+        'pedals': ('rb_master_p', 'cb_al_enable_p', 'cb_min_enable_p', 'cb_headless_p'),
+        'collective': ('rb_master_c', 'cb_al_enable_c', 'cb_min_enable_c', 'cb_headless_c'),
+        'trimwheel': ('rb_master_t', 'cb_al_enable_t', 'cb_min_enable_t', 'cb_headless_t'),
+    }
+
+    def toggle_device_launch_widgets(self):
+        """Work out each device's launch row from the current state.
+
+        A device with nothing assigned has nothing to master or launch, and
+        the master instance launches itself, so its row has no options at
+        all.  Both are facts about the state rather than events, so they are
+        applied here rather than left to whichever signal last fired.
+
+        This only shows, hides, enables and disables.  Clearing the
+        checkboxes is left to the handlers for a change the user actually
+        made: a device that is merely unplugged today shows as (None) here,
+        and unchecking it would throw away a setting never touched.
+        """
+        al_enabled = self.cb_al_enable.isChecked()
+        master_role = self.MASTER_ROLE_IDS.get(self.master_button_group.checkedId())
+        for role, (radio, *launch_boxes) in self.ROLE_LAUNCH_WIDGETS.items():
+            assigned = self.selected_device(role) is not None
+            getattr(self, radio).setEnabled(assigned)
+            for name in launch_boxes:
+                widget = getattr(self, name)
+                widget.setVisible(role != master_role)
+                widget.setEnabled(assigned and al_enabled)
 
     def toggle_al_widgets(self):
         al_enabled = self.cb_al_enable.isChecked()
         self.lab_auto_launch.setEnabled(al_enabled)
         self.lab_start_min.setEnabled(al_enabled)
         self.lab_start_headless.setEnabled(al_enabled)
-        self.cb_al_enable_j.setEnabled(al_enabled)
-        self.cb_al_enable_p.setEnabled(al_enabled)
-        self.cb_al_enable_c.setEnabled(al_enabled)
-        self.cb_al_enable_t.setEnabled(al_enabled)
-        self.cb_min_enable_j.setEnabled(al_enabled)
-        self.cb_min_enable_p.setEnabled(al_enabled)
-        self.cb_min_enable_c.setEnabled(al_enabled)
-        self.cb_min_enable_t.setEnabled(al_enabled)
-        self.cb_headless_j.setEnabled(al_enabled)
-        self.cb_headless_p.setEnabled(al_enabled)
-        self.cb_headless_c.setEnabled(al_enabled)
-        self.cb_headless_t.setEnabled(al_enabled)
+        self.toggle_device_launch_widgets()
 
     def toggle_msfs_widgets(self):
         msfs_enabled = self.enableMSFS.isChecked()
@@ -934,59 +846,39 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self._add_il2_fwd_row(dest.get('addr', ''), dest.get('port', ''), dest.get('telem', False),
                                    dest.get('motion', False), dest.get('ffb', False))
 
+    #: Which auto-launch toggle belongs to which device.
+    AUTOLAUNCH_TOGGLES = {'joystick': 'cb_al_enable_j', 'pedals': 'cb_al_enable_p',
+                          'collective': 'cb_al_enable_c', 'trimwheel': 'cb_al_enable_t'}
+
     def validate_settings(self):
-        master = self.master_button_group.checkedId()
-        match master:
-            case 1:
-                val_entry = self.tb_pid_j.text()
-            case 2:
-                val_entry = self.tb_pid_p.text()
-            case 3:
-                val_entry = self.tb_pid_c.text()
-            case 4:
-                val_entry = self.tb_pid_t.text()
+        master_role = self.MASTER_ROLE_IDS.get(
+            self.master_button_group.checkedId())
         if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()  or self.cb_al_enable_t.isChecked()):
             QMessageBox.warning(self, "Config Error", "Auto Launching is enabled but no devices are configured for auto launch.  Please enable a device or disable auto launching")
             return False
-        if val_entry == '':
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the selected Master Instance')
+        # An instance is launched against a device; without one picked there
+        # is nothing for it to drive.
+        if master_role and not self.instance_pid(master_role):
+            QMessageBox.warning(
+                self, "Config Error",
+                "Please select a device for the Master Instance")
             return False
-        if self.cb_al_enable_c.isChecked() and self.tb_pid_c.text() == '':
-            r = self.tb_pid_c.text()
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the collective device or disable auto-launch')
-            return False
-        if self.cb_al_enable_j.isChecked() and self.tb_pid_j.text() == '':
-            r = self.tb_pid_j.text()
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the joystick device or disable auto-launch')
-            return False
-        if self.cb_al_enable_p.isChecked() and self.tb_pid_p.text() == '':
-            r = self.tb_pid_p.text()
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the pedals device or disable auto-launch')
-            return False
-        if self.cb_al_enable_t.isChecked() and self.tb_pid_t.text() == '':
-            r = self.tb_pid_t.text()
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the trim wheel device or disable auto-launch')
-            return False
+        for role, toggle in self.AUTOLAUNCH_TOGGLES.items():
+            if role == master_role:
+                continue          # the master launches itself; it has no row
+            if getattr(self, toggle).isChecked() and not self.instance_pid(role):
+                QMessageBox.warning(
+                    self, "Config Error",
+                    f"Please select a device for the "
+                    f"{device_display_name(role)} or disable its auto-launch")
+                return False
         if self.validateXPLANE.isChecked():
             pth = os.path.join(self.pathXPLANE.text(), 'resources')
             if not os.path.isdir(pth):
                 QMessageBox.warning(self, "Config Error", 'Please enter the root X-Plane install path or disable auto X-plane setup')
                 return False
-        # vpconf paths are only validated when the pushes can actually run:
-        # not with a DirectInput device selected, where the stored settings
-        # are preserved but inert (see _vpconf_features_blocked)
-        if self.enableVPConfStartup.isChecked() and not self._vpconf_features_blocked():
-            if not os.path.isfile(self.pathVPConfStartup.text()):
-                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Startup' VPforce Configurator file")
-                return False
-            if not validate_vpconf_profile(self.pathVPConfStartup.text(), G.device_usbpid, G.device_type):
-                return False
-        if self.enableVPConfExit.isChecked() and not self._vpconf_features_blocked():
-            if not os.path.isfile(self.pathVPConfExit.text()):
-                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Exit' VPforce Configurator file")
-                return False
-            if not validate_vpconf_profile(self.pathVPConfExit.text(), G.device_usbpid, G.device_type):
-                return False
+        if not self.validate_instance_settings():
+            return False
 
         if self.enableIL2.isChecked():
             if not self.validate_il2_path():
@@ -1037,10 +929,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
-            'pidJoystick': str(self.tb_pid_j.text()),
-            'pidPedals': str(self.tb_pid_p.text()),
-            'pidCollective': str(self.tb_pid_c.text()),
-            'pidTrimWheel': str(self.tb_pid_t.text()),
+            'pidJoystick': self.instance_pid('joystick'),
+            'pidPedals': self.instance_pid('pedals'),
+            'pidCollective': self.instance_pid('collective'),
+            'pidTrimWheel': self.instance_pid('trimwheel'),
             'pruneLogs': self.cb_logPrune.isChecked(),
             'pruneLogsNum': self.tb_logPrune.text(),
             'pruneLogsUnit': self.combo_logPrune.currentText(),
@@ -1050,19 +942,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'themeId': self.themeButtonGroup.checkedId(),
         }
 
-        instance_settings_dict = {
-            "logLevel": self.logLevel.currentText(),
-            "telemTimeout": str(self.telemTimeout.text()),
-            "ignoreUpdate": self.ignoreUpdate.isChecked(),
-            "saveWindow": self.cb_save_geometry.isChecked(),
-            "saveLastTab": self.cb_save_view.isChecked(),
-            "enableVPConfStartup": self.enableVPConfStartup.isChecked(),
-            "pathVPConfStartup": self.pathVPConfStartup.text(),
-            "enableVPConfExit": self.enableVPConfExit.isChecked(),
-            "pathVPConfExit": self.pathVPConfExit.text(),
-            "enableVPConfGlobalDefault": self.enableVPConfGlobalDefault.isChecked(),
-            "enableResetGainsExit": self.enableResetGainsExit.isChecked(),
-        }
+        # Only the update check remains this-instance-only in name; it is
+        # a global concern (the master is what checks), so it is written as
+        # one.  Everything else per-instance now comes from the panels.
+        global_settings_dict["ignoreUpdate"] = self.ignoreUpdate.isChecked()
 
         key_list = [
             'autolaunchMaster',
@@ -1097,8 +980,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         for k,v in global_settings_dict.items():
             G.system_settings.setValue(f"{k}", v)
 
-        for k,v in instance_settings_dict.items():
-            G.system_settings.setValue(f"{G.device_type}/{k}", v)
+        # each device's own settings, from its panels
+        for panel in self.instance_panels.values():
+            panel.save(G.system_settings)
 
         # Persist any pending devpath selections that were changed while the dialog was open
         try:
@@ -1112,8 +996,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if G.master_instance and G.launched_instances:
             G.ipc_instance.send_broadcast_message("RESTART SIMS")
 
-        # adjust logging level:
-        ll = self.logLevel.currentText()
+        # adjust logging level (this instance's own panel):
+        own = self.instance_panels.get(('system', G.device_type))
+        ll = own.widgets['logLevel'].currentText() if own else 'INFO'
         if ll == "INFO":
             logging.getLogger().setLevel(logging.INFO)
         elif ll == "DEBUG":
@@ -1127,16 +1012,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """
         if default:
             settings_dict = G.system_settings.defaults
-            self.cb_save_geometry.setChecked(True)
-            self.cb_save_view.setChecked(True)
+            pass
         else:
             # Read settings from the registry
             settings_dict = G.system_settings
             pass
         # Update widget states based on the loaded settings
-        self.logLevel.setCurrentText(settings_dict.get('logLevel', 'INFO'))
-
-        self.telemTimeout.setText(str(settings_dict.get('telemTimeout', 200)))
+        for panel in self.instance_panels.values():
+            panel.load(G.system_settings, defaults_only=default)
 
         self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
 
@@ -1202,17 +1085,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableBMS.setChecked(settings_dict.get('enableBMS', False))
         self.toggle_bms_widgets()
 
-        self.cb_save_geometry.setChecked(settings_dict.get('saveWindow', True))
-
-        self.cb_save_view.setChecked(settings_dict.get('saveLastTab', True))
-
-        self.tb_pid_j.setText(str(settings_dict.get('pidJoystick', '2055')))
-
-        self.tb_pid_p.setText(str(settings_dict.get('pidPedals', '')))
-
-        self.tb_pid_c.setText(str(settings_dict.get('pidCollective', '')))
-
-        self.tb_pid_t.setText(str(settings_dict.get('pidTrimWheel', '')))
 
         self.cb_al_enable.setChecked(settings_dict.get('autolaunchMaster', False))
 
@@ -1234,13 +1106,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
 
-        self.enableVPConfStartup.setChecked(settings_dict.get('enableVPConfStartup', False))
-        self.pathVPConfStartup.setText(settings_dict.get('pathVPConfStartup', ''))
-        self.enableVPConfExit.setChecked(settings_dict.get('enableVPConfExit', False))
-        self.pathVPConfExit.setText(settings_dict.get('pathVPConfExit', ''))
-        self.enableVPConfGlobalDefault.setChecked(settings_dict.get('enableVPConfGlobalDefault', False))
-        self.enableResetGainsExit.setChecked(settings_dict.get('enableResetGainsExit', False))
-
 
         self.toggle_al_widgets()
 
@@ -1259,106 +1124,127 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
-            'pidJoystick': str(self.tb_pid_j.text()),
-            'pidPedals': str(self.tb_pid_p.text()),
-            'pidCollective': str(self.tb_pid_c.text()),
-            'pidTrimWheel': str(self.tb_pid_t.text()),
+            'pidJoystick': self.instance_pid('joystick'),
+            'pidPedals': self.instance_pid('pedals'),
+            'pidCollective': self.instance_pid('collective'),
+            'pidTrimWheel': self.instance_pid('trimwheel'),
             'themeId': self.themeButtonGroup.checkedId(),
         }
 
-        self._apply_device_capability_gates()
+    #: Device roles, in the order their tabs appear.
+    INSTANCE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel')
 
-    def _selected_device_is_dinput(self) -> bool:
-        """True when the device currently SELECTED in this instance's device
-        combo is a generic DirectInput device (devpath 'dinput:{GUID}').
+    #: The device selector for each role.
+    DEVICE_SELECTORS = {'joystick': 'cb_select_j', 'pedals': 'cb_select_p',
+                        'collective': 'cb_select_c', 'trimwheel': 'cb_select_t'}
 
-        The selection is what the settings being saved will apply to, so
-        gating keys on it rather than on the currently connected device -
-        which may be absent entirely (capabilities unknown) or about to be
-        replaced by the new selection on restart."""
-        cb = {'joystick': self.cb_select_j, 'pedals': self.cb_select_p,
-              'collective': self.cb_select_c, 'trimwheel': self.cb_select_t,
-              }.get(G.device_type)
-        if cb is None:
-            return False
-        idx = cb.currentIndex()
-        if idx < 0:
-            return False
-        dev = cb.model().data(cb.model().index(idx, 0), Qt.ItemDataRole.UserRole)
-        path = getattr(dev, 'path', None) or b''
-        return bytes(path).startswith(b'dinput:')
+    def selected_device(self, role):
+        """The device currently picked for a role, if any."""
+        combo = getattr(self, self.DEVICE_SELECTORS.get(role, ''), None)
+        if combo is None or combo.currentIndex() < 0:
+            return None
+        model = combo.model()
+        return model.data(model.index(combo.currentIndex(), 0),
+                          Qt.ItemDataRole.UserRole)
 
-    def _vpconf_features_blocked(self) -> bool:
-        """VPConf profile pushes (startup/exit/global default) and the exit
-        gain reset only apply to VPforce hardware.  Blocked as soon as a
-        generic DirectInput device is selected in the dialog, or when the
-        connected device reports no Configurator gains."""
-        if self._selected_device_is_dinput():
-            return True
-        caps = G.device_capabilities
-        return caps is not None and not caps.has_gains
+    def instance_pid(self, role):
+        """A device's USB product ID, as the hex string it is stored as.
 
-    def _apply_device_capability_gates(self):
-        """VPConf startup/exit/global-default profiles and the exit gain
-        reset push VPforce Configurator gains, which don't exist on a
-        generic DirectInput device.  Disable (without clearing) the
-        controls so stored settings survive a switch back to a VPforce
-        device; the runtime pushes are gated independently."""
-        # Sim tabs are deliberately not gated here: DCS/IL-2/BMS render
-        # their own native FFB but work on a DirectInput device with the
-        # tap/sink dinput8 wrapper in the game folder, and without it FFB
-        # priority loss surfaces as an actionable exception-tracker error
-        # (see SimTelemListener.is_enabled and ffb_dinput).
-        self._update_vpconf_gates()
-        # re-evaluate live when this instance's device selection changes
-        if not getattr(self, '_vpconf_gate_hooked', False):
-            cb = {'joystick': self.cb_select_j, 'pedals': self.cb_select_p,
-                  'collective': self.cb_select_c, 'trimwheel': self.cb_select_t,
-                  }.get(G.device_type)
-            if cb is not None:
-                cb.currentIndexChanged.connect(lambda _idx: self._update_vpconf_gates())
-                self._vpconf_gate_hooked = True
+        Taken from the picked device, so a selection counts before it is
+        saved.  Falling back to the stored value needs the str():
+        SystemSettings.get() turns a numeric-looking value into an int, and
+        validate_vpconf_profile() reads hex only from a str - so the pedals'
+        '2052' would arrive as 2052 decimal and the profile be checked
+        against PID 0804.  Returns '' when no device is configured for the
+        role, which is not the same as this instance's own.
+        """
+        device = self.selected_device(role)
+        if device is not None:
+            return format(device.product_id, 'x')
+        return str(G.system_settings.get(device_pid_key(role), '') or '').strip()
 
-    def _update_vpconf_gates(self):
-        widgets = (self.enableVPConfStartup, self.pathVPConfStartup,
-                   self.browseVPConfStartup, self.enableVPConfExit,
-                   self.pathVPConfExit, self.browseVPConfExit,
-                   self.enableVPConfGlobalDefault, self.enableResetGainsExit)
-        if not hasattr(self, '_vpconf_orig_tooltips'):
-            self._vpconf_orig_tooltips = {w: w.toolTip() for w in widgets}
-        if self._vpconf_features_blocked():
-            tip = ('Not available: VPforce Configurator profiles do not apply '
-                   'to a generic DirectInput device')
-            for widget in widgets:
-                widget.setEnabled(False)
-                widget.setToolTip(tip)
-        else:
-            for widget in widgets:
-                widget.setEnabled(True)
-                widget.setToolTip(self._vpconf_orig_tooltips.get(widget, ''))
-            # dependent enable-states follow their checkboxes
-            self.toggle_vpconf_startup()
-            self.toggle_vpconf_exit()
+    def _configured_roles(self):
+        """Devices this installation is set up for, so each gets a tab.
 
-    def browse_vpconf(self, mode):
-        options = QFileDialog.Option(0)
-        # options |= QFileDialog.Option.DontUseNativeDialog
-        calling_button = self.sender()
-        starting_dir = os.getcwd()
-        if mode == 'startup':
-            lbl = self.pathVPConfStartup
-        elif mode == 'exit':
-            lbl = self.pathVPConfExit
-        else:
+        Based on the stored device assignment rather than on which instances
+        happen to be running: a device that is configured but not currently
+        launched still needs to be configurable, and its settings are read at
+        its next start.  This instance's own role is always included, so
+        there is always at least one tab.
+        """
+        roles = [r for r in self.INSTANCE_ROLES
+                 if G.system_settings.get(f'devpath_{r}', '')]
+        if G.device_type not in roles:
+            roles.insert(0, G.device_type)
+        return roles
+
+    def _build_instance_panels(self):
+        """One panel per configured device, per section.
+
+        The .ui carries an empty tab widget per page; the tabs themselves are
+        filled here because which devices exist is only known at runtime.
+        """
+        self.instance_panels = {}      # (section, role) -> panel
+        for section, fields, tabs in (
+                ('system', SYSTEM_FIELDS, self.instance_tabs_system),
+                ('startup', STARTUP_FIELDS, self.instance_tabs_startup)):
+            for role in self._configured_roles():
+                panel = InstanceSettingsPanel(
+                    role, fields, browse_handler=self.browse_instance_vpconf)
+                tabs.addTab(panel, device_display_name(role))
+                self.instance_panels[(section, role)] = panel
+
+    def panels_for(self, role):
+        """Both of a device's panels."""
+        return [p for (_, r), p in self.instance_panels.items() if r == role]
+
+    def validate_instance_settings(self):
+        """Check every device's Configurator profiles, not just this one's.
+
+        A profile is validated against the device it will be pushed to, so a
+        path that is right for the joystick is not accepted for the pedals.
+        """
+        for (section, role), panel in self.instance_panels.items():
+            if section != 'startup':
+                continue
+            pid = self.instance_pid(role)
+            for field in panel.fields:
+                if field.kind != 'path' or not panel.widgets[field.key].isChecked():
+                    continue
+                path = panel.widgets[field.path_key].path()
+                label = field.label.strip(':')
+                if not os.path.isfile(path):
+                    QMessageBox.warning(
+                        self, "Config Error",
+                        f"{device_display_name(role)}: please select a valid "
+                        f"'{label}' VPforce Configurator file")
+                    return False
+                if not pid:
+                    # Nothing to check it against; the instance that owns the
+                    # device knows its own product ID and validates on load.
+                    logging.info(
+                        f"No USB product ID configured for the "
+                        f"{device_display_name(role)}; not validating {path}")
+                elif not validate_vpconf_profile(path, pid, role):
+                    return False
+        return True
+
+    def browse_instance_vpconf(self, role, field):
+        """Pick a Configurator profile for one device's panel."""
+        panel = self.instance_panels.get(('startup', role))
+        if panel is None:
             return
+        line_edit = panel.widgets[field.path_key]
+        current = line_edit.path()
+        starting_dir = os.path.dirname(current) \
+            if os.path.exists(current) else os.getcwd()
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, f"Choose a Configurator profile for the "
+                  f"{device_display_name(role)}", starting_dir,
+            "vpconf Files (*.vpconf)", options=QFileDialog.Option(0))
+        if not file_path:
+            return
+        pid = self.instance_pid(role)
+        if not pid or validate_vpconf_profile(file_path, pid, role):
+            line_edit.setPath(file_path)
 
-        cur_path = lbl.text()
-        if os.path.exists(cur_path):
-            starting_dir = os.path.dirname(cur_path)
-
-        # Open the file browser dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose {mode} vpconf profile for {G.device_type} ", starting_dir, "vpconf Files (*.vpconf)", options=options)
-
-        if file_path:
-            if validate_vpconf_profile(file_path, G.device_usbpid, G.device_type):
-                lbl.setText(file_path)

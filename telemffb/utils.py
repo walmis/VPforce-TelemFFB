@@ -1234,6 +1234,44 @@ class SystemSettings(QSettings):
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
     }
 
+    #: Roles by their masterInstance id, as the dialog's radio group numbers
+    #: them.
+    INSTANCE_ROLES = {1: 'joystick', 2: 'pedals', 3: 'collective',
+                      4: 'trimwheel'}
+
+    def migrate_instance_scoped_globals(self):
+        """Clear instance-scoped copies of settings that are global.
+
+        Some settings used to be written under `{role}/` even though they
+        describe the installation rather than one device - ignoreUpdate is
+        the one that mattered, since only the master ever checks for
+        updates.  `get()` resolves instance-scoped first, so leaving those
+        copies in place would let a stale value shadow the global one
+        forever: the setting would appear not to stick, and the updater
+        would keep reading the old answer.
+
+        The instance copy is what the app has actually been honoring, so
+        the master's copy is promoted before the rest are removed.  Runs on
+        every start and does nothing once there is nothing left to move.
+
+        Returns:
+            list[str]: the keys that were migrated, for logging.
+        """
+        master = self.INSTANCE_ROLES.get(self.value('masterInstance'), 'joystick')
+        moved = []
+        for name in self.globl_sys_dict:
+            scoped = [f"{role}/{name}" for role in self.INSTANCE_ROLES.values()
+                      if self.value(f"{role}/{name}") is not None]
+            if not scoped:
+                continue
+            authoritative = self.value(f"{master}/{name}")
+            if authoritative is not None:
+                super().setValue(name, authoritative)
+            for key in scoped:
+                self.remove(key)
+            moved.append(name)
+        return moved
+
     @property
     def defaults(self):
         s = {}
@@ -1241,8 +1279,18 @@ class SystemSettings(QSettings):
         s.update(self.globl_sys_dict)
         return s
 
-    def __init__(self, pid=None, tp=None):
-        super().__init__('VPforce', 'TelemFFB')
+    def __init__(self, pid=None, tp=None, path=None):
+        """Open the settings store.
+
+        `path` points the store at an ini file instead of the user's real
+        settings.  Tests need it: QSettings.setDefaultFormat() does not
+        redirect the two-argument constructor on Windows, so without an
+        explicit path a test store *is* the live registry.
+        """
+        if path:
+            super().__init__(path, QSettings.Format.IniFormat)
+        else:
+            super().__init__('VPforce', 'TelemFFB')
         #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
         # No additional initialization required. Keep QSettings initialization intact.
         return
@@ -1295,9 +1343,17 @@ class SystemSettings(QSettings):
             extra = []
         return sorted(set(super().__dir__() + extra))
 
-    def get(self, name, default=None):       
+    def get(self, name, default=None, instance=None):
+        """Resolve a setting, instance-scoped first then global.
+
+        `instance` names the device whose value to read, defaulting to this
+        process's own.  The master instance passes it explicitly so it can
+        read and write every instance's settings from one dialog, rather
+        than each child having to configure itself.
+        """
+        instance = instance or G.device_type
         # check instance params
-        val = self.value(f"{G.device_type}/{name}")
+        val = self.value(f"{instance}/{name}")
         if val is None:
             # check global param
             val = self.value(name)
@@ -1306,7 +1362,7 @@ class SystemSettings(QSettings):
             val = self.defaults.get(name, None)
             if val is not None:
                 if name in self.default_inst:
-                    self.setValue(f"{G.device_type}/{name}", val) # save instance variable
+                    self.setValue(f"{instance}/{name}", val) # save instance variable
                 else:
                     self.setValue(name, val)
                 return val
@@ -3782,14 +3838,17 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             pid (int): Device PID
             
         Returns:
-            str: Device identifier
+            str or None: Device identifier, or None when no connected device
+            has that PID.
         """
         dev_info = G.instance_dev_dict.get(pid)
         if dev_info is not None:
             return dev_info.ident
         if G.device_info and G.device_info.product_id == pid:
             return G.device_info.ident
-        return G.device_info.ident if G.device_info else "UnknownDevice"
+        # Answering with this instance's own identifier would compare the
+        # profile against the wrong device entirely.
+        return None
 
 
     def _show_error_message(title, message, silent, window):
@@ -3835,7 +3894,7 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             f"Target device:\n"
             f"  Type: {dev_type}\n"
             f"  PID: {pid:04X}\n"
-            f"  Name: {target_device_ident}\n\n"
+            f"  Name: {target_device_ident or 'not connected'}\n\n"
             f"Profile settings:\n"
             f"  PID: {cfg_pid:04X}\n"
             f"  Name: {cfg_device_name}\n"
@@ -3846,6 +3905,10 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
     
     # Step 4: Validate device identifier matching
     current_device_ident = _get_current_device_ident(pid)
+    if current_device_ident is None:
+        # Configured but not connected, so there is no identifier to compare
+        # against; the PID matched, which is as much as can be checked here.
+        return True
     if cfg_device_name != current_device_ident:
         error_msg = (
             f"Device identifier mismatch detected:\n\n"
@@ -4079,6 +4142,26 @@ def threaded(daemon=False):
         return wrapper
 
     return _threaded
+
+
+#: Device roles as they are written for a reader.  ``capitalize()`` gets
+#: three of the four right and turns the trim wheel into "Trimwheel".
+DEVICE_DISPLAY_NAMES = {
+    'joystick': 'Joystick',
+    'pedals': 'Pedals',
+    'collective': 'Collective',
+    'trimwheel': 'Trim Wheel',
+}
+
+
+def device_display_name(role):
+    """The name to show a user for a device role."""
+    return DEVICE_DISPLAY_NAMES.get(role, str(role).capitalize())
+
+
+def device_pid_key(role):
+    """The settings key holding a device role's USB product ID."""
+    return 'pid' + device_display_name(role).replace(' ', '')
 
 
 def exit_application():

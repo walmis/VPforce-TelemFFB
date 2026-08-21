@@ -30,13 +30,6 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="buttonChildSettings">
-       <property name="text">
-        <string>Open Child Instance Settings</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QDialogButtonBox" name="buttonBox">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
@@ -64,218 +57,14 @@
        <string>System</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_16">
-       <item row="0" column="0" colspan="2">
-        <layout class="QGridLayout" name="gridLayout_5">
-         <property name="horizontalSpacing">
-          <number>15</number>
-         </property>
-         <item row="1" column="1">
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>System Logging Level:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1" colspan="2">
-          <layout class="QGridLayout" name="gridLayout_2">
-           <item row="1" column="0">
-            <spacer name="horizontalSpacer_12">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Fixed</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>30</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item row="1" column="4">
-            <spacer name="horizontalSpacer_13">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item row="1" column="1">
-            <widget class="QLabel" name="lab_logPrune">
-             <property name="enabled">
-              <bool>false</bool>
-             </property>
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>After:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0" colspan="4">
-            <widget class="LabeledToggle" name="cb_logPrune">
-             <property name="text">
-              <string>Prune Logs (Global):</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="2">
-            <widget class="QLineEdit" name="tb_logPrune">
-             <property name="enabled">
-              <bool>false</bool>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>30</width>
-               <height>16777215</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="3">
-            <widget class="QComboBox" name="combo_logPrune">
-             <property name="enabled">
-              <bool>false</bool>
-             </property>
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <item>
-              <property name="text">
-               <string>Day(s)</string>
-              </property>
-             </item>
-             <item>
-              <property name="text">
-               <string>Week(s)</string>
-              </property>
-             </item>
-             <item>
-              <property name="text">
-               <string>Month(s)</string>
-              </property>
-             </item>
-            </widget>
-           </item>
-          </layout>
-         </item>
-         <item row="2" column="2">
-          <widget class="QLineEdit" name="telemTimeout"/>
-         </item>
-         <item row="3" column="1" colspan="2">
-          <widget class="LabeledToggle" name="ignoreUpdate">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>Disable Update Prompt on Startup</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <spacer name="horizontalSpacer_28">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>2</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="0" column="0" colspan="2">
-          <widget class="QLabel" name="labelSystem">
-           <property name="font">
-            <font>
-             <bold>true</bold>
-             <underline>true</underline>
-            </font>
-           </property>
-           <property name="text">
-            <string>System:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QLabel" name="label_2">
-           <property name="text">
-            <string>Telemetry Timeout (ms):</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2">
-          <widget class="QComboBox" name="logLevel">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="0" column="2">
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>449</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="1" column="0" rowspan="2" colspan="2">
-        <widget class="QWidget" name="pruneLogOptions" native="true">
-         <layout class="QGridLayout" name="gridLayout_14">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-         </layout>
-        </widget>
-       </item>
-       <item row="2" column="1" colspan="2">
+       <item row="1" column="1" colspan="2">
         <widget class="Line" name="systab_line2">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
+       <item row="2" column="1">
         <widget class="QWidget" name="themeOptions" native="true">
          <layout class="QGridLayout" name="gridLayout_13">
           <property name="leftMargin">
@@ -325,7 +114,7 @@
           <item row="0" column="0" colspan="3">
            <widget class="QLabel" name="labelTheme">
             <property name="text">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700; text-decoration: underline;&quot;&gt;Theme (Global):&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700; text-decoration: underline;"&gt;Theme (Global):&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
            </widget>
           </item>
@@ -365,7 +154,7 @@
          </layout>
         </widget>
        </item>
-       <item row="4" column="1" colspan="2">
+       <item row="3" column="1" colspan="2">
         <widget class="Line" name="systab_line1">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -384,7 +173,7 @@
          </property>
         </widget>
        </item>
-       <item row="6" column="0" colspan="2">
+       <item row="5" column="0" colspan="2">
         <spacer name="verticalSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -397,7 +186,7 @@
          </property>
         </spacer>
        </item>
-       <item row="5" column="1" colspan="2">
+       <item row="4" column="1" colspan="2">
         <widget class="QWidget" name="masterLaunchOptions" native="true">
          <layout class="QGridLayout" name="gridLayout_7">
           <property name="leftMargin">
@@ -437,7 +226,7 @@
               </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>357</width>
+                <width>40</width>
                 <height>29</height>
                </size>
               </property>
@@ -465,7 +254,7 @@
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
@@ -484,7 +273,7 @@
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
@@ -533,7 +322,7 @@ Instance</string>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>357</width>
+                <width>40</width>
                 <height>19</height>
                </size>
               </property>
@@ -546,21 +335,11 @@ Instance</string>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>357</width>
+                <width>40</width>
                 <height>19</height>
                </size>
               </property>
              </spacer>
-            </item>
-            <item row="4" column="2">
-             <widget class="QLineEdit" name="tb_pid_c">
-              <property name="maximumSize">
-               <size>
-                <width>50</width>
-                <height>16777215</height>
-               </size>
-              </property>
-             </widget>
             </item>
             <item row="1" column="4">
              <widget class="QLabel" name="lab_auto_launch">
@@ -594,7 +373,7 @@ Launch:</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
@@ -608,7 +387,7 @@ Launch:</string>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
-                <width>357</width>
+                <width>40</width>
                 <height>19</height>
                </size>
               </property>
@@ -626,7 +405,7 @@ Launch:</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
@@ -645,23 +424,10 @@ Launch:</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="2">
-             <widget class="QLineEdit" name="tb_pid_j">
-              <property name="maximumSize">
-               <size>
-                <width>50</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string/>
               </property>
              </widget>
             </item>
@@ -677,7 +443,7 @@ Launch:</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
              </widget>
             </item>
@@ -693,7 +459,7 @@ Launch:</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
@@ -710,24 +476,6 @@ Launch:</string>
               </property>
               <property name="text">
                <string>Enable Auto-Launch</string>
-              </property>
-             </widget>
-            </item>
-            <item row="6" column="1" colspan="2">
-             <widget class="QLabel" name="label_10">
-              <property name="text">
-               <string>Rhino default = 2055</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="2">
-             <widget class="QLabel" name="label_12">
-              <property name="text">
-               <string>USB
-Product ID</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
               </property>
              </widget>
             </item>
@@ -766,7 +514,7 @@ Product ID</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
@@ -777,26 +525,6 @@ Product ID</string>
              <widget class="QRadioButton" name="rb_master_c">
               <property name="text">
                <string>Collective</string>
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="2">
-             <widget class="QLineEdit" name="tb_pid_t">
-              <property name="maximumSize">
-               <size>
-                <width>50</width>
-                <height>16777215</height>
-               </size>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="2">
-             <widget class="QLineEdit" name="tb_pid_p">
-              <property name="maximumSize">
-               <size>
-                <width>50</width>
-                <height>16777215</height>
-               </size>
               </property>
              </widget>
             </item>
@@ -812,7 +540,7 @@ Product ID</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
              </widget>
             </item>
@@ -828,7 +556,7 @@ Product ID</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
              </widget>
             </item>
@@ -844,7 +572,7 @@ Product ID</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
               <property name="checkable">
                <bool>true</bool>
@@ -863,7 +591,7 @@ Product ID</string>
                </size>
               </property>
               <property name="text">
-               <string/>
+               <string />
               </property>
              </widget>
             </item>
@@ -882,21 +610,224 @@ Minimized:</string>
              </widget>
             </item>
             <item row="2" column="3">
-             <widget class="QComboBox" name="cb_select_j"/>
+             <widget class="QComboBox" name="cb_select_j" />
             </item>
             <item row="3" column="3">
-             <widget class="QComboBox" name="cb_select_p"/>
+             <widget class="QComboBox" name="cb_select_p" />
             </item>
             <item row="4" column="3">
-             <widget class="QComboBox" name="cb_select_c"/>
+             <widget class="QComboBox" name="cb_select_c" />
             </item>
             <item row="5" column="3">
-             <widget class="QComboBox" name="cb_select_t"/>
+             <widget class="QComboBox" name="cb_select_t" />
             </item>
            </layout>
           </item>
          </layout>
         </widget>
+       </item>
+       <item row="0" column="0" colspan="3">
+        <layout class="QHBoxLayout" name="systemSplit" stretch="0,0,1">
+         <item>
+          <layout class="QVBoxLayout" name="globalSystemColumn">
+           <item>
+            <layout class="QGridLayout" name="gridLayout_5">
+             <property name="horizontalSpacing">
+              <number>15</number>
+             </property>
+             <item row="4" column="1" colspan="2">
+              <layout class="QGridLayout" name="gridLayout_2">
+               <item row="1" column="0">
+                <spacer name="horizontalSpacer_12">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeType">
+                  <enum>QSizePolicy::Fixed</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>30</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item row="1" column="4">
+                <spacer name="horizontalSpacer_13">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item row="1" column="1">
+                <widget class="QLabel" name="lab_logPrune">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="text">
+                  <string>After:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="0" colspan="4">
+                <widget class="LabeledToggle" name="cb_logPrune">
+                 <property name="text">
+                  <string>Prune Logs (Global):</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="2">
+                <widget class="QLineEdit" name="tb_logPrune">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>30</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="3">
+                <widget class="QComboBox" name="combo_logPrune">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <item>
+                  <property name="text">
+                   <string>Day(s)</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>Week(s)</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>Month(s)</string>
+                  </property>
+                 </item>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="3" column="1" colspan="2">
+              <widget class="LabeledToggle" name="ignoreUpdate">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="text">
+                <string>Disable Update Prompt on Startup</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <spacer name="horizontalSpacer_28">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>2</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="0" column="0" colspan="2">
+              <widget class="QLabel" name="labelSystem">
+               <property name="font">
+                <font>
+                 <bold>true</bold>
+                 <underline>true</underline>
+                </font>
+               </property>
+               <property name="text">
+                <string>Global System Settings:</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QWidget" name="pruneLogOptions" native="true">
+             <layout class="QGridLayout" name="gridLayout_14">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="Line" name="systab_vline">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="instanceSystemColumn">
+           <item>
+            <widget class="QLabel" name="labelInstanceSystem">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+               <underline>true</underline>
+              </font>
+             </property>
+             <property name="text">
+              <string>Instance System Settings:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTabWidget" name="instance_tabs_system">
+             <property name="currentIndex">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
@@ -979,7 +910,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_14">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700;"&gt;Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1003,7 +934,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_3">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;Digital Combat Simulator&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-size:12pt; font-weight:700;"&gt;Digital Combat Simulator&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1041,7 +972,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_4">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;Microsoft Flight Simulator (2020/2024)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-size:12pt; font-weight:700;"&gt;Microsoft Flight Simulator (2020/2024)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1102,7 +1033,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_13">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Options: &lt;/span&gt;(none)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700;"&gt;Options: &lt;/span&gt;(none)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1146,7 +1077,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_5">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;X-Plane (11/12)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-size:12pt; font-weight:700;"&gt;X-Plane (11/12)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1201,7 +1132,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_8">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700;"&gt;Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1249,7 +1180,7 @@ Minimized:</string>
               </widget>
              </item>
              <item>
-              <widget class="QLineEdit" name="pathXPLANE"/>
+              <widget class="QLineEdit" name="pathXPLANE" />
              </item>
              <item>
               <widget class="QToolButton" name="browseXPLANE">
@@ -1285,7 +1216,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_6">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;IL-2 Series&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-size:12pt; font-weight:700;"&gt;IL-2 Series&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1397,7 +1328,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="lab_IL2_S">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;IL2 Sturmovik Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700;"&gt;IL2 Sturmovik Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1494,7 +1425,7 @@ Minimized:</string>
               </widget>
              </item>
              <item>
-              <widget class="QLineEdit" name="pathIL2"/>
+              <widget class="QLineEdit" name="pathIL2" />
              </item>
              <item>
               <widget class="QToolButton" name="browseIL2">
@@ -1533,7 +1464,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="lab_IL2_K">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;IL2 Korea Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700;"&gt;IL2 Korea Options:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1630,7 +1561,7 @@ Minimized:</string>
               </widget>
              </item>
              <item>
-              <widget class="QLineEdit" name="pathIL2_K"/>
+              <widget class="QLineEdit" name="pathIL2_K" />
              </item>
              <item>
               <widget class="QToolButton" name="browseIL2_K">
@@ -1653,7 +1584,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_7">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;Telemetry Forwarding&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-size:12pt; font-weight:700;"&gt;Telemetry Forwarding&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1689,7 +1620,7 @@ Minimized:</string>
               </widget>
              </item>
              <item row="0" column="1">
-              <widget class="QLineEdit" name="udp_ip"/>
+              <widget class="QLineEdit" name="udp_ip" />
              </item>
              <item row="0" column="2">
               <widget class="QLabel" name="label_18">
@@ -1765,7 +1696,7 @@ Minimized:</string>
               </spacer>
              </item>
              <item row="1" column="0" colspan="8">
-              <widget class="QTableView" name="il2_fwd_table"/>
+              <widget class="QTableView" name="il2_fwd_table" />
              </item>
              <item row="2" column="0" colspan="7">
               <spacer name="horizontalSpacer_42">
@@ -1774,7 +1705,7 @@ Minimized:</string>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
-                 <width>418</width>
+                 <width>40</width>
                  <height>20</height>
                 </size>
                </property>
@@ -1814,7 +1745,7 @@ Minimized:</string>
              <item>
               <widget class="QLabel" name="label_16">
                <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:12pt; font-weight:700;&quot;&gt;Falcon BMS (Beta)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-size:12pt; font-weight:700;"&gt;Falcon BMS (Beta)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
               </widget>
              </item>
@@ -1867,7 +1798,7 @@ Minimized:</string>
            <item row="3" column="0">
             <widget class="QLabel" name="label_17">
              <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Options: &lt;/span&gt;(none)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700;"&gt;Options: &lt;/span&gt;(none)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
             </widget>
            </item>
@@ -1878,7 +1809,7 @@ Minimized:</string>
              </property>
              <property name="sizeHint" stdset="0">
               <size>
-               <width>425</width>
+               <width>40</width>
                <height>20</height>
               </size>
              </property>
@@ -1908,138 +1839,34 @@ Minimized:</string>
        <string>Startup Behavior</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_17">
-       <item row="0" column="2">
-        <spacer name="horizontalSpacer_27">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>384</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="2" column="0" colspan="2">
+       <item row="2" column="0">
         <layout class="QGridLayout" name="gridLayout_6">
          <property name="horizontalSpacing">
           <number>15</number>
          </property>
          <item row="0" column="0" colspan="3">
-          <widget class="QLabel" name="lb_configProfile">
-           <property name="text">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700; text-decoration: underline;&quot;&gt;VPforce Configurator Profiles:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <spacer name="horizontalSpacer_31">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>2</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="1" column="1">
-          <widget class="LabeledToggle" name="enableVPConfStartup">
-           <property name="text">
-            <string>Load on Startup:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2">
-          <widget class="QLineEdit" name="pathVPConfStartup">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="3">
-          <widget class="QToolButton" name="browseVPConfStartup">
-           <property name="enabled">
-            <bool>false</bool>
+          <widget class="QLabel" name="labelInstanceStartup">
+           <property name="font">
+            <font>
+             <bold>true</bold>
+             <underline>true</underline>
+            </font>
            </property>
            <property name="text">
-            <string>...</string>
+            <string>Per-Device Startup Behavior:</string>
            </property>
           </widget>
          </item>
-         <item row="2" column="1" colspan="2">
-          <layout class="QHBoxLayout" name="horizontalLayout_24">
-           <item>
-            <spacer name="horizontalSpacer_10">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Fixed</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="LabeledToggle" name="enableVPConfGlobalDefault">
-             <property name="enabled">
-              <bool>false</bool>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Startup profile will also re-load for any aircraft that does not&lt;/p&gt;&lt;p&gt;have an override defined at the Sim/Class/Model level.  &lt;br/&gt;&lt;br/&gt;The profile will only re-load if the previously loaded aircraft changed&lt;/p&gt;&lt;p&gt;the profile and the new aircraft does not have one defined at the&lt;/p&gt;&lt;p&gt;Sim/Class/Model level.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Make Startup Profile Global Default</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-         <item row="3" column="1">
-          <widget class="LabeledToggle" name="enableVPConfExit">
-           <property name="text">
-            <string>Load on Exit:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="2">
-          <widget class="QLineEdit" name="pathVPConfExit">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="3">
-          <widget class="QToolButton" name="browseVPConfExit">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="text">
-            <string>...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1" colspan="2">
-          <widget class="LabeledToggle" name="enableResetGainsExit">
-           <property name="text">
-            <string>Restore Startup Gains on Exit</string>
+         <item row="1" column="0" colspan="3">
+          <widget class="QTabWidget" name="instance_tabs_startup">
+           <property name="currentIndex">
+            <number>0</number>
            </property>
           </widget>
          </item>
         </layout>
        </item>
-       <item row="0" column="0" colspan="2">
+       <item row="0" column="0">
         <layout class="QGridLayout" name="gridLayout_4">
          <property name="horizontalSpacing">
           <number>15</number>
@@ -2053,7 +1880,7 @@ Minimized:</string>
             </sizepolicy>
            </property>
            <property name="text">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700; text-decoration: underline;&quot;&gt;Startup Behavior:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700; text-decoration: underline;"&gt;Startup Behavior:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="alignment">
             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
@@ -2088,20 +1915,6 @@ Minimized:</string>
            </property>
           </widget>
          </item>
-         <item row="3" column="1">
-          <widget class="LabeledToggle" name="cb_save_geometry">
-           <property name="text">
-            <string>Restore window position</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="2">
-          <widget class="LabeledToggle" name="cb_save_view">
-           <property name="text">
-            <string>Restore last tab view</string>
-           </property>
-          </widget>
-         </item>
          <item row="3" column="0">
           <spacer name="spacer_startup">
            <property name="orientation">
@@ -2120,7 +1933,7 @@ Minimized:</string>
          </item>
         </layout>
        </item>
-       <item row="1" column="0" colspan="3">
+       <item row="1" column="0">
         <widget class="Line" name="line_6">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -2167,8 +1980,6 @@ Minimized:</string>
  </customwidgets>
  <tabstops>
   <tabstop>tabWidget</tabstop>
-  <tabstop>logLevel</tabstop>
-  <tabstop>telemTimeout</tabstop>
   <tabstop>ignoreUpdate</tabstop>
   <tabstop>cb_logPrune</tabstop>
   <tabstop>combo_logPrune</tabstop>
@@ -2177,25 +1988,21 @@ Minimized:</string>
   <tabstop>rb_SystemTheme</tabstop>
   <tabstop>cb_al_enable</tabstop>
   <tabstop>rb_master_j</tabstop>
-  <tabstop>tb_pid_j</tabstop>
   <tabstop>cb_select_j</tabstop>
   <tabstop>cb_al_enable_j</tabstop>
   <tabstop>cb_min_enable_j</tabstop>
   <tabstop>cb_headless_j</tabstop>
   <tabstop>rb_master_p</tabstop>
-  <tabstop>tb_pid_p</tabstop>
   <tabstop>cb_select_p</tabstop>
   <tabstop>cb_al_enable_p</tabstop>
   <tabstop>cb_min_enable_p</tabstop>
   <tabstop>cb_headless_p</tabstop>
   <tabstop>rb_master_c</tabstop>
-  <tabstop>tb_pid_c</tabstop>
   <tabstop>cb_select_c</tabstop>
   <tabstop>cb_al_enable_c</tabstop>
   <tabstop>cb_min_enable_c</tabstop>
   <tabstop>cb_headless_c</tabstop>
   <tabstop>rb_master_t</tabstop>
-  <tabstop>tb_pid_t</tabstop>
   <tabstop>cb_select_t</tabstop>
   <tabstop>cb_al_enable_t</tabstop>
   <tabstop>cb_min_enable_t</tabstop>
@@ -2217,20 +2024,11 @@ Minimized:</string>
   <tabstop>cb_motion</tabstop>
   <tabstop>cb_ffb</tabstop>
   <tabstop>pb_add_dest</tabstop>
-  <tabstop>browseVPConfStartup</tabstop>
-  <tabstop>enableVPConfGlobalDefault</tabstop>
-  <tabstop>enableVPConfExit</tabstop>
-  <tabstop>pathVPConfExit</tabstop>
-  <tabstop>browseVPConfExit</tabstop>
-  <tabstop>enableResetGainsExit</tabstop>
   <tabstop>cb_startWithWindows</tabstop>
   <tabstop>cb_masterStartMin</tabstop>
   <tabstop>cb_startToTray</tabstop>
   <tabstop>cb_closeToTray</tabstop>
-  <tabstop>cb_save_geometry</tabstop>
-  <tabstop>cb_save_view</tabstop>
   <tabstop>resetButton</tabstop>
-  <tabstop>buttonChildSettings</tabstop>
   <tabstop>pathXPLANE</tabstop>
   <tabstop>browseXPLANE</tabstop>
   <tabstop>tb_logPrune</tabstop>
@@ -2240,13 +2038,11 @@ Minimized:</string>
   <tabstop>enableXPLANE</tabstop>
   <tabstop>validateXPLANE</tabstop>
   <tabstop>enableBMS</tabstop>
-  <tabstop>enableVPConfStartup</tabstop>
   <tabstop>il2_fwd_table</tabstop>
-  <tabstop>pathVPConfStartup</tabstop>
  </tabstops>
- <resources/>
- <connections/>
+ <resources />
+ <connections />
  <buttongroups>
-  <buttongroup name="themeButtonGroup"/>
+  <buttongroup name="themeButtonGroup" />
  </buttongroups>
 </ui>
