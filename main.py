@@ -108,6 +108,51 @@ def _launch_children():
         logging.exception("Error during Auto-Launch sequence")
 
 
+#: Held for this process's lifetime so the dinput8 tap wrapper can tell which
+#: devices TelemFFB is managing.  Must stay referenced - closing a handle
+#: retracts that beacon.
+beacons = []
+
+#: Must match the names built in the wrapper (TelemFFB-DInput-Tap,
+#: src/telemffb_presence.cpp).  The per-device beacon is the real signal; the
+#: coarse one is a fallback for devices whose USB ids the wrapper cannot read.
+TELEMFFB_RUNNING_BEACON = r"Local\TelemFFB_Running"
+TELEMFFB_DEVICE_BEACON = r"Local\TelemFFB_Dev_{vid:04X}_{pid:04X}"
+
+
+def _publish_beacons():
+    """Announce which device this instance is driving, for the tap wrapper.
+
+    The wrapper's 'sink' and 'tap' rules hand a device over to TelemFFB, so
+    they only make sense for a device TelemFFB is actually managing.  It
+    checks for the matching beacon once as the game starts and otherwise
+    leaves that device's own force feedback alone - which is what keeps a
+    wrapper left behind in a game folder, or a stale rule naming a device
+    nobody manages, from silently swallowing the game's forces.
+
+    Keyed on USB vendor/product id because that is the one identifier both
+    sides share: the wrapper reads it from DirectInput, while TelemFFB may
+    hold the device over raw HID (a VPforce device using the tap for gain
+    tuning) or over DirectInput, and only the latter has an instance GUID.
+
+    Named mutexes are used rather than a file or registry flag because
+    Windows releases them when the process ends for any reason, crashes
+    included, so there is no stale state to clean up.
+    """
+    names = [TELEMFFB_RUNNING_BEACON]
+    if G.device_info is not None:
+        names.append(TELEMFFB_DEVICE_BEACON.format(
+            vid=G.device_info.vendor_id, pid=G.device_info.product_id))
+    for name in names:
+        try:
+            beacons.append(NamedMutex(name))
+            logging.info(f"Published beacon '{name}' for the DirectInput tap wrapper")
+        except Exception:
+            # Non-fatal: the wrapper simply stays inert for that device, and
+            # everything not involving the tap keeps working.
+            logging.exception(f"Unable to publish the beacon '{name}'")
+
+
 def _check_master_instance_mutex():
     """
     Check if another master instance is already running.
@@ -1107,6 +1152,11 @@ def main():
     # ============================================================================
     # Connect to Rhino FFB device and validate firmware version
     dev, dev_serial, dev_firmware_version = _initialize_device_connection()
+
+    # Tell the dinput8 tap wrapper which device we are driving.  Published
+    # here rather than earlier because it is keyed on the device's USB ids,
+    # which are only known once the device is open (see _publish_beacons).
+    _publish_beacons()
 
 
     # ============================================================================
