@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayo
     QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout, QSizePolicy, \
     QGraphicsColorizeEffect
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
-    QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
+    QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
     QLinearGradient, QFont, QIcon
 from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
@@ -1626,131 +1626,197 @@ class SimStatusLabel(QWidget):
         return pixmap
 
 class Toggle(QCheckBox):
-    """Borrowed from qtwidgets library: https://github.com/pythonguis/python-qtwidgets
-    Modified default behavior to support simple checkbox widget replacement in QT designer"""
-    _transparent_pen = QPen(Qt.GlobalColor.transparent)
-    _light_grey_pen = QPen(Qt.GlobalColor.lightGray)
+    """A switch, drawn to read at the size it is actually shown.
 
-    def __init__(self,
-                 parent=None,
-                 bar_color=QColor("#44ab37c8"),
-                 checked_color="#ab37c8",
-                 handle_color=Qt.GlobalColor.white,
-                 disabled_color=Qt.GlobalColor.gray):
+    Originally from the qtwidgets library, since reworked.  Two things drove
+    the rework:
+
+    * The colours were hardcoded around a dark background, so on the light
+      theme the off-track composited to a pale lilac and the white handle
+      sat on it at 1.7:1 - all but invisible.  Everything except the accent
+      is now derived from the palette's window colour, as a fixed step away
+      from it, so the switch reads the same on either theme.
+
+    * The old handle was 14px across with a 12px bar, overhanging it by a
+      single pixel and running past both ends; and its shape came from a
+      three-stop radial gradient and a heavy rim, neither of which survives
+      being drawn in 14 pixels.  The handle now sits inset in the track,
+      travel bounded, with shading as a garnish rather than the substance.
+
+    `checked_color` is the accent, in both themes: lifting it for dark is
+    right for text, where thin strokes need the help, but a filled track
+    only loses saturation - and the handle loses definition against it.
+    """
+    #: How long the handle takes to slide, and how it eases.
+    SLIDE_MS = 150
+
+    #: Gap between the handle and the inside of the track.
+    HANDLE_INSET = 2.0
+
+    #: The switch as drawn.  The widget is a little larger, leaving room
+    #: for the handle's shadow and the focus ring; the old widget was 45x30
+    #: with a 22x12 bar rattling around inside it.
+    TRACK_W, TRACK_H = 29, 15
+    MARGIN_X, MARGIN_Y = 3, 4
+
+    def __init__(self, parent=None, checked_color=vpf_purple):
         super().__init__(parent)
         self.setStyleSheet("QCheckBox::indicator { width: 0px; height: 0px; }")
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
-        # Save our properties on the object via self, so we can access them later
-        # in the paintEvent.
-        self._bar_color = bar_color
-        self._checked_color = checked_color
-        self._handle_color = handle_color
-        self._disabled_color = QColor(disabled_color)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self._checked_color = QColor(checked_color)
+        self._hover = False
+        self._interactive = False
+        self._handle_position = 0.0
 
-        self._bar_brush = QBrush(bar_color)
-        self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
+        # The whole widget is the switch, so all of it should be clickable.
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setFixedSize(QSize(self.TRACK_W + 2 * self.MARGIN_X,
+                                self.TRACK_H + 2 * self.MARGIN_Y))
 
-        self._handle_brush = QBrush(handle_color)
-        self._handle_checked_brush = QBrush(QColor(checked_color))
-
-        # Setup the rest of the widget.
-        self.setContentsMargins(8, 0, 8, 0)
-        self._handle_position = 0
-        self.setMaximumSize(QSize(45, 30))
-        self.setMinimumSize(QSize(45, 30))
+        self._animation = QPropertyAnimation(self, b"handle_position", self)
+        self._animation.setDuration(self.SLIDE_MS)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         self.stateChanged.connect(self.handle_state_change)
 
     def sizeHint(self):
-        return QSize(58, 45)
+        return self.minimumSize()
 
     def hitButton(self, pos: QPointF):
         return self.contentsRect().contains(pos)
 
+    def nextCheckState(self):
+        """Mark a change the user made.
+
+        Mouse clicks and the space bar arrive here; setChecked() does not.
+        That is exactly the line between a toggle the user flipped and one
+        the app set, and only the first is worth animating - the aircraft
+        settings page rebuilds its rows on every edit, and a page full of
+        switches all sliding at once is noise.
+        """
+        self._interactive = True
+        try:
+            super().nextCheckState()
+        finally:
+            self._interactive = False
+
+    def enterEvent(self, event):
+        self._hover = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self.update()
+        super().leaveEvent(event)
+
+    # ------------------------------------------------------------------
+    def _colors(self):
+        """Every colour the switch needs, for whichever theme is running.
+
+        Taken as a step away from the window colour rather than as absolute
+        greys, so the track keeps the same separation from the page on a
+        dark background and a light one.
+        """
+        window = self.palette().color(QPalette.ColorRole.Window)
+        dark = window.lightness() < 128
+        hover = self._hover and self.isEnabled()
+        return {
+            'accent': self._checked_color,
+            # Chosen for two ratios at once: the track has to separate
+            # from the page (>=2:1) and the handle from the track (>=2.5:1).
+            # A lighter track reads better on dark but washes out the handle
+            # on light, so the two sides are not mirror images.
+            'off': (window.lighter(220 if hover else 190) if dark
+                    else window.darker(170 if hover else 150)),
+            'handle': QColor("#f2f2f4") if dark else QColor("#ffffff"),
+            'track_disabled': window.lighter(122) if dark else window.darker(112),
+            'handle_disabled': window.lighter(165) if dark else window.darker(126),
+            'rim': QColor(0, 0, 0, 40 if dark else 55),
+            'shadow': QColor(0, 0, 0, 70 if dark else 45),
+            'hover': hover,
+        }
+
+    def _geometry(self, position=None):
+        """Where the track and the handle go.
+
+        The one place this arithmetic lives, so what the tests check is what
+        paintEvent draws.
+
+        Returns:
+            (track, handle_radius, handle_centre)
+        """
+        if position is None:
+            position = self._handle_position
+        track = QRectF(0, 0, self.TRACK_W, self.TRACK_H)
+        track.moveCenter(QRectF(self.rect()).center())
+        handle_r = track.height() / 2 - self.HANDLE_INSET
+        # bounded travel, so the handle never leaves the track
+        left = track.x() + self.HANDLE_INSET + handle_r
+        right = track.right() - self.HANDLE_INSET - handle_r
+        return track, handle_r, QPointF(left + (right - left) * position,
+                                        track.center().y())
+
     def paintEvent(self, e: QPaintEvent):
-        contRect = self.contentsRect()
-        handleRadius = round(0.24 * contRect.height())
+        c = self._colors()
+        track, handle_r, centre = self._geometry()
+        radius = track.height() / 2
+        x, y = centre.x(), centre.y()
 
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        p.setPen(self._transparent_pen)
-        barRect = QRectF(
-            0, 0,
-            contRect.width() - handleRadius, 0.40 * contRect.height()
-        )
-        barRect.moveCenter(QPointF(contRect.center()))
-        rounding = barRect.height() / 2
-
-        # the handle will move along this line
-        trailLength = contRect.width() - 2 * handleRadius
-        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
-
-        # Draw the bar with a subtle 3D sunken effect
-        barGradient = QLinearGradient(0, 0, 0, barRect.height())
-        barGradient.setStart(barRect.topLeft())
-        barGradient.setFinalStop(barRect.bottomLeft())
-
         if not self.isEnabled():
-            barGradient.setColorAt(0.0, self._disabled_color.lighter(150))
-            barGradient.setColorAt(0.0, self._disabled_color)
-            barGradient.setColorAt(1.0, self._disabled_color.darker(150))
+            base = c['track_disabled']
+        elif self.isChecked():
+            base = c['accent'].lighter(110) if c['hover'] else c['accent']
         else:
-            barGradient.setColorAt(0.0, self._bar_color.lighter(150))
-            barGradient.setColorAt(0.5, self._bar_color)
-            barGradient.setColorAt(1.0, self._bar_color.darker(150))
+            base = c['off']
 
-            if self.isChecked():
-                barGradient.setColorAt(0.0, QColor(self._checked_color).lighter(150))
-                barGradient.setColorAt(0.5, QColor(self._checked_color))
-                barGradient.setColorAt(1.0, QColor(self._checked_color).darker(150))
+        track_gradient = QLinearGradient(track.topLeft(), track.bottomLeft())
+        track_gradient.setColorAt(0.0, base.darker(115))
+        track_gradient.setColorAt(1.0, base.lighter(108))
+        p.setPen(QPen(c['rim'], 1))
+        p.setBrush(QBrush(track_gradient))
+        p.drawRoundedRect(track.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
 
-        p.setBrush(QBrush(barGradient))
-        p.drawRoundedRect(barRect, rounding, rounding)
+        if self.hasFocus():
+            p.setPen(QPen(c['accent'].lighter(130), 1.5))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(track.adjusted(0.75, 0.75, -0.75, -0.75),
+                              radius, radius)
 
-        # Draw the border around the bar
+        handle = c['handle_disabled'] if not self.isEnabled() else c['handle']
+        handle_gradient = QLinearGradient(QPointF(x, y - handle_r),
+                                          QPointF(x, y + handle_r))
+        handle_gradient.setColorAt(0.0, handle.lighter(104))
+        handle_gradient.setColorAt(1.0, handle.darker(110))
+
+        # a soft drop shadow lifts the handle off the track; at this size it
+        # carries the depth that a radial gradient cannot
         p.setPen(Qt.PenStyle.NoPen)
-        p.drawRoundedRect(barRect, rounding, rounding)
+        p.setBrush(QBrush(c['shadow']))
+        p.drawEllipse(QPointF(x, y + 0.8), handle_r, handle_r)
 
-        if not self.isEnabled():
-            handle_color = self._disabled_color.darker(110)
-        elif self.isChecked():
-            handle_color = self._handle_checked_brush.color()
-        else:
-            handle_color = self._handle_brush.color()
-
-        # Draw the handle with a gradient for 3D effect
-        handleGradient = QRadialGradient(
-            QPointF(xPos - handleRadius / 3, barRect.center().y() - handleRadius / 3),
-            handleRadius
-        )
-
-        if not self.isEnabled():
-            handleGradient.setColorAt(0.0, handle_color.lighter(120))
-            handleGradient.setColorAt(0.4, handle_color)
-            handleGradient.setColorAt(1.0, handle_color.darker(130))
-        elif self.isChecked():
-            handleGradient.setColorAt(0.0, QColor(255, 255, 255, 180))
-            handleGradient.setColorAt(0.3, handle_color)
-            handleGradient.setColorAt(1.0, handle_color.darker(120))
-        else:
-            # OFF + Enabled: More subtle highlight
-            handleGradient.setColorAt(0.0, handle_color.lighter(150))
-            handleGradient.setColorAt(0.3, handle_color)
-            handleGradient.setColorAt(1.0, handle_color.darker(300))
-
-        p.setBrush(handleGradient)
-        p.setPen(QPen(handle_color.darker()))
-        p.drawEllipse(
-            QPointF(xPos, barRect.center().y()),
-            handleRadius, handleRadius)
-
+        p.setBrush(QBrush(handle_gradient))
+        p.setPen(QPen(c['rim'], 0.8))
+        p.drawEllipse(QPointF(x, y), handle_r, handle_r)
         p.end()
 
+    # ------------------------------------------------------------------
     @pyqtSlot(int)
     def handle_state_change(self, value):
-        self._handle_position = 1 if value else 0
+        """Slide the handle for a change the user made; snap for one the
+        app made."""
+        target = 1.0 if value else 0.0
+        self._animation.stop()
+        if not self._interactive:
+            self.handle_position = target
+            return
+        self._animation.setStartValue(self._handle_position)
+        self._animation.setEndValue(target)
+        self._animation.start()
 
     @pyqtProperty(float)
     def handle_position(self):
@@ -1758,25 +1824,31 @@ class Toggle(QCheckBox):
 
     @handle_position.setter
     def handle_position(self, pos):
-        """change the property
-        we need to trigger QWidget.update() method, either by:
-            1- calling it here [ what we're doing ].
-            2- connecting the QPropertyAnimation.valueChanged() signal to it.
-        """
+        """Driven by the slide animation; setting it repaints."""
         self._handle_position = pos
         self.update()
 
+
 class LabeledToggle(QWidget):
-    """Combo widget that creates a single widget with label and connectable slots using the Toggle widget"""
+    """Combo widget that creates a single widget with label and connectable slots using the Toggle widget
+
+    The label is an InfoLabel, so a toggle that carries a tooltip advertises
+    it with the same information icon used elsewhere in the app - a tooltip
+    nothing points at is a tooltip nobody hovers.
+    """
     stateChanged = pyqtSignal(int)  # Expose the stateChanged signal
     clicked = pyqtSignal(bool)      # Expose the clicked signal
 
-    def __init__(self, parent=None, label=""):
+    def __init__(self, parent=None, label="", tooltip=None):
         super().__init__(parent)
 
         self.toggle = Toggle(self)
-        self.label = QLabel(label, self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Ensure the label is vertically centered
+        self.label = InfoLabel(self, text=label)
+        # InfoLabel lets its text shrink to nothing, which suits the settings
+        # tree's narrow columns but truncates a toggle's caption in a form.
+        # Hold it to the width its text asks for.
+        self.label.setSizePolicy(QSizePolicy.Policy.Minimum,
+                                 QSizePolicy.Policy.Preferred)
 
         layout = QHBoxLayout(self)
         layout.addWidget(self.toggle)
@@ -1788,6 +1860,9 @@ class LabeledToggle(QWidget):
         self.toggle.stateChanged.connect(self.stateChanged)  # Forward the stateChanged signal
         self.toggle.clicked.connect(self.clicked)  # Forward the clicked signal
 
+        if tooltip:
+            self.setToolTip(tooltip)
+
     def isChecked(self):
         return self.toggle.isChecked()
 
@@ -1796,6 +1871,13 @@ class LabeledToggle(QWidget):
 
     def setText(self, text):
         self.label.setText(text)
+
+    def setToolTip(self, tooltip):
+        """Mark the label with the information icon, and answer a hover
+        anywhere on the row rather than only over the icon."""
+        self.label.setToolTip(tooltip)
+        self.toggle.setToolTip(tooltip or '')
+        super().setToolTip(tooltip or '')
 
     def connect(self, *args, **kwargs):
         return self.stateChanged.connect(*args, **kwargs)
@@ -1808,136 +1890,6 @@ class LabeledToggle(QWidget):
 
     def click(self):
         self.toggle.click()
-
-class AnimatedToggle(QCheckBox):
-    """Borrowed from qtwidgets library: https://github.com/pythonguis/python-qtwidgets"""
-    _transparent_pen = QPen(Qt.GlobalColor.transparent)
-    _light_grey_pen = QPen(Qt.GlobalColor.lightGray)
-
-    def __init__(self,
-        parent=None,
-        bar_color=Qt.GlobalColor.gray,
-        checked_color="#ab37c8",
-        handle_color=Qt.GlobalColor.white,
-        pulse_unchecked_color="#44999999",
-        pulse_checked_color="#44#ab37c8"
-        ):
-        super().__init__(parent)
-
-        # Save our properties on the object via self, so we can access them later
-        # in the paintEvent.
-        self._bar_brush = QBrush(bar_color)
-        self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
-
-        self._handle_brush = QBrush(handle_color)
-        self._handle_checked_brush = QBrush(QColor(checked_color))
-
-        self._pulse_unchecked_animation = QBrush(QColor(pulse_unchecked_color))
-        self._pulse_checked_animation = QBrush(QColor(pulse_checked_color))
-
-        # Setup the rest of the widget.
-        self.setContentsMargins(8, 0, 8, 0)
-        self._handle_position = 0
-
-        self._pulse_radius = 0
-
-        self.animation = QPropertyAnimation(self, b"handle_position", self)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        self.animation.setDuration(200)  # time in ms
-
-        self.pulse_anim = QPropertyAnimation(self, b"pulse_radius", self)
-        self.pulse_anim.setDuration(350)  # time in ms
-        self.pulse_anim.setStartValue(10)
-        self.pulse_anim.setEndValue(20)
-
-        self.animations_group = QSequentialAnimationGroup()
-        self.animations_group.addAnimation(self.animation)
-        self.animations_group.addAnimation(self.pulse_anim)
-
-        self.stateChanged.connect(self.setup_animation)
-
-    def sizeHint(self):
-        return QSize(58, 45)
-
-    def hitButton(self, pos: QPoint):
-        return self.contentsRect().contains(pos)
-
-    @pyqtSlot(int)
-    def setup_animation(self, value):
-        self.animations_group.stop()
-        if value:
-            self.animation.setEndValue(1)
-        else:
-            self.animation.setEndValue(0)
-        self.animations_group.start()
-
-    def paintEvent(self, e: QPaintEvent):
-
-        contRect = self.contentsRect()
-        handleRadius = round(0.24 * contRect.height())
-
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        p.setPen(self._transparent_pen)
-        barRect = QRectF(
-            0, 0,
-            contRect.width() - handleRadius, 0.40 * contRect.height()
-        )
-        barRect.moveCenter(contRect.center())
-        rounding = barRect.height() / 2
-
-        # the handle will move along this line
-        trailLength = contRect.width() - 2 * handleRadius
-
-        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
-
-        if self.pulse_anim.state() == QPropertyAnimation.Running:
-            p.setBrush(
-                self._pulse_checked_animation if
-                self.isChecked() else self._pulse_unchecked_animation)
-            p.drawEllipse(QPointF(xPos, barRect.center().y()),
-                          self._pulse_radius, self._pulse_radius)
-
-        if self.isChecked():
-            p.setBrush(self._bar_checked_brush)
-            p.drawRoundedRect(barRect, rounding, rounding)
-            p.setBrush(self._handle_checked_brush)
-
-        else:
-            p.setBrush(self._bar_brush)
-            p.drawRoundedRect(barRect, rounding, rounding)
-            p.setPen(self._light_grey_pen)
-            p.setBrush(self._handle_brush)
-
-        p.drawEllipse(
-            QPointF(xPos, barRect.center().y()),
-            handleRadius, handleRadius)
-
-        p.end()
-
-    @pyqtProperty(float)
-    def handle_position(self):
-        return self._handle_position
-
-    @handle_position.setter
-    def handle_position(self, pos):
-        """change the property
-        we need to trigger QWidget.update() method, either by:
-            1- calling it here [ what we doing ].
-            2- connecting the QPropertyAnimation.valueChanged() signal to it.
-        """
-        self._handle_position = pos
-        self.update()
-
-    @pyqtProperty(float)
-    def pulse_radius(self):
-        return self._pulse_radius
-
-    @pulse_radius.setter
-    def pulse_radius(self, pos):
-        self._pulse_radius = pos
-        self.update()
 
 class InstanceStatusRow(QWidget):
     changeConfigScope = QtCore.pyqtSignal(str)
