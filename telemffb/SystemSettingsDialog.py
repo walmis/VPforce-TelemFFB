@@ -616,6 +616,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         made: a device that is merely unplugged today shows as (None) here,
         and unchecking it would throw away a setting never touched.
         """
+        self._update_vpconf_gates()
         al_enabled = self.cb_al_enable.isChecked()
         master_role = self.MASTER_ROLE_IDS.get(self.master_button_group.checkedId())
         for role, (radio, *launch_boxes) in self.ROLE_LAUNCH_WIDGETS.items():
@@ -1147,6 +1148,36 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return model.data(model.index(combo.currentIndex(), 0),
                           Qt.ItemDataRole.UserRole)
 
+    #: Shown on the Configurator settings a DirectInput device cannot use.
+    VPCONF_BLOCKED_REASON = (
+        'Not available: VPforce Configurator profiles do not apply to a generic DirectInput device')
+
+    def device_is_dinput(self, role):
+        """True when the device picked for a role is a generic DirectInput one.
+
+        Keyed on the selection rather than on the connected device: the
+        selection is what the settings being saved will apply to, and the
+        device it names may not be plugged in yet.
+        """
+        device = self.selected_device(role)
+        path = getattr(device, 'path', None) or b''
+        return bytes(path).startswith(b'dinput:')
+
+    def _update_vpconf_gates(self):
+        """Grey out Configurator settings for any device that cannot use them.
+
+        VPConf startup/exit/global-default profiles and the exit gain reset
+        push VPforce Configurator gains, which a generic DirectInput device
+        does not have.  The stored values are left alone so switching back
+        to VPforce hardware restores them.
+        """
+        for (section, role), panel in self.instance_panels.items():
+            if section != 'startup':
+                continue
+            blocked = self.device_is_dinput(role)
+            panel.set_vpforce_features_enabled(
+                not blocked, self.VPCONF_BLOCKED_REASON)
+
     def instance_pid(self, role):
         """A device's USB product ID, as the hex string it is stored as.
 
@@ -1206,6 +1237,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """
         for (section, role), panel in self.instance_panels.items():
             if section != 'startup':
+                continue
+            if panel.vpforce_blocked:
+                # the settings are stored but inert; validating a profile the
+                # device can never be sent would block saving for no reason
                 continue
             pid = self.instance_pid(role)
             for field in panel.fields:
