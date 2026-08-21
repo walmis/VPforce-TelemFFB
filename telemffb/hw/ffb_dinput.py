@@ -914,11 +914,14 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                 # priority; effect ops fail until it releases the device.
                 # ERROR level so the exception tracker (which de-duplicates
                 # with a count) surfaces the condition in the UI; the
-                # per-frame lazy re-create doubles as automatic recovery.
+                # per-frame lazy re-create doubles as automatic recovery
+                # where the other application does release the device.
                 logging.error(
                     f"FFB effects blocked: {self.bridge.last_error()}. "
-                    "Close other FFB software / disable the sim's own force "
-                    "feedback - effects resume automatically once released.")
+                    "Either turn off the sim's own force feedback, or - if "
+                    "using the DirectInput tap - start TelemFFB before the "
+                    "sim and restart the sim now, since the tap is set up "
+                    "as the sim starts.")
                 self._acquisition_warned = True
                 return None
             logging.warning(f"create_effect failed ({effect_id}): {effect_names.get(type, type)} "

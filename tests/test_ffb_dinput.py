@@ -332,7 +332,11 @@ class TestEffectLifecycle:
                 assert device.create_effect(EFFECT_SPRING) is None
         blocked = [r for r in caplog.records if "FFB effects blocked" in r.message]
         assert blocked and all(r.levelno == _logging.ERROR for r in blocked)
-        assert "resume automatically" in blocked[0].message
+        # both remedies must be named: turning the sim's own force feedback
+        # off, and - for a tap user, where nothing will release the device
+        # mid-session - starting TelemFFB first and restarting the sim
+        assert "force feedback" in blocked[0].message
+        assert "start TelemFFB before the sim" in blocked[0].message
         # stable message text so the exception tracker's dedup groups them
         assert len({r.message for r in blocked}) == 1
 
