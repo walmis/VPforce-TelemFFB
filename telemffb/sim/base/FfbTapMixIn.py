@@ -18,14 +18,17 @@
 
 """Game spring via the DirectInput FFB tap - sim-agnostic.
 
-Spring mode DINPUT_TAP ('Game Managed (DirectInput Tap)'): the game
-computes its own FFB but TelemFFB renders it.  For sims with no FFB
-telemetry export (DCS, IL-2, BMS), the extended dinput8 wrapper's 'tap'
-device policy publishes the game's live effect state into a shared-memory
-mirror while the game believes it still renders to the device; this mixin
-reconciles the mirrored spring onto the device each telemetry frame -
-trim center follow, force-trim coefficient collapse, etc. reproduced
-exactly.  The reader and unit translation live in telemffb.hw.ffb_tap.
+Spring mode DINPUT_TAP ('Game Managed (DirectInput Tap)'): the sim
+computes its own spring but TelemFFB renders it.  Sims that render their
+own force feedback (DCS, IL-2, BMS) take exclusive access of the device,
+which is what has always kept companion software off it; the
+TelemFFB-DInput-Tap wrapper's 'tap' device policy absorbs the sim's
+output and publishes its live effect state into a shared-memory mirror
+instead, leaving the device free.  This mixin reconciles the mirrored
+spring onto the device each telemetry frame - trim center follow,
+force-trim coefficient collapse and the rest reproduced exactly - so the
+sim's own forces and TelemFFB's telemetry-driven effects share one
+device.  The reader and unit translation live in telemffb.hw.ffb_tap.
 
 Works identically on VPforce hardware (raw-HID rendering) and generic
 DirectInput devices (DI bridge).  A distinct mode and effect from IL-2

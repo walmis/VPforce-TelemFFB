@@ -18,15 +18,21 @@
 
 """FFB tap reader - access to a game's native force-feedback intent.
 
-A dinput8 proxy DLL in the game folder (the 'tap' device policy of the
-extended dcs-force-feedback-fix wrapper) lets the game believe it is
-rendering FFB normally while publishing the live effect state into a
-shared-memory mirror (``Local\\FFBTap_v1``).  This module is the reader
-side: the sim-agnostic 'Game Managed (DirectInput Tap)' spring mode
-(FfbTapMixIn) calls :func:`read_game_spring` from the telemetry
-loop and re-renders the game's spring on the device TelemFFB controls -
-FFB telemetry for games that have no telemetry export of their own
-(DCS, IL-2, BMS).
+Sims that render their own force feedback (DCS, IL-2, BMS) take exclusive
+access of the device, and DirectInput grants that to exactly one
+application - so TelemFFB cannot add its effects on top, however much
+telemetry the sim exports.  The obstacle is ownership of the device, not
+data.
+
+The TelemFFB-DInput-Tap wrapper (a dinput8 proxy DLL in the game folder,
+device policy 'tap') removes it: the sim keeps computing its forces and
+believes it is rendering them, while the wrapper absorbs its output,
+publishes the live effect state into a shared-memory mirror
+(``Local\\FFBTap_v1``) and hands the device over.  This module is the
+reader side - the sim-agnostic 'Game Managed (DirectInput Tap)' spring
+mode (FfbTapMixIn) calls :func:`read_game_spring` from the telemetry loop
+and renders the sim's own spring alongside TelemFFB's telemetry-driven
+effects, on one device.
 
 The mirror is a STATE TABLE, not a command stream: per-slot seqlocks keep
 snapshots consistent, and monotonic start/stop/update counters expose
