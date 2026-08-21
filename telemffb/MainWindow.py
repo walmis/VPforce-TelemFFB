@@ -175,9 +175,12 @@ class MainWindow(QMainWindow):
 
         system_menu = self.menu.addMenu('&System')
 
-        system_settings_action = QAction('System Settings', self)
-        system_settings_action.triggered.connect(self.open_system_settings_dialog)
-        system_menu.addAction(system_settings_action)
+        if G.master_instance:
+            # Settings for every device live in the master's dialog; a child
+            # has none of its own to show.
+            system_settings_action = QAction('System Settings', self)
+            system_settings_action.triggered.connect(self.open_system_settings_dialog)
+            system_menu.addAction(system_settings_action)
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         def do_open_cfg_dir():
@@ -210,7 +213,12 @@ class MainWindow(QMainWindow):
         reset_geometry.triggered.connect(do_reset_window_size)
         system_menu.addAction(reset_geometry)
 
-        exit_app_action = QAction('Quit TelemFFB', self)
+        # Quitting a child ends that instance; only the master takes the
+        # whole application down with it.
+        exit_app_action = QAction(
+            'Quit TelemFFB' if G.master_instance else
+            f'Quit the {utils.device_display_name(G.device_type)} Instance',
+            self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
@@ -1355,9 +1363,6 @@ class MainWindow(QMainWindow):
     def update_child_status(self, device, status):
         # self.instance_status_row.set_status(device, status)
         self.device_panel.set_device_status(device, status)
-
-    def show_child_settings(self):
-        G.ipc_instance.send_broadcast_message("SHOW SETTINGS")
 
     def reset_user_config(self):
         ans = QMessageBox.warning(self, "Caution", "Are you sure you want to proceed?  All contents of your user configuration will be erased\n\nA backup of the configuration will be generated containing the current timestamp.", QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)

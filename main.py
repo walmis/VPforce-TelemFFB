@@ -156,7 +156,7 @@ def _setup_device_configuration():
         if devpath:
             G.device_devpath = devpath
 
-        G.device_usbpid = str(G.system_settings.get(f'pid{devname.capitalize()}', "2055"))
+        G.device_usbpid = str(G.system_settings.get(utils.device_pid_key(devname), "2055"))
         G.device_type = devname
 
 
@@ -367,7 +367,7 @@ def _device_is_configured() -> bool:
     error dialog) and the System Settings dialog opens for first-time
     setup instead.
     """
-    pid_key = f'pid{G.device_type.capitalize()}'
+    pid_key = utils.device_pid_key(G.device_type)
     path_key = f'devpath_{G.device_type}'
     for key in (pid_key, path_key,
                 f'{G.device_type}/{pid_key}', f'{G.device_type}/{path_key}'):
@@ -708,7 +708,10 @@ def _setup_ipc_and_connections():
     G.ipc_instance.show_signal.connect(G.main_window.show)
     G.ipc_instance.hide_signal.connect(G.main_window.hide)
     G.ipc_instance.showlog_signal.connect(G.log_window.show)
-    G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
+    if G.master_instance:
+        # Children ask the master to open settings when their device is
+        # unassigned; nothing asks a child to open its own.
+        G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
     G.ipc_instance.show_adv_spr_signal.connect(G.main_window.settings_layout.advanced_spring_button_clicked)
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
@@ -994,6 +997,10 @@ def main():
     # Set child instance flag and load system-wide settings
     G.child_instance = G.args.child
     G.system_settings = utils.SystemSettings()
+    migrated = G.system_settings.migrate_instance_scoped_globals()
+    if migrated:
+        logging.info(f"Migrated instance-scoped copies of global settings to "
+                     f"global: {', '.join(migrated)}")
 
     # Configure application theme (light/dark/system) and apply custom styling
     _setup_theme_and_styling(app)

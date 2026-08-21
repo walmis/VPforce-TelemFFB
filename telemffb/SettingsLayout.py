@@ -35,7 +35,7 @@ from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.AdvancedGDialog import AdvancedGDialog
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.utils import validate_vpconf_profile, dbprint, HiDpiPixmap
+from telemffb.utils import validate_vpconf_profile, device_pid_key, dbprint, HiDpiPixmap
 import telemffb.utils as utils
 import styles
 from . import globals as G
@@ -1608,8 +1608,7 @@ class SettingsLayout(QGridLayout):
 
         if file_path:
             cfg_scope = xmlutils.device
-            dev_type_cap = cfg_scope.capitalize()
-            usbpid = str(G.system_settings.get(f'pid{dev_type_cap}', '2055'))
+            usbpid = str(G.system_settings.get(device_pid_key(cfg_scope), '2055'))
 
             if validate_vpconf_profile(file_path, pid=usbpid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
