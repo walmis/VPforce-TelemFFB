@@ -227,6 +227,36 @@ def _setup_device_configuration():
         
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
 
+def _check_directinput_support():
+    """Turn DirectInput support off if the bridge DLL is not usable.
+
+    The DLL is distributed separately from TelemFFB, so an install can lose
+    it - to an update, a move, or a beta build reaching its expiry. Leaving
+    the setting on would list no devices and explain nothing, and any
+    instance already assigned a [DI] device would fail to connect with no
+    obvious cause. Better to switch it off and say why.
+    """
+    if G.child_instance:
+        # one report per launch: the master owns the setting, and four
+        # instances each raising the same dialog helps nobody
+        return
+    if not G.system_settings.get('enableDirectInput', False):
+        return
+    from telemffb.hw.ffb_dinput import bridge_availability
+    available, reason = bridge_availability()
+    if available:
+        return
+
+    G.system_settings.setValue('enableDirectInput', False)
+    logging.error(f"DirectInput support disabled: {reason.splitlines()[0]}")
+    QMessageBox.warning(
+        None, "DirectInput Support Disabled",
+        "DirectInput support was enabled, but has been automatically turned off.\n\n"
+        + reason
+        + "\n\nAny instance assigned a [DI] device will not connect until "
+        "this is resolved and the setting is re-enabled in System Settings.")
+
+
 def _setup_theme_and_styling(app):
     """
     Configure application theme and styling based on system settings.
@@ -1056,6 +1086,7 @@ def main():
     # Set child instance flag and load system-wide settings
     G.child_instance = G.args.child
     G.system_settings = utils.SystemSettings()
+    _check_directinput_support()
     migrated = G.system_settings.migrate_instance_scoped_globals()
     if migrated:
         logging.info(f"Migrated instance-scoped copies of global settings to "

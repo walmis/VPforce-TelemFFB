@@ -289,8 +289,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # restored, so it sees what is actually assigned.
         self.toggle_device_launch_widgets()
 
+        # Connected only now, not with the other signals earlier in __init__:
+        # this handler repopulates the device selectors, which reach for the
+        # companion widgets attached to them above.  The box is ticked while
+        # restoring saved settings, so an earlier connection would fire the
+        # handler before they exist.
+        self.cb_enable_dinput.stateChanged.connect(self.toggle_dinput_support)
+
     @staticmethod
-    def _enumerate_dinput_devices():
+    def _enumerate_dinput_devices(enabled=None):
         """Generic DirectInput FFB devices, prepared for the selector model.
 
         VPforce hardware also enumerates as a DI FFB device, so VID 0xFFFF is
@@ -304,6 +311,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         The devpath encodes the backend ('dinput:{GUID}') so the selection
         flows through the existing devpath_* persistence untouched.
         """
+        # Opt-in: with support off, no [DI] entries appear anywhere and the
+        # bridge is never loaded, so a stock install behaves exactly as it did
+        # before DirectInput support existed.  `enabled` overrides the stored
+        # setting so the dialog can re-list live as the box is ticked.
+        if enabled is None:
+            enabled = G.system_settings.get('enableDirectInput', False)
+        if not enabled:
+            return []
+
         try:
             from telemffb.hw.ffb_dinput import DInputFFBDevice
 
@@ -319,13 +335,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 di_devices.append(dev)
             return di_devices
         except Exception as e:
-            # debug level: a stock install without the (optional, separately
-            # distributed) bridge DLL must look exactly like pre-DI TelemFFB -
-            # no log noise hinting at a "missing" component
-            logging.debug(f"DirectInput device enumeration unavailable: {e}")
+            # Support is explicitly on at this point, so silence would just
+            # look like "my device is missing".  The usual cause is the
+            # separately distributed bridge DLL not being installed.
+            logging.error(
+                f"DirectInput support is enabled but no devices could be "
+                f"enumerated: {e}. The DInput bridge DLL is required - see the "
+                "TelemFFB DirectInput documentation.")
             return []
 
-    def populateUSBSelectors(self):
+    def populateUSBSelectors(self, dinput_enabled=None):
         # Populate the USB device selectors with currently connected devices
         devices = FFBRhino.enumerate()
 
@@ -334,9 +353,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Generic DirectInput FFB devices are joystick-role only for now, so
         # the joystick combo gets its own extended model.
         model = FFBDeviceListModel(devices)
-        joystick_model = FFBDeviceListModel(list(devices) + self._enumerate_dinput_devices())
+        joystick_model = FFBDeviceListModel(
+            list(devices) + self._enumerate_dinput_devices(dinput_enabled))
         for cb in combo_boxes:
             cb_model = joystick_model if cb is self.cb_select_j else model
+            # Swapping the model emits currentIndexChanged with nothing
+            # selected yet.  On a repopulate (the DirectInput toggle) that
+            # reaches the handler connected below, which reads it as "device
+            # cleared" and wipes this role's launch options - so stay quiet
+            # until the saved selection has been restored.
+            cb.blockSignals(True)
             cb.setModel(cb_model)
             # Ensure the combobox shows the display role text but we can fetch the DeviceInfo from the model via UserRole
             cb.setModelColumn(0)
@@ -512,10 +538,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
             self.toggle_device_launch_widgets()
 
-        # connect signals
         for cb in combo_boxes:
-            # use lambda binding to capture cb in the handler
-            cb.currentIndexChanged.connect(lambda idx, _cb=cb: on_device_changed(idx, changed_cb=_cb))
+            cb.blockSignals(False)
+
+        # connect signals (once - this method also runs on repopulate)
+        if not getattr(self, '_device_signals_connected', False):
+            for cb in combo_boxes:
+                # use lambda binding to capture cb in the handler
+                cb.currentIndexChanged.connect(lambda idx, _cb=cb: on_device_changed(idx, changed_cb=_cb))
+            self._device_signals_connected = True
 
         # Additionally, ensure that when selection is cleared (index 0 / None) the setting is persisted.
         # The on_device_changed handler will call persist after committing the change, but if a selection
@@ -647,6 +678,31 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseXPLANE.setEnabled(xplane_enabled)
         icon = self.XPLANE_ICON_ENABLED if xplane_enabled else self.XPLANE_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.XPLANE_TAB, icon)
+
+    def toggle_dinput_support(self):
+        """Re-list devices so [DI] entries appear or disappear immediately.
+
+        The checkbox state is passed through rather than written to settings:
+        the dialog persists it on save, and writing here would make the
+        change stick even if the user cancels.
+
+        Switching it on without the bridge DLL would silently list nothing,
+        which reads as "my device is missing" - so the reason is shown and
+        the box goes back off rather than sitting on and doing nothing.
+        """
+        if self.cb_enable_dinput.isChecked():
+            from telemffb.hw.ffb_dinput import bridge_availability
+            available, reason = bridge_availability()
+            if not available:
+                QMessageBox.warning(self, "DirectInput Unavailable", reason)
+                # the revert re-enters here with the box off; block it so
+                # the repopulate below runs once, for the settled state
+                self.cb_enable_dinput.blockSignals(True)
+                self.cb_enable_dinput.setChecked(False)
+                self.cb_enable_dinput.blockSignals(False)
+
+        self.populateUSBSelectors(dinput_enabled=self.cb_enable_dinput.isChecked())
+        self.toggle_device_launch_widgets()
 
     def toggle_dcs_widgets(self):
         # show/hide DCS related widgets based on checkbox state
@@ -916,6 +972,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "il2_fwd_enable": self.il2_fwd_enable.isChecked(),
             "il2_fwd_destinations": json.dumps(self.get_il2_fwd_destinations()),
             'enableBMS': self.enableBMS.isChecked(),
+            'enableDirectInput': self.cb_enable_dinput.isChecked(),
             'masterInstance': self.master_button_group.checkedId(),
             'autolaunchMaster': self.cb_al_enable.isChecked(),
             'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
@@ -1085,6 +1142,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.enableBMS.setChecked(settings_dict.get('enableBMS', False))
         self.toggle_bms_widgets()
+
+        self.cb_enable_dinput.setChecked(settings_dict.get('enableDirectInput', False))
 
 
         self.cb_al_enable.setChecked(settings_dict.get('autolaunchMaster', False))

@@ -71,6 +71,7 @@ import ctypes
 import logging
 import json
 import os
+import sys
 import time
 import weakref
 from dataclasses import dataclass, field
@@ -206,6 +207,55 @@ def _describe_params(effect_type: int, params: DibEffectParams) -> str:
     return "?"
 
 
+#: Where a user obtains the bridge DLL.  Placeholder until the download
+#: location is settled - every message that mentions it reads from here, so
+#: finalising the address is a one-line change.
+BRIDGE_DOWNLOAD_LOCATION = "<location to be determined>"
+
+
+def bridge_availability(dll_path: Optional[str] = None):
+    """Whether the DInput bridge DLL can actually be used.
+
+    Returns (available, reason).  `reason` is written for a message box, not
+    a log line, and is empty when available.  The bridge is separately
+    distributed, so "missing" is an ordinary state rather than an error -
+    but one worth explaining rather than leaving the user with an
+    unexplained empty device list.
+    """
+    try:
+        bridge = DIBridge(dll_path)
+    except Exception as e:                    # DIBridgeError, OSError, ...
+        searched = (dll_path,) if dll_path else DIBridge.library_paths()
+        where = "\n".join("    " + os.path.abspath(p) for p in searched)
+        # "Unable to load ... from: a, b, c" names the same paths the list
+        # below does, one per line and more readably; anything else - an ABI
+        # mismatch, a load error from Windows - is worth showing.
+        detail = "" if str(e).startswith("Unable to load") else str(e) + "\n\n"
+        return False, (
+            "The DInput bridge DLL could not be loaded.\n\n"
+            "{}Looked in:\n{}\n\n"
+            "Place dinput_ffb.dll in the 'dll' folder of your TelemFFB "
+            "installation.\n\n"
+            "If you do not have the DLL, you can obtain it from "
+            "{}.".format(detail, where, BRIDGE_DOWNLOAD_LOCATION))
+
+    expires = (bridge.build_info or {}).get("expires")
+    if expires:
+        try:
+            from datetime import date
+            days_left = (date.fromisoformat(expires) - date.today()).days
+        except ValueError:
+            days_left = None
+        if days_left is not None and days_left < 0:
+            return False, (
+                "The DInput bridge build expired on {}.\n\n"
+                "Beta builds carry a time limit; the device connection will "
+                "be refused until a current build is installed.\n\n"
+                "You can obtain the current build from {}.".format(
+                    expires, BRIDGE_DOWNLOAD_LOCATION))
+    return True, ""
+
+
 class DIBridge:
     """ctypes binding to dinput_ffb.dll.
 
@@ -213,13 +263,37 @@ class DIBridge:
     substitute a pure-Python fake without touching ctypes.
     """
 
-    _library_paths = (
-        os.path.join(os.path.dirname(__file__), "..", "..", "dll", "dinput_ffb.dll"),
-        "dinput_ffb.dll",
-    )
+    @staticmethod
+    def library_paths():
+        """Where dinput_ffb.dll is looked for, in order.
+
+        Worked out when asked rather than at import: frozen and source
+        installs keep it in different places, and os.path.dirname(__file__)
+        in a PyInstaller build points inside the unpacked bundle - a
+        temporary directory, not the installation the user drops the DLL
+        into. Matches get_resource_path(prefer_root=True): beside the
+        executable first, then whatever shipped in the bundle.
+        """
+        name = "dinput_ffb.dll"
+        if getattr(sys, "frozen", False):
+            beside_exe = os.path.dirname(sys.executable)
+            bundled = getattr(sys, "_MEIPASS", beside_exe)
+            candidates = [os.path.join(beside_exe, "dll", name),
+                          os.path.join(beside_exe, name),
+                          os.path.join(bundled, "dll", name)]
+        else:
+            here = os.path.dirname(os.path.abspath(__file__))
+            root = os.path.abspath(os.path.join(here, "..", ".."))
+            candidates = [os.path.join(root, "dll", name),
+                          os.path.join(root, name)]
+        # Deliberately no bare-name fallback: letting Windows search its own
+        # DLL path makes "not found" depend on the working directory and on
+        # whatever is already loaded in the process, and could pick up a
+        # dinput_ffb.dll from somewhere nobody intended.
+        return tuple(candidates)
 
     def __init__(self, dll_path: Optional[str] = None):
-        paths = (dll_path,) if dll_path else self._library_paths
+        paths = (dll_path,) if dll_path else self.library_paths()
         self._dll = None
         for p in paths:
             try:

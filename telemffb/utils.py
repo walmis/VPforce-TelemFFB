@@ -1171,6 +1171,7 @@ class SystemSettings(QSettings):
     pathIL2: str
     portIL2: int
     enableBMS: bool
+    enableDirectInput: bool
     masterInstance: int
     autolaunchMaster: bool
     autolaunchJoystick: bool
@@ -1220,6 +1221,7 @@ class SystemSettings(QSettings):
         'il2_fwd_enable': False,
         'il2_fwd_destinations': '[]',
         'enableBMS': False,
+        'enableDirectInput': False,
         'masterInstance': 1,
         'autolaunchMaster': False,
         'autolaunchJoystick': False,
