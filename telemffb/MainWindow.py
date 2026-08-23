@@ -68,6 +68,23 @@ from telemffb.utils import exit_application, HiDpiPixmap
 class MainWindow(QMainWindow):
     version_check_complete = pyqtSignal()
 
+    #: Number-sliders whose handle shows a live force readout: setting name
+    #: -> the telemetry key its aircraft code publishes (fraction 0..1 of
+    #: the relevant full scale, so 100% on the handle means clipping/max).
+    N_SLIDER_LIVE_KEYS = {
+        'max_elevator_coeff': '_pct_max_e',
+        'max_aileron_coeff': '_pct_max_a',
+        'max_rudder_coeff': '_pct_max_r',
+        'steering_friction_intensity': '_pct_steer_f',
+        'tap_spring_gain_x': '_pct_tap_x',
+        'tap_spring_gain_y': '_pct_tap_y',
+        'tap_effect_constant_gain': '_pct_tap_const',
+        'tap_effect_periodic_gain': '_pct_tap_periodic',
+        'tap_effect_damper_gain': '_pct_tap_damper',
+        'tap_effect_inertia_gain': '_pct_tap_inertia',
+        'tap_effect_friction_gain': '_pct_tap_friction',
+    }
+
     def __init__(self):
         super().__init__()
         self.tray_icon = QSystemTrayIcon(self)
@@ -2458,10 +2475,6 @@ class MainWindow(QMainWindow):
 
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
-            pct_max_a = data.get('_pct_max_a', 0)
-            pct_max_e = data.get('_pct_max_e', 0)
-            pct_max_r = data.get('_pct_max_r', 0)
-            pct_steer_f = data.get('_pct_steer_f', 0)
             qcolor_green = QColor("#17c411")
             qcolor_grey = QColor("grey")
             if window_mode == 1:
@@ -2485,28 +2498,11 @@ class MainWindow(QMainWindow):
                     slidername = my_slider.objectName().replace('sld_', '')
                     my_slider.blockSignals(True)
 
-                    if slidername == 'max_elevator_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_e)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_e *100)}%")
-                        # print(int(pct_max_e * 100))
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'max_aileron_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_a)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_a * 100)}%")
-                        # print(new_color)
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'max_rudder_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_r)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_r * 100)}%")
-                        # print(new_color)
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'steering_friction_intensity':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_steer_f)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_steer_f * 100)}%")
-                        # print(new_color)
+                    live_key = self.N_SLIDER_LIVE_KEYS.get(slidername)
+                    if live_key is not None:
+                        pct = min(data.get(live_key, 0), 1.0)
+                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
+                        my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
                         my_slider.blockSignals(False)
                         continue
                     for a_s in active_settings:

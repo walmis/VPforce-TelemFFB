@@ -402,9 +402,9 @@
 		<value>true</value>
 		<datatype>group</datatype>
 		<name>tap_axis_group</name>
-		<displayname>Tap: Axis Corrections</displayname>
+		<displayname>Tap: Axis Corrections and Gain</displayname>
 		<prereq>spring_mode.DINPUT_TAP</prereq>
-		<info>Orientation corrections applied to the game spring received via the DirectInput tap.</info>
+		<info>Orientation corrections and per-axis force gain applied to the game spring received via the DirectInput tap.</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
@@ -453,6 +453,228 @@
 		<displayname>Tap: Invert Y Axis FFB</displayname>
 		<prereq>tap_axis_group</prereq>
 		<info>Invert the Y (pitch) direction of the game spring received via the DirectInput tap.&lt;br&gt;&lt;br&gt;Counterpart to in-game FFB tuning settings (e.g. DCS FFTune 'Invert Y'): those alter the FFB the game emits and distort the tapped spring, so leave them at neutral in the game and apply any needed correction here instead.&lt;br&gt;&lt;br&gt;Use if the spring center moves the wrong way fore/aft when trimming.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.25</order>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<name>tap_spring_gain_x</name>
+		<displayname>Tap: X Axis Spring Gain</displayname>
+		<prereq>tap_axis_group</prereq>
+		<info>Force gain on the X (roll) axis of the game spring received via the DirectInput tap.  100% renders the spring exactly as the game commanded; raise it if the game's native forces feel weak.&lt;br&gt;&lt;br&gt;Applies to the axis as rendered on the device: with 'Swap X/Y FFB Axes' enabled, this scales whichever game axis ends up on X.  Spring centering positions are unaffected - only the force gradient scales.&lt;br&gt;&lt;br&gt;The % shown on the slider handle is the current rendered spring force - pinned at 100% means the gain is clipping at the device's maximum.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.26</order>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<name>tap_spring_gain_y</name>
+		<displayname>Tap: Y Axis Spring Gain</displayname>
+		<prereq>tap_axis_group</prereq>
+		<info>Force gain on the Y (pitch) axis of the game spring received via the DirectInput tap.  100% renders the spring exactly as the game commanded; raise it if the game's native forces feel weak.&lt;br&gt;&lt;br&gt;Applies to the axis as rendered on the device: with 'Swap X/Y FFB Axes' enabled, this scales whichever game axis ends up on Y.  Spring centering positions are unaffected - only the force gradient scales.&lt;br&gt;&lt;br&gt;The % shown on the slider handle is the current rendered spring force - pinned at 100% means the gain is clipping at the device's maximum.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.3</order>
+		<value>true</value>
+		<datatype>group</datatype>
+		<name>tap_effects_group</name>
+		<displayname>Tap: Additional Game Effects</displayname>
+		<prereq>spring_mode.DINPUT_TAP</prereq>
+		<info>The DirectInput tap mirrors everything the game plays, not just the spring.  Each type of additional game effect can be rendered or dropped independently, with its own gain.  The axis corrections above apply to these effects as well.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.32</order>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<name>tap_effect_constant</name>
+		<displayname>Tap: Constant Forces</displayname>
+		<prereq>tap_effects_group</prereq>
+		<info>Render the game's constant-force effects received via the DirectInput tap - stick kicks, gun recoil, control impulses.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.321</order>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<name>tap_effect_constant_gain</name>
+		<displayname>Tap: Constant Force Gain</displayname>
+		<prereq>tap_effect_constant</prereq>
+		<info>Force gain on the game's constant-force effects.  100% renders them exactly as the game commanded; raise it if the game's native forces feel weak.&lt;br&gt;&lt;br&gt;The % shown on the slider handle is the current rendered force - pinned at 100% means the gain is clipping at the device's maximum.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.33</order>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<name>tap_effect_periodic</name>
+		<displayname>Tap: Periodic Vibrations</displayname>
+		<prereq>tap_effects_group</prereq>
+		<info>Render the game's periodic vibration effects received via the DirectInput tap - engine rumble, buffet, shaking.&lt;br&gt;&lt;br&gt;If a vibration doubles up with a TelemFFB telemetry-driven effect (e.g. both rendering engine rumble), disable one of the two.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.331</order>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<name>tap_effect_periodic_gain</name>
+		<displayname>Tap: Periodic Vibration Gain</displayname>
+		<prereq>tap_effect_periodic</prereq>
+		<info>Force gain on the game's periodic vibration effects.  100% renders them exactly as the game commanded; raise it if the game's native forces feel weak.&lt;br&gt;&lt;br&gt;The % shown on the slider handle is the current rendered force - pinned at 100% means the gain is clipping at the device's maximum.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.34</order>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<name>tap_effect_damper</name>
+		<displayname>Tap: Damper Effects</displayname>
+		<prereq>tap_effects_group</prereq>
+		<info>Render the game's damper effects received via the DirectInput tap - velocity-based resistance to stick motion.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.341</order>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<name>tap_effect_damper_gain</name>
+		<displayname>Tap: Damper Gain</displayname>
+		<prereq>tap_effect_damper</prereq>
+		<info>Force gain on the game's damper effects.  100% renders them exactly as the game commanded; raise it if the game's native resistance feels weak.&lt;br&gt;&lt;br&gt;The % shown on the slider handle is the current rendered force - pinned at 100% means the gain is clipping at the device's maximum.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.35</order>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<name>tap_effect_inertia</name>
+		<displayname>Tap: Inertia Effects</displayname>
+		<prereq>tap_effects_group</prereq>
+		<info>Render the game's inertia effects received via the DirectInput tap - acceleration-based resistance simulating control mass.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.351</order>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<name>tap_effect_inertia_gain</name>
+		<displayname>Tap: Inertia Gain</displayname>
+		<prereq>tap_effect_inertia</prereq>
+		<info>Force gain on the game's inertia effects.  100% renders them exactly as the game commanded; raise it if the game's native resistance feels weak.&lt;br&gt;&lt;br&gt;The % shown on the slider handle is the current rendered force - pinned at 100% means the gain is clipping at the device's maximum.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.36</order>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<name>tap_effect_friction</name>
+		<displayname>Tap: Friction Effects</displayname>
+		<prereq>tap_effects_group</prereq>
+		<info>Render the game's friction effects received via the DirectInput tap - constant drag resisting stick motion.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.361</order>
+		<value>1.0</value>
+		<validvalues>0,200</validvalues>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<name>tap_effect_friction_gain</name>
+		<displayname>Tap: Friction Gain</displayname>
+		<prereq>tap_effect_friction</prereq>
+		<info>Force gain on the game's friction effects.  100% renders them exactly as the game commanded; raise it if the game's native resistance feels weak.&lt;br&gt;&lt;br&gt;The % shown on the slider handle is the current rendered force - pinned at 100% means the gain is clipping at the device's maximum.</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>

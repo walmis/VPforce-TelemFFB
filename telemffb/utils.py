@@ -439,6 +439,14 @@ class EffectTranslator:
         "il2_rockets": ["Rocket Fire", "il2_rocket_release_intensity"],
         "il2_ffb_spring": ["FFB Telemetry Spring Override", ""],
         "ffb_tap_spring": ["FFB Telemetry Spring (DirectInput Tap)", ""],
+        # the game's non-spring effects rendered from the tap mirror: slot-
+        # keyed names 'tap_game_{slot}_{type}', matched by effect type code
+        # ($-anchored so _1 does not also swallow _10/_11)
+        r"tap_game_\d+_1$": ["Game Constant Force (DirectInput Tap)", "tap_effect_constant_gain"],
+        r"tap_game_\d+_[34567]$": ["Game Periodic Vibration (DirectInput Tap)", "tap_effect_periodic_gain"],
+        r"tap_game_\d+_9$": ["Game Damper (DirectInput Tap)", "tap_effect_damper_gain"],
+        r"tap_game_\d+_10$": ["Game Inertia (DirectInput Tap)", "tap_effect_inertia_gain"],
+        r"tap_game_\d+_11$": ["Game Friction (DirectInput Tap)", "tap_effect_friction_gain"],
         "il2_ffb_const": ["FFB Telemetry Constant Force", ""],
         "il2_ffb_damper": ["FFB Telemetry Damper", ""],
         "il2_eng_shk1": ["IL2 Prop Eng Shake (Telemetry)", ""],
