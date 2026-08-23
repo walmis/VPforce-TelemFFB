@@ -41,12 +41,15 @@ class TestWhenItFires:
         assert world.save()
         assert restart_notices(world) == []
 
-    def test_a_changed_device_is_named(self, app, tmp_path, monkeypatch):
+    def test_a_changed_device_switches_live_instead_of_asking_for_restart(
+            self, app, tmp_path, monkeypatch):
+        """Device selections apply immediately at save (the master
+        re-acquires its own device); they used to be a restart matter."""
         world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
         world.set_device("joystick", 2)              # the Warthog
         assert world.save()
-        assert restart_notices(world) == [
-            "The selected devices changed. Restart TelemFFB for this to take effect."]
+        assert restart_notices(world) == []
+        assert world.device_switches == 1
 
     def test_the_master_device_counts(self, app, tmp_path, monkeypatch):
         """The old notice named the master device in its text and never
@@ -66,7 +69,40 @@ class TestWhenItFires:
 
     def test_saving_twice_does_not_say_it_twice(self, app, tmp_path, monkeypatch):
         world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
-        world.set_device("joystick", 2)
+        world.dialog.master_button_group.button(2).click()   # pedals as master
         assert world.save()
         assert world.save()
         assert len(restart_notices(world)) == 1
+
+    def test_saving_twice_does_not_switch_twice(self, app, tmp_path, monkeypatch):
+        """The live switch compares stored state before and after the save -
+        an unchanged second save must not re-acquire the device."""
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        world.set_device("joystick", 2)
+        assert world.save()
+        assert world.save()
+        assert world.device_switches == 1
+
+    def test_change_then_change_back_never_switches(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        original = world.dialog.cb_select_j.currentIndex()
+        world.set_device("joystick", 2)
+        world.set_device("joystick", original)
+        assert world.save()
+        assert world.device_switches == 0
+
+    def test_unchanged_save_retries_while_deviceless(self, app, tmp_path, monkeypatch):
+        """The recovery path for a failed open: nothing watches for a
+        replug (a failed open left no device object), so saving again -
+        with the selection unchanged - must retry the acquire."""
+        import telemffb.globals as G
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        monkeypatch.setattr(G, 'device_connection_status', False, raising=False)
+        assert world.save()                      # nothing changed in the dialog
+        assert world.device_switches == 1
+        assert restart_notices(world) == []
+
+    def test_unchanged_save_while_connected_stays_quiet(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        assert world.save()
+        assert world.device_switches == 0

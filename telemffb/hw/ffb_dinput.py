@@ -793,11 +793,14 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         # frame (the lazy effect re-create retries continuously)
         self._acquisition_warned = False
 
+        self._shutdown = False
+
         self._handle = self.bridge.open(guid)
 
         super().__init__()
+        self._timer_id = None
         if poll_interval_ms:
-            self.startTimer(poll_interval_ms)
+            self._timer_id = self.startTimer(poll_interval_ms)
 
     def _find_info(self, guid: str) -> DIDeviceInfo:
         for dev in self.bridge.enumerate():
@@ -847,7 +850,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
     @override
     def timerEvent(self, a0: QTimerEvent) -> None:
-        if self._reconnecting:
+        if self._reconnecting or self._shutdown:
             return
         try:
             self._poll_once()
@@ -894,6 +897,29 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                         self.buttonReleased.emit(b)
             self._prev_hats = hats
 
+    def shutdown(self):
+        """Release the device deliberately (live device switch).
+
+        Stops the poll timer and defuses the loss-reconnect loop - a queued
+        retry must not re-acquire the old hardware behind the new device -
+        then releases the bridge handle (which frees the exclusive
+        DirectInput acquisition).
+        """
+        self._shutdown = True
+        if self._timer_id is not None:
+            try:
+                self.killTimer(self._timer_id)
+            except Exception:
+                pass
+            self._timer_id = None
+        if self._handle is not None:
+            try:
+                self.bridge.release(self._handle)
+            except Exception:
+                pass
+            self._handle = None
+        logging.info(f"DirectInput device released: {self.info.product_string}")
+
     def _begin_reconnect(self):
         self._reconnecting = True
         try:
@@ -906,6 +932,8 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         QTimer.singleShot(1000, self._try_reconnect)
 
     def _try_reconnect(self):
+        if self._shutdown:
+            return   # deliberately released mid-retry
         try:
             self._handle = self.bridge.open(self.guid)
             # bridge-side effects died with the old handle

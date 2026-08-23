@@ -909,18 +909,7 @@ class MainWindow(QMainWindow):
         self.version_label.setOpenExternalLinks(True)
         self.setStatusBar(self.status_bar)
         self.firmware_label = QLabel()
-        if not HapticEffect.device:
-            f_vers = 'Device Disconnected'
-            self.firmware_label.setText("Device Disconnected")
-        elif not HapticEffect.device.caps.has_firmware_version:
-            f_vers = 'DirectInput device'
-            self.firmware_label.setText('DirectInput device')
-        else:
-            try:
-                f_vers = HapticEffect.device.get_firmware_version()
-            except:
-                f_vers = 'error fetching'
-            self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
+        self.refresh_firmware_label()
 
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -1243,6 +1232,33 @@ class MainWindow(QMainWindow):
             "Enable or Disable in System -> System Settings"
         )
 
+    def refresh_firmware_label(self):
+        if not HapticEffect.device:
+            self.firmware_label.setText("Device Disconnected")
+        elif not HapticEffect.device.caps.has_firmware_version:
+            self.firmware_label.setText('DirectInput device')
+        else:
+            try:
+                f_vers = HapticEffect.device.get_firmware_version()
+            except:
+                f_vers = 'error fetching'
+            self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
+
+    def refresh_configurator_gating(self):
+        caps = getattr(HapticEffect.device, 'caps', None)
+        no_gains = caps is not None and not caps.has_gains
+        self.configurator_settings_action.setEnabled(not no_gains)
+        self.configurator_settings_action.setToolTip(
+            'Not supported on this device (no Configurator gains)'
+            if no_gains else '')
+
+    def refresh_device_identity(self):
+        """Bring every device-identity-derived piece of the UI in line with
+        the currently open device - called after a live device switch."""
+        self.refresh_firmware_label()
+        self.refresh_configurator_gating()
+        self.update_device_status(G.device_connection_status)
+
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
         G.telem_manager.currentAircraftName = None
@@ -1343,10 +1359,8 @@ class MainWindow(QMainWindow):
             dialog.activateWindow()
             dialog.show()
         configurator_settings_action.triggered.connect(do_open_configurator_dialog)
-        caps = getattr(HapticEffect.device, 'caps', None)
-        if caps is not None and not caps.has_gains:
-            configurator_settings_action.setEnabled(False)
-            configurator_settings_action.setToolTip('Not supported on this device (no Configurator gains)')
+        self.configurator_settings_action = configurator_settings_action
+        self.refresh_configurator_gating()
         debug_menu.addAction(configurator_settings_action)
 
         sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)

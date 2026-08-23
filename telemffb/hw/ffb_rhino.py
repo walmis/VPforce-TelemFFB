@@ -832,9 +832,10 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
         self._in_reports = {}
         self._effect_handles : List[FFBEffectHandle] = []
         self._dev = None
+        self._shutdown = False
 
         super().__init__()
-        self.startTimer(1) # start Qt timer to read HID reports every 1ms
+        self._timer_id = self.startTimer(1) # start Qt timer to read HID reports every 1ms
 
         self.reconnect()
 
@@ -845,6 +846,27 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
 
         self._dev = hid.Device(path=self.info.path)
         self._dev.nonblocking = True
+
+    def shutdown(self):
+        """Release the device deliberately (live device switch).
+
+        The read timer and the unplug-reconnect loop both exist to keep a
+        process-lifetime device alive at all costs; a deliberate close must
+        stop them, or a queued reconnect would silently re-open the old
+        hardware behind the new one.
+        """
+        self._shutdown = True
+        try:
+            self.killTimer(self._timer_id)
+        except Exception:
+            pass
+        if self._dev:
+            try:
+                self._dev.close()
+            except Exception:
+                pass
+            self._dev = None
+        logging.info(f"HID device released: {self.info.product_string}")
 
     @property
     def serial(self):
@@ -934,6 +956,8 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
     # runs on mainThread
     @override
     def timerEvent(self, a0: QTimerEvent) -> None:
+        if self._shutdown:
+            return
         try:
             self.read_reports()
         except Exception:
@@ -943,6 +967,8 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
 
             logging.warn("Reconnecting HID device in 1s")
             def do_reconnect():
+                if self._shutdown:
+                    return   # deliberately released mid-retry
                 try:
                     self.reconnect()
                     logging.info("HID connected!")

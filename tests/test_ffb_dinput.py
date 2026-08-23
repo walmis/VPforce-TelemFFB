@@ -716,3 +716,34 @@ class TestInputAndCPEmulation:
         assert not snapshot.isButtonPressed(1)
         assert snapshot.isButtonPressed(0x80 | 3)
         assert set(snapshot.getPressedButtons()) == {2, 0x80 | 3}
+
+
+class TestShutdown:
+    """Deliberate release for the live device switch: the poll and
+    reconnect machinery must stop, and a queued reconnect retry must not
+    re-acquire the hardware behind a new device."""
+
+    def test_shutdown_releases_the_bridge_handle(self, bridge):
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        device.shutdown()
+        assert device._handle is None
+
+    def test_reconnect_retry_after_shutdown_is_inert(self, bridge):
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        device.shutdown()
+        device._try_reconnect()          # a queued retry firing late
+        assert device._handle is None    # did not re-open
+
+    def test_poll_after_shutdown_is_inert(self, bridge):
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        device.shutdown()
+        bridge.poll_error = OSError("polled a released handle")
+        device.timerEvent(None)          # a queued tick firing late: no poll,
+                                         # no exception, no reconnect kickoff
+        assert not device._reconnecting
+
+    def test_shutdown_is_idempotent(self, bridge):
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        device.shutdown()
+        device.shutdown()
+        assert device._handle is None

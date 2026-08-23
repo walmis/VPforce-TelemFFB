@@ -36,6 +36,7 @@ class IPCNetworkThread(QObject, threading.Thread):
     exit_signal = pyqtSignal(str)
     restart_sim_signal = pyqtSignal(str)
     reload_aircraft_signal = pyqtSignal()
+    reacquire_device_signal = pyqtSignal()
     show_signal = pyqtSignal()
     showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
@@ -230,6 +231,12 @@ class IPCNetworkThread(QObject, threading.Thread):
             self.restart_sim_signal.emit('Restart Sims')
         elif msg == "RELOAD AIRCRAFT":
             self.reload_aircraft_signal.emit()
+        elif msg.startswith('REACQUIRE:'):
+            dev = msg.removeprefix('REACQUIRE:')
+            if dev == G.device_type:
+                logging.info("Device reacquire command received via IPC - "
+                             "switching to the saved device selection")
+                self.reacquire_device_signal.emit()
         elif msg.startswith('SHOW LOG:'):
             dev = msg.removeprefix('SHOW LOG:')
             if dev == G.device_type:
@@ -375,6 +382,12 @@ class IPCNetworkThread(QObject, threading.Thread):
             self._socket.sendto(message.encode("utf-8"), (self._host, self._dstport))
         except OSError as e:
             logging.warning(f"IPC send error: {e}")
+
+    def child_device_connected(self, role):
+        """The device-connection state a child last reported in its
+        keepalive, or None when that child has never reported."""
+        info = self._child_keepalive_info.get(role)
+        return None if info is None else bool(info.get("connected"))
 
     def send_broadcast_message(self, message):
         for addr in self._child_addrs.values():

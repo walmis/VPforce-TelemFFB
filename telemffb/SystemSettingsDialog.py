@@ -1341,6 +1341,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if not self.validate_settings():
             return
 
+        # What each slot held on disk before this save - the reference for
+        # deciding which devices actually changed and should switch live.
+        # Compared on stored state rather than on the dialog's pending dict
+        # so a change-then-change-back never triggers a needless switch.
+        pre_devpaths = {role: G.system_settings.get(f'devpath_{role}', '') or ''
+                        for role in self.INSTANCE_ROLES}
+
         for k,v in global_settings_dict.items():
             G.system_settings.setValue(f"{k}", v)
 
@@ -1386,6 +1393,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         if G.master_instance and G.launched_instances:
             G.ipc_instance.send_broadcast_message("RESTART SIMS")
+
+        # A changed device takes effect immediately: this instance
+        # re-acquires its own, a running child is told to re-acquire via
+        # IPC, and an instance that is not running simply reads the new
+        # selection whenever it launches.
+        try:
+            self._apply_device_changes_live(pre_devpaths)
+        except Exception:
+            logging.exception('Live device switch after save failed')
 
         # the panels' own writes were meant after all
         for panel in self.tap_panels.values():
@@ -1546,7 +1562,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                  "for it." if replaced else
                  "Until it is updated, those games keep tapping a device that "
                  "is no longer configured.")
-        return "\n\n".join(paragraphs) + "\n\n" + until
+        restart = ("A sim reads this configuration as it starts, so restart "
+                   "any of these sims that is running now for the change to "
+                   "take effect.")
+        return "\n\n".join(paragraphs) + "\n\n" + until + "\n\n" + restart
 
     @staticmethod
     def _rule_owner(line):
@@ -2012,9 +2031,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     #: them.  Devices and the master are process identity; the launch
     #: options are read when the master starts its children; the theme is
     #: applied once at startup.
+    # Device selections are absent deliberately: a changed device is applied
+    # live at save (_apply_device_changes_live) and needs no restart.
     RESTART_GROUPS = (
-        ("the selected devices", ('pidJoystick', 'pidPedals',
-                                  'pidCollective', 'pidTrimWheel')),
         ("the master device", ('masterInstance',)),
         ("the auto-launch options", ('autolaunchMaster', 'autolaunchJoystick',
                                      'autolaunchPedals', 'autolaunchCollective',
@@ -2031,6 +2050,49 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         loaded and what it just saved, as the phrases the notice uses."""
         return [name for name, keys in self.RESTART_GROUPS
                 if any(self.current_al_dict.get(k) != saved.get(k) for k in keys)]
+
+    def _apply_device_changes_live(self, before):
+        """Switch every changed device selection into effect, live.
+
+        ``before`` maps role -> the devpath stored on disk when the save
+        began; anything different now was really changed by this save.
+        The master (this process) re-acquires its own device directly via
+        the switch primitive; a RUNNING child instance is told to
+        re-acquire over IPC and does the same on its side.  Instances that
+        are not running need nothing - they read settings at launch.
+
+        An UNCHANGED selection is retried anyway while the instance sits
+        device-less: a failed open leaves no device object and therefore
+        no replug watcher, so saving again is the recovery path - it must
+        work even though the stored selection reads the same.
+        """
+        for role in self.INSTANCE_ROLES:
+            after = G.system_settings.get(f'devpath_{role}', '') or ''
+            changed = before.get(role, '') != after
+            if role == G.device_type:
+                if not changed and G.device_connection_status:
+                    continue
+                if not after:
+                    continue   # nothing selected: nothing to (re)acquire
+                switch = getattr(G, 'switch_to_device', None)
+                if switch is None:
+                    continue
+                ok = switch()
+                logging.info(
+                    f"Device selection for '{role}' "
+                    f"{'applied live' if changed else 'retried (was device-less)'}: "
+                    f"{'connected' if ok else 'FAILED to connect'}")
+            elif role in G.launched_instances:
+                if not changed and G.ipc_instance.child_device_connected(
+                        role) is not False:
+                    continue
+                if not after:
+                    continue
+                logging.info(
+                    f"Device selection for '{role}' "
+                    f"{'changed' if changed else 'unchanged but the child is device-less'}"
+                    " - telling the running child to re-acquire")
+                G.ipc_instance.send_broadcast_message(f'REACQUIRE:{role}')
 
     #: Device roles, in the order their tabs appear.
     INSTANCE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel')

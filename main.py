@@ -143,7 +143,10 @@ def _publish_beacons():
     if G.device_info is not None:
         names.append(TELEMFFB_DEVICE_BEACON.format(
             vid=G.device_info.vendor_id, pid=G.device_info.product_id))
+    published = {b.name for b in beacons}
     for name in names:
+        if name in published:
+            continue   # already claimed (a live device switch re-publishes)
         try:
             beacons.append(NamedMutex(name))
             logging.info(f"Published beacon '{name}' for the DirectInput tap wrapper")
@@ -515,6 +518,28 @@ def _initialize_device_connection():
                 "connection — System Settings will open for setup.")
         return dev, dev_serial, dev_firmware_version
 
+    dev, dev_serial, dev_firmware_version = _open_device_and_derive(
+        min_firmware_version)
+    if dev is None:
+        # the configured device may simply not be plugged in yet; connect
+        # unattended when it appears
+        device_retry_ticker.start()
+    return dev, dev_serial, dev_firmware_version
+
+
+def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
+    """Open the device named by the identity globals and derive the rest.
+
+    The shared core of startup and the live device switch: opens by
+    G.device_di_guid / G.device_usbpid, wires the device signals to the
+    main window, and fills every G.device_* value that describes the open
+    device.  Returns (device, serial, firmware_version); device is None
+    when the open fails - with the connection-error dialog shown unless
+    ``show_error`` is False (background retries must not pop modals).
+    """
+    dev = None
+    dev_serial = None
+    dev_firmware_version = 'ERROR'
     try:
         if G.device_di_guid:
             dev = HapticEffect.open_dinput(G.device_di_guid)
@@ -526,6 +551,7 @@ def _initialize_device_connection():
             dev.buttonPressed.connect(G.main_window.get_active_buttons)
             dev.buttonReleased.connect(G.main_window.get_active_buttons)
         # Use QTimer.singleShot to connect signals after event loop starts
+        # (at startup the main window does not exist yet)
         QTimer.singleShot(0, connect_signals)
 
         G.device_info = dev.info
@@ -536,6 +562,10 @@ def _initialize_device_connection():
         dev_firmware_version = dev.get_firmware_version()
         G.device_firmware_version = dev_firmware_version
         dev_serial = dev.serial
+        # kept as a global: the startup locals freeze whatever this was at
+        # launch, and a live device switch must update what exit-time and
+        # startup-deferred consumers (vpconf pushes) see
+        G.device_serial = dev_serial
 
         if dev_firmware_version:
             logging.info(f"Rhino Firmware: {dev_firmware_version}")
@@ -547,11 +577,188 @@ def _initialize_device_connection():
     except Exception as e:
         G.device_connection_status = False
         logging.exception("Exception")
-        QMessageBox.warning(None, "Cannot connect to FFB device",
+        if show_error:
+            # parent to whatever the user is looking at (the System
+            # Settings dialog during a live switch, the main window
+            # otherwise) so the error appears over the app, not centered
+            # on the monitor; at startup neither exists yet and None is
+            # all there is
+            parent = (QApplication.activeWindow()
+                      or getattr(G, 'main_window', None))
+            QMessageBox.warning(parent, "Cannot connect to FFB device",
                           f"Unable to open device: {G.device_type}\nError: {e}\n\n"
                           "Please open the System Settings and verify the Master\ndevice configuration is correct")
 
     return dev, dev_serial, dev_firmware_version
+
+
+def _configured_device_present() -> bool:
+    """Whether the device this instance's saved selection names is
+    currently enumerable - without opening it."""
+    try:
+        devpath = str(G.system_settings.get(
+            f'devpath_{G.device_type}', '') or '')
+        if not devpath:
+            return False
+        if devpath.startswith('dinput:'):
+            guid = devpath[len('dinput:'):]
+            from telemffb.hw.ffb_dinput import DInputFFBDevice
+            return any(d.guid == guid for d in DInputFFBDevice.enumerate())
+        pid = int(str(G.system_settings.get(
+            utils.device_pid_key(G.device_type), '') or '2055'), 16)
+        return any(d.product_id == pid for d in FFBRhino.enumerate())
+    except Exception:
+        return False
+
+
+class _DeviceRetryTicker:
+    """Reconnects an instance that has a saved device selection but no open
+    device.
+
+    A device that was opened successfully heals itself after an unplug (the
+    device object's own reconnect loop); a device whose OPEN failed leaves
+    no object and therefore no watcher - historically the user had to know
+    that saving System Settings again was the retry button.  This ticker
+    closes that gap: while the instance is device-less it checks every
+    couple of seconds whether the configured device has appeared, and only
+    then runs the switch primitive - quietly, since a background retry must
+    never pop the connection-error dialog.  Started by every failed open
+    (startup and live switch alike); stops itself the moment a device is
+    connected, however that came about.
+    """
+    INTERVAL_MS = 2000
+
+    def __init__(self):
+        self._timer = None
+
+    def start(self):
+        if self._timer is None:
+            # created lazily: a QTimer wants the Qt application, which does
+            # not exist when this module is merely imported
+            self._timer = QTimer()
+            self._timer.timeout.connect(self._tick)
+        if not self._timer.isActive():
+            logging.info("Device watcher: waiting for the configured "
+                         f"'{G.device_type}' device to appear")
+            self._timer.start(self.INTERVAL_MS)
+
+    def stop(self):
+        if self._timer is not None and self._timer.isActive():
+            self._timer.stop()
+
+    def _tick(self):
+        if G.device_connection_status:
+            self.stop()            # connected by other means
+            return
+        devpath = G.system_settings.get(f'devpath_{G.device_type}', '') or ''
+        if not devpath:
+            self.stop()            # nothing selected: nothing to wait for
+            return
+        if not _configured_device_present():
+            return
+        logging.info("Device watcher: configured device appeared - connecting")
+        if switch_to_device(show_error=False):
+            self.stop()
+        # on failure the switch already re-armed this ticker; the device
+        # enumerated but would not open (e.g. still initializing) - the
+        # next tick tries again
+
+
+device_retry_ticker = _DeviceRetryTicker()
+
+
+def switch_to_device(show_error=True) -> bool:
+    """Live device switch: re-acquire this instance's device from the saved
+    system settings, without a restart.
+
+    The hot-swap primitive.  The caller has already SAVED the new selection
+    for this instance's role; this re-reads it, tears the old device down
+    completely - every effect destroyed on the hardware, the poll and
+    reconnect machinery stopped - opens the new device through the same
+    core as startup, and brings the identity-derived state (beacons, UI,
+    the loaded aircraft's capability gates) in line.  Telemetry is held for
+    the duration so no effect code runs against a half-switched device.
+
+    Beacons are only ever ADDED: a beacon says "TelemFFB took
+    responsibility for this device's FFB role this session", and a game
+    that latched onto the old device's tap at launch keeps that
+    arrangement until the game restarts.
+
+    Returns True when the new device is open; on failure the instance is
+    left device-less (connection status false), exactly like a failed
+    startup open - the user fixes the selection and tries again.
+    """
+    old_dev = HapticEffect.device
+    old_name = getattr(getattr(old_dev, 'info', None), 'product_string', None)
+    logging.info(f"Live device switch: releasing "
+                 f"'{old_name or 'no device'}' for '{G.device_type}'")
+    G.telem_manager.set_paused(True)
+    try:
+        # 1. Effects die first, while the old device can still be written:
+        #    they would otherwise keep rendering on hardware nobody drives.
+        try:
+            freed = HapticEffect.destroy_all()
+            if freed:
+                logging.info(f"Device switch: freed {freed} effect(s)")
+        except Exception:
+            logging.exception("Device switch: unable to free effects")
+        effects = getattr(G, 'effects', None)
+        if effects is not None:
+            effects.clear()
+
+        # 2. Release the old device and its keep-alive machinery.
+        if old_dev is not None:
+            try:
+                old_dev.shutdown()
+            except Exception:
+                logging.exception("Device switch: old device shutdown failed")
+        HapticEffect.device = None
+        G.device_connection_status = False
+
+        # 3. Re-derive the stored identity for this role (the dialog saved
+        #    it before asking for the switch).
+        devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
+        G.device_devpath = devpath
+        G.device_di_guid = None
+        if devpath and str(devpath).startswith('dinput:'):
+            G.device_di_guid = str(devpath)[len('dinput:'):]
+        pid = str(G.system_settings.get(
+            utils.device_pid_key(G.device_type), '') or '2055')
+        G.device_usbpid = pid
+
+        # 4. Open through the same core as startup.
+        dev, _, _ = _open_device_and_derive(show_error=show_error)
+        main_window = getattr(G, 'main_window', None)
+        if dev is None:
+            # the device status icon and firmware label only hear about
+            # state through the device object's signals, and a failed open
+            # has no object - show the disconnected state explicitly
+            if main_window is not None:
+                main_window.refresh_device_identity()
+            # watch for the configured device to appear and finish the
+            # job unattended (replug, powered hub, late USB init)
+            device_retry_ticker.start()
+            return False
+        device_retry_ticker.stop()
+
+        # 5. Beacon for the new device (additive; see docstring), UI, and
+        #    the loaded aircraft's capability gates.
+        _publish_beacons()
+        if main_window is not None:
+            main_window.refresh_device_identity()
+        G.force_reload_aircraft_trigger = True
+        G.telem_manager.currentAircraftName = None
+        logging.info(f"Live device switch complete: now driving "
+                     f"'{dev.info.product_string}'")
+        return True
+    finally:
+        G.telem_manager.set_paused(False)
+
+
+# Registered on G so the System Settings dialog can trigger a live switch
+# without importing this entry-script module (which would re-execute it).
+G.switch_to_device = switch_to_device
+
 
 def _enumerate_and_log_devices() -> List[DeviceInfo]:
     """Enumerate and log available Rhino devices."""
@@ -833,6 +1040,8 @@ def _setup_ipc_and_connections():
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.reload_caller_signal.connect(G.main_window.settings_layout.reload_caller)
     G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)
+    # master saved a new device selection for this instance's role: switch live
+    G.ipc_instance.reacquire_device_signal.connect(switch_to_device)
     G.ipc_instance.toggle_offline_mode_signal.connect(G.main_window.toggle_offline_mode)
     G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_sim.setCurrentText)
     G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_class.setCurrentText)
@@ -938,7 +1147,8 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
             else:
                 logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
                 try:
-                    upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
+                    upload_vpconf_profile(G.system_settings.pathVPConfStartup,
+                                          getattr(G, 'device_serial', None))
                 except Exception:
                     logging.exception("Unable to set VPConfigurator startup profile")
 
@@ -986,7 +1196,8 @@ def _cleanup_on_exit(dev_serial):
     device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
     if G.system_settings.enableVPConfExit and device_has_gains:
         try:
-            upload_vpconf_profile(G.system_settings.pathVPConfExit, dev_serial)
+            upload_vpconf_profile(G.system_settings.pathVPConfExit,
+                                  getattr(G, 'device_serial', None))
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
 

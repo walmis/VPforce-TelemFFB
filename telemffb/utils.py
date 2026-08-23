@@ -4007,6 +4007,13 @@ def upload_vpconf_profile(config_filepath, serial):
     if caps is not None and not caps.has_gains:
         logging.info("vpconf push skipped: the connected device has no Configurator gains")
         return
+    if not serial:
+        # no serial means no device was ever successfully opened (or the
+        # caller carries stale identity); Configurator selects the target
+        # device by serial, so pushing without one is at best a crash and
+        # at worst the wrong device
+        logging.warning("vpconf push skipped: no device serial available")
+        return
 
     settings = QSettings("VPforce", "RhinoFFB")
     vpconf_path = settings.value("path")

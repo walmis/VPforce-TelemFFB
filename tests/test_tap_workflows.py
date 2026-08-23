@@ -215,6 +215,7 @@ class World:
                             ('child_instance', False), ('launched_instances', []),
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False),
+                            ('device_connection_status', True),
                             ('sim_listeners', SimpleNamespace(restart_all=lambda: None)),
                             ('ipc_instance', None)):
             monkeypatch.setattr(G, name, value, raising=False)
@@ -243,6 +244,16 @@ class World:
                             self.policy.cleanup)
         monkeypatch.setattr(panel_module, 'confirm_overwrite', self.policy.overwrite)
         monkeypatch.setattr(panel_module, 'ask_for_devices', self.policy.devices)
+        # the live device-switch primitive lives in main.py and is registered
+        # on G when the app starts; a save with a changed device calls it.
+        # Recorded here so tests can assert on it - and so a test run that
+        # happens to have imported main never opens real hardware.
+        self.device_switches = 0
+
+        def record_switch():
+            self.device_switches += 1
+            return True
+        monkeypatch.setattr(G, 'switch_to_device', record_switch, raising=False)
         self.dialog = None
         self.open()
 
