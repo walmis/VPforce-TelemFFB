@@ -66,22 +66,21 @@ def spy(monkeypatch):
     from telemffb import tap_reconcile
     import telemffb.SystemSettingsDialog as module
 
-    state = {"asked": [], "applied": [], "answer": True, "items": [an_item()]}
+    state = {"asked": [], "applied": [], "items": [an_item()]}
     monkeypatch.setattr(tap_reconcile, 'pending_reconcile',
                         lambda changes, settings, statuses=None: state["items"])
     monkeypatch.setattr(tap_reconcile, 'apply_reconcile',
                         lambda items: state["applied"].append(items) or [])
 
-    def question(parent, title, text, *args, **kwargs):
+    def notice(parent, title, text, *args, **kwargs):
         state["asked"].append(text)
-        return (QtWidgets.QMessageBox.StandardButton.Yes if state["answer"]
-                else QtWidgets.QMessageBox.StandardButton.No)
+        return QtWidgets.QMessageBox.StandardButton.Ok
 
-    monkeypatch.setattr(module.QMessageBox, 'question', question)
+    monkeypatch.setattr(module.QMessageBox, 'information', notice)
     return state
 
 
-class TestWhenTheQuestionAppears:
+class TestWhenTheNoticeAppears:
     def test_a_swapped_device_raises_it(self, dialog, spy):
         dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
@@ -92,40 +91,43 @@ class TestWhenTheQuestionAppears:
                                     {"devpath_joystick": OLD_PATH})
         assert spy["asked"] == []
 
-
-    def test_nothing_is_asked_when_no_sim_names_the_device(self, dialog, spy):
-        """The gate that keeps this prompt worth reading."""
+    def test_nothing_is_said_when_no_sim_names_the_device(self, dialog, spy):
+        """The gate that keeps this notice worth reading."""
         spy["items"] = []
         dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
         assert spy["asked"] == []
 
 
-class TestWhatTheQuestionSays:
-
-
+class TestWhatTheNoticeSays:
     def test_it_says_what_happens_if_ignored(self, dialog, spy):
-        """A prompt that does not say what is at stake gets dismissed."""
+        """A notice that does not say what is at stake gets dismissed."""
         dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
         said = spy["asked"][0]
-        assert "previously selected device" in said
-        assert "pass straight through" in said
+        assert "keep tapping the old device" in said
+        assert "leave the new one alone" in said
+
+    def test_at_the_change_it_says_the_update_is_staged(self, dialog, spy):
+        """A notice, not a question: the only effect a 'No' could have had
+        was leaving a config pointing at hardware no longer in the slot.
+        Cancelling the dialog is how to decline."""
+        dialog._raise_tap_reconcile({"devpath_joystick": OLD_PATH},
+                                    {"devpath_joystick": NEW_PATH})
+        assert "staged" in spy["asked"][0]
+        assert "Cancel the dialog" in spy["asked"][0]
 
 
-
-
-class TestActingOnTheAnswer:
-    def test_yes_updates_the_configs(self, dialog, spy):
+class TestWhenItIsWritten:
+    def test_the_staged_update_is_applied_at_save(self, dialog, spy):
         dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
         assert len(spy["applied"]) == 1
 
-    def test_no_leaves_every_file_alone(self, dialog, spy):
-        """Declining has to mean nothing was written, not written and
-        reverted."""
-        spy["answer"] = False
-        dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
+    def test_nothing_is_written_at_the_change(self, dialog, spy):
+        """Backing out of the dialog has to leave the game folders alone -
+        the selection that justified the rewrite was never saved."""
+        dialog._raise_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
         assert spy["applied"] == []
 
@@ -156,23 +158,15 @@ class TestTheDialogSuppliesLiveDevices:
 
 class TestRaisingItAtTheMomentOfTheChange:
     """The change is what the user just did; by the time they close the
-    dialog they may not connect a question about DCS to a combo box they
+    dialog they may not connect a notice about DCS to a combo box they
     touched ten minutes ago."""
 
-    def test_changing_a_device_asks_straight_away(self, dialog, spy):
+    def test_changing_a_device_says_so_straight_away(self, dialog, spy):
         dialog._raise_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
         assert len(spy["asked"]) == 1
 
-    def test_nothing_is_written_yet(self, dialog, spy):
-        """Backing out of the dialog has to leave the game folders alone -
-        the selection that justified the rewrite was never saved."""
-        dialog._raise_tap_reconcile({"devpath_joystick": OLD_PATH},
-                                    {"devpath_joystick": NEW_PATH})
-        assert spy["applied"] == []
-
-
-    def test_changing_again_does_not_ask_again(self, dialog, spy):
+    def test_changing_again_does_not_say_it_again(self, dialog, spy):
         """Cycling through devices to see what is there must not produce a
         popup per step."""
         for _ in range(3):
@@ -187,31 +181,25 @@ class TestRaisingItAtTheMomentOfTheChange:
         assert spy["asked"] == []
 
 
-class TestSavingHonorsTheEarlierAnswer:
-    def test_yes_applies_without_asking_twice(self, dialog, spy):
+class TestSavingWritesWhatWasStaged:
+    def test_applied_without_a_second_notice(self, dialog, spy):
         dialog._raise_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
         spy["asked"].clear()
         dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
-        assert spy["asked"] == [], "asked a second time"
+        assert spy["asked"] == [], "said a second time"
         assert len(spy["applied"]) == 1
 
-    def test_no_means_no_at_save_too(self, dialog, spy):
-        spy["answer"] = False
-        dialog._raise_tap_reconcile({"devpath_joystick": OLD_PATH},
-                                    {"devpath_joystick": NEW_PATH})
-        spy["asked"].clear()
-        dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
-                                    {"devpath_joystick": NEW_PATH})
-        assert spy["asked"] == [] and spy["applied"] == []
-
-    def test_an_unasked_change_is_still_caught_at_save(self, dialog, spy):
-        """The change-time prompt is a courtesy, not the only guard - a
-        selection altered by some other path still gets picked up."""
+    def test_a_change_never_mentioned_is_mentioned_at_save_then_written(
+            self, dialog, spy):
+        """The change-time notice is a courtesy, not the only guard - a
+        selection altered by some other path is still picked up, and still
+        said before it is written."""
         dialog._offer_tap_reconcile({"devpath_joystick": OLD_PATH},
                                     {"devpath_joystick": NEW_PATH})
         assert len(spy["asked"]) == 1 and len(spy["applied"]) == 1
+        assert "written now" in spy["asked"][0]
 
 
 class TestSettingsThatPredateStoredIds:
@@ -580,44 +568,48 @@ class TestCancellingLeavesAConsistentPage:
         assert not panel.visible
 
 
-class TestWhatTheQuestionListsPerSim:
-    """DCS holds two configs that usually agree; listing the sim once per
-    file read as a duplicate.  And the device is named, not just numbered."""
+class TestHowTheQuestionReads:
+    """One change, said once; the sims listed by name; devices named, not
+    numbered.  DCS holds two configs that agree, and listing it per file
+    read as a duplicate."""
 
-    def item(self, directory,
-             replacement="045E:001B=tap    ; SideWinder (joystick)"):
-        status = SimStatus(sim=SIMS_BY_KEY["DCS"], root=r"C:\DCS",
-                           provenance="t")
+    def item(self, directory, replacement="045E:001B=tap    ; SideWinder (joystick)",
+             sim="DCS"):
+        status = SimStatus(sim=SIMS_BY_KEY[sim], root=r"C:\DCS", provenance="t")
         return ReconcileItem(status=status, directory=directory,
                              config="[FFBDevices]\n",
                              obsolete=[Rule("FFFF:2054", "tap", 1,
                                             ids=(0xFFFF, 0x2054))],
-                             replacement=replacement)
+                             replacement=replacement, role="joystick",
+                             was_ident="Monster")
 
-    def test_two_files_that_agree_read_as_one_sim(self):
+    def summary(self, *items):
         from telemffb.SystemSettingsDialog import SystemSettingsDialog
-        text = SystemSettingsDialog._reconcile_summary(
-            [self.item(r"C:\DCS\bin"), self.item(r"C:\DCS\bin-mt")])
+        return SystemSettingsDialog._reconcile_summary(list(items))
+
+    def test_the_change_is_stated_once_and_the_sims_listed(self):
+        text = self.summary(self.item(r"C:\DCS\bin"), self.item(r"C:\DCS\bin-mt"),
+                            self.item(r"C:\IL2\bin\game", sim="IL2"))
+        assert text.count("changed from") == 1
         assert text.count("DCS World") == 1
+        assert "IL-2 Sturmovik Great Battles" in text
 
-    def test_two_files_that_differ_are_told_apart(self):
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
-        text = SystemSettingsDialog._reconcile_summary(
-            [self.item(r"C:\DCS\bin"),
-             self.item(r"C:\DCS\bin-mt", replacement=None)])
-        assert "DCS World (bin):" in text and "DCS World (bin-mt):" in text
+    def test_both_devices_are_named_not_just_numbered(self):
+        text = self.summary(self.item(r"C:\DCS\bin"))
+        assert "The joystick changed from Monster (FFFF:2054) to " \
+               "SideWinder (045E:001B)." in text
 
-    def test_the_device_is_named_not_just_numbered(self):
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
-        text = SystemSettingsDialog._reconcile_summary([self.item(r"C:\DCS\bin")])
-        assert "SideWinder (045E:001B)" in text
+    def test_a_cleared_slot_reads_as_cleared(self):
+        text = self.summary(self.item(r"C:\DCS\bin", replacement=None))
+        assert "The joystick slot was cleared; it held Monster (FFFF:2054)." in text
+        assert "leave the new one alone" not in text
 
 
-class TestADeviceThatCannotBeDrivenIsAskedAboutOnce:
-    """One change raised two dialogs: the reconcile question, then the gap
-    question about the same device in the same sims.  And the gap answer
-    was remembered per dialog, so a second DirectInput device later was
-    never asked about at all."""
+class TestADeviceThatCannotBeDrivenIsMentionedOnce:
+    """One change raised two dialogs: the reconcile notice, then the gap
+    notice about the same device in the same sims.  And the gap notice was
+    remembered per dialog, so a second DirectInput device later was never
+    mentioned at all."""
 
     SIDEWINDER = TapDevice("joystick", 0x045E, 0x001B, "SideWinder",
                            directinput=True)
@@ -633,33 +625,32 @@ class TestADeviceThatCannotBeDrivenIsAskedAboutOnce:
         monkeypatch.setattr(tap_reconcile, "missing_tap_rules",
                             lambda *a, **k: [gap])
 
-    def test_the_same_device_is_not_asked_about_twice(self, dialog, spy,
-                                                      monkeypatch):
+    def test_the_same_device_is_not_mentioned_twice(self, dialog, spy,
+                                                    monkeypatch):
         self.gap_for(monkeypatch, self.SIDEWINDER)
         dialog._raise_tap_gaps()
         dialog._raise_tap_gaps()
         assert len(spy["asked"]) == 1
 
-    def test_a_different_device_is_a_new_question(self, dialog, spy,
-                                                  monkeypatch):
+    def test_a_different_device_is_a_new_notice(self, dialog, spy,
+                                                monkeypatch):
         self.gap_for(monkeypatch, self.SIDEWINDER)
         dialog._raise_tap_gaps()
         self.gap_for(monkeypatch, self.MOZA)
         dialog._raise_tap_gaps()
         assert len(spy["asked"]) == 2
 
-    def test_a_gap_the_agreed_reconcile_will_close_is_not_asked(
+    def test_a_gap_the_staged_reconcile_will_close_is_not_mentioned(
             self, dialog, spy, monkeypatch):
-        """Yes to 'update the config for the new device' already means the
-        new device gets its rule there; asking again in other words is the
-        second dialog nobody wanted."""
+        """The staged reconcile already gives the new device its rule there;
+        saying so again in other words is the second dialog nobody wanted."""
         from telemffb.tap_reconcile import device_changes
         dialog._tap_baseline = {"devpath_joystick": OLD_PATH,
                                 "devids_joystick": "FFFF:2054"}
         dialog._pending_devpaths = {"devpath_joystick": NEW_PATH,
                                     "devids_joystick": "044F:B10A"}
         changes = device_changes(dialog._tap_baseline, dialog.tap_settings_view())
-        dialog._tap_reconcile_answers = {dialog._change_signature(changes): True}
+        dialog._tap_reconcile_seen = frozenset({dialog._change_signature(changes)})
         self.gap_for(monkeypatch, self.WARTHOG)        # DCS, 044F:B10A
         dialog._raise_tap_gaps()
         assert spy["asked"] == []

@@ -530,7 +530,7 @@ class TestChangingYourMindAboutADevice:
 
     def reconcile_questions(self, world):
         return [t for title, t in world.policy.asked
-                if "named in the DirectInput tap" in t]
+                if "still names the old device" in t]
 
     def test_change_and_change_back_writes_nothing(self, app, tmp_path,
                                                    monkeypatch):
@@ -543,28 +543,28 @@ class TestChangingYourMindAboutADevice:
         assert world.tree() == world.opened_tree
         world.check_save_is_idempotent()
 
-    def test_declining_one_change_does_not_silence_a_different_one(
-            self, app, tmp_path, monkeypatch):
-        """Asked-once was per dialog; cycling the same device must not nag,
-        but a move to a third device is a new question, and the stale rule
-        it leaves behind is a new problem."""
+    def test_a_different_change_is_a_new_notice(self, app, tmp_path,
+                                                monkeypatch):
+        """Once-per-dialog would nag nobody but would also stay silent about
+        a move to a third device - a new stale rule the user never heard
+        of.  Once per change: cycling the same device is quiet, a different
+        device is said."""
         world = World(tmp_path, monkeypatch, random.Random(0), start="ours",
-                      settings={**self.PRESET, 'enableDirectInput': True},
-                      question=False)
-        world.set_device("joystick", 2)          # Warthog: asked, says no
-        world.set_device("joystick", 2)          # same again: not asked
+                      settings={**self.PRESET, 'enableDirectInput': True})
+        world.set_device("joystick", 2)          # Warthog: said
+        world.set_device("joystick", 2)          # same again: not said
         assert len(self.reconcile_questions(world)) == 1
-        world.set_device("joystick", 5)          # Moza: asked again
+        world.set_device("joystick", 5)          # Moza: said again
         assert len(self.reconcile_questions(world)) == 2
 
-    def test_the_answer_given_at_the_change_is_honored_at_save(
+    def test_what_was_staged_at_the_change_is_written_at_save(
             self, app, tmp_path, monkeypatch):
         world = World(tmp_path, monkeypatch, random.Random(0), start="ours",
                       settings=self.PRESET, question=True)
         world.set_device("joystick", 2)
         asked = len(world.policy.questions())
         assert world.save()
-        assert len(world.policy.questions()) == asked, "asked again at save"
+        assert len(world.policy.questions()) == asked, "said again at save"
         text = world.tree()["bin\\dinput8.ini"].decode()
         assert "044F:B10A=tap" in text
         assert "; retired by TelemFFB: FFFF:2054=tap" in text

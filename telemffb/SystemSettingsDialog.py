@@ -1430,19 +1430,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         "effects. VPforce devices need it only for the "
         "'Game Managed (DirectInput Tap)' spring mode.")
 
-    #: What the user said when told a device change stranded a tap config,
-    #: keyed by the change they were told about - the set of slots that
-    #: differ from the state the dialog opened in.  Cycling through devices
-    #: to see what is there lands on the same key and is not asked again;
-    #: a different change is a different question.  Rebound, never
-    #: mutated: the class-level default is shared.
-    _tap_reconcile_answers = {}
-
-    #: Whether the user agreed to add rules for a DirectInput device that
-    #: has none, keyed by the device's ids.  Cycling back to the same device
-    #: asks nothing; a different device is a different question.  Rebound,
+    #: Device changes the user has been told about, as signatures - the set
+    #: of slots that differ from the state the dialog opened in.  Cycling
+    #: through devices to see what is there lands on the same signature and
+    #: is not mentioned again; a different change is a new notice.  Rebound,
     #: never mutated: the class-level default is shared.
-    _tap_gaps_answers = {}
+    _tap_reconcile_seen = frozenset()
+
+    #: DirectInput devices the user has been told have no rule, by their
+    #: ids.  Same idea: once per device, not once per toggle.
+    _tap_gaps_seen = frozenset()
 
     #: The device settings as the dialog opened, captured lazily before the
     #: first change.  None means no device has been changed.
@@ -1466,23 +1463,26 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     _tap_cleanup_agreed = frozenset()
 
     def _raise_tap_reconcile(self, before, after):
-        """Tell the user straight away that a tap config is now stranded.
+        """Tell the user straight away that a tap config is now stranded, and
+        that the update is staged.
 
         Raised here rather than only at save because this is the moment the
         change makes sense to them - by the time they close the dialog they
-        may not connect a question about DCS to a combo box they touched ten
+        may not connect a notice about DCS to a combo box they touched ten
         minutes ago.
 
-        Nothing is written yet.  The answer is remembered and acted on when
-        the settings are saved, so backing out of the dialog leaves the game
-        folders exactly as they were.
+        A notice, not a question.  Nothing is written yet - the update is
+        applied when the settings are saved, and backing out of the dialog
+        leaves the game folders exactly as they were - so Cancel is how to
+        decline.  A "No" button here would have had exactly one effect:
+        leaving a config that names hardware no longer in the slot.
         """
         from telemffb.tap_reconcile import device_changes, pending_reconcile
 
         changes = device_changes(before, after)
         signature = self._change_signature(changes)
-        if signature in self._tap_reconcile_answers:
-            return          # already answered; asking again is nagging
+        if signature in self._tap_reconcile_seen:
+            return          # already said; saying it again is nagging
         items = pending_reconcile(changes, self.tap_settings(),
                                   self.tap_statuses())
         if not items:
@@ -1495,15 +1495,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     ", ".join(c.role for c in changes))
             return
 
-        answer = QMessageBox.question(
+        QMessageBox.information(
             self, "DirectInput Tap Configuration",
             self._reconcile_summary(items) +
-            "\n\nUpdate them? The change is written when you save.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes)
-        self._tap_reconcile_answers = {
-            **self._tap_reconcile_answers,
-            signature: answer == QMessageBox.StandardButton.Yes}
+            "\n\nThe update is staged and will be written when you save. "
+            "Cancel the dialog to keep the files as they are.")
+        self._tap_reconcile_seen = self._tap_reconcile_seen | {signature}
 
     @staticmethod
     def _change_signature(changes):
@@ -1514,32 +1511,51 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     @staticmethod
     def _reconcile_summary(items):
-        """What is stranded, and what it would become.
+        """The question in three parts: what changed, which sims' configs
+        still say the old thing, and what happens until they are updated.
 
-        One line per sim where its files agree - DCS holds two configs and
-        they usually say the same thing, and listing the sim twice read as
-        a duplicate - and one per file, named, where they differ.
+        One change is the normal case - the joystick went from A to B - and
+        every sim's config says the same about it, so that is said once and
+        the sims are simply listed.  Distinct changes (two slots, or one
+        cleared) each get their own paragraph.  Items are per file, but a
+        sim's two files almost always agree, so sims are listed by name.
         """
-        by_sim = {}
+        def old_label(item):
+            key = ", ".join(sorted({r.key for r in item.obsolete}))
+            return f"{item.was_ident} ({key})" if item.was_ident and key else \
+                (item.was_ident or key)
+
+        def new_label(item):
+            return (SystemSettingsDialog._rule_owner(item.replacement)
+                    if item.replacement else None)
+
+        groups = {}      # (role, old, new) -> sim names, in order, once
         for item in items:
-            naming = ", ".join(sorted({r.key for r in item.obsolete}))
-            becomes = (SystemSettingsDialog._rule_owner(item.replacement)
-                       if item.replacement else "no device")
-            by_sim.setdefault(item.sim.name, []).append(
-                (os.path.basename(item.directory), f"{naming}  ->  {becomes}"))
-        lines = []
-        for sim_name, entries in by_sim.items():
-            if len({text for _, text in entries}) == 1:
-                lines.append(f"    {sim_name}:  {entries[0][1]}")
+            sims = groups.setdefault((item.role, old_label(item), new_label(item)), [])
+            if item.sim.name not in sims:
+                sims.append(item.sim.name)
+
+        paragraphs = []
+        for (role, old, new), sims in groups.items():
+            slot = device_display_name(role).lower() if role else "device"
+            if new:
+                what = f"The {slot} changed from {old} to {new}."
             else:
-                for where, text in entries:
-                    lines.append(f"    {sim_name} ({where}):  {text}")
-        return ("The device you changed is named in the DirectInput tap "
-                "configuration for these sims:\n\n" + "\n".join(lines) +
-                "\n\nUntil this is reconciled, game-generated FFB effects "
-                "will continue to be intercepted on the previously selected "
-                "device, and will pass straight through to the newly "
-                "selected device.\n\n" + SystemSettingsDialog.TAP_REQUIREMENT)
+                what = f"The {slot} slot was cleared; it held {old}."
+            where = ("The DirectInput Tap configuration for these sims still "
+                     "names the old device:" if len(sims) > 1 else
+                     "The DirectInput Tap configuration for this sim still "
+                     "names the old device:")
+            paragraphs.append(what + " " + where + "\n\n" +
+                              "\n".join(f"    {name}" for name in sims))
+
+        replaced = any(new for (_, _, new) in groups)
+        until = ("Until it is updated, those games keep tapping the old device "
+                 "and leave the new one alone - TelemFFB has nothing to render "
+                 "for it." if replaced else
+                 "Until it is updated, those games keep tapping a device that "
+                 "is no longer configured.")
+        return "\n\n".join(paragraphs) + "\n\n" + until
 
     @staticmethod
     def _rule_owner(line):
@@ -1733,7 +1749,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
 
     def _raise_tap_gaps(self):
-        """Warn when a DirectInput device has no way to be driven at all.
+        """Tell the user a DirectInput device has no way to be driven at all,
+        and that the missing rules are staged.
 
         Not the same problem as a stale rule.  Nothing is wrong with the
         config - there simply is no rule where one is mandatory, because
@@ -1741,11 +1758,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         Without it the game keeps the device and TelemFFB stays silent, and
         nothing anywhere reports a fault.
 
-        Asked once per device, like the reconcile prompt is asked once per
-        change, and written on save for the same reason.  Where a reconcile
-        the user has already agreed to will write this device's rule into a
-        sim, that sim is not a gap and is not mentioned - one change, one
-        question, not two dialogs saying the same thing in different words.
+        Once per device, like the reconcile notice is once per change, and
+        written at save for the same reason.  Where a reconcile the user has
+        already been told about will write this device's rule into a sim,
+        that sim is not a gap and is not mentioned - one change, one notice,
+        not two dialogs saying the same thing in different words.  Where the
+        tap is not installed at all, the notice says where to do that; a
+        rule cannot be added to a wrapper that is not there.
         """
         from telemffb.tap_reconcile import missing_tap_rules
 
@@ -1754,7 +1773,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                                              self.tap_settings(),
                                              self.tap_statuses())
                 if (g.sim.key, g.device.key) not in closed
-                and g.device.key not in self._tap_gaps_answers]
+                and g.device.key not in self._tap_gaps_seen]
         if not gaps:
             return
 
@@ -1770,37 +1789,32 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 "the tap is configured:\n\n" + "\n".join(lines) +
                 "\n\n" + self.TAP_REQUIREMENT)
 
-        if not any(g.fixable for g in gaps):
-            # nothing to offer: setting the tap up is a bigger step than
+        if any(g.fixable for g in gaps):
+            tail = ("\n\nThe missing rules are staged and will be written when "
+                    "you save.")
+            if not all(g.fixable for g in gaps):
+                tail += (" Where the tap is not set up, use the DirectInput "
+                         "Tap section on that sim's tab to install it.")
+        else:
+            # nothing to stage: setting the tap up is a bigger step than
             # adding a rule, and belongs on the sim's own tab
-            QMessageBox.information(
-                self, "DirectInput Tap Configuration",
-                body + "\n\nUse the DirectInput Tap section on each sim's tab to "
-                "install it.")
-            self._tap_gaps_answers = {**self._tap_gaps_answers,
-                                      **{g.device.key: False for g in gaps}}
-            return
-
-        answer = QMessageBox.question(
-            self, "DirectInput Tap Configuration",
-            body + "\n\nAdd the missing rules? The change is written when "
-            "you save.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes)
-        agreed = answer == QMessageBox.StandardButton.Yes
-        self._tap_gaps_answers = {**self._tap_gaps_answers,
-                                  **{g.device.key: agreed for g in gaps}}
+            tail = ("\n\nUse the DirectInput Tap section on each sim's tab to "
+                    "install it.")
+        QMessageBox.information(self, "DirectInput Tap Configuration",
+                                body + tail)
+        self._tap_gaps_seen = self._tap_gaps_seen | {g.device.key for g in gaps}
 
     def _gaps_a_reconcile_will_close(self):
-        """(sim key, device ids) a reconcile the user said yes to will write
-        a rule for at save - so a gap there is already being closed."""
+        """(sim key, device ids) a reconcile the user has been told about
+        will write a rule for at save - so a gap there is already being
+        closed."""
         from telemffb.tap_reconcile import device_changes, pending_reconcile
 
         if self._tap_baseline is None:
             return set()
         changes = device_changes(self._tap_baseline, self.tap_settings_view())
-        if not changes or not self._tap_reconcile_answers.get(
-                self._change_signature(changes)):
+        if not changes or self._change_signature(changes) not in \
+                self._tap_reconcile_seen:
             return set()
         return {(item.sim.key, item.replacement.split("=")[0].strip().upper())
                 for item in pending_reconcile(changes, self.tap_settings(),
@@ -1808,18 +1822,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 if item.replacement}
 
     def _apply_tap_gaps(self):
-        """Add the rules the user agreed to, once the settings are saved.
+        """Add the missing rules, once the settings are saved.
 
         Runs after the reconcile has been applied, so a gap that reconcile
-        closed is no longer reported and is not written twice."""
+        closed is no longer reported and is not written twice.  A gap the
+        user was never shown - one that opened after the last change, say by
+        installing the wrapper - is shown now, before it is written."""
         from telemffb.tap_reconcile import apply_tap_rules, missing_tap_rules
 
         gaps = [g for g in missing_tap_rules(self.tap_devices(),
                                              self.tap_settings(),
                                              self.tap_statuses())
-                if self._tap_gaps_answers.get(g.device.key)]
+                if g.fixable]
         if not gaps:
             return
+        if any(g.device.key not in self._tap_gaps_seen for g in gaps):
+            self._raise_tap_gaps()
         failures = [o for o in apply_tap_rules(gaps) if not o.ok]
         if failures:
             QMessageBox.warning(
@@ -1836,10 +1854,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         sim was tapping stays silent, which is what keeps this worth reading
         when it does appear.
 
-        This is where the writing happens, whichever prompt asked.  Deferring
-        it to save means a user who backs out of the dialog leaves the game
-        folders untouched, rather than having their configs repointed at a
-        device selection they then abandoned.
+        This is where the writing happens.  Deferring it to save means a user
+        who backs out of the dialog leaves the game folders untouched, rather
+        than having their configs repointed at a device selection they then
+        abandoned.
         """
         from telemffb.tap_reconcile import (apply_reconcile, device_changes,
                                           pending_reconcile)
@@ -1852,19 +1870,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if not items:
             return
 
-        # answered already, when the selection changed
+        # said already, when the selection changed; a change that reached
+        # save without being mentioned is mentioned now, before it is written
         signature = self._change_signature(changes)
-        if signature in self._tap_reconcile_answers:
-            if not self._tap_reconcile_answers[signature]:
-                return
-        else:
-            answer = QMessageBox.question(
+        if signature not in self._tap_reconcile_seen:
+            QMessageBox.information(
                 self, "DirectInput Tap Configuration",
-                self._reconcile_summary(items) + "\n\nUpdate them now?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes)
-            if answer != QMessageBox.StandardButton.Yes:
-                return
+                self._reconcile_summary(items) + "\n\nThe update is written now.")
+            self._tap_reconcile_seen = self._tap_reconcile_seen | {signature}
 
         failures = [o for o in apply_reconcile(items) if not o.ok]
         if failures:

@@ -80,6 +80,11 @@ class ReconcileItem:
     config: str
     obsolete: List[Rule]                # rules naming the old device
     replacement: Optional[str] = None   # the rule to add, if there is one
+    #: The change this answers: which slot, and what the user called the
+    #: device that left - so the question can say "the joystick changed
+    #: from Monster to SideWinder" rather than list rule keys.
+    role: str = ""
+    was_ident: str = ""
     #: [DeviceOrder] entries naming the old device, and what replaces them.
     #: An order entry left pointing at replaced hardware strands the new
     #: device exactly as a stale tap rule does - the game keeps handing its
@@ -169,6 +174,7 @@ def pending_reconcile(changes: Sequence[DeviceChange], settings,
                 items.append(ReconcileItem(
                     status=status, directory=directory, config=config,
                     obsolete=obsolete, obsolete_order=stale_order,
+                    role=change.role, was_ident=change.was_ident,
                     order_replacement=(
                         order_line(change.now, int(stale_order[0].position)
                                    if stale_order[0].position.isdigit() else 1)
