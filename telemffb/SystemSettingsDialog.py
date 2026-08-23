@@ -1626,31 +1626,31 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return ("\n\nIf you leave it, note that " +
                 "; and ".join(plan.still_acts) + ".")
 
-    def _cleanup_message(self, plan, opening):
-        """The removal question, as HTML.
-
-        Rich text because of the link: a message box switches format the
-        moment it sees an anchor, and plain newlines would then collapse.
-        Worth the escaping - everything we say about a config is a summary,
-        and someone deciding whether to delete it should be able to read the
-        file itself without cancelling out of the question first.
-        """
+    def _cleanup_message(self, plan, opening):
+        """The removal question, as HTML.
+
+        Rich text because of the link: a message box switches format the
+        moment it sees an anchor, and plain newlines would then collapse.
+        Worth the escaping - everything we say about a config is a summary,
+        and someone deciding whether to delete it should be able to read the
+        file itself without cancelling out of the question first.
+        """
         from telemffb.tap_install import (config_label, config_link,
                                           config_paths)
-
-        doing = "".join(f"<li>{html.escape(line)}</li>"
-                        for line in plan.describe())
-        body = (f"{html.escape(opening)}<br><br>This would:<ul>{doing}</ul>"
-                f"{html.escape(self._leaving_it(plan).strip())}"
-                " The change is made when you save.")
+
+        doing = "".join(f"<li>{html.escape(line)}</li>"
+                        for line in plan.describe())
+        body = (f"{html.escape(opening)}<br><br>This would:<ul>{doing}</ul>"
+                f"{html.escape(self._leaving_it(plan).strip())}"
+                " The change is made when you save.")
         # Named by folder: a sim can hold two configs that differ, and two
         # links both reading "open dinput8.ini" say nothing about which is
         # which - the exact question someone about to delete one has.
         links = "<br>".join(
             config_link(p, config_label(p, plan.status.root))
             for p in config_paths(plan.status))
-        return body + (f"<br><br>{links}" if links else "")
-
+        return body + (f"<br><br>{links}" if links else "")
+
     def _ask_with_preview(self, message, plan):
         """The removal question, with a look at the files on offer.
 
