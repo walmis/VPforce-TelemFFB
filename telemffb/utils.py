@@ -1221,6 +1221,12 @@ class SystemSettings(QSettings):
         'il2_fwd_enable': False,
         'il2_fwd_destinations': '[]',
         'enableBMS': False,
+        # opt-in per sim: the tap is a thing most VPforce owners never
+        # need, and defaulting it on would imply otherwise
+        'enableTapDCS': False,
+        'enableTapIL2': False,
+        'enableTapIL2_K': False,
+        'enableTapBMS': False,
         'enableDirectInput': False,
         'masterInstance': 1,
         'autolaunchMaster': False,

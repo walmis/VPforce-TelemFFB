@@ -271,7 +271,7 @@ class FfbTapReader:
                                   access=mmap.ACCESS_WRITE)
             return True
         except OSError as e:
-            logging.debug(f"FFB tap: mapping unavailable: {e}")
+            logging.debug(f"DirectInput tap: mapping unavailable: {e}")
             return False
 
     def close(self):
@@ -333,7 +333,7 @@ class FfbTapReader:
             return None
         if shm.version != TAP_VERSION:
             if not self._logged_writer:
-                logging.warning(f"FFB tap: protocol version {shm.version} != "
+                logging.warning(f"DirectInput tap: protocol version {shm.version} != "
                                 f"{TAP_VERSION}; ignoring tap")
                 self._logged_writer = True
             return None
@@ -347,7 +347,7 @@ class FfbTapReader:
                 continue
             name = dev.name.decode("utf-8", "replace")
             if self._logged_device_gen != (dev.generation, dev.resetCount):
-                logging.info(f"FFB tap: tapped device [{name}] "
+                logging.info(f"DirectInput tap: tapped device [{name}] "
                              f"vid={dev.vid:04X} pid={dev.pid:04X} "
                              f"gen={dev.generation} resets={dev.resetCount}")
                 self._logged_device_gen = (dev.generation, dev.resetCount)
@@ -370,10 +370,10 @@ class FfbTapReader:
 
     def _log_writer_state(self, alive: bool, pid: int = 0):
         if alive and not self._logged_writer:
-            logging.info(f"FFB tap: writer detected (pid={pid})")
+            logging.info(f"DirectInput tap: writer detected (pid={pid})")
             self._logged_writer = True
         elif not alive and self._logged_writer:
-            logging.info("FFB tap: writer gone")
+            logging.info("DirectInput tap: writer gone")
             self._logged_writer = False
             self._logged_device_gen = None
 
@@ -390,5 +390,5 @@ def read_game_spring() -> Optional[TapSpringState]:
     try:
         return _reader.read_game_spring()
     except Exception:
-        logging.exception("FFB tap: read failed")
+        logging.exception("DirectInput tap: read failed")
         return None

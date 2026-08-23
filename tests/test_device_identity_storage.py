@@ -252,6 +252,37 @@ class TestFillingInWhatWasNeverStored:
                                       [other])
         assert got == {}
 
+    def test_the_settings_dialog_recovers_it_from_its_own_selectors(
+            self, monkeypatch):
+        """The reported symptom, end to end: pedals set up before the name
+        was stored read as "unnamed device" in the DirectInput Tap dialog until
+        their owner toggled the slot off and on again."""
+        app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        monkeypatch.setattr(G, 'system_settings',
+                            TestIdentIsRemembered.FakeSettings({
+                                'devpath_joystick': '',
+                                'devpath_pedals': self.PEDAL_PATH,
+                                'devpath_collective': '',
+                                'devpath_trimwheel': ''}), raising=False)
+        for name, value in (('device_type', 'joystick'),
+                            ('master_instance', True), ('child_instance', False),
+                            ('launched_instances', []), ('device_usbpid', '2054'),
+                            ('device_capabilities', None),
+                            ('device_di_guid', None), ('is_exe', False)):
+            monkeypatch.setattr(G, name, value, raising=False)
+        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        dialog = SystemSettingsDialog()
+        pedals = self.Device(0x2052, "VPforce Pedals", self.PEDAL_PATH.encode())
+        dialog.cb_select_p.setModel(FFBDeviceListModel([pedals]))
+        # populating the selector is not the user picking anything, and an
+        # unsaved pick would outrank the stored settings under test
+        dialog._pending_devpaths.clear()
+
+        view = dialog.tap_settings_view()
+        assert view[device_ident_key('pedals')] == "VPforce Pedals"
+        dialog.deleteLater()
+        app.processEvents()
+
 
 class TestStartupHealsOldSettings:
     """Thousands of installs predate the identity keys.  Waiting for each

@@ -19,27 +19,43 @@
 
 import ipaddress
 import json
+import html
 import logging
 import os
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption, QTabWidget
+from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout
 
 from . import globals as G
 from . import utils
 from .ui.Ui_SystemDialog import Ui_SystemDialog
+from .TapStatusPanel import TapStatusPanel
+from .tap_install import SIMS_BY_KEY, sim_status
 from .InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 from .utils import (
     device_display_name, device_ident_key, device_ids_key, device_pid_key,
-    directinput_selection_devices, format_usb_ids, validate_vpconf_profile,
-    HiDpiPixmap,
+    directinput_selection_devices, format_usb_ids, recover_device_identity,
+    validate_vpconf_profile, HiDpiPixmap,
 )
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
-from .custom_widgets import FFBDeviceListModel
+from .custom_widgets import FFBDeviceListModel, LabeledToggle
+
+def _as_bool(value):
+    """A stored setting as a boolean.
+
+    SystemSettings.get coerces the common spellings, but a value that
+    reaches here any other way - a defaults dict, a raw QSettings read -
+    can still be the string "false", and bool("false") is True: the
+    obvious reading turns every saved-off switch on.
+    """
+    if isinstance(value, str):
+        return value.strip().lower() not in ("", "false", "0")
+    return bool(value)
+
 
 def _same_hardware(a, b):
     """Whether two selector entries are one physical device.
@@ -69,6 +85,30 @@ def _same_hardware(a, b):
            (getattr(b, 'vendor_id', None), getattr(b, 'product_id', None)) and \
         getattr(a, 'vendor_id', None) not in (None, 0)
 
+
+#: What the removal question can come back with.  Cancelling is not the
+#: same as declining: one keeps the switch where the user just put it, the
+#: other puts the switch back.
+CLEANUP_REMOVE = "remove"
+CLEANUP_LEAVE = "leave"
+CLEANUP_CANCELLED = "cancelled"
+
+
+class _LiveSettings:
+    """Stored settings with the dialog's unsaved switches laid over the top.
+
+    Thin on purpose: it answers ``get`` the way SystemSettings does and
+    nothing else, so anything reading settings can be handed one without
+    knowing a dialog is open.
+    """
+
+    def __init__(self, base, overrides):
+        self._base, self._overrides = base, overrides
+
+    def get(self, name, default=None, instance=None):
+        if name in self._overrides:
+            return self._overrides[name]
+        return self._base.get(name, default, instance)
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -316,6 +356,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # pending device path changes (only written on Save)
         self._pending_devpaths = {}
 
+        self._build_tap_panels()
+
         self.populateUSBSelectors()
         # Runs after the selectors are filled and the saved assignments
         # restored, so it sees what is actually assigned.
@@ -387,7 +429,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         for cb, short in dev_map.items():
             try:
                 saved_key = f"devpath_{short}"
-                saved_path = G.system_settings.get(saved_key, '')
+                # An unsaved pick outranks the saved one.  Re-listing
+                # (the DirectInput toggle does it) used to restore from
+                # the saved settings alone, so a device chosen a moment
+                # ago vanished from the selector while still queued to be
+                # written at Save - the selector said one thing and Save
+                # did another.
+                if saved_key in self._pending_devpaths:
+                    saved_path = self._pending_devpaths[saved_key]
+                else:
+                    saved_path = G.system_settings.get(saved_key, '')
             except Exception:
                 saved_path = ''
 
@@ -465,6 +516,24 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
 
 
+        def slot_changed(cb, role):
+            """A slot now holds something else - or nothing.  Record it,
+            and let the tap say what that means while the change is still
+            in front of the user."""
+            # the state the dialog opened in, captured before the first
+            # change - the only place the outgoing device's ids exist
+            if self._tap_baseline is None:
+                self._tap_baseline = self.tap_settings_view()
+            persist_combobox_selection(cb, role)
+            # the tap panels describe the devices as much as the folders,
+            # so a new selection changes what they should be saying
+            self.refresh_tap_panels()
+            self._raise_tap_reconcile(self._tap_baseline,
+                                      self.tap_settings_view())
+            # a different question: not "this rule is stale" but "this
+            # device cannot be driven at all without one"
+            self._raise_tap_gaps()
+
         # Handler to enforce uniqueness across combo boxes
         def on_device_changed(index, changed_cb= None):
             # map combobox to role name for persistence
@@ -489,7 +558,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 changed_cb._prev_index = index
                 role = cb_role_map.get(changed_cb, None)
                 if role:
-                    persist_combobox_selection(changed_cb, role)
+                    # Clearing a slot is a device change like any other:
+                    # a tap rule for what was there is stranded the same
+                    # way, and used to be caught only at Save.
+                    slot_changed(changed_cb, role)
                 # The user cleared this slot deliberately, so its launch
                 # options go with it.
                 changed_cb._autolaunch_cb.setChecked(False)
@@ -546,7 +618,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
             role = cb_role_map.get(changed_cb, None)
             if role:
-                persist_combobox_selection(changed_cb, role)
+                slot_changed(changed_cb, role)
 
             self.toggle_device_launch_widgets()
 
@@ -586,11 +658,32 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return icon_enabled, icon_disabled
 
     def closeEvent(self, event):
+        # Closing is cancelling: whatever the tap panels wrote goes back.
+        # A wrapper installed and then backed out of would otherwise stay
+        # active in a game folder, with the opt-in never saved and nothing
+        # in TelemFFB saying a tap was live.
+        self._discard_tap_writes()
         self.hide()
         event.ignore()
 
+    def reject(self):
+        # Escape and the close button both have to mean Cancel.  QDialog's
+        # own reject would just hide the window, skipping closeEvent.
+        self.close()
+
     def accept(self):
         self.hide()
+
+    def _discard_tap_writes(self):
+        failed = []
+        for panel in self.tap_panels.values():
+            failed += panel.undo_all()
+        if failed:
+            QMessageBox.warning(
+                self, "DirectInput Tap Configuration",
+                "Cancelled, but these could not be put back as they were - "
+                "if a game is running, close it and check them:\n\n" +
+                "\n".join(f"    {path}" for path in failed))
 
     def reset_settings(self):
         # Load default settings and update widgets
@@ -690,6 +783,225 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseXPLANE.setEnabled(xplane_enabled)
         icon = self.XPLANE_ICON_ENABLED if xplane_enabled else self.XPLANE_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.XPLANE_TAB, icon)
+
+    #: Each sim's opt-in toggle and the placeholder its status panel fills.
+    #: Both are laid out in the .ui, so Designer shows the tab as it ships;
+    #: only the panel, which depends on what is installed, is built here.
+    #: IL-2's two titles share a tab and have a pair each.
+    TAP_WIDGETS = {
+        'DCS': ('enableTap_DCS', 'tapStatusHost_DCS'),
+        'IL2': ('enableTap_IL2', 'tapStatusHost_IL2'),
+        'IL2_K': ('enableTap_IL2_K', 'tapStatusHost_IL2_K'),
+        'BMS': ('enableTap_BMS', 'tapStatusHost_BMS'),
+    }
+
+    def _build_tap_panels(self):
+        """A status panel per sim, under its opt-in toggle.
+
+        Each sits behind its own opt-in.  Most VPforce owners never need the
+        tap - it is only required to render the *game's* effects, in the
+        Game Managed (DirectInput Tap) spring mode - so presenting it as
+        part of ordinary sim setup would suggest otherwise.  IL-2's two
+        titles get one each, since they are separate installs with separate
+        configs.
+        """
+        self.tap_panels = {}
+        self.tap_enable_boxes = {}
+        # kept so the tap code can read the sim switches as they stand in
+        # the dialog rather than as they were last saved
+        self._sim_enable_boxes = {}
+        for name in ('enableDCS', 'enableIL2', 'enableBMS'):
+            try:
+                widget = getattr(self, name)
+            except (AttributeError, RuntimeError):
+                continue
+            self._sim_enable_boxes[name] = widget
+            # turning a sim on is a moment to say what its tap still needs,
+            # and turning one off a moment to offer to take it out.
+            # stateChanged, not toggled: these are LabeledToggles, which
+            # forward that one and not Qt's.
+            widget.stateChanged.connect(
+                lambda state, n=name: self._on_sim_enabled(state, n))
+        for key, (toggle_name, host_name) in self.TAP_WIDGETS.items():
+            box = getattr(self, toggle_name, None)
+            host = getattr(self, host_name, None)
+            if box is None or host is None:
+                continue
+            sim = SIMS_BY_KEY[key]
+            # Read here rather than relying on load_settings: that runs
+            # before this method, when tap_enable_boxes is still empty,
+            # so its restore loop had nothing to restore and every box
+            # came up unchecked however the setting was saved.
+            box.setChecked(_as_bool(
+                G.system_settings.get(sim.tap_enable_key, False)))
+            self.tap_enable_boxes[key] = box
+
+            layout = QVBoxLayout(host)
+            layout.setContentsMargins(0, 0, 0, 0)
+            panel = TapStatusPanel(self._tap_status(key), host,
+                                   devices=self.tap_devices)
+            # after an install or removal, re-scan rather than trust the
+            # panel's idea of what it just did
+            panel.changed.connect(self.refresh_tap_panels)
+            layout.addWidget(panel)
+            self.tap_panels[key] = panel
+
+            # stateChanged, not toggled: a LabeledToggle forwards that one,
+            # and an int rather than a bool
+            box.stateChanged.connect(
+                lambda state, p=panel: p.setVisible(bool(state)))
+            box.stateChanged.connect(
+                lambda state, k=key: self._on_tap_opt_in(bool(state), k))
+            panel.setVisible(box.isChecked())
+
+    def tap_settings(self):
+        """Settings with the dialog's unsaved sim switches over the top.
+
+        Everything the tap decides - which sims to warn about, which to skip
+        - keys off this rather than the registry, for the same reason the
+        device list does: the user is changing these switches in the same
+        visit, and answering from saved state would describe a machine they
+        have already stopped configuring.
+        """
+        overrides = {}
+        for key, box in self.tap_enable_boxes.items():
+            overrides[SIMS_BY_KEY[key].tap_enable_key] = box.isChecked()
+        for name, box in self._sim_enable_boxes.items():
+            overrides[name] = box.isChecked()
+        return _LiveSettings(G.system_settings, overrides)
+
+    def _on_sim_enabled(self, state, setting_name):
+        """A sim switch moved.  One switch can cover more than one title -
+        IL-2's two share theirs - so both are considered."""
+        self.refresh_tap_panels()
+        if state:
+            self._raise_tap_gaps()
+            return
+        for sim in SIMS_BY_KEY.values():
+            if sim.enable_key == setting_name:
+                self._offer_tap_cleanup(sim.key, sim_switched_off=True)
+
+    def _on_tap_opt_in(self, checked, sim_key=None):
+        """Opting in asks what is still missing; opting out asks what to
+        take away.  Two different questions, and neither is worth asking in
+        the other direction."""
+        self.refresh_tap_panels()
+        if checked:
+            self._raise_tap_gaps()
+        elif sim_key is not None:
+            self._offer_tap_cleanup(sim_key)
+
+    def tap_devices(self):
+        """The devices configured right now, unsaved picks included.
+
+        Everything about the tap keys off this rather than the registry.  A
+        user does all of their changing in one visit - pick a device, then go
+        set up the sim that uses it - so reading only what has been saved
+        would offer them the device they just replaced, and make them save
+        and reopen the dialog to get an answer that is already on screen.
+        """
+        from telemffb.tap_install import configured_devices
+
+        return configured_devices(self.tap_settings_view())
+
+    def tap_settings_view(self):
+        """The device settings as they stand, unsaved picks included."""
+        from telemffb.utils import DEVICE_ROLES
+
+        merged = {}
+        for role in DEVICE_ROLES:
+            for key in (f'devpath_{role}', device_ident_key(role),
+                        device_ids_key(role)):
+                merged[key] = G.system_settings.get(key, '') or ''
+        merged.update(self._pending_devpaths)
+        return self._with_known_identity(merged)
+
+    def _connected_devices(self):
+        """Everything enumerated in the selectors right now."""
+        devices = []
+        for combo in self._device_combos:
+            model = combo.model()
+            if model is None:
+                continue
+            for row in range(model.rowCount()):
+                device = model.data(model.index(row, 0),
+                                    Qt.ItemDataRole.UserRole)
+                if device is not None:
+                    devices.append(device)
+        return devices
+
+    def _with_known_identity(self, view):
+        """Fill in what a slot's settings predate storing.
+
+        The same recovery startup performs, repeated here because this
+        dialog can see devices startup could not: a DirectInput device is
+        enumerated only when the selector asks for it.
+        """
+        view.update(recover_device_identity(view, self._connected_devices()))
+        return view
+
+    def _tap_status(self, sim_key):
+        """One sim's status, using whatever this dialog currently shows.
+
+        The dialog wins over the stored settings, for the path and for the
+        devices alike: a user who has just corrected either should see the
+        effect before saving it.
+        """
+        from telemffb.tap_config import read, stale_tap_rules
+        from telemffb.tap_install import read_config
+
+        sim = SIMS_BY_KEY[sim_key]
+        configured = None
+        field = {'IL2': getattr(self, 'pathIL2', None),
+                 'IL2_K': getattr(self, 'pathIL2_K', None)}.get(sim_key)
+        if field is not None:
+            configured = field.text().strip() or None
+        if configured is None and sim.settings_key:
+            configured = G.system_settings.get(sim.settings_key, '') or None
+
+        status = sim_status(sim, configured)
+        # sim_status knows nothing about what is configured, so the drift
+        # line has to be filled in here or it never appears at all
+        if any(t.has_config for t in status.targets):
+            config = read_config(status)
+            if config is not None:
+                status.stale_rules = stale_tap_rules(read(config),
+                                                     self.tap_devices())
+        return status
+
+    def tap_statuses(self):
+        """Every sim's status as this dialog sees it.
+
+        Handed to reconcile rather than letting it resolve the sims itself:
+        it would go back to the registry and the saved settings, and miss a
+        path the user has typed into a field but not saved - which is the
+        same visit in which they are changing devices.
+        """
+        if not self.tap_panels:
+            # nothing better to offer; let reconcile resolve the sims itself
+            return None
+        return [self._tap_status(key) for key in self.tap_panels]
+
+    def refresh_tap_panels(self):
+        """Re-scan the game folders and redraw.
+
+        Cheap - a handful of stat calls and, where a wrapper is present, one
+        file read - so it runs whenever the dialog is shown rather than
+        leaving stale state on screen after the user installs something.
+        """
+        for key, panel in getattr(self, 'tap_panels', {}).items():
+            panel.set_status(self._tap_status(key))
+            # Visibility normally follows the switch's toggled signal, but
+            # anything that moves a switch with signals blocked - restoring
+            # one after a cancelled question - would otherwise leave a
+            # ticked box above an empty space.
+            box = self.tap_enable_boxes.get(key)
+            if box is not None:
+                panel.setVisible(box.isChecked())
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.refresh_tap_panels()
 
     def toggle_dinput_support(self):
         """Re-list devices so [DI] entries appear or disappear immediately.
@@ -984,6 +1296,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "il2_fwd_enable": self.il2_fwd_enable.isChecked(),
             "il2_fwd_destinations": json.dumps(self.get_il2_fwd_destinations()),
             'enableBMS': self.enableBMS.isChecked(),
+            # per-sim DirectInput Tap opt-in, built in code rather than the .ui
+            **{SIMS_BY_KEY[k].tap_enable_key: b.isChecked()
+               for k, b in self.tap_enable_boxes.items()},
             'enableDirectInput': self.cb_enable_dinput.isChecked(),
             'masterInstance': self.master_button_group.checkedId(),
             'autolaunchMaster': self.cb_al_enable.isChecked(),
@@ -1055,16 +1370,47 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             panel.save(G.system_settings)
 
         # Persist any pending devpath selections that were changed while the dialog was open
+        # What the slots held when the dialog opened, captured before the
+        # first change was made.  None means no device was ever changed.
+        baseline = self._tap_baseline
+        # Identity we had to recover from the connected hardware is
+        # written too, so a settings base that predates it being stored
+        # heals itself after one save.  Only keys that are empty on disk:
+        # this fills gaps, it does not overwrite the user's own selection.
+        current = self.tap_settings_view()
+        for key, value in current.items():
+            if key.startswith(('devids_', 'devident_')) and value and \
+                    not G.system_settings.get(key, ''):
+                self._pending_devpaths.setdefault(key, value)
+
         try:
-            for k, v in getattr(self, '_pending_devpaths', {}).items():
+            for k, v in self._pending_devpaths.items():
                 G.system_settings.setValue(k, v)
         except Exception:
             logging.exception('Failed to write pending devpath settings')
+
+        # A swapped device leaves any tap config pointing at hardware that is
+        # no longer there, which fails silently in both directions.  Compared
+        # against the baseline rather than against whatever keys happen to be
+        # pending: the outgoing device's ids are only knowable from the state
+        # the dialog opened in.
+        try:
+            if baseline is not None:
+                self._offer_tap_reconcile(baseline, current)
+            self._apply_tap_gaps()
+            self._apply_tap_cleanup()
+        except Exception:
+            logging.exception('Failed to check DirectInput tap configs after a '
+                              'device change')
 
         G.sim_listeners.restart_all()
 
         if G.master_instance and G.launched_instances:
             G.ipc_instance.send_broadcast_message("RESTART SIMS")
+
+        # the panels' own writes were meant after all
+        for panel in self.tap_panels.values():
+            panel.commit()
 
         # adjust logging level (this instance's own panel):
         own = self.instance_panels.get(('system', G.device_type))
@@ -1075,6 +1421,457 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             logging.getLogger().setLevel(logging.DEBUG)
 
         self.accept()
+
+    #: Which devices need the tap, and for what.  Stated wherever the tap
+    #: comes up, because the distinction decides whether a missing rule is a
+    #: preference or a broken setup.
+    TAP_REQUIREMENT = (
+        "Generic DirectInput devices require the tap for all TelemFFB "
+        "effects. VPforce devices need it only for the "
+        "'Game Managed (DirectInput Tap)' spring mode.")
+
+    #: What the user said when told a device change stranded a tap config,
+    #: keyed by the change they were told about - the set of slots that
+    #: differ from the state the dialog opened in.  Cycling through devices
+    #: to see what is there lands on the same key and is not asked again;
+    #: a different change is a different question.  Rebound, never
+    #: mutated: the class-level default is shared.
+    _tap_reconcile_answers = {}
+
+    #: Whether the user agreed to add rules for a DirectInput device that
+    #: has none, keyed by the device's ids.  Cycling back to the same device
+    #: asks nothing; a different device is a different question.  Rebound,
+    #: never mutated: the class-level default is shared.
+    _tap_gaps_answers = {}
+
+    #: The device settings as the dialog opened, captured lazily before the
+    #: first change.  None means no device has been changed.
+    _tap_baseline = None
+
+    #: The device selectors, once they have been built.  A class-level
+    #: default because several things ask what is connected, and they can
+    #: run before the selectors exist.
+    _device_combos = ()
+
+    #: Per-sim DirectInput Tap opt-in boxes, and the sim switches, once built.
+    #: Class-level for the same reason: loading settings and saving both
+    #: read them, and either can run before the tap panels are built.
+    tap_enable_boxes = {}
+    _sim_enable_boxes = {}
+
+    #: Sims the user has been asked about clearing, and those they agreed
+    #: to clear.  Asked once each; acted on at save, and only for sims whose
+    #: switch is still off by then.
+    _tap_cleanup_asked = frozenset()
+    _tap_cleanup_agreed = frozenset()
+
+    def _raise_tap_reconcile(self, before, after):
+        """Tell the user straight away that a tap config is now stranded.
+
+        Raised here rather than only at save because this is the moment the
+        change makes sense to them - by the time they close the dialog they
+        may not connect a question about DCS to a combo box they touched ten
+        minutes ago.
+
+        Nothing is written yet.  The answer is remembered and acted on when
+        the settings are saved, so backing out of the dialog leaves the game
+        folders exactly as they were.
+        """
+        from telemffb.tap_reconcile import device_changes, pending_reconcile
+
+        changes = device_changes(before, after)
+        signature = self._change_signature(changes)
+        if signature in self._tap_reconcile_answers:
+            return          # already answered; asking again is nagging
+        items = pending_reconcile(changes, self.tap_settings(),
+                                  self.tap_statuses())
+        if not items:
+            # logged because the silence is deliberate and indistinguishable
+            # from a fault: a device did change, and no sim was tapping it
+            if changes:
+                logging.info(
+                    "DirectInput tap: %s changed but no enabled sim has a tap rule "
+                    "for the outgoing device - nothing to reconcile",
+                    ", ".join(c.role for c in changes))
+            return
+
+        answer = QMessageBox.question(
+            self, "DirectInput Tap Configuration",
+            self._reconcile_summary(items) +
+            "\n\nUpdate them? The change is written when you save.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes)
+        self._tap_reconcile_answers = {
+            **self._tap_reconcile_answers,
+            signature: answer == QMessageBox.StandardButton.Yes}
+
+    @staticmethod
+    def _change_signature(changes):
+        """What a reconcile question is about: which slots changed, from
+        what, to what.  The key an answer is remembered under."""
+        return frozenset((c.role, c.was, c.now.key if c.now else None)
+                         for c in changes)
+
+    @staticmethod
+    def _reconcile_summary(items):
+        """What is stranded, and what it would become.
+
+        One line per sim where its files agree - DCS holds two configs and
+        they usually say the same thing, and listing the sim twice read as
+        a duplicate - and one per file, named, where they differ.
+        """
+        by_sim = {}
+        for item in items:
+            naming = ", ".join(sorted({r.key for r in item.obsolete}))
+            becomes = (SystemSettingsDialog._rule_owner(item.replacement)
+                       if item.replacement else "no device")
+            by_sim.setdefault(item.sim.name, []).append(
+                (os.path.basename(item.directory), f"{naming}  ->  {becomes}"))
+        lines = []
+        for sim_name, entries in by_sim.items():
+            if len({text for _, text in entries}) == 1:
+                lines.append(f"    {sim_name}:  {entries[0][1]}")
+            else:
+                for where, text in entries:
+                    lines.append(f"    {sim_name} ({where}):  {text}")
+        return ("The device you changed is named in the DirectInput tap "
+                "configuration for these sims:\n\n" + "\n".join(lines) +
+                "\n\nUntil this is reconciled, game-generated FFB effects "
+                "will continue to be intercepted on the previously selected "
+                "device, and will pass straight through to the newly "
+                "selected device.\n\n" + SystemSettingsDialog.TAP_REQUIREMENT)
+
+    @staticmethod
+    def _rule_owner(line):
+        """'SideWinder (045E:001B)' from a rule line, or the bare key.
+
+        The ids are what the rule is keyed on; the name is what the user
+        recognizes.  A line written by TelemFFB carries both."""
+        key, _, rest = line.partition("=")
+        comment = rest.partition(";")[2].strip()
+        name = comment.split(" (")[0].strip() if comment else ""
+        return f"{name} ({key.strip()})" if name and name != "unnamed" \
+            else key.strip()
+
+    def _offer_tap_cleanup(self, sim_key, sim_switched_off=False):
+        """Opting a sim out - offer to take the tap back out of it.
+
+        Asked rather than done: the wrapper and its config live in a game
+        folder, and leaving them is a reasonable choice - the wrapper is
+        inert while TelemFFB is not running, and the user may be turning the
+        switch off only to stop TelemFFB managing it.
+
+        Only ever removes what is ours.  A config we generated goes; a
+        config that was somebody else's keeps everything but the rules we
+        added; a dinput8.dll that is not ours is never touched.
+
+        Recorded now and done on save, like every other write a settings
+        change implies.  Nothing in a game folder should disappear because
+        of a switch the user then backed out of.
+        """
+        from telemffb.tap_reconcile import plan_tap_cleanup
+
+        if sim_key in self._tap_cleanup_asked:
+            return
+        plan = plan_tap_cleanup(self._tap_status(sim_key))
+        if plan.empty:
+            return
+        # rebound rather than mutated: the class-level default is shared,
+        # and adding to it would leak between dialogs
+        self._tap_cleanup_asked = self._tap_cleanup_asked | {sim_key}
+
+        opening = (f"{plan.sim.name} is being turned off, but its tap is "
+                   "still set up. Remove it?" if sim_switched_off else
+                   f"The tap is still set up for {plan.sim.name}. "
+                   "Remove it?")
+        answer = self._ask_with_preview(
+            self._cleanup_message(plan, opening), plan)
+
+        if answer == CLEANUP_CANCELLED:
+            # They dismissed the question, which is an answer about the
+            # switch and not about the files: put it back where it was and
+            # forget we asked, so flipping it again asks again.
+            self._tap_cleanup_asked = self._tap_cleanup_asked - {sim_key}
+            self._restore_switch(sim_key, sim_switched_off)
+            return
+
+        if answer == CLEANUP_REMOVE:
+            self._tap_cleanup_agreed = self._tap_cleanup_agreed | {sim_key}
+            # agreeing to take the tap out is opting the sim out of it, and
+            # the removal at save is keyed on that switch being off
+            box = self.tap_enable_boxes.get(sim_key)
+            if box is not None:
+                box.setChecked(False)
+
+    @staticmethod
+    def _leaving_it(plan):
+        """What declining actually means, which is not always "nothing".
+
+        RequireTelemFFB gates only the tap and sink rules; block and scale
+        rules apply whatever TelemFFB is doing, and so does any reordering.
+        Saying a leftover config is harmless when it is still shaping the
+        game's force feedback would be a comfortable lie of exactly the kind
+        this feature exists to avoid.
+        """
+        if not plan.still_acts:
+            return ("\n\nLeaving it in place is harmless - the wrapper does "
+                    "nothing while TelemFFB is not running.")
+        return ("\n\nIf you leave it, note that " +
+                "; and ".join(plan.still_acts) + ".")
+
+    def _cleanup_message(self, plan, opening):
+        """The removal question, as HTML.
+
+        Rich text because of the link: a message box switches format the
+        moment it sees an anchor, and plain newlines would then collapse.
+        Worth the escaping - everything we say about a config is a summary,
+        and someone deciding whether to delete it should be able to read the
+        file itself without cancelling out of the question first.
+        """
+        from telemffb.tap_install import (config_label, config_link,
+                                          config_paths)
+
+        doing = "".join(f"<li>{html.escape(line)}</li>"
+                        for line in plan.describe())
+        body = (f"{html.escape(opening)}<br><br>This would:<ul>{doing}</ul>"
+                f"{html.escape(self._leaving_it(plan).strip())}"
+                " The change is made when you save.")
+        # Named by folder: a sim can hold two configs that differ, and two
+        # links both reading "open dinput8.ini" say nothing about which is
+        # which - the exact question someone about to delete one has.
+        links = "<br>".join(
+            config_link(p, config_label(p, plan.status.root))
+            for p in config_paths(plan.status))
+        return body + (f"<br><br>{links}" if links else "")
+
+    def _ask_with_preview(self, message, plan):
+        """The removal question, with a look at the files on offer.
+
+        Returns one of CLEANUP_REMOVE, CLEANUP_LEAVE or CLEANUP_CANCELLED.
+
+        A message box closes on whichever button is pressed, so previewing
+        means asking again afterwards - which is nothing worse than the
+        question reappearing where the user left it.
+        """
+        from telemffb.tap_reconcile import cleanup_preview
+        from telemffb.TapDiffDialog import TapDiffDialog
+
+        while True:
+            box = QMessageBox(self)
+            box.setWindowTitle("DirectInput Tap Configuration")
+            box.setText(message)
+            # Three outcomes, not two.  Leaving the files and changing your
+            # mind about the switch are different answers, and closing the
+            # window has to mean the second - otherwise dismissing a
+            # question silently keeps half of what it asked about.
+            remove = box.addButton("Remove", QMessageBox.ButtonRole.YesRole)
+            leave = box.addButton("Leave it", QMessageBox.ButtonRole.NoRole)
+            cancel = box.addButton(QMessageBox.StandardButton.Cancel)
+            look = box.addButton("Preview changes...",
+                                 QMessageBox.ButtonRole.ActionRole)
+            box.setDefaultButton(leave)
+            box.setEscapeButton(cancel)
+            box.exec()
+
+            clicked = box.clickedButton()
+            if clicked is look:
+                TapDiffDialog("DirectInput Tap - proposed changes",
+                              cleanup_preview(plan), self).exec()
+                continue
+            if clicked is remove:
+                return CLEANUP_REMOVE
+            if clicked is leave:
+                return CLEANUP_LEAVE
+            return CLEANUP_CANCELLED
+
+    def _restore_switch(self, sim_key, sim_switched_off):
+        """Put back the switch whose flick raised the question.
+
+        Signals blocked: turning it back on would otherwise run the opt-in
+        handler and ask a fresh question about a sim nobody has changed.
+        """
+        widgets = []
+        if sim_switched_off:
+            sim = SIMS_BY_KEY[sim_key]
+            widget = self._sim_enable_boxes.get(sim.enable_key)
+            if widget is not None:
+                widgets.append(widget)
+        else:
+            box = self.tap_enable_boxes.get(sim_key)
+            if box is not None:
+                widgets.append(box)
+
+        for widget in widgets:
+            widget.blockSignals(True)
+            widget.setChecked(True)
+            widget.blockSignals(False)
+        # blocked signals mean nothing downstream ran, so the panels are
+        # re-synced from the switches rather than by the toggle handler
+        self.refresh_tap_panels()
+
+    def _apply_tap_cleanup(self):
+        """Undo the tap for sims the user turned off and agreed to clear.
+
+        The toggle is read again here rather than trusted from when they
+        answered: turning it back off and on again before saving must not
+        leave a deletion queued against a sim that is switched on.
+        """
+        from telemffb.tap_reconcile import apply_tap_cleanup, plan_tap_cleanup
+
+        wanted = [key for key in self._tap_cleanup_agreed
+                  if key in self.tap_enable_boxes
+                  and not self.tap_enable_boxes[key].isChecked()]
+        if not wanted:
+            return
+
+        plans = [plan_tap_cleanup(self._tap_status(key)) for key in wanted]
+        failures = [o for o in apply_tap_cleanup(plans) if not o.ok]
+        if failures:
+            QMessageBox.warning(
+                self, "DirectInput Tap Configuration",
+                "Some of it could not be removed:\n\n" +
+                "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
+
+    def _raise_tap_gaps(self):
+        """Warn when a DirectInput device has no way to be driven at all.
+
+        Not the same problem as a stale rule.  Nothing is wrong with the
+        config - there simply is no rule where one is mandatory, because
+        TelemFFB reaches a generic DirectInput device only through the tap.
+        Without it the game keeps the device and TelemFFB stays silent, and
+        nothing anywhere reports a fault.
+
+        Asked once per device, like the reconcile prompt is asked once per
+        change, and written on save for the same reason.  Where a reconcile
+        the user has already agreed to will write this device's rule into a
+        sim, that sim is not a gap and is not mentioned - one change, one
+        question, not two dialogs saying the same thing in different words.
+        """
+        from telemffb.tap_reconcile import missing_tap_rules
+
+        closed = self._gaps_a_reconcile_will_close()
+        gaps = [g for g in missing_tap_rules(self.tap_devices(),
+                                             self.tap_settings(),
+                                             self.tap_statuses())
+                if (g.sim.key, g.device.key) not in closed
+                and g.device.key not in self._tap_gaps_answers]
+        if not gaps:
+            return
+
+        lines = []
+        for gap in gaps:
+            why = ("no tap rule" if gap.fixable
+                   else "the tap is not set up for this sim")
+            lines.append(f"    {gap.sim.name}:  {why}")
+        names = sorted({g.device.ident or g.device.key for g in gaps})
+
+        body = (f"{', '.join(names)} is a generic DirectInput device, so "
+                "TelemFFB cannot render anything for it in these sims until "
+                "the tap is configured:\n\n" + "\n".join(lines) +
+                "\n\n" + self.TAP_REQUIREMENT)
+
+        if not any(g.fixable for g in gaps):
+            # nothing to offer: setting the tap up is a bigger step than
+            # adding a rule, and belongs on the sim's own tab
+            QMessageBox.information(
+                self, "DirectInput Tap Configuration",
+                body + "\n\nUse the DirectInput Tap section on each sim's tab to "
+                "install it.")
+            self._tap_gaps_answers = {**self._tap_gaps_answers,
+                                      **{g.device.key: False for g in gaps}}
+            return
+
+        answer = QMessageBox.question(
+            self, "DirectInput Tap Configuration",
+            body + "\n\nAdd the missing rules? The change is written when "
+            "you save.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes)
+        agreed = answer == QMessageBox.StandardButton.Yes
+        self._tap_gaps_answers = {**self._tap_gaps_answers,
+                                  **{g.device.key: agreed for g in gaps}}
+
+    def _gaps_a_reconcile_will_close(self):
+        """(sim key, device ids) a reconcile the user said yes to will write
+        a rule for at save - so a gap there is already being closed."""
+        from telemffb.tap_reconcile import device_changes, pending_reconcile
+
+        if self._tap_baseline is None:
+            return set()
+        changes = device_changes(self._tap_baseline, self.tap_settings_view())
+        if not changes or not self._tap_reconcile_answers.get(
+                self._change_signature(changes)):
+            return set()
+        return {(item.sim.key, item.replacement.split("=")[0].strip().upper())
+                for item in pending_reconcile(changes, self.tap_settings(),
+                                              self.tap_statuses())
+                if item.replacement}
+
+    def _apply_tap_gaps(self):
+        """Add the rules the user agreed to, once the settings are saved.
+
+        Runs after the reconcile has been applied, so a gap that reconcile
+        closed is no longer reported and is not written twice."""
+        from telemffb.tap_reconcile import apply_tap_rules, missing_tap_rules
+
+        gaps = [g for g in missing_tap_rules(self.tap_devices(),
+                                             self.tap_settings(),
+                                             self.tap_statuses())
+                if self._tap_gaps_answers.get(g.device.key)]
+        if not gaps:
+            return
+        failures = [o for o in apply_tap_rules(gaps) if not o.ok]
+        if failures:
+            QMessageBox.warning(
+                self, "DirectInput Tap Configuration",
+                "Some configurations could not be updated:\n\n" +
+                "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
+
+    def _offer_tap_reconcile(self, before, after):
+        """Repoint tap configs at the device now in the slot.
+
+        Only where it would change something.  A sim is skipped unless it is
+        enabled, has our wrapper installed with a config, and that config
+        actually names the device that just left - so swapping a device no
+        sim was tapping stays silent, which is what keeps this worth reading
+        when it does appear.
+
+        This is where the writing happens, whichever prompt asked.  Deferring
+        it to save means a user who backs out of the dialog leaves the game
+        folders untouched, rather than having their configs repointed at a
+        device selection they then abandoned.
+        """
+        from telemffb.tap_reconcile import (apply_reconcile, device_changes,
+                                          pending_reconcile)
+
+        changes = device_changes(before, after)
+        if not changes:
+            return
+        items = pending_reconcile(changes, self.tap_settings(),
+                                  self.tap_statuses())
+        if not items:
+            return
+
+        # answered already, when the selection changed
+        signature = self._change_signature(changes)
+        if signature in self._tap_reconcile_answers:
+            if not self._tap_reconcile_answers[signature]:
+                return
+        else:
+            answer = QMessageBox.question(
+                self, "DirectInput Tap Configuration",
+                self._reconcile_summary(items) + "\n\nUpdate them now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+        failures = [o for o in apply_reconcile(items) if not o.ok]
+        if failures:
+            QMessageBox.warning(
+                self, "DirectInput Tap Configuration",
+                "Some configurations could not be updated:\n\n" +
+                "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
 
     def load_settings(self, default=False):
         """
@@ -1153,6 +1950,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
 
         self.enableBMS.setChecked(settings_dict.get('enableBMS', False))
+        for key, box in self.tap_enable_boxes.items():
+            box.setChecked(_as_bool(settings_dict.get(
+                SIMS_BY_KEY[key].tap_enable_key, False)))
         self.toggle_bms_widgets()
 
         self.cb_enable_dinput.setChecked(settings_dict.get('enableDirectInput', False))

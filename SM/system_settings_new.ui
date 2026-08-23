@@ -871,7 +871,7 @@ Minimized:</string>
            <string>DCS</string>
           </attribute>
           <layout class="QGridLayout" name="gridLayout_12">
-           <item row="5" column="0">
+           <item row="9" column="0">
             <spacer name="verticalSpacer_5">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -975,6 +975,39 @@ Minimized:</string>
               <string>Auto DCS setup 🛈</string>
              </property>
             </widget>
+           </item>
+           <item row="5" column="0" colspan="2">
+            <widget class="Line" name="tapLine_tab_DCS">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0" colspan="2">
+            <widget class="QLabel" name="tapHeader_tab_DCS">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+               <underline>true</underline>
+              </font>
+             </property>
+             <property name="text">
+              <string>DirectInput Tap:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_DCS">
+             <property name="text">
+              <string>Enable for DCS World</string>
+             </property>
+             <property name="toolTip">
+              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+             </property>
+            </widget>
+           </item>
+           <item row="8" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_DCS" />
            </item>
           </layout>
          </widget>
@@ -1736,7 +1769,7 @@ Minimized:</string>
              </item>
             </layout>
            </item>
-           <item row="15" column="1">
+           <item row="21" column="1">
             <spacer name="verticalSpacer_2">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1748,6 +1781,52 @@ Minimized:</string>
               </size>
              </property>
             </spacer>
+           </item>
+           <item row="15" column="0" colspan="2">
+            <widget class="Line" name="tapLine_tab_IL2">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="16" column="0" colspan="2">
+            <widget class="QLabel" name="tapHeader_tab_IL2">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+               <underline>true</underline>
+              </font>
+             </property>
+             <property name="text">
+              <string>DirectInput Tap:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="17" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_IL2">
+             <property name="text">
+              <string>Enable for IL-2 Sturmovik Great Battles</string>
+             </property>
+             <property name="toolTip">
+              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+             </property>
+            </widget>
+           </item>
+           <item row="18" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_IL2" />
+           </item>
+           <item row="19" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_IL2_K">
+             <property name="text">
+              <string>Enable for IL-2 Korea</string>
+             </property>
+             <property name="toolTip">
+              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+             </property>
+            </widget>
+           </item>
+           <item row="20" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_IL2_K" />
            </item>
           </layout>
          </widget>
@@ -1831,7 +1910,7 @@ Minimized:</string>
              </property>
             </spacer>
            </item>
-           <item row="4" column="0">
+           <item row="8" column="0">
             <spacer name="verticalSpacer_8">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1843,6 +1922,39 @@ Minimized:</string>
               </size>
              </property>
             </spacer>
+           </item>
+           <item row="4" column="0" colspan="2">
+            <widget class="Line" name="tapLine_tab_BMS">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0" colspan="2">
+            <widget class="QLabel" name="tapHeader_tab_BMS">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+               <underline>true</underline>
+              </font>
+             </property>
+             <property name="text">
+              <string>DirectInput Tap:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_BMS">
+             <property name="text">
+              <string>Enable for Falcon BMS</string>
+             </property>
+             <property name="toolTip">
+              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_BMS" />
            </item>
           </layout>
          </widget>
