@@ -515,9 +515,11 @@ def archive_logs(directory):
                     log_file_path = os.path.join(directory, filename)
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
-    if G.system_settings.get("pruneLogs", False):
+    # the fallbacks mirror SystemSettings.defaults, which is what is actually
+    # returned; they only matter if a key is missing there too
+    if G.system_settings.get("pruneLogs", True):
         num = G.system_settings.get('pruneLogsNum', 1)
-        unit = G.system_settings.get('pruneLogsUnit', "Month(s)")
+        unit = G.system_settings.get('pruneLogsUnit', "Week(s)")
         prune_log_files(directory, num, unit)
 
 
@@ -1201,7 +1203,10 @@ class SystemSettings(QSettings):
     }
 
     globl_sys_dict = {
-        'pruneLogs': False,
+        # On by default, one week: a log level left at DEBUG by accident fills
+        # a disk quickly, and a user who never opens this setting should not
+        # find out that way.  Only day-archives older than the window go.
+        'pruneLogs': True,
         'pruneLogsNum': 1,
         'pruneLogsUnit': 'Week(s)',
         'ignoreUpdate': False,
