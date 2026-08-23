@@ -29,10 +29,19 @@ from telemffb.telem.TelemParserBase import TelemParserBase
 
 class SharedMemThread(threading.Thread):
     def __init__(self, telemetry: TelemManager, telem_parser: Optional[TelemParserBase] = None) -> None:
-        super().__init__()
+        # Daemon: a telemetry reader must never hold the process open.  These
+        # threads are told to stop at exit, but one asleep in a retry backoff
+        # would keep the interpreter - and the master's mutex - alive until it
+        # woke; the BMS listener's ten-second sleep did exactly that.
+        super().__init__(daemon=True)
         self._run: bool = False
         self._telem: TelemManager = telemetry
         self._telem_parser: Optional[TelemParserBase] = telem_parser
+        #: Set when the thread is told to stop.  Handed to the parser so a
+        #: wait inside it - a connect-retry backoff - ends the moment we do.
+        self.stop_event = threading.Event()
+        if telem_parser is not None:
+            telem_parser.stop_event = self.stop_event
 
     def run(self) -> None:
         self._run = True
@@ -53,3 +62,4 @@ class SharedMemThread(threading.Thread):
         if self._run:
             logging.info(f"SharedMemThread stopping")
             self._run = False
+            self.stop_event.set()
