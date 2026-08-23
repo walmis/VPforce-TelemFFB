@@ -1332,32 +1332,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # one.  Everything else per-instance now comes from the panels.
         global_settings_dict["ignoreUpdate"] = self.ignoreUpdate.isChecked()
 
-        key_list = [
-            'autolaunchMaster',
-            'autolaunchJoystick',
-            'autolaunchPedals',
-            'autolaunchCollective',
-            'autolaunchTrimWheel',
-            'startMinJoystick',
-            'startMinPedals',
-            'startMinCollective',
-            'startMinTrimWheel',
-            'startHeadlessJoystick',
-            'startHeadlessPedals',
-            'startHeadlessCollective',
-            'startHeadlessTrimWheel',
-            'pidJoystick',
-            'pidPedals',
-            'pidCollective',
-            'pidTrimWheel',
-            'themeId'
-        ]
-        saved_al_dict = {}
-        for key in key_list:
-            saved_al_dict[key] = global_settings_dict[key]
-
-        if self.current_al_dict != saved_al_dict:
-            QMessageBox.information(self, "Restart Required", "The Auto-Launch or Master Device settings have changed.  Please restart TelemFFB.")
+        # What only takes effect at the next start, as it is about to be
+        # saved.  Compared after the write, below: a save the validation
+        # refuses must not leave the user restarting for changes never made.
+        saved_al_dict = {key: global_settings_dict[key]
+                         for _, keys in self.RESTART_GROUPS for key in keys}
 
         if not self.validate_settings():
             return
@@ -1411,6 +1390,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # the panels' own writes were meant after all
         for panel in self.tap_panels.values():
             panel.commit()
+
+        # Said once the settings are on disk, naming what changed; and the
+        # baseline moves to what was saved, so saving again in the same
+        # dialog compares against this save rather than the one it opened with.
+        changed = self._restart_worthy_changes(saved_al_dict)
+        self.current_al_dict = saved_al_dict
+        if changed:
+            what = ", ".join(changed)
+            QMessageBox.information(
+                self, "Restart Required",
+                f"{what[0].upper()}{what[1:]} changed. Restart TelemFFB for "
+                "this to take effect.")
 
         # adjust logging level (this instance's own panel):
         own = self.instance_panels.get(('system', G.device_type))
@@ -2013,8 +2004,33 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals': self.instance_pid('pedals'),
             'pidCollective': self.instance_pid('collective'),
             'pidTrimWheel': self.instance_pid('trimwheel'),
+            'masterInstance': self.master_button_group.checkedId(),
             'themeId': self.themeButtonGroup.checkedId(),
         }
+
+    #: What only takes effect at the next start, grouped as the notice names
+    #: them.  Devices and the master are process identity; the launch
+    #: options are read when the master starts its children; the theme is
+    #: applied once at startup.
+    RESTART_GROUPS = (
+        ("the selected devices", ('pidJoystick', 'pidPedals',
+                                  'pidCollective', 'pidTrimWheel')),
+        ("the master device", ('masterInstance',)),
+        ("the auto-launch options", ('autolaunchMaster', 'autolaunchJoystick',
+                                     'autolaunchPedals', 'autolaunchCollective',
+                                     'autolaunchTrimWheel', 'startMinJoystick',
+                                     'startMinPedals', 'startMinCollective',
+                                     'startMinTrimWheel', 'startHeadlessJoystick',
+                                     'startHeadlessPedals', 'startHeadlessCollective',
+                                     'startHeadlessTrimWheel')),
+        ("the theme", ('themeId',)),
+    )
+
+    def _restart_worthy_changes(self, saved):
+        """Which of the restart-only groups differ between what the dialog
+        loaded and what it just saved, as the phrases the notice uses."""
+        return [name for name, keys in self.RESTART_GROUPS
+                if any(self.current_al_dict.get(k) != saved.get(k) for k in keys)]
 
     #: Device roles, in the order their tabs appear.
     INSTANCE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel')
