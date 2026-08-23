@@ -4161,6 +4161,162 @@ def device_display_name(role):
     return DEVICE_DISPLAY_NAMES.get(role, str(role).capitalize())
 
 
+def device_ids_key(role):
+    """The settings key holding a device role's USB vendor and product ids.
+
+    Stored as the device reports them rather than parsed back out of its
+    path.  A DirectInput device's path is its DirectInput instance GUID,
+    which carries no ids at all - so deriving them from the path works for
+    HID devices and silently fails for the DirectInput ones.
+    """
+    return 'devids_' + role
+
+
+def format_usb_ids(vid, pid):
+    """``VVVV:PPPP``, or empty when the device did not report real ids."""
+    if not vid or not pid:
+        return ''
+    return f'{int(vid):04X}:{int(pid):04X}'
+
+
+def parse_usb_ids(value):
+    """The (vid, pid) in a stored ``VVVV:PPPP``, or None."""
+    match = re.fullmatch(r'([0-9A-Fa-f]{4}):([0-9A-Fa-f]{4})', str(value or ''))
+    return (int(match.group(1), 16), int(match.group(2), 16)) if match else None
+
+
+def device_ident_key(role):
+    """The settings key holding a device role's product name.
+
+    A display hint only.  Owners rename VPforce devices and vendors reword
+    models, so this can be stale; USB ids are what anything functional is
+    keyed on.
+    """
+    return 'devident_' + role
+
+
+def usb_ids_from_devpath(devpath):
+    r"""The (vid, pid) a Windows device path names, or None.
+
+    Paths look like \\?\HID#VID_FFFF&PID_2054&MI_00#... - the ids are in
+    there, which is what lets a rule be written for a device that is not
+    currently plugged in.
+    """
+    if not devpath:
+        return None
+    # case-insensitive: Windows writes these uppercase, but a path that
+    # has been round-tripped through other tooling may not be
+    match = re.search(r'VID_([0-9A-F]{4})&PID_([0-9A-F]{4})', str(devpath),
+                      re.IGNORECASE)
+    if not match:
+        return None
+    return int(match.group(1), 16), int(match.group(2), 16)
+
+
+#: Slots TelemFFB can configure, in the order they are shown.
+DEVICE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel')
+
+
+def recover_device_identity(settings, devices):
+    """What a configured slot should remember but does not, taken from the
+    hardware that is connected right now.
+
+    Returns ``{settings_key: value}`` for every ``devids_``/``devident_``
+    key that is empty while its slot's ``devpath_`` names a device in
+    ``devices``.  Empty when nothing is missing or nothing is connected to
+    learn it from.
+
+    Two things produce these gaps and neither is the user's doing: a
+    settings base written before the keys existed, and first-launch
+    auto-assignment, which only ever wrote the path.  The ids are the
+    device's identity - a rule or a comparison keyed on a slot with no ids
+    silently matches nothing - and the name is how a dialog shows the
+    device, which without it reads as "unnamed device" next to hardware
+    that is plugged in and working.
+
+    Only empty keys are filled.  A stored name is the one that was on the
+    device when the slot was set, and a rename the owner has not reselected
+    through yet is theirs to keep until they do.  ``devices`` need only
+    carry ``path``, ``vendor_id``, ``product_id`` and ``ident``.
+    """
+    by_path = {}
+    for device in devices:
+        path = getattr(device, 'path', None)
+        if isinstance(path, (bytes, bytearray)):
+            path = path.decode(errors='replace')
+        if path:
+            by_path[str(path)] = device
+
+    updates = {}
+    for role in DEVICE_ROLES:
+        path = str(settings.get(f'devpath_{role}', '') or '')
+        device = by_path.get(path)
+        if device is None:
+            continue
+        key = device_ids_key(role)
+        if not settings.get(key, ''):
+            ids = format_usb_ids(getattr(device, 'vendor_id', 0),
+                                 getattr(device, 'product_id', 0))
+            if ids:
+                updates[key] = ids
+        key = device_ident_key(role)
+        if not settings.get(key, ''):
+            ident = str(getattr(device, 'ident', '') or '')
+            if ident:
+                updates[key] = ident
+    return updates
+
+
+def directinput_selection_devices(settings, enabled=None):
+    """Generic DirectInput FFB devices, as the device selectors list them.
+
+    Empty unless DirectInput support is on: with it off no [DI] entry
+    appears anywhere and the bridge is never loaded, so a stock install
+    behaves exactly as it did before the backend existed.  ``enabled``
+    overrides the stored setting so a dialog can re-list live as the box
+    is ticked.
+
+    VPforce hardware also enumerates as a DirectInput FFB device, so VID
+    0xFFFF is filtered out - those entries come from the native HID
+    enumeration.  Debug override: the registry value ``vpforce_as_dinput``
+    = 1 under HKCU\\Software\\VPforce\\TelemFFB lists VPforce devices as
+    [DI] entries too, so a Rhino can be driven through the DirectInput
+    backend as a second test implementation.
+
+    The devpath encodes the backend (``dinput:{GUID}``) so a selection
+    flows through the existing devpath_* persistence untouched - and so a
+    stored slot can be matched back to the device it names, at startup or
+    in a dialog, by the same string.
+    """
+    if enabled is None:
+        enabled = settings.get('enableDirectInput', False)
+    if not enabled:
+        return []
+    try:
+        from telemffb.hw.ffb_dinput import DInputFFBDevice
+
+        # registry values arrive as strings; bool('0') is True
+        flag = str(settings.get('vpforce_as_dinput', '')).strip().lower()
+        include_vpforce = flag in ('1', 'true', 'yes', 'on')
+        listed = []
+        for dev in DInputFFBDevice.enumerate():
+            if dev.vendor_id == 0xFFFF and not include_vpforce:
+                continue
+            dev.product_string = f"[DI] {dev.product_string}"
+            dev.path = f"dinput:{dev.guid}".encode()
+            listed.append(dev)
+        return listed
+    except Exception as e:
+        # Support is explicitly on at this point, so silence would just
+        # look like "my device is missing".  The usual cause is the
+        # separately distributed bridge DLL not being installed.
+        logging.error(
+            f"DirectInput support is enabled but no devices could be "
+            f"enumerated: {e}. The DInput bridge DLL is required - see the "
+            "TelemFFB DirectInput documentation.")
+        return []
+
+
 def device_pid_key(role):
     """The settings key holding a device role's USB product ID."""
     return 'pid' + device_display_name(role).replace(' ', '')

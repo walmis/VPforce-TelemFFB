@@ -488,6 +488,7 @@ def _initialize_device_connection():
 
     # Attempt to auto-assign unconfigured devpath_* settings based on discovered devices
     _auto_assign_devices(devs)
+    _record_device_identity(devs)
 
     if G.args.device is None and not device_configured:
         # Nothing stored for this device: don't guess at the default PID
@@ -679,6 +680,37 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
 
     except Exception:
         logging.exception("_auto_assign_devices failure")
+
+def _record_device_identity(devs: List[DeviceInfo]):
+    """Write the ids and name of each configured device, where missing.
+
+    Every install that predates these keys - and every slot the auto-assign
+    above has ever filled, since it writes only the path - holds a
+    ``devpath_`` and nothing else.  The ids are what a tap rule is keyed
+    on and what lets one be written while the device is switched off; the
+    name is how a dialog shows the device.  Either gap would otherwise
+    persist until the user happened to reselect the device in the settings
+    dialog, and looks like TelemFFB not recognizing hardware that works.
+
+    Healed here, once, from the devices just enumerated - HID, and
+    DirectInput when that support is on.  Master only, as with every other
+    settings write at startup.  Only empty keys are written: see
+    ``recover_device_identity``.
+    """
+    if not G.master_instance:
+        return
+    try:
+        # DirectInput devices too, while support is on: a stick driven through
+        # the bridge sits in a slot like any other, and the selectors would
+        # otherwise be the only place its identity could be recovered.
+        listed = list(devs) + utils.directinput_selection_devices(G.system_settings)
+        updates = utils.recover_device_identity(G.system_settings, listed)
+        for key, value in updates.items():
+            logging.info(f"Recording {key} = {value!r} for a configured device")
+            G.system_settings.setValue(key, value)
+    except Exception:
+        logging.exception("_record_device_identity failure")
+
 
 def _check_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""

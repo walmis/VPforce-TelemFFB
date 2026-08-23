@@ -34,10 +34,42 @@ from .InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 from .utils import (
-    device_display_name, device_pid_key, validate_vpconf_profile, HiDpiPixmap,
+    device_display_name, device_ident_key, device_ids_key, device_pid_key,
+    directinput_selection_devices, format_usb_ids, validate_vpconf_profile,
+    HiDpiPixmap,
 )
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from .custom_widgets import FFBDeviceListModel
+
+def _same_hardware(a, b):
+    """Whether two selector entries are one physical device.
+
+    Normally the path settles it.  The exception is a VPforce device listed
+    twice when the ``vpforce_as_dinput`` debug flag is on - once natively
+    over HID, once as a DirectInput device - under two different paths (a
+    HID path and an instance GUID) and with no serial on the DirectInput
+    side.  Assigning the native entry to one slot and the DirectInput entry
+    to another would be the same stick in two roles, so the two are matched
+    on their USB ids when exactly one of them is the DirectInput listing.
+
+    Two physically identical VPforce devices are still told apart: both
+    are listed over HID, with their own paths and serials.
+    """
+    if a is None or b is None:
+        return False
+    path_a, path_b = getattr(a, 'path', None), getattr(b, 'path', None)
+    if path_a is not None and path_a == path_b and \
+            getattr(a, 'serial_number', None) == getattr(b, 'serial_number', None):
+        return True
+    di_a = bool(path_a) and bytes(path_a).startswith(b"dinput:")
+    di_b = bool(path_b) and bytes(path_b).startswith(b"dinput:")
+    if di_a == di_b:
+        return False
+    return (getattr(a, 'vendor_id', None), getattr(a, 'product_id', None)) == \
+           (getattr(b, 'vendor_id', None), getattr(b, 'product_id', None)) and \
+        getattr(a, 'vendor_id', None) not in (None, 0)
+
+
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None,):
@@ -300,55 +332,21 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def _enumerate_dinput_devices(enabled=None):
         """Generic DirectInput FFB devices, prepared for the selector model.
 
-        VPforce hardware also enumerates as a DI FFB device, so VID 0xFFFF is
-        filtered out — those entries come from the native HID enumeration.
-        Debug override: list VPforce devices as [DI] entries too, so a Rhino
-        can be driven through the DirectInput backend as a second test
-        implementation (full generic-device behavior: capability gating,
-        CP emulation, no vpconf/firmware).  Enable via the registry value
-        'vpforce_as_dinput' = 1 under HKCU\\Software\\VPforce\\TelemFFB
-        (root, or the master instance's device subkey).
-        The devpath encodes the backend ('dinput:{GUID}') so the selection
-        flows through the existing devpath_* persistence untouched.
+        One definition, shared with startup: the listing is what a stored
+        ``dinput:{GUID}`` slot is matched back to, so the two had better
+        agree.  ``enabled`` overrides the stored setting so the dialog can
+        re-list live as the box is ticked.
         """
-        # Opt-in: with support off, no [DI] entries appear anywhere and the
-        # bridge is never loaded, so a stock install behaves exactly as it did
-        # before DirectInput support existed.  `enabled` overrides the stored
-        # setting so the dialog can re-list live as the box is ticked.
-        if enabled is None:
-            enabled = G.system_settings.get('enableDirectInput', False)
-        if not enabled:
-            return []
-
-        try:
-            from telemffb.hw.ffb_dinput import DInputFFBDevice
-
-            # registry values arrive as strings; bool('0') is True
-            flag = str(G.system_settings.get('vpforce_as_dinput', '')).strip().lower()
-            include_vpforce = flag in ('1', 'true', 'yes', 'on')
-            di_devices = []
-            for dev in DInputFFBDevice.enumerate():
-                if dev.vendor_id == 0xFFFF and not include_vpforce:
-                    continue
-                dev.product_string = f"[DI] {dev.product_string}"
-                dev.path = f"dinput:{dev.guid}".encode()
-                di_devices.append(dev)
-            return di_devices
-        except Exception as e:
-            # Support is explicitly on at this point, so silence would just
-            # look like "my device is missing".  The usual cause is the
-            # separately distributed bridge DLL not being installed.
-            logging.error(
-                f"DirectInput support is enabled but no devices could be "
-                f"enumerated: {e}. The DInput bridge DLL is required - see the "
-                "TelemFFB DirectInput documentation.")
-            return []
+        return directinput_selection_devices(G.system_settings, enabled)
 
     def populateUSBSelectors(self, dinput_enabled=None):
         # Populate the USB device selectors with currently connected devices
         devices = FFBRhino.enumerate()
 
         combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
+        # kept so the tap code can ask what is connected without knowing
+        # which widget holds which role
+        self._device_combos = combo_boxes
 
         # Generic DirectInput FFB devices are joystick-role only for now, so
         # the joystick combo gets its own extended model.
@@ -426,6 +424,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 # clear saved setting
                 try:
                     self._pending_devpaths[f'devpath_{role_name}'] = ''
+                    self._pending_devpaths[device_ident_key(role_name)] = ''
+                    self._pending_devpaths[device_ids_key(role_name)] = ''
                 except Exception:
                     logging.exception('Failed to clear devpath setting')
                 return
@@ -434,6 +434,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if dev is None:
                 try:
                     self._pending_devpaths[f'devpath_{role_name}'] = ''
+                    self._pending_devpaths[device_ident_key(role_name)] = ''
+                    self._pending_devpaths[device_ids_key(role_name)] = ''
                 except Exception:
                     logging.exception('Failed to clear devpath setting')
                 return
@@ -448,6 +450,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
             try:
                 self._pending_devpaths[f'devpath_{role_name}'] = dev_path
+                # remembered so a rule or a dialog can name this device while
+                # it is unplugged; refreshed every time it is selected, since
+                # the owner may have renamed it since
+                self._pending_devpaths[device_ident_key(role_name)] = str(
+                    getattr(dev, 'ident', '') or '')
+                # taken from the device, not parsed back out of its path: a
+                # DirectInput device's path is a GUID and carries no ids
+                self._pending_devpaths[device_ids_key(role_name)] = \
+                    format_usb_ids(getattr(dev, 'vendor_id', 0),
+                                   getattr(dev, 'product_id', 0))
             except Exception:
                 logging.exception('Failed to persist devpath setting')
 
@@ -494,7 +506,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 if other_idx < 0:
                     continue
                 other_dev = other.model().data(other.model().index(other_idx, 0), Qt.ItemDataRole.UserRole)
-                if other_dev is not None and getattr(other_dev, 'serial_number', None) == getattr(dev, 'serial_number', None) and getattr(other_dev, 'path', None) == getattr(dev, 'path', None):
+                if _same_hardware(other_dev, dev):
                     # conflict detected
                     msg = QMessageBox(self)
                     msg.setWindowTitle('Device Conflict')
