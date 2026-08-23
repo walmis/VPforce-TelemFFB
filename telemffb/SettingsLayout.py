@@ -1162,7 +1162,8 @@ class SettingsLayout(QGridLayout):
                 dropbox.setObjectName(f"edb_{item['name']}")
 
                 label_dict_name = item['validvalues']
-                label_dict = getattr(G.settings_mgr, label_dict_name, None)
+                label_dict = G.settings_mgr.resolve_enum_list(
+                    label_dict_name, item['value'])
 
                 if not isinstance(label_dict, dict):
                     dropbox.addItem(f"Label dict '{label_dict_name}' not found or invalid")
