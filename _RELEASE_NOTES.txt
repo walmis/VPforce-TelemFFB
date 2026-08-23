@@ -1,7 +1,7 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  2.1.260823 - August 23, 2026
+##  DRAFT - August 23, 2026
 ############################################
 ## Platform
 - **NEW: One System Settings dialog configures every device**
@@ -19,9 +19,11 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
 
-############################################
-##  2.1.260815 - August 15, 2026
-############################################
+---
+
+## Included from 2.1.260815 - August 15, 2026
+The full previous release, carried here so its many changes are not hidden behind this small patch.
+
 ## Platform
 - **NEW: Aircraft profile notes**
   - Many curated aircraft profiles now ship with notes explaining their quirks - why certain effects are disabled, control-system oddities, and custom-class aircraft where liveries must be cloned from the default profile rather than created new
@@ -66,6 +68,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 
 ## MSFS / X-Plane
 - **NEW: Automated Elevator Trim-Following Calibration** (fixed wing)
+  - See a full demo/walkthrough of the calibration feature here: https://www.youtube.com/watch?v=otveS5mgbu0
   - Trim following has always assumed a 1:1 relationship between trim position and elevator - many aircraft (especially 3rd party) are far from 1:1, causing the nose to wander when trimming with the stick held
   - A wizard-style assistant flies a short automated routine, measures your aircraft's real trim response, and produces a calibrated trim-following curve you can apply and test live in the sim before saving
   - Run it at multiple airspeeds and the results blend into a single speed-aware curve; review, delete, export, and import stored calibrations from the dialog
