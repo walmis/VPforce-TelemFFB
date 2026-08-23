@@ -144,6 +144,9 @@ class BMSManager(TelemParserBase):
         # Connection state
         self._connected = False
         self._connection_attempts = 0
+        #: Set by the listener thread when it is told to stop, so the wait
+        #: between connect attempts ends at once instead of running out.
+        self.stop_event = None
 
         self._pause_state = False
         
@@ -199,7 +202,7 @@ class BMSManager(TelemParserBase):
                 if self._connection_attempts % 6 == 0:  # Log every 6th attempt (1 minute)
                     logger.info(f"Failed to connect to BMS - is BMS Running?")
                 self._connection_attempts += 1
-                time.sleep(10)
+                self._backoff(10)
                 return False
         except Exception as e:
             self._connection_attempts += 1
@@ -207,6 +210,15 @@ class BMSManager(TelemParserBase):
                 logger.error(f"Error connecting to BMS: {e}")
             return False
     
+    def _backoff(self, seconds: float) -> None:
+        """Wait between connect attempts - but wake the moment the listener is
+        told to stop.  A plain sleep here held every instance's exit for up to
+        ten seconds whenever BMS was enabled and not running."""
+        if self.stop_event is not None:
+            self.stop_event.wait(seconds)
+        else:
+            time.sleep(seconds)
+
     def _read_bms_data(self):
         """Read current data from BMS shared memory"""
         try:
