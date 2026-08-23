@@ -1,0 +1,107 @@
+; dinput8.ini - sample configuration for the DirectInput tap wrapper.
+;
+; Settings at their defaults are commented out; uncomment one to change
+; it.  TelemFFB writes a file in this same shape, adds to it when your
+; device selection changes, and never rewrites what is already here -
+; edit freely.
+
+[General]
+; Enable the wrapper (false = pure pass-through, no interception)
+;Enabled=true
+
+; Log level: 0=none, 1=error, 2=warn, 3=info, 4=debug
+;LogLevel=3
+
+; Apply 'tap' and 'sink' rules only while TelemFFB is running, checked
+; once as the game starts.  Leave this true: a wrapper left behind in a
+; game folder then goes inert instead of silently swallowing the game's
+; force feedback.  'block' and scaling rules are never gated by this.
+;
+; Set false to apply them unconditionally, so the game no longer has to be
+; started after TelemFFB - at the cost of a tapped device staying silent
+; until TelemFFB shows up.  Intended for development and power users.
+RequireTelemFFB=true
+
+[FFB]
+; Global force feedback enable (false = block FFB on ALL devices)
+;Enabled=true
+
+; Log all FFB operations (effect create/start/stop/params, commands)
+;LogEffects=true
+
+; Default force scale for all devices (0-100, 100 = full force)
+;DefaultScale=100
+
+; Restart effects automatically after a device reconnects: the wrapper
+; remembers which effects were running and starts them again when the
+; game recreates them.
+;AutoRestart=true
+
+[FFBDevices]
+; Per-device policy.  First matching rule wins; a device with no matching
+; rule is untouched by the wrapper.
+;
+; Format: VVVV:PPPP=action             (USB vendor:product ids, hex)
+;         DeviceNameSubstring=action   (case-insensitive)
+;
+; Actions:
+;   tap     - the game's effects on this device are intercepted and
+;             relayed to TelemFFB, which can then render them locally,
+;             depending on the spring mode setting.  The game still
+;             sees a normal force feedback device and believes it is
+;             rendering, and its exclusive hold on the device is
+;             released so TelemFFB can reach it.  Games that compute or
+;             export FFB telemetry keep doing so.
+;   block   - no force feedback on this device at all
+;   allow   - explicitly allow force feedback (with the global enable off)
+;   sink    - like tap without the relay: the game's effects go nowhere
+;   0-100   - scale force to this percentage (0 = effectively block)
+;
+; USB ids are the safer form and the one TelemFFB writes: a name can be
+; changed by its owner (VPforce devices are renameable), reworded by a
+; vendor, or match more devices than intended - "Pedals" matches anything
+; with that word in it.  Ids also let a rule be written for a device that
+; is not plugged in.  A trailing comment names the device for readability;
+; it is never read back, so a stale one means the hardware changed, not
+; that the rule stopped working.
+;
+; Examples:
+;   FFFF:2054=tap       ; VPforce Rhino - relay its effects to TelemFFB
+;   MSFFB 2=50          ; scale a SideWinder to half force
+;
+; What most DCS setups want - the game's force feedback kept off the
+; pedals and collective, and off any virtual joystick.  Comment a line
+; out if a game drives that device and you want it to.
+vJoy=block          ; virtual joystick - never a force feedback device
+Pedals=block        ; no force feedback on anything named Pedals
+Collective=block    ; or on a collective
+
+[DeviceOrder]
+; Which devices DirectInput reports first.  Optional - leave this section
+; out and nothing is reordered.
+;
+; Format: position=VVVV:PPPP            (USB vendor:product ids, hex)
+;         position=DeviceNameSubstring
+;
+; Windows caches the order devices are reported in, and a game that gives
+; force feedback to the first devices it sees keeps giving it to the same
+; ones.  Blocking a device removes its force feedback but does not give up
+; its place in the queue, so this is the only way to change which stick a
+; game drives - and a tapped device further down the list can be given no
+; effects at all, leaving nothing for TelemFFB to render.
+;
+; Devices listed here are reported first, in this order; anything unlisted
+; keeps its usual position behind them.  The number is the position, not
+; the order the lines are written in.
+;
+; Some games identify a device by its position rather than its name, so
+; reordering can disturb their bindings - which is why this does nothing
+; unless you list something.
+;
+; As with the rules above, a name fragment matches every device containing
+; it: "Rhino" alone would match a VPforce stick, pedals and collective
+; alike.  USB ids cannot be ambiguous, and cannot be renamed out from under
+; the rule.
+;
+; 1=FFFF:2054                 ; the stick first
+; 2=Rhino FFB Pedals          ; then the pedals
