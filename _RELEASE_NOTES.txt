@@ -1,6 +1,25 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  2.1.260823 - August 23, 2026
+############################################
+## Platform
+- **NEW: One System Settings dialog configures every device**
+  - The master's System Settings now carries a panel for each configured device (joystick, pedals, collective, trim wheel) - per-device options are set there and written to that device's settings directly
+  - Child instances no longer need (or have) a settings page of their own; they exist to drive their device and process telemetry
+  - VPforce Configurator (.vpconf) profiles are validated against the device they are selected for, not against whichever instance you happened to open the dialog from
+  - The USB Product ID column is gone; the device selector is the source. A slot with no device assigned can no longer be made the master or given launch options
+- Toggle switches reworked to match the rest of the app.  A flatter look, the handle animates as it slides
+- Safety: compiled builds now refuse to start (with an explanation) when unzipped straight onto the Desktop, into Documents/Downloads, the user profile or OneDrive root, Program Files, Windows, a drive root, or anywhere under Temp. The in-app updater manages the whole folder the executable lives in, so a release run from the Desktop could have had the updater move the entire Desktop into the previous-version backup. A dedicated subfolder of any of those places is fine
+- Fix: exiting TelemFFB could take up to ten seconds before its processes actually closed, and a restart in that window was refused as "already running"
+- Fix: a setting value this build does not understand (for example a spring mode that only exists in dev build) no longer blocks the aircraft from loading
+- Fix: effects are now properly freed when the sim exits and when TelemFFB exits preventing scenarios that may result in hung effects on the device
+
+## MSFS / X-Plane
+- Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
+- Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
+
+############################################
 ##  2.1.260815 - August 15, 2026
 ############################################
 ## Platform
