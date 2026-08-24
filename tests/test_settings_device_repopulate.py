@@ -43,6 +43,13 @@ def _make_dialog(monkeypatch, settings):
                         ('device_di_guid', None)):
         monkeypatch.setattr(G, name, value, raising=False)
     from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    # never the real hardware layer: DirectInput enumeration loads the
+    # bridge DLL and walks the machine's actual devices, which blocks
+    # while a running TelemFFB holds one exclusively
+    monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
+                        staticmethod(lambda enabled=None: []))
+    monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
+                        lambda *a, **k: (True, ''))
     return app, SystemSettingsDialog()
 
 
@@ -101,6 +108,15 @@ def dialog(monkeypatch):
         monkeypatch.setattr(G, name, value, raising=False)
 
     from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    # stub the hardware layer for the same reason as _make_dialog above -
+    # and FFBRhino.enumerate too, which otherwise lists the developer's
+    # actual VPforce devices
+    monkeypatch.setattr('telemffb.SystemSettingsDialog.FFBRhino.enumerate',
+                        staticmethod(lambda *a, **k: []), raising=False)
+    monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
+                        staticmethod(lambda enabled=None: []))
+    monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
+                        lambda *a, **k: (True, ''))
     dlg = SystemSettingsDialog()
     yield dlg
     dlg.deleteLater()
