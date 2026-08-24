@@ -213,6 +213,22 @@ def _describe_params(effect_type: int, params: DibEffectParams) -> str:
 BRIDGE_DOWNLOAD_LOCATION = "<location to be determined>"
 
 
+#: One DIBridge per process (see shared_bridge).  The DLL's state (the
+#: DirectInput context, the device and effect tables) is process-global
+#: regardless, so extra python-side instances only re-log the build banner
+#: and waste an init - and every construction historically ran a fresh
+#: availability probe.
+_shared_bridge: Optional["DIBridge"] = None
+
+
+def shared_bridge() -> "DIBridge":
+    """The process's DIBridge, created on first use."""
+    global _shared_bridge
+    if _shared_bridge is None:
+        _shared_bridge = DIBridge()
+    return _shared_bridge
+
+
 def bridge_availability(dll_path: Optional[str] = None):
     """Whether the DInput bridge DLL can actually be used.
 
@@ -223,6 +239,9 @@ def bridge_availability(dll_path: Optional[str] = None):
     unexplained empty device list.
     """
     try:
+        # a fresh construction, deliberately: this is a probe of the
+        # current truth (paths, expiry), not a user of the bridge - the
+        # shared instance is for the device and enumeration paths
         bridge = DIBridge(dll_path)
     except Exception as e:                    # DIBridgeError, OSError, ...
         searched = (dll_path,) if dll_path else DIBridge.library_paths()
@@ -380,6 +399,17 @@ class DIBridge:
 
     def release(self, device: int):
         self._dll.dib_release(device)
+
+    def device_reset(self, device: int) -> int:
+        """DISFFC_RESET: destroy every effect the DEVICE holds, orphans
+        included, and free the bridge's effect entries for it.  Absent in
+        pre-0.9.1 DLLs; reported as a general failure there."""
+        if self._trace:
+            logging.info(f"DIB device_reset dev#{device}")
+        fn = getattr(self._dll, 'dib_device_reset', None)
+        if fn is None:
+            return DIB_ERR_UNSUPPORTED
+        return fn(device)
 
     def poll(self, device: int) -> DibDeviceState:
         state = DibDeviceState()
@@ -540,6 +570,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         self._dirty = False
         self._pushed_hash = None
         self._override_warned = False
+        self._consecutive_failures = 0
         # condition effects: True while the DirectInput effect is actually
         # playing.  A zero-coefficient condition is muted device-side (the
         # effect is stopped) because an energized-but-zero spring changes
@@ -564,6 +595,10 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
     def started(self):
         return self._started
 
+    #: consecutive generic update/start failures before the device-side
+    #: effect is presumed dead and the handle re-creates itself
+    FAILURES_BEFORE_RECREATE = 3
+
     def invalidate(self):
         """Forget the bridge effect (evicted, device reset, or reconnect) so
         the owning HapticEffect lazily re-creates on next start."""
@@ -571,6 +606,32 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         self._started = False
         self._device_playing = False
         self._pushed_hash = None
+        self._consecutive_failures = 0
+
+    def _note_call_failed(self, rc) -> None:
+        """Self-heal from a device-side effect death.
+
+        A vendor driver can silently destroy downloaded effects (observed:
+        SideWinder drops them when ANOTHER DirectInput device object is
+        created for the hardware, e.g. by an enumeration) - the handle then
+        fails every update forever with a generic error.  After a few
+        consecutive failures the handle invalidates itself and the owning
+        HapticEffect lazily re-creates the effect on the next frame.
+        DIB_ERR_ACQUISITION is exempt: FFB priority loss has its own
+        latched handling and resolves itself when priority returns.
+        """
+        if rc == DIB_ERR_ACQUISITION:
+            return
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= self.FAILURES_BEFORE_RECREATE:
+            # Dead effect interfaces come in batches, and the "dead" effects
+            # are usually ORPHANS - still playing on the device, unreachable
+            # through their invalidated interfaces (E_HANDLE; SideWinder
+            # does this to every downloaded effect whenever any process
+            # runs a DirectInput device enumeration).  Only a device-level
+            # reset clears them, so recovery is device-wide: reset, forget
+            # every handle, and let the effects re-create lazily.
+            self.device.recover_effects(reason=repr(self))
 
     def _push(self):
         """Send params to the bridge if they changed since the last push."""
@@ -583,8 +644,15 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         rc = self.device.bridge.effect_update(self.effect_id, self.params)
         if rc == DIB_OK:
             self._pushed_hash = h
+            self._consecutive_failures = 0
         else:
-            logging.warning(f"effect_update failed ({rc}) for {self!r}")
+            # first failure of a run at WARNING; the repeats before the
+            # recovery threshold are bookkeeping, and the device-wide
+            # recovery line carries the real signal
+            log = (logging.warning if self._consecutive_failures == 0
+                   else logging.debug)
+            log(f"effect_update failed ({rc}) for {self!r}")
+            self._note_call_failed(rc)
 
     def _is_zero_condition(self) -> bool:
         """All coefficients zero: the effect commands no force at any
@@ -653,10 +721,14 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             self._started = True
             self._device_playing = True
             self.device.note_effect_started(self)
+            self._consecutive_failures = 0
         elif rc == DIB_ERR_ACQUISITION:
             logging.debug(f"effect_start blocked by FFB priority for {self!r}")
         else:
-            logging.warning(f"effect_start failed ({rc}) for {self!r}")
+            log = (logging.warning if self._consecutive_failures == 0
+                   else logging.debug)
+            log(f"effect_start failed ({rc}) for {self!r}")
+            self._note_call_failed(rc)
         return self
 
     def stop(self):
@@ -777,7 +849,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
     def __init__(self, guid: str, bridge=None, poll_interval_ms: int = 1) -> None:
         self.guid = guid
-        self.bridge = bridge if bridge is not None else DIBridge()
+        self.bridge = bridge if bridge is not None else shared_bridge()
         self.info = self._find_info(guid)
         self.firmware_version = None
         self._button_state: int = 0
@@ -794,6 +866,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._acquisition_warned = False
 
         self._shutdown = False
+        self._last_recovery = 0.0
 
         self._handle = self.bridge.open(guid)
 
@@ -821,7 +894,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
     @staticmethod
     def enumerate(bridge=None) -> List[DIDeviceInfo]:
-        bridge = bridge if bridge is not None else DIBridge()
+        bridge = bridge if bridge is not None else shared_bridge()
         return [DIDeviceInfo(
             guid=d.get("guid", ""),
             product_string=d.get("name", "?"),
@@ -919,6 +992,41 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                 pass
             self._handle = None
         logging.info(f"DirectInput device released: {self.info.product_string}")
+
+    #: minimum spacing of device-wide effect recoveries; a burst of dead
+    #: handles discovered in one frame must trigger exactly one reset
+    RECOVERY_DEBOUNCE_S = 1.0
+
+    def recover_effects(self, reason: str = ""):
+        """Device-wide effect recovery: reset the device (destroying every
+        effect it holds, orphans included) and invalidate all handles so
+        their owners lazily re-create - the effects are back within a frame
+        or two.
+
+        The escape hatch for drivers that invalidate downloaded-effect
+        interfaces wholesale while the effects keep PLAYING (SideWinder,
+        on any process's DirectInput EnumDevices): the orphans cannot be
+        stopped individually, and without the reset each re-created effect
+        doubles forces over its stranded predecessor.
+        """
+        now = time.monotonic()
+        if now - getattr(self, '_last_recovery', 0.0) < self.RECOVERY_DEBOUNCE_S:
+            return
+        self._last_recovery = now
+        logging.warning(
+            f"DirectInput device effect recovery ({reason or 'requested'}): "
+            "resetting the device and re-creating all effects")
+        try:
+            rc = self.bridge.device_reset(self._handle)
+            if rc != DIB_OK:
+                logging.warning(f"device_reset failed ({rc}); "
+                                "continuing with handle invalidation")
+        except Exception:
+            logging.exception("device_reset failed")
+        for ref in self._effect_handles:
+            effect = ref()
+            if effect:
+                effect.invalidate()
 
     def _begin_reconnect(self):
         self._reconnecting = True

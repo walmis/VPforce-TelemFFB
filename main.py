@@ -1224,6 +1224,18 @@ def _cleanup_on_exit(dev_serial):
         except Exception:
             logging.error("Unable to reset device deadzone.. device likely disconnected")
 
+        # Release the device properly rather than letting the process die
+        # with it: the DirectInput release path device-resets first, which
+        # is the ONLY thing that clears effects a driver glitch orphaned
+        # away from their interfaces - those kept rendering on the hardware
+        # after exit (a stranded constant force held the stick forward).
+        try:
+            shutdown = getattr(HapticEffect.device, 'shutdown', None)
+            if shutdown is not None:
+                shutdown()
+        except Exception:
+            logging.error("Unable to release the device on exit")
+
 def _init_excepthooks():
     orig_stdout = sys.stdout
     # Configure global exception handler for better error reporting

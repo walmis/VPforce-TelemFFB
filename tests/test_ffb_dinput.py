@@ -9,7 +9,8 @@ emulation, and button/hat signal emission.
 import pytest
 
 from telemffb.hw.ffb_dinput import (
-    DIB_ERR_DEVICE_FULL, DIB_OK, DINPUT_CAPABILITIES,
+    DIB_ERR_ACQUISITION, DIB_ERR_DEVICE_FULL, DIB_ERR_GENERAL, DIB_OK,
+    DINPUT_CAPABILITIES,
     DibDeviceState, DibEffectParams,
     DIDeviceInfo, DInputEffectHandle, DInputFFBDevice,
 )
@@ -54,6 +55,12 @@ class FakeDIBridge:
     def release(self, device):
         self.effects.clear()
         self.started.clear()
+
+    def device_reset(self, device):
+        self.reset_calls = getattr(self, 'reset_calls', 0) + 1
+        self.effects.clear()
+        self.started.clear()
+        return DIB_OK
 
     def poll(self, device):
         if self.poll_error:
@@ -747,3 +754,89 @@ class TestShutdown:
         device.shutdown()
         device.shutdown()
         assert device._handle is None
+
+
+class TestUpdateFailureSelfHeal:
+    """A vendor driver can silently destroy downloaded effects (observed on
+    SideWinder when an enumeration created a second device object for held
+    hardware): every update then fails forever with a generic error.  The
+    handle must presume the device-side effect dead after a few consecutive
+    failures and invalidate itself, so the owning HapticEffect lazily
+    re-creates the effect on the next frame."""
+
+    def _failing_handle(self, bridge):
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        handle = device.create_effect(EFFECT_CONSTANT)
+        bridge.effect_update = lambda effect, params: DIB_ERR_GENERAL
+        return handle
+
+    def _fail_push(self, handle, magnitude):
+        handle.params.constant_magnitude = magnitude   # defeat the hash skip
+        handle._push()
+
+    def test_persistent_update_failure_triggers_device_recovery(self, bridge):
+        handle = self._failing_handle(bridge)
+        for magnitude in (1, 2):
+            self._fail_push(handle, magnitude)
+            assert handle.effect_id                    # not yet
+        self._fail_push(handle, 3)
+        assert handle.effect_id == 0                   # presumed dead
+        assert not handle._started
+        assert getattr(bridge, 'reset_calls', 0) == 1  # device-level reset
+
+    def test_success_resets_the_failure_count(self, bridge):
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        handle = device.create_effect(EFFECT_CONSTANT)
+        good_update = bridge.effect_update
+        bridge.effect_update = lambda effect, params: DIB_ERR_GENERAL
+        self._fail_push(handle, 1)
+        self._fail_push(handle, 2)
+        bridge.effect_update = good_update
+        self._fail_push(handle, 3)                     # succeeds: counter resets
+        bridge.effect_update = lambda effect, params: DIB_ERR_GENERAL
+        self._fail_push(handle, 4)
+        self._fail_push(handle, 5)
+        assert handle.effect_id                        # 2 + 2, never 3 in a row
+
+    def test_acquisition_loss_never_invalidates(self, bridge):
+        """FFB priority loss has its own latched handling and resolves when
+        priority returns - churning re-creates would fight it."""
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        handle = device.create_effect(EFFECT_CONSTANT)
+        bridge.effect_update = lambda effect, params: DIB_ERR_ACQUISITION
+        for magnitude in range(1, 8):
+            self._fail_push(handle, magnitude)
+        assert handle.effect_id                        # still the same effect
+
+    def test_start_failures_also_heal(self, bridge):
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        handle = device.create_effect(EFFECT_CONSTANT)
+        bridge.effect_start = lambda effect, iterations=1: DIB_ERR_GENERAL
+        for _ in range(3):
+            handle.start()
+        assert handle.effect_id == 0
+
+    def test_recovery_is_device_wide_and_clears_orphans(self, bridge):
+        """'Dead' effects are usually ORPHANS - still playing on the device,
+        unreachable through their interfaces (E_HANDLE) - and they die in
+        batches.  Recovery must be one device-level reset (the only thing
+        that clears orphans) that invalidates EVERY handle for lazy
+        re-creation, not per-effect churn."""
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        failing = device.create_effect(EFFECT_CONSTANT)
+        bystander = device.create_effect(EFFECT_SINE)
+        bridge.effect_update = lambda effect, params: DIB_ERR_GENERAL
+        for magnitude in (1, 2, 3):
+            self._fail_push(failing, magnitude)
+        assert failing.effect_id == 0
+        assert bystander.effect_id == 0            # everyone re-creates
+        assert not bridge.effects                  # device memory wiped
+        assert bridge.reset_calls == 1
+
+    def test_recovery_bursts_are_debounced(self, bridge):
+        """A burst of dead handles discovered in one frame must trigger
+        exactly one reset."""
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        device.recover_effects(reason="test")
+        device.recover_effects(reason="test")
+        assert bridge.reset_calls == 1
