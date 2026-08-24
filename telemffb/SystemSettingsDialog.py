@@ -23,7 +23,7 @@ import html
 import logging
 import os
 
-from PyQt6 import QtCore
+from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout
@@ -249,7 +249,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """
         self.tabWidget.setStyleSheet(main_tab_format)
 
+        # open on the tab the user last saved from (stored by name, so
+        # tab reshuffles never send anyone to the wrong page)
+        last = str(G.system_settings.get('sysDialogTab', '') or '')
         self.tabWidget.setCurrentIndex(0)
+        for i in range(self.tabWidget.count()):
+            if self.tabWidget.widget(i).objectName() == last:
+                self.tabWidget.setCurrentIndex(i)
+                break
         self.simTabWidget.setCurrentIndex(0)
         
 
@@ -1638,6 +1645,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             logging.exception('Failed to check DirectInput tap configs after a '
                               'device change')
 
+        # remembered by name: the dialog reopens on the tab the user
+        # last saved from
+        try:
+            G.system_settings.setValue(
+                'sysDialogTab', self.tabWidget.currentWidget().objectName())
+        except Exception:
+            pass
+
         G.sim_listeners.restart_all()
 
         if G.master_instance and G.launched_instances:
@@ -2441,20 +2456,43 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return roles
 
     def _build_instance_panels(self):
-        """One panel per configured device, per section.
+        """One page per configured device on the Devices tab, each holding
+        both of the device's settings panels (system + startup) - one tab
+        strip instead of the two the old System/Startup split needed.
 
-        The .ui carries an empty tab widget per page; the tabs themselves are
-        filled here because which devices exist is only known at runtime.
+        The .ui carries the empty tab widget; pages are built here because
+        which devices exist is only known at runtime.  The panels dict
+        keeps its (section, role) keys so save/load/validation and the
+        vpconf gates run unchanged.
         """
         self.instance_panels = {}      # (section, role) -> panel
-        for section, fields, tabs in (
-                ('system', SYSTEM_FIELDS, self.instance_tabs_system),
-                ('startup', STARTUP_FIELDS, self.instance_tabs_startup)):
-            for role in self._configured_roles():
+        self._role_pages = {}          # role -> the page holding its panels
+        # both names the rest of the code and the tests know point at the
+        # single merged tab widget
+        self.instance_tabs_system = self.instance_tabs_devices
+        self.instance_tabs_startup = self.instance_tabs_devices
+        for role in self._configured_roles():
+            self.instance_tabs_devices.addTab(
+                self._build_role_page(role), device_display_name(role))
+
+    def _build_role_page(self, role):
+        """One device's page: its system panel over its startup panel."""
+        page = QtWidgets.QWidget()
+        page.role = role
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(6)
+        for section, fields in (('system', SYSTEM_FIELDS),
+                                ('startup', STARTUP_FIELDS)):
+            panel = self.instance_panels.get((section, role))
+            if panel is None:
                 panel = InstanceSettingsPanel(
                     role, fields, browse_handler=self.browse_instance_vpconf)
-                tabs.addTab(panel, device_display_name(role))
                 self.instance_panels[(section, role)] = panel
+            layout.addWidget(panel)
+        layout.addStretch(1)
+        self._role_pages[role] = page
+        return page
 
     def panels_for(self, role):
         """Both of a device's panels."""
@@ -2482,24 +2520,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         whatever they hold (settings for an unconfigured role are inert
         but preserved)."""
         desired = self._selected_roles()
-        for section, fields, tabs in (
-                ('system', SYSTEM_FIELDS, self.instance_tabs_system),
-                ('startup', STARTUP_FIELDS, self.instance_tabs_startup)):
-            for i in reversed(range(tabs.count())):
-                panel = tabs.widget(i)
-                if getattr(panel, 'role', None) not in desired:
-                    tabs.removeTab(i)
-            for pos, role in enumerate(desired):
-                key = (section, role)
-                panel = self.instance_panels.get(key)
-                if panel is None:
-                    panel = InstanceSettingsPanel(
-                        role, fields,
-                        browse_handler=self.browse_instance_vpconf)
+        tabs = self.instance_tabs_devices
+        for i in reversed(range(tabs.count())):
+            if getattr(tabs.widget(i), 'role', None) not in desired:
+                tabs.removeTab(i)
+        for pos, role in enumerate(desired):
+            page = self._role_pages.get(role)
+            if page is None:
+                page = self._build_role_page(role)
+                for panel in self.panels_for(role):
                     panel.load(G.system_settings)
-                    self.instance_panels[key] = panel
-                if tabs.indexOf(panel) < 0:
-                    tabs.insertTab(pos, panel, device_display_name(role))
+            if tabs.indexOf(page) < 0:
+                tabs.insertTab(pos, page, device_display_name(role))
 
     def validate_instance_settings(self):
         """Check every device's Configurator profiles, not just this one's.

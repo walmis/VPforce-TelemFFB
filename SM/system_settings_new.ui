@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <ui version="4.0">
  <class>SystemDialog</class>
  <widget class="QDialog" name="SystemDialog">
@@ -25,7 +25,7 @@
      <item>
       <widget class="QPushButton" name="resetButton">
        <property name="text">
-        <string>Reset to  Defaults</string>
+        <string>Reset to Defaults</string>
        </property>
       </widget>
      </item>
@@ -52,6 +52,47 @@
      <property name="currentIndex">
       <number>1</number>
      </property>
+     <widget class="QWidget" name="tab_Devices">
+      <attribute name="title">
+       <string>Devices</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="devicesTabLayout">
+       <item>
+        <widget class="QWidget" name="masterLaunchOptions" native="true">
+         <layout class="QVBoxLayout" name="deviceCardsHostLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelInstanceDevices">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+           <underline>true</underline>
+          </font>
+         </property>
+         <property name="text">
+          <string>Device Settings:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTabWidget" name="instance_tabs_devices" />
+       </item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="tab_System">
       <attribute name="title">
        <string>System</string>
@@ -113,8 +154,14 @@
           </item>
           <item row="0" column="0" colspan="3">
            <widget class="QLabel" name="labelTheme">
+            <property name="font">
+             <font>
+              <bold>true</bold>
+              <underline>true</underline>
+             </font>
+            </property>
             <property name="text">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700; text-decoration: underline;"&gt;Theme (Global):&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string>Theme:</string>
             </property>
            </widget>
           </item>
@@ -185,24 +232,6 @@
           </size>
          </property>
         </spacer>
-       </item>
-       <item row="4" column="1" colspan="2">
-        <widget class="QWidget" name="masterLaunchOptions" native="true">
-         <layout class="QVBoxLayout" name="deviceCardsHostLayout">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-         </layout>
-        </widget>
        </item>
        <item row="0" column="0" colspan="3">
         <layout class="QHBoxLayout" name="systemSplit" stretch="0,0,1">
@@ -390,36 +419,78 @@
            </item>
           </layout>
          </item>
-         <item>
-          <widget class="Line" name="systab_vline">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
+        </layout>
+       </item>
+       <item row="4" column="1" colspan="2">
+        <layout class="QGridLayout" name="gridLayout_4">
+         <property name="horizontalSpacing">
+          <number>15</number>
+         </property>
+         <item row="0" column="0" colspan="2">
+          <widget class="QLabel" name="label_11">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="font">
+            <font>
+             <bold>true</bold>
+             <underline>true</underline>
+            </font>
+           </property>
+           <property name="text">
+            <string>Startup Behavior:</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
            </property>
           </widget>
          </item>
-         <item>
-          <layout class="QVBoxLayout" name="instanceSystemColumn">
-           <item>
-            <widget class="QLabel" name="labelInstanceSystem">
-             <property name="font">
-              <font>
-               <bold>true</bold>
-               <underline>true</underline>
-              </font>
-             </property>
-             <property name="text">
-              <string>Instance System Settings:</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QTabWidget" name="instance_tabs_system">
-             <property name="currentIndex">
-              <number>0</number>
-             </property>
-            </widget>
-           </item>
-          </layout>
+         <item row="1" column="1">
+          <widget class="LabeledToggle" name="cb_startWithWindows">
+           <property name="text">
+            <string>Start with Windows</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="2">
+          <widget class="LabeledToggle" name="cb_masterStartMin">
+           <property name="text">
+            <string>Start Minimized</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="LabeledToggle" name="cb_startToTray">
+           <property name="text">
+            <string>Start in System Tray</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="2">
+          <widget class="LabeledToggle" name="cb_closeToTray">
+           <property name="text">
+            <string>Closing App Sends to Tray</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <spacer name="spacer_startup">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>2</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </item>
@@ -1540,139 +1611,6 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="tab_Startup">
-      <attribute name="title">
-       <string>Startup Behavior</string>
-      </attribute>
-      <layout class="QGridLayout" name="gridLayout_17">
-       <item row="2" column="0">
-        <layout class="QGridLayout" name="gridLayout_6">
-         <property name="horizontalSpacing">
-          <number>15</number>
-         </property>
-         <item row="0" column="0" colspan="3">
-          <widget class="QLabel" name="labelInstanceStartup">
-           <property name="font">
-            <font>
-             <bold>true</bold>
-             <underline>true</underline>
-            </font>
-           </property>
-           <property name="text">
-            <string>Per-Device Startup Behavior:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0" colspan="3">
-          <widget class="QTabWidget" name="instance_tabs_startup">
-           <property name="currentIndex">
-            <number>0</number>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="0" column="0">
-        <layout class="QGridLayout" name="gridLayout_4">
-         <property name="horizontalSpacing">
-          <number>15</number>
-         </property>
-         <item row="0" column="0" colspan="2">
-          <widget class="QLabel" name="label_11">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700; text-decoration: underline;"&gt;Startup Behavior:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="LabeledToggle" name="cb_startWithWindows">
-           <property name="text">
-            <string>Start with Windows</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2">
-          <widget class="LabeledToggle" name="cb_masterStartMin">
-           <property name="text">
-            <string>Start Minimized</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="LabeledToggle" name="cb_startToTray">
-           <property name="text">
-            <string>Start in System Tray</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="2">
-          <widget class="LabeledToggle" name="cb_closeToTray">
-           <property name="text">
-            <string>Closing App Sends to Tray</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0">
-          <spacer name="spacer_startup">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>2</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </item>
-       <item row="1" column="0">
-        <widget class="Line" name="line_6">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>15</height>
-          </size>
-         </property>
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <spacer name="verticalSpacer_6">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>188</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </widget>
     </widget>
    </item>
   </layout>
@@ -1709,10 +1647,6 @@
   <tabstop>cb_motion</tabstop>
   <tabstop>cb_ffb</tabstop>
   <tabstop>pb_add_dest</tabstop>
-  <tabstop>cb_startWithWindows</tabstop>
-  <tabstop>cb_masterStartMin</tabstop>
-  <tabstop>cb_startToTray</tabstop>
-  <tabstop>cb_closeToTray</tabstop>
   <tabstop>resetButton</tabstop>
   <tabstop>pathXPLANE</tabstop>
   <tabstop>browseXPLANE</tabstop>

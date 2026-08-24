@@ -69,7 +69,7 @@ def _blocks(page):
 
 
 class TestNoStackedWidth:
-    @pytest.mark.parametrize("tab", ["System", "Startup Behavior"])
+    @pytest.mark.parametrize("tab", ["Devices", "System"])
     def test_a_page_is_as_wide_as_its_widest_block(self, dialog, tab):
         index = next(i for i in range(dialog.tabWidget.count())
                      if dialog.tabWidget.tabText(i) == tab)

@@ -95,7 +95,7 @@ QFrame#deviceCardHead {
 }
 QLabel#sectionLabel {
     color: palette(text);
-    font-weight: 600;
+    font-weight: bold;
 }
 """ % {'head_bg': head_bg, 'border': border}
 

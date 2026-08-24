@@ -254,3 +254,44 @@ class TestInstanceTabsFollowSelection:
             devident_collective='Collective'))
         assert 'collective' in self._tab_roles(
             world.dialog.instance_tabs_system)
+
+
+class TestThreeTabLayout:
+    """Devices first (it is what most visits are for), System holds only
+    app globals (startup globals folded in), the Startup tab is gone, and
+    each device page carries BOTH of its settings panels."""
+
+    def test_tab_order_and_titles(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        tabs = world.dialog.tabWidget
+        titles = [tabs.tabText(i) for i in range(tabs.count())]
+        assert titles == ['Devices', 'System', 'Simulator Setup']
+
+    def test_a_role_page_holds_both_of_its_panels(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        dlg = world.dialog
+        page = dlg._role_pages['joystick']
+        assert dlg.instance_panels[('system', 'joystick')] in page.children()
+        assert dlg.instance_panels[('startup', 'joystick')] in page.children()
+        # both legacy names point at the one merged tab widget
+        assert dlg.instance_tabs_system is dlg.instance_tabs_devices
+        assert dlg.instance_tabs_startup is dlg.instance_tabs_devices
+
+    def test_the_dialog_reopens_on_the_tab_last_saved_from(
+            self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        tabs = world.dialog.tabWidget
+        system_index = next(i for i in range(tabs.count())
+                            if tabs.tabText(i) == 'System')
+        tabs.setCurrentIndex(system_index)
+        assert world.save()
+        assert world.settings.get('sysDialogTab') == 'tab_System'
+        reopened = World(tmp_path / 'reopen', monkeypatch, random.Random(1),
+                         settings=dict(world.settings))
+        assert reopened.dialog.tabWidget.currentWidget().objectName() == \
+            'tab_System'
+
+    def test_a_fresh_install_opens_on_devices(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        assert world.dialog.tabWidget.currentWidget().objectName() == \
+            'tab_Devices'
