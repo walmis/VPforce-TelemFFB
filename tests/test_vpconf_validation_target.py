@@ -223,17 +223,24 @@ class TestLaunchOptionsFollowTheDevice:
     def test_an_empty_slot_cannot_be_the_master(self, dialog):
         assert not dialog.rb_master_p.isEnabled()
 
-    def test_an_empty_slot_has_no_launch_options(self, dialog):
-        assert not dialog.cb_al_enable_p.isEnabled()
-        assert not dialog.cb_min_enable_p.isEnabled()
-        assert not dialog.cb_headless_p.isEnabled()
+    def test_an_empty_slot_still_offers_its_switch(self, dialog):
+        """The switch is the door into configuring an empty role - it must
+        work with nothing picked (the save is what refuses a switched-on
+        role with no device)."""
+        card = dialog.device_cards.cards['pedals']
+        assert card.launch_toggle.isEnabled()
+        assert not card.window_mode.isEnabled()   # follows the switch
 
     def test_assigning_a_device_opens_them(self, dialog):
         self._assign(dialog, 'cb_select_p', FakeDevice(PEDALS_PID, "Pedals"))
+        card = dialog.device_cards.cards['pedals']
+        assert card.launch_toggle.isEnabled()
+        # the master radio waits for the auto-launch switch: an enabled
+        # role is one that launches (while auto-launch is globally on)
+        assert not dialog.rb_master_p.isEnabled()
+        dialog.cb_al_enable_p.setChecked(True)
         assert dialog.rb_master_p.isEnabled()
-        assert dialog.cb_al_enable_p.isEnabled()
-        assert dialog.cb_min_enable_p.isEnabled()
-        assert dialog.cb_headless_p.isEnabled()
+        assert card.window_mode.isEnabled()
 
     def test_auto_launch_still_gates_its_own_column(self, dialog):
         """Two conditions, both required: a device to launch, and
@@ -241,18 +248,40 @@ class TestLaunchOptionsFollowTheDevice:
         self._assign(dialog, 'cb_select_p', FakeDevice(PEDALS_PID, "Pedals"))
         dialog.cb_al_enable.setChecked(False)
         dialog.toggle_al_widgets()
-        assert not dialog.cb_al_enable_p.isEnabled()
-        # being the master instance is not an auto-launch setting
+        card = dialog.device_cards.cards['pedals']
+        assert not card.launch_toggle.isEnabled()
+        # being the master instance is not an auto-launch setting: with
+        # auto-launch globally off, the radio is free
         assert dialog.rb_master_p.isEnabled()
 
     def test_a_disconnected_device_keeps_its_settings(self, dialog):
-        """A device that is merely unplugged shows as (None); greying its
-        options must not also clear them, or an unplugged pedal set would
-        silently lose its auto-launch on the next save."""
+        """A device that is merely unplugged shows as (None); its
+        auto-launch state must survive untouched, or an unplugged pedal
+        set would silently lose its auto-launch on the next save."""
         dialog.cb_al_enable_p.setChecked(True)
         dialog.toggle_device_launch_widgets()
-        assert not dialog.cb_al_enable_p.isEnabled()
+        card = dialog.device_cards.cards['pedals']
         assert dialog.cb_al_enable_p.isChecked()
+        assert card.launch_toggle.isChecked()      # the switch shows it too
+
+    def test_an_unconfigured_role_collapses_until_switched_on(self, dialog):
+        """An unused role is a slim header; flipping its switch expands
+        the card so a device can be picked."""
+        card = dialog.device_cards.cards['pedals']       # no device assigned
+        assert not card.body_host.isVisibleTo(card)      # collapsed
+        dialog.cb_al_enable_p.setChecked(True)           # = the switch
+        assert card.body_host.isVisibleTo(card)          # the door opens
+
+    def test_switched_off_role_collapses_but_keeps_config(self, dialog):
+        """Auto-launch off folds the card to its header; the device rows
+        (and their settings) survive underneath."""
+        self._assign(dialog, 'cb_select_p', FakeDevice(PEDALS_PID, "Pedals"))
+        card = dialog.device_cards.cards['pedals']
+        assert not card.body_host.isVisibleTo(card)      # collapsed
+        assert card.collapsed_device.isVisibleTo(card)   # named in the header
+        assert 'Pedals' in card.collapsed_device.text()
+        dialog.cb_al_enable_p.setChecked(True)
+        assert card.body_host.isVisibleTo(card)          # expands
 
 
 class TestTheMasterRowHasNoLaunchOptions:
@@ -266,13 +295,6 @@ class TestTheMasterRowHasNoLaunchOptions:
     Which row is the master's is a fact about the state, so it is settled by
     the same sync that greys out unassigned devices.
     """
-
-    ROWS = {
-        'joystick': ('rb_master_j', 'cb_al_enable_j', 'cb_min_enable_j', 'cb_headless_j'),
-        'pedals': ('rb_master_p', 'cb_al_enable_p', 'cb_min_enable_p', 'cb_headless_p'),
-        'collective': ('rb_master_c', 'cb_al_enable_c', 'cb_min_enable_c', 'cb_headless_c'),
-        'trimwheel': ('rb_master_t', 'cb_al_enable_t', 'cb_min_enable_t', 'cb_headless_t'),
-    }
 
     @pytest.fixture
     def dialog(self, monkeypatch):
@@ -308,40 +330,45 @@ class TestTheMasterRowHasNoLaunchOptions:
             combo.setModel(FFBDeviceListModel([FakeDevice(pid, ident)]))
             combo.setCurrentIndex(1)
         dlg.cb_al_enable.setChecked(True)
+        for suffix in 'jpct':
+            getattr(dlg, f'cb_al_enable_{suffix}').setChecked(True)
         dlg.toggle_device_launch_widgets()
         yield dlg
         dlg.deleteLater()
         app.processEvents()
 
-    def _hidden(self, dialog, role):
-        return [getattr(dialog, n).isHidden()
-                for n in self.ROWS[role][1:]]
+    def _controls_hidden(self, dialog, role):
+        card = dialog.device_cards.cards[role]
+        return (not card.launch_toggle.isVisibleTo(card)
+                and not card.window_mode.isVisibleTo(card))
 
-    def test_the_master_row_is_hidden_without_anyone_clicking(self, dialog):
-        assert all(self._hidden(dialog, 'joystick'))
+    def test_the_master_card_hides_its_launch_controls(self, dialog):
+        assert self._controls_hidden(dialog, 'joystick')
 
     @pytest.mark.parametrize("role", ['pedals', 'collective', 'trimwheel'])
-    def test_every_other_row_keeps_its_options(self, dialog, role):
-        assert not any(self._hidden(dialog, role)), role
+    def test_every_other_card_keeps_its_controls(self, dialog, role):
+        assert not self._controls_hidden(dialog, role), role
 
-    def test_switching_master_moves_the_hidden_row(self, dialog):
+    def test_switching_master_moves_the_hidden_controls(self, dialog):
         dialog.rb_master_p.click()
-        assert all(self._hidden(dialog, 'pedals'))
-        assert not any(self._hidden(dialog, 'joystick'))
+        assert self._controls_hidden(dialog, 'pedals')
+        assert not self._controls_hidden(dialog, 'joystick')
 
-    def test_the_trim_wheel_hides_its_own_headless_box(self, dialog):
-        """The old per-branch code hid the collective's headless box when
-        the trim wheel became master - a copy-paste slip."""
-        dialog.rb_master_t.click()
-        assert dialog.cb_headless_t.isHidden()
-        assert not dialog.cb_headless_c.isHidden()
+    def test_the_master_card_never_collapses(self, dialog):
+        """The master launches itself - its device rows must stay in
+        reach whatever its (hidden, inert) auto-launch state says."""
+        card = dialog.device_cards.cards['joystick']
+        assert card.body_host.isVisibleTo(card)
 
-    def test_becoming_master_clears_its_launch_settings(self, dialog):
+    def test_becoming_master_keeps_its_launch_settings(self, dialog):
+        """They hide while master (launch ignores them anyway), but the
+        values survive - clearing them meant an exploratory master change
+        and back silently wiped a role's startup configuration."""
         dialog.cb_al_enable_p.setChecked(True)
         dialog.cb_headless_p.setChecked(True)
         dialog.rb_master_p.click()
-        assert not dialog.cb_al_enable_p.isChecked()
-        assert not dialog.cb_headless_p.isChecked()
+        assert dialog.cb_al_enable_p.isChecked()
+        assert dialog.cb_headless_p.isChecked()
 
     def test_an_unassigned_device_cannot_become_master(self, dialog, monkeypatch):
         from telemffb.custom_widgets import FFBDeviceListModel

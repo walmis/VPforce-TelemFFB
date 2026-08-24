@@ -1263,13 +1263,17 @@ class MainWindow(QMainWindow):
 
     def refresh_device_labels(self):
         """Name the hardware under each status icon (the stored per-slot
-        identity), flashing any icon whose device just changed."""
+        identity) and show its icon choice, flashing any icon whose device
+        just changed."""
         for role in self.device_panel.get_device_names():
             try:
                 label = utils.device_panel_label(role, G.system_settings)
+                icon = utils.device_panel_icon(role, G.system_settings)
             except Exception:
-                label = ''
-            if self.device_panel.set_device_label(role, label):
+                label, icon = '', ''
+            changed = self.device_panel.set_device_label(role, label)
+            changed = self.device_panel.set_device_icon(role, icon) or changed
+            if changed:
                 self.device_panel.flash_device(role)
 
     def force_reload_aircraft(self):

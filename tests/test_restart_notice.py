@@ -106,3 +106,85 @@ class TestWhenItFires:
         world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
         assert world.save()
         assert world.device_switches == 0
+
+
+class TestMasterChangeKeepsLaunchFlags:
+    def test_exploring_the_master_choice_and_back_loses_nothing(
+            self, app, tmp_path, monkeypatch):
+        """Designating a role master used to CLEAR its launch checkboxes -
+        an exploratory master change and back silently wiped that role's
+        startup configuration.  Launch ignores the master's own flags, so
+        the values now survive untouched (hidden while master)."""
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        dlg = world.dialog
+        dlg.cb_al_enable.setChecked(True)
+        dlg.cb_al_enable_p.setChecked(True)
+        dlg.cb_headless_p.setChecked(True)
+        dlg.master_button_group.button(2).click()   # pedals as master...
+        dlg.master_button_group.button(1).click()   # ...and back
+        assert dlg.cb_al_enable_p.isChecked()
+        assert dlg.cb_headless_p.isChecked()
+
+
+class TestAutoLaunchNeedsADevice:
+    def test_a_switched_on_role_with_no_device_refuses_to_save(
+            self, app, tmp_path, monkeypatch):
+        """The switch works with nothing picked (it is the door into
+        configuring an empty role), so the save is the guard: a role
+        cannot leave the dialog auto-launching nothing."""
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        world.dialog.cb_al_enable.setChecked(True)
+        world.dialog.cb_al_enable_c.setChecked(True)   # collective: no device
+        assert not world.save()
+        assert any('Collective' in text and 'auto-launch' in text
+                   for _t, text in world.policy.warned)
+
+
+class TestWindowMode:
+    """The header's Window Mode tri-state: Headless / Minimized / Normal,
+    stored as windowMode{Role} with the legacy booleans written in step
+    (the launch code reads those)."""
+
+    def _mode(self, world, suffix='p'):
+        return world.dialog.device_cards.cards[
+            {'j': 'joystick', 'p': 'pedals'}[suffix]].window_mode.currentText()
+
+    def test_legacy_untouched_store_reads_headless(self, app, tmp_path, monkeypatch):
+        """Legacy 'neither box checked' technically meant a normal window,
+        but it is indistinguishable from the untouched default and almost
+        nobody ran children windowed on purpose - it migrates to Headless
+        (a deliberate Normal is a one-time re-pick)."""
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        assert self._mode(world) == 'Headless'
+        assert world.dialog.cb_headless_p.isChecked()
+
+    def test_legacy_minimized_survives(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0),
+                      settings=dict(SETTLED, startMinPedals=True))
+        assert self._mode(world) == 'Minimized'
+
+    def test_normal_survives_a_reopen(self, app, tmp_path, monkeypatch):
+        """As two False booleans, a deliberate Normal would be
+        indistinguishable from the untouched default and flip back to
+        Headless on every reopen - the tri-state key is what prevents
+        that fight."""
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        card = world.dialog.device_cards.cards['pedals']
+        card.window_mode.setCurrentIndex(2)            # Normal
+        assert world.save()
+        assert world.settings.get('windowModePedals') == 'normal'
+        assert world.settings.get('startHeadlessPedals') is False
+        assert world.settings.get('startMinPedals') is False
+        reopened = World(tmp_path / 'reopen', monkeypatch, random.Random(1),
+                         settings=dict(world.settings))
+        assert self._mode(reopened) == 'Normal'
+
+    def test_the_combo_and_booleans_stay_in_step(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        card = world.dialog.device_cards.cards['pedals']
+        card.window_mode.setCurrentIndex(1)            # Minimized
+        assert world.dialog.cb_min_enable_p.isChecked()
+        assert not world.dialog.cb_headless_p.isChecked()
+        assert world.save()
+        assert world.settings.get('windowModePedals') == 'minimized'
+        assert world.settings.get('startMinPedals') is True

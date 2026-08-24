@@ -167,6 +167,22 @@ class DeviceIconWidget(QWidget):
         known, in place of the generic role name."""
         self.text_label.setText(text or self.device_name.capitalize())
 
+    def set_icon(self, icon_path):
+        """Swap the icon artwork (the active device's icon choice - e.g.
+        the yoke).  Returns True when this actually changed the image."""
+        if icon_path == self.icon_path:
+            return False
+        pm = QPixmap(icon_path)
+        if pm.isNull():
+            return False
+        self.icon_path = icon_path
+        self._original_pixmap = pm.scaled(
+            ICON_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+        self.icon_label.setPixmap(
+            self._tint_pixmap(self._original_pixmap, self.status_color))
+        return True
+
     def _fade_text(self, visible: bool):
         # Always show text if this widget is active
         self.text_label.setVisible(visible or self.active)
@@ -402,6 +418,15 @@ class DeviceIconPanel(QWidget):
         widget = self.icons.get(device_name.lower())
         if widget:
             widget.flash()
+
+    def set_device_icon(self, device_name: str, icon_path: str):
+        """The icon artwork for a role ('' = the role's default icon).
+        Returns True when the image actually changed."""
+        widget = self.icons.get(device_name.lower())
+        if widget is None:
+            return False
+        return widget.set_icon(
+            icon_path or DEVICE_ICONS.get(device_name.lower(), ''))
 
     def update_device_status_icon(self, device_name, new_icon_path):
         if device_name.lower() in self.icons:

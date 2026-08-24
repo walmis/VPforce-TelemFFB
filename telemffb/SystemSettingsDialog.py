@@ -114,10 +114,36 @@ class _LiveSettings:
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None,):
         super(SystemSettingsDialog, self).__init__(parent)
+        # pending device path changes (only written on Save).  Created
+        # before ANY wiring: state-derivation slots that read it fire as
+        # early as load_settings' master-radio click.
+        self._pending_devpaths = {}
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"System Settings ({G.device_type.capitalize()})")
 
+        # The Devices / Launch Options area is built in code (dynamic device
+        # rows do not fit a static .ui); the .ui keeps an empty host layout.
+        # bind_to() re-creates every legacy widget name (cb_select_j,
+        # rb_master_p, ...) as dialog attributes so the rest of this file -
+        # and the test harness - work unchanged.
+        from .DeviceCardsPanel import DeviceCardsPanel
+        self.device_cards = DeviceCardsPanel(self)
+        self.deviceCardsHostLayout.addWidget(self.device_cards)
+        self.device_cards.bind_to(self)
+        joy_card = self.device_cards.joystick_card
+        joy_card.add_requested.connect(self._on_add_joystick_alt)
+        joy_card.activate_requested.connect(self._on_activate_joystick_row)
+        joy_card.remove_requested.connect(self._on_remove_joystick_alt)
+        joy_card.primary_row.icon_changed.connect(
+            lambda kind: self._on_device_icon_changed(
+                joy_card.primary_row, kind))
+        # the visible switches sync through the hidden legacy checkboxes;
+        # a changed auto-launch state re-derives the card states (collapse,
+        # master-radio gating, window-mode enabling)
+        for suffix in 'jpct':
+            getattr(self, f'cb_al_enable_{suffix}').toggled.connect(
+                self.toggle_device_launch_widgets)
 
         self.master_button_group = QButtonGroup()
         self.master_button_group.setObjectName(u"master_button_group")
@@ -353,8 +379,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.select_enabled_sim()
 
-        # pending device path changes (only written on Save)
-        self._pending_devpaths = {}
 
         self._build_tap_panels()
 
@@ -467,72 +491,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 cb._prev_index = found_index
                 cb.blockSignals(False)
 
-        # Helper: persist a combobox selection into G.system_settings
-        def persist_combobox_selection(cb, role_name):
-            model = cb.model()
-            sel_index = cb.currentIndex()
-            if sel_index < 0:
-                # clear saved setting
-                try:
-                    self._pending_devpaths[f'devpath_{role_name}'] = ''
-                    self._pending_devpaths[device_ident_key(role_name)] = ''
-                    self._pending_devpaths[device_ids_key(role_name)] = ''
-                except Exception:
-                    logging.exception('Failed to clear devpath setting')
-                return
 
-            dev = model.data(model.index(sel_index, 0), Qt.ItemDataRole.UserRole)
-            if dev is None:
-                try:
-                    self._pending_devpaths[f'devpath_{role_name}'] = ''
-                    self._pending_devpaths[device_ident_key(role_name)] = ''
-                    self._pending_devpaths[device_ids_key(role_name)] = ''
-                except Exception:
-                    logging.exception('Failed to clear devpath setting')
-                return
-
-            # prefer device.path (bytes) decode
-            dev_path = getattr(dev, 'path', None)
-            if isinstance(dev_path, (bytes, bytearray)):
-                try:
-                    dev_path = dev_path.decode()
-                except Exception:
-                    dev_path = str(dev_path)
-
-            try:
-                self._pending_devpaths[f'devpath_{role_name}'] = dev_path
-                # remembered so a rule or a dialog can name this device while
-                # it is unplugged; refreshed every time it is selected, since
-                # the owner may have renamed it since
-                self._pending_devpaths[device_ident_key(role_name)] = str(
-                    getattr(dev, 'ident', '') or '')
-                # taken from the device, not parsed back out of its path: a
-                # DirectInput device's path is a GUID and carries no ids
-                self._pending_devpaths[device_ids_key(role_name)] = \
-                    format_usb_ids(getattr(dev, 'vendor_id', 0),
-                                   getattr(dev, 'product_id', 0))
-            except Exception:
-                logging.exception('Failed to persist devpath setting')
-
-
-
-        def slot_changed(cb, role):
-            """A slot now holds something else - or nothing.  Record it,
-            and let the tap say what that means while the change is still
-            in front of the user."""
-            # the state the dialog opened in, captured before the first
-            # change - the only place the outgoing device's ids exist
-            if self._tap_baseline is None:
-                self._tap_baseline = self.tap_settings_view()
-            persist_combobox_selection(cb, role)
-            # the tap panels describe the devices as much as the folders,
-            # so a new selection changes what they should be saying
-            self.refresh_tap_panels()
-            self._raise_tap_reconcile(self._tap_baseline,
-                                      self.tap_settings_view())
-            # a different question: not "this rule is stale" but "this
-            # device cannot be driven at all without one"
-            self._raise_tap_gaps()
+        # the joystick card's alternate rows share the joystick model and
+        # restore from their own slots (devpath_joystick_2/_3)
+        self._restore_joystick_alternates(joystick_model)
 
         # Handler to enforce uniqueness across combo boxes
         def on_device_changed(index, changed_cb= None):
@@ -561,17 +523,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     # Clearing a slot is a device change like any other:
                     # a tap rule for what was there is stranded the same
                     # way, and used to be caught only at Save.
-                    slot_changed(changed_cb, role)
-                # The user cleared this slot deliberately, so its launch
-                # options go with it.
+                    self._joystick_or_role_changed(changed_cb, role)
+                # The user cleared this slot deliberately, so it will not
+                # auto-launch.  Its window mode is a preference, not a
+                # launch decision - it survives for whenever a device
+                # returns.
                 changed_cb._autolaunch_cb.setChecked(False)
-                changed_cb._startmin_cb.setChecked(False)
-                changed_cb._headless_cb.setChecked(False)
                 self.toggle_device_launch_widgets()
                 return
 
-            # check if any other combobox already has this device
-            for other in combo_boxes:
+            # check if any other combobox already has this device -
+            # including the joystick card's alternate rows
+            for other in combo_boxes + self.device_cards.alt_selectors():
                 if other is changed_cb:
                     continue
                 other_idx = other.currentIndex()
@@ -618,12 +581,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
             role = cb_role_map.get(changed_cb, None)
             if role:
-                slot_changed(changed_cb, role)
+                self._joystick_or_role_changed(changed_cb, role)
 
             self.toggle_device_launch_widgets()
 
         for cb in combo_boxes:
             cb.blockSignals(False)
+
+        # restores above ran with signals blocked; bring the ids
+        # readouts in line with what is actually selected
+        self.device_cards.refresh_ids_labels()
 
         # connect signals (once - this method also runs on repopulate)
         if not getattr(self, '_device_signals_connected', False):
@@ -637,6 +604,244 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # was reverted by conflict resolution it will also update the persisted value when appropriate.
 
 
+
+    def _persist_combobox_selection(self, cb, role_name):
+        """Stage a selector's device into the pending writes (devpath, and
+        the display identity - ident and USB ids - remembered so rules and
+        dialogs can name the device while it is unplugged)."""
+        model = cb.model()
+        sel_index = cb.currentIndex()
+        dev = None
+        if sel_index >= 0 and model is not None:
+            dev = model.data(model.index(sel_index, 0),
+                             Qt.ItemDataRole.UserRole)
+        try:
+            if dev is None:
+                self._pending_devpaths[f'devpath_{role_name}'] = ''
+                self._pending_devpaths[device_ident_key(role_name)] = ''
+                self._pending_devpaths[device_ids_key(role_name)] = ''
+                return
+            dev_path = getattr(dev, 'path', None)
+            if isinstance(dev_path, (bytes, bytearray)):
+                try:
+                    dev_path = dev_path.decode()
+                except Exception:
+                    dev_path = str(dev_path)
+            self._pending_devpaths[f'devpath_{role_name}'] = dev_path
+            self._pending_devpaths[device_ident_key(role_name)] = str(
+                getattr(dev, 'ident', '') or '')
+            # taken from the device, not parsed back out of its path: a
+            # DirectInput device's path is a GUID and carries no ids
+            self._pending_devpaths[device_ids_key(role_name)] = \
+                format_usb_ids(getattr(dev, 'vendor_id', 0),
+                               getattr(dev, 'product_id', 0))
+        except Exception:
+            logging.exception('Failed to persist devpath setting')
+
+    def _slot_changed(self, cb, role):
+        """A slot now holds something else - or nothing.  Record it, and
+        let the tap say what that means while the change is still in front
+        of the user."""
+        # the state the dialog opened in, captured before the first
+        # change - the only place the outgoing device's ids exist
+        if self._tap_baseline is None:
+            self._tap_baseline = self.tap_settings_view()
+        self._persist_combobox_selection(cb, role)
+        # the tap panels describe the devices as much as the folders,
+        # so a new selection changes what they should be saying
+        self.refresh_tap_panels()
+        self._raise_tap_reconcile(self._tap_baseline,
+                                  self.tap_settings_view())
+        # a different question: not "this rule is stale" but "this
+        # device cannot be driven at all without one"
+        self._raise_tap_gaps()
+
+    # ------------------------------------------------------------------
+    # Joystick alternate devices.  The FIRST card row is always the active
+    # device (devpath_joystick - everything downstream keys on it);
+    # alternates store under devpath_joystick_2/_3 and become active by
+    # SWAPPING their selection into row one.  A save with a swapped device
+    # is then an ordinary device change: the live switch, tap reconcile
+    # and status-panel refresh all follow from the existing machinery.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _alt_role(slot: int) -> str:
+        """The pseudo-role alternate slot N stores under (devpath_joystick_2
+        and friends - the same key helpers apply)."""
+        return f'joystick_{slot}'
+
+    @staticmethod
+    def _devicon_key(slot: int) -> str:
+        return 'devicon_joystick' if slot == 1 else f'devicon_joystick_{slot}'
+
+    def _stored_or_pending(self, key, default=''):
+        if key in self._pending_devpaths:
+            return self._pending_devpaths[key]
+        return G.system_settings.get(key, default) or default
+
+    def _select_devpath(self, cb, saved_path):
+        """Point a selector at the item whose device path matches, quietly."""
+        if not saved_path:
+            return
+        model = cb.model()
+        for row in range(model.rowCount()):
+            dev = model.data(model.index(row, 0), Qt.ItemDataRole.UserRole)
+            path = getattr(dev, 'path', None)
+            if path and path.decode() == str(saved_path):
+                cb.blockSignals(True)
+                cb.setCurrentIndex(row)
+                cb._prev_index = row
+                cb.blockSignals(False)
+                return
+
+    def _restore_joystick_alternates(self, joystick_model):
+        """Build and fill the joystick card's alternate rows from the saved
+        (or pending) state.  Runs from populateUSBSelectors, including on a
+        repopulate - rows already on screen keep their place."""
+        card = self.device_cards.joystick_card
+        stored = 0
+        for slot in (2, 3):
+            if self._stored_or_pending(f'devpath_{self._alt_role(slot)}'):
+                stored = slot - 1
+        while len(card.alt_rows) < stored:
+            self._create_joystick_alt_row()
+        for i, row in enumerate(card.alt_rows):
+            slot = i + 2
+            cb = row.selector
+            cb.blockSignals(True)
+            cb.setModel(joystick_model)
+            cb.setModelColumn(0)
+            cb._ffb_device_model = joystick_model
+            cb._prev_index = 0
+            cb.blockSignals(False)
+            self._select_devpath(
+                cb, self._stored_or_pending(f'devpath_{self._alt_role(slot)}'))
+            row._refresh_ids()
+            row.set_device_icon(
+                self._stored_or_pending(self._devicon_key(slot), 'stick')
+                or 'stick')
+        self.device_cards.joystick_card.primary_row.set_device_icon(
+            self._stored_or_pending(self._devicon_key(1), 'stick') or 'stick')
+        card.set_active_slot(1)
+
+    def _create_joystick_alt_row(self):
+        """One new alternate row, wired: selection changes stage into the
+        pending writes, conflicts are refused, icons persist per device."""
+        card = self.device_cards.joystick_card
+        row = card.add_alt_row()
+        row.selector.currentIndexChanged.connect(
+            lambda _i, r=row: self._on_alt_device_changed(r))
+        row.icon_changed.connect(
+            lambda kind, r=row: self._on_device_icon_changed(r, kind))
+        return row
+
+    def _on_add_joystick_alt(self):
+        row = self._create_joystick_alt_row()
+        cb = row.selector
+        model = getattr(self.cb_select_j, '_ffb_device_model', None)
+        if model is not None:
+            cb.blockSignals(True)
+            cb.setModel(model)
+            cb.setModelColumn(0)
+            cb._ffb_device_model = model
+            cb.setCurrentIndex(0)
+            cb._prev_index = 0
+            cb.blockSignals(False)
+
+    def _alt_slot_of(self, row) -> int:
+        return 2 + self.device_cards.joystick_card.alt_rows.index(row)
+
+    def _on_alt_device_changed(self, row):
+        cb = row.selector
+        index = cb.currentIndex()
+        dev = None
+        if index >= 0:
+            dev = cb.model().data(cb.model().index(index, 0),
+                                  Qt.ItemDataRole.UserRole)
+        if dev is not None:
+            # one device, one slot - the same rule the role selectors keep
+            others = [c for c in self._device_combos
+                      if c is not cb] + [
+                      c for c in self.device_cards.alt_selectors()
+                      if c is not cb]
+            for other in others:
+                oidx = other.currentIndex()
+                odev = other.model().data(
+                    other.model().index(oidx, 0),
+                    Qt.ItemDataRole.UserRole) if oidx >= 0 else None
+                if odev is not None and _same_hardware(odev, dev):
+                    QMessageBox.information(
+                        self, 'Device Conflict',
+                        'That device is already assigned to another slot.')
+                    cb.blockSignals(True)
+                    cb.setCurrentIndex(getattr(cb, '_prev_index', 0))
+                    cb.blockSignals(False)
+                    return
+        cb._prev_index = index
+        row._refresh_ids()
+        if self.device_cards.joystick_card.active_row() is row:
+            self._slot_changed(cb, 'joystick')
+        self._persist_joystick_rows()
+
+    def _joystick_or_role_changed(self, cb, role):
+        """Route a role selector's change.  For the joystick, whether this
+        is 'the active device changed' depends on where the marker sits;
+        the whole card re-stages either way."""
+        if role != 'joystick':
+            self._slot_changed(cb, role)
+            return
+        card = self.device_cards.joystick_card
+        if card.active_row() is card.primary_row:
+            self._slot_changed(cb, 'joystick')
+        self._persist_joystick_rows()
+
+    def _on_device_icon_changed(self, row, kind):
+        self._persist_joystick_rows()
+
+    def _on_activate_joystick_row(self, slot: int):
+        """The marker moved: the marked row's device becomes the active one
+        (devpath_joystick) at Save.  Rows stay put; only the mapping onto
+        storage slots changes - and downstream, this is an ordinary device
+        change, so the tap notices and the live switch follow from it."""
+        card = self.device_cards.joystick_card
+        if slot == card.active_slot:
+            return
+        card.set_active_slot(slot)
+        self._slot_changed(card.active_row().selector, 'joystick')
+        self._persist_joystick_rows()
+        self.toggle_device_launch_widgets()
+
+    def _on_remove_joystick_alt(self, slot: int):
+        card = self.device_cards.joystick_card
+        was_active = (slot == card.active_slot)
+        card.remove_alt_row(slot)     # resets the marker to row one if needed
+        if was_active:
+            # the active device went away with its row: row one takes over
+            self._slot_changed(card.active_row().selector, 'joystick')
+            self.toggle_device_launch_widgets()
+        self._persist_joystick_rows()
+
+    def _persist_joystick_rows(self):
+        """Stage the whole joystick card: the marked row's device under
+        'joystick' (the active device - what startup reads), the remaining
+        rows in visual order under the _2/_3 slots, empties cleared.  Every
+        card mutation funnels through here so the mapping can never drift.
+        """
+        card = self.device_cards.joystick_card
+        rows = card.rows_by_priority()
+        roles = ['joystick', self._alt_role(2), self._alt_role(3)]
+        for i, role in enumerate(roles):
+            key = self._devicon_key(1) if role == 'joystick' \
+                else self._devicon_key(int(role.rsplit('_', 1)[1]))
+            if i < len(rows):
+                self._persist_combobox_selection(rows[i].selector, role)
+                self._pending_devpaths[key] = rows[i].device_icon()
+            else:
+                self._pending_devpaths[f'devpath_{role}'] = ''
+                self._pending_devpaths[device_ident_key(role)] = ''
+                self._pending_devpaths[device_ids_key(role)] = ''
+                self._pending_devpaths[key] = ''
 
     def select_enabled_sim(self):
         for sim in ('DCS', 'MSFS', 'XPLANE', 'IL2', 'BMS'):
@@ -715,15 +920,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
 
     def change_master_widgets(self, button):
-        """The master instance launches itself, so it has no launch options.
+        """The master instance launches itself, so its launch options hide
+        (toggle_device_launch_widgets works that out from the state).
 
-        Only the clearing lives here; which row is hidden is worked out from
-        the current state by toggle_device_launch_widgets.
+        The checkboxes deliberately keep their values: launch ignores the
+        master role's flags anyway (check_launch_instance skips it), and
+        clearing them meant an exploratory master change and back silently
+        wiped a role's startup configuration.
         """
-        role = self.MASTER_ROLE_IDS.get(self.master_button_group.id(button))
-        if role:
-            for name in self.ROLE_LAUNCH_WIDGETS[role][1:]:
-                getattr(self, name).setChecked(False)
         self.toggle_device_launch_widgets()
 
     #: Device roles by the id their master-instance radio carries.
@@ -740,28 +944,41 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     }
 
     def toggle_device_launch_widgets(self):
-        """Work out each device's launch row from the current state.
+        """Work out each card's launch state from the current facts.
 
-        A device with nothing assigned has nothing to master or launch, and
-        the master instance launches itself, so its row has no options at
-        all.  Both are facts about the state rather than events, so they are
-        applied here rather than left to whichever signal last fired.
+        The master's card hides its launch controls (it launches itself);
+        a card whose auto-launch switch is off collapses to its header
+        with the configuration kept underneath; a role with no device can
+        neither launch nor be the master.  All derived from state rather
+        than events, so no signal ordering can leave it stale.
 
-        This only shows, hides, enables and disables.  Clearing the
-        checkboxes is left to the handlers for a change the user actually
-        made: a device that is merely unplugged today shows as (None) here,
-        and unchecking it would throw away a setting never touched.
+        The collapse only applies while auto-launch is globally enabled:
+        with it off the switches are inert, and collapsing would strand a
+        role's device configuration out of reach.
         """
+        self._refresh_instance_tabs()
         self._update_vpconf_gates()
         al_enabled = self.cb_al_enable.isChecked()
         master_role = self.MASTER_ROLE_IDS.get(self.master_button_group.checkedId())
-        for role, (radio, *launch_boxes) in self.ROLE_LAUNCH_WIDGETS.items():
+        for role, (radio, al_box, *_rest) in self.ROLE_LAUNCH_WIDGETS.items():
+            card = self.device_cards.cards[role]
             assigned = self.selected_device(role) is not None
-            getattr(self, radio).setEnabled(assigned)
-            for name in launch_boxes:
-                widget = getattr(self, name)
-                widget.setVisible(role != master_role)
-                widget.setEnabled(assigned and al_enabled)
+            is_master = role == master_role
+            launches = getattr(self, al_box).isChecked()
+            card.set_launch_controls_visible(not is_master)
+            # the switch works with no device picked: it is the door into
+            # configuring an empty role (the card expands when switched
+            # on).  Saving with it on and no device is refused by
+            # validate_settings, so nothing half-configured escapes.
+            card.launch_toggle.setEnabled(al_enabled)
+            card.window_mode.setEnabled(al_enabled and launches)
+            # the auto-launch switch gates the master radio only while the
+            # global switch is on; master selection itself is independent
+            # of auto-launch
+            getattr(self, radio).setEnabled(
+                assigned and (is_master or not al_enabled or launches))
+            card.set_collapsed(
+                (not is_master) and al_enabled and not launches)
 
     def toggle_al_widgets(self):
         al_enabled = self.cb_al_enable.isChecked()
@@ -1231,6 +1448,34 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     AUTOLAUNCH_TOGGLES = {'joystick': 'cb_al_enable_j', 'pedals': 'cb_al_enable_p',
                           'collective': 'cb_al_enable_c', 'trimwheel': 'cb_al_enable_t'}
 
+    #: The Window Mode tri-state, stored as windowMode{Role}.  The legacy
+    #: booleans (startMin/startHeadless) are still written in step - the
+    #: launch code reads them - but the tri-state is what LOADS, so
+    #: 'Normal' survives a reopen (as two False booleans it would be
+    #: indistinguishable from the never-configured default).
+    WINDOW_MODES = ('headless', 'minimized', 'normal')
+
+    def _window_mode_value(self, suffix: str) -> str:
+        if getattr(self, f'cb_headless_{suffix}').isChecked():
+            return 'headless'
+        if getattr(self, f'cb_min_enable_{suffix}').isChecked():
+            return 'minimized'
+        return 'normal'
+
+    def _load_window_mode(self, suffix: str, role_cap: str, settings_dict):
+        mode = settings_dict.get(f'windowMode{role_cap}', None)
+        if mode not in self.WINDOW_MODES:
+            # Legacy store: the old checkboxes were mutually exclusive, so
+            # 'neither' technically meant a normal window - but it is also
+            # indistinguishable from the untouched default, and almost
+            # nobody ran children windowed on purpose.  It reads as
+            # Headless; a deliberate Normal is a one-time re-pick, after
+            # which the tri-state key preserves it.
+            mode = 'minimized' if settings_dict.get(
+                f'startMin{role_cap}', False) else 'headless'
+        getattr(self, f'cb_headless_{suffix}').setChecked(mode == 'headless')
+        getattr(self, f'cb_min_enable_{suffix}').setChecked(mode == 'minimized')
+
     def validate_settings(self):
         master_role = self.MASTER_ROLE_IDS.get(
             self.master_button_group.checkedId())
@@ -1314,6 +1559,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
+            'windowModeJoystick': self._window_mode_value('j'),
+            'windowModePedals': self._window_mode_value('p'),
+            'windowModeCollective': self._window_mode_value('c'),
+            'windowModeTrimWheel': self._window_mode_value('t'),
             'pidJoystick': self.instance_pid('joystick'),
             'pidPedals': self.instance_pid('pedals'),
             'pidCollective': self.instance_pid('collective'),
@@ -1998,15 +2247,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_al_enable_c.setChecked(settings_dict.get('autolaunchCollective', False))
         self.cb_al_enable_t.setChecked(settings_dict.get('autolaunchTrimWheel', False))
 
-        self.cb_min_enable_j.setChecked(settings_dict.get('startMinJoystick', False))
-        self.cb_min_enable_p.setChecked(settings_dict.get('startMinPedals', False))
-        self.cb_min_enable_c.setChecked(settings_dict.get('startMinCollective', False))
-        self.cb_min_enable_t.setChecked(settings_dict.get('startMinTrimWheel', False))
-
-        self.cb_headless_j.setChecked(settings_dict.get('startHeadlessJoystick', False))
-        self.cb_headless_p.setChecked(settings_dict.get('startHeadlessPedals', False))
-        self.cb_headless_c.setChecked(settings_dict.get('startHeadlessCollective', False))
-        self.cb_headless_t.setChecked(settings_dict.get('startHeadlessTrimWheel', False))
+        for suffix, role_cap in (('j', 'Joystick'), ('p', 'Pedals'),
+                                 ('c', 'Collective'), ('t', 'TrimWheel')):
+            self._load_window_mode(suffix, role_cap, settings_dict)
 
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
@@ -2029,6 +2272,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
+            'windowModeJoystick': self._window_mode_value('j'),
+            'windowModePedals': self._window_mode_value('p'),
+            'windowModeCollective': self._window_mode_value('c'),
+            'windowModeTrimWheel': self._window_mode_value('t'),
             'pidJoystick': self.instance_pid('joystick'),
             'pidPedals': self.instance_pid('pedals'),
             'pidCollective': self.instance_pid('collective'),
@@ -2112,11 +2359,23 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                         'collective': 'cb_select_c', 'trimwheel': 'cb_select_t'}
 
     def selected_device(self, role):
-        """The device currently picked for a role, if any."""
-        combo = getattr(self, self.DEVICE_SELECTORS.get(role, ''), None)
+        """The device currently picked for a role, if any.
+
+        For the joystick this is the ACTIVE row's device - the marker may
+        sit on an alternate within a dialog session, and everything that
+        asks "what will this role drive" (vpconf gating, tap views, launch
+        options) must follow it.
+        """
+        combo = None
+        if role == 'joystick' and getattr(self, 'device_cards', None):
+            combo = self.device_cards.joystick_card.active_row().selector
+        if combo is None:
+            combo = getattr(self, self.DEVICE_SELECTORS.get(role, ''), None)
         if combo is None or combo.currentIndex() < 0:
             return None
         model = combo.model()
+        if model is None:
+            return None
         return model.data(model.index(combo.currentIndex(), 0),
                           Qt.ItemDataRole.UserRole)
 
@@ -2201,14 +2460,61 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """Both of a device's panels."""
         return [p for (_, r), p in self.instance_panels.items() if r == role]
 
+    def _selected_roles(self):
+        """Roles with a device picked RIGHT NOW - unsaved picks included -
+        plus this instance's own.  The settings tabs follow the selection,
+        not the store: enable a role, pick its device, and its settings
+        are configurable in the same visit."""
+        roles = {r for r in self.INSTANCE_ROLES
+                 if self.selected_device(r) is not None
+                 # stored-but-unplugged devices stay configurable: their
+                 # selector shows (None) because the hardware is absent,
+                 # not because the user cleared it (clearing empties the
+                 # pending devpath, which this view sees)
+                 or self._stored_or_pending(f'devpath_{r}')}
+        roles.add(G.device_type)
+        return [r for r in self.INSTANCE_ROLES if r in roles]
+
+    def _refresh_instance_tabs(self):
+        """Keep the per-instance settings tabs in step with the current
+        selections.  Panels are hidden, never destroyed: staged edits
+        survive a clear-and-repick within the session, and Save persists
+        whatever they hold (settings for an unconfigured role are inert
+        but preserved)."""
+        desired = self._selected_roles()
+        for section, fields, tabs in (
+                ('system', SYSTEM_FIELDS, self.instance_tabs_system),
+                ('startup', STARTUP_FIELDS, self.instance_tabs_startup)):
+            for i in reversed(range(tabs.count())):
+                panel = tabs.widget(i)
+                if getattr(panel, 'role', None) not in desired:
+                    tabs.removeTab(i)
+            for pos, role in enumerate(desired):
+                key = (section, role)
+                panel = self.instance_panels.get(key)
+                if panel is None:
+                    panel = InstanceSettingsPanel(
+                        role, fields,
+                        browse_handler=self.browse_instance_vpconf)
+                    panel.load(G.system_settings)
+                    self.instance_panels[key] = panel
+                if tabs.indexOf(panel) < 0:
+                    tabs.insertTab(pos, panel, device_display_name(role))
+
     def validate_instance_settings(self):
         """Check every device's Configurator profiles, not just this one's.
 
         A profile is validated against the device it will be pushed to, so a
         path that is right for the joystick is not accepted for the pedals.
         """
+        selected = self._selected_roles()
         for (section, role), panel in self.instance_panels.items():
             if section != 'startup':
+                continue
+            if role not in selected:
+                # cleared this session: its panel is out of sight (and its
+                # settings inert) - failing the save on something the user
+                # cannot see to fix would be a trap
                 continue
             if panel.vpforce_blocked:
                 # the settings are stored but inert; validating a profile the

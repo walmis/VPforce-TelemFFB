@@ -121,6 +121,25 @@ class TestWidgetLabelAndFlash:
         w.set_active(True)
         assert w.text_label.isVisibleTo(w)
 
+    def test_icon_follows_the_device_choice(self, app):
+        """The active joystick device's icon choice (stick vs yoke) shows
+        on the panel and reports change for the flash."""
+        import resources, resources_extra  # noqa: F401
+        from telemffb.DevicePanel import DeviceIconPanel
+        panel = DeviceIconPanel()
+        panel.set_devices(['joystick'])
+        assert panel.set_device_icon('joystick', ':/image/icon_yoke.png') is True
+        assert panel.set_device_icon('joystick', ':/image/icon_yoke.png') is False
+        assert panel.set_device_icon('joystick', '') is True   # role default
+
+    def test_device_panel_icon_helper(self, app):
+        from telemffb.utils import device_panel_icon
+        assert device_panel_icon('joystick', FakeSettings(
+            devicon_joystick='yoke')) == ':/image/icon_yoke.png'
+        assert device_panel_icon('joystick', FakeSettings(
+            devicon_joystick='stick')) == ''
+        assert device_panel_icon('joystick', FakeSettings()) == ''
+
     def test_panel_reports_label_change(self, app):
         from telemffb.DevicePanel import DeviceIconPanel
         panel = DeviceIconPanel()

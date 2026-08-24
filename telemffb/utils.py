@@ -1249,9 +1249,11 @@ class SystemSettings(QSettings):
         'startMinJoystick': False,
         'startMinPedals': False,
         'startMinCollective': False,
-        'startHeadlessJoystick': False,
-        'startHeadlessPedals': False,
-        'startHeadlessCollective': False,
+        # children default to headless: they exist to drive their device
+        # and everything is configured from the master
+        'startHeadlessJoystick': True,
+        'startHeadlessPedals': True,
+        'startHeadlessCollective': True,
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
     }
 
@@ -4219,6 +4221,19 @@ def device_ident_key(role):
     keyed on.
     """
     return 'devident_' + role
+
+
+def device_panel_icon(role, settings):
+    """Resource path for a role's status icon, or '' for the role default.
+
+    The joystick role's devices each carry an icon choice (stored as
+    devicon_joystick / devicon_joystick_2 ...); the ACTIVE device's choice
+    is what the panel shows, and it follows the device through swaps.
+    """
+    kind = str(settings.get(f'devicon_{role}', '') or '')
+    if kind == 'yoke':
+        return ':/image/icon_yoke.png'
+    return ''
 
 
 def device_panel_label(role, settings, max_chars=14):
