@@ -419,6 +419,7 @@ class MainWindow(QMainWindow):
             self.device_panel.set_devices([G.device_type])
             self.device_panel.set_device_status(G.device_type, "ok")
             self.device_panel.set_active_device(G.device_type)
+            self.refresh_device_labels()
 
 
         """ Create Status Panel """
@@ -1258,6 +1259,18 @@ class MainWindow(QMainWindow):
         self.refresh_firmware_label()
         self.refresh_configurator_gating()
         self.update_device_status(G.device_connection_status)
+        self.refresh_device_labels()
+
+    def refresh_device_labels(self):
+        """Name the hardware under each status icon (the stored per-slot
+        identity), flashing any icon whose device just changed."""
+        for role in self.device_panel.get_device_names():
+            try:
+                label = utils.device_panel_label(role, G.system_settings)
+            except Exception:
+                label = ''
+            if self.device_panel.set_device_label(role, label):
+                self.device_panel.flash_device(role)
 
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
@@ -1461,6 +1474,7 @@ class MainWindow(QMainWindow):
         self.device_panel.set_device_status(G.device_type, "ok")
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)
+        self.refresh_device_labels()
 
 
     def show_device_logo(self):

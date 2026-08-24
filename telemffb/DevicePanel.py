@@ -42,6 +42,9 @@ STATUS_COLORS_DARK = {
 class DeviceIconWidget(QWidget):
     clicked = pyqtSignal(str)
 
+    FADE_MS = 1000     # the error border pulse's fade pace
+    FLASH_MS = 40      # step pace of the finite attention flash
+
     def __init__(self, device_name, icon_path, parent=None):
         super().__init__(parent)
         self.status_color = STATUS_COLORS['normal']  # Default
@@ -73,22 +76,27 @@ class DeviceIconWidget(QWidget):
         self.icon_fade = QPropertyAnimation(self.icon_opacity, b"opacity")
         self.icon_fade.setStartValue(0.5)
         self.icon_fade.setEndValue(1.0)
-        self.icon_fade.setDuration(1000)
+        self.icon_fade.setDuration(self.FADE_MS)
         self.icon_fade.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.icon_fade.setLoopCount(1)
         self.icon_fade.setDirection(QPropertyAnimation.Direction.Forward)
         self.icon_fade.finished.connect(self._reverse_icon_fade)
+        # finite attention flash (tint blinking; see flash())
+        self._flash_timer = None
+        self._flash_state = 0
 
-        # Text
+        # Text.  Shown/hidden directly - no QGraphicsOpacityEffect: the
+        # status updates restyle this label periodically, and repainting a
+        # label through an opacity effect leaves a stale (blank) render
+        # until something else forces a full repaint.  Size is retained
+        # while hidden so the icon above never shifts.
         self.text_label = QLabel(self.device_name.capitalize(), self)
         self.text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.text_label.setFont(QFont("Top Secret", 12))
         self.text_label.setStyleSheet("color: #ab37c8;")
-
-        self.opacity_effect = QGraphicsOpacityEffect()
-        self.text_label.setGraphicsEffect(self.opacity_effect)
-        self.opacity_anim = QPropertyAnimation(self.opacity_effect, b"opacity")
-        self.opacity_anim.setDuration(250)
+        policy = self.text_label.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        self.text_label.setSizePolicy(policy)
 
         # Layout
         layout = QVBoxLayout(self)
@@ -110,14 +118,58 @@ class DeviceIconWidget(QWidget):
         )
         self.icon_fade.start()
 
-    def _fade_text(self, visible: bool):
-        self.opacity_anim.stop()
-        self.opacity_anim.setStartValue(self.opacity_effect.opacity())
+    #: one pulse of the attention flash, as brightness factors for
+    #: QColor.lighter() - a ramp up and back down, stepped at FLASH_MS
+    FLASH_CURVE = (108, 115, 125, 135, 148, 160, 171, 180,
+                   171, 160, 148, 135, 125, 115, 108, 100)
 
+    def flash(self, pulses=2):
+        """A brief, finite brightness pulse of the icon tint to draw the
+        eye - used when the hardware behind this icon changes.
+
+        Implemented by re-tinting the pixmap (the same machinery as status
+        colors), NOT the graphics-effect opacity: animating the opacity
+        effect over a scaled pixmap misrenders the icon at the wrong
+        size/position for the duration.  The error border pulse takes
+        precedence and cancels a flash in progress.
+        """
+        if self.border_anim:
+            return
+        self._flash_state = pulses * len(self.FLASH_CURVE)
+        if self._flash_timer is None:
+            self._flash_timer = QTimer(self)
+            self._flash_timer.setInterval(self.FLASH_MS)
+            self._flash_timer.timeout.connect(self._flash_step)
+        self._flash_timer.start()
+        self._flash_step()
+
+    def _flash_step(self):
+        if self.border_anim or self._flash_state <= 0:
+            self._end_flash()
+            return
+        self._flash_state -= 1
+        factor = self.FLASH_CURVE[
+            (len(self.FLASH_CURVE) - 1 - self._flash_state)
+            % len(self.FLASH_CURVE)]
+        color = (QColor(self.status_color).lighter(factor)
+                 if factor > 100 else self.status_color)
+        self.icon_label.setPixmap(self._tint_pixmap(self._original_pixmap, color))
+
+    def _end_flash(self):
+        if self._flash_timer is not None:
+            self._flash_timer.stop()
+        self._flash_state = 0
+        self.icon_label.setPixmap(
+            self._tint_pixmap(self._original_pixmap, self.status_color))
+
+    def set_label(self, text):
+        """The text under the icon - the hardware holding this role, when
+        known, in place of the generic role name."""
+        self.text_label.setText(text or self.device_name.capitalize())
+
+    def _fade_text(self, visible: bool):
         # Always show text if this widget is active
-        final_visible = visible or self.active
-        self.opacity_anim.setEndValue(1.0 if final_visible else 0.0)
-        self.opacity_anim.start()
+        self.text_label.setVisible(visible or self.active)
 
     def set_active(self, active: bool):
         self.active = active
@@ -245,6 +297,7 @@ class DeviceIconWidget(QWidget):
         self.border_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.border_anim.valueChanged.connect(self.update)
         self.border_anim.start()
+        self._end_flash()   # the pulse takes over the icon's appearance
         self.icon_fade.start()
 
     def _stop_border_pulse(self):
@@ -333,6 +386,22 @@ class DeviceIconPanel(QWidget):
         widget = self.icons.get(device_name.lower())
         if widget:
             widget.set_status_color(status)
+
+    def set_device_label(self, device_name: str, text: str):
+        """The text under a role's icon: the hardware holding the role.
+        Returns True when this actually changed what was displayed."""
+        widget = self.icons.get(device_name.lower())
+        if widget is None:
+            return False
+        changed = widget.text_label.text() != (
+            text or widget.device_name.capitalize())
+        widget.set_label(text)
+        return changed
+
+    def flash_device(self, device_name: str):
+        widget = self.icons.get(device_name.lower())
+        if widget:
+            widget.flash()
 
     def update_device_status_icon(self, device_name, new_icon_path):
         if device_name.lower() in self.icons:

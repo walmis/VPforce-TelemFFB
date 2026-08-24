@@ -4221,6 +4221,35 @@ def device_ident_key(role):
     return 'devident_' + role
 
 
+def device_panel_label(role, settings, max_chars=14):
+    """A short device name for the role's status icon, or '' when unknown.
+
+    VPforce idents are the owner's own Configurator names and already
+    short; a generic DirectInput ident is the full product string
+    ("Microsoft SideWinder Force Feedback 2"), so it is cut to its first
+    word or two.  Either way the result fits under the icon.
+    """
+    ident = str(settings.get(device_ident_key(role), '') or '').strip()
+    if not ident:
+        return ''
+    devpath = str(settings.get(f'devpath_{role}', '') or '')
+    if devpath.startswith('dinput:'):
+        words = ident.split()
+        # the selector lists these as '[DI] name' and the ident was stored
+        # that way; the marker is not part of the device's name
+        if words and words[0].strip('[]').upper() == 'DI':
+            words = words[1:]
+        short = words[0] if words else ident
+        for word in words[1:]:
+            if len(short) + 1 + len(word) > max_chars:
+                break
+            short += ' ' + word
+        ident = short
+    if len(ident) > max_chars:
+        ident = ident[:max_chars - 1] + '…'
+    return ident
+
+
 def usb_ids_from_devpath(devpath):
     r"""The (vid, pid) a Windows device path names, or None.
 

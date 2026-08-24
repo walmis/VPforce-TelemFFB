@@ -1403,6 +1403,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         except Exception:
             logging.exception('Live device switch after save failed')
 
+        # the status-icon labels name the hardware behind each role; a
+        # child slot's change reaches the panel only through this refresh
+        # (the master's own switch refreshes on its own)
+        main_window = getattr(G, 'main_window', None)
+        if main_window is not None:
+            try:
+                main_window.refresh_device_labels()
+            except Exception:
+                logging.exception('Device label refresh failed')
+
         # the panels' own writes were meant after all
         for panel in self.tap_panels.values():
             panel.commit()
