@@ -92,3 +92,35 @@ class TestChildSettingsButtonIsGone:
         for the child settings pages to offer."""
         assert not hasattr(dialog, 'buttonChildSettings')
         assert not hasattr(dialog, 'launch_child_settings_windows')
+
+
+class TestGrowToFit:
+    """The .ui's opening size is a preference: when the content needs a
+    taller window (real fonts, all cards expanded), the dialog grows to
+    fit rather than letting the layout crush the tallest card - which
+    painted the joystick selector clipped until the user dragged the
+    frame and the window system enforced the real minimum."""
+
+    def test_a_too_short_window_grows_to_its_content(self, dialog):
+        need = dialog.minimumSizeHint().height()
+        dialog.resize(dialog.width(), max(200, need - 150))
+        dialog._grow_to_fit()
+        cap = dialog.screen().availableGeometry().height()
+        assert dialog.height() >= min(need, cap)
+
+    def test_a_window_already_tall_enough_is_not_touched(self, dialog):
+        need = dialog.minimumSizeHint()
+        avail = dialog.screen().availableGeometry()
+        width = min(need.width() + 50, avail.width())
+        height = min(need.height() + 120, avail.height())
+        dialog.resize(width, height)
+        dialog._grow_to_fit()
+        assert dialog.height() == height     # growth only, never shrink
+        assert dialog.width() == width
+
+    def test_the_growth_never_exceeds_the_screen(self, dialog):
+        dialog.resize(dialog.width(), 200)
+        dialog._grow_to_fit()
+        avail = dialog.screen().availableGeometry()
+        assert dialog.height() <= avail.height()
+        assert dialog.width() <= avail.width()

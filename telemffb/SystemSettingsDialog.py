@@ -1153,6 +1153,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 assigned and (is_master or not al_enabled or launches))
             card.set_collapsed(
                 (not is_master) and al_enabled and not launches)
+        # cards expanding (or rows appearing) can push the content past
+        # the window; grow to fit rather than letting the layout crush
+        # the tallest card
+        if self.isVisible():
+            self._grow_to_fit()
 
     def toggle_al_widgets(self):
         al_enabled = self.cb_al_enable.isChecked()
@@ -1393,6 +1398,31 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def showEvent(self, event):
         super().showEvent(event)
         self.refresh_tap_panels()
+        QtCore.QTimer.singleShot(0, self._grow_to_fit)
+
+    def _grow_to_fit(self):
+        """Make the window at least as tall as its content needs.
+
+        The .ui's opening size is a preference, not a promise: with real
+        font metrics the Devices tab can need more height than it, and a
+        programmatic resize below the layout minimum is allowed - the
+        layout then compresses the tallest card and paints its selector
+        clipped, until the user drags the frame and the window system
+        enforces the real minimum.  Enforce it up front (and again when
+        the content grows, e.g. cards expanding), capped to the screen.
+        Never shrinks the window.
+        """
+        need = self.minimumSizeHint()
+        width, height = self.width(), self.height()
+        grown_w = max(width, need.width())
+        grown_h = max(height, need.height())
+        screen = self.screen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            grown_w = min(grown_w, avail.width())
+            grown_h = min(grown_h, avail.height())
+        if (grown_w, grown_h) != (width, height):
+            self.resize(grown_w, grown_h)
 
     def toggle_dinput_support(self):
         """Re-list devices so [DI] entries appear or disappear immediately.
