@@ -22,9 +22,6 @@ class Ui_SystemDialog(object):
         self.gridLayout.setObjectName("gridLayout")
         self.horizontalLayout_25 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_25.setObjectName("horizontalLayout_25")
-        self.resetButton = QtWidgets.QPushButton(parent=SystemDialog)
-        self.resetButton.setObjectName("resetButton")
-        self.horizontalLayout_25.addWidget(self.resetButton)
         self.buttonBox = QtWidgets.QDialogButtonBox(parent=SystemDialog)
         self.buttonBox.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel|QtWidgets.QDialogButtonBox.StandardButton.Save)
@@ -689,8 +686,7 @@ class Ui_SystemDialog(object):
         SystemDialog.setTabOrder(self.cb_telem, self.cb_motion)
         SystemDialog.setTabOrder(self.cb_motion, self.cb_ffb)
         SystemDialog.setTabOrder(self.cb_ffb, self.pb_add_dest)
-        SystemDialog.setTabOrder(self.pb_add_dest, self.resetButton)
-        SystemDialog.setTabOrder(self.resetButton, self.pathXPLANE)
+        SystemDialog.setTabOrder(self.pb_add_dest, self.pathXPLANE)
         SystemDialog.setTabOrder(self.pathXPLANE, self.browseXPLANE)
         SystemDialog.setTabOrder(self.browseXPLANE, self.tb_logPrune)
         SystemDialog.setTabOrder(self.tb_logPrune, self.enableDCS)
@@ -704,7 +700,6 @@ class Ui_SystemDialog(object):
     def retranslateUi(self, SystemDialog):
         _translate = QtCore.QCoreApplication.translate
         SystemDialog.setWindowTitle(_translate("SystemDialog", "System Settings"))
-        self.resetButton.setText(_translate("SystemDialog", "Reset to Defaults"))
         self.labelInstanceDevices.setText(_translate("SystemDialog", "Device Settings:"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_Devices), _translate("SystemDialog", "Devices"))
         self.rb_SystemTheme.setText(_translate("SystemDialog", "System"))

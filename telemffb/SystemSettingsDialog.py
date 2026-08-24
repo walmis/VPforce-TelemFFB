@@ -22,6 +22,7 @@ import json
 import html
 import logging
 import os
+import time
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt, QSize
@@ -111,6 +112,34 @@ class _LiveSettings:
         return self._base.get(name, default, instance)
 
 
+class _ImportedSettings:
+    """A settings export file, readable the way SystemSettings is read.
+
+    ``get`` resolves instance-scoped keys first and coerces stored
+    booleans the same way, so the dialog's load paths work from a file
+    exactly as they do from the registry.  Read-only: an import only
+    populates the form, and Save is what writes.
+    """
+
+    def __init__(self, flat):
+        self._flat = flat
+
+    def get(self, name, default=None, instance=None):
+        val = self._flat.get(f"{instance}/{name}") if instance else None
+        if val is None:
+            val = self._flat.get(name)
+        if val is None:
+            return default
+        if val == "true":
+            return 1
+        if val == "false":
+            return 0
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return val
+
+
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None,):
         super(SystemSettingsDialog, self).__init__(parent)
@@ -118,6 +147,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # before ANY wiring: state-derivation slots that read it fire as
         # early as load_settings' master-radio click.
         self._pending_devpaths = {}
+        # while an import is populating the form, panels created on the fly
+        # read the imported values instead of the store
+        self._import_source = None
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"System Settings ({G.device_type.capitalize()})")
@@ -271,7 +303,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseIL2.clicked.connect(self.select_il2_directory)
         self.browseIL2_K.clicked.connect(self.select_il2_directory)
         self.buttonBox.accepted.connect(self.save_settings)
-        self.resetButton.clicked.connect(self.reset_settings)
+        self._build_settings_menu()
         self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
         self.cb_al_enable.stateChanged.connect(self.toggle_al_widgets)
         self.buttonBox.rejected.connect(self.close)
@@ -896,6 +928,128 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 "Cancelled, but these could not be put back as they were - "
                 "if a game is running, close it and check them:\n\n" +
                 "\n".join(f"    {path}" for path in failed))
+
+    def _build_settings_menu(self):
+        """The File menu at the top of the dialog: import, export, reset.
+
+        None of the three writes anything - each only populates (or, for
+        export, reads) the form and store, and Save remains the single
+        committing action.
+        """
+        self.settings_menu_bar = QtWidgets.QMenuBar(self)
+        self.file_menu = self.settings_menu_bar.addMenu("&File")
+        self.action_import = self.file_menu.addAction(
+            "Import Settings...", self.import_settings)
+        self.action_export = self.file_menu.addAction(
+            "Export Settings...", self.export_settings)
+        self.file_menu.addSeparator()
+        self.action_reset = self.file_menu.addAction(
+            "Reset to Defaults", self.reset_settings)
+        self.layout().setMenuBar(self.settings_menu_bar)
+
+    def export_settings(self):
+        """Write every stored setting to a JSON file the user picks.
+
+        The whole configuration - master and children alike - lives in
+        this one store, so the file is a complete system-settings backup.
+        Binary UI state (window geometry and the like) is not portable
+        and is left out.
+        """
+        default_name = f"TelemFFB-settings-{time.strftime('%Y%m%d')}.json"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Settings", default_name,
+            "TelemFFB settings (*.json)")
+        if not path:
+            return
+        settings = {}
+        for key in G.system_settings.allKeys():
+            value = G.system_settings.value(key)
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                settings[key] = value
+        try:
+            version = utils.get_version()
+        except Exception:
+            version = ''
+        payload = {
+            "application": "TelemFFB",
+            "version": version,
+            "exported": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "settings": settings,
+        }
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, sort_keys=True)
+        except OSError as e:
+            QMessageBox.warning(self, "Export Settings",
+                                f"Could not write the file:\n{e}")
+            return
+        QMessageBox.information(
+            self, "Export Settings",
+            f"{len(settings)} settings exported to:\n{path}")
+
+    def import_settings(self):
+        """Load a settings export into the form, committing nothing.
+
+        The imported state flows through every guard Save already has -
+        validation, the live device switch, restart notices, the tap
+        reconcile - because it lands in the widgets exactly as if the
+        user had clicked it all in.  Cancel discards it.
+
+        Device identity keys are staged as pending writes so hardware
+        that is not currently plugged in survives the round trip: the
+        stored-but-unplugged machinery (retry ticker, panel labels)
+        already handles the rest.
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import Settings", "", "TelemFFB settings (*.json)")
+        if not path:
+            return
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            flat = data.get("settings", data) if isinstance(data, dict) \
+                else None
+            if not isinstance(flat, dict) or not flat:
+                raise ValueError("no settings found in the file")
+        except (OSError, ValueError) as e:
+            QMessageBox.warning(self, "Import Settings",
+                                f"Could not read the file:\n{e}")
+            return
+
+        source = _ImportedSettings(flat)
+        # identity keys go through the pending-write path Save already
+        # has; a devpath the file leaves out clears that slot rather than
+        # keeping the old selection behind the imported ones
+        for key, value in flat.items():
+            if key.startswith(("devpath_", "devicon_", "devids_",
+                               "devident_", "pid")):
+                self._pending_devpaths[key] = value
+        for role in list(self.INSTANCE_ROLES) + ['joystick_2', 'joystick_3']:
+            self._pending_devpaths[f"devpath_{role}"] = \
+                flat.get(f"devpath_{role}", "") or ""
+
+        self._import_source = source
+        try:
+            # selectors restart from nothing so an unmatched (unplugged)
+            # import shows no device rather than the previous selection
+            selectors = list(self._device_combos) + [
+                row.selector
+                for row in self.device_cards.joystick_card.alt_rows]
+            for cb in selectors:
+                cb.blockSignals(True)
+                cb.setCurrentIndex(0)
+                cb._prev_index = 0
+                cb.blockSignals(False)
+            self.populateUSBSelectors()
+            self.load_settings(source=source)
+        finally:
+            self._import_source = None
+
+        QMessageBox.information(
+            self, "Import Settings",
+            f"Settings loaded from:\n{path}\n\n"
+            "Nothing is applied yet - review the tabs and click Save, "
+            "or Cancel to discard the import.")
 
     def reset_settings(self):
         # Load default settings and update widgets
@@ -2170,20 +2324,23 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 "Some configurations could not be updated:\n\n" +
                 "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
 
-    def load_settings(self, default=False):
+    def load_settings(self, default=False, source=None):
         """
         Load settings from the registry and update widget states.
+
+        ``source`` substitutes a dict-like (an imported settings file) for
+        the registry, populating the form without touching the store.
         """
-        if default:
+        if source is not None:
+            settings_dict = source
+        elif default:
             settings_dict = G.system_settings.defaults
-            pass
         else:
             # Read settings from the registry
             settings_dict = G.system_settings
-            pass
         # Update widget states based on the loaded settings
         for panel in self.instance_panels.values():
-            panel.load(G.system_settings, defaults_only=default)
+            panel.load(source or G.system_settings, defaults_only=default)
 
         self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
 
@@ -2271,6 +2428,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
 
         self.toggle_al_widgets()
+
+        # A reset or import only stages values in the form, so the
+        # baseline the restart notice compares against must stay what the
+        # app is actually running with - otherwise restoring a backup
+        # with a different master would never say a restart is needed.
+        if default or source is not None:
+            return
 
         # build record of auto-launch settings to see if they changed on save:
         self.current_al_dict = {
@@ -2438,7 +2602,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         device = self.selected_device(role)
         if device is not None:
             return format(device.product_id, 'x')
-        return str(G.system_settings.get(device_pid_key(role), '') or '').strip()
+        # pending first: an import stages the pid of hardware that is not
+        # currently plugged in, and validation runs before anything is
+        # written
+        return str(self._stored_or_pending(device_pid_key(role)) or '').strip()
 
     def _configured_roles(self):
         """Devices this installation is set up for, so each gets a tab.
@@ -2529,7 +2696,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if page is None:
                 page = self._build_role_page(role)
                 for panel in self.panels_for(role):
-                    panel.load(G.system_settings)
+                    panel.load(self._import_source or G.system_settings)
             if tabs.indexOf(page) < 0:
                 tabs.insertTab(pos, page, device_display_name(role))
 

@@ -23,13 +23,6 @@
    <item row="1" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_25">
      <item>
-      <widget class="QPushButton" name="resetButton">
-       <property name="text">
-        <string>Reset to Defaults</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QDialogButtonBox" name="buttonBox">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
@@ -1647,7 +1640,6 @@
   <tabstop>cb_motion</tabstop>
   <tabstop>cb_ffb</tabstop>
   <tabstop>pb_add_dest</tabstop>
-  <tabstop>resetButton</tabstop>
   <tabstop>pathXPLANE</tabstop>
   <tabstop>browseXPLANE</tabstop>
   <tabstop>tb_logPrune</tabstop>

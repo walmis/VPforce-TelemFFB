@@ -101,6 +101,17 @@ class Settings(dict):
     def value(self, key, default=None):
         return dict.get(self, key, default)
 
+    def allKeys(self):
+        return list(self.keys())
+
+    @property
+    def defaults(self):
+        from telemffb.utils import SystemSettings
+        merged = {}
+        merged.update(SystemSettings.default_inst)
+        merged.update(SystemSettings.globl_sys_dict)
+        return merged
+
 
 class Policy:
     """Answers every prompt the dialog can raise, at random unless told.
