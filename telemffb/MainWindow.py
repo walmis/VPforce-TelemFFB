@@ -1246,10 +1246,16 @@ class MainWindow(QMainWindow):
             self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
 
     def refresh_configurator_gating(self):
+        # the action is part of the Debug menu, which only exists with the
+        # debug registry key (or Alt+D) - on a normal install there is
+        # nothing to gate
+        action = getattr(self, 'configurator_settings_action', None)
+        if action is None:
+            return
         caps = getattr(HapticEffect.device, 'caps', None)
         no_gains = caps is not None and not caps.has_gains
-        self.configurator_settings_action.setEnabled(not no_gains)
-        self.configurator_settings_action.setToolTip(
+        action.setEnabled(not no_gains)
+        action.setToolTip(
             'Not supported on this device (no Configurator gains)'
             if no_gains else '')
 

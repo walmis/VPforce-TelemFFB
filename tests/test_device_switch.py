@@ -286,3 +286,33 @@ class TestConfiguredDevicePresent:
     def test_no_selection_reads_as_absent(self, rig):
         rig.settings['devpath_joystick'] = ''
         assert rig.main._configured_device_present() is False
+
+
+class TestIdentityRefreshWithoutDebugMenu:
+    """The Configurator gain action lives on the Debug menu, which only
+    exists with the debug registry key.  The live switch's identity
+    refresh must survive a normal install where the menu - and so the
+    action - was never built.  (Field case: a first-launch restore on a
+    clean registry crashed the switch mid-apply.)"""
+
+    def test_gating_refresh_survives_a_missing_action(self):
+        from telemffb.MainWindow import MainWindow
+        bare = SimpleNamespace()          # no configurator_settings_action
+        MainWindow.refresh_configurator_gating(bare)   # must not raise
+
+    def test_gating_still_applies_when_the_menu_exists(self, monkeypatch):
+        from telemffb.MainWindow import MainWindow
+        from telemffb.hw.ffb_rhino import HapticEffect
+
+        class Action:
+            enabled = None
+            def setEnabled(self, v): self.enabled = v
+            def setToolTip(self, t): self.tooltip = t
+
+        monkeypatch.setattr(
+            HapticEffect, 'device',
+            SimpleNamespace(caps=SimpleNamespace(has_gains=False)),
+            raising=False)
+        window = SimpleNamespace(configurator_settings_action=Action())
+        MainWindow.refresh_configurator_gating(window)
+        assert window.configurator_settings_action.enabled is False
