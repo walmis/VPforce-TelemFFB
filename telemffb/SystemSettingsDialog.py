@@ -631,6 +631,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # readouts in line with what is actually selected
         self.device_cards.refresh_ids_labels()
 
+        # First-launch guidance for the non-VPforce user: their stick can
+        # only appear through the DirectInput listing, and that switch
+        # lives on the System page.  Shown only while the cards would
+        # otherwise be a dead end - no VPforce hardware listed, nothing
+        # configured, DirectInput off.
+        dinput_on = (dinput_enabled if dinput_enabled is not None
+                     else bool(G.system_settings.get('enableDirectInput',
+                                                     False)))
+        nothing_stored = not any(self._stored_or_pending(f'devpath_{r}')
+                                 for r in self.INSTANCE_ROLES)
+        self.device_cards.dinput_hint.setVisible(
+            not devices and nothing_stored and not dinput_on)
+
         # connect signals (once - this method also runs on repopulate)
         if not getattr(self, '_device_signals_connected', False):
             for cb in combo_boxes:

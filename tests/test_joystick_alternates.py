@@ -295,3 +295,58 @@ class TestThreeTabLayout:
         world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
         assert world.dialog.tabWidget.currentWidget().objectName() == \
             'tab_Devices'
+
+
+class TestDInputHint:
+    """The no-devices hint under the cards: a non-VPforce user's stick can
+    only appear through the DirectInput listing, and that switch lives on
+    the System page - the Devices tab says so instead of dead-ending."""
+
+    def _fresh(self, tmp_path, monkeypatch, **extra):
+        from telemffb.hw.ffb_rhino import FFBRhino
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=dict(
+            {'devpath_joystick': '', 'devpath_pedals': '',
+             'devids_joystick': '', 'devident_joystick': '',
+             'devids_pedals': '', 'devident_pedals': '',
+             'masterInstance': 1, 'themeId': 2}, **extra))
+        monkeypatch.setattr(FFBRhino, 'enumerate', staticmethod(lambda: []))
+        world.open()
+        return world
+
+    def test_hidden_while_vpforce_hardware_is_listed(
+            self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
+        hint = world.dialog.device_cards.dinput_hint
+        assert not hint.isVisibleTo(world.dialog)
+
+    def test_shown_on_a_fresh_install_with_no_vpforce_devices(
+            self, app, tmp_path, monkeypatch):
+        world = self._fresh(tmp_path, monkeypatch)
+        hint = world.dialog.device_cards.dinput_hint
+        assert hint.isVisibleTo(world.dialog)
+        assert 'System page' in hint.text()
+
+    def test_enabling_directinput_dismisses_it(
+            self, app, tmp_path, monkeypatch):
+        world = self._fresh(tmp_path, monkeypatch)
+        world.dialog.cb_enable_dinput.setChecked(True)
+        assert not world.dialog.device_cards.dinput_hint.isVisibleTo(
+            world.dialog)
+
+    def test_a_configured_but_unplugged_rig_is_not_nagged(
+            self, app, tmp_path, monkeypatch):
+        """An owner whose Rhino is simply not plugged in right now has a
+        stored configuration; pointing them at DirectInput would mislead."""
+        world = self._fresh(tmp_path, monkeypatch,
+                            devpath_joystick=RHINO.path.decode())
+        assert not world.dialog.device_cards.dinput_hint.isVisibleTo(
+            world.dialog)
+
+    def test_the_hint_costs_its_full_height_in_the_minimum(
+            self, app, tmp_path, monkeypatch):
+        """A word-wrapping label reports a one-line minimum, letting the
+        dialog open short and crush the joystick card.  The hint must
+        cost the same in the minimum as it occupies for real."""
+        world = self._fresh(tmp_path, monkeypatch)
+        panel = world.dialog.device_cards
+        assert panel.minimumSizeHint().height() == panel.sizeHint().height()

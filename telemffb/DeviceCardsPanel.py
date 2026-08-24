@@ -62,6 +62,11 @@ DEVICE_ICON_CHOICES = {
 #: One selector width everywhere, so the columns line up across cards.
 SELECTOR_WIDTH = 360
 
+#: Where the TelemFFB DirectInput Bridge utility is offered.  The bridge
+#: DLL deliberately does not ship with TelemFFB; while this is empty the
+#: no-devices hint under the cards omits its where-to-get-it sentence.
+DINPUT_BRIDGE_URL = ''
+
 #: Most rows a role card may hold (the active device plus alternates).
 MAX_DEVICES_PER_ROLE = 3
 
@@ -555,6 +560,34 @@ class DeviceCardsPanel(QWidget):
             setattr(self, f'cb_select_{suffix}', card.selector)
             setattr(self, f'rb_master_{suffix}', card.master_radio)
         self.joystick_card = self.cards['joystick']
+
+        # For the first launch with no VPforce hardware: the cards sit
+        # empty and the one switch that would list a DirectInput stick
+        # lives on another page - say so.  The dialog decides when this
+        # shows (no VPforce devices, nothing configured, DirectInput off).
+        #
+        # Line-broken by hand rather than word-wrapped: a wrapping label
+        # reports a one-line minimum height, which let the dialog open
+        # too short and crush the tallest card (the joystick selector
+        # painted clipped until the frame was dragged).
+        lines = ['No VPforce devices were found.  DirectInput support for '
+                 'other force feedback devices',
+                 'can be enabled on the System page.']
+        if DINPUT_BRIDGE_URL:
+            lines[-1] += (f'  Visit <a href="{DINPUT_BRIDGE_URL}">'
+                          f'{DINPUT_BRIDGE_URL}</a> to get your copy of')
+            lines.append('the TelemFFB DirectInput Bridge utility if you '
+                         'do not already have it.')
+            hint = '<br/>'.join(lines)     # rich text: the link needs it
+        else:
+            hint = '\n'.join(lines)
+        self.dinput_hint = QLabel(hint)
+        self.dinput_hint.setObjectName('dinputHint')
+        self.dinput_hint.setOpenExternalLinks(True)
+        # dim through the theme's own placeholder color, like the ids labels
+        self.dinput_hint.setForegroundRole(QPalette.ColorRole.PlaceholderText)
+        self.dinput_hint.setVisible(False)
+        layout.addWidget(self.dinput_hint)
 
         # ------------------------------------------------------------------
         # Legacy launch widgets, alive but invisible.  Every save/load/
