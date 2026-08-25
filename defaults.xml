@@ -6,6 +6,31 @@
 -->
 <TelemFFB>
 	<defaults>
+		<grouping>Device</grouping>
+		<order>40.0</order>
+		<displayname>Device</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>true</value>
+		<datatype>group</datatype>
+		<name>device_group</name>
+	</defaults>
+	<defaults>
+		<grouping>Device</grouping>
+		<parentgroup>device</parentgroup>
+		<order>41</order>
+		<displayname>Joystick Device</displayname>
+		<prereq>device_group</prereq>
+		<info>Which of the configured joystick devices this aircraft uses.&lt;br&gt;&lt;br&gt;'Primary (default)' is the device marked in System Settings; the * in the list marks which named device that currently is.  Picking another configured device switches to it while this aircraft is loaded and back to the primary afterward - nothing changes in System Settings.&lt;br&gt;&lt;br&gt;If the referenced device is later replaced in System Settings, TelemFFB offers to update the aircraft settings that reference it.</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>primary</value>
+		<datatype>devicelist</datatype>
+		<name>joystick_device</name>
+	</defaults>
+	<defaults>
 		<grouping>Basic</grouping>
 		<order>50.0</order>
 		<datatype>group</datatype>

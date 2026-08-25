@@ -645,6 +645,45 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit='', the_device=''):
             f"Added <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}{unit}, name={setting_name}")
 
 
+def find_joystick_device_references(devpath):
+    """User-config entries whose per-aircraft device setting names this
+    devpath, across every scope (sim, class, model).
+
+    The 'joystick_device' aircraft setting stores the devpath of one of
+    the joystick role's configured devices, so a device change in System
+    Settings is what makes these stale - the caller offers to rewrite
+    them (see update_joystick_device_references).
+    """
+    refs = []
+    for tag in ('models', 'classSettings', 'simSettings'):
+        for elem in auto_user_root.findall(tag):
+            if elem.findtext('name') != 'joystick_device':
+                continue
+            if (elem.findtext('value') or '') == devpath:
+                refs.append(elem)
+    return refs
+
+
+def describe_setting_scope(elem):
+    """A user-config entry's scope, phrased for a prompt."""
+    if elem.tag == 'models':
+        return elem.findtext('model') or 'unknown aircraft'
+    if elem.tag == 'classSettings':
+        return f"{elem.findtext('type') or 'unknown'} (class default)"
+    return f"all {elem.findtext('sim') or 'sim'} aircraft (sim default)"
+
+
+def update_joystick_device_references(old_path, new_path):
+    """Rewrite every user-config reference to a replaced joystick device
+    and persist.  Returns the number of entries changed."""
+    refs = find_joystick_device_references(old_path)
+    for elem in refs:
+        elem.find('value').text = new_path
+    if refs:
+        write_userconfig_xml(auto_user_tree)
+    return len(refs)
+
+
 def clone_profile_entry(sim, cls, src_model, src_profile, dst_profile):
     """
     Clone a profile entry for a src_model and src_profile into a dst_profile.
@@ -1109,6 +1148,18 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 #####                                                   #####
 #############################################################
 
+def multiple_joystick_devices():
+    """Whether the joystick role has more than one device configured -
+    the gate for the per-aircraft device selection (a single-device rig
+    has nothing to choose between).  Never hides on plumbing failure."""
+    try:
+        return sum(1 for suffix in ('', '_2', '_3')
+                   if G.system_settings.get(
+                       f'devpath_joystick{suffix}', '')) > 1
+    except Exception:
+        return True
+
+
 def read_xml_file(the_sim, instance_device=''):
     """
         Parses the default settings XML for a given simulation and device, and returns a sorted list of configuration dictionaries.
@@ -1170,6 +1221,15 @@ def read_xml_file(the_sim, instance_device=''):
         debug_only_elem = defaults_elem.find('debug_only')
         debug_only = debug_only_elem is not None and debug_only_elem.text.strip().lower() == 'true'
         if debug_only and not G.system_settings.get('debug', False):
+            continue
+        # The per-aircraft device selection only means something when the
+        # joystick role holds more than one device; with a single device
+        # the row AND its section header disappear from the form and from
+        # runtime resolution (this reader feeds both).  A stored
+        # preference goes inert, not lost - it resurfaces when a second
+        # device is configured again.
+        if name in ('device_group', 'joystick_device') \
+                and not multiple_joystick_devices():
             continue
         sliderfactor_elem = defaults_elem.find('sliderfactor')
         sliderfactor = (f"{sliderfactor_elem.text}") if sliderfactor_elem is not None else "1"

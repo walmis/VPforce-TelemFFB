@@ -47,6 +47,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
+from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
@@ -950,6 +951,11 @@ class MainWindow(QMainWindow):
         reload_shortcut = QShortcut(QKeySequence('Ctrl+Shift+R'), self)
         reload_shortcut.activated.connect(self.force_reload_aircraft)
 
+        # System Settings announces device-configuration changes here
+        # rather than calling each UI consumer by hand
+        app_events().device_config_changed.connect(
+            self.on_device_config_changed)
+
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
             self.add_debug_menu()
@@ -1267,14 +1273,50 @@ class MainWindow(QMainWindow):
         self.update_device_status(G.device_connection_status)
         self.refresh_device_labels()
 
+    def on_device_config_changed(self, before, after):
+        """The stored device configuration changed (System Settings save,
+        announced via app_events) - bring every UI consumer in line.
+
+        The status labels refresh unconditionally: identity details the
+        path snapshots cannot see (idents, icon choices) may have
+        changed.  The aircraft settings form only rebuilds when the
+        joystick slots really changed - its Device section and dropdown
+        are read at build time - and a section APPEARING at the top
+        (one device becoming several) also scrolls there, since holding
+        the reading position would leave it silently off-screen above.
+        """
+        try:
+            self.refresh_device_labels()
+        except Exception:
+            logging.exception('Device label refresh failed')
+        try:
+            joy = [key for key in after if key.startswith('devpath_joystick')]
+            if any(before.get(key, '') != after.get(key, '') for key in joy):
+                was_multi = sum(1 for key in joy if before.get(key)) > 1
+                now_multi = sum(1 for key in joy if after.get(key)) > 1
+                self.settings_layout.reload_caller(
+                    reveal_top=now_multi and not was_multi)
+        except Exception:
+            logging.exception('Aircraft settings form refresh failed')
+
     def refresh_device_labels(self):
         """Name the hardware under each status icon (the stored per-slot
         identity) and show its icon choice, flashing any icon whose device
         just changed."""
         for role in self.device_panel.get_device_names():
             try:
-                label = utils.device_panel_label(role, G.system_settings)
-                icon = utils.device_panel_icon(role, G.system_settings)
+                slot_suffix = ''
+                if role == 'joystick' and G.device_type == 'joystick':
+                    # a per-aircraft swap may have an ALTERNATE slot's
+                    # device in hand; the icon names what is actually
+                    # connected, not the stored primary
+                    slot_suffix = utils.active_joystick_slot_suffix(
+                        G.system_settings,
+                        getattr(G, 'device_devpath', '')) or ''
+                label = utils.device_panel_label(
+                    role, G.system_settings, slot_suffix=slot_suffix)
+                icon = utils.device_panel_icon(
+                    role, G.system_settings, slot_suffix=slot_suffix)
             except Exception:
                 label, icon = '', ''
             changed = self.device_panel.set_device_label(role, label)

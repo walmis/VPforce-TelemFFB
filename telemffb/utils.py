@@ -4223,31 +4223,36 @@ def device_ident_key(role):
     return 'devident_' + role
 
 
-def device_panel_icon(role, settings):
+def device_panel_icon(role, settings, slot_suffix=''):
     """Resource path for a role's status icon, or '' for the role default.
 
     The joystick role's devices each carry an icon choice (stored as
     devicon_joystick / devicon_joystick_2 ...); the ACTIVE device's choice
     is what the panel shows, and it follows the device through swaps.
+    ``slot_suffix`` reads an alternate slot's choice - what the panel
+    needs while a per-aircraft swap has that slot's device in hand.
     """
-    kind = str(settings.get(f'devicon_{role}', '') or '')
+    kind = str(settings.get(f'devicon_{role}{slot_suffix}', '') or '')
     if kind == 'yoke':
         return ':/image/icon_yoke.png'
     return ''
 
 
-def device_panel_label(role, settings, max_chars=14):
+def device_panel_label(role, settings, max_chars=14, slot_suffix=''):
     """A short device name for the role's status icon, or '' when unknown.
 
     VPforce idents are the owner's own Configurator names and already
     short; a generic DirectInput ident is the full product string
     ("Microsoft SideWinder Force Feedback 2"), so it is cut to its first
     word or two.  Either way the result fits under the icon.
+    ``slot_suffix`` reads an alternate slot's identity - what the panel
+    needs while a per-aircraft swap has that slot's device in hand.
     """
-    ident = str(settings.get(device_ident_key(role), '') or '').strip()
+    ident = str(settings.get(
+        device_ident_key(role) + slot_suffix, '') or '').strip()
     if not ident:
         return ''
-    devpath = str(settings.get(f'devpath_{role}', '') or '')
+    devpath = str(settings.get(f'devpath_{role}{slot_suffix}', '') or '')
     if devpath.startswith('dinput:'):
         words = ident.split()
         # the selector lists these as '[DI] name' and the ident was stored
@@ -4390,6 +4395,46 @@ def directinput_selection_devices(settings, enabled=None):
 def device_pid_key(role):
     """The settings key holding a device role's USB product ID."""
     return 'pid' + device_display_name(role).replace(' ', '')
+
+
+def active_joystick_slot_suffix(settings, devpath):
+    """Which configured joystick slot holds this devpath: '' (primary),
+    '_2', '_3' - or None when no slot matches (device-less, or identity
+    that predates the slots).  How the status panel finds the icon and
+    name for whatever a per-aircraft swap actually put in hand."""
+    for suffix in ('', '_2', '_3'):
+        stored = str(settings.get(f'devpath_joystick{suffix}', '') or '')
+        if stored and stored == str(devpath or ''):
+            return suffix
+    return None
+
+
+def joystick_device_choices(settings):
+    """The joystick role's configured devices, as (devpath, label) pairs.
+
+    What the per-aircraft device dropdown offers: the stored value is the
+    devpath (the slot system's own unique handle - a product name cannot
+    tell two identical side sticks apart), the label is the human side
+    (stored ident, with the USB ids appended to disambiguate twins).
+    Slot order: primary first, then the alternates; the primary's label
+    carries a trailing ' *' so the list shows which named device the
+    'Primary (default)' entry currently resolves to (the setting's
+    tooltip explains the mark).
+    """
+    choices = []
+    for suffix in ('', '_2', '_3'):
+        path = str(settings.get(f'devpath_joystick{suffix}', '') or '')
+        if not path:
+            continue
+        ident = str(settings.get(f'devident_joystick{suffix}', '') or '')
+        ids = str(settings.get(f'devids_joystick{suffix}', '') or '')
+        label = ident or 'Unnamed device'
+        if ids:
+            label = f'{label} ({ids})'
+        if suffix == '':
+            label += ' *'
+        choices.append((path, label))
+    return choices
 
 
 def exit_application():

@@ -55,6 +55,7 @@ import logging
 import os
 import re
 import shutil
+import time
 import subprocess
 import traceback
 from datetime import datetime
@@ -545,7 +546,22 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
         if G.device_di_guid:
             dev = HapticEffect.open_dinput(G.device_di_guid)
         else:
-            dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+            # By exact path when one is known - a PID-only open cannot
+            # tell identical devices apart (two of the same side stick).
+            # A stale path (device moved to another USB port) falls back
+            # to the PID open that was always used, so port moves keep
+            # working the way they did.
+            dev = None
+            if G.device_devpath:
+                try:
+                    dev = HapticEffect.open(pid=int(G.device_usbpid, 16),
+                                            path=str(G.device_devpath))
+                except Exception:
+                    logging.info(
+                        "Open by stored device path failed; falling back "
+                        f"to PID {G.device_usbpid}")
+            if dev is None:
+                dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
 
         def connect_signals():
             dev.deviceConnected.connect(G.main_window.update_device_status)
@@ -668,17 +684,30 @@ class _DeviceRetryTicker:
 device_retry_ticker = _DeviceRetryTicker()
 
 
-def switch_to_device(show_error=True) -> bool:
-    """Live device switch: re-acquire this instance's device from the saved
-    system settings, without a restart.
+def _pid_from_devpath(devpath: str):
+    """The USB product id embedded in a HID device path, as the hex string
+    G.device_usbpid carries ('2054'), or None for paths without one (a
+    dinput: GUID)."""
+    m = re.search(r'PID_([0-9A-Fa-f]{4})', devpath)
+    return m.group(1).lower() if m else None
 
-    The hot-swap primitive.  The caller has already SAVED the new selection
-    for this instance's role; this re-reads it, tears the old device down
-    completely - every effect destroyed on the hardware, the poll and
-    reconnect machinery stopped - opens the new device through the same
-    core as startup, and brings the identity-derived state (beacons, UI,
-    the loaded aircraft's capability gates) in line.  Telemetry is held for
-    the duration so no effect code runs against a half-switched device.
+
+def switch_to_device(devpath=None, show_error=True) -> bool:
+    """Live device switch: re-acquire this instance's device, no restart.
+
+    The hot-swap primitive.  Without ``devpath``, the caller has already
+    SAVED the new selection for this instance's role and this re-reads it.
+    With ``devpath``, that exact device is acquired instead - the
+    per-aircraft ephemeral swap: nothing is read from or written to the
+    stored settings, which keep naming the user's primary device, and a
+    later parameterless call (or a restart) returns to it.
+
+    Either way the old device is torn down completely - every effect
+    destroyed on the hardware, the poll and reconnect machinery stopped -
+    the new one opens through the same core as startup, and the
+    identity-derived state (beacons, UI, the loaded aircraft's capability
+    gates) is brought in line.  Telemetry is held for the duration so no
+    effect code runs against a half-switched device.
 
     Beacons are only ever ADDED: a beacon says "TelemFFB took
     responsibility for this device's FFB role this session", and a game
@@ -687,13 +716,27 @@ def switch_to_device(show_error=True) -> bool:
 
     Returns True when the new device is open; on failure the instance is
     left device-less (connection status false), exactly like a failed
-    startup open - the user fixes the selection and tries again.
+    startup open - the user fixes the selection and tries again (an
+    ephemeral caller falls back to a parameterless call instead).
     """
     old_dev = HapticEffect.device
     old_name = getattr(getattr(old_dev, 'info', None), 'product_string', None)
     logging.info(f"Live device switch: releasing "
                  f"'{old_name or 'no device'}' for '{G.device_type}'")
     G.telem_manager.set_paused(True)
+    # The pause only stops NEW frames; a frame in flight (or one already
+    # buffered) would keep writing effects to the device being torn down.
+    # Hold the frame lock for the whole switch so nothing runs against a
+    # half-switched device; on a wedged telemetry thread, proceed rather
+    # than hang (the old, racy behavior - with a warning).
+    hold = getattr(G.telem_manager, 'frame_hold', None)
+    frame_lock = hold() if callable(hold) else None
+    frames_held = False
+    if frame_lock is not None:
+        frames_held = frame_lock.acquire(timeout=2.0)
+        if not frames_held:
+            logging.warning("Device switch: telemetry frame lock not "
+                            "acquired within 2s - switching anyway")
     try:
         # 1. Effects die first, while the old device can still be written:
         #    they would otherwise keep rendering on hardware nobody drives.
@@ -716,15 +759,22 @@ def switch_to_device(show_error=True) -> bool:
         HapticEffect.device = None
         G.device_connection_status = False
 
-        # 3. Re-derive the stored identity for this role (the dialog saved
-        #    it before asking for the switch).
-        devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
+        # 3. The identity to acquire.  An explicit devpath (the ephemeral
+        #    swap) carries its own PID in the HID path; the stored pid key
+        #    describes the primary, which may be a different device.
+        if devpath is None:
+            # re-derive the stored identity for this role (the dialog
+            # saved it before asking for the switch)
+            devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
+            pid = str(G.system_settings.get(
+                utils.device_pid_key(G.device_type), '') or '2055')
+        else:
+            pid = _pid_from_devpath(str(devpath)) or str(G.system_settings.get(
+                utils.device_pid_key(G.device_type), '') or '2055')
         G.device_devpath = devpath
         G.device_di_guid = None
         if devpath and str(devpath).startswith('dinput:'):
             G.device_di_guid = str(devpath)[len('dinput:'):]
-        pid = str(G.system_settings.get(
-            utils.device_pid_key(G.device_type), '') or '2055')
         G.device_usbpid = pid
 
         # 4. Open through the same core as startup.
@@ -742,6 +792,27 @@ def switch_to_device(show_error=True) -> bool:
             return False
         device_retry_ticker.stop()
 
+        # A freshly opened device has no input snapshot until its first
+        # report arrives, and the aircraft mixins read input every frame
+        # assuming it is always there.  The read timer cannot fire while
+        # this stack holds the main thread, so pump the device directly
+        # for a moment; the frame-level guard in TelemManager covers
+        # whatever window remains.
+        pump = getattr(dev, 'read_reports', None) \
+            or getattr(dev, '_poll_once', None)
+        if pump is not None:
+            try:
+                deadline = time.perf_counter() + 0.5
+                while (dev.get_input() is None
+                        and time.perf_counter() < deadline):
+                    pump()
+                    time.sleep(0.005)
+                if dev.get_input() is None:
+                    logging.warning("Device switch: no input report within "
+                                    "500ms of open")
+            except Exception:
+                logging.exception("Device switch: input pump failed")
+
         # 5. Beacon for the new device (additive; see docstring), UI, and
         #    the loaded aircraft's capability gates.
         _publish_beacons()
@@ -753,7 +824,24 @@ def switch_to_device(show_error=True) -> bool:
                      f"'{dev.info.product_string}'")
         return True
     finally:
+        if frames_held:
+            frame_lock.release()
         G.telem_manager.set_paused(False)
+
+
+def _on_device_swap_requested(devpath: str):
+    """Per-aircraft device swap, on the main thread (queued from the
+    telemetry thread - the device's read timer must live here).  An empty
+    devpath means back to the stored primary.  A failed ephemeral open
+    falls back to the primary rather than leaving the instance
+    device-less mid-session; never a modal - the wrong-but-working
+    device beats a dead one."""
+    if devpath:
+        if switch_to_device(devpath=devpath, show_error=False):
+            return
+        logging.warning("Per-aircraft device swap could not open the "
+                        "requested device - falling back to the primary")
+    switch_to_device(show_error=False)
 
 
 # Registered on G so the System Settings dialog can trigger a live switch
@@ -1458,6 +1546,13 @@ def main():
     # ============================================================================
     # Initialize telemetry manager for handling sim data
     G.telem_manager = TelemManager()
+    # queued explicitly: the request comes from the telemetry thread and
+    # the swap must run here on the main thread (PyQt gives the proxy for
+    # a plain-callable queued connection the affinity of the connecting
+    # thread - this one)
+    G.telem_manager.deviceSwapRequested.connect(
+        _on_device_swap_requested,
+        QtCore.Qt.ConnectionType.QueuedConnection)
     G.telem_manager.start()
 
     # Initialize simulation listener manager for multiple sim support

@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialo
 
 from . import globals as G
 from . import utils
+from .app_events import events as app_events
 from .ui.Ui_SystemDialog import Ui_SystemDialog
 from .TapStatusPanel import TapStatusPanel
 from .tap_install import SIMS_BY_KEY, sim_status
@@ -1800,6 +1801,25 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # so a change-then-change-back never triggers a needless switch.
         pre_devpaths = {role: G.system_settings.get(f'devpath_{role}', '') or ''
                         for role in self.INSTANCE_ROLES}
+        # every joystick slot, alternates included: aircraft settings
+        # reference these by devpath, and a replaced device strands those
+        # references (offered for rewrite after the save, below)
+        pre_joystick_slots = {
+            suffix: str(G.system_settings.get(
+                f'devpath_joystick{suffix}', '') or '')
+            for suffix in ('', '_2', '_3')}
+        # ...and their names, for the reconcile prompt: by the time it
+        # asks, the stored idents already describe the newcomers
+        pre_joystick_idents = {
+            suffix: str(G.system_settings.get(
+                f'devident_joystick{suffix}', '') or '')
+            for suffix in ('', '_2', '_3')}
+        # the before-snapshot for the device_config_changed signal: every
+        # role plus the joystick alternates, by settings key
+        pre_config = {f'devpath_{role}': path
+                      for role, path in pre_devpaths.items()}
+        pre_config.update({f'devpath_joystick{suffix}': path
+                           for suffix, path in pre_joystick_slots.items()})
 
         for k,v in global_settings_dict.items():
             G.system_settings.setValue(f"{k}", v)
@@ -1842,6 +1862,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             logging.exception('Failed to check DirectInput tap configs after a '
                               'device change')
 
+        try:
+            self._offer_aircraft_device_reconcile(pre_joystick_slots,
+                                                  pre_joystick_idents)
+        except Exception:
+            logging.exception('Failed to check aircraft device references '
+                              'after a device change')
+
         # remembered by name: the dialog reopens on the tab the user
         # last saved from
         try:
@@ -1864,15 +1891,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         except Exception:
             logging.exception('Live device switch after save failed')
 
-        # the status-icon labels name the hardware behind each role; a
-        # child slot's change reaches the panel only through this refresh
-        # (the master's own switch refreshes on its own)
-        main_window = getattr(G, 'main_window', None)
-        if main_window is not None:
-            try:
-                main_window.refresh_device_labels()
-            except Exception:
-                logging.exception('Device label refresh failed')
+        # Everything UI that follows a device-configuration change - the
+        # status-icon labels, the aircraft settings form's Device section,
+        # whatever subscribes next - hears about it through one signal
+        # rather than a hand-wired call per consumer here.
+        try:
+            after_devpaths = {key: str(G.system_settings.get(key, '') or '')
+                              for key in pre_config}
+            app_events().device_config_changed.emit(dict(pre_config),
+                                                    after_devpaths)
+        except Exception:
+            logging.exception('Device configuration change '
+                              'notification failed')
 
         # the panels' own writes were meant after all
         for panel in self.tap_panels.values():
@@ -2325,6 +2355,68 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self, "DirectInput Tap Configuration",
                 "Some configurations could not be updated:\n\n" +
                 "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
+
+    def _offer_aircraft_device_reconcile(self, before, before_idents=None):
+        """Keep per-aircraft device references in step with the devices.
+
+        Aircraft settings name a configured device by its devpath (the
+        'joystick_device' setting), and the ONLY place the configured
+        set changes is this save - so a device that was REPLACED is
+        swept here: every user-config reference to the departed path is
+        offered a rewrite to its slot's newcomer, and references never
+        silently rot.
+
+        Replacement means the DEVICE left, not that its slot changed
+        hands: activating a different primary permutes devices between
+        slots while every one of them stays configured, and references
+        follow devices, so a shuffle is net-neutral and prompts for
+        nothing (field case: swapping which stick is primary asked to
+        rewrite perfectly valid references, in both directions).  A slot
+        that was merely CLEARED is also left alone: the per-aircraft
+        resolver falls back to the primary and says so, and there is
+        nothing sensible to rewrite to.
+        """
+        from telemffb import xmlutils
+        before_idents = before_idents or {}
+        after = {suffix: str(G.system_settings.get(
+                     f'devpath_joystick{suffix}', '') or '')
+                 for suffix in before}
+        before_paths = {path for path in before.values() if path}
+        after_paths = {path for path in after.values() if path}
+        for suffix, old in before.items():
+            new = after.get(suffix, '')
+            if not old or not new or old == new:
+                continue
+            if old in after_paths or new in before_paths:
+                continue        # a shuffle between slots, not a departure
+            try:
+                refs = xmlutils.find_joystick_device_references(old)
+            except Exception:
+                logging.exception('Aircraft device reference scan failed')
+                continue
+            if not refs:
+                continue
+            scopes = sorted({xmlutils.describe_setting_scope(e)
+                             for e in refs})
+            shown = '\n'.join(f'    {s}' for s in scopes[:12])
+            if len(scopes) > 12:
+                shown += f'\n    ... and {len(scopes) - 12} more'
+            new_name = str(G.system_settings.get(
+                f'devident_joystick{suffix}', '') or '') or 'the new device'
+            old_name = str(before_idents.get(suffix, '')
+                           or 'a device that is no longer configured')
+            answer = QMessageBox.question(
+                self, 'Aircraft Device Settings',
+                f'{len(refs)} aircraft setting(s) reference {old_name}, '
+                'which was just replaced in System Settings:\n\n'
+                f'{shown}\n\n'
+                f'Update them to use {new_name} instead?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if answer == QMessageBox.StandardButton.Yes:
+                count = xmlutils.update_joystick_device_references(old, new)
+                logging.info(f'Updated {count} aircraft device '
+                             f'reference(s) to {new_name}')
 
     def _offer_tap_reconcile(self, before, after):
         """Repoint tap configs at the device now in the slot.
