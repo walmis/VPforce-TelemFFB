@@ -47,6 +47,12 @@ class FakeDevice:
     def get_firmware_version(self):
         return None
 
+    def get_input(self):
+        return 'input-snapshot'          # a device with input flowing
+
+    def pump_input(self):
+        pass
+
     def reset_effects(self):
         pass
 

@@ -1059,3 +1059,27 @@ class TestFirmwareDenialBackoff:
                    return_value=good):
             assert mock_ffb_device.get_firmware_version(
                 cached=False) == 'v1.0.18-3'
+
+
+class TestPumpInput:
+    """pump_input is the backend-contract way for a device switch to get
+    the first input report while it holds the main thread (the read
+    timer cannot fire).  Input intake ONLY: unlike read_reports, no
+    button/hat events - a swap must not fire button side effects
+    mid-teardown."""
+
+    def test_pump_populates_the_input_snapshot(self, mock_ffb_device):
+        report = FFBReport_Input(reportId=HID_REPORT_ID_INPUT)
+        mock_ffb_device._dev.add_input_report(bytes(report))
+        assert mock_ffb_device.get_input() is None
+        mock_ffb_device.pump_input()
+        assert mock_ffb_device.get_input() is not None
+
+    def test_pump_does_not_dispatch_button_events(self, mock_ffb_device):
+        report = FFBReport_Input(reportId=HID_REPORT_ID_INPUT)
+        report.Button0_31 = 0b101              # buttons held in the report
+        mock_ffb_device._dev.add_input_report(bytes(report))
+        mock_ffb_device.pump_input()
+        # intake only: the press was stored, never processed into events
+        assert mock_ffb_device._button_state == 0
+        assert mock_ffb_device.get_input().Button0_31 == 0b101

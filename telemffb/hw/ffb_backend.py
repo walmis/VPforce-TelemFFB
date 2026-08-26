@@ -162,6 +162,19 @@ class BaseFFBDevice(QObject):
         forceXY/axisOverrideActive/isButtonPressed/getPressedButtons."""
         raise NotImplementedError
 
+    def pump_input(self):
+        """Perform one non-blocking input read, so get_input() can
+        populate without the event loop running.
+
+        A freshly opened device has no input snapshot until its first
+        report arrives, and the read timer that normally delivers it
+        cannot fire while a device switch holds the main thread - the
+        switch pumps this in a short loop instead.  Input intake only:
+        no button/hat event processing (a swap must not fire button
+        side effects mid-teardown).
+        """
+        pass
+
     def reset_effects(self):
         pass
 

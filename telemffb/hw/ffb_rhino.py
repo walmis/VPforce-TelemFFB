@@ -1146,6 +1146,20 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
         if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
+    def pump_input(self):
+        """One non-blocking drain of pending HID reports, input intake
+        only (see BaseFFBDevice.pump_input).  Unlike read_reports, the
+        report handlers do NOT run: a device switch pumps this while it
+        holds the main thread, and button events must not fire
+        mid-teardown."""
+        if not self._dev:
+            return
+        while True:
+            tmp = self._dev.read(64)
+            if not tmp:
+                break
+            self._in_reports[tmp[0]] = tmp
+
     def read_reports(self):
         if not self._dev:
             return

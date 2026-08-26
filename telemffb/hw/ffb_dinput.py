@@ -28,10 +28,9 @@ Differences from the native VPforce backend, hidden behind the
 - Spring center-point telemetry is EMULATED: the device tracks the last
   spring condition written per axis, so ``CP_XY()``/``CP_scaled_axisXY()``
   return the software-known spring center (trim following and helicopter
-  force-trim depend on these).  Offsets themselves render natively: the
-  bridge builds condition effects with DIEFF_POLAR coordinates, the one
-  formation whose lOffset works on both SideWinder-class drivers and the
-  standard PID driver.
+  force-trim depend on these).  Offsets themselves render natively; the
+  coordinate formation that makes them portable across driver families is
+  the bridge DLL's concern.
 - ``forceXY()`` returns None (no force output telemetry on generic devices).
 - ``start(override=True)`` downgrades to a normal start (no sticky-start
   concept in DirectInput); logged once per effect.
@@ -40,21 +39,9 @@ Differences from the native VPforce backend, hidden behind the
   full, the least-recently-started tier-1 effect is evicted and its
   HapticEffect lazily re-creates when it next starts.
 - Zero-coefficient condition effects are MUTED device-side (stopped, not
-  destroyed) - see ``DInputEffectHandle._sync_device_playing`` for the
-  field-tested rationale.
-
-Hardware quirks discovered in field testing (SideWinder Force Feedback 2,
-2026-08; each translated here or in the bridge DLL so app code stays
-device-agnostic):
-
-- The app's FFBReport_SetCondition objects default saturation to 0, which
-  VPforce firmware reads as "unlimited" but DirectInput reads as a
-  zero-force cap - untranslated, EVERY condition effect renders zero force.
-- DICONDITION.lOffset is silently dropped by the SideWinder driver unless
-  the effect uses DIEFF_POLAR coordinates (handled in the bridge DLL).
-- A PLAYING spring with zero coefficients is not force-free: the energized
-  drive stage adds cogging texture and even pulls the stick toward the stop
-  past ~half deflection (the mute behavior above).
+  destroyed) - see ``DInputEffectHandle._sync_device_playing``.
+- Condition saturation 0 is translated to full scale: the native backend's
+  firmware treats 0 as "unlimited", DirectInput as a zero-force cap.
 
 Debugging (registry values under HKCU\\Software\\VPforce\\TelemFFB):
 
@@ -401,9 +388,10 @@ class DIBridge:
         self._dll.dib_release(device)
 
     def device_reset(self, device: int) -> int:
-        """DISFFC_RESET: destroy every effect the DEVICE holds, orphans
-        included, and free the bridge's effect entries for it.  Absent in
-        pre-0.9.1 DLLs; reported as a general failure there."""
+        """Device-level reset: destroy every effect the DEVICE holds -
+        reachable through a handle or not - and free the bridge's effect
+        entries for it.  Absent in pre-0.9.1 DLLs; reported as a general
+        failure there."""
         if self._trace:
             logging.info(f"DIB device_reset dev#{device}")
         fn = getattr(self._dll, 'dib_device_reset', None)
@@ -572,10 +560,9 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         self._override_warned = False
         self._consecutive_failures = 0
         # condition effects: True while the DirectInput effect is actually
-        # playing.  A zero-coefficient condition is muted device-side (the
-        # effect is stopped) because an energized-but-zero spring changes
-        # the back-drive feel on consumer hardware (motor cogging/braking);
-        # zero force should feel like no effect at all.
+        # playing.  A zero-coefficient condition is muted device-side -
+        # zero force should feel like no effect at all (see
+        # _sync_device_playing).
         self._device_playing = False
 
     def __bool__(self) -> bool:
@@ -611,12 +598,11 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
     def _note_call_failed(self, rc) -> None:
         """Self-heal from a device-side effect death.
 
-        A vendor driver can silently destroy downloaded effects (observed:
-        SideWinder drops them when ANOTHER DirectInput device object is
-        created for the hardware, e.g. by an enumeration) - the handle then
-        fails every update forever with a generic error.  After a few
-        consecutive failures the handle invalidates itself and the owning
-        HapticEffect lazily re-creates the effect on the next frame.
+        Some drivers silently kill downloaded effects out from under
+        their handles - every update then fails forever with a generic
+        error.  After a few consecutive failures the handle presumes the
+        device-side effect dead and invalidates itself, so the owning
+        HapticEffect lazily re-creates it on the next frame.
         DIB_ERR_ACQUISITION is exempt: FFB priority loss has its own
         latched handling and resolves itself when priority returns.
         """
@@ -624,13 +610,9 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             return
         self._consecutive_failures += 1
         if self._consecutive_failures >= self.FAILURES_BEFORE_RECREATE:
-            # Dead effect interfaces come in batches, and the "dead" effects
-            # are usually ORPHANS - still playing on the device, unreachable
-            # through their invalidated interfaces (E_HANDLE; SideWinder
-            # does this to every downloaded effect whenever any process
-            # runs a DirectInput device enumeration).  Only a device-level
-            # reset clears them, so recovery is device-wide: reset, forget
-            # every handle, and let the effects re-create lazily.
+            # dead effects come in batches, and per-effect cleanup cannot
+            # be trusted on the drivers that cause this - recovery is
+            # device-wide (see recover_effects)
             self.device.recover_effects(reason=repr(self))
 
     def _push(self):
@@ -667,25 +649,19 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         """Keep the DirectInput effect's play state matched to the logical
         started state, muting zero-coefficient conditions device-side.
 
-        Why (field-tested on a SideWinder FFB 2, 2026-08): a PLAYING spring
-        with zero coefficients is not force-free on consumer hardware.  The
-        energized drive stage changes the back-drive feel (motor cogging),
-        and past ~half deflection the SideWinder actively pulls the stick
-        the rest of the way to the stop - felt as a phantom force in the
-        helicopter force-trim modes, whose "hold" state is exactly a
-        zero-coefficient spring whose center follows the stick.  Net-force
-        instrumentation reads ~0 for that state, so this only surfaces
-        under a human hand.  (DCS appears to have met the same issue: it
-        leaves a ~1% residual spring during trim release rather than
-        commanding a true zero.)
+        A PLAYING condition with zero coefficients is not force-free on
+        some hardware - felt most in the helicopter force-trim modes,
+        whose "hold" state is exactly a zero-coefficient spring whose
+        center follows the stick - so zero force renders as no effect at
+        all.
 
-        Muting means Stop, never destroy: the effect stays downloaded with
-        its slot held, and SetParameters keeps landing on the stopped
-        effect (hardware-verified), so per-frame center updates during a
-        force-trim hold accumulate and render the instant a nonzero
-        coefficient restarts the effect.  ``_started`` (the logical state
-        HapticEffect sees) is deliberately independent of
-        ``_device_playing`` (what the device renders)."""
+        Muting means Stop, never destroy: the effect stays downloaded
+        with its slot held and parameter updates keep landing on it, so
+        per-frame center updates during a force-trim hold accumulate and
+        render the instant a nonzero coefficient restarts the effect.
+        ``_started`` (the logical state HapticEffect sees) is
+        deliberately independent of ``_device_playing`` (what the device
+        renders)."""
         if not self.effect_id:
             return
         should_play = self._started and not self._is_zero_condition()
@@ -931,6 +907,13 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
             logging.exception("DInput poll failed, device lost")
             self._begin_reconnect()
 
+    def pump_input(self):
+        """One bridge poll, input intake only (see
+        BaseFFBDevice.pump_input).  Unlike _poll_once, buttons and hats
+        are NOT processed: a device switch pumps this while it holds the
+        main thread, and button events must not fire mid-teardown."""
+        self._last_state = self.bridge.poll(self._handle)
+
     def _poll_once(self):
         state = self.bridge.poll(self._handle)
         self._last_state = state
@@ -999,15 +982,15 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
     def recover_effects(self, reason: str = ""):
         """Device-wide effect recovery: reset the device (destroying every
-        effect it holds, orphans included) and invalidate all handles so
+        effect it holds, reachable or not) and invalidate all handles so
         their owners lazily re-create - the effects are back within a frame
         or two.
 
-        The escape hatch for drivers that invalidate downloaded-effect
-        interfaces wholesale while the effects keep PLAYING (SideWinder,
-        on any process's DirectInput EnumDevices): the orphans cannot be
-        stopped individually, and without the reset each re-created effect
-        doubles forces over its stranded predecessor.
+        The escape hatch for drivers that kill downloaded effects in
+        batches while the hardware may keep rendering them: such strays
+        cannot be cleaned up individually, and without the device-level
+        reset a re-created effect can double forces over its stranded
+        predecessor.
         """
         now = time.monotonic()
         if now - getattr(self, '_last_recovery', 0.0) < self.RECOVERY_DEBOUNCE_S:

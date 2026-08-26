@@ -631,10 +631,10 @@ class TestInputWarmup:
     def test_the_switch_pumps_until_input_flows(self, rig, monkeypatch):
         reports = {'count': 0}
 
-        def read_reports():
+        def pump_input():
             reports['count'] += 1
 
-        rig.new.read_reports = read_reports
+        rig.new.pump_input = pump_input
         rig.new.get_input = lambda: 'snapshot' if reports['count'] >= 3 \
             else None
         assert rig.main.switch_to_device() is True

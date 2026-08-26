@@ -253,9 +253,8 @@ class TestEffectLifecycle:
         assert handle.effect_id in bridge.started
 
     def test_spring_offset_passes_through_natively(self, device, bridge):
-        """Offsets render natively (the bridge uses DIEFF_POLAR condition
-        coordinates, the one formation whose lOffset works on SideWinder-class
-        drivers AND the PID driver) - and CP telemetry reports the same."""
+        """Offsets render natively (portable coordinate formation is the
+        bridge DLL's concern) - and CP telemetry reports the same."""
         handle = device.create_effect(EFFECT_SPRING)
         handle.setCondition(make_condition(axis=0, positiveCoefficient=4096,
                                            negativeCoefficient=4096,
@@ -267,9 +266,9 @@ class TestEffectLifecycle:
         assert device.get_input().CP_XY()[0] == 0.5
 
     def test_zero_coefficient_condition_is_muted_device_side(self, device, bridge):
-        """A playing zero-coefficient spring changes the back-drive feel on
-        consumer sticks (energized motors cog); zero force must render as no
-        effect at all, resuming transparently when force returns."""
+        """A playing zero-coefficient spring is not force-free on some
+        hardware; zero force must render as no effect at all, resuming
+        transparently when force returns."""
         handle = device.create_effect(EFFECT_SPRING)
         handle.setCondition(make_condition(axis=0, positiveCoefficient=0,
                                            negativeCoefficient=0))
@@ -293,8 +292,7 @@ class TestEffectLifecycle:
         """Force-trim flow: while the spring is muted at 0%, center updates
         must keep landing on the (stopped, not destroyed) device effect and
         on the CP telemetry, so restoring the coefficient re-engages the
-        spring at the latest center.  Verified against real hardware:
-        SetParameters on a stopped effect renders on the next Start."""
+        spring at the latest center."""
         handle = device.create_effect(EFFECT_SPRING)
         handle.setCondition(make_condition(axis=0, positiveCoefficient=0,
                                            cpOffset=0))
@@ -757,9 +755,8 @@ class TestShutdown:
 
 
 class TestUpdateFailureSelfHeal:
-    """A vendor driver can silently destroy downloaded effects (observed on
-    SideWinder when an enumeration created a second device object for held
-    hardware): every update then fails forever with a generic error.  The
+    """Some drivers silently kill downloaded effects out from under their
+    handles: every update then fails forever with a generic error.  The
     handle must presume the device-side effect dead after a few consecutive
     failures and invalidate itself, so the owning HapticEffect lazily
     re-creates the effect on the next frame."""
@@ -816,11 +813,10 @@ class TestUpdateFailureSelfHeal:
             handle.start()
         assert handle.effect_id == 0
 
-    def test_recovery_is_device_wide_and_clears_orphans(self, bridge):
-        """'Dead' effects are usually ORPHANS - still playing on the device,
-        unreachable through their interfaces (E_HANDLE) - and they die in
-        batches.  Recovery must be one device-level reset (the only thing
-        that clears orphans) that invalidates EVERY handle for lazy
+    def test_recovery_is_device_wide(self, bridge):
+        """Dead effects come in batches and per-effect cleanup cannot be
+        trusted on the drivers that cause this.  Recovery must be one
+        device-level reset that invalidates EVERY handle for lazy
         re-creation, not per-effect churn."""
         device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
         failing = device.create_effect(EFFECT_CONSTANT)
@@ -840,3 +836,24 @@ class TestUpdateFailureSelfHeal:
         device.recover_effects(reason="test")
         device.recover_effects(reason="test")
         assert bridge.reset_calls == 1
+
+
+class TestPumpInput:
+    """pump_input is the backend-contract way for a device switch to get
+    the first input snapshot while it holds the main thread.  Input
+    intake ONLY: unlike the poll timer's _poll_once, no button/hat
+    events - a swap must not fire button side effects mid-teardown."""
+
+    def test_pump_populates_the_input_snapshot(self, device, bridge):
+        device._last_state = None
+        assert device.get_input() is None
+        device.pump_input()
+        assert device.get_input() is not None
+
+    def test_pump_does_not_dispatch_button_events(self, device, bridge):
+        bridge.state.buttons = 0b1             # a button held in the state
+        device._last_state = None
+        device._button_state = 0
+        device.pump_input()
+        assert device._button_state == 0       # intake only: no processing
+        assert device.get_input().buttons == 0b1

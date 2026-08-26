@@ -795,23 +795,21 @@ def switch_to_device(devpath=None, show_error=True) -> bool:
         # A freshly opened device has no input snapshot until its first
         # report arrives, and the aircraft mixins read input every frame
         # assuming it is always there.  The read timer cannot fire while
-        # this stack holds the main thread, so pump the device directly
-        # for a moment; the frame-level guard in TelemManager covers
-        # whatever window remains.
-        pump = getattr(dev, 'read_reports', None) \
-            or getattr(dev, '_poll_once', None)
-        if pump is not None:
-            try:
-                deadline = time.perf_counter() + 0.5
-                while (dev.get_input() is None
-                        and time.perf_counter() < deadline):
-                    pump()
-                    time.sleep(0.005)
-                if dev.get_input() is None:
-                    logging.warning("Device switch: no input report within "
-                                    "500ms of open")
-            except Exception:
-                logging.exception("Device switch: input pump failed")
+        # this stack holds the main thread, so pump the backend's input
+        # intake directly (pump_input: part of the device contract, and
+        # input only - no button events mid-teardown); the frame-level
+        # guard in TelemManager covers whatever window remains.
+        try:
+            deadline = time.perf_counter() + 0.5
+            while (dev.get_input() is None
+                    and time.perf_counter() < deadline):
+                dev.pump_input()
+                time.sleep(0.005)
+            if dev.get_input() is None:
+                logging.warning("Device switch: no input report within "
+                                "500ms of open")
+        except Exception:
+            logging.exception("Device switch: input pump failed")
 
         # 5. Beacon for the new device (additive; see docstring), UI, and
         #    the loaded aircraft's capability gates.
