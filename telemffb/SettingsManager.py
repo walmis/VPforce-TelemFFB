@@ -242,6 +242,7 @@ class SettingsManager(QObject):
     IL2_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap, Korea Only)",
         SpringModeEnum.STATIC: "Static Spring",
         SpringModeEnum.DYNAMIC: "Dynamic Spring",
         SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",

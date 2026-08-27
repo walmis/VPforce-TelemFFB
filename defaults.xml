@@ -434,6 +434,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -466,6 +467,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -500,6 +502,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -534,6 +537,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -550,6 +554,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -568,6 +573,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -584,6 +590,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -602,6 +609,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -618,6 +626,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -636,6 +645,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -652,6 +662,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -670,6 +681,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -686,6 +698,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -704,6 +717,7 @@
 		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>

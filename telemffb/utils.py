@@ -438,7 +438,7 @@ class EffectTranslator:
         "il2_bombs": ["Bomb Release", "il2_bomb_release_intensity"],
         "il2_rockets": ["Rocket Fire", "il2_rocket_release_intensity"],
         "il2_ffb_spring": ["FFB Telemetry Spring Override", ""],
-        "ffb_tap_spring": ["FFB Telemetry Spring (DirectInput Tap)", ""],
+        "ffb_tap_spring": ["Game Spring (DirectInput Tap)", ""],
         # the game's non-spring effects rendered from the tap mirror: slot-
         # keyed names 'tap_game_{slot}_{type}', matched by effect type code
         # ($-anchored so _1 does not also swallow _10/_11)

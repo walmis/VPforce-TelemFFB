@@ -130,7 +130,13 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         if self._sim_is_msfs() or self._sim_is_xplane(): # TODO: override ac_override_pedal_spring with a stub in the child class
             return
 
-        if self.spring_mode_is(SpringModeEnum.NONE) or self.spring_mode_is(SpringModeEnum.TELEM):
+        # modes where this mixin owns no spring: the game (NONE), the
+        # Korea telemetry effect (TELEM) or the tap mixin (DINPUT_TAP)
+        # renders it instead - falling through would START pedal_spring
+        # with a stale coefficient on top of theirs
+        if (self.spring_mode_is(SpringModeEnum.NONE)
+                or self.spring_mode_is(SpringModeEnum.TELEM)
+                or self.spring_mode_is(SpringModeEnum.DINPUT_TAP)):
             if self.effects['pedal_spring'].started:
                 self.effects["pedal_spring"].stop()
             return

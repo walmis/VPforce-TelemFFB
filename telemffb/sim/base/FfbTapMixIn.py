@@ -96,7 +96,11 @@ class FfbTapMixIn:
         spring is stopped (e.g. in the menus, where the stick intentionally
         goes spring-less).
         """
-        if not self.is_joystick():
+        # joystick and pedals: the roles a game can render FFB to through
+        # the tap (IL-2 Korea drives native FFB pedals).  Each instance
+        # renders its own device's mirror block - see
+        # FfbTapReader._select_device.
+        if not (self.is_joystick() or self.is_pedals()):
             return False
         if not self.spring_mode_is(SpringModeEnum.DINPUT_TAP):
             self.effects['ffb_tap_spring'].stop()

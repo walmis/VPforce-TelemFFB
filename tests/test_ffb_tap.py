@@ -763,3 +763,191 @@ class TestTapGameEffectsMode:
         env = case.mock_effects.dict['tap_game_1_1']._envelope
         assert env['attackFromForce'] == 2048
         assert env['decayToForce'] == 4096    # 6000 clamped
+
+
+class TestDeviceSelection:
+    """The mirror can carry several tapped devices at once (IL-2 Korea
+    taps the joystick AND the pedals); each TelemFFB instance renders its
+    own, matched by the configured device's USB ids - never another
+    instance's, which would double its forces."""
+
+    def two_device_shm(self):
+        shm = make_shm()                    # devices[0]: FFFF:2054, XY spring
+        dev = shm.devices[1]
+        dev.used = 1
+        dev.generation = 1
+        dev.vid, dev.pid = 0xFFFF, 0x2052
+        dev.name = b"VPforce Rhino Pedals"
+        e = dev.effects[0]
+        e.slotUsed = 1
+        e.effectType = ET_SPRING
+        e.playing = 1
+        c = e.u.condition
+        c.count = 1                          # pedals: single-axis spring
+        c.offset[0] = 1000
+        c.positiveCoefficient[0] = 5000
+        c.negativeCoefficient[0] = 5000
+        shm.deviceCount = 2
+        return shm
+
+    def _configure(self, monkeypatch, ids, role):
+        import telemffb.globals as G
+
+        class S(dict):
+            def get(self, name, default=None, instance=None):
+                return dict.get(self, name, default)
+        monkeypatch.setattr(G, 'system_settings',
+                            S({f'devids_{role}': ids} if ids else {}),
+                            raising=False)
+        monkeypatch.setattr(G, 'device_type', role, raising=False)
+
+    def _read(self, tap_mapping, shm):
+        reader = FfbTapReader()
+        tap_mapping(shm)
+        try:
+            return reader.read_game_spring()
+        finally:
+            reader.close()
+
+    def test_each_instance_renders_its_own_device(
+            self, tap_mapping, monkeypatch):
+        self._configure(monkeypatch, 'FFFF:2052', role='pedals')
+        state = self._read(tap_mapping, self.two_device_shm())
+        assert state.device_name == "VPforce Rhino Pedals"
+        assert state.y is None               # single-axis block
+        self._configure(monkeypatch, 'FFFF:2054', role='joystick')
+        state = self._read(tap_mapping, self.two_device_shm())
+        assert state.device_name == "VPforce Rhino FFB Monster"
+        assert state.y is not None
+
+    def test_no_match_among_several_renders_nothing(
+            self, tap_mapping, monkeypatch):
+        """Rendering some other instance's device would double forces."""
+        self._configure(monkeypatch, '044F:B10A', role='joystick')
+        assert self._read(tap_mapping, self.two_device_shm()) is None
+
+    def test_a_lone_device_is_used_despite_stale_ids(
+            self, tap_mapping, monkeypatch):
+        """Stored ids may be absent or stale on an old config; with only
+        one tapped device there is no ambiguity to protect against."""
+        self._configure(monkeypatch, '044F:B10A', role='joystick')
+        state = self._read(tap_mapping, make_shm())
+        assert state is not None
+
+    def test_no_configured_ids_keeps_the_legacy_first_device(
+            self, tap_mapping, monkeypatch):
+        self._configure(monkeypatch, None, role='joystick')
+        state = self._read(tap_mapping, self.two_device_shm())
+        assert state.device_name == "VPforce Rhino FFB Monster"
+
+    def test_game_effects_follow_the_same_selection(
+            self, tap_mapping, monkeypatch):
+        shm = self.two_device_shm()
+        e = shm.devices[1].effects[1]
+        e.slotUsed = 1
+        e.effectType = ffb_tap.ET_CONSTANT
+        e.playing = 1
+        e.axisCount = 1
+        e.gain = 10000
+        e.flags = 0x20
+        e.u.constant.magnitude = 10000
+        self._configure(monkeypatch, 'FFFF:2052', role='pedals')
+        reader = FfbTapReader()
+        tap_mapping(shm)
+        try:
+            effects = reader.read_game_effects()
+        finally:
+            reader.close()
+        assert effects.device_name == "VPforce Rhino Pedals"
+        assert len(effects.effects) == 1
+
+
+class TestPedalTap:
+    """IL-2 Korea drives native FFB pedals: the pedals instance runs the
+    same DINPUT_TAP mode against its own (single-axis) mirror block, with
+    the joystick-only alternates machinery uninvolved."""
+
+    def test_pedals_instance_renders_its_single_axis_spring(self):
+        import unittest.mock as mock
+        from telemffb.hw.ffb_tap import TapAxisCondition, TapSpringState
+        harness = TestTapSpringMode()
+        case, inst = harness._make_instance("DINPUT_TAP")
+        inst._telem_data["FFBType"] = "pedals"
+        state = TapSpringState(
+            x=TapAxisCondition(offset=512, positive_coefficient=2048,
+                               negative_coefficient=2048,
+                               positive_saturation=4096,
+                               negative_saturation=4096, deadband=0),
+            y=None, device_name="VPforce Rhino Pedals",
+            generation=1, reset_count=0, update_count=1)
+        with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
+                        return_value=state):
+            rendered = inst.ffb_tap_spring()
+        assert rendered
+        assert case.mock_effects.dict['ffb_tap_spring'].started
+        assert inst._tap_cond_x.cpOffset == 512
+        assert inst._telem_data['FFB_X_Center'] == 0.125
+        assert 'FFB_Y_Center' not in inst._telem_data
+
+    def test_other_roles_stay_gated_off(self):
+        harness = TestTapSpringMode()
+        _case, inst = harness._make_instance("DINPUT_TAP")
+        inst._telem_data["FFBType"] = "collective"
+        assert not inst.ffb_tap_spring()
+
+    def test_il2_pedal_spring_modes_offer_the_tap(self):
+        from telemffb.SettingsManager import SettingsManager, SpringModeEnum
+        assert SpringModeEnum.DINPUT_TAP in \
+            SettingsManager.IL2_PEDAL_SPRING_MODE
+
+    def test_pedal_tap_settings_are_scoped_for_one_axis(self):
+        """Pedals get the tap rows that mean something on a single axis;
+        the Y-axis and swap rows stay joystick-only."""
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+        root = ET.parse(str(Path(__file__).parents[1] / 'defaults.xml')
+                        ).getroot()
+        flags = {}
+        for elem in root.findall('defaults'):
+            name = elem.findtext('name') or ''
+            if name.startswith('tap_'):
+                flags[name] = elem.findtext('pedals') == 'true'
+        for name in ('tap_axis_group', 'tap_spring_invert_x',
+                     'tap_spring_gain_x', 'tap_effects_group',
+                     'tap_effect_constant', 'tap_effect_periodic_gain',
+                     'tap_effect_friction'):
+            assert flags[name], f'{name} should be offered for pedals'
+        for name in ('tap_spring_swap_axes', 'tap_spring_invert_y',
+                     'tap_spring_gain_y'):
+            assert not flags[name], f'{name} is meaningless on one axis'
+
+
+class TestPedalSpringOverrideYieldsToTap:
+    """With mode DINPUT_TAP the pedal-spring override mixin owns nothing:
+    its mode ladder used to FALL THROUGH for unknown modes and start
+    pedal_spring with a stale coefficient on top of the tap-rendered
+    spring (field find: the effects panel showed 'Pedal Spring' instead
+    of the tap spring on the pedals instance)."""
+
+    def _pedals_instance(self, spring_mode):
+        harness = TestTapSpringMode()
+        case, inst = harness._make_instance(spring_mode)
+        inst._telem_data["FFBType"] = "pedals"
+        return case, inst
+
+    def test_tap_mode_never_starts_the_override_spring(self):
+        case, inst = self._pedals_instance("DINPUT_TAP")
+        inst.ac_override_pedal_spring(inst._telem_data)
+        assert not case.mock_effects.dict['pedal_spring'].started
+
+    def test_tap_mode_stops_a_leftover_override_spring(self):
+        case, inst = self._pedals_instance("DINPUT_TAP")
+        case.mock_effects['pedal_spring'].spring().start()
+        assert case.mock_effects.dict['pedal_spring'].started
+        inst.ac_override_pedal_spring(inst._telem_data)
+        assert not case.mock_effects.dict['pedal_spring'].started
+
+    def test_the_tap_spring_shares_the_game_effect_naming(self):
+        from telemffb.utils import EffectTranslator
+        label, _gain = EffectTranslator.get_translation('ffb_tap_spring')
+        assert label == 'Game Spring (DirectInput Tap)'

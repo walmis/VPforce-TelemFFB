@@ -330,7 +330,8 @@ class TapGameEffect:
 
 @dataclass
 class TapGameEffects:
-    """All mirrored non-spring effect slots of the first tapped device."""
+    """All mirrored non-spring effect slots of this instance's tapped
+    device (see FfbTapReader._select_device)."""
     effects: List[TapGameEffect] = field(default_factory=list)
     device_name: str = ""
     generation: int = 0
@@ -419,6 +420,66 @@ class FfbTapReader:
         self._last_pid_check = 0.0
         self._logged_writer = False
         self._logged_device_gen = None
+        self._target_ids_cache = (0.0, None)   # (checked_at, (vid, pid)|None)
+        self._warned_no_match = False
+
+    def _target_ids(self):
+        """The USB ids of THIS instance's game-facing device, or None.
+
+        Read from the stored identity for this instance's role
+        (devids_{role}, kept current by the settings reconcile) - NOT
+        from the currently-connected device, which a per-aircraft swap
+        may have pointed elsewhere while the game keeps addressing the
+        configured one.  Cached briefly: this runs every telemetry frame
+        and the settings store is a registry."""
+        now = time.monotonic()
+        checked_at, ids = self._target_ids_cache
+        if now - checked_at < 5.0:
+            return ids
+        ids = None
+        try:
+            import telemffb.globals as G
+            raw = str(G.system_settings.get(
+                f'devids_{G.device_type}', '') or '')
+            vid_s, _, pid_s = raw.partition(':')
+            if vid_s and pid_s:
+                ids = (int(vid_s, 16), int(pid_s, 16))
+        except Exception:
+            ids = None
+        self._target_ids_cache = (now, ids)
+        return ids
+
+    def _select_device(self, shm: TapShm, warn: bool = True):
+        """The mirror block this instance renders, or None.
+
+        The mirror can carry several tapped devices at once (IL-2 Korea
+        taps the joystick AND the pedals); each TelemFFB instance renders
+        its own, matched by the configured device's USB ids.  With no
+        match: a lone tapped device is used anyway (stored ids may be
+        absent or stale on old configs), several without a match is
+        ambiguous and none is returned - rendering another instance's
+        forces would double them."""
+        used = [d for d in shm.devices if d.used]
+        if not used:
+            return None
+        ids = self._target_ids()
+        if ids is not None:
+            vid, pid = ids
+            for dev in used:
+                if dev.vid == vid and dev.pid == pid:
+                    self._warned_no_match = False
+                    return dev
+            if len(used) > 1:
+                if warn and not self._warned_no_match:
+                    listed = ", ".join(f"{d.vid:04X}:{d.pid:04X}"
+                                       for d in used)
+                    logging.warning(
+                        "DirectInput tap: none of the tapped devices "
+                        f"({listed}) matches this instance's configured "
+                        f"device ({vid:04X}:{pid:04X}); not rendering")
+                    self._warned_no_match = True
+                return None
+        return used[0]
 
     def attach(self) -> bool:
         if self._buf is not None:
@@ -477,7 +538,7 @@ class FfbTapReader:
         return self._writer_ok
 
     def read_game_spring(self) -> Optional[TapSpringState]:
-        """The first tapped device's playing spring, translated to Rhino
+        """This instance's tapped device's playing spring, in Rhino
         units - or None (no writer, wrong protocol version, device paused,
         or spring not playing).
 
@@ -499,34 +560,34 @@ class FfbTapReader:
             return None
         self._log_writer_state(True, shm.writerPid)
 
-        for dev in shm.devices:
-            if not dev.used:
-                continue
-            name = dev.name.decode("utf-8", "replace")
-            if self._logged_device_gen != (dev.generation, dev.resetCount):
-                logging.info(f"DirectInput tap: tapped device [{name}] "
-                             f"vid={dev.vid:04X} pid={dev.pid:04X} "
-                             f"gen={dev.generation} resets={dev.resetCount}")
-                self._logged_device_gen = (dev.generation, dev.resetCount)
-            if dev.pausedState:
-                return None
-            for e in dev.effects:
-                if e.slotUsed and e.effectType == ET_SPRING and e.playing:
-                    c = e.u.condition
-                    n = min(c.count, 2)
-                    return TapSpringState(
-                        x=_translate_axis(c, 0) if n >= 1 else None,
-                        y=_translate_axis(c, 1) if n >= 2 else None,
-                        device_name=name,
-                        generation=dev.generation,
-                        reset_count=dev.resetCount,
-                        update_count=e.updateCount,
-                    )
-            return None   # tapped device present, no playing spring
-        return None
+        dev = self._select_device(shm)
+        if dev is None:
+            return None
+        name = dev.name.decode("utf-8", "replace")
+        if self._logged_device_gen != (dev.generation, dev.resetCount):
+            logging.info(f"DirectInput tap: tapped device [{name}] "
+                         f"vid={dev.vid:04X} pid={dev.pid:04X} "
+                         f"gen={dev.generation} resets={dev.resetCount}")
+            self._logged_device_gen = (dev.generation, dev.resetCount)
+        if dev.pausedState:
+            return None
+        for e in dev.effects:
+            if e.slotUsed and e.effectType == ET_SPRING and e.playing:
+                c = e.u.condition
+                n = min(c.count, 2)
+                return TapSpringState(
+                    x=_translate_axis(c, 0) if n >= 1 else None,
+                    y=_translate_axis(c, 1) if n >= 2 else None,
+                    device_name=name,
+                    generation=dev.generation,
+                    reset_count=dev.resetCount,
+                    update_count=e.updateCount,
+                )
+        return None   # tapped device present, no playing spring
 
     def read_game_effects(self) -> Optional[TapGameEffects]:
-        """Every mirrored NON-spring effect slot of the first tapped device,
+        """Every mirrored NON-spring effect slot of this instance's tapped
+        device,
         translated for rendering - or None under the same conditions that
         make :meth:`read_game_spring` return None (no writer, wrong
         protocol version, device paused).
@@ -544,21 +605,18 @@ class FfbTapReader:
             return None
         if not self.writer_alive(shm):
             return None
-        for dev in shm.devices:
-            if not dev.used:
-                continue
-            if dev.pausedState:
-                return None
-            out = TapGameEffects(
-                device_name=dev.name.decode("utf-8", "replace"),
-                generation=dev.generation,
-                reset_count=dev.resetCount,
-            )
-            for slot, e in enumerate(dev.effects):
-                if e.slotUsed and e.effectType != ET_SPRING:
-                    out.effects.append(_translate_effect(e, slot))
-            return out
-        return None
+        dev = self._select_device(shm)
+        if dev is None or dev.pausedState:
+            return None
+        out = TapGameEffects(
+            device_name=dev.name.decode("utf-8", "replace"),
+            generation=dev.generation,
+            reset_count=dev.resetCount,
+        )
+        for slot, e in enumerate(dev.effects):
+            if e.slotUsed and e.effectType != ET_SPRING:
+                out.effects.append(_translate_effect(e, slot))
+        return out
 
     def _log_writer_state(self, alive: bool, pid: int = 0):
         if alive and not self._logged_writer:
