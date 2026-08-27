@@ -52,6 +52,13 @@ class FakeDIBridge:
             raise self.open_error
         return 1
 
+    #: what dib_autocenter_state reports; default = OFF applied+verified,
+    #: prior state known and ON
+    autocenter = 0x1 | 0x2 | 0x4 | 0x8
+
+    def autocenter_state(self, device):
+        return self.autocenter
+
     def release(self, device):
         self.effects.clear()
         self.started.clear()
@@ -857,3 +864,56 @@ class TestPumpInput:
         device.pump_input()
         assert device._button_state == 0       # intake only: no processing
         assert device.get_input().buttons == 0b1
+
+
+class TestAutocenterHandover:
+    """The device's own centering spring is switched off while TelemFFB
+    holds the device (it would fight every rendered force) and restored
+    at release - a device left with autocenter off is limp for other
+    applications until its USB is replugged.  The switch-off is not
+    guaranteed: a driver that refuses leaves its spring fighting ours,
+    which looks exactly like TelemFFB rendering nothing, so it is
+    reported rather than assumed."""
+
+    def test_a_refusing_driver_is_reported(self, bridge, caplog):
+        import logging as _logging
+        bridge.autocenter = 0                       # OFF not applied
+        with caplog.at_level(_logging.WARNING):
+            DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        assert any('refused to switch its own centering spring off'
+                   in r.message for r in caplog.records)
+
+    def test_a_cooperating_driver_is_quiet(self, bridge, caplog):
+        import logging as _logging
+        with caplog.at_level(_logging.WARNING):
+            DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        assert not [r for r in caplog.records
+                    if r.levelno >= _logging.WARNING]
+
+    def test_a_verified_switch_off_says_so(self, bridge, caplog):
+        """The device confirming the property reads OFF is the only
+        ground truth: the property call reported success even when a
+        later force-feedback reset had quietly undone it."""
+        import logging as _logging
+        with caplog.at_level(_logging.INFO):
+            DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        assert any('device-confirmed' in r.message for r in caplog.records)
+
+    def test_an_unverifiable_switch_off_is_flagged_as_such(
+            self, bridge, caplog):
+        import logging as _logging
+        bridge.autocenter = 0x1                     # applied, not verified
+        with caplog.at_level(_logging.INFO):
+            DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        assert any('not reported back by this driver' in r.message
+                   for r in caplog.records)
+
+    def test_an_old_bridge_reports_nothing(self, bridge, caplog):
+        """Pre-0.9.2 DLLs have no such export; absence is not a fault."""
+        import logging as _logging
+        from telemffb.hw.ffb_dinput import DIB_ERR_UNSUPPORTED
+        bridge.autocenter = DIB_ERR_UNSUPPORTED
+        with caplog.at_level(_logging.INFO):
+            DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        assert not any('centering spring' in r.message
+                       for r in caplog.records)

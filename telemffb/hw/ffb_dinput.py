@@ -387,6 +387,21 @@ class DIBridge:
     def release(self, device: int):
         self._dll.dib_release(device)
 
+    #: dib_autocenter_state bits (dinput_bridge.h)
+    AC_OFF_APPLIED = 0x1
+    AC_PRIOR_KNOWN = 0x2
+    AC_PRIOR_ON = 0x4
+    AC_OFF_VERIFIED = 0x8
+
+    def autocenter_state(self, device: int) -> int:
+        """How the autocenter handover went for an open device, as
+        DIB_AC_* bits - or a negative DIB_ERR_*.  Absent in pre-0.9.2
+        DLLs."""
+        fn = getattr(self._dll, 'dib_autocenter_state', None)
+        if fn is None:
+            return DIB_ERR_UNSUPPORTED
+        return fn(device)
+
     def device_reset(self, device: int) -> int:
         """Device-level reset: destroy every effect the DEVICE holds -
         reachable through a handle or not - and free the bridge's effect
@@ -845,11 +860,38 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._last_recovery = 0.0
 
         self._handle = self.bridge.open(guid)
+        self._log_autocenter_state()
 
         super().__init__()
         self._timer_id = None
         if poll_interval_ms:
             self._timer_id = self.startTimer(poll_interval_ms)
+
+    def _log_autocenter_state(self):
+        """Say whether the device's own centering spring was switched off.
+
+        A driver that refuses leaves that spring fighting every rendered
+        force - which looks exactly like TelemFFB rendering nothing, so
+        it is worth a warning rather than silence.
+        """
+        try:
+            state = self.bridge.autocenter_state(self._handle)
+        except Exception:
+            return
+        if state < 0:
+            return          # pre-0.9.2 bridge: nothing to report
+        if state & DIBridge.AC_OFF_APPLIED:
+            verified = ('device-confirmed'
+                        if state & DIBridge.AC_OFF_VERIFIED
+                        else 'not reported back by this driver')
+            logging.info("DirectInput: the device's own centering spring "
+                         f"was switched off for this session ({verified})")
+        else:
+            logging.warning(
+                "DirectInput: this device refused to switch its own "
+                "centering spring off; it will fight the forces TelemFFB "
+                "renders.  Check the device's driver/profile software for "
+                "a centering or spring setting.")
 
     def _find_info(self, guid: str) -> DIDeviceInfo:
         for dev in self.bridge.enumerate():
