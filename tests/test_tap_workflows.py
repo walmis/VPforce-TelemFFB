@@ -201,7 +201,7 @@ class World:
     """One settings dialog over a real tree, with the means to drive it."""
 
     def __init__(self, tmp_path, monkeypatch, rng, start="legacy",
-                 settings=None, **fixed):
+                 settings=None, bridge=None, **fixed):
         self.mp = monkeypatch
         self.rng = rng
         self.root = make_tree(tmp_path, start)
@@ -247,6 +247,12 @@ class World:
                 else self.settings.get('enableDirectInput')) else []))
         monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
                             lambda *a, **k: (True, ''))
+        # the status line beside the toggle must never load the real DLL
+        # from a test (environment-dependent, and it can wedge the run)
+        from telemffb.hw.ffb_dinput import BridgeStatus
+        bridge = bridge or BridgeStatus(installed=True, version='1.0.0')
+        monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_status',
+                            lambda *a, **k: bridge)
         monkeypatch.setattr(QtWidgets.QMessageBox, 'question', self.policy.question)
         monkeypatch.setattr(QtWidgets.QMessageBox, 'information',
                             self.policy.information)

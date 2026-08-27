@@ -66,6 +66,7 @@ from typing import Dict, List, Optional, override
 
 from PyQt6.QtCore import QTimer, QTimerEvent
 
+import telemffb.globals as G
 import telemffb.hw.ffb_backend as ffb_backend
 from telemffb.hw.ffb_rhino import (
     EFFECT_CONSTANT, EFFECT_SQUARE, EFFECT_SINE, EFFECT_TRIANGLE,
@@ -245,6 +246,17 @@ def bridge_availability(dll_path: Optional[str] = None):
             "If you do not have the DLL, you can obtain it from "
             "{}.".format(detail, where, BRIDGE_DOWNLOAD_LOCATION))
 
+    minimum = getattr(G, 'dinput_bridge_min_version', '') or ''
+    if minimum:
+        version = (bridge.build_info or {}).get("version", "")
+        if not version_is_at_least(version, minimum):
+            return False, (
+                "The installed DInput bridge is too old for this version of "
+                "TelemFFB.\n\nInstalled: {}\nRequired: {} or newer\n\n"
+                "You can obtain the current build from {}.".format(
+                    version or "an unidentified build predating 0.9",
+                    minimum, BRIDGE_DOWNLOAD_LOCATION))
+
     expires = (bridge.build_info or {}).get("expires")
     if expires:
         try:
@@ -260,6 +272,108 @@ def bridge_availability(dll_path: Optional[str] = None):
                 "You can obtain the current build from {}.".format(
                     expires, BRIDGE_DOWNLOAD_LOCATION))
     return True, ""
+
+
+def _version_tuple(version: str):
+    """'0.9.2' -> (0, 9, 2), for ordering.  Trailing non-numeric parts
+    are dropped rather than guessed at, so '1.0.0-rc1' orders as 1.0.0."""
+    parts = []
+    for chunk in str(version).split('.'):
+        digits = ''
+        for ch in chunk:
+            if not ch.isdigit():
+                break
+            digits += ch
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def version_is_at_least(version: str, minimum: str) -> bool:
+    """Whether a bridge version meets the minimum this TelemFFB needs.
+
+    An unreadable or absent version fails the check: builds predating
+    the identity export cannot be shown to be new enough, and the point
+    of a minimum is to refuse what cannot be vouched for.
+    """
+    if not minimum:
+        return True
+    have = _version_tuple(version)
+    if not have:
+        return False
+    want = _version_tuple(minimum)
+    # compare on equal length so 0.9 is not read as older than 0.9.0
+    length = max(len(have), len(want))
+    have += (0,) * (length - len(have))
+    want += (0,) * (length - len(want))
+    return have >= want
+
+
+@dataclass
+class BridgeStatus:
+    """What the settings page says about the bridge utility.
+
+    Presentation-free: the dialog decides the wording and whether the
+    state deserves attention (``problem`` non-empty).
+    """
+    installed: bool = False
+    version: str = ""
+    built: str = ""
+    expires: str = ""            # ISO date, or '' for a build with no fuse
+    days_left: Optional[int] = None
+    problem: str = ""            # '' when nothing is wrong
+
+
+def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
+    """Identity and health of the installed bridge DLL, for display.
+
+    Deliberately quiet: constructing the binding logs the build identity
+    (that belongs to the app's own startup, not to a settings page
+    repainting), so this reads the same facts without the narration.
+    """
+    bridge = DIBridge.__new__(DIBridge)
+    try:
+        bridge._dll = DIBridge._load_library(dll_path)
+    except Exception as e:
+        detail = str(e)
+        return BridgeStatus(
+            installed=False,
+            problem=("not installed" if detail.startswith("Unable to load")
+                     else detail or "not installed"))
+    try:
+        info = bridge._read_build_info()
+    except Exception:
+        # the library loaded, so it IS installed - only its identity is
+        # unreadable, which is what a pre-identity build looks like
+        info = {}
+    minimum = getattr(G, 'dinput_bridge_min_version', '') or ''
+    if not info:
+        # pre-0.9 DLLs predate the build-info export, so they cannot be
+        # shown to meet a minimum
+        return BridgeStatus(
+            installed=True, version="",
+            problem=("too old for this TelemFFB, which needs bridge "
+                     f"{minimum} or newer" if minimum else ""))
+    status = BridgeStatus(installed=True,
+                          version=str(info.get("version", "")),
+                          built=str(info.get("built", "")),
+                          expires=str(info.get("expires", "") or ""))
+    if not version_is_at_least(status.version, minimum):
+        status.problem = (f"version {status.version or '(unknown)'} is older "
+                          f"than the {minimum} this TelemFFB needs")
+        return status
+    if status.expires:
+        try:
+            from datetime import date
+            status.days_left = (date.fromisoformat(status.expires)
+                                - date.today()).days
+        except ValueError:
+            status.problem = f"unreadable expiry date '{status.expires}'"
+            return status
+        if status.days_left < 0:
+            status.problem = f"expired {status.expires}"
+    return status
 
 
 class DIBridge:
@@ -298,21 +412,28 @@ class DIBridge:
         # dinput_ffb.dll from somewhere nobody intended.
         return tuple(candidates)
 
-    def __init__(self, dll_path: Optional[str] = None):
-        paths = (dll_path,) if dll_path else self.library_paths()
-        self._dll = None
+    @classmethod
+    def _load_library(cls, dll_path: Optional[str] = None):
+        """The loaded DLL, ABI checked - shared with bridge_status, which
+        wants the same facts without constructing a working binding."""
+        paths = (dll_path,) if dll_path else cls.library_paths()
+        dll = None
         for p in paths:
             try:
-                self._dll = ctypes.CDLL(p)
+                dll = ctypes.CDLL(p)
                 break
             except OSError:
                 pass
-        if not self._dll:
+        if not dll:
             raise DIBridgeError(f"Unable to load dinput_ffb.dll from: {', '.join(paths)}")
 
-        abi = self._dll.dib_abi_version()
+        abi = dll.dib_abi_version()
         if abi != DIB_ABI_VERSION:
             raise DIBridgeError(f"dinput_ffb.dll ABI version {abi}, expected {DIB_ABI_VERSION}")
+        return dll
+
+    def __init__(self, dll_path: Optional[str] = None):
+        self._dll = self._load_library(dll_path)
 
         # trace logs every effect call with decoded parameters - the ground
         # truth of what the device is actually told to render

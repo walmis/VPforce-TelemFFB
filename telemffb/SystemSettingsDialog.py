@@ -24,7 +24,7 @@ import logging
 import os
 import time
 
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout
@@ -354,6 +354,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.load_settings()
 
+        self.refresh_dinput_status()
         self.toggle_log_prune_widgets()
         self.toggle_dcs_widgets()
         self.toggle_il2_widgets()
@@ -1425,6 +1426,60 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if (grown_w, grown_h) != (width, height):
             self.resize(grown_w, grown_h)
 
+    #: A beta fuse this close is worth flagging before launch day.
+    BRIDGE_EXPIRY_WARN_DAYS = 14
+
+    def refresh_dinput_status(self):
+        """Say which bridge utility is installed, and whether it is
+        healthy - the toggle alone cannot answer "is it there, which
+        build, and how long is this beta good for?".
+
+        Shown only while DirectInput support is switched ON: to everyone
+        else the bridge is a utility they have never heard of, and a
+        line about its absence would read as something being wrong.
+        """
+        from telemffb.hw.ffb_dinput import BRIDGE_DOWNLOAD_LOCATION, bridge_status
+        if not self.cb_enable_dinput.isChecked():
+            self.lab_dinput_status.setVisible(False)
+            return
+        self.lab_dinput_status.setVisible(True)
+        try:
+            status = bridge_status()
+        except Exception:
+            logging.exception('DInput bridge status check failed')
+            self.lab_dinput_status.setVisible(False)
+            return
+        attention = True
+        if not status.installed:
+            text = ("DirectInput Bridge: not installed - available from "
+                    f"{BRIDGE_DOWNLOAD_LOCATION}")
+        elif status.problem:
+            text = (f"DirectInput Bridge {status.version or '(unknown build)'}"
+                    f": {status.problem} - a current build is available from "
+                    f"{BRIDGE_DOWNLOAD_LOCATION}")
+        elif not status.version:
+            text = "DirectInput Bridge: installed (build identity unavailable)"
+            attention = False
+        elif status.days_left is None:
+            text = f"DirectInput Bridge {status.version}: installed"
+            attention = False
+        else:
+            days = status.days_left
+            when = (f"expires {status.expires} "
+                    f"({days} day{'' if days == 1 else 's'} left)")
+            text = f"DirectInput Bridge {status.version}: beta build, {when}"
+            attention = days <= self.BRIDGE_EXPIRY_WARN_DAYS
+        self.lab_dinput_status.setText(text)
+        self.lab_dinput_status.setStyleSheet(
+            f"color: {self._attention_color().name()};" if attention else "")
+
+    def _attention_color(self):
+        """An amber that reads on either theme (the palette has no
+        'warning' role, and a fixed one washes out on one of them)."""
+        window = self.palette().color(QtGui.QPalette.ColorRole.Window)
+        return (QtGui.QColor(0xE6, 0xA8, 0x23) if window.lightness() < 128
+                else QtGui.QColor(0xA8, 0x66, 0x00))
+
     def toggle_dinput_support(self):
         """Re-list devices so [DI] entries appear or disappear immediately.
 
@@ -1448,6 +1503,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_enable_dinput.blockSignals(False)
 
         self.populateUSBSelectors(dinput_enabled=self.cb_enable_dinput.isChecked())
+        # the toggle is the moment a user who just installed the
+        # bridge finds out whether it took
+        self.refresh_dinput_status()
         self.toggle_device_launch_widgets()
 
     def toggle_dcs_widgets(self):

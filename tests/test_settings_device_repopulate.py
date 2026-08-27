@@ -50,6 +50,11 @@ def _make_dialog(monkeypatch, settings):
                         staticmethod(lambda enabled=None: []))
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
                         lambda *a, **k: (True, ''))
+    # bridge_status loads the real bridge DLL - never from a test
+    from telemffb.hw.ffb_dinput import BridgeStatus
+    monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_status',
+                        lambda *a, **k: BridgeStatus(
+                            installed=True, version='1.0.0'))
     return app, SystemSettingsDialog()
 
 
@@ -117,6 +122,11 @@ def dialog(monkeypatch):
                         staticmethod(lambda enabled=None: []))
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
                         lambda *a, **k: (True, ''))
+    # bridge_status loads the real bridge DLL - never from a test
+    from telemffb.hw.ffb_dinput import BridgeStatus
+    monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_status',
+                        lambda *a, **k: BridgeStatus(
+                            installed=True, version='1.0.0'))
     dlg = SystemSettingsDialog()
     yield dlg
     dlg.deleteLater()
