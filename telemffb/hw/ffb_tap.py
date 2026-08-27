@@ -421,6 +421,7 @@ class FfbTapReader:
         self._logged_writer = False
         self._logged_device_gen = None
         self._target_ids_cache = (0.0, None)   # (checked_at, (vid, pid)|None)
+        self._presence_cache = (0.0, False)    # (checked_at, tapped?)
         self._warned_no_match = False
 
     def _target_ids(self):
@@ -449,7 +450,37 @@ class FfbTapReader:
         self._target_ids_cache = (now, ids)
         return ids
 
-    def _select_device(self, shm: TapShm, warn: bool = True):
+    #: how often the "is our device tapped" question is actually asked;
+    #: it runs from the telemetry loop in modes that do NOT read the tap
+    PRESENCE_TTL_S = 2.0
+
+    def device_tapped(self) -> bool:
+        """Whether the wrapper is currently capturing this instance's
+        device.
+
+        Asked in the spring modes that do NOT render the tap: with a tap
+        rule live, the game's forces are being swallowed and nothing is
+        re-rendering them, which presents as "force feedback is broken".
+        Throttled - the answer changes only when a game starts or stops.
+        """
+        now = time.monotonic()
+        checked_at, value = self._presence_cache
+        if now - checked_at < self.PRESENCE_TTL_S:
+            return value
+        value = False
+        try:
+            shm = self.snapshot()
+            if (shm is not None and shm.magic == TAP_MAGIC
+                    and shm.version == TAP_VERSION and self.writer_alive(shm)):
+                value = self._select_device(shm, warn=False,
+                                            strict=True) is not None
+        except Exception:
+            value = False
+        self._presence_cache = (now, value)
+        return value
+
+    def _select_device(self, shm: TapShm, warn: bool = True,
+                       strict: bool = False):
         """The mirror block this instance renders, or None.
 
         The mirror can carry several tapped devices at once (IL-2 Korea
@@ -458,7 +489,12 @@ class FfbTapReader:
         match: a lone tapped device is used anyway (stored ids may be
         absent or stale on old configs), several without a match is
         ambiguous and none is returned - rendering another instance's
-        forces would double them."""
+        forces would double them.
+
+        ``strict`` drops the lone-device fallback, for callers asking
+        whether THIS device is tapped rather than what to render:
+        guessing there would have a pedals instance claim the joystick's
+        tap and warn about forces that were never its own."""
         used = [d for d in shm.devices if d.used]
         if not used:
             return None
@@ -469,6 +505,8 @@ class FfbTapReader:
                 if dev.vid == vid and dev.pid == pid:
                     self._warned_no_match = False
                     return dev
+            if strict:
+                return None
             if len(used) > 1:
                 if warn and not self._warned_no_match:
                     listed = ", ".join(f"{d.vid:04X}:{d.pid:04X}"
@@ -642,6 +680,18 @@ def read_game_spring() -> Optional[TapSpringState]:
     except Exception:
         logging.exception("DirectInput tap: read failed")
         return None
+
+
+def device_is_tapped() -> bool:
+    """Aircraft-facing entry point (see FfbTapReader.device_tapped)."""
+    global _reader
+    if _reader is None:
+        _reader = FfbTapReader()
+    try:
+        return _reader.device_tapped()
+    except Exception:
+        logging.exception("DirectInput tap: presence check failed")
+        return False
 
 
 def read_game_effects() -> Optional[TapGameEffects]:

@@ -105,6 +105,7 @@ class FfbTapMixIn:
         if not self.spring_mode_is(SpringModeEnum.DINPUT_TAP):
             self.effects['ffb_tap_spring'].stop()
             self._tap_effects_teardown()
+            self._warn_if_tap_is_swallowing()
             return False
 
         # the game's non-spring effects ride the same mode and mirror
@@ -159,6 +160,34 @@ class FfbTapMixIn:
                 axis_state.offset / 4096, 4)
         spring.start(override=True)
         return True
+
+    def _warn_if_tap_is_swallowing(self):
+        """Say so when spring mode NONE meets a live tap - the one
+        combination that leaves the stick with no spring at all.
+
+        A tap rule is decided when the game creates the device and stands
+        for that session: the wrapper swallows the game's effects whether
+        or not the aircraft's spring mode reads them back.  Every mode
+        that generates a spring LOCALLY (static, dynamic, advanced, or
+        IL-2's telemetry spring) is unaffected by that - swallowing the
+        game's own spring is what those modes want anyway.  NONE is the
+        exception: it means "the game manages the spring", and the tap is
+        precisely what stops the game's spring from arriving.  The user
+        experiences a stick with no centering at all and nothing in the
+        UI explaining why.
+        """
+        if not self.spring_mode_is(SpringModeEnum.NONE):
+            return
+        from telemffb.hw import ffb_tap
+        if not ffb_tap.device_is_tapped():
+            return
+        self.flag_error(
+            "Spring mode is 'None (Game Managed)', but the DirectInput "
+            "Tap is capturing this game's force feedback for this device "
+            "- so the game's spring never reaches it and there is no "
+            "spring at all.  Select spring mode 'Game Managed "
+            "(DirectInput Tap)' to render the game's spring, or remove "
+            "this device from the tap configuration in System Settings.")
 
     # ------------------------------------------------------------------
     # Non-spring game effects: constant forces (stick kicks, recoil),

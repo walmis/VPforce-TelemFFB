@@ -951,3 +951,98 @@ class TestPedalSpringOverrideYieldsToTap:
         from telemffb.utils import EffectTranslator
         label, _gain = EffectTranslator.get_translation('ffb_tap_spring')
         assert label == 'Game Spring (DirectInput Tap)'
+
+
+class TestSwallowedForcesWarning:
+    """Spring mode NONE means "the game manages the spring" - and a live
+    tap is precisely what stops the game's spring from arriving, leaving
+    the stick with no centering at all.  Modes that generate a spring
+    LOCALLY are not affected: swallowing the game's spring is what they
+    want, and their users still get every other TelemFFB effect."""
+
+    def _instance(self, spring_mode):
+        harness = TestTapSpringMode()
+        return harness._make_instance(spring_mode)
+
+    def _run(self, spring_mode, tapped):
+        import unittest.mock as mock
+        case, inst = self._instance(spring_mode)
+        with mock.patch("telemffb.hw.ffb_tap.device_is_tapped",
+                        return_value=tapped):
+            with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
+                            return_value=None):
+                inst.ffb_tap_spring()
+        return inst
+
+    def test_none_with_a_live_tap_is_reported(self):
+        inst = self._run("NONE", tapped=True)
+        error = inst._telem_data.get('error', '')
+        assert 'DirectInput Tap is capturing' in error
+        assert 'Game Managed (DirectInput Tap)' in error
+
+    def test_no_tap_no_warning(self):
+        inst = self._run("NONE", tapped=False)
+        assert not inst._telem_data.get('error')
+
+    def test_tap_mode_itself_never_warns(self):
+        """The mode that reads the mirror is the one case that is fine."""
+        inst = self._run("DINPUT_TAP", tapped=True)
+        assert not inst._telem_data.get('error')
+
+    def test_locally_generated_springs_are_left_alone(self):
+        """These modes render their own spring; the game's being
+        swallowed is what they want, and warning would be noise."""
+        for mode in ("STATIC", "DYNAMIC", "ADVANCED", "CUSTOM", "TELEM"):
+            inst = self._run(mode, tapped=True)
+            assert not inst._telem_data.get('error'), mode
+
+
+class TestTapPresenceQuery:
+    """device_tapped(): is the wrapper capturing THIS instance's device
+    right now?  Runs from the telemetry loop in modes that do not read
+    the mirror, so it is throttled."""
+
+    def _reader(self, monkeypatch, role='joystick', ids='FFFF:2054'):
+        import telemffb.globals as G
+
+        class S(dict):
+            def get(self, name, default=None, instance=None):
+                return dict.get(self, name, default)
+        monkeypatch.setattr(G, 'system_settings',
+                            S({f'devids_{role}': ids}), raising=False)
+        monkeypatch.setattr(G, 'device_type', role, raising=False)
+        return FfbTapReader()
+
+    def test_our_device_being_tapped_reads_true(self, tap_mapping, monkeypatch):
+        reader = self._reader(monkeypatch)
+        tap_mapping(make_shm())
+        assert reader.device_tapped()
+        reader.close()
+
+    def test_another_devices_tap_reads_false(self, tap_mapping, monkeypatch):
+        """Strict here, unlike the render path's lone-device fallback: a
+        pedals instance must not claim the joystick's tap and warn about
+        forces that were never its own."""
+        reader = self._reader(monkeypatch, ids='044F:B10A')
+        tap_mapping(make_shm())          # mirror carries FFFF:2054 only
+        assert not reader.device_tapped()
+        reader.close()
+
+    def test_a_dead_writer_reads_false(self, tap_mapping, monkeypatch):
+        reader = self._reader(monkeypatch)
+        tap_mapping(make_shm(writer_pid=0))
+        assert not reader.device_tapped()
+        reader.close()
+
+    def test_the_answer_is_throttled(self, tap_mapping, monkeypatch):
+        """It is asked every frame; the answer changes only when a game
+        starts or stops."""
+        reader = self._reader(monkeypatch)
+        tap_mapping(make_shm())
+        assert reader.device_tapped()
+        calls = []
+        monkeypatch.setattr(reader, 'snapshot',
+                            lambda: calls.append(1))
+        assert reader.device_tapped()    # cached
+        assert not calls
+        reader.close()
