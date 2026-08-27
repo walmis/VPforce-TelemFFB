@@ -984,8 +984,9 @@ class TestSwallowedForcesWarning:
         inst = self._run("NONE", tapped=False)
         assert not inst._telem_data.get('error')
 
-    def test_tap_mode_itself_never_warns(self):
-        """The mode that reads the mirror is the one case that is fine."""
+    def test_tap_mode_with_a_live_tap_never_warns(self):
+        """The mode that reads the mirror, with a tap behind it, is fine -
+        even with the game's spring stopped (menus)."""
         inst = self._run("DINPUT_TAP", tapped=True)
         assert not inst._telem_data.get('error')
 
@@ -994,6 +995,36 @@ class TestSwallowedForcesWarning:
         swallowed is what they want, and warning would be noise."""
         for mode in ("STATIC", "DYNAMIC", "ADVANCED", "CUSTOM", "TELEM"):
             inst = self._run(mode, tapped=True)
+            assert not inst._telem_data.get('error'), mode
+
+
+class TestTapNotCapturingWarning:
+    """The reverse of the swallowed-forces warning: spring mode DINPUT_TAP
+    renders only what the wrapper captures, so a mode selected with no
+    live tap behind it renders nothing - usually because the game was
+    started before TelemFFB, and the wrapper only engages when TelemFFB
+    is already running."""
+
+    def _run(self, spring_mode, tapped):
+        return TestSwallowedForcesWarning()._run(spring_mode, tapped)
+
+    def test_tap_mode_without_a_tap_is_reported(self):
+        inst = self._run("DINPUT_TAP", tapped=False)
+        error = inst._telem_data.get('error', '')
+        assert 'is not capturing' in error
+        assert 'started before TelemFFB' in error
+
+    def test_a_stopped_game_spring_is_not_this(self):
+        """Device in the mirror, spring merely stopped (the menus): the
+        tap is working and the silence is the game's own."""
+        inst = self._run("DINPUT_TAP", tapped=True)
+        assert not inst._telem_data.get('error')
+
+    def test_other_modes_never_get_this_warning(self):
+        """Only the mode that renders from the mirror can miss it."""
+        for mode in ("NONE", "STATIC", "DYNAMIC", "ADVANCED", "CUSTOM",
+                     "TELEM"):
+            inst = self._run(mode, tapped=False)
             assert not inst._telem_data.get('error'), mode
 
 

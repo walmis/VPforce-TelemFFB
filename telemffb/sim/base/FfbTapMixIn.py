@@ -116,6 +116,7 @@ class FfbTapMixIn:
         self.telem_data['FFB_Tap'] = 'active' if state else 'inactive'
         if state is None:
             self.effects['ffb_tap_spring'].stop()
+            self._warn_if_tap_is_missing()
             return False
 
         # axis-orientation corrections (see the tap_spring_* attrs)
@@ -160,6 +161,31 @@ class FfbTapMixIn:
                 axis_state.offset / 4096, 4)
         spring.start(override=True)
         return True
+
+    def _warn_if_tap_is_missing(self):
+        """Say so when spring mode DINPUT_TAP has no live tap behind it -
+        the reverse of _warn_if_tap_is_swallowing.
+
+        The mode renders only what the wrapper captures, and the wrapper
+        binds a device the moment the game creates it - so with telemetry
+        flowing and this device absent from the mirror, nothing is being
+        captured and the mode renders nothing.  The usual cause is order:
+        the wrapper engages only when TelemFFB is already running as the
+        game starts.  A tapped device whose game spring is merely STOPPED
+        (the menus, a spring-less aircraft) is not this case - the device
+        is in the mirror, and this stays silent.
+        """
+        from telemffb.hw import ffb_tap
+        if ffb_tap.device_is_tapped():
+            return
+        self.flag_error(
+            "Spring mode is 'Game Managed (DirectInput Tap)', but the "
+            "DirectInput Tap is not capturing this game's force feedback "
+            "for this device, so there is no game spring to render.  If "
+            "the game was started before TelemFFB, restart the game - the "
+            "tap only engages when TelemFFB is already running.  Otherwise "
+            "check that the tap is installed and enabled for this sim and "
+            "that this device is in its capture list (System Settings).")
 
     def _warn_if_tap_is_swallowing(self):
         """Say so when spring mode NONE meets a live tap - the one
