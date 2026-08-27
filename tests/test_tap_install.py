@@ -578,3 +578,61 @@ class TestSharedLogFolder:
         game, status = self._sim(tmp_path, config, monkeypatch)
         install(status)
         assert (game / WRAPPER_CONFIG).read_bytes().decode() == config
+
+
+class TestWriteRefusals:
+    """Two different problems arrive as the same PermissionError: the
+    game holding the file open (sharing violation) and the folder's ACL
+    refusing writes (a game under Program Files).  Telling a user with
+    an elevation problem to close a game that is not running sends them
+    in circles - the winerror says which it was."""
+
+    def _sim(self, tmp_path, monkeypatch):
+        game = tmp_path / "DCS World" / "bin"
+        game.mkdir(parents=True)
+        (game / WRAPPER_NAME).write_bytes(TAP_BYTES)
+        bundled = tmp_path / "bundled.dll"
+        bundled.write_bytes(TAP_BYTES)
+        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+                            lambda: str(bundled))
+        return SimStatus(
+            sim=SIMS_BY_KEY['DCS'], root=str(tmp_path / "DCS World"),
+            provenance="test",
+            targets=[TargetStatus(directory=str(game),
+                                  state=wrapper_state(str(game)),
+                                  has_config=False)])
+
+    def _refuse(self, monkeypatch, winerror):
+        import shutil
+        def denied(*args, **kwargs):
+            raise PermissionError(13, "refused", None, winerror)
+        monkeypatch.setattr(shutil, 'copyfile', denied)
+
+    def test_access_denied_names_the_folder_not_the_game(
+            self, tmp_path, monkeypatch):
+        status = self._sim(tmp_path, monkeypatch)
+        self._refuse(monkeypatch, winerror=5)
+        outcome, = install(status)
+        assert not outcome.ok
+        assert "administrator" in outcome.detail
+        assert "Program Files" in outcome.detail
+        assert "close the game" not in outcome.detail
+
+    def test_a_sharing_violation_still_says_close_the_game(
+            self, tmp_path, monkeypatch):
+        status = self._sim(tmp_path, monkeypatch)
+        self._refuse(monkeypatch, winerror=32)
+        outcome, = install(status)
+        assert not outcome.ok
+        assert "close the game" in outcome.detail
+
+    def test_removal_distinguishes_the_same_two_cases(
+            self, tmp_path, monkeypatch):
+        from telemffb.tap_install import remove
+        status = self._sim(tmp_path, monkeypatch)
+        def denied(path):
+            raise PermissionError(13, "refused", None, 5)
+        monkeypatch.setattr(os, 'remove', denied)
+        outcome, = remove(status)
+        assert not outcome.ok
+        assert "administrator" in outcome.detail

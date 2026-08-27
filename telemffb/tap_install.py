@@ -775,6 +775,27 @@ def _backfill_log_dir(destination: str) -> None:
         logging.exception(f"DirectInput tap: could not update {destination}")
 
 
+def _write_refusal(e: PermissionError) -> str:
+    """Why the game's folder refused a write, from the error itself.
+
+    Two different problems arrive as the same exception: a sharing
+    violation (the game is running and holds the file) and access denied
+    (the folder's ACL - a game installed under Program Files, typically).
+    Telling a user with an elevation problem to close a game that is not
+    running sends them in circles.  The winerror is the ground truth; a
+    path test ("is it under Program Files?") would be both over- and
+    under-inclusive - Steam trees under Program Files (x86) are
+    user-writable, and a locked-down folder can live anywhere.
+    """
+    winerror = getattr(e, 'winerror', None)
+    if winerror == 5:      # ERROR_ACCESS_DENIED: the ACL, not a lock
+        return ("Windows denied write access to this folder - typical for "
+                "a game installed under Program Files.  Run TelemFFB as "
+                "administrator once to do this, or grant the folder write "
+                "access.")
+    return "the file is in use - close the game and try again"
+
+
 def install(status: SimStatus,
             config_text: Optional[str] = None,
             overwrite_foreign: bool = False) -> List[TargetOutcome]:
@@ -811,10 +832,9 @@ def install(status: SimStatus,
             continue
         try:
             shutil.copyfile(source, destination)
-        except PermissionError:
+        except PermissionError as e:
             outcomes.append(TargetOutcome(
-                target.directory, False, "failed",
-                "the file is in use - close the game and try again"))
+                target.directory, False, "failed", _write_refusal(e)))
             continue
         except OSError as e:
             outcomes.append(TargetOutcome(
@@ -900,10 +920,9 @@ def remove(status: SimStatus) -> List[TargetOutcome]:
             continue
         try:
             os.remove(path)
-        except PermissionError:
+        except PermissionError as e:
             outcomes.append(TargetOutcome(
-                target.directory, False, "failed",
-                "the file is in use - close the game and try again"))
+                target.directory, False, "failed", _write_refusal(e)))
             continue
         except OSError as e:
             outcomes.append(TargetOutcome(target.directory, False, "failed",
