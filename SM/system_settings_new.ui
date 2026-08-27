@@ -654,7 +654,7 @@
               <string>Enable for DCS World</string>
              </property>
              <property name="toolTip">
-              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
              </property>
             </widget>
            </item>
@@ -1460,7 +1460,7 @@
               <string>Enable for IL-2 Sturmovik Great Battles</string>
              </property>
              <property name="toolTip">
-              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
              </property>
             </widget>
            </item>
@@ -1473,7 +1473,7 @@
               <string>Enable for IL-2 Korea</string>
              </property>
              <property name="toolTip">
-              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
              </property>
             </widget>
            </item>
@@ -1601,7 +1601,7 @@
               <string>Enable for Falcon BMS</string>
              </property>
              <property name="toolTip">
-              <string>The tap lets TelemFFB render the force feedback effects the game generates. Required for generic DirectInput devices; for VPforce devices it is needed only in the 'Game Managed (DirectInput Tap)' spring mode.</string>
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
              </property>
             </widget>
            </item>
