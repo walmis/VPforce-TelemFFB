@@ -363,8 +363,8 @@ class TestADeviceThatCannotBeDrivenAtAll:
     ON = None
 
     def setup_method(self):
-        # the tap is opt-in per sim, so a gap only exists once the user
-        # has asked for the tap there
+        # opted in everywhere, so these gaps are the fixable kind; the
+        # opt-in-off case is TestTheTapIsOptInPerSim's subject
         self.ON = Settings({"enableDCS": True, "enableIL2": True,
                             "enableTapDCS": True, "enableTapIL2": True,
                             "enableTapIL2_K": True})
@@ -437,7 +437,10 @@ class TestTheTapIsOptInPerSim:
     """Most VPforce owners never need the tap - it only renders the game's
     own effects, in DirectInput Tap spring mode. Presenting it as part of
     ordinary sim setup would suggest otherwise, so each sim is opted in
-    separately and nothing nags until it is."""
+    separately.  What the opt-in gates is WRITING: a generic DirectInput
+    device is still reported (it cannot be driven at all without the tap,
+    and off is also the default - a fresh setup was never asked), but
+    nothing is ever staged for a sim whose toggle is off."""
 
     DI = TapDevice("joystick", 0x045E, 0x001B, "SideWinder", directinput=True)
 
@@ -446,10 +449,33 @@ class TestTheTapIsOptInPerSim:
         monkeypatch.setattr(tap_reconcile, 'read_configs',
                             lambda s: [(r"C:\DCS\bin", "[FFBDevices]\n")])
 
-    def test_a_sim_not_opted_in_is_never_flagged(self, no_rule):
+    def test_a_sim_not_opted_in_is_flagged_but_never_fixable(self, no_rule):
+        """The fresh-setup path: DirectInput device picked, sim enabled,
+        tap opt-in never touched.  Silence here left the device selected,
+        doing nothing, with no error anywhere."""
         settings = Settings({"enableDCS": True, "enableTapDCS": False})
-        assert tap_reconcile.missing_tap_rules([self.DI], settings,
-                                             [dcs_status()]) == []
+        gap, = tap_reconcile.missing_tap_rules([self.DI], settings,
+                                               [dcs_status()])
+        assert not gap.fixable
+
+    def test_an_opted_out_sim_never_gets_rules_written(self, no_rule,
+                                                       monkeypatch):
+        """Even with our wrapper installed and a config to write into -
+        writing for a sim whose tap the user has not opted into is acting
+        behind their back."""
+        written = []
+        monkeypatch.setattr(tap_reconcile, 'write_one_config',
+                            lambda d, text: written.append(text))
+        settings = Settings({"enableDCS": True, "enableTapDCS": False})
+        tap_reconcile.apply_tap_rules(tap_reconcile.missing_tap_rules(
+            [self.DI], settings, [dcs_status()]))
+        assert written == []
+
+    def test_opting_in_makes_the_same_gap_fixable(self, no_rule):
+        settings = Settings({"enableDCS": True, "enableTapDCS": True})
+        gap, = tap_reconcile.missing_tap_rules([self.DI], settings,
+                                               [dcs_status()])
+        assert gap.fixable
 
 
 

@@ -262,6 +262,13 @@ def missing_tap_rules(devices: Sequence[TapDevice], settings,
     wrapper, typically - would take the line and do nothing with it, and
     the prompt would have claimed a fix it did not make.  Until the tap is
     installed there, the gap is reported as one the sim's tab has to close.
+
+    A sim whose tap opt-in is off still reports its gaps - off is also the
+    DEFAULT, and a fresh setup was never asked, while every device here is
+    one the tap is mandatory for.  What the opt-in gates is the fix: those
+    gaps are never fixable, because writing rules for a sim whose tap the
+    user has not opted into is acting behind their back.  The notice sends
+    them to the sim's tab instead.
     """
     wanted = [d for d in devices if d.directinput and d.usable]
     if not wanted:
@@ -271,11 +278,10 @@ def missing_tap_rules(devices: Sequence[TapDevice], settings,
     for status in (statuses if statuses is not None else all_status(settings)):
         if not sim_is_enabled(status.sim, settings):
             continue
-        # opting out of the tap for this sim opts out of being told to set
-        # it up; a config that already exists is still reconciled, since
-        # rules in a file mean it is in use whatever the toggle says
-        if not tap_is_enabled(status.sim, settings):
-            continue
+        # the opt-in gates the fix, not the report (see the docstring); a
+        # config that already exists still counts as coverage, since rules
+        # in a file mean the tap is in use whatever the toggle says
+        opted_in = tap_is_enabled(status.sim, settings)
         configs = read_configs(status)
         ours = {t.directory for t in status.targets
                 if t.state == WrapperState.TAP}
@@ -291,7 +297,7 @@ def missing_tap_rules(devices: Sequence[TapDevice], settings,
                        for r in facts.rules):
                     covered = True
                     break
-                if spare is None and directory in ours:
+                if opted_in and spare is None and directory in ours:
                     spare = (directory, config)
             if covered:
                 continue

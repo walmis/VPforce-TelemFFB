@@ -2363,12 +2363,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     "you save.")
             if not all(g.fixable for g in gaps):
                 tail += (" Where the tap is not set up, use the DirectInput "
-                         "Tap section on that sim's tab to install it.")
+                         "Tap section on that sim's tab to set it up.")
         else:
             # nothing to stage: setting the tap up is a bigger step than
             # adding a rule, and belongs on the sim's own tab
             tail = ("\n\nUse the DirectInput Tap section on each sim's tab to "
-                    "install it.")
+                    "set it up.")
         QMessageBox.information(self, "DirectInput Tap Configuration",
                                 body + tail)
         self._tap_gaps_seen = self._tap_gaps_seen | {g.device.key for g in gaps}
