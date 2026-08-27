@@ -40,8 +40,9 @@ class TestWhichDevicesGetRules:
         """A rule needs ids. Guessing one would tap somebody else's
         hardware, so the device is skipped instead."""
         text = generate_config([RHINO, UNREADABLE])
-        # the rule, RequireTelemFFB, and the vJoy block every file gets
-        assert len(rules(text)) == 3
+        # the rule, plus what every file gets: RequireTelemFFB, LogDir,
+        # and the vJoy block
+        assert len(rules(text)) == 4
         assert "Some Wheel" not in text
 
     def test_vjoy_is_always_blocked(self):

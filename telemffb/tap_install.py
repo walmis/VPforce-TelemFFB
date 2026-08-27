@@ -480,6 +480,19 @@ def order_line(device: TapDevice, position: int) -> str:
         position, device.key, device.ident or "unnamed", device.role)
 
 
+def tap_log_dir() -> str:
+    """The one folder TelemFFB points every sim's wrapper log at (the
+    LogDir it writes into configs), so support means searching one place.
+
+    On its own the wrapper logs beside itself in the game's folder,
+    falling back to the user's home folder where that is not writable -
+    the right default for standalone installs with no TelemFFB around.
+    """
+    local = os.environ.get('LOCALAPPDATA') or os.path.expanduser(
+        r'~\AppData\Local')
+    return os.path.join(local, 'VPForce-TelemFFB', 'log', 'tap')
+
+
 def generate_config(devices: Sequence[TapDevice],
                     ordered: Sequence[TapDevice] = (),
                     blocked: Sequence[TapDevice] = ()) -> str:
@@ -506,6 +519,13 @@ def generate_config(devices: Sequence[TapDevice],
         "",
         "; Log level: 0=none, 1=error, 2=warn, 3=info, 4=debug",
         ";LogLevel=3",
+        "",
+        "; One folder for every sim's tap log, so they are all in the same",
+        "; place when searching; each file is named for its game's exe.",
+        "; Remove the path to log beside the wrapper in the game's folder",
+        "; instead (falling back to your home folder where that is not",
+        "; writable).",
+        "LogDir=" + tap_log_dir(),
         "",
         "; Apply 'tap' and 'sink' rules only while TelemFFB is running, checked",
         "; once as the game starts.  Leave this true: a wrapper left behind in a",
@@ -707,6 +727,54 @@ def bundled_wrapper() -> Optional[str]:
 # --------------------------------------------------------------------------
 # installing and removing
 # --------------------------------------------------------------------------
+def _backfill_log_dir(destination: str) -> None:
+    """Point a TelemFFB-written config that predates LogDir at the shared
+    log folder.
+
+    Additive, the way device rules are: never a config that is not ours
+    (no generated marker), and never one that already carries a LogDir
+    decision - including ``LogDir=`` left empty, which is how to decline
+    the shared folder without this putting it back on every update.
+    """
+    try:
+        if not os.path.isfile(destination):
+            return
+        with open_config(destination, "r") as handle:
+            text = handle.read()
+    except OSError:
+        return
+    if GENERATED_MARKER not in text:
+        return
+
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(newline)
+    in_general = False
+    insert_at = None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('[') and stripped.endswith(']'):
+            in_general = stripped.lower() == '[general]'
+            if in_general:
+                insert_at = i + 1
+            continue
+        if in_general and re.match(r'\s*logdir\s*=', line, re.IGNORECASE):
+            return
+    if insert_at is None:
+        return
+
+    lines[insert_at:insert_at] = [
+        "; One folder for every sim's tap log (added by a TelemFFB",
+        "; update).  Remove the path to log beside the wrapper instead.",
+        "LogDir=" + tap_log_dir(),
+        "",
+    ]
+    try:
+        with open_config(destination, "w") as handle:
+            handle.write(newline.join(lines))
+    except OSError:
+        logging.exception(f"DirectInput tap: could not update {destination}")
+
+
 def install(status: SimStatus,
             config_text: Optional[str] = None,
             overwrite_foreign: bool = False) -> List[TargetOutcome]:
@@ -772,6 +840,10 @@ def install(status: SimStatus,
                     handle.write(config_text)
             except OSError:
                 logging.exception(f"DirectInput tap: could not write {destination}")
+
+    for outcome in outcomes:
+        if outcome.ok:
+            _backfill_log_dir(os.path.join(outcome.directory, WRAPPER_CONFIG))
 
     _match_config_across_targets(status, outcomes)
     return outcomes

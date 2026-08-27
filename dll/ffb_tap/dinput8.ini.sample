@@ -12,6 +12,15 @@
 ; Log level: 0=none, 1=error, 2=warn, 3=info, 4=debug
 ;LogLevel=3
 
+; Where the wrapper writes its log.  Default: dinput8_wrapper.log next to
+; the wrapper in the game's folder.  When that folder cannot be written -
+; a game installed under Program Files, typically - the log falls back to
+; your home folder (%USERPROFILE%).  Set LogDir to send it somewhere else
+; explicitly; TelemFFB-written configs point every sim at one shared
+; folder.  Outside the game's own folder the file is named
+; dinput8_wrapper_<game exe>.log, so one folder can hold every sim's log.
+;LogDir=
+
 ; Apply 'tap' and 'sink' rules only while TelemFFB is running, checked
 ; once as the game starts.  Leave this true: a wrapper left behind in a
 ; game folder then goes inert instead of silently swallowing the game's

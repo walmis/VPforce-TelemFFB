@@ -16,8 +16,8 @@ import pytest
 from telemffb import tap_install
 from telemffb.tap_install import (
     SIMS_BY_KEY, SimStatus, TapSim, TargetStatus, WRAPPER_CONFIG,
-    WRAPPER_NAME, WrapperState, install, outdated_targets, resolve_root,
-    sim_status, target_dirs, wrapper_state,
+    WRAPPER_NAME, WrapperState, generate_config, install, outdated_targets,
+    resolve_root, sim_status, tap_log_dir, target_dirs, wrapper_state,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -509,3 +509,72 @@ class TestUpdateMechanics:
         game, status = self._sim(tmp_path, b"MZ someone else's proxy")
         assert status.targets[0].state == WrapperState.FOREIGN
         assert not outdated_targets(status, bundled='9.9.9.9')
+
+
+class TestSharedLogFolder:
+    """TelemFFB points every sim's wrapper log at one folder - the LogDir
+    it writes into configs - so support means searching one place.  The
+    wrapper's own defaults stay standalone-friendly (beside itself, then
+    the user's home folder); TelemFFB never relies on them."""
+
+    OURS = ("; dinput8.ini - written by TelemFFB on 2026-08-01.\r\n"
+            "[General]\r\n"
+            "RequireTelemFFB=true\r\n"
+            "\r\n"
+            "[FFBDevices]\r\n"
+            "FFFF:2054=tap\r\n")
+
+    def _sim(self, tmp_path, config, monkeypatch):
+        game = tmp_path / "DCS World" / "bin"
+        game.mkdir(parents=True)
+        (game / WRAPPER_NAME).write_bytes(TAP_BYTES)
+        (game / WRAPPER_CONFIG).write_bytes(config.encode())
+        bundled = tmp_path / "bundled.dll"
+        bundled.write_bytes(TAP_BYTES)
+        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+                            lambda: str(bundled))
+        status = SimStatus(
+            sim=SIMS_BY_KEY['DCS'], root=str(tmp_path / "DCS World"),
+            provenance="test",
+            targets=[TargetStatus(directory=str(game),
+                                  state=wrapper_state(str(game)),
+                                  has_config=True)])
+        return game, status
+
+    def test_generated_configs_carry_the_shared_folder(self):
+        assert "LogDir=" + tap_log_dir() in generate_config([])
+
+    def test_an_update_backfills_our_old_config(self, tmp_path, monkeypatch):
+        game, status = self._sim(tmp_path, self.OURS, monkeypatch)
+        install(status)
+        text = (game / WRAPPER_CONFIG).read_bytes().decode()
+        head, _, tail = text.partition("[FFBDevices]")
+        assert "LogDir=" + tap_log_dir() in head
+        assert "FFFF:2054=tap" in tail
+        assert "\r\nLogDir=" in text          # the CRLF shape survives
+
+    def test_the_backfill_happens_once(self, tmp_path, monkeypatch):
+        game, status = self._sim(tmp_path, self.OURS, monkeypatch)
+        install(status)
+        install(status)
+        assert (game / WRAPPER_CONFIG).read_bytes().decode().count(
+            "LogDir=") == 1
+
+    def test_a_log_decision_already_made_is_kept(self, tmp_path, monkeypatch):
+        """Including LogDir= left empty - that is how to decline the
+        shared folder without an update putting it back."""
+        decisions = ("LogDir=D:\\my own logs\r\n", "LogDir=\r\n")
+        for n, decision in enumerate(decisions):
+            config = self.OURS.replace("[General]\r\n",
+                                       "[General]\r\n" + decision)
+            game, status = self._sim(tmp_path / f"case{n}", config,
+                                     monkeypatch)
+            install(status)
+            assert (game / WRAPPER_CONFIG).read_bytes().decode() == config
+
+    def test_a_config_that_is_not_ours_is_left_alone(self, tmp_path,
+                                                     monkeypatch):
+        config = "[General]\r\nLogLevel=3\r\n[FFBDevices]\r\nPedals=block\r\n"
+        game, status = self._sim(tmp_path, config, monkeypatch)
+        install(status)
+        assert (game / WRAPPER_CONFIG).read_bytes().decode() == config
