@@ -964,14 +964,16 @@ class TestSwallowedForcesWarning:
         harness = TestTapSpringMode()
         return harness._make_instance(spring_mode)
 
-    def _run(self, spring_mode, tapped):
+    def _run(self, spring_mode, tapped, di_guid=None):
         import unittest.mock as mock
+        import telemffb.globals as G
         case, inst = self._instance(spring_mode)
-        with mock.patch("telemffb.hw.ffb_tap.device_is_tapped",
-                        return_value=tapped):
-            with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
-                            return_value=None):
-                inst.ffb_tap_spring()
+        with mock.patch.object(G, 'device_di_guid', di_guid, create=True):
+            with mock.patch("telemffb.hw.ffb_tap.device_is_tapped",
+                            return_value=tapped):
+                with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
+                                return_value=None):
+                    inst.ffb_tap_spring()
         return inst
 
     def test_none_with_a_live_tap_is_reported(self):
@@ -1026,6 +1028,47 @@ class TestTapNotCapturingWarning:
                      "TELEM"):
             inst = self._run(mode, tapped=False)
             assert not inst._telem_data.get('error'), mode
+
+
+class TestUnreachableDeviceWarning:
+    """The last silent cell of the mode-by-tap grid: mode NONE, no tap
+    capturing, on a generic DirectInput device.  The game cannot drive
+    the device (TelemFFB holds it exclusively through the bridge) and
+    nothing is relaying - and since DCS/IL-2/BMS ship no spring-mode
+    default and an unset mode resolves to NONE, this is exactly what an
+    untouched settings page gives a DirectInput user."""
+
+    def _run(self, spring_mode, tapped, di_guid=None):
+        return TestSwallowedForcesWarning()._run(spring_mode, tapped,
+                                                 di_guid)
+
+    def test_a_di_device_with_no_tap_is_told_why_there_is_no_spring(self):
+        inst = self._run("NONE", tapped=False, di_guid="{GUID}")
+        error = inst._telem_data.get('error', '')
+        assert 'cannot drive this device directly' in error
+        assert 'Game Managed (DirectInput Tap)' in error
+
+    def test_the_untouched_settings_default_gets_the_same_warning(self):
+        """spring_mode never chosen: the setter resolves it to NONE."""
+        inst = self._run(None, tapped=False, di_guid="{GUID}")
+        assert 'cannot drive this device directly' in \
+            inst._telem_data.get('error', '')
+
+    def test_a_vpforce_device_stays_silent(self):
+        """NONE with no tap on VPforce is the game driving it natively -
+        working as advertised, nothing to warn about."""
+        inst = self._run("NONE", tapped=False, di_guid=None)
+        assert not inst._telem_data.get('error')
+
+    def test_a_capturing_tap_wins_the_message(self):
+        """With the tap capturing, the swallowed-forces message is the
+        one whose advice fits - remove the rule or use the tap mode."""
+        inst = self._run("NONE", tapped=True, di_guid="{GUID}")
+        assert 'is capturing' in inst._telem_data.get('error', '')
+
+    def test_tap_mode_on_a_di_device_gets_the_reverse_trap_instead(self):
+        inst = self._run("DINPUT_TAP", tapped=False, di_guid="{GUID}")
+        assert 'is not capturing' in inst._telem_data.get('error', '')
 
 
 class TestTapPresenceQuery:

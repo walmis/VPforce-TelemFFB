@@ -188,32 +188,49 @@ class FfbTapMixIn:
             "that this device is in its capture list (System Settings).")
 
     def _warn_if_tap_is_swallowing(self):
-        """Say so when spring mode NONE meets a live tap - the one
-        combination that leaves the stick with no spring at all.
+        """Say so when spring mode NONE will never see the game's spring.
 
-        A tap rule is decided when the game creates the device and stands
-        for that session: the wrapper swallows the game's effects whether
-        or not the aircraft's spring mode reads them back.  Every mode
-        that generates a spring LOCALLY (static, dynamic, advanced, or
-        IL-2's telemetry spring) is unaffected by that - swallowing the
-        game's own spring is what those modes want anyway.  NONE is the
-        exception: it means "the game manages the spring", and the tap is
-        precisely what stops the game's spring from arriving.  The user
-        experiences a stick with no centering at all and nothing in the
-        UI explaining why.
+        Every mode that generates a spring LOCALLY (static, dynamic,
+        advanced, or IL-2's telemetry spring) needs no game spring and is
+        left alone.  NONE means "the game manages the spring", and two
+        situations make that impossible - each with nothing in the UI
+        explaining why the stick has no centering at all:
+
+        * a live tap: a tap rule is decided when the game creates the
+          device and stands for that session, so the wrapper swallows the
+          game's effects whether or not this mode reads them back;
+        * a generic DirectInput device with NO tap capturing: TelemFFB
+          holds those devices exclusively through the bridge, so the game
+          cannot drive them directly and there is nothing relaying.  This
+          is also the untouched-settings default - DCS/IL-2/BMS ship no
+          spring-mode value, and an unset mode resolves to NONE - so it
+          greets exactly the users who configured the device and stopped.
+
+        A VPforce device with no tap stays silent here: the game drives
+        it natively, and NONE works as advertised.
         """
         if not self.spring_mode_is(SpringModeEnum.NONE):
             return
         from telemffb.hw import ffb_tap
-        if not ffb_tap.device_is_tapped():
+        if ffb_tap.device_is_tapped():
+            self.flag_error(
+                "Spring mode is 'None (Game Managed)', but the DirectInput "
+                "Tap is capturing this game's force feedback for this device "
+                "- so the game's spring never reaches it and there is no "
+                "spring at all.  Select spring mode 'Game Managed "
+                "(DirectInput Tap)' to render the game's spring, or remove "
+                "this device from the tap configuration in System Settings.")
             return
-        self.flag_error(
-            "Spring mode is 'None (Game Managed)', but the DirectInput "
-            "Tap is capturing this game's force feedback for this device "
-            "- so the game's spring never reaches it and there is no "
-            "spring at all.  Select spring mode 'Game Managed "
-            "(DirectInput Tap)' to render the game's spring, or remove "
-            "this device from the tap configuration in System Settings.")
+        import telemffb.globals as G
+        if G.device_di_guid:
+            self.flag_error(
+                "Spring mode is 'None (Game Managed)', but the game cannot "
+                "drive this device directly - TelemFFB holds generic "
+                "DirectInput devices exclusively - and the DirectInput Tap "
+                "is not capturing this game's force feedback for it, so "
+                "there is no spring at all.  Select spring mode 'Game "
+                "Managed (DirectInput Tap)' and configure the tap for this "
+                "sim in System Settings.")
 
     # ------------------------------------------------------------------
     # Non-spring game effects: constant forces (stick kicks, recoil),
