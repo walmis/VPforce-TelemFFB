@@ -738,7 +738,8 @@ def install(status: SimStatus,
         if target.state == WrapperState.UNREADABLE:
             outcomes.append(TargetOutcome(
                 target.directory, False, "skipped",
-                "a dinput8.dll is here but could not be read"))
+                "a dinput8.dll is here but could not be read - it may be "
+                "locked by a running program; close the game and try again"))
             continue
         try:
             shutil.copyfile(source, destination)
@@ -879,6 +880,65 @@ def file_version(path: str) -> Optional[str]:
     except Exception:
         logging.debug(f"DirectInput tap: no readable version resource on {path}")
         return None
+
+
+def bundled_version() -> Optional[str]:
+    """The version of the wrapper TelemFFB ships, or None when it carries
+    no version resource (or is not bundled at all)."""
+    path = bundled_wrapper()
+    return file_version(path) if path else None
+
+
+def _version_parts(version: Optional[str]):
+    """'0.9.1.0' -> (0, 9, 1, 0).  An unreadable or absent version is
+    (), which orders below every real one - a build too old to say what
+    it is predates the ones that can."""
+    if not version:
+        return ()
+    parts = []
+    for chunk in str(version).split('.'):
+        digits = ''.join(ch for ch in chunk if ch.isdigit())
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def version_is_newer(candidate: Optional[str],
+                     installed: Optional[str]) -> bool:
+    """Whether ``candidate`` supersedes ``installed``.
+
+    Used to offer an update, so it is deliberately conservative: an
+    unreadable candidate never supersedes anything, while an unreadable
+    INSTALLED version is superseded by any identifiable build (that is
+    precisely the pre-version-resource case worth replacing).
+    """
+    have = _version_parts(candidate)
+    if not have:
+        return False
+    theirs = _version_parts(installed)
+    if not theirs:
+        return True
+    length = max(len(have), len(theirs))
+    have += (0,) * (length - len(have))
+    theirs += (0,) * (length - len(theirs))
+    return have > theirs
+
+
+def outdated_targets(status: SimStatus,
+                     bundled: Optional[str] = None) -> List["TargetStatus"]:
+    """This sim's installed wrappers that the bundled build supersedes.
+
+    Only OUR wrapper counts: a foreign dinput8.dll belongs to something
+    else the user installed, and an absent one is an install decision
+    rather than an update.
+    """
+    bundled = bundled if bundled is not None else bundled_version()
+    if not bundled:
+        return []
+    return [t for t in status.targets
+            if t.state == WrapperState.TAP
+            and version_is_newer(bundled, t.version)]
 
 
 def wrapper_state(directory: str) -> str:

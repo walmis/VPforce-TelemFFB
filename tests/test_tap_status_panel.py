@@ -24,6 +24,16 @@ DCS = SIMS_BY_KEY['DCS']
 ROOT = r"C:\Games\DCS World"
 
 
+@pytest.fixture(autouse=True)
+def bundled(monkeypatch):
+    """Pin the version TelemFFB ships.  Version rows compare against it,
+    and reading the real bundled DLL would make these tests change
+    meaning every time the wrapper is rebuilt."""
+    from telemffb import tap_install
+    monkeypatch.setattr(tap_install, 'bundled_version', lambda: "0.9.0.0")
+    return "0.9.0.0"
+
+
 @pytest.fixture(scope="module")
 def app():
     return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -80,8 +90,10 @@ class TestHeadline:
     def test_the_missing_half_of_a_partial_install_is_flagged(self, app):
         """It has to stand out from an install that is simply absent, which
         is not a problem at all."""
-        panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT),
-                                      target("bin-mt", WrapperState.TAP)))
+        panel = TapStatusPanel(status(
+            target("bin", WrapperState.ABSENT),
+            # current, so the missing half is the only thing flagged
+            target("bin-mt", WrapperState.TAP, version="0.9.0.0")))
         assert self.attention_texts(panel) == ["not installed"]
 
 
@@ -120,13 +132,39 @@ class TestDetail:
         panel = TapStatusPanel(status(
             target("bin", WrapperState.TAP, version="0.9.0.0"),
             target("bin-mt", WrapperState.TAP, version="0.9.0.0")))
-        assert rendered(panel).count("v0.9.0.0") == 2
+        assert len([t for t in rendered(panel) if "v0.9.0.0" in t]) == 2
+
+    def test_a_current_wrapper_says_so(self, app):
+        """Reinstalling the same build looked identical to a failed
+        update until the row said which build TelemFFB ships."""
+        panel = TapStatusPanel(status(
+            target("bin", WrapperState.TAP, version="0.9.0.0")))
+        assert any("(current)" in t for t in rendered(panel))
+
+    def test_an_outdated_wrapper_offers_the_shipped_build(self, app):
+        panel = TapStatusPanel(status(
+            target("bin", WrapperState.TAP, version="0.8.0.0")))
+        text = " ".join(rendered(panel))
+        assert "v0.8.0.0" in text and "v0.9.0.0 available" in text
+
+    def test_an_unversioned_wrapper_is_offered_the_shipped_build(self, app):
+        """A build with no version resource predates every build that has
+        one, so it is exactly what an update is for."""
+        panel = TapStatusPanel(status(target("bin", WrapperState.TAP)))
+        assert any("v0.9.0.0 available" in t for t in rendered(panel))
+
+    def test_a_newer_wrapper_is_left_alone(self, app):
+        """A user testing a newer wrapper than TelemFFB ships must not
+        be told to downgrade."""
+        panel = TapStatusPanel(status(
+            target("bin", WrapperState.TAP, version="1.0.0.0")))
+        assert not any("available" in t for t in rendered(panel))
 
     def test_a_wrapper_without_a_version_says_so(self, app):
         """Builds predating the version resource are still ours; they just
         cannot say which build they are."""
         panel = TapStatusPanel(status(target("bin", WrapperState.TAP)))
-        assert "version unknown" in rendered(panel)
+        assert any("version unknown" in t for t in rendered(panel))
 
     def test_no_version_is_shown_for_a_target_without_our_wrapper(self, app):
         panel = TapStatusPanel(status(target("bin", WrapperState.FOREIGN,
@@ -155,7 +193,7 @@ class TestRedraw:
                                        version="0.9.0.0")))
         text = rendered(panel)
         assert "not installed" not in text
-        assert "v0.9.0.0" in text
+        assert any("v0.9.0.0" in t for t in text)
 
     def test_redrawing_does_not_accumulate_widgets(self, app):
         panel = TapStatusPanel(status(target("bin", WrapperState.TAP)))

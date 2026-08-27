@@ -1596,6 +1596,16 @@ def main():
     # Prompt for system settings if no devices are configured
     _check_system_settings_required()
 
+    # A TelemFFB update strands every installed tap wrapper on the old
+    # build until something copies over them; offer to do the rounds.
+    # Master only - the wrappers live in game folders, not per instance.
+    if G.master_instance:
+        try:
+            from telemffb.TapUpdateDialog import offer_wrapper_updates
+            offer_wrapper_updates(G.main_window)
+        except Exception:
+            logging.exception("DirectInput tap: startup update offer failed")
+
     # ============================================================================
     # PHASE 14: Background Initialization
     # ============================================================================

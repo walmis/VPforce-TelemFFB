@@ -15,8 +15,9 @@ import pytest
 
 from telemffb import tap_install
 from telemffb.tap_install import (
-    SIMS_BY_KEY, TapSim, WrapperState, resolve_root, sim_status, target_dirs,
-    wrapper_state,
+    SIMS_BY_KEY, SimStatus, TapSim, TargetStatus, WRAPPER_CONFIG,
+    WRAPPER_NAME, WrapperState, install, outdated_targets, resolve_root,
+    sim_status, target_dirs, wrapper_state,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -449,3 +450,62 @@ class TestRemove:
         outcome = tap_install.remove(sim_status(dcs, root))[0]
         assert not outcome.ok
         assert "close the game" in outcome.detail
+
+
+class TestUpdateMechanics:
+    """The update path, validated end to end: an installed wrapper is
+    byte-replaced by the bundled one, its config file is preserved, and
+    the outdated flag clears once the copy lands."""
+
+    def _sim(self, tmp_path, dll_bytes=TAP_BYTES):
+        game = tmp_path / "DCS World" / "bin"
+        game.mkdir(parents=True)
+        (game / WRAPPER_NAME).write_bytes(dll_bytes)
+        (game / WRAPPER_CONFIG).write_text(
+            "[FFBDevices]\nFFFF:2054=tap\n", encoding="utf-8")
+        status = SimStatus(
+            sim=SIMS_BY_KEY['DCS'], root=str(tmp_path / "DCS World"),
+            provenance="test",
+            targets=[TargetStatus(directory=str(game),
+                                  state=wrapper_state(str(game)),
+                                  has_config=True)])
+        return game, status
+
+    def test_update_replaces_bytes_and_keeps_the_config(
+            self, tmp_path, monkeypatch):
+        game, status = self._sim(tmp_path, TAP_BYTES + b" STALE")
+        bundled = tmp_path / "bundled.dll"
+        bundled.write_bytes(TAP_BYTES + b" FRESH")
+        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+                            lambda: str(bundled))
+        outcomes = install(status)
+        assert [(o.ok, o.action) for o in outcomes] == [(True, 'updated')]
+        assert (game / WRAPPER_NAME).read_bytes() == TAP_BYTES + b" FRESH"
+        assert "FFFF:2054=tap" in (game / WRAPPER_CONFIG).read_text(
+            encoding="utf-8")
+
+    def test_outdated_flag_raises_and_clears(self, tmp_path, monkeypatch):
+        game, status = self._sim(tmp_path)
+        monkeypatch.setattr('telemffb.tap_install.bundled_version',
+                            lambda: '0.9.1.0')
+        # installed build has no readable version -> superseded
+        assert outdated_targets(status)
+        # after an update the installed version matches the bundled one
+        monkeypatch.setattr('telemffb.tap_install.file_version',
+                            lambda path: '0.9.1.0')
+        refreshed = SimStatus(
+            sim=status.sim, root=status.root, provenance="test",
+            targets=[TargetStatus(directory=str(game),
+                                  state=WrapperState.TAP,
+                                  version='0.9.1.0')])
+        assert not outdated_targets(refreshed)
+
+    def test_a_newer_installed_build_is_not_outdated(self, tmp_path):
+        _, status = self._sim(tmp_path)
+        status.targets[0].version = '9.9.9.9'
+        assert not outdated_targets(status, bundled='0.9.1.0')
+
+    def test_foreign_wrappers_are_never_outdated(self, tmp_path):
+        game, status = self._sim(tmp_path, b"MZ someone else's proxy")
+        assert status.targets[0].state == WrapperState.FOREIGN
+        assert not outdated_targets(status, bundled='9.9.9.9')

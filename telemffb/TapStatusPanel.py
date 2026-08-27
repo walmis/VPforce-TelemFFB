@@ -41,6 +41,7 @@ from PyQt6.QtGui import QPalette
 
 from telemffb.custom_widgets import InfoLabel
 from telemffb.TapDeviceDialog import TapDeviceDialog
+from telemffb import tap_install
 from telemffb.tap_config import (already_blocked, already_ordered,
                                  already_tapped, amend, lines_for,
                                  retired_identities)
@@ -258,7 +259,20 @@ class TapStatusPanel(QtWidgets.QWidget):
                            else "version unknown")
                 tip = ("" if target.version else
                        "Built before the wrapper carried a version resource")
-                grid.addWidget(self._label(version, "dim", tip), row, 2)
+                style = "dim"
+                # Say how the installed build compares with the one
+                # TelemFFB ships: without it, reinstalling the same
+                # version looks identical to a failed update.
+                bundled = tap_install.bundled_version()
+                if tap_install.version_is_newer(bundled, target.version):
+                    version = f"{version} → v{bundled} available"
+                    tip = (f"TelemFFB ships v{bundled}; use Install to "
+                           "update this copy")
+                    style = "attention"
+                elif bundled and target.version == bundled:
+                    version = f"{version} (current)"
+                    tip = "Matches the wrapper TelemFFB ships"
+                grid.addWidget(self._label(version, style, tip), row, 2)
             # Everything this panel says about a config is a summary; the
             # file is the only thing that settles a disagreement with it.
             if target.has_config:
