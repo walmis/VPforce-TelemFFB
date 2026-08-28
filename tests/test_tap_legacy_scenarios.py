@@ -122,9 +122,9 @@ def dll_bytes(root, sub):
 def panel_for(monkeypatch, root, devices=(), overwrite=True, answer=None):
     """A status panel over a real tree, with both questions pre-answered.
 
-    ``answer`` is what the device dialog returns; None is the user
-    cancelling it, which on a tree that already has a config is never
-    reached anyway.
+    ``answer`` is what the device dialog returns - the fresh-install ask,
+    or the adoption dialog that opens itself after an ffb-fix upgrade.
+    None is the user cancelling it.
     """
     monkeypatch.setattr(panel_module, "confirm_overwrite",
                         lambda *a, **k: overwrite)
@@ -163,9 +163,11 @@ class TestInstallingOverIt:
     def test_the_user_is_asked_and_the_ini_is_kept(self, app, tmp_path,
                                                    monkeypatch):
         """Replacing the DLL is an upgrade; the file beside it is theirs and
-        goes on working.  Nobody is asked to choose devices, because the
-        file already says what the game hands over.  The question asked is
-        the affirmative upgrade one - the wrapper identified itself."""
+        goes on working.  The question asked is the affirmative upgrade one
+        - the wrapper identified itself - and the adoption dialog opens by
+        itself afterwards, so the additions are offered without hunting for
+        Configure Devices.  Cancelling it leaves the file exactly as it
+        was: the user has the final say over every write."""
         root = dcs_root(tmp_path)
         asked, chose, classify = [], [], []
         monkeypatch.setattr(panel_module, "confirm_legacy_upgrade",
@@ -176,7 +178,8 @@ class TestInstallingOverIt:
                             lambda *a, **k: chose.append(a) or None)
         TapStatusPanel(status_of(root))._install()
 
-        assert asked and not chose and not classify
+        assert asked and not classify
+        assert len(chose) == 1, "the adoption dialog opens itself, once"
         assert dll_bytes(root, "bin") == dll_bytes(root, "bin-mt") == OUR_DLL
         assert ini_bytes(root, "bin-mt") == LEGACY_INI.encode("utf-8")
 
@@ -205,8 +208,8 @@ class TestAdoptingTheirFile:
         root = dcs_root(tmp_path)
         panel = panel_for(monkeypatch, root, devices=[RHINO, PEDALS, COLLECTIVE],
                           answer=VPFORCE_ANSWER)
+        # the adoption dialog opens itself after the upgrade
         panel._install()
-        panel._configure()
         return ini_bytes(root, "bin-mt").decode("utf-8")
 
     def test_the_stick_is_tapped_and_put_first(self, app, tmp_path, monkeypatch):
@@ -304,8 +307,8 @@ class TestTakingTheTapBackOut:
         root = dcs_root(tmp_path)
         panel = panel_for(monkeypatch, root, devices=[RHINO, PEDALS, COLLECTIVE],
                           answer=VPFORCE_ANSWER)
+        # the adoption dialog opens itself after the upgrade
         panel._install()
-        panel._configure()
 
         plan = tap_reconcile.plan_tap_cleanup(status_of(root))
         assert plan.delete_config == []          # not ours to delete

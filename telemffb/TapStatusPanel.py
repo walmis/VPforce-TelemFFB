@@ -100,6 +100,9 @@ def confirm_legacy_upgrade(sim_name, directories, parent=None):
         "TelemFFB's DirectInput Tap is built from it and replaces it in "
         "place. Everything it does keeps working: the dinput8.ini beside "
         "it is kept, and every rule in it stays in effect.\n\n"
+        "TelemFFB will show the device configuration next, with the "
+        "proposed additions for your devices - nothing is added to the "
+        "file until you confirm it there.\n\n"
         "Upgrade it to TelemFFB's wrapper?",
         QtWidgets.QMessageBox.StandardButton.Yes |
         QtWidgets.QMessageBox.StandardButton.No,
@@ -383,12 +386,20 @@ class TapStatusPanel(QtWidgets.QWidget):
         config_text = self._config_to_write()
         if config_text is CANCELLED:
             return
+        # A confirmed ffb-fix upgrade flows straight into the adoption
+        # dialog: the config already exists, so the proposed additions (the
+        # tap rule for the selected joystick, blocks for uncovered devices)
+        # open pre-selected with the preview available, and nothing is
+        # written to the file until the user confirms.  One click fewer
+        # than making them find Configure Devices - with the same final say.
+        adopt = bool(legacy) and not foreign and any(
+            t.has_config for t in self.status.targets)
         # bound here rather than passed through _run, so every action stays a
         # one-argument call; `install` is still looked up when the lambda runs
         self._run(lambda status: install(status, config_text,
                                          overwrite_foreign=bool(foreign or
                                                                 legacy)),
-                  "Install")
+                  "Install", then=self._configure if adopt else None)
 
     def _config_to_write(self):
         """The config this install should lay down, or None to leave it alone.
@@ -486,7 +497,7 @@ class TapStatusPanel(QtWidgets.QWidget):
     def _remove(self):
         self._run(remove, "Remove")
 
-    def _run(self, action, title):
+    def _run(self, action, title, then=None):
         """Run an action and report what happened to each target.
 
         Reported per directory rather than as one verdict: with two targets
@@ -498,10 +509,16 @@ class TapStatusPanel(QtWidgets.QWidget):
         the dialog around them is a Cancel/Save dialog, and a wrapper
         installed and then cancelled out of would otherwise stay active
         in the game folder with nothing in TelemFFB saying so.
+
+        ``then`` runs after a fully successful action, before the changed
+        signal - so a follow-on step (the adoption dialog after an ffb-fix
+        upgrade) opens from a panel the rescan has not yet replaced.
         """
         self._undo.append(self._snapshot())
         outcomes = action(self.status)
         failures = [o for o in outcomes if not o.ok]
+        if not failures and then is not None:
+            then()
         if failures:
             lines = [f"{os.path.basename(o.directory)}: {o.detail}"
                      for o in failures]
