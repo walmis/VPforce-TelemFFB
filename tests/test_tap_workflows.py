@@ -49,7 +49,8 @@ pytestmark = [
 DCS = SIMS_BY_KEY["DCS"]
 
 OUR_DLL = b"MZ\x00 FFB tap: device [%ls] bound to block %d \x00"
-LEGACY_DLL = b"MZ\x00 dinput8.ini [FFBDevices] DeviceNameSubstring=action \x00"
+LEGACY_DLL = (b"MZ\x00 CreateDevice: [%ls]  FFB=%s  scale=%d%% \x00"
+              b" dinput8.ini [FFBDevices] DeviceNameSubstring=action \x00")
 LEGACY_INI = "\r\n".join([
     "[General]", "Enabled=true", "LogLevel=3", "",
     "[FFB]", "Enabled=true", "LogEffects=true", "DefaultScale=100", "",
@@ -260,6 +261,8 @@ class World:
         monkeypatch.setattr(SystemSettingsDialog, '_ask_with_preview',
                             self.policy.cleanup)
         monkeypatch.setattr(panel_module, 'confirm_overwrite', self.policy.overwrite)
+        monkeypatch.setattr(panel_module, 'confirm_legacy_upgrade',
+                            self.policy.overwrite)
         monkeypatch.setattr(panel_module, 'ask_for_devices', self.policy.devices)
         # the live device-switch primitive lives in main.py and is registered
         # on G when the app starts; a save with a changed device calls it.

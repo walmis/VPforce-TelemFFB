@@ -81,16 +81,41 @@ def ask_for_devices(sim, devices, existing=None, parent=None, preview=None):
             dialog.blocked())
 
 
+def confirm_legacy_upgrade(sim_name, directories, parent=None):
+    """Confirm upgrading a recognized ffb-fix wrapper.
+
+    The wrapper identified itself (LEGACY_MARKERS), so the user is asked
+    to confirm an upgrade, not to classify a DLL they installed a year
+    ago and may not remember.  Affirmative where confirm_overwrite is
+    cautious: replacing ffb-fix with its successor is safe, and the ini
+    beside it is kept.
+
+    A module-level seam, for the same reason as ask_for_devices.
+    """
+    where = "\n".join(f"    {d}" for d in directories)
+    answer = QtWidgets.QMessageBox.question(
+        parent, "DirectInput Tap Install",
+        f"{sim_name} has the community ffb-fix wrapper installed:\n\n"
+        f"{where}\n\n"
+        "TelemFFB's DirectInput Tap is built from it and replaces it in "
+        "place. Everything it does keeps working: the dinput8.ini beside "
+        "it is kept, and every rule in it stays in effect.\n\n"
+        "Upgrade it to TelemFFB's wrapper?",
+        QtWidgets.QMessageBox.StandardButton.Yes |
+        QtWidgets.QMessageBox.StandardButton.No,
+        QtWidgets.QMessageBox.StandardButton.Yes)
+    return answer == QtWidgets.QMessageBox.StandardButton.Yes
+
+
 def confirm_overwrite(sim_name, directories, parent=None):
-    """Ask before replacing a dinput8.dll that is not ours.
+    """Ask before replacing a dinput8.dll that is not ours and not the
+    recognized ffb-fix wrapper.
 
     We do not try to work out whose it is.  Several tools install a proxy
     under this name and the file does not reliably say which, so the useful
     thing is to name what is there and let the person who installed it
     decide - guessing would either block a legitimate install or break a
-    tool the user wanted.  The question does say what the common case
-    means, though: for most people it is the legacy ffb-fix wrapper, and
-    for them replacing it is an upgrade that keeps their ini.
+    tool the user wanted.
 
     A module-level seam, for the same reason as ask_for_devices.
     """
@@ -117,6 +142,8 @@ INDENT = 14
 TARGET_TEXT = {
     WrapperState.TAP: ("installed", False),
     WrapperState.ABSENT: ("not installed", False),
+    WrapperState.LEGACY: ("ffb-fix wrapper installed - Install upgrades "
+                          "it in place", True),
     WrapperState.FOREIGN: ("another dinput8.dll installed", True),
     WrapperState.UNREADABLE: ("present, unreadable", True),
 }
@@ -337,12 +364,21 @@ class TapStatusPanel(QtWidgets.QWidget):
     # ------------------------------------------------------------------
     def _install(self):
         # asked before anything else: there is no point choosing devices for
-        # an install the user is about to call off
+        # an install the user is about to call off.  A recognized ffb-fix
+        # wrapper gets the affirmative upgrade question; anything unknown
+        # keeps the cautious one, which also covers a mixed tree.
         foreign = [t.directory for t in self.status.targets
                    if t.state == WrapperState.FOREIGN]
-        if foreign and not confirm_overwrite(self.status.sim.name, foreign,
-                                             parent=self):
-            return
+        legacy = [t.directory for t in self.status.targets
+                  if t.state == WrapperState.LEGACY]
+        if foreign:
+            if not confirm_overwrite(self.status.sim.name, foreign + legacy,
+                                     parent=self):
+                return
+        elif legacy:
+            if not confirm_legacy_upgrade(self.status.sim.name, legacy,
+                                          parent=self):
+                return
 
         config_text = self._config_to_write()
         if config_text is CANCELLED:
@@ -350,7 +386,8 @@ class TapStatusPanel(QtWidgets.QWidget):
         # bound here rather than passed through _run, so every action stays a
         # one-argument call; `install` is still looked up when the lambda runs
         self._run(lambda status: install(status, config_text,
-                                         overwrite_foreign=bool(foreign)),
+                                         overwrite_foreign=bool(foreign or
+                                                                legacy)),
                   "Install")
 
     def _config_to_write(self):

@@ -30,10 +30,13 @@ pytestmark = [pytest.mark.unit]
 
 DCS = SIMS_BY_KEY["DCS"]
 
-#: Our wrapper carries these strings; the legacy one does not, and is
-#: therefore "another dinput8.dll" to us - by design, not by oversight.
+#: Our wrapper carries the tap markers.  The legacy ffb-fix wrapper
+#: carries its own log strings, which we recognize (WrapperState.LEGACY)
+#: so the install prompt can be an affirmative upgrade instead of asking
+#: the user to classify a DLL they installed a year ago.
 OUR_DLL = b"MZ\x00 FFB tap: device [%ls] bound to block %d \x00"
-LEGACY_DLL = b"MZ\x00 dinput8.ini [FFBDevices] DeviceNameSubstring=action \x00"
+LEGACY_DLL = (b"MZ\x00 CreateDevice: [%ls]  FFB=%s  scale=%d%% \x00"
+              b" dinput8.ini [FFBDevices] DeviceNameSubstring=action \x00")
 
 #: The upstream sample as shipped, plus the two rules every VPforce owner
 #: added.  CRLF, as a Windows editor writes it.
@@ -125,20 +128,23 @@ def panel_for(monkeypatch, root, devices=(), overwrite=True, answer=None):
     """
     monkeypatch.setattr(panel_module, "confirm_overwrite",
                         lambda *a, **k: overwrite)
+    monkeypatch.setattr(panel_module, "confirm_legacy_upgrade",
+                        lambda *a, **k: overwrite)
     monkeypatch.setattr(panel_module, "ask_for_devices",
                         lambda *a, **k: answer)
     return TapStatusPanel(status_of(root), devices=lambda: list(devices))
 
 
 class TestWhatWeFind:
-    def test_the_legacy_wrapper_is_another_dll_and_the_install_is_partial(
+    def test_the_legacy_wrapper_is_recognized_and_the_install_is_partial(
             self, tmp_path):
         """Upstream's README says bin\\; MT users chose bin-mt.  Either way
-        one of DCS's two directories has it and the other does not."""
+        one of DCS's two directories has it and the other does not - and
+        the one that does is identified as ffb-fix, not an unknown DLL."""
         status = status_of(dcs_root(tmp_path))
         by_name = {os.path.basename(t.directory): t for t in status.targets}
         assert by_name["bin"].state == WrapperState.ABSENT
-        assert by_name["bin-mt"].state == WrapperState.FOREIGN
+        assert by_name["bin-mt"].state == WrapperState.LEGACY
         assert by_name["bin-mt"].has_config
         assert not status.installed and not status.partially_installed
 
@@ -158,16 +164,19 @@ class TestInstallingOverIt:
                                                    monkeypatch):
         """Replacing the DLL is an upgrade; the file beside it is theirs and
         goes on working.  Nobody is asked to choose devices, because the
-        file already says what the game hands over."""
+        file already says what the game hands over.  The question asked is
+        the affirmative upgrade one - the wrapper identified itself."""
         root = dcs_root(tmp_path)
-        asked, chose = [], []
-        monkeypatch.setattr(panel_module, "confirm_overwrite",
+        asked, chose, classify = [], [], []
+        monkeypatch.setattr(panel_module, "confirm_legacy_upgrade",
                             lambda *a, **k: asked.append(a) or True)
+        monkeypatch.setattr(panel_module, "confirm_overwrite",
+                            lambda *a, **k: classify.append(a) or True)
         monkeypatch.setattr(panel_module, "ask_for_devices",
                             lambda *a, **k: chose.append(a) or None)
         TapStatusPanel(status_of(root))._install()
 
-        assert asked and not chose
+        assert asked and not chose and not classify
         assert dll_bytes(root, "bin") == dll_bytes(root, "bin-mt") == OUR_DLL
         assert ini_bytes(root, "bin-mt") == LEGACY_INI.encode("utf-8")
 

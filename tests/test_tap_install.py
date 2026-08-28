@@ -636,3 +636,65 @@ class TestWriteRefusals:
         outcome, = remove(status)
         assert not outcome.ok
         assert "administrator" in outcome.detail
+
+
+LEGACY_BYTES = (b"MZ\x00\x00 CreateDevice: [%ls]  FFB=%s  scale=%d%% "
+                b"... FFB [%ls] CreateEffect: type=%s ... \x00")
+
+
+class TestLegacyWrapperIdentity:
+    """The community ffb-fix wrapper identifies itself by its own log
+    strings, so the user confirms an upgrade instead of classifying a
+    DLL they installed a year ago.  Our fork inherits those strings, so
+    the tap markers are checked first."""
+
+    def test_the_ffb_fix_wrapper_is_recognized(self, tmp_path):
+        (tmp_path / "dinput8.dll").write_bytes(LEGACY_BYTES)
+        assert wrapper_state(str(tmp_path)) == WrapperState.LEGACY
+
+    def test_our_wrapper_wins_over_its_inherited_strings(self, tmp_path):
+        (tmp_path / "dinput8.dll").write_bytes(TAP_BYTES + LEGACY_BYTES)
+        assert wrapper_state(str(tmp_path)) == WrapperState.TAP
+
+    def test_an_unrelated_proxy_is_still_foreign(self, tmp_path):
+        (tmp_path / "dinput8.dll").write_bytes(FOREIGN_BYTES)
+        assert wrapper_state(str(tmp_path)) == WrapperState.FOREIGN
+
+    def _sim(self, tmp_path, monkeypatch):
+        game = tmp_path / "DCS World" / "bin"
+        game.mkdir(parents=True)
+        (game / WRAPPER_NAME).write_bytes(LEGACY_BYTES)
+        bundled = tmp_path / "bundled.dll"
+        bundled.write_bytes(TAP_BYTES)
+        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+                            lambda: str(bundled))
+        return game, SimStatus(
+            sim=SIMS_BY_KEY['DCS'], root=str(tmp_path / "DCS World"),
+            provenance="test",
+            targets=[TargetStatus(directory=str(game),
+                                  state=wrapper_state(str(game)),
+                                  has_config=False)])
+
+    def test_install_still_asks_before_replacing_it(self, tmp_path,
+                                                    monkeypatch):
+        """The bare install call skips a legacy wrapper exactly as it
+        skips a foreign one - replacing is the panel's decision, made
+        after its prompt."""
+        game, status = self._sim(tmp_path, monkeypatch)
+        outcome, = install(status)
+        assert not outcome.ok and outcome.action == "skipped"
+        assert "ffb-fix" in outcome.detail
+        assert (game / WRAPPER_NAME).read_bytes() == LEGACY_BYTES
+
+    def test_a_confirmed_upgrade_replaces_it(self, tmp_path, monkeypatch):
+        game, status = self._sim(tmp_path, monkeypatch)
+        outcome, = install(status, overwrite_foreign=True)
+        assert outcome.ok and outcome.action == "replaced"
+        assert (game / WRAPPER_NAME).read_bytes() == TAP_BYTES
+
+    def test_a_legacy_wrapper_is_never_offered_an_update(self, tmp_path,
+                                                         monkeypatch):
+        """The startup update offer replaces only OUR wrappers - an
+        upgrade from ffb-fix is a decision, not an update."""
+        game, status = self._sim(tmp_path, monkeypatch)
+        assert outdated_targets(status, bundled='9.9.9.9') == []

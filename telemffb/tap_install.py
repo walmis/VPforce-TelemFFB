@@ -58,6 +58,15 @@ from telemffb.utils import (DEVICE_ROLES, device_ident_key,
 #: strings are the identity and the version is only ever extra.
 TAP_MARKERS = (b"FFB tap:", b"TelemFFB gate:")
 
+#: Strings that identify the community dcs-force-feedback-fix wrapper the
+#: tap is built from - its own log format literals, ASCII in the binary
+#: and stable across its releases.  Checked only after TAP_MARKERS: our
+#: fork inherits these strings, so the order is the discriminator.  A
+#: recognized ffb-fix wrapper gets an affirmative upgrade prompt instead
+#: of asking the user to identify a DLL they installed a year ago.
+LEGACY_MARKERS = (b"CreateDevice: [%ls]  FFB=%s  scale=%d%%",
+                  b"] CreateEffect: type=%s")
+
 #: What the wrapper is called once installed, and the optional ini beside it.
 WRAPPER_NAME = "dinput8.dll"
 WRAPPER_CONFIG = "dinput8.ini"
@@ -67,6 +76,7 @@ class WrapperState:
     """What is sitting in a target directory."""
     ABSENT = "absent"        # nothing there
     TAP = "tap"              # our wrapper
+    LEGACY = "ffb-fix"       # the community wrapper the tap is built from
     FOREIGN = "foreign"      # any other dinput8.dll
     UNREADABLE = "unreadable"  # present but could not be examined
 
@@ -824,6 +834,12 @@ def install(status: SimStatus,
                 target.directory, False, "skipped",
                 "a dinput8.dll that is not ours is already here"))
             continue
+        if target.state == WrapperState.LEGACY and not overwrite_foreign:
+            outcomes.append(TargetOutcome(
+                target.directory, False, "skipped",
+                "the ffb-fix wrapper is here - Install replaces it after "
+                "asking"))
+            continue
         if target.state == WrapperState.UNREADABLE:
             outcomes.append(TargetOutcome(
                 target.directory, False, "skipped",
@@ -843,6 +859,7 @@ def install(status: SimStatus,
         outcomes.append(TargetOutcome(
             target.directory, True, {
                 WrapperState.TAP: "updated",
+                WrapperState.LEGACY: "replaced",
                 WrapperState.FOREIGN: "replaced",
             }.get(target.state, "installed")))
 
@@ -1050,8 +1067,11 @@ def wrapper_state(directory: str) -> str:
     except OSError:
         logging.warning(f"DirectInput tap: could not read {path}")
         return WrapperState.UNREADABLE
-    return (WrapperState.TAP if any(m in content for m in TAP_MARKERS)
-            else WrapperState.FOREIGN)
+    if any(m in content for m in TAP_MARKERS):
+        return WrapperState.TAP
+    if any(m in content for m in LEGACY_MARKERS):
+        return WrapperState.LEGACY
+    return WrapperState.FOREIGN
 
 
 def sim_status(sim: TapSim, configured: Optional[str] = None) -> SimStatus:

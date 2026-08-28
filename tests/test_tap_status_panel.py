@@ -578,3 +578,45 @@ class TestConfiguringTwoFilesAtOnce:
                        for r in read(by_dir[r"C:\DCS\bin"]).rules)
         # the other file never had that rule, so nothing of its own was lost
         assert "Warthog=block" in by_dir[r"C:\DCS\bin-mt"]
+
+
+class TestLegacyWrapperOnThePanel:
+    """A recognized ffb-fix wrapper renders as an upgrade opportunity,
+    and Install asks the affirmative upgrade question - the cautious
+    classify-it-yourself prompt is reserved for DLLs we cannot name."""
+
+    def test_the_row_names_it_and_offers_the_upgrade(self):
+        panel = TapStatusPanel(status(target("bin", WrapperState.LEGACY)))
+        text = rendered(panel)
+        assert any("ffb-fix wrapper installed" in t for t in text)
+        assert any("Install upgrades it in place" in t for t in text)
+
+    def _prompts(self, monkeypatch):
+        import telemffb.TapStatusPanel as module
+        calls = []
+        monkeypatch.setattr(module, 'confirm_legacy_upgrade',
+                            lambda *a, **k: calls.append('legacy') or False)
+        monkeypatch.setattr(module, 'confirm_overwrite',
+                            lambda *a, **k: calls.append('classify') or False)
+        return calls
+
+    def test_a_legacy_tree_gets_the_upgrade_question(self, monkeypatch):
+        calls = self._prompts(monkeypatch)
+        panel = TapStatusPanel(status(target("bin", WrapperState.LEGACY)))
+        panel._install()
+        assert calls == ['legacy']
+
+    def test_an_unknown_dll_keeps_the_cautious_question(self, monkeypatch):
+        calls = self._prompts(monkeypatch)
+        panel = TapStatusPanel(status(target("bin", WrapperState.FOREIGN)))
+        panel._install()
+        assert calls == ['classify']
+
+    def test_a_mixed_tree_gets_the_cautious_question_once(self, monkeypatch):
+        """One folder ffb-fix, one unknown: the cautious question covers
+        both, and nobody is asked twice."""
+        calls = self._prompts(monkeypatch)
+        panel = TapStatusPanel(status(target("bin", WrapperState.LEGACY),
+                                      target("bin-mt", WrapperState.FOREIGN)))
+        panel._install()
+        assert calls == ['classify']
