@@ -62,7 +62,7 @@ DEVICE_ICON_CHOICES = {
 #: One selector width everywhere, so the columns line up across cards.
 SELECTOR_WIDTH = 360
 
-#: Where the TelemFFB DirectInput Bridge utility is offered.  The bridge
+#: Where DirectLink for TelemFFB is offered.  The DLL
 #: DLL deliberately does not ship with TelemFFB; while this is empty the
 #: no-devices hint under the cards omits its where-to-get-it sentence.
 DINPUT_BRIDGE_URL = ''
@@ -576,8 +576,8 @@ class DeviceCardsPanel(QWidget):
         if DINPUT_BRIDGE_URL:
             lines[-1] += (f'  Visit <a href="{DINPUT_BRIDGE_URL}">'
                           f'{DINPUT_BRIDGE_URL}</a> to get your copy of')
-            lines.append('the TelemFFB DirectInput Bridge utility if you '
-                         'do not already have it.')
+            lines.append('DirectLink for TelemFFB if you do not '
+                         'already have it.')
             hint = '<br/>'.join(lines)     # rich text: the link needs it
         else:
             hint = '\n'.join(lines)

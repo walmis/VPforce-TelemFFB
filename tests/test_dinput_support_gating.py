@@ -373,7 +373,7 @@ class TestBridgeStatusLabel:
             self, app, tmp_path, monkeypatch):
         dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
             installed=True, version='1.0.0'))
-        assert 'DirectInput Bridge 1.0.0' in dlg.lab_dinput_status.text()
+        assert 'DirectLink 1.0.0' in dlg.lab_dinput_status.text()
         assert not dlg.lab_dinput_status.styleSheet()
 
     def test_a_beta_shows_its_expiry_and_days(

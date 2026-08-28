@@ -718,7 +718,7 @@ class Ui_SystemDialog(object):
         self.combo_logPrune.setItemText(2, _translate("SystemDialog", "Month(s)"))
         self.ignoreUpdate.setText(_translate("SystemDialog", "Disable Update Prompt on Startup"))
         self.labelSystem.setText(_translate("SystemDialog", "Global System Settings:"))
-        self.cb_enable_dinput.setToolTip(_translate("SystemDialog", "List generic DirectInput force feedback devices (shown as \"[DI]\") alongside VPforce hardware, so they can be selected as an instance\'s device. Requires the TelemFFB DInput bridge DLL."))
+        self.cb_enable_dinput.setToolTip(_translate("SystemDialog", "List generic DirectInput force feedback devices (shown as \"[DI]\") alongside VPforce hardware, so they can be selected as an instance\'s device. Requires the separately distributed DirectLink DLL."))
         self.cb_enable_dinput.setText(_translate("SystemDialog", "Enable DirectInput Devices"))
         self.label_11.setText(_translate("SystemDialog", "Startup Behavior:"))
         self.cb_startWithWindows.setText(_translate("SystemDialog", "Start with Windows"))

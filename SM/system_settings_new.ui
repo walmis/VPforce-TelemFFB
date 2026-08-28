@@ -383,7 +383,7 @@
                 </sizepolicy>
                </property>
                <property name="toolTip">
-                <string>List generic DirectInput force feedback devices (shown as "[DI]") alongside VPforce hardware, so they can be selected as an instance's device. Requires the TelemFFB DInput bridge DLL.</string>
+                <string>List generic DirectInput force feedback devices (shown as "[DI]") alongside VPforce hardware, so they can be selected as an instance's device. Requires the separately distributed DirectLink DLL.</string>
                </property>
                <property name="text">
                 <string>Enable DirectInput Devices</string>

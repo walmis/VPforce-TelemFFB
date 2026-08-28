@@ -1451,23 +1451,23 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             return
         attention = True
         if not status.installed:
-            text = ("DirectInput Bridge: not installed - available from "
+            text = ("DirectLink: not installed - available from "
                     f"{BRIDGE_DOWNLOAD_LOCATION}")
         elif status.problem:
-            text = (f"DirectInput Bridge {status.version or '(unknown build)'}"
+            text = (f"DirectLink {status.version or '(unknown build)'}"
                     f": {status.problem} - a current build is available from "
                     f"{BRIDGE_DOWNLOAD_LOCATION}")
         elif not status.version:
-            text = "DirectInput Bridge: installed (build identity unavailable)"
+            text = "DirectLink: installed (build identity unavailable)"
             attention = False
         elif status.days_left is None:
-            text = f"DirectInput Bridge {status.version}: installed"
+            text = f"DirectLink {status.version}: installed"
             attention = False
         else:
             days = status.days_left
             when = (f"expires {status.expires} "
                     f"({days} day{'' if days == 1 else 's'} left)")
-            text = f"DirectInput Bridge {status.version}: beta build, {when}"
+            text = f"DirectLink {status.version}: beta build, {when}"
             attention = days <= self.BRIDGE_EXPIRY_WARN_DAYS
         self.lab_dinput_status.setText(text)
         self.lab_dinput_status.setStyleSheet(

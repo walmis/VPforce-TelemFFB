@@ -239,7 +239,7 @@ def bridge_availability(dll_path: Optional[str] = None):
         # mismatch, a load error from Windows - is worth showing.
         detail = "" if str(e).startswith("Unable to load") else str(e) + "\n\n"
         return False, (
-            "The DInput bridge DLL could not be loaded.\n\n"
+            "The DirectLink DLL could not be loaded.\n\n"
             "{}Looked in:\n{}\n\n"
             "Place dinput_ffb.dll in the 'dll' folder of your TelemFFB "
             "installation.\n\n"
@@ -251,7 +251,7 @@ def bridge_availability(dll_path: Optional[str] = None):
         version = (bridge.build_info or {}).get("version", "")
         if not version_is_at_least(version, minimum):
             return False, (
-                "The installed DInput bridge is too old for this version of "
+                "The installed DirectLink is too old for this version of "
                 "TelemFFB.\n\nInstalled: {}\nRequired: {} or newer\n\n"
                 "You can obtain the current build from {}.".format(
                     version or "an unidentified build predating 0.9",
@@ -266,7 +266,7 @@ def bridge_availability(dll_path: Optional[str] = None):
             days_left = None
         if days_left is not None and days_left < 0:
             return False, (
-                "The DInput bridge build expired on {}.\n\n"
+                "The DirectLink build expired on {}.\n\n"
                 "Beta builds carry a time limit; the device connection will "
                 "be refused until a current build is installed.\n\n"
                 "You can obtain the current build from {}.".format(
@@ -353,7 +353,7 @@ def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
         # shown to meet a minimum
         return BridgeStatus(
             installed=True, version="",
-            problem=("too old for this TelemFFB, which needs bridge "
+            problem=("too old for this TelemFFB, which needs DirectLink "
                      f"{minimum} or newer" if minimum else ""))
     status = BridgeStatus(installed=True,
                           version=str(info.get("version", "")),
