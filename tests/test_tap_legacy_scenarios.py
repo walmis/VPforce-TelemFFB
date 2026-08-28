@@ -324,3 +324,37 @@ class TestTakingTheTapBackOut:
         assert "LogEffects=true" in text
         for sub in ("bin", "bin-mt"):
             assert not os.path.exists(os.path.join(root, sub, "dinput8.dll"))
+
+
+class TestOrderingBesideAnExistingSection:
+    """An existing entry naming hardware that is not the configured
+    device ('1=Rhino FFB Joystick' beside a stick whose ident is
+    'Monster') is not ours to judge - but our new entry must not reuse
+    its position: two entries sharing a rank is a conflict the wrapper
+    never resolves predictably.  Numbering past it keeps the ordering
+    correct.  (An entry that DOES name the configured device, prefix
+    included, is recognized and nothing is added - TestTheVPforcePrefix
+    in test_tap_config.)"""
+
+    MONSTER = TapDevice("joystick", 0xFFFF, 0x2054, "Monster")
+
+    def test_the_new_entry_takes_the_next_position(self, app, tmp_path,
+                                                   monkeypatch):
+        ini = LEGACY_INI + "\r\n".join([
+            "[DeviceOrder]",
+            "1=Rhino FFB Joystick",
+            "",
+        ])
+        root = dcs_root(tmp_path, ini=ini)
+        answer = ([self.MONSTER], [], [self.MONSTER], [PEDALS, COLLECTIVE])
+        panel = panel_for(monkeypatch, root,
+                          devices=[self.MONSTER, PEDALS, COLLECTIVE],
+                          answer=answer)
+        panel._install()
+
+        facts = read(ini_bytes(root, "bin-mt").decode("utf-8"))
+        entries = [(e.position, e.match) for e in facts.order]
+        assert ("1", "Rhino FFB Joystick") in entries, "their entry stays"
+        assert ("2", "FFFF:2054") in entries, "ours takes the next rank"
+        positions = [p for p, _ in entries]
+        assert len(positions) == len(set(positions)), "no duplicate ranks"

@@ -44,6 +44,7 @@ from telemffb.TapDeviceDialog import TapDeviceDialog
 from telemffb import tap_install
 from telemffb.tap_config import (already_blocked, already_ordered,
                                  already_tapped, amend, lines_for,
+                                 read as read_config_text,
                                  retired_identities)
 from telemffb.tap_install import (SimStatus, VJOY_RULE, WRAPPER_CONFIG,
                                   WRAPPER_NAME, WrapperState, block_line,
@@ -469,8 +470,18 @@ class TapStatusPanel(QtWidgets.QWidget):
                 promote = [d for d in ordered
                            if not already_ordered(text, (d.vid, d.pid),
                                                   d.ident, lines)]
+                # New entries take positions AFTER what the file already
+                # holds - two entries sharing a rank is a conflict the
+                # wrapper never resolves predictably.  An entry naming
+                # hardware we cannot match (a renamed device, or a stick
+                # that is not ours to judge) stays where it is; it matches
+                # nothing under the wrapper's rules, so numbering past it
+                # keeps the ordering correct without touching it.
+                taken = [int(e.position) for e in read_config_text(text).order
+                         if e.line not in set(lines) and e.position.isdigit()]
                 order_lines = [order_line(d, i)
-                               for i, d in enumerate(promote, start=1)]
+                               for i, d in enumerate(
+                                   promote, start=max(taken, default=0) + 1)]
                 panes.append((directory, text,
                               amend(text, wanted, lines, order=order_lines,
                                     order_even_if_present=True)))

@@ -193,13 +193,37 @@ def read(text: str) -> ConfigFacts:
     return facts
 
 
+#: Every VPforce device's DirectInput product string carries this prefix
+#: ('Rhino FFB Monster'); TelemFFB's stored ident strips it ('Monster' -
+#: DeviceInfo.ident).  The wrapper matches name fragments against the
+#: FULL DirectInput string, so matching here must answer for both forms,
+#: or a config written against what enumerators show ('Rhino FFB
+#: Monster=tap', '1=Rhino FFB Monster') reads as covering nothing and
+#: gets a duplicate line appended beside it.
+VPFORCE_VID = 0xFFFF
+VPFORCE_NAME_PREFIX = "Rhino FFB "
+
+
+def _names_the_wrapper_sees(ids: Optional[Tuple[int, int]],
+                            name: str = "") -> Tuple[str, ...]:
+    """The product names the wrapper could match this device under."""
+    if not name:
+        return ()
+    lowered = name.lower()
+    if (ids is not None and ids[0] == VPFORCE_VID
+            and not lowered.startswith(VPFORCE_NAME_PREFIX.lower())):
+        return (lowered, VPFORCE_NAME_PREFIX.lower() + lowered)
+    return (lowered,)
+
+
 def rule_matches(rule: Rule, ids: Optional[Tuple[int, int]],
                  name: str = "") -> bool:
     """Whether the wrapper would apply this rule to this device.
 
     Mirrors ``Config::getDevicePolicy``: an id rule matches ids exactly, and a
     name rule matches when its key appears anywhere in the product name,
-    case-insensitively.
+    case-insensitively - the full DirectInput name, which for a VPforce
+    device is the stored ident plus its 'Rhino FFB ' prefix.
 
     The name we hold is the one TelemFFB remembers, which is not guaranteed to
     be the string the game sees - so a name match here is a strong reason to
@@ -207,7 +231,9 @@ def rule_matches(rule: Rule, ids: Optional[Tuple[int, int]],
     """
     if rule.ids is not None:
         return ids is not None and rule.ids == ids
-    return bool(rule.key) and rule.key.lower() in (name or "").lower()
+    return bool(rule.key) and any(
+        rule.key.lower() in seen
+        for seen in _names_the_wrapper_sees(ids, name))
 
 
 def order_matches(entry: OrderEntry, ids: Optional[Tuple[int, int]],
@@ -215,11 +241,14 @@ def order_matches(entry: OrderEntry, ids: Optional[Tuple[int, int]],
     """Whether this ordering entry names the given device.
 
     Same matching as a rule - ids exactly, or a name fragment anywhere in
-    the product name - because the wrapper reads both the same way.
+    the product name (including the VPforce 'Rhino FFB ' prefix the stored
+    ident strips) - because the wrapper reads both the same way.
     """
     if entry.ids is not None:
         return ids is not None and entry.ids == ids
-    return bool(entry.match) and entry.match.lower() in (name or "").lower()
+    return bool(entry.match) and any(
+        entry.match.lower() in seen
+        for seen in _names_the_wrapper_sees(ids, name))
 
 
 def shadowing_rules(facts: ConfigFacts, ids: Optional[Tuple[int, int]],

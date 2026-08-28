@@ -115,8 +115,21 @@ class TestFindingWhatWouldShadowUs:
         assert [r.key for r in shadows] == ["Rhino"]
 
     def test_an_unrelated_rule_is_not(self):
+        """A different device's name fragment does not shadow.  Note the
+        pedals hold a non-VPforce vid here: for a VPforce device a bare
+        'Rhino' fragment matches its full DirectInput name ('Rhino FFB
+        ...'), exactly as the wrapper reads it - see TestTheVPforcePrefix."""
         facts = read(FFB_FIX)
-        assert shadowing_rules(facts, PEDALS, "VPforce Pedals") == []
+        thrustmaster_pedals = (0x044F, 0xB68F)
+        assert shadowing_rules(facts, thrustmaster_pedals, "TPR Pedals") == []
+
+    def test_a_rhino_fragment_shadows_every_vpforce_device(self):
+        """'Rhino' appears in every VPforce device's DirectInput name, so
+        under the wrapper's matching it takes precedence for all of them -
+        the pedals included."""
+        facts = read(FFB_FIX)
+        assert [r.key for r in shadowing_rules(facts, PEDALS,
+                                               "VPforce Pedals")] == ["Rhino"]
 
     def test_an_existing_tap_rule_counts_too(self):
         """Harmless, but it means the line we would add is dead weight and
@@ -351,3 +364,34 @@ class TestChangingYourMindBackAndForth:
         start = "[FFBDevices]\n" + self.MONSTER + "\n"
         once = self.flip(start, "FFFF:2054", self.SIDEWINDER)
         assert "; retired by TelemFFB: " + self.MONSTER in once
+
+
+class TestTheVPforcePrefix:
+    """TelemFFB's stored ident strips the 'Rhino FFB ' prefix every
+    VPforce device carries in its DirectInput product string; the wrapper
+    matches fragments against the FULL string.  Field case: '1=Rhino FFB
+    Monster' read as covering nothing beside a device whose ident is
+    'Monster', and adoption appended a duplicate entry."""
+
+    def test_a_full_name_fragment_matches_the_stripped_ident(self):
+        rule = Rule("Rhino FFB Monster", "tap", 0)
+        assert rule_matches(rule, RHINO, "Monster")
+
+    def test_and_the_same_for_order_entries(self):
+        from telemffb.tap_config import OrderEntry, order_matches
+        entry = OrderEntry("1", "Rhino FFB Monster", 0)
+        assert order_matches(entry, RHINO, "Monster")
+
+    def test_a_different_base_name_still_does_not_match(self):
+        """'Rhino FFB Joystick' names other hardware than 'Monster' -
+        the prefix is equivalence, not a wildcard."""
+        rule = Rule("Rhino FFB Joystick", "block", 0)
+        assert not rule_matches(rule, RHINO, "Monster")
+
+    def test_the_prefix_is_not_granted_to_non_vpforce_devices(self):
+        """A DirectInput stick's ident IS its full product string; inventing
+        a Rhino-prefixed alias for it could match a fragment aimed at
+        somebody's actual Rhino."""
+        moza = (0x346E, 0x0005)
+        rule = Rule("Rhino FFB Mo", "block", 0)
+        assert not rule_matches(rule, moza, "Moza AB9")
