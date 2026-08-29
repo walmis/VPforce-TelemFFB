@@ -75,8 +75,16 @@ class MockFFBDevice:
     
     def __init__(self):
         self._input_data = MockInputData()
+        self._connected = True
         self.axis_override_commands = []
-    
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    def set_connected(self, value: bool):
+        self._connected = value
+
     def get_input(self) -> MockInputData:
         """Return mock input data."""
         return self._input_data
