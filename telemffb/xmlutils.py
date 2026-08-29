@@ -106,6 +106,24 @@ auto_defaults_root: Optional[ET.Element] = None
 _mgr: Optional[tuple[XmlStore, ConfigResolver, ConfigWriter]] = None
 
 
+def _setting_is_hidden(name: str) -> bool:
+    """Whether an application policy says this setting does not apply.
+
+    Supplied to ConfigResolver so the XML layer never reaches up for it
+    (see its ``hidden`` parameter).  Today the only such setting is the
+    per-aircraft device selection, which means nothing until the
+    joystick role holds more than one device; a stored preference goes
+    inert, not lost - it resurfaces when a second device is configured
+    again.  The import is local because telemffb.utils imports this
+    module: the cycle is real, and this is the layer that should carry
+    it rather than the parser.
+    """
+    if name in ('device_group', 'joystick_device'):
+        from telemffb.utils import multiple_joystick_devices
+        return not multiple_joystick_devices()
+    return False
+
+
 def _get_mgr() -> tuple[XmlStore, ConfigResolver, ConfigWriter]:
     """Return the singleton (store, resolver, writer), recreating when paths change."""
     global _mgr
@@ -122,7 +140,7 @@ def _get_mgr() -> tuple[XmlStore, ConfigResolver, ConfigWriter]:
             # every read return nothing (the aircraft came back unknown
             # and the new-aircraft wizard fired).
             store.adopt_trees_from(_mgr[0])
-        resolver = ConfigResolver(store)
+        resolver = ConfigResolver(store, hidden=_setting_is_hidden)
         writer = ConfigWriter(store, resolver)
         _mgr = (store, resolver, writer)
     return _mgr
