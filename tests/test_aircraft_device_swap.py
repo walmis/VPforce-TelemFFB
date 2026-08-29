@@ -199,8 +199,12 @@ def userconfig_with_refs(monkeypatch, *values):
                           ('sim', 'MSFS'), ('device', 'joystick')):
             ET.SubElement(entry, tag).text = text
     tree = ET.ElementTree(root)
-    monkeypatch.setattr(xmlutils, 'auto_user_root', root, raising=False)
-    monkeypatch.setattr(xmlutils, 'auto_user_tree', tree, raising=False)
+    # Injected through the store, not the module globals: since xmlutils
+    # became a shim over telemffb.xml, its globals are a one-way mirror
+    # (store -> module) and assigning to them changes nothing that reads.
+    store = xmlutils._store()
+    monkeypatch.setattr(store, '_user_root', root, raising=False)
+    monkeypatch.setattr(store, '_user_tree', tree, raising=False)
     writes = []
     monkeypatch.setattr(xmlutils, 'write_userconfig_xml',
                         lambda t: writes.append(t))

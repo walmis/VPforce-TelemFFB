@@ -85,6 +85,11 @@ class MainWindow(QMainWindow):
         'tap_effect_inertia_gain': '_pct_tap_inertia',
         'tap_effect_friction_gain': '_pct_tap_friction',
     }
+    #: How long the error status is held after the LAST error-bearing
+    #: frame before it clears.  Wall-clock on purpose: child-instance
+    #: errors reach the master over IPC on whichever frames catch them,
+    #: and a frame-counted debounce shrinks with sim frame rate.
+    ERROR_CLEAR_HOLD_S = 3.0
 
     def __init__(self):
         super().__init__()
@@ -92,7 +97,7 @@ class MainWindow(QMainWindow):
         self.tray_notifications = {}
         self.new_craft_notification_sent = False
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
-        self.error_clean_counter = 0 # counter to use as hysteresis for clearing error condition - not always 'error' from child instance on every loop
+        self._error_last_seen = 0.0 # monotonic time an 'error' key was last seen; the clear path holds ERROR_CLEAR_HOLD_S past it (child errors arrive over IPC on whichever frames catch them)
         self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
         self.telemetry_timed_out = True
         self.last_telemetry_refresh = utils.millis()
@@ -2290,7 +2295,12 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
 
-                self.pop_tray_notification("Error", message, renew_period= 2)
+                # The popup's job is initial attention; the tray icon and
+                # tooltip carry the persistent state.  A short renew period
+                # made a persistent error a metronome - the same message
+                # popped every couple of seconds for as long as it held.
+                self.pop_tray_notification("Error", message,
+                                           renew_period=300)
 
 
             elif paused:
@@ -2598,9 +2608,17 @@ class MainWindow(QMainWindow):
 
             if error_cond is None:  # no 'error' key in telemetry
                 if self.telemetry_timed_out or self.error_state:  # only set status to run if previously debug_timed out or error status was true
-                    if not self.error_clean_counter:  # avoid flapping due to ipc_telem not populating on every frame due to thread timing between instances
+                    # Hold the error state for a wall-clock window after the
+                    # last sighting: a child instance's error arrives over
+                    # IPC on whichever master frames happen to catch it, so
+                    # error-free frames BETWEEN sightings are routine.  The
+                    # old debounce counted 5 frames, a window that shrank
+                    # with sim frame rate (~30ms at 150fps) - thread timing
+                    # alone could flap clear->onset, and every re-onset
+                    # popped the tray notification again.
+                    if time.monotonic() - self._error_last_seen >= self.ERROR_CLEAR_HOLD_S:
                         if self.error_state:
-                            logging.info("App status error cleared by an error-free frame (debounce elapsed)")
+                            logging.info("App status error cleared by an error-free frame (hold window elapsed)")
                         self.update_sim_indicators(data.get('src'), paused=False)
                         self.error_state = False
                         self.telemetry_timed_out = False
@@ -2611,11 +2629,9 @@ class MainWindow(QMainWindow):
                         for msg in self.flagged_error_msgs:
                             G.exception_tracker.remove_matching(msg)
                         self.flagged_error_msgs.clear()
-                    else:
-                        self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
             elif error_cond is not None:
 
-                self.error_clean_counter = 5
+                self._error_last_seen = time.monotonic()
                 if not self.error_state:  # only set error status once when there is error cond but state is not yet true
                     self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
                     logging.error(error_cond)

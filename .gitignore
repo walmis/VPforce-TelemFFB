@@ -9,3 +9,5 @@ __pycache__
 /pyenv
 .idea/
 dll/dinput_ffb.dll
+*.lock
+/pyenv

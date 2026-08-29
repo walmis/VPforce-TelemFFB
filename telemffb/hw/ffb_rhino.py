@@ -869,6 +869,15 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
         logging.info(f"HID device released: {self.info.product_string}")
 
     @property
+    def connected(self) -> bool:
+        """Whether the HID handle is currently open.
+
+        False after a failed read / hot-unplug until reconnect() succeeds.
+        _in_reports intentionally keeps the last (stale) report after a
+        disconnect, so handle state is the only reliable liveness signal.
+        """
+        return self._dev is not None
+    @property
     def serial(self):
         if not self._dev:
             return None

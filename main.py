@@ -1044,8 +1044,8 @@ def _convert_user_config():
     Converts user config from legacy single user profile to multi-user profile capabilities.
     """
     if G.master_instance:
-        xmlutils.update_roots()
         xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+        xmlutils.update_roots()
         utils.convert_legacy_userconfig(G.userconfig_path)
 
 
@@ -1060,8 +1060,8 @@ def _initialize_settings_manager():
     3. If corruption detected, offer backup/reset option
     4. Create new default config if user agrees
     """
-    xmlutils.update_roots()
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+    xmlutils.update_roots()
     try:
         G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
                                       userconfig_path=G.userconfig_path,
@@ -1268,14 +1268,27 @@ def _cleanup_on_exit(dev_serial):
     Flow:
     1. Notify child instances to close
     2. Stop IPC communication
-    3. Stop all simulation listeners
-    4. Quit telemetry manager
-    5. Apply exit VPConfigurator profile if configured
-    6. Reset device gains to startup values if configured
+    3. Release any X-Plane axis override this instance holds
+    4. Stop all simulation listeners
+    5. Quit telemetry manager
+    6. Apply exit VPConfigurator profile if configured
+    7. Reset device gains to startup values if configured
     """
     if G.ipc_instance:
         G.ipc_instance.notify_close_children()
         G.ipc_instance.stop()
+
+    # Give X-Plane its axis back before we go.  The override datarefs live in
+    # the sim, so one left latched outlives this process and leaves the user's
+    # physical control inert until they clear it from the plugin menu.  Done
+    # before the listeners stop, while the aircraft object is still current.
+    try:
+        _aircraft = G.telem_manager.currentAircraft if G.telem_manager else None
+        _release = getattr(_aircraft, "release_xp_axis_override", None)
+        if callable(_release):
+            _release()
+    except Exception:
+        logging.exception("Unable to release X-Plane axis override on exit")
 
     G.sim_listeners.stop_all()
     G.telem_manager.quit()

@@ -94,6 +94,65 @@ class TestTrimwheelWriteMethods(BaseTelemetryEffectTestCase):
         assert instance._tw_limits_warned
 
 
+class TestTrimwheelAxisControlGate(BaseTelemetryEffectTestCase):
+    """The wheel must stop driving the sim when axis control is switched off.
+
+    Either switch does it: the global "TelemFFB controls axes", or the
+    per-device disable.  The gate used to read
+    ``not telemffb_controls_axes and not local_disable_axis_control``, so a
+    wheel disabled for its own device alone kept writing trim to the sim.
+    """
+
+    def _trimwheel(self, controls_axes, local_disable):
+        instance = self.create_test_instance(
+            MsfsXpTrimwheelMixIn,
+            telemffb_controls_axes=controls_axes,
+            local_disable_axis_control=local_disable,
+            trimwheel_use_axis=False,
+        )
+        instance._test_sim_is_msfs = True
+        self.mock_device.get_input().set_axis(x=0.0, y=0.05)
+        return instance
+
+    def _run(self, instance):
+        telem = (
+            TelemetryDataBuilder()
+            .ffb_type("trimwheel")
+            .set("APMaster", 0)
+            .set("ElevTrimPct", 0.0)
+            .set("ElevTrim", 2.0)
+            .set("ElevTrimMax", 10.0)
+            .set("ElevTrimMin", -10.0)
+            .build()
+        )
+        instance._telem_data = telem
+        instance.msfs_update_trimwheel(telem)
+        # A gated-off wheel returns before ever touching simconnect, so the
+        # mock is never even built — that counts as "no writes".
+        simconnect = instance.mock_simconnect
+        return [] if simconnect is None else simconnect.sim_data_written
+
+    def test_local_disable_stops_trim_writes(self):
+        instance = self._trimwheel(controls_axes=True, local_disable=True)
+
+        assert self._run(instance) == []
+
+    def test_global_disable_stops_trim_writes(self):
+        instance = self._trimwheel(controls_axes=False, local_disable=False)
+
+        assert self._run(instance) == []
+
+    def test_both_disabled_stops_trim_writes(self):
+        instance = self._trimwheel(controls_axes=False, local_disable=True)
+
+        assert self._run(instance) == []
+
+    def test_enabled_still_writes_trim(self):
+        instance = self._trimwheel(controls_axes=True, local_disable=False)
+
+        assert self._run(instance) != []
+
+
 class TestTrimwheelCalibrationHold(BaseTelemetryEffectTestCase):
     """A running trim calibration broadcasts a hold (G.trimcal_hold_until):
     the wheel is parked where it sits (the calibrator restores the starting

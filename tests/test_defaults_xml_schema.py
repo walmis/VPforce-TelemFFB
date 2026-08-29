@@ -4,20 +4,33 @@ Verifies structural integrity, cross-references, and data consistency
 of the shipped defaults.xml configuration file.
 """
 import re
-import xml.etree.ElementTree as ET
+import tempfile
+import os
 from pathlib import Path
 
 import pytest
 
 from telemffb.utils import to_number
+from telemffb.xml import XmlConfigManager
 
 
 @pytest.fixture(scope="module")
 def defaults_root():
     """Load defaults.xml once for all tests in this module."""
     defaults_path = str(Path(__file__).parents[1] / "defaults.xml")
-    tree = ET.parse(defaults_path)
-    return tree.getroot()
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?><TelemFFB/>')
+        userconfig_path = f.name
+    try:
+        mgr = XmlConfigManager(
+            device="joystick",
+            userconfig_path=userconfig_path,
+            defaults_path=defaults_path,
+        )
+        mgr.store.update_roots()
+        yield mgr.store.defaults_root
+    finally:
+        os.unlink(userconfig_path)
 
 
 # ─────────────────────────────────────────────────────────────

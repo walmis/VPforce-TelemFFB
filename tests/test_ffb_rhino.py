@@ -883,6 +883,21 @@ class TestDeviceInfo:
         assert info.ident == "My Custom Device"
 
 
+# ============================================================================
+# Connection State Tests
+# ============================================================================
+
+class TestFFBRhinoConnected:
+    """`connected` must mirror the HID handle, not the stale report cache."""
+
+    def test_connected_tracks_hid_handle(self, mock_ffb_device):
+        assert mock_ffb_device.connected is True
+        mock_ffb_device._dev = None  # what timerEvent does on a failed read
+        assert mock_ffb_device.connected is False
+        mock_ffb_device._dev = MockHIDDevice()  # what reconnect() restores
+        assert mock_ffb_device.connected is True
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
 

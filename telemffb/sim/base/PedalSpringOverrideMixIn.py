@@ -1,3 +1,4 @@
+import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
@@ -186,18 +187,31 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         spring.start(override=True)
 
     def verify_pedal_axis(self):
+        """Flag a pedal wired to the HID Y axis.
+
+        The firmware reports exactly 0 for an axis with no motor
+        connected, so ANY nonzero Y on a pedals device means the pedal
+        is mapped to Y.  The message carries the observed values so a
+        user's screenshot of the notification is the diagnostic.
+        """
         if not self.is_pedals():
             return False
 
         # VPforce only: do not execute check for dinput devices as we can not guarantee
         # 0 read status for alternate axis on any device but vpforce
-        import telemffb.globals as G
         if G.device_di_guid:
             return False
 
         x, y = self._get_device_axes()
         if y != 0 and x == 0:
-            self.flag_error("Pedal axis mismatch: Y axis used instead of X. Fix by swapping X/Y in VPConfigurator.")
+            # the ident names the CONNECTED hardware, so a wrong device
+            # sitting in the pedals slot (a collective, say) exposes
+            # itself right in the message
+            device_name = getattr(G, 'device_ident', '') or 'unknown device'
+            self.flag_error(
+                "Pedal axis mismatch: Y axis used instead of X "
+                f"(X={x:.3f}, Y={y:.3f}, device: {device_name}). "
+                "Fix by swapping X/Y in VPConfigurator.")
 
     def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
