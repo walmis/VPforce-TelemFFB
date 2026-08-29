@@ -17,6 +17,8 @@
 #
 
 
+import logging
+
 from telemffb.telem.SimConnectManager import SimConnectManager
 from telemffb.hw.ffb_rhino import HapticEffect
 from typing import override
@@ -49,9 +51,22 @@ class SimConnectSock(SimConnectManager):
     def emit_event(self, event, *args):
         # special handling of Open event
         if event == "Open":
-            # Reset all FFB effects on device, ensure we have a clean start
+            # Reset all FFB effects on device, ensure we have a clean
+            # start.  Best-effort, from this (the SimConnect reader)
+            # thread: a live device switch may be mid-flight - the old
+            # device already released, HapticEffect.device not yet
+            # repointed - and a write then aborts against the closed
+            # handle.  Skipping is harmless (the switch opens the new
+            # device clean, and effects lazily re-create), while letting
+            # it raise killed this thread and with it the sim's
+            # telemetry until the next listener restart.
             if HapticEffect.device is not None:
-                HapticEffect.device.reset_effects()
+                try:
+                    HapticEffect.device.reset_effects()
+                except Exception as e:
+                    logging.warning(
+                        "Open-event effect reset skipped - the device is "
+                        f"mid-transition: {e}")
 
         if event == "Quit":
             pass
