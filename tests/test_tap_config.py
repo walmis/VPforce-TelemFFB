@@ -346,17 +346,17 @@ class TestChangingYourMindBackAndForth:
         assert len([l for l in text.splitlines() if "=tap" in l]) == 2
         assert len(read(text).rules) == 1
 
-    def test_ordering_entries_are_bounded_the_same_way(self):
+    def test_ordering_entries_never_accumulate(self):
+        """No graveyard by construction: [DeviceOrder] is rewritten
+        wholesale to the one policy entry, so flipping devices back and
+        forth leaves exactly one line however often."""
         text = "[DeviceOrder]\n1=FFFF:2054    ; Monster (joystick)\n"
         for flip in range(5):
-            facts = read(text)
-            stale = [e.line for e in facts.order]
             new = ("1=045E:001B    ; SideWinder (joystick)" if flip % 2 == 0
                    else "1=FFFF:2054    ; Monster (joystick)")
-            text = amend(text, [], disable_lines=stale, order=[new],
-                         order_even_if_present=True)
+            text = amend(text, [], order=[new])
         assert len(read(text).order) == 1
-        assert len([l for l in text.splitlines() if "1=" in l]) == 2
+        assert len([l for l in text.splitlines() if "1=" in l]) == 1
 
     def test_a_retired_line_is_still_there_to_read(self):
         """Bounded, not erased: the one retired copy is what tells a reader

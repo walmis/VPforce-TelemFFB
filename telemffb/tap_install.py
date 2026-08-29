@@ -480,6 +480,23 @@ def block_line(device: TapDevice) -> str:
         device.key, device.ident or "unnamed", device.role)
 
 
+def order_entries(devices) -> List[str]:
+    """The whole [DeviceOrder] payload, by policy.
+
+    The section is TelemFFB's own concept - this wrapper introduced it -
+    and it has exactly one job: a game hands its force feedback to the
+    first device it enumerates, so the tapped JOYSTICK must be first.
+    One entry, position 1, the joystick-role device; no other device is
+    ever named.  A game drives one joystick, so a second position could
+    only disturb bindings, and a stale first position can hand the
+    game's forces to a blocked device - which renders nothing, with
+    nothing for TelemFFB to capture.
+    """
+    joystick = next((d for d in devices
+                     if d.role == 'joystick' and d.usable), None)
+    return [order_line(joystick, 1)] if joystick is not None else []
+
+
 def order_line(device: TapDevice, position: int) -> str:
     """One ``[DeviceOrder]`` line for a device.
 
@@ -587,19 +604,18 @@ def generate_config(devices: Sequence[TapDevice],
             lines.append(block_line(device))
     lines.append(VJOY_RULE)
 
-    if ordered:
+    order = order_entries(ordered)
+    if order:
         lines.extend([
             "",
             "[DeviceOrder]",
-            "; Which devices the game sees first, as position=VVVV:PPPP.  A game",
-            "; that gives force feedback to the first devices it sees keeps",
-            "; giving it to the same ones, so a tapped device further down the",
-            "; list can be given no effects at all - and then there is nothing",
-            "; for TelemFFB to render.  Nothing is reordered unless listed here.",
+            "; Which device the game sees first, as position=VVVV:PPPP.  A game",
+            "; that gives force feedback to the first device it sees keeps",
+            "; giving it to the same one, so the tapped joystick must be first",
+            "; - ordered elsewhere it can be given no effects at all, and then",
+            "; there is nothing for TelemFFB to render.",
+            *order,
         ])
-        for position, device in enumerate(
-                (d for d in ordered if d.usable), start=1):
-            lines.append(order_line(device, position))
     lines.append("")
     return "\r\n".join(lines)   # a Windows game config
 

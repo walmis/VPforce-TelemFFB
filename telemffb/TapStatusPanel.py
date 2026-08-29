@@ -51,7 +51,7 @@ from telemffb.tap_install import (SimStatus, VJOY_RULE, WRAPPER_CONFIG,
                                   config_label,
                                   config_link,
                                   config_paths, generate_config, read_configs,
-                                  install, order_line, remove,
+                                  install, order_entries, order_line, remove,
                                   rule_line, write_one_config)
 
 #: The user closed the device dialog without choosing.  Distinct from
@@ -465,26 +465,14 @@ class TapStatusPanel(QtWidgets.QWidget):
                 # it - a legacy sample did, and a rule of theirs wins.
                 if not already_blocked(text, None, "vJoy", lines):
                     wanted.append(VJOY_RULE)
-                # Same for ordering: a device this file already reports
-                # first needs no second entry saying so.
-                promote = [d for d in ordered
-                           if not already_ordered(text, (d.vid, d.pid),
-                                                  d.ident, lines)]
-                # New entries take positions AFTER what the file already
-                # holds - two entries sharing a rank is a conflict the
-                # wrapper never resolves predictably.  An entry naming
-                # hardware we cannot match (a renamed device, or a stick
-                # that is not ours to judge) stays where it is; it matches
-                # nothing under the wrapper's rules, so numbering past it
-                # keeps the ordering correct without touching it.
-                taken = [int(e.position) for e in read_config_text(text).order
-                         if e.line not in set(lines) and e.position.isdigit()]
-                order_lines = [order_line(d, i)
-                               for i, d in enumerate(
-                                   promote, start=max(taken, default=0) + 1)]
+                # Ordering is policy, not preference: the joystick
+                # device at position 1, nothing else (see order_entries).
+                # amend replaces the whole section, so entries left by
+                # earlier device selections go with it.
+                order_lines = order_entries(ordered)
                 panes.append((directory, text,
-                              amend(text, wanted, lines, order=order_lines,
-                                    order_even_if_present=True)))
+                              amend(text, wanted, lines,
+                                    order=order_lines)))
             return panes
 
         def preview(chosen, retire, ordered, blocked):

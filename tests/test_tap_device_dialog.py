@@ -354,14 +354,10 @@ class TestConfirmingIsOnlyOfferedWhenItWouldDoSomething:
             rules += [block_line(d) for d in blocked
                       if not already_blocked(existing, (d.vid, d.pid),
                                              d.ident, lines)]
-            promote = [d for d in ordered
-                       if not already_ordered(existing, (d.vid, d.pid),
-                                              d.ident, lines)]
+            from telemffb.tap_install import order_entries
             return [("dinput8.ini", existing,
                      amend(existing, rules,
-                           lines, order=[order_line(d, i)
-                                         for i, d in enumerate(promote, 1)],
-                           order_even_if_present=True))]
+                           lines, order=order_entries(ordered)))]
         return preview
 
     def ok(self, dialog):

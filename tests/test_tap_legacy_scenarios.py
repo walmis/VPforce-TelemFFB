@@ -327,19 +327,18 @@ class TestTakingTheTapBackOut:
 
 
 class TestOrderingBesideAnExistingSection:
-    """An existing entry naming hardware that is not the configured
-    device ('1=Rhino FFB Joystick' beside a stick whose ident is
-    'Monster') is not ours to judge - but our new entry must not reuse
-    its position: two entries sharing a rank is a conflict the wrapper
-    never resolves predictably.  Numbering past it keeps the ordering
-    correct.  (An entry that DOES name the configured device, prefix
-    included, is recognized and nothing is added - TestTheVPforcePrefix
-    in test_tap_config.)"""
+    """[DeviceOrder] is TelemFFB's own concept - no hand-written config
+    predates it - so an existing entry is never a user's answer to
+    defer to, only an earlier device selection to supersede.  The
+    section is rewritten wholesale to its one policy entry: the
+    joystick device at position 1.  Deference was tried first, and it
+    left a real config with a stale device at rank 1 - which hands the
+    game's forces to a blocked device that renders nothing."""
 
     MONSTER = TapDevice("joystick", 0xFFFF, 0x2054, "Monster")
 
-    def test_the_new_entry_takes_the_next_position(self, app, tmp_path,
-                                                   monkeypatch):
+    def test_the_section_is_rewritten_to_the_joystick_at_one(
+            self, app, tmp_path, monkeypatch):
         ini = LEGACY_INI + "\r\n".join([
             "[DeviceOrder]",
             "1=Rhino FFB Joystick",
@@ -354,7 +353,5 @@ class TestOrderingBesideAnExistingSection:
 
         facts = read(ini_bytes(root, "bin-mt").decode("utf-8"))
         entries = [(e.position, e.match) for e in facts.order]
-        assert ("1", "Rhino FFB Joystick") in entries, "their entry stays"
-        assert ("2", "FFFF:2054") in entries, "ours takes the next rank"
-        positions = [p for p, _ in entries]
-        assert len(positions) == len(set(positions)), "no duplicate ranks"
+        assert entries == [("1", "FFFF:2054")], \
+            "one entry: the joystick, first"

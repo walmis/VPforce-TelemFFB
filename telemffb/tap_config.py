@@ -389,17 +389,18 @@ def _eol(text: str) -> str:
 def amend(text: str, rules: Sequence[str],
           disable_lines: Sequence[int] = (),
           ensure_require: bool = True,
-          order: Sequence[str] = (),
-          order_even_if_present: bool = False) -> str:
-    """Add rules to an existing config, leaving the rest of it alone.
+          order: Sequence[str] = ()) -> str:
+    """Add rules to an existing config, leaving the rest of it alone -
+    except [DeviceOrder], which is ours wholesale.
 
     ``rules`` are finished ``key=value`` lines.  ``order`` are finished
-    ``position=device`` lines for ``[DeviceOrder]``, written only when the
-    file has no such section - one already there is the user's answer to a
-    question we would only be asking again.  ``order_even_if_present``
-    overrides that for the one case where it is not a fresh answer: an entry
-    naming hardware the user has just replaced is being retired in the same
-    edit, and leaving no replacement would strand the new device.
+    ``position=device`` lines for ``[DeviceOrder]``.  Unlike the rules,
+    a non-empty ``order`` REPLACES every entry the section holds:
+    TelemFFB introduced the section (it exists in no hand-written
+    config that predates the tap) and its policy is a single entry -
+    the joystick device at position 1 - so an existing entry is never a
+    user's answer to preserve, only a previous device selection to
+    supersede.  An empty ``order`` leaves the section alone.
 
     ``ensure_require`` adds ``RequireTelemFFB=true`` when the file has no
     such setting - off only when taking our lines back out, where adding a
@@ -444,7 +445,6 @@ def amend(text: str, rules: Sequence[str],
     # lines coming back from retirement go back where they were, and
     # only what is still missing gets appended below
     rules = _restore_retired(lines, rules)
-    order = _restore_retired(lines, order)
     facts = read(eol.join(lines))
 
     if ensure_require and facts.require_line is None:
@@ -463,19 +463,26 @@ def amend(text: str, rules: Sequence[str],
             lines.extend(["", "[FFBDevices]", *rules])
         facts = read(eol.join(lines))
 
-    # Only when the file has none.  Reordering decides which device a game
-    # drives at all, so overwriting somebody's existing answer to that is
-    # not a change to make on their behalf.
-    if order and facts.order_end is not None and order_even_if_present:
-        for offset, entry in enumerate(order):
-            lines.insert(facts.order_end + 1 + offset, entry)
-    elif order and facts.order_header is None:
-        lines.extend([
-            "",
-            "[DeviceOrder]",
-            "; Reported to the game first, so it drives these devices rather",
-            "; than whichever it happened to enumerate first.",
-            *order,
-        ])
+    # The whole section, every time: [DeviceOrder] is TelemFFB's own
+    # concept and holds exactly the current joystick device at position
+    # 1 - stale entries from earlier device selections are dropped, not
+    # deferred to (an old entry at 1 hands the game's forces to a
+    # blocked device, which renders nothing).
+    if order:
+        entry_lines = sorted((e.line for e in facts.order), reverse=True)
+        for index in entry_lines:
+            del lines[index]
+        facts = read(eol.join(lines))
+        if facts.order_header is not None:
+            for offset, entry in enumerate(order):
+                lines.insert(facts.order_header + 1 + offset, entry)
+        else:
+            lines.extend([
+                "",
+                "[DeviceOrder]",
+                "; Reported to the game first, so it drives this device rather",
+                "; than whichever it happened to enumerate first.",
+                *order,
+            ])
 
     return bom + eol.join(lines) + eol

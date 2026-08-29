@@ -175,9 +175,10 @@ def pending_reconcile(changes: Sequence[DeviceChange], settings,
                     status=status, directory=directory, config=config,
                     obsolete=obsolete, obsolete_order=stale_order,
                     role=change.role, was_ident=change.was_ident,
+                    # position 1 always, by policy: [DeviceOrder]
+                    # holds the joystick device first and nothing else
                     order_replacement=(
-                        order_line(change.now, int(stale_order[0].position)
-                                   if stale_order[0].position.isdigit() else 1)
+                        order_line(change.now, 1)
                         if stale_order and change.now is not None
                         and change.now.usable else None),
                     replacement=(rule_line(change.now)
@@ -467,8 +468,7 @@ def apply_reconcile(items: Sequence[ReconcileItem]) -> List[TargetOutcome]:
                      [item.replacement] if item.replacement else [],
                      disable_lines=retire,
                      order=([item.order_replacement]
-                            if item.order_replacement else ()),
-                     order_even_if_present=bool(item.obsolete_order))
+                            if item.order_replacement else ()))
         # only the file the rules came from: the other executable may hold a
         # different config that nothing asked us to touch
         outcomes.append(write_one_config(item.directory, text))

@@ -217,3 +217,51 @@ class TestWhereTheIdsComeFrom:
         device, = configured_devices(FakeSettings({
             "devpath_joystick": self.GUID, "devids_joystick": "garbage"}))
         assert not device.usable
+
+
+class TestDeviceOrderPolicy:
+    """[DeviceOrder] holds exactly one entry: the joystick-role device at
+    position 1.  The section is TelemFFB's own concept and its one job
+    is making the game hand its force feedback to the tapped joystick -
+    a second position could only disturb bindings, and a stale first
+    position hands the game's forces to a blocked device."""
+
+    def test_only_the_joystick_is_ordered(self):
+        from telemffb.tap_install import order_entries
+        joystick = RHINO
+        collective = TapDevice("collective", 0xFFFF, 0x2051, "Collective")
+        entries = order_entries([collective, joystick])
+        assert len(entries) == 1
+        assert entries[0].startswith("1=FFFF:2054")
+
+    def test_no_joystick_means_no_ordering(self):
+        from telemffb.tap_install import order_entries
+        pedals = TapDevice("pedals", 0xFFFF, 0x2052, "Pedals")
+        assert order_entries([pedals]) == []
+
+    def test_generate_writes_the_single_entry(self):
+        collective = TapDevice("collective", 0xFFFF, 0x2051, "Collective")
+        text = generate_config([RHINO, collective],
+                               ordered=[collective, RHINO])
+        from telemffb.tap_config import read
+        entries = [(e.position, e.match) for e in read(text).order]
+        assert entries == [("1", "FFFF:2054")]
+
+    def test_amend_rewrites_a_polluted_section(self):
+        """The field case, 2026-08-29: a collective left at rank 1 by
+        earlier testing, the joystick appended at 2 - DCS would hand its
+        forces to the blocked collective and render nothing."""
+        from telemffb.tap_config import amend, read
+        from telemffb.tap_install import order_entries
+        polluted = "\r\n".join([
+            "[FFBDevices]",
+            "FFFF:2054=tap",
+            "",
+            "[DeviceOrder]",
+            "1=FFFF:2051    ; Collective (collective)",
+            "2=FFFF:2054    ; Monster (joystick)",
+            "",
+        ])
+        fixed = amend(polluted, [], order=order_entries([RHINO]))
+        entries = [(e.position, e.match) for e in read(fixed).order]
+        assert entries == [("1", "FFFF:2054")]
