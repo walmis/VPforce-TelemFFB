@@ -46,10 +46,10 @@ class GliderAircraft(Aircraft):
 
         self._spring_handle.name = "dynamic_spring"
         # logging.debug(f"update_force_trim: x={x_axis}, y={y_axis}")
-        input_data = HapticEffect.device.get_input()
+        input_data = HapticEffect.get_device_input()
         force_trim_pressed = self.check_button_press(self.force_trim_button, self.collective_ft_use_master_buttons)
         # force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
-        if self.force_trim_reset_button > 0:
+        if self.force_trim_reset_button > 0 and input_data is not None:
             trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
         else:
             trim_reset_pressed = False

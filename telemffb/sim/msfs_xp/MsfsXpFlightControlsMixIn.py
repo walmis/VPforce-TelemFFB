@@ -626,9 +626,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                                    index [1] scaled by normalized stick Y position
             Written: _G_term    (float; pitch bias term sent to control_weight effect)
         """
-        assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
-
-        input_data = HapticEffect.device.get_input()
+        input_data = HapticEffect.get_device_input()
+        if input_data is None:
+            # No live device: the stick hold state is unknown and the
+            # constant-force consumer is a no-op anyway, so the term is
+            # zeroed (and the telemetry key kept) instead of raising.
+            telem_data._G_term = 0.0
+            return 0.0
         dx, dy = input_data.CP_scaled_axisXY()
         _G_term = self.g_force_gain * telem_data.AccBody[1]
         _G_term = _G_term * abs(dy)
@@ -764,7 +768,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         """
         if not self._axis_control_enabled():
             return
-        assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
+        # No device assertion: _get_device_raw_axes() is None-safe, so a
+        # missing device degrades to zero axes (no per-frame exception).
         phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
@@ -984,9 +989,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         """Send axis control commands to the simulator for rudder pedals."""
         if not self._axis_control_enabled():
             return
-        
-        assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
-
+        # No device assertion: _get_device_raw_axes() is None-safe, so a
+        # missing device degrades to zero axes (no per-frame exception).
         phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         x_pos = phys_x - virtual_rudder_x_offs

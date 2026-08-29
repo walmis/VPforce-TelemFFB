@@ -1206,6 +1206,23 @@ class HapticEffect(Destroyable):
         dev = HapticEffect.device
         return dev is not None and dev.connected
 
+    @staticmethod
+    def get_device_input():
+        """The device's latest input report, or None when it is not alive.
+
+        Per-frame consumers (trim buttons, force-trim, stick-center
+        scaling) used to dereference ``HapticEffect.device`` directly, which
+        raised every frame in the 08:30:31 zombie state (startup open
+        failed, device is None).  A hot-unplugged device is also excluded:
+        its input buffer only holds stale data, and a stale "button
+        pressed" state would trigger wrong trim actions.  Callers treat
+        None as "no input": buttons not pressed, center 0.
+        """
+        dev = HapticEffect.device
+        if not HapticEffect._device_alive():
+            return None
+        return dev.get_input()
+
     #: Every effect this application has created, so a session can be torn
     #: down completely.  Most effects live in the global `G.effects`
     #: dispenser, but some are held directly on a mixin (the advanced spring

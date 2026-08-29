@@ -81,15 +81,16 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         if not self.telemffb_controls_axes or self.local_disable_axis_control:
             return
         
-        assert HapticEffect.device is not None, "Haptic device not initialized"
-        
+        # No device assertion: a missing/hot-unplugged device is a valid
+        # runtime state - the sim-side trim commands are device-independent
+        # and the device reads use the None-safe get_device_input().
         ap_active = 0
         if self._sim_is_msfs():
             ap_active = telem_data.APMaster or 0
         if self._sim_is_xplane():
             ap_active = telem_data.APServos or 0
 
-        input_data = HapticEffect.device.get_input()
+        input_data = HapticEffect.get_device_input()
         phys_x, phys_y = self._get_device_axes()
         self._spring_handle.name = "trimwheel_ap_spring"
 
@@ -180,7 +181,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                     y_var = "AXIS_ELEV_TRIM_SET"
                     y_range = 16384
 
-                input_data = HapticEffect.device.get_input()
+                input_data = HapticEffect.get_device_input()
                 # phys_x, phys_y = input_data.axisXY()
 
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))

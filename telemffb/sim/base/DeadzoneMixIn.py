@@ -20,16 +20,34 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
         self.deadzone_active: bool = False
         self.active_deadzone_pct: float = 0.0
         self.active_deadzone_pct_override: float = 0.0
+        self._dz_defer_logged: bool = False  # rate-limit the deferred-write debug log
+
+    def _write_device_deadzone(self, dz: int) -> bool:
+        """Write the device deadzone if the device is alive.
+
+        Returns True when the write was issued.  A missing (zombie
+        startup) or hot-unplugged device is a silent no-op (one debug line
+        per episode) so the 60-120 Hz path never sees an exception.
+        """
+        dev = HapticEffect.device
+        if dev is None or not dev.connected:
+            if not self._dz_defer_logged:
+                self._dz_defer_logged = True
+                logging.debug("DeadzoneMixIn: device not connected, deadzone write deferred")
+            return False
+        self._dz_defer_logged = False
+        dev.set_deadzone(dz)
+        return True
 
     def ac_set_deadzone_override(self, value: float):
         """Set deadzone override value (0 to disable override). Range: 0.0 to 1.0 (0% to 100%)."""
         if(value == 0.0 and self.active_deadzone_pct_override != 0.0):
-            HapticEffect.device.set_deadzone(0)
             self.active_deadzone_pct_override = value
+            self._write_device_deadzone(0)
             logging.info("Resetting Deadzone override")
         elif(value != self.active_deadzone_pct_override):
             self.active_deadzone_pct_override = value
-            HapticEffect.device.set_deadzone(pct2dz(self.active_deadzone_pct_override))
+            self._write_device_deadzone(pct2dz(self.active_deadzone_pct_override))
             logging.info(f"Setting Deadzone override to %{self.active_deadzone_pct_override*100}")
 
 
@@ -38,16 +56,19 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
             return
         if not self.enable_deadzone and self.deadzone_active:
             if self.active_deadzone_pct != 0.0:
-                HapticEffect.device.set_deadzone(0)
-                self.active_deadzone_pct = 0.0
-                logging.info('Disabling deadzone')
-                self.deadzone_active = False
+                # Only commit the transition when the write actually went
+                # out; while the device is down the pending state stays so
+                # the same frame logic retries it once the device returns.
+                if self._write_device_deadzone(0):
+                    self.active_deadzone_pct = 0.0
+                    logging.info('Disabling deadzone')
+                    self.deadzone_active = False
             return
         if self.active_deadzone_pct != self.deadzone_base_pct:
-            HapticEffect.device.set_deadzone(pct2dz(self.deadzone_base_pct))
-            self.active_deadzone_pct = self.deadzone_base_pct
-            logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
-            self.deadzone_active = True
+            if self._write_device_deadzone(pct2dz(self.deadzone_base_pct)):
+                self.active_deadzone_pct = self.deadzone_base_pct
+                logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
+                self.deadzone_active = True
 
     def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
@@ -58,6 +79,10 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
         super().on_timeout()
         self.ac_set_deadzone_override(0.0)
         if self.deadzone_active:
-            HapticEffect.device.set_deadzone(0)
+            # Best-effort device clear; the in-memory state is reset
+            # regardless, which is all a timeout path may do to a device
+            # that is absent or hot-unplugged (the recovery setup replay
+            # re-applies the configured state when it returns).
+            self._write_device_deadzone(0)
             self.deadzone_updated = False
             self.deadzone_active = False
