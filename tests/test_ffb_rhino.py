@@ -45,6 +45,7 @@ from telemffb.hw.ffb_rhino import (
     OP_STOP,
     OP_START_OVERRIDE,
     CONTROL_RESET,
+    HIDDisconnectedError,
     FFB_GAIN_MASTER,
     FFB_GAIN_SPRING,
     FFB_GAIN_DAMPER,
@@ -896,6 +897,122 @@ class TestFFBRhinoConnected:
         assert mock_ffb_device.connected is False
         mock_ffb_device._dev = MockHIDDevice()  # what reconnect() restores
         assert mock_ffb_device.connected is True
+
+
+# ============================================================================
+# Disconnected-Primitive Tests (Task 1)
+# ============================================================================
+#
+# A device whose HID handle has been lost (hot-unplug / startup failure) must
+# degrade to a catchable HIDDisconnectedError from the low-level primitives,
+# and effect-handle stop/destroy must become cheap no-ops so the 60-120 Hz hot
+# path never sees an exception (the 13:55:41 thread-death bug).
+
+class TestDisconnectedPrimitives:
+    """Low-level primitives raise HIDDisconnectedError when the handle is gone."""
+
+    def _disconnect(self, mock_ffb_device):
+        """Simulate a hot-unplug: the HID handle is dropped."""
+        mock_ffb_device._dev = None
+
+    def test_write_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.write(b"\x01\x02")
+
+    def test_write_succeeds_when_connected(self, mock_ffb_device):
+        mock_ffb_device.write(b"\x01\x02")
+        assert len(mock_ffb_device._dev._write_buffer) > 0
+
+    def test_get_gains_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.get_gains()
+
+    def test_set_gain_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.set_gain(FFB_GAIN_SPRING, 85)
+
+    def test_set_gain_range_still_validated_when_connected(self, mock_ffb_device):
+        # The range contract is independent of device state.
+        with pytest.raises(ValueError):
+            mock_ffb_device.set_gain(FFB_GAIN_SPRING, 101)
+
+    def test_set_deadzone_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.set_deadzone(100)
+
+    def test_send_axis_override_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.send_axis_override(x_mode=1, x_value=12)
+
+    def test_create_effect_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.create_effect(EFFECT_CONSTANT)
+
+    def test_reset_effects_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.reset_effects()
+
+
+class TestDisconnectedEffectHandle:
+    """stop()/destroy() are in-memory no-ops when the HID handle is gone."""
+
+    def test_stop_is_noop_when_disconnected(self, mock_ffb_device):
+        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+        handle.start()
+        assert handle.started
+        old_dev = mock_ffb_device._dev
+        writes_after_start = len(old_dev._write_buffer)
+        assert writes_after_start > 0
+
+        mock_ffb_device._dev = None  # hot-unplug mid-flight
+
+        handle.stop()  # must not raise
+        assert not handle.started
+        # Nothing was written to the (now dead) HID handle.
+        assert len(old_dev._write_buffer) == writes_after_start
+
+    def test_stop_no_write_recorded_when_disconnected(self, mock_ffb_device):
+        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+        handle.start()
+        old_dev = mock_ffb_device._dev
+        writes_after_start = len(old_dev._write_buffer)
+        assert writes_after_start > 0
+
+        mock_ffb_device._dev = None
+        handle.stop()  # no-op: no new write to the dead handle
+        assert mock_ffb_device._dev is None  # still disconnected
+        assert len(old_dev._write_buffer) == writes_after_start
+        assert not handle.started
+
+    def test_destroy_is_noop_write_when_disconnected(self, mock_ffb_device):
+        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+        writes_before = len(mock_ffb_device._dev._write_buffer)
+
+        mock_ffb_device._dev = None  # hot-unplug
+
+        handle.destroy()  # must not raise, must not write
+        assert handle.effect_id is None
+        assert handle.type == 0
+        assert not handle.started
+        assert bool(handle) is False  # invalidated, replayable on recovery
+
+    def test_handle_still_usable_after_recovery(self, mock_ffb_device):
+        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+        mock_ffb_device._dev = None
+        handle.stop()  # no-op while dead
+        # Restore the handle; a subsequent stop writes again.
+        mock_ffb_device._dev = MockHIDDevice()
+        writes_before = len(mock_ffb_device._dev._write_buffer)
+        handle.start()
+        handle.stop()
+        assert len(mock_ffb_device._dev._write_buffer) > writes_before
 
 
 if __name__ == '__main__':

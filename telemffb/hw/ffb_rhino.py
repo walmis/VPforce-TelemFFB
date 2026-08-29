@@ -46,6 +46,21 @@ for p in paths:
 import telemffb.hw.hid as hid
 from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
 
+
+class HIDDisconnectedError(Exception):
+    """Raised by a state-safe HID primitive when the device handle is gone.
+
+    The underlying ``hid`` layer reports a dead handle in several ways
+    (``None`` after ``timerEvent`` clears it, or a native ``HIDException``
+    from a failed ``hid_read``/``hid_write``).  Rather than letting an
+    ``assert`` (stripped under ``-O``) or a raw ``HIDException`` escape into
+    the 60-120 Hz telemetry hot path, every primitive that dereferences the
+    handle raises this single, catchable exception instead.  Callers on the
+    hot path (effect ``start``/``stop``) do not even need to catch it: they
+    check ``device.connected`` first and no-op.
+    """
+
+
 USB_REQTYPE_DEVICE_TO_HOST = 0x80
 USB_REQTYPE_VENDOR = 0x40
 
@@ -641,6 +656,17 @@ class FFBEffectHandle:
     def invalidate(self):
         self.effect_id = 0
 
+    def _device_alive(self) -> bool:
+        """Whether the handle's HID handle can still be written to.
+
+        ``self.ffb`` is the exact device this handle was allocated on (the same
+        object as ``HapticEffect.device`` in normal operation).  After a
+        hot-unplug ``timerEvent`` clears its ``_dev``, so ``connected`` is the
+        single source of truth for whether a device write would succeed.
+        """
+        dev = self.ffb
+        return dev is not None and dev.connected
+
     def _data_changed(self, key, data) -> bool:
         h = hash(data)
         if not self._cache.get(key):
@@ -678,6 +704,15 @@ class FFBEffectHandle:
         return self
 
     def stop(self):
+        if not self._device_alive():
+            # Handle is dead (hot-unplugged or never opened): clear the
+            # in-memory playback state only.  The device write would raise
+            # HIDDisconnectedError, which must never reach the 60-120 Hz
+            # timeout path.  The effect replays automatically on recovery.
+            logging.debug(
+                f"FFBEffectHandle.stop: device disconnected, no-op for block {self.effect_id}")
+            self._started = False
+            return self
         op = FFBReport_EffectOperation(effectBlockIndex=self.effect_id, operation=OP_STOP)
         self.ffb.write(bytes(op))
         self._started = False
@@ -685,9 +720,14 @@ class FFBEffectHandle:
 
     def destroy(self):
         if self.effect_id:
-            logging.debug(f"Destroying effect {self.effect_id} ({effect_names[self.type]})")
-            op = FFBReport_BlockFree(effectBlockIndex=self.effect_id)
-            self.ffb.write(bytes(op))
+            if self._device_alive():
+                op = FFBReport_BlockFree(effectBlockIndex=self.effect_id)
+                self.ffb.write(bytes(op))
+            else:
+                # The device block is gone with the handle; freeing it
+                # in-memory only keeps the finalizer/teardown paths exception-free.
+                logging.debug(
+                    f"FFBEffectHandle.destroy: device disconnected, freeing block {self.effect_id} in-memory only")
             self.type = 0
             self.effect_id = None
             self._started = False
@@ -888,14 +928,18 @@ class FFBRhino(QObject):
 
     # Get global effect slider values as seen in VPConfigurator
     def get_gains(self) -> FFBReport_Get_Gains_Feature_Data:
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("get_gains: HID device is not connected")
         d = self._dev.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
         data = FFBReport_Get_Gains_Feature_Data.from_buffer_copy(d)
         return data
     
     # Set global effect class gain, same as in VPConfigurator sliders
     def set_gain(self, slider_id, value):
-        assert(self._dev and value >= 0 and value <= 100)
+        if self._dev is None:
+            raise HIDDisconnectedError("set_gain: HID device is not connected")
+        if not 0 <= value <= 100:
+            raise ValueError(f"set_gain: value {value} out of range [0, 100]")
         data = FFBReport_Set_Gain_Feature_Data_t()
         data.reportId = HID_REPORT_FEATURE_ID_SET_GAIN
         data.gain_id = slider_id
@@ -908,7 +952,10 @@ class FFBRhino(QObject):
 
         :param deadzone: Deadzone value in the range 0-4096.
         """
-        assert(self._dev and 0 <= deadzone <= 4096)
+        if self._dev is None:
+            raise HIDDisconnectedError("set_deadzone: HID device is not connected")
+        if not 0 <= deadzone <= 4096:
+            raise ValueError(f"set_deadzone: value {deadzone} out of range [0, 4096]")
         data = FFBReport_SetDeadzone(deadzone=deadzone)
         self._dev.write(bytes(data))
 
@@ -924,7 +971,8 @@ class FFBRhino(QObject):
         y_value: int = 0,
         watchdog_ms: int = 1000,
     ):
-        assert self._dev
+        if self._dev is None:
+            raise HIDDisconnectedError("send_axis_override: HID device is not connected")
         data = FFBReport_AxisOverride_Output(
             x_mode=x_mode,
             x_value=x_value,
@@ -1040,13 +1088,15 @@ class FFBRhino(QObject):
         return None
 
     def reset_effects(self):
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("reset_effects: HID device is not connected")
         logging.info("FFB: Reset device effects")
         self._dev.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
         time.sleep(0.01)
 
     def create_effect(self, type) -> FFBEffectHandle:
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("create_effect: HID device is not connected")
         self._dev.send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
         r = bytearray(self._dev.get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
 
@@ -1063,7 +1113,8 @@ class FFBRhino(QObject):
         return handle
     
     def write(self, data):
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("write: HID device is not connected")
         if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
