@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import socket
+import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import telemffb.globals as G
@@ -12,6 +13,23 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 if TYPE_CHECKING:
     from telemffb.telem.SimConnectManager import SimConnectManager
+
+# The X-Plane plugin echoes the live value of each override dataref back in
+# every telemetry frame.  Maps this instance's device role to the key carrying
+# its state, so the desired override can be reconciled against what the sim
+# actually has latched instead of against a local assumption.
+XP_OVERRIDE_STATE_KEYS: dict[str, str] = {
+    "joystick": "jOvrd",
+    "pedals": "pOvrd",
+    "collective": "cOvrd",
+}
+
+# How long to wait for the plugin to apply a sent OVERRIDE command before
+# trusting its echoed state again.  The plugin queues inbound commands and
+# applies them on its next flight loop, so frames already in flight still
+# carry the pre-command value; without this guard that stale mismatch would
+# re-send the command on every telemetry frame.
+XP_OVERRIDE_ECHO_GRACE_S = 0.5
 
 
 class SimConnectProxy(object):
@@ -77,6 +95,9 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._trim_blend_last_v = None  # last valid IAS (kt) fed to the blend — in-frame dropout guard
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
         self._fw_override_supported_last = None
+        # Monotonic stamp of the last OVERRIDE command sent; -inf means
+        # nothing sent yet, so the plugin's echoed state is trusted at once.
+        self.__xplane_override_sent_at = float("-inf")
 
     @property
     def joystick_trim_follow_curve_y(self) -> Optional[str]:
@@ -360,51 +381,115 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
 
             # If state matches last_state, do nothing (no change)
 
-    def toggle_xp_control(self):
-        if self._use_firmware_axis_backend():
-            if self.__xplane_axis_override_active and self._socket is not None:
-                sendstr = f"OVERRIDE:{self.telem_data.FFBType}=false"
-                self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
-                logging.info(f"Sending to XPLANE: >>{sendstr}<<")
-                self.__xplane_axis_override_active = False
-            return
+    def _xp_role(self) -> str:
+        """Return the override keyword the plugin knows this device by.
 
-        if self.is_collective():
-            # issues with axis override for collectve
-            return
+        Read and write must agree on one string: reading state under one role
+        while sending commands under another would leave the two permanently
+        out of step, and the mismatch would be re-sent every grace period.
+        """
+        return self.telem_data.FFBType or "joystick"
 
-        if self.is_trimwheel():
-            # not implemented
-            return
+    def _xp_reported_override_state(self) -> Optional[bool]:
+        """Return the override state the X-Plane plugin reports for this device.
 
+        The plugin publishes the live value of each override dataref in every
+        telemetry frame (``jOvrd`` / ``pOvrd`` / ``cOvrd``).  That value is the
+        authority on what the sim actually has latched — unlike the local
+        "override active" flag, which only records what this process last sent
+        and is wrong whenever the state changed behind our back: a TelemFFB
+        restart, or the plugin's "Clear All Overrides" menu item.
+
+        :return: the reported state, or ``None`` when the frame carries no
+            state for this role (older plugin build, or an untracked role).
+        """
+        key = XP_OVERRIDE_STATE_KEYS.get(self._xp_role())
+        if key is None:
+            return None
+        value = self.telem_data.get(key, None)
+        if value is None:
+            return None
+        try:
+            return bool(int(value))
+        except (TypeError, ValueError):
+            return None
+
+    def _send_xp_override(self, active: bool) -> None:
+        """Send an OVERRIDE command for this device's role to the X-Plane plugin.
+
+        :param active: ``True`` hands the axis to TelemFFB, ``False`` gives it
+            back to the physical control.
+        """
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        sendstr = f"OVERRIDE:{self._xp_role()}={'true' if active else 'false'}"
+        self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
+        logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+        self.__xplane_axis_override_active = active
+        self.__xplane_override_sent_at = time.perf_counter()
 
-        if self.is_collective() and not self.is_helicopter():
-            # we don't want to send the "prop pitch" override (collective) to XPLANE if we are not in a helo
-            if self.telem_data.get("cOvrd", 1):  # non-zero default: keep .get()
-                sendstr = f"OVERRIDE:{self.telem_data.FFBType}=false"
-                self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
-                logging.info(f"Sending to XPLANE: >>{sendstr}<<")
-                self.__xplane_axis_override_active = False
+    def release_xp_axis_override(self) -> None:
+        """Hand any axis this device holds back to X-Plane.
+
+        Called on shutdown.  The override datarefs live in the sim and outlive
+        this process, so an override left latched leaves the user's physical
+        control inert until they clear it from the plugin's menu or restart
+        X-Plane.  Sent unconditionally rather than only when an override is
+        believed active: the command is idempotent, and "believed active" is
+        exactly the state that cannot be trusted here.
+        """
+        if not self._sim_is_xplane():
+            return
+        if self.is_trimwheel():
+            # the plugin has no trimwheel override keyword — nothing to release
+            return
+        self._send_xp_override(False)
+
+    def toggle_xp_control(self):
+        """Reconcile X-Plane's axis override with what this device needs.
+
+        Called every telemetry frame.  The axis is claimed only while all of
+        these hold, and released the moment any of them stops holding:
+
+        * the simulator-side axis backend is in use — false when the user
+          disables axis control globally (``telemffb_controls_axes``) or for
+          this device alone (``local_disable_axis_control``), and false when
+          the axis is driven in device firmware instead;
+        * the FFB device is connected and feeding input — a dead instance
+          would otherwise pin the sim's yoke to zeros and silence the user's
+          real controller;
+        * for a collective, the aircraft is a helicopter.
+
+        The command is sent only on a state change, measured against the
+        plugin's echoed state whenever that is available.  Reconciling against
+        the sim rather than a local flag is what makes the release reliable: a
+        device whose override is still latched in the sim — from a previous
+        session, or from the user having just disabled axis control for it — is
+        handed back to the physical control on the next frame, with no restart
+        and no trip to the plugin's "Clear All Overrides" menu.
+        """
+        if self.is_trimwheel():
+            # not implemented — the plugin has no trimwheel override keyword
             return
 
-        feeding = self._device_feeding()
+        desired = self._use_sim_axis_backend() and self._device_feeding()
 
-        if (
-            self.telemffb_controls_axes
-            and not self.local_disable_axis_control
-            and feeding
-            and not self.__xplane_axis_override_active
+        if self.is_collective() and not self.is_helicopter():
+            # The plugin maps "collective" to the sim's prop-pitch override.
+            # On a fixed-wing aircraft that dataref is prop pitch and nothing
+            # else, so the axis is never taken — and any override latched by
+            # an earlier helicopter session is released here.
+            desired = False
+
+        reported = self._xp_reported_override_state()
+
+        # Trust the sim's echoed state, but only once a command we just sent
+        # has had time to be applied and reflected back.
+        if reported is not None and (
+            time.perf_counter() - self.__xplane_override_sent_at
+            > XP_OVERRIDE_ECHO_GRACE_S
         ):
-            sendstr = f"OVERRIDE:{self.telem_data.FFBType}=true"
-            self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
-            logging.info(f"Sending to XPLANE: >>{sendstr}<<")
-            self.__xplane_axis_override_active = True
-        elif self.__xplane_axis_override_active and (
-            not self.telemffb_controls_axes or not feeding
-        ):
-            sendstr = f"OVERRIDE:{self.telem_data.FFBType}=false"
-            self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
-            logging.info(f"Sending to XPLANE: >>{sendstr}<<")
-            self.__xplane_axis_override_active = False
+            self.__xplane_axis_override_active = reported
+
+        if desired != self.__xplane_axis_override_active:
+            self._send_xp_override(desired)

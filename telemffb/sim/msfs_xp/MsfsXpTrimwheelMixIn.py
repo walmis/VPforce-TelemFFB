@@ -74,7 +74,11 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         """
         if not self.is_trimwheel():
             return
-        if not self.telemffb_controls_axes and not self.local_disable_axis_control:
+        # Either switch turns the wheel's axis output off: the global
+        # "TelemFFB controls axes", or the per-device disable.  The old
+        # `not A and not B` form let a locally-disabled wheel keep driving
+        # the sim's trim axis.
+        if not self.telemffb_controls_axes or self.local_disable_axis_control:
             return
         
         assert HapticEffect.device is not None, "Haptic device not initialized"
