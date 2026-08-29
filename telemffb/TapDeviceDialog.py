@@ -45,6 +45,7 @@ from PyQt6.QtGui import QPalette
 
 from telemffb.tap_config import (blocking_rules, order_matches, read,
                                  shadowing_rules, stale_tap_rules)
+from telemffb.tap_install import devices_a_sim_drives
 from telemffb.utils import device_display_name
 
 INDENT = 22
@@ -113,7 +114,9 @@ class TapDeviceDialog(QtWidgets.QDialog):
         # which in this dialog means "not tapped" - so leaving them
         # alone clears them out.  Listed rather than removed silently: the
         # device may simply be unplugged today.
-        stale = stale_tap_rules(self._facts, devices) if self._facts else []
+        stale = (stale_tap_rules(self._facts,
+                                 devices_a_sim_drives(sim, devices))
+                 if self._facts else [])
         if stale:
             layout.addWidget(self._note(
                 "These are still in the configuration but no longer "

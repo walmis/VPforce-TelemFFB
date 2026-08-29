@@ -1454,8 +1454,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if any(t.has_config for t in status.targets):
             config = read_config(status)
             if config is not None:
-                status.stale_rules = stale_tap_rules(read(config),
-                                                     self.tap_devices())
+                from telemffb.tap_install import devices_a_sim_drives
+                status.stale_rules = stale_tap_rules(
+                    read(config),
+                    devices_a_sim_drives(sim, self.tap_devices()))
         return status
 
     def tap_statuses(self):

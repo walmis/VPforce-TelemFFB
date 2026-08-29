@@ -45,8 +45,10 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Tuple
 
 from telemffb.tap_config import (OrderEntry, Rule, amend, order_matches,
-                                 read, rule_matches, stale_tap_rules)
+                                 read, rule_matches, shadowing_rules,
+                                 stale_tap_rules)
 from telemffb.tap_install import (GENERATED_MARKER, SIMS, WRAPPER_CONFIG,
+                                  devices_a_sim_drives,
                                   SimStatus, TapDevice, TapSim, TargetOutcome,
                                   WrapperState, open_config, config_label,
                                   configured_devices, order_line, read_config,
@@ -309,13 +311,39 @@ def missing_tap_rules(devices: Sequence[TapDevice], settings,
 
 
 def apply_tap_rules(gaps: Sequence[TapGap]) -> List[TargetOutcome]:
-    """Add the missing rule to every gap that has somewhere to put one."""
+    """Add the missing rule to every gap that has somewhere to put one.
+
+    A rule we append is the last one in the file, and the wrapper uses
+    the FIRST rule that matches - so an existing rule naming the same
+    hardware wins and ours does nothing.  Those are retired in the same
+    edit (commented, not deleted, like everywhere else), or the fix
+    would report success and change nothing.  Adopted configs are where
+    this bites: the ffb-fix sample ships name-keyed blocks, and a
+    'Collective=block' sitting above our ids-keyed tap rule for the same
+    device is the whole hazard in one line.
+
+    Another *tap* rule for the device is left alone - it already does
+    what ours would, so displacing it changes nothing.
+    """
     outcomes = []
     for gap in gaps:
         if not gap.fixable:
             continue
+        facts = read(gap.config)
+        shadows = [rule for rule
+                   in shadowing_rules(facts, (gap.device.vid, gap.device.pid),
+                                      gap.device.ident)
+                   if not rule.is_tap]
+        if shadows:
+            listed = ", ".join(f"{r.key}={r.value}" for r in shadows)
+            logging.info(
+                f"DirectInput tap: {gap.status.sim.name} "
+                f"[{os.path.basename(gap.directory)}] - retiring {listed}; "
+                f"it would outrank the new {gap.device.key}=tap rule")
         outcomes.append(write_one_config(
-            gap.directory, amend(gap.config, [rule_line(gap.device)])))
+            gap.directory,
+            amend(gap.config, [rule_line(gap.device)],
+                  disable_lines=[r.line for r in shadows])))
     return outcomes
 
 
@@ -487,6 +515,7 @@ def all_status(settings=None) -> List[SimStatus]:
         if settings is not None and any(t.has_config for t in status.targets):
             config = read_config(status)
             if config is not None:
-                status.stale_rules = stale_tap_rules(read(config), devices)
+                status.stale_rules = stale_tap_rules(
+                    read(config), devices_a_sim_drives(sim, devices))
         out.append(status)
     return out

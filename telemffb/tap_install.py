@@ -480,6 +480,20 @@ def block_line(device: TapDevice) -> str:
         device.key, device.ident or "unnamed", device.role)
 
 
+def devices_a_sim_drives(sim: TapSim, devices) -> List["TapDevice"]:
+    """The configured devices this sim can actually render force to.
+
+    A device serves one role at a time, and a sim renders to some roles
+    and not others - so a device that moves from the joystick slot to
+    the collective slot stops being anything DCS can drive, even though
+    it is still configured.  Anything asking "is this sim's rule for
+    this device still meaningful?" has to ask it against this list, not
+    against everything configured, or a rule that can no longer do
+    anything reads as current forever.
+    """
+    return [d for d in devices if sim.renders_to(d.role)]
+
+
 def order_entries(devices) -> List[str]:
     """The whole [DeviceOrder] payload, by policy.
 

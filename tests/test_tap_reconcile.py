@@ -17,7 +17,7 @@ from telemffb.tap_config import read, stale_tap_rules
 from telemffb.utils import DEVICE_ROLES
 from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
                                   TargetStatus, WrapperState)
-from telemffb.tap_reconcile import (DeviceChange, ReconcileItem,
+from telemffb.tap_reconcile import (DeviceChange, ReconcileItem, TapGap,
                                     apply_reconcile, device_changes,
                                     pending_reconcile, sim_is_enabled)
 
@@ -740,3 +740,101 @@ class TestCleanupTakesOnlyWhatWeWrote:
         assert heading == r"bin\dinput8.ini"
         assert current == self.ADOPTED
         assert proposed == self.apply(monkeypatch, self.ADOPTED)
+
+
+class TestARuleOutlivesItsRole:
+    """A tap rule is only meaningful while the device it names serves a
+    role the sim renders to.  Moving a device between slots leaves it
+    configured, so a check that only asks "is this still configured?"
+    calls the rule current forever - the field case (2026-08-29): a
+    collective that had once been the joystick kept its DCS tap rule
+    after the roles moved, and DCS renders nothing to a collective."""
+
+    JOY = TapDevice("joystick", 0xFFFF, 0x2054, "Monster")
+    COLLECTIVE = TapDevice("collective", 0xFFFF, 0x2051, "Collective")
+    CONFIG = ("[FFBDevices]\r\n"
+              "FFFF:2054=tap    ; Monster (joystick)\r\n"
+              "FFFF:2051=tap    ; Collective (collective)\r\n")
+
+    def test_a_device_now_in_a_role_dcs_ignores_is_stale(self):
+        from telemffb.tap_config import read, stale_tap_rules
+        from telemffb.tap_install import devices_a_sim_drives
+        dcs = SIMS_BY_KEY['DCS']
+        configured = [self.JOY, self.COLLECTIVE]
+        stale = stale_tap_rules(read(self.CONFIG),
+                                devices_a_sim_drives(dcs, configured))
+        assert [r.key for r in stale] == ['FFFF:2051']
+
+    def test_the_joystick_rule_stays_current(self):
+        from telemffb.tap_config import read, stale_tap_rules
+        from telemffb.tap_install import devices_a_sim_drives
+        dcs = SIMS_BY_KEY['DCS']
+        stale = stale_tap_rules(read(self.CONFIG),
+                                devices_a_sim_drives(dcs, [self.JOY]))
+        assert 'FFFF:2054' not in [r.key for r in stale]
+
+    def test_korea_keeps_its_pedal_rule(self):
+        """The scoping is per sim, not a blanket joystick-only rule:
+        IL-2 Korea renders to pedals, so a pedal rule is current there."""
+        from telemffb.tap_config import read, stale_tap_rules
+        from telemffb.tap_install import devices_a_sim_drives
+        pedals = TapDevice("pedals", 0xFFFF, 0x2052, "Pedals")
+        config = "[FFBDevices]\r\nFFFF:2052=tap    ; Pedals (pedals)\r\n"
+        korea = SIMS_BY_KEY['IL2_K']
+        stale = stale_tap_rules(read(config),
+                                devices_a_sim_drives(korea, [pedals]))
+        assert stale == []
+        # ...and the same rule in DCS, which drives no pedals, is not
+        dcs_stale = stale_tap_rules(
+            read(config), devices_a_sim_drives(SIMS_BY_KEY['DCS'], [pedals]))
+        assert [r.key for r in dcs_stale] == ['FFFF:2052']
+
+
+class TestAFilledGapIsNotShadowed:
+    """The wrapper uses the first matching rule, and a gap fix appends -
+    so an existing rule naming the same hardware would win and the fix
+    would change nothing.  Adopted ffb-fix configs ship name-keyed
+    blocks, which is exactly where this bites."""
+
+    DI = TapDevice("joystick", 0x045E, 0x001B, "SideWinder", directinput=True)
+
+    def _gap(self, config):
+        return TapGap(status=SimStatus(sim=SIMS_BY_KEY['DCS'], root='r',
+                                       provenance='t'),
+                      device=self.DI, directory=r"C:\DCS\bin", config=config)
+
+    def _applied(self, monkeypatch, config):
+        written = []
+        monkeypatch.setattr(tap_reconcile, 'write_one_config',
+                            lambda d, text: written.append(text))
+        tap_reconcile.apply_tap_rules([self._gap(config)])
+        return written[0]
+
+    def test_a_name_keyed_block_is_retired(self, monkeypatch):
+        text = self._applied(monkeypatch,
+                             "[FFBDevices]\r\nSideWinder=block\r\n")
+        facts = read(text)
+        assert [r.key for r in facts.rules] == ['045E:001B']
+        assert '; retired by TelemFFB: SideWinder=block' in text
+
+    def test_the_new_rule_is_the_first_that_matches(self, monkeypatch):
+        """The point of the retirement, stated as the wrapper sees it."""
+        text = self._applied(monkeypatch,
+                             "[FFBDevices]\r\nSideWinder=block\r\n")
+        from telemffb.tap_config import rule_matches
+        first = next(r for r in read(text).rules
+                     if rule_matches(r, (0x045E, 0x001B), 'SideWinder'))
+        assert first.is_tap
+
+    def test_an_unrelated_block_is_untouched(self, monkeypatch):
+        text = self._applied(monkeypatch,
+                             "[FFBDevices]\r\nvJoy=block\r\n")
+        assert 'retired' not in text
+        assert 'vJoy=block' in text
+
+    def test_an_existing_tap_rule_is_left_alone(self, monkeypatch):
+        """It already does what ours would; displacing it changes
+        nothing and would churn the file."""
+        text = self._applied(monkeypatch,
+                             "[FFBDevices]\r\nSideWinder=tap\r\n")
+        assert 'retired' not in text
