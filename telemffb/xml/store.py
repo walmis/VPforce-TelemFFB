@@ -43,10 +43,10 @@ class XmlStore:
     auto_defaults_root = defaults_root
 
     def update_roots(self) -> None:
-        """Re-parse both XML files into in-memory trees under shared locks."""
-        # try_parse() acquires its own shared (read) lock per file.
-        # Shared locks allow concurrent readers; writers block until all
-        # readers finish, preventing mid-read corruption.
+        """Re-parse both XML files into in-memory trees under file locks."""
+        # try_parse() acquires its own lock per file and holds it only while
+        # reading raw bytes, so the critical section is tiny.  The lock
+        # guarantees we never observe a file mid-write.
         self._user_tree = try_parse(self.userconfig_path)
         self._user_root = (
             self._user_tree.getroot() if self._user_tree is not None else None
@@ -73,7 +73,7 @@ class XmlStore:
         assert root is not None
         ET.indent(root, " ")
         with FileLock(self.userconfig_path):
-            tree.write(self.userconfig_path, "utf-8")
+            _atomic_write(tree, self.userconfig_path)
 
     def consolidated_tree(self, tree: Optional[ET.ElementTree] = None) -> Optional[ET.ElementTree]:
         """Return a deduplicated/sorted copy of the tree without writing.
@@ -90,15 +90,19 @@ class XmlStore:
 def try_parse(file_path: str, max_attempts: int = 3, delay: float = 0.1) -> Optional[ET.ElementTree]:
     """Parse XML with retry on ParseError (multi-instance file locking).
 
-    Acquires a **shared** (read) lock only while reading raw bytes from disk
-    so the critical section is as short as possible.  Parsing happens in-memory
-    after the lock is released — if another writer modified the file between our
-    read and parse, we catch ``ParseError`` and retry from scratch.
+    Acquires the file lock only while reading raw bytes from disk so the
+    critical section is as short as possible.  Parsing happens in-memory
+    after the lock is released — if another writer modified the file between
+    our read and parse, we catch ``ParseError`` and retry from scratch.
+
+    A lock-acquisition timeout is treated as a hard failure (returns
+    ``None``) so callers running on worker threads (e.g. the telemetry
+    thread) never block beyond the lock timeout or crash on a wedged lock.
     """
     attempt = 0
     while attempt < max_attempts:
         try:
-            # Read raw bytes under shared lock (fast I/O only)
+            # Read raw bytes under the file lock (fast I/O only)
             with FileLock(file_path, shared=True):
                 with open(file_path, "rb") as f:
                     data = f.read()
@@ -107,6 +111,10 @@ def try_parse(file_path: str, max_attempts: int = 3, delay: float = 0.1) -> Opti
         except ET.ParseError:
             attempt += 1
             time.sleep(delay)
+        except TimeoutError:
+            logging.warning("Could not lock %s for reading (lock timeout); "
+                            "returning None.", file_path)
+            return None
     logging.error("All %d attempts to parse %s failed.", max_attempts, file_path)
     return None
 
@@ -181,8 +189,9 @@ def _atomic_write(tree: ET.ElementTree, path: str) -> None:
     """Write *tree* to *path* via a temp file + rename for crash safety.
 
     Prevents partially-written files if the process crashes mid-write.
+    The fixed .tmp name is safe because writers are serialized against
+    each other by the per-file exclusive lock held by the caller.
     """
-    dir_name = os.path.dirname(path) or '.'
     tmp_path = path + ".tmp"
     tree.write(tmp_path, "utf-8")
     os.replace(tmp_path, path)

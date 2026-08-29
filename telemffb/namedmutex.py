@@ -141,13 +141,20 @@ class NamedMutex:
 # ── Cross-platform FileLock ───────────────────────────────────────────
 
 class FileLock:
-    """Cross-platform file-level lock using a named mutex per file path.
+    """Cross-platform file-level lock keyed on the file path.
 
-    * **Windows**: backed by Win32 named mutexes (SHA-256 hashed path).
-      Shared (read) locks use a two-mutex reader-writer scheme allowing
-      concurrent readers; exclusive (write) locks block all other access.
-    * **Linux / Unix**: backed by ``fcntl.flock()`` on a companion .lock file.
-      Shared (read) and exclusive (write) modes are fully supported.
+    * **Windows**: one exclusive Win32 named mutex per path (SHA-256
+      hashed).  Both shared (read) and exclusive (write) modes acquire the
+      same mutex, so readers and writers are always mutually exclusive.
+      A true cross-process reader-writer lock is not used because the
+      critical section is microsecond-scale raw byte I/O, and per-instance
+      reader counting cannot work across processes.
+    * **Linux / Unix**: ``fcntl.flock()`` on a companion .lock file.
+      Shared (read) locks may be held concurrently; exclusive (write)
+      locks are mutually exclusive with all other locks.  The lock file is
+      intentionally never unlinked — another process may be blocked on the
+      current inode, and deleting it would let a new acquirer lock a
+      different inode.
 
     Example::
 
@@ -157,7 +164,7 @@ class FileLock:
             # ... modify ...
             tree.write(path)
 
-        # Shared lock (read) — allows concurrent readers
+        # Shared lock (read)
         with FileLock('/path/to/userconfig_v2.xml', shared=True):
             tree = ET.parse(path)  # safe from mid-write corruption
 
@@ -168,9 +175,10 @@ class FileLock:
         timeout: Maximum seconds to wait for the lock.  ``None`` waits
             indefinitely.  On timeout the context manager raises
             :class:`TimeoutError`.
-        shared: If ``True``, acquire a shared (read) lock.  Multiple
-            processes may hold shared locks concurrently; an exclusive
-            (write) lock blocks until all shared locks are released.
+        shared: If ``True``, acquire a shared (read) lock.  On POSIX this
+            is a real shared ``flock`` (concurrent readers allowed).
+            On Windows it still acquires the per-file exclusive mutex,
+            so all access to the path is serialized.
 
     Raises:
         TimeoutError: If *timeout* elapsed before the lock was acquired.
@@ -203,8 +211,8 @@ class FileLock:
     # ── Windows implementation ──────────────────────────────────
 
     def _acquire_win(self) -> bool:
-        if self.shared:
-            return self._acquire_win_shared()
+        # Both shared and exclusive modes use the same per-path mutex so
+        # that readers and writers can never overlap.
         self._mutex = NamedMutex(self._safe_name(self.file_path))
         ok = self._mutex.acquire(timeout=self.timeout)
         if not ok:
@@ -213,70 +221,12 @@ class FileLock:
         return ok
 
     def _release_win(self) -> None:
-        if self.shared:
-            self._release_win_shared()
-            return
         if self._mutex is not None:
             try:
                 self._mutex.release()
             finally:
                 self._mutex.close()
                 self._mutex = None
-
-    def _rw_reader_mutex_name(self) -> str:
-        return f"r_{self._safe_name(self.file_path)}"
-
-    def _rw_writer_mutex_name(self) -> str:
-        return f"w_{self._safe_name(self.file_path)}"
-
-    def _acquire_win_shared(self) -> bool:
-        """Acquire a shared (read) lock using two Win32 mutexes.
-
-        Uses a readers-mutex to count concurrent readers and a writer-mutex
-        to block writers while any reader holds the lock.
-        """
-        reader_mutex = NamedMutex(self._rw_reader_mutex_name())
-        if not reader_mutex.acquire(timeout=self.timeout):
-            reader_mutex.close()
-            return False
-
-        # Bump reader count
-        self._reader_count = getattr(self, '_reader_count', 0) + 1
-        first_reader = self._reader_count == 1
-
-        if first_reader:
-            # First reader blocks writers
-            writer_mutex = NamedMutex(self._rw_writer_mutex_name())
-            if not writer_mutex.acquire(timeout=self.timeout):
-                reader_mutex.release()
-                reader_mutex.close()
-                self._reader_count -= 1
-                return False
-            object.__setattr__(self, '_writer_mutex', writer_mutex)
-        else:
-            object.__setattr__(self, '_writer_mutex', None)
-
-        reader_mutex.release()
-        reader_mutex.close()
-        return True
-
-    def _release_win_shared(self) -> None:
-        """Release a shared (read) lock."""
-        reader_mutex = NamedMutex(self._rw_reader_mutex_name())
-        reader_mutex.acquire(timeout=self.timeout)
-
-        self._reader_count -= 1
-        last_reader = self._reader_count == 0
-
-        if last_reader:
-            writer_mutex = getattr(self, '_writer_mutex', None)
-            if writer_mutex is not None:
-                writer_mutex.release()
-                writer_mutex.close()
-            object.__setattr__(self, '_writer_mutex', None)
-
-        reader_mutex.release()
-        reader_mutex.close()
 
     # ── POSIX implementation ─────────────────────────────────────
 
@@ -307,11 +257,10 @@ class FileLock:
             finally:
                 os.close(self._fd)
                 self._fd = None
-            # Clean up lock file
-            try:
-                os.unlink(self._lock_path())
-            except OSError:
-                pass
+            # The lock file is deliberately NOT unlinked: another process
+            # may be blocked on flock() of the current inode, and deleting
+            # the file would let the next acquirer create a new inode and
+            # "hold the lock" concurrently with the blocked process.
 
     # ── public API ──────────────────────────────────────────────
 

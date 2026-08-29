@@ -29,6 +29,19 @@ Module-level globals are synced automatically with the internal manager::
     xu.update_roots()
     model_class, pattern, settings = xu.read_single_model('MSFS', 'Cessna 172')
     root = xu.auto_user_root  # direct tree access still works
+
+.. note::
+   The global sync is **one-way** (store → module globals).  All
+   read/write operations go exclusively through the internal
+   ``XmlStore``/``ConfigResolver``/``ConfigWriter`` triple, so assigning
+   to ``auto_user_root``/``auto_user_tree``/``auto_defaults_root`` does
+   NOT change behaviour — it only changes what subsequent code reads
+   from those names directly.  Use :func:`update_roots` to refresh the
+   trees, or operate on ``telemffb.xml.XmlConfigManager`` instances for
+   fully encapsulated access.  (This differs from the legacy module,
+   where the functions read the module globals, so monkeypatching
+   ``xu.auto_user_root`` to inject a fixture tree no longer takes
+   effect — inject via ``XmlStore`` instead.)
 """
 from __future__ import annotations
 
@@ -73,13 +86,17 @@ userconfig_path: str = ''
 #: Path to default settings XML file (``defaults.xml``)
 defaults_path: str = ''
 
-#: Parsed root element of userconfig (set by :func:`update_roots`)
+#: Parsed root element of userconfig.  One-way sync target: refreshed by
+#: :func:`update_roots` (store → globals).  Assigning to it does NOT
+#: affect any read/write operation — they all use the internal store.
 auto_user_root: Optional[ET.Element] = None
 
-#: Parsed ElementTree of userconfig (set by :func:`update_roots`)
+#: Parsed ElementTree of userconfig.  One-way sync target (see
+#: :data:`auto_user_root`).
 auto_user_tree: Optional[ET.ElementTree] = None
 
-#: Parsed root element of defaults (set by :func:`update_roots`)
+#: Parsed root element of defaults.  One-way sync target (see
+#: :data:`auto_user_root`).
 auto_defaults_root: Optional[ET.Element] = None
 
 # ── Singleton manager ──────────────────────────────────────────────

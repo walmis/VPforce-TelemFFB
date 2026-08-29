@@ -325,6 +325,31 @@ class TestTryParse:
         assert result is None
         assert call_count["n"] == 2
 
+    def test_lock_timeout_returns_none(self, tmp_path):
+        """A wedged lock must not escape as TimeoutError (the telemetry
+        thread calls try_parse via update_roots without a surrounding
+        try/except)."""
+        good = tmp_path / "good.xml"
+        good.write_text("<root><ok/></root>")
+        attempts = {"n": 0}
+
+        class WedgedLock:
+            def __init__(self, path, *args, **kwargs):
+                pass
+
+            def __enter__(self):
+                attempts["n"] += 1
+                raise TimeoutError("simulated lock timeout")
+
+            def __exit__(self, *exc):
+                return None
+
+        with patch("telemffb.xml.store.FileLock", WedgedLock):
+            result = xmlutils.try_parse(str(good), max_attempts=3, delay=0.01)
+        assert result is None
+        # failed on first attempt; must not retry after a lock timeout
+        assert attempts["n"] == 1
+
 
 # ─────────────────────────────────────────────────────────────
 # update_vars / update_roots
@@ -881,6 +906,13 @@ class TestReallyWriteUserconfigXml:
         content = Path(xml_tmpdir["userconfig"]).read_text()
         assert "<TelemFFB>" in content
         assert "global_gain" in content
+
+    def test_atomic_write_leaves_no_tmp(self, xml_tmpdir):
+        tree = xmlutils.auto_user_tree
+        xmlutils.really_write_userconfig_xml(tree)
+        assert not Path(xml_tmpdir["userconfig"] + ".tmp").exists()
+        # file still parses after atomic rewrite
+        assert xmlutils.try_parse(xml_tmpdir["userconfig"]) is not None
 
 
 # ─────────────────────────────────────────────────────────────
