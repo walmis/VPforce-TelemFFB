@@ -25,6 +25,20 @@ class XmlStore:
         self._user_root: Optional[ET.Element] = None
         self._defaults_root: Optional[ET.Element] = None
 
+    def adopt_trees_from(self, other: "XmlStore") -> None:
+        """Take over another store's parsed trees without re-parsing.
+
+        The legacy module's update_vars() never invalidated the parsed
+        trees - they persisted until the next update_roots().  The
+        facade recreates the store when the active device changes (the
+        master's device-scope switch does this and reads immediately),
+        so the new store must inherit the trees or every read returns
+        empty until something happens to re-parse.
+        """
+        self._user_tree = other._user_tree
+        self._user_root = other._user_root
+        self._defaults_root = other._defaults_root
+
     @property
     def user_tree(self) -> Optional[ET.ElementTree]:
         return self._user_tree

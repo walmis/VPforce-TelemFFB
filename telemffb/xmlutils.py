@@ -114,6 +114,14 @@ def _get_mgr() -> tuple[XmlStore, ConfigResolver, ConfigWriter]:
             _mgr[0].userconfig_path != userconfig_path or
             _mgr[0].defaults_path != defaults_path):
         store = XmlStore(device, userconfig_path, defaults_path)
+        if _mgr is not None:
+            # Legacy semantics: update_vars() never invalidated the parsed
+            # trees; they persist until the next update_roots().  The
+            # master's device-scope switch relies on this - it changes the
+            # device and reads immediately, and a fresh empty store made
+            # every read return nothing (the aircraft came back unknown
+            # and the new-aircraft wizard fired).
+            store.adopt_trees_from(_mgr[0])
         resolver = ConfigResolver(store)
         writer = ConfigWriter(store, resolver)
         _mgr = (store, resolver, writer)
