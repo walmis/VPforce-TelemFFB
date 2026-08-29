@@ -1070,6 +1070,25 @@ class TestUnreachableDeviceWarning:
         inst = self._run("DINPUT_TAP", tapped=False, di_guid="{GUID}")
         assert 'is not capturing' in inst._telem_data.get('error', '')
 
+    def test_a_di_pedal_in_a_sim_without_pedal_ffb_stays_quiet(self):
+        """Most of these sims render no pedal FFB at all, so NONE leaves
+        a VPforce pedal just as spring-less as a DirectInput one - the
+        exclusivity warning is a joystick statement.  (IL-2 Korea, which
+        does drive pedals, deserves it too once the aircraft can tell
+        Korea from GB at runtime.)"""
+        import unittest.mock as mock
+        import telemffb.globals as G
+        harness = TestTapSpringMode()
+        case, inst = harness._make_instance("NONE")
+        inst._telem_data["FFBType"] = "pedals"
+        with mock.patch.object(G, 'device_di_guid', '{GUID}', create=True):
+            with mock.patch("telemffb.hw.ffb_tap.device_is_tapped",
+                            return_value=False):
+                with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
+                                return_value=None):
+                    inst.ffb_tap_spring()
+        assert not inst._telem_data.get('error')
+
 
 class TestTapPresenceQuery:
     """device_tapped(): is the wrapper capturing THIS instance's device

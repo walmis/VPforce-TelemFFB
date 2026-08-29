@@ -315,6 +315,16 @@ class IPCNetworkThread(QObject, threading.Thread):
         elif msg.startswith("LOADCONFIG:"):
             path = msg.removeprefix("LOADCONFIG:")
             load_custom_userconfig(path)
+        elif msg == "REAPPLY_AXIS_MAP":
+            # a settings save changed an FFB axis mapping somewhere; each
+            # instance re-reads ITS OWN settings, so an unchanged map is
+            # a no-op.  Flag only - the device work runs on the owning
+            # instance's poll tick, never this IPC thread.
+            from telemffb.hw.ffb_rhino import HapticEffect
+            request = getattr(HapticEffect.device,
+                              'request_axis_map_reapply', None)
+            if request:
+                request()
         elif msg.startswith("MASTER_BUTTONS:"):
             payload = msg.removeprefix("MASTER_BUTTONS:")
             G.master_buttons = json.loads(payload)

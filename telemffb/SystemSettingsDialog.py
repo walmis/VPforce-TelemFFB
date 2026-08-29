@@ -455,13 +455,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # which widget holds which role
         self._device_combos = combo_boxes
 
-        # Generic DirectInput FFB devices are joystick-role only for now, so
-        # the joystick combo gets its own extended model.
-        model = FFBDeviceListModel(devices)
-        joystick_model = FFBDeviceListModel(
+        # Generic DirectInput FFB devices can serve any FFB role:
+        # third-party FFB pedals exist (Brunner and friends), and a
+        # modified DirectInput stick makes a collective or a trim wheel.
+        # The joystick keeps its native X/Y; other roles get an axis
+        # mapping when the hardware's FFB axis is not the one the role
+        # addresses.
+        extended_model = FFBDeviceListModel(
             list(devices) + self._enumerate_dinput_devices(dinput_enabled))
         for cb in combo_boxes:
-            cb_model = joystick_model if cb is self.cb_select_j else model
+            cb_model = extended_model
             # Swapping the model emits currentIndexChanged with nothing
             # selected yet.  On a repopulate (the DirectInput toggle) that
             # reaches the handler connected below, which reads it as "device
@@ -535,7 +538,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # the joystick card's alternate rows share the joystick model and
         # restore from their own slots (devpath_joystick_2/_3)
-        self._restore_joystick_alternates(joystick_model)
+        self._restore_joystick_alternates(extended_model)
 
         # Handler to enforce uniqueness across combo boxes
         def on_device_changed(index, changed_cb= None):
@@ -653,6 +656,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 cb.currentIndexChanged.connect(lambda idx, _cb=cb: on_device_changed(idx, changed_cb=_cb))
             self._device_signals_connected = True
 
+        # the FFB-axis choosers track whatever the restore above landed on
+        self._refresh_all_axis_choices()
+
         # Additionally, ensure that when selection is cleared (index 0 / None) the setting is persisted.
         # The on_device_changed handler will call persist after committing the change, but if a selection
         # was reverted by conflict resolution it will also update the persisted value when appropriate.
@@ -692,6 +698,77 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         except Exception:
             logging.exception('Failed to persist devpath setting')
 
+    #: Roles whose effects address one logical axis, remappable on a
+    #: DirectInput device (the joystick stays native X/Y, always).
+    AXIS_ROLES = {'pedals': 'p', 'collective': 'c', 'trimwheel': 't'}
+
+    @staticmethod
+    def _query_ffb_axes(guid):
+        """Force-actuator axes for an UNOPENED device - a seam like
+        _enumerate_dinput_devices: tests stub it, the real one loads
+        DirectLink.  Safe while another process holds the device (object
+        enumeration needs no acquisition)."""
+        from telemffb.hw.ffb_dinput import DIBridge
+        try:
+            return DIBridge().query_ffb_axes(guid)
+        except Exception:
+            logging.debug('DirectLink axis query failed', exc_info=True)
+            return []
+
+    def _refresh_axis_choice(self, role):
+        """Show the role's FFB-axis chooser when its selected device is
+        DirectInput, filled with the axes the device reports; hide it
+        otherwise.  The stored choice (or an unsaved pending one) is
+        restored into it."""
+        suffix = self.AXIS_ROLES.get(role)
+        if suffix is None:
+            return
+        row = self.device_cards.cards[role].primary_row
+        dev = getattr(self, f'cb_select_{suffix}').currentData()
+        path = getattr(dev, 'path', b'') or b''
+        if isinstance(path, (bytes, bytearray)):
+            path = path.decode(errors='replace')
+        if not str(path).startswith('dinput:'):
+            row.show_axis_choice([])
+            return
+        from telemffb.hw.ffb_dinput import (axis_setting_key,
+                                            invert_setting_key)
+        names = self._query_ffb_axes(str(path)[len('dinput:'):])
+        # the stored choice belongs to the device it was made FOR - the
+        # one saved on disk.  A different selection starts from Auto,
+        # uninverted: its axes are its own.  Cycling back to the saved
+        # device restores the stored choice.
+        saved_path = str(G.system_settings.get(f'devpath_{role}', '')
+                         or '')
+        if str(path) == saved_path:
+            stored = str(self._stored_or_pending(axis_setting_key(role),
+                                                 'auto') or 'auto')
+            inverted = bool(self._stored_or_pending(
+                invert_setting_key(role), False))
+        else:
+            stored, inverted = 'auto', False
+        row.show_axis_choice(names, stored, inverted)
+
+    @staticmethod
+    def _request_axis_map_reapply_everywhere():
+        """A saved axis/invert change reaches every running instance:
+        this one directly, the children over IPC."""
+        from telemffb.hw.ffb_rhino import HapticEffect
+        request = getattr(HapticEffect.device,
+                          'request_axis_map_reapply', None)
+        if request:
+            request()
+        ipc = getattr(G, 'ipc_instance', None)
+        if G.master_instance and ipc and G.launched_instances:
+            ipc.send_broadcast_message('REAPPLY_AXIS_MAP')
+
+    def _refresh_all_axis_choices(self):
+        for role in self.AXIS_ROLES:
+            try:
+                self._refresh_axis_choice(role)
+            except Exception:
+                logging.exception(f'axis chooser refresh failed ({role})')
+
     def _slot_changed(self, cb, role):
         """A slot now holds something else - or nothing.  Record it, and
         let the tap say what that means while the change is still in front
@@ -701,6 +778,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if self._tap_baseline is None:
             self._tap_baseline = self.tap_settings_view()
         self._persist_combobox_selection(cb, role)
+        self._refresh_axis_choice(role)
         # the tap panels describe the devices as much as the folders,
         # so a new selection changes what they should be saying
         self.refresh_tap_panels()
@@ -1900,11 +1978,39 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     not G.system_settings.get(key, ''):
                 self._pending_devpaths.setdefault(key, value)
 
+        # the FFB-axis choice rides the same flush; None means the
+        # chooser is hidden (not a DirectInput device) and the stored
+        # value, if any, is left alone for the device that set it
+        try:
+            from telemffb.hw.ffb_dinput import (axis_setting_key,
+                                                invert_setting_key)
+            for role in self.AXIS_ROLES:
+                row = self.device_cards.cards[role].primary_row
+                value = row.axis_choice_value()
+                if value is not None:
+                    self._pending_devpaths[axis_setting_key(role)] = value
+                inverted = row.axis_invert_value()
+                if inverted is not None:
+                    self._pending_devpaths[invert_setting_key(role)] = \
+                        inverted
+        except Exception:
+            logging.exception('Failed to record FFB axis choices')
+
         try:
             for k, v in self._pending_devpaths.items():
                 G.system_settings.setValue(k, v)
         except Exception:
             logging.exception('Failed to write pending devpath settings')
+
+        # a changed FFB axis map applies live: this instance re-resolves on
+        # its next poll tick, and every child is told to do the same (each
+        # re-reads its OWN settings, so an unchanged map is a no-op; the
+        # re-apply recreates the device's effects, since DirectInput fixes
+        # an effect's axes at creation)
+        try:
+            self._request_axis_map_reapply_everywhere()
+        except Exception:
+            logging.exception('Failed to request live axis-map re-apply')
 
         # A swapped device leaves any tap config pointing at hardware that is
         # no longer there, which fails silently in both directions.  Compared

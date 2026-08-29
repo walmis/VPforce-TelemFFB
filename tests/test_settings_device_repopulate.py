@@ -48,6 +48,8 @@ def _make_dialog(monkeypatch, settings):
     # while a running TelemFFB holds one exclusively
     monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
                         staticmethod(lambda enabled=None: []))
+    monkeypatch.setattr(SystemSettingsDialog, '_query_ffb_axes',
+                        staticmethod(lambda guid: []))
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
                         lambda *a, **k: (True, ''))
     # bridge_status loads the real bridge DLL - never from a test
@@ -120,6 +122,8 @@ def dialog(monkeypatch):
                         staticmethod(lambda *a, **k: []), raising=False)
     monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
                         staticmethod(lambda enabled=None: []))
+    monkeypatch.setattr(SystemSettingsDialog, '_query_ffb_axes',
+                        staticmethod(lambda guid: []))
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
                         lambda *a, **k: (True, ''))
     # bridge_status loads the real bridge DLL - never from a test
@@ -174,3 +178,159 @@ def test_repopulate_connects_handlers_once(dialog):
     dialog.populateUSBSelectors(dinput_enabled=True)
     dialog.populateUSBSelectors(dinput_enabled=False)
     assert dialog.cb_select_j.receivers(dialog.cb_select_j.currentIndexChanged) == before
+
+
+class _FakeDIDevice:
+    """A generic DirectInput entry, as directinput_selection_devices shapes
+    them."""
+
+    def __init__(self):
+        self.path = b'dinput:{0d1e55b2-f16f-11cf-88cb-001111000030}'
+        self.product_id = 0x0005
+        self.vendor_id = 0x346E
+        self.product_string = '[DI] MOZA AB9'
+        self.manufacturer_string = ''
+        self.serial_number = ''
+
+
+class TestDirectInputRolesListed:
+    """DirectInput devices can serve any FFB role: third-party FFB
+    pedals exist, and a modified DirectInput stick makes a collective or
+    a trim wheel.  The selectors have to offer them everywhere the
+    backend can drive them."""
+
+    def _dialog(self, monkeypatch):
+        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        app, dlg = _make_dialog(monkeypatch, _Settings({
+            'devpath_joystick': '', 'devpath_pedals': '',
+            'devpath_collective': '', 'devpath_trimwheel': '',
+            'enableDirectInput': True,
+        }))
+        # dropping the last QApplication reference destroys every widget
+        self._app = app
+        monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
+                            staticmethod(lambda enabled=None: [_FakeDIDevice()]))
+        dlg.populateUSBSelectors(dinput_enabled=True)
+        return dlg
+
+    def _listed(self, combo):
+        model = combo.model()
+        return [model.data(model.index(row, 0))
+                for row in range(model.rowCount())]
+
+    def test_every_role_offers_di_devices(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        for combo in (dlg.cb_select_j, dlg.cb_select_p, dlg.cb_select_c,
+                      dlg.cb_select_t):
+            assert any('[DI]' in str(x) for x in self._listed(combo)), \
+                combo.objectName()
+
+
+class TestAxisChooser:
+    """The FFB-axis pulldown: pedals/collective/trimwheel on a
+    DirectInput device choose which native axis the role drives.
+    Hidden for VPforce devices (their axes are the convention), and the
+    joystick never has one - X/Y untouched, always."""
+
+    def _dialog(self, monkeypatch, axes=('X', 'RZ'), extra=None):
+        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        base = {'devpath_joystick': '', 'devpath_pedals': '',
+                'devpath_collective': '', 'devpath_trimwheel': '',
+                'enableDirectInput': True}
+        base.update(extra or {})
+        app, dlg = _make_dialog(monkeypatch, _Settings(base))
+        self._app = app
+        monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
+                            staticmethod(lambda enabled=None: [_FakeDIDevice()]))
+        monkeypatch.setattr(SystemSettingsDialog, '_query_ffb_axes',
+                            staticmethod(lambda guid: list(axes)))
+        dlg.populateUSBSelectors(dinput_enabled=True)
+        return dlg
+
+    def _select_di(self, combo):
+        model = combo.model()
+        for row in range(model.rowCount()):
+            if '[DI]' in str(model.data(model.index(row, 0))):
+                combo.setCurrentIndex(row)
+                return
+        raise AssertionError('no [DI] row in the combo')
+
+    def test_hidden_until_a_di_device_is_selected(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        assert dlg.cb_axis_p.isHidden()
+        self._select_di(dlg.cb_select_p)
+        assert not dlg.cb_axis_p.isHidden()
+
+    def test_lists_auto_plus_the_reported_axes(self, monkeypatch):
+        dlg = self._dialog(monkeypatch, axes=('X', 'RZ'))
+        self._select_di(dlg.cb_select_p)
+        items = [dlg.cb_axis_p.itemText(i)
+                 for i in range(dlg.cb_axis_p.count())]
+        assert items == ['Auto', 'X', 'RZ']
+
+    def test_a_stored_choice_is_restored(self, monkeypatch):
+        """...for the device it was made for - the saved one."""
+        dlg = self._dialog(monkeypatch, axes=('X', 'RZ'),
+                           extra={'dinput_axis_pedals': 'RZ',
+                                  'devpath_pedals': 'dinput:{0d1e55b2-f16f-11cf-88cb-001111000030}'})
+        self._select_di(dlg.cb_select_p)
+        assert dlg.cb_axis_p.currentData() == 'RZ'
+
+    def test_a_different_device_starts_from_auto(self, monkeypatch):
+        """A stored choice belongs to the device it was made for; a
+        different selection must not inherit it - its axes are its
+        own."""
+        dlg = self._dialog(monkeypatch, axes=('X', 'RZ'),
+                           extra={'dinput_axis_pedals': 'RZ',
+                                  'dinput_invert_pedals': True,
+                                  'devpath_pedals': 'dinput:{SOME-OTHER}'})
+        self._select_di(dlg.cb_select_p)
+        assert dlg.cb_axis_p.currentData() == 'auto'
+        row = dlg.device_cards.cards['pedals'].primary_row
+        assert row.axis_invert_value() is False
+
+    def test_the_value_persists_only_while_shown(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        row = dlg.device_cards.cards['pedals'].primary_row
+        assert row.axis_choice_value() is None      # no DI device selected
+        self._select_di(dlg.cb_select_p)
+        assert row.axis_choice_value() == 'auto'
+
+    def test_the_joystick_never_has_one(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        assert dlg.device_cards.cards['joystick'].primary_row.axis_combo \
+            is None
+
+    def test_collective_and_trimwheel_have_choosers(self, monkeypatch):
+        # one dialog per role: the same DI device in two roles at once
+        # raises the (modal) device-conflict prompt, which is not the
+        # subject here
+        for role, attr in (('collective', 'cb_select_c'),
+                           ('trimwheel', 'cb_select_t')):
+            dlg = self._dialog(monkeypatch)
+            self._select_di(getattr(dlg, attr))
+            assert not dlg.device_cards.cards[role] \
+                .primary_row.axis_combo.isHidden(), role
+
+
+class TestAxisInvert(TestAxisChooser):
+    """The Invert checkbox rides the axis chooser: same visibility, its
+    own stored flag - the DI-world equivalent of reversing the axis in
+    VPConfigurator."""
+
+    def test_appears_and_hides_with_the_chooser(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        row = dlg.device_cards.cards['pedals'].primary_row
+        assert row.axis_invert.isHidden()
+        assert row.axis_invert_value() is None
+        self._select_di(dlg.cb_select_p)
+        assert not row.axis_invert.isHidden()
+        assert row.axis_invert_value() is False
+
+    def test_a_stored_flag_is_restored(self, monkeypatch):
+        dlg = self._dialog(monkeypatch,
+                           extra={'dinput_invert_pedals': True,
+                                  'devpath_pedals': 'dinput:{0d1e55b2-f16f-11cf-88cb-001111000030}'})
+        self._select_di(dlg.cb_select_p)
+        row = dlg.device_cards.cards['pedals'].primary_row
+        assert row.axis_invert_value() is True

@@ -254,6 +254,8 @@ class World:
         bridge = bridge or BridgeStatus(installed=True, version='1.0.0')
         monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_status',
                             lambda *a, **k: bridge)
+        monkeypatch.setattr(dialog_module.SystemSettingsDialog,
+                            '_query_ffb_axes', staticmethod(lambda g: []))
         monkeypatch.setattr(QtWidgets.QMessageBox, 'question', self.policy.question)
         monkeypatch.setattr(QtWidgets.QMessageBox, 'information',
                             self.policy.information)

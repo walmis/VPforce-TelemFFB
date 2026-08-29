@@ -63,6 +63,8 @@ def dialog(monkeypatch):
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_status',
                         lambda *a, **k: BridgeStatus(
                             installed=True, version='1.0.0'))
+    monkeypatch.setattr(SystemSettingsDialog, '_query_ffb_axes',
+                        staticmethod(lambda guid: []))
     dlg = SystemSettingsDialog()
     yield dlg
     dlg.deleteLater()

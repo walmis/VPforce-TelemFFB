@@ -376,6 +376,64 @@ def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
     return status
 
 
+#: Which logical axis each role's effects address.  The joystick is
+#: deliberately absent: it stays native X/Y, unmapped, always.
+ROLE_LOGICAL_AXIS = {'pedals': 'X', 'collective': 'Y', 'trimwheel': 'X'}
+
+AXIS_SETTING_AUTO = 'auto'
+
+
+def axis_setting_key(role: str) -> str:
+    """Where the role's DirectInput axis choice is stored ('auto' or an
+    AXIS_NAMES entry), alongside devpath_{role}."""
+    return f'dinput_axis_{role}'
+
+
+def invert_setting_key(role: str) -> str:
+    """Where the role's DirectInput axis-inversion flag is stored - the
+    DI-world equivalent of reversing the axis in VPConfigurator, for
+    hardware that runs its force axis the other way."""
+    return f'dinput_invert_{role}'
+
+
+def resolve_axis_map(role, choice, actuators):
+    """(native axis for logical X, native for logical Y) as AXIS_NAMES
+    entries or None-for-unmapped - or None entirely for a role that
+    never remaps (the joystick).
+
+    'auto' keeps the role's own axis when the device actuates it (a
+    modified stick as a collective: Y exists, identity, done), else
+    takes the device's first actuator (Rz-only pedals: X -> RZ, nothing
+    to configure).  An explicit choice is applied as given - the user
+    can see the pulldown, and it only offers axes the device reported.
+    The role's OTHER logical axis keeps its identity mapping when that
+    axis exists and is not the one chosen, so two-axis effects keep
+    their second dimension where the hardware has one.
+    """
+    primary = ROLE_LOGICAL_AXIS.get(role)
+    if primary is None:
+        return None
+    actuators = list(actuators or [])
+    if not actuators:
+        # nothing known - an old DirectLink with no axis query, or a
+        # driver that reports no actuators.  Identity: exactly the
+        # behavior every install had before the map existed.
+        return ('X', 'Y')
+    if choice and choice != AXIS_SETTING_AUTO and choice in DIBridge.AXIS_NAMES:
+        native = choice
+    elif primary in actuators:
+        native = primary
+    else:
+        native = actuators[0]
+    secondary_logical = 'Y' if primary == 'X' else 'X'
+    secondary = (secondary_logical
+                 if secondary_logical in actuators
+                 and secondary_logical != native else None)
+    if primary == 'X':
+        return (native, secondary)
+    return (secondary, native)
+
+
 class DIBridge:
     """ctypes binding to dinput_ffb.dll.
 
@@ -522,6 +580,46 @@ class DIBridge:
         if fn is None:
             return DIB_ERR_UNSUPPORTED
         return fn(device)
+
+    #: DIB_AXIS_* codes, in DIJOYSTATE2 order (dinput_bridge.h)
+    AXIS_NAMES = ('X', 'Y', 'Z', 'RX', 'RY', 'RZ', 'SL0', 'SL1')
+    AXIS_NONE = -1
+
+    def ffb_axes(self, device: int):
+        """The open device's force-actuator axes, as names from
+        AXIS_NAMES.  Empty when the DLL predates 0.9.3 or errors."""
+        fn = getattr(self._dll, 'dib_ffb_axes', None)
+        if fn is None:
+            return []
+        return self._axis_names(fn(device))
+
+    def query_ffb_axes(self, guid: str):
+        """The same, for a device that is NOT open - the settings dialog
+        asks before anything is held.  Safe while another process holds
+        the device (object enumeration needs no acquisition), and a
+        device held by THIS process answers from its open-time record."""
+        fn = getattr(self._dll, 'dib_query_ffb_axes', None)
+        if fn is None:
+            return []
+        return self._axis_names(fn(guid.encode()))
+
+    @classmethod
+    def _axis_names(cls, mask: int):
+        if mask <= 0:
+            return []
+        return [name for bit, name in enumerate(cls.AXIS_NAMES)
+                if mask & (1 << bit)]
+
+    def set_axis_map(self, device: int, x_axis: int, y_axis: int,
+                     invert_x: bool = False, invert_y: bool = False) -> int:
+        """Point logical X/Y at native axes (AXIS_NAMES indexes, or
+        AXIS_NONE), optionally inverting a logical axis's direction -
+        effects mirrored and the input reading negated, as if the
+        hardware ran the other way.  Absent in pre-0.9.3 DLLs."""
+        fn = getattr(self._dll, 'dib_set_axis_map', None)
+        if fn is None:
+            return DIB_ERR_UNSUPPORTED
+        return fn(device, x_axis, y_axis, int(invert_x), int(invert_y))
 
     def device_reset(self, device: int) -> int:
         """Device-level reset: destroy every effect the DEVICE holds -
@@ -979,14 +1077,107 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
         self._shutdown = False
         self._last_recovery = 0.0
+        # plain assignments only before super().__init__: a getattr for a
+        # MISSING attribute on an uninitialized QObject raises RuntimeError
+        self._axis_map_state = self._IDENTITY_MAP
+        self._axis_map_reapply = False
 
         self._handle = self.bridge.open(guid)
+        self._apply_axis_map()
         self._log_autocenter_state()
 
         super().__init__()
         self._timer_id = None
         if poll_interval_ms:
             self._timer_id = self.startTimer(poll_interval_ms)
+
+    #: what an untouched device runs: identity axes, uninverted
+    _IDENTITY_MAP = (0, 1, False, False)
+
+    def _desired_axis_map(self):
+        """(x_code, y_code, invert_x, invert_y, description): what the
+        stored settings resolve to right now.  Identity for roles that
+        never remap (the joystick) and on resolution failure."""
+        identity = (*self._IDENTITY_MAP, "identity (device X/Y)")
+        try:
+            role = getattr(G, 'device_type', 'joystick')
+            choice = AXIS_SETTING_AUTO
+            inverted = False
+            if getattr(G, 'system_settings', None):
+                choice = str(G.system_settings.get(
+                    axis_setting_key(role), AXIS_SETTING_AUTO)
+                    or AXIS_SETTING_AUTO)
+                inverted = bool(G.system_settings.get(
+                    invert_setting_key(role), False))
+            mapping = resolve_axis_map(role, choice,
+                                       self.bridge.ffb_axes(self._handle))
+        except Exception:
+            logging.exception("DirectInput axis map resolution failed; "
+                              "staying on native X/Y")
+            return identity
+        if mapping is None:
+            return identity
+        x_name, y_name = mapping
+        # inversion belongs to the role's own logical axis; the secondary
+        # identity axis is never inverted
+        primary = ROLE_LOGICAL_AXIS.get(role, 'X')
+        invert_x = inverted and primary == 'X'
+        invert_y = inverted and primary == 'Y'
+
+        def code(name):
+            return (DIBridge.AXIS_NAMES.index(name) if name
+                    else DIBridge.AXIS_NONE)
+
+        described = ", ".join(
+            f"logical {logical} -> "
+            f"{'device ' + native if native else '(unmapped)'}"
+            + (' (inverted)' if inv else '')
+            for logical, native, inv in (('X', x_name, invert_x),
+                                         ('Y', y_name, invert_y)))
+        return (code(x_name), code(y_name), invert_x, invert_y, described)
+
+    def _apply_axis_map(self, recover=False):
+        """Point logical X/Y at the axes this role's hardware renders
+        force on.
+
+        TelemFFB's conventions are fixed - pedals effects address logical
+        X, collective Y, trim wheel X - but third-party hardware puts its
+        force feedback wherever it likes (pedals on Rz, typically).  The
+        resolved map is handed to DirectLink only when it DIFFERS from
+        what the device is running - so an identity map is never sent
+        and old DLLs stay quiet.  With ``recover`` (a live settings
+        change), the device's effects are recreated afterwards:
+        DirectInput fixes an effect's axes at creation, so the ones
+        already downloaded would otherwise keep the old map forever.
+        """
+        role = getattr(G, 'device_type', 'joystick')
+        *desired, described = self._desired_axis_map()
+        desired = tuple(desired)
+        if desired == self._axis_map_state:
+            return
+        rc = self.bridge.set_axis_map(self._handle, *desired)
+        if rc == DIB_ERR_UNSUPPORTED:
+            logging.warning(
+                f"DirectInput axis map ({role}): this DirectLink build "
+                f"has no axis mapping (0.9.3 adds it) - wanted {described}, "
+                "effects stay on native X/Y")
+        elif rc < 0:
+            logging.warning(f"DirectInput axis map ({role}) refused: "
+                            f"{self.bridge.last_error()}")
+        else:
+            self._axis_map_state = desired
+            logging.info(f"DirectInput axis map ({role}): {described}")
+            if recover:
+                self.recover_effects("the FFB axis map changed")
+
+    def request_axis_map_reapply(self):
+        """A settings save may have changed this role's axis or invert
+        choice: re-resolve and re-apply on the next poll tick.  Called
+        from any thread (a settings save, the IPC listener) - the device
+        work happens on this instance's own timer, and an unchanged map
+        is a no-op there.
+        """
+        self._axis_map_reapply = True
 
     def _log_autocenter_state(self):
         """Say whether the device's own centering spring was switched off.
@@ -1064,6 +1255,12 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
     def timerEvent(self, a0: QTimerEvent) -> None:
         if self._reconnecting or self._shutdown:
             return
+        if self._axis_map_reapply:
+            self._axis_map_reapply = False
+            try:
+                self._apply_axis_map(recover=True)
+            except Exception:
+                logging.exception("live axis-map re-apply failed")
         try:
             self._poll_once()
         except Exception:

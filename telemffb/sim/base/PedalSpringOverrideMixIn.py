@@ -189,6 +189,12 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         if not self.is_pedals():
             return False
 
+        # VPforce only: do not execute check for dinput devices as we can not guarantee
+        # 0 read status for alternate axis on any device but vpforce
+        import telemffb.globals as G
+        if G.device_di_guid:
+            return False
+
         x, y = self._get_device_axes()
         if y != 0 and x == 0:
             self.flag_error("Pedal axis mismatch: Y axis used instead of X. Fix by swapping X/Y in VPConfigurator.")

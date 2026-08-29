@@ -221,6 +221,14 @@ class FfbTapMixIn:
                 "(DirectInput Tap)' to render the game's spring, or remove "
                 "this device from the tap configuration in System Settings.")
             return
+        # Joystick only: for pedals, most of these sims render no pedal
+        # FFB at all, so NONE leaves a VPforce pedal just as spring-less
+        # as a DirectInput one - the exclusivity changes nothing and the
+        # warning would be noise.  The one sim where it does matter
+        # (IL-2 Korea drives pedals natively) deserves this warning too,
+        # once the aircraft can tell Korea from GB at runtime.
+        if not self.is_joystick():
+            return
         import telemffb.globals as G
         if G.device_di_guid:
             self.flag_error(

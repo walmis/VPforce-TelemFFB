@@ -59,6 +59,16 @@ class FakeDIBridge:
     def autocenter_state(self, device):
         return self.autocenter
 
+    #: what the fake device's force actuators report (identity-friendly)
+    actuator_axes = ['X', 'Y']
+
+    def ffb_axes(self, device):
+        return list(self.actuator_axes)
+
+    def set_axis_map(self, device, x_axis, y_axis, invert_x=0, invert_y=0):
+        self.axis_map = (x_axis, y_axis, bool(invert_x), bool(invert_y))
+        return 0
+
     def release(self, device):
         self.effects.clear()
         self.started.clear()
@@ -917,3 +927,193 @@ class TestAutocenterHandover:
             DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
         assert not any('centering spring' in r.message
                        for r in caplog.records)
+
+
+class TestAxisMapResolution:
+    """resolve_axis_map: TelemFFB's logical conventions are fixed (pedals
+    X, collective Y, trim wheel X, joystick untouchable) and the map
+    points them at whatever axis the hardware renders force on."""
+
+    def _resolve(self, *a):
+        from telemffb.hw.ffb_dinput import resolve_axis_map
+        return resolve_axis_map(*a)
+
+    def test_the_joystick_never_remaps(self):
+        assert self._resolve('joystick', 'RZ', ['X', 'Y', 'RZ']) is None
+
+    def test_auto_keeps_the_roles_axis_when_the_device_has_it(self):
+        assert self._resolve('pedals', 'auto', ['X', 'Y']) == ('X', 'Y')
+        assert self._resolve('collective', 'auto', ['X', 'Y']) == ('X', 'Y')
+
+    def test_auto_takes_the_sole_actuator_otherwise(self):
+        """Rz-only pedals: nothing to configure, it just works."""
+        assert self._resolve('pedals', 'auto', ['RZ']) == ('RZ', None)
+
+    def test_an_explicit_choice_is_applied_as_given(self):
+        assert self._resolve('pedals', 'Y', ['X', 'Y']) == ('Y', None)
+
+    def test_collective_on_a_single_axis_device(self):
+        """Logical Y carries the force; logical X goes unmapped."""
+        assert self._resolve('collective', 'auto', ['X']) == (None, 'X')
+
+    def test_no_actuator_info_means_identity(self):
+        """An old DirectLink reports nothing; behave exactly as before."""
+        assert self._resolve('pedals', 'auto', []) == ('X', 'Y')
+
+
+class TestAxisMapApplication:
+    """The resolved map is handed to DirectLink once, at open, before
+    any effect exists - and identity is a no-op so old DLLs stay
+    quiet."""
+
+    def _open(self, monkeypatch, role, actuators, choice='auto',
+              inverted=False):
+        import telemffb.globals as G
+        monkeypatch.setattr(G, 'device_type', role, raising=False)
+
+        class S(dict):
+            def get(self, name, default=None, instance=None):
+                return dict.get(self, name, default)
+        from telemffb.hw.ffb_dinput import (axis_setting_key,
+                                            invert_setting_key)
+        monkeypatch.setattr(G, 'system_settings',
+                            S({axis_setting_key(role): choice,
+                               invert_setting_key(role): inverted}),
+                            raising=False)
+        bridge = FakeDIBridge()
+        bridge.actuator_axes = actuators
+        DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        return bridge
+
+    def test_rz_only_pedals_get_the_map(self, monkeypatch):
+        bridge = self._open(monkeypatch, 'pedals', ['RZ'])
+        assert bridge.axis_map == (5, -1, False, False)   # X->RZ, Y unmapped
+
+    def test_identity_is_never_sent(self, monkeypatch):
+        bridge = self._open(monkeypatch, 'pedals', ['X', 'Y'])
+        assert not hasattr(bridge, 'axis_map')
+
+    def test_an_explicit_choice_reaches_the_bridge(self, monkeypatch):
+        bridge = self._open(monkeypatch, 'pedals', ['X', 'Y'], choice='Y')
+        assert bridge.axis_map == (1, -1, False, False)   # X->Y; Y taken, unmapped
+
+    def test_a_joystick_never_sends_one(self, monkeypatch):
+        bridge = self._open(monkeypatch, 'joystick', ['RZ'])
+        assert not hasattr(bridge, 'axis_map')
+
+    def test_inversion_rides_the_map(self, monkeypatch):
+        bridge = self._open(monkeypatch, 'pedals', ['RZ'], inverted=True)
+        assert bridge.axis_map == (5, -1, True, False)
+
+    def test_inversion_alone_is_reason_to_send(self, monkeypatch):
+        """Identity axes but reversed direction: the map must go out."""
+        bridge = self._open(monkeypatch, 'pedals', ['X', 'Y'],
+                            inverted=True)
+        assert bridge.axis_map == (0, 1, True, False)
+
+    def test_collective_inverts_its_own_logical_axis(self, monkeypatch):
+        bridge = self._open(monkeypatch, 'collective', ['X', 'Y'],
+                            inverted=True)
+        assert bridge.axis_map == (0, 1, False, True)
+
+
+class TestLiveAxisMapReapply:
+    """Axis/invert changes apply without a restart: the save flags every
+    instance (the master directly, children over IPC), the flag lands on
+    the device's own poll tick, and the device's effects are recreated -
+    DirectInput fixes an effect's axes at creation, so the downloaded
+    ones would otherwise keep the old map forever."""
+
+    def _open(self, monkeypatch, role='pedals', actuators=('X', 'Y'),
+              choice='auto', inverted=False):
+        import telemffb.globals as G
+        from telemffb.hw.ffb_dinput import (axis_setting_key,
+                                            invert_setting_key)
+        monkeypatch.setattr(G, 'device_type', role, raising=False)
+
+        class S(dict):
+            def get(self, name, default=None, instance=None):
+                return dict.get(self, name, default)
+        settings = S({axis_setting_key(role): choice,
+                      invert_setting_key(role): inverted})
+        monkeypatch.setattr(G, 'system_settings', settings, raising=False)
+        bridge = FakeDIBridge()
+        bridge.actuator_axes = list(actuators)
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge,
+                                 poll_interval_ms=0)
+        return bridge, device, settings
+
+    def test_a_changed_choice_applies_on_the_next_tick(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import axis_setting_key
+        bridge, device, settings = self._open(monkeypatch)
+        assert not hasattr(bridge, 'axis_map')     # identity at open
+        settings[axis_setting_key('pedals')] = 'Y'
+        device.request_axis_map_reapply()
+        device.timerEvent(None)
+        assert bridge.axis_map == (1, -1, False, False)
+        assert getattr(bridge, 'reset_calls', 0) == 1   # effects recreated
+
+    def test_an_unchanged_map_is_a_noop(self, monkeypatch):
+        bridge, device, _ = self._open(monkeypatch)
+        device.request_axis_map_reapply()
+        device.timerEvent(None)
+        assert not hasattr(bridge, 'axis_map')
+        assert getattr(bridge, 'reset_calls', 0) == 0
+
+    def test_reverting_to_identity_is_sent(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import axis_setting_key
+        bridge, device, settings = self._open(monkeypatch, choice='Y')
+        assert bridge.axis_map == (1, -1, False, False)
+        settings[axis_setting_key('pedals')] = 'auto'
+        device.request_axis_map_reapply()
+        device.timerEvent(None)
+        assert bridge.axis_map == (0, 1, False, False)
+
+    def test_a_live_invert_flip_applies(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import invert_setting_key
+        bridge, device, settings = self._open(monkeypatch)
+        settings[invert_setting_key('pedals')] = True
+        device.request_axis_map_reapply()
+        device.timerEvent(None)
+        assert bridge.axis_map == (0, 1, True, False)
+
+    def test_the_ipc_message_flags_the_device(self, monkeypatch):
+        """The child side of the broadcast: flag only - the device work
+        stays off the IPC thread."""
+        from telemffb.hw.ffb_rhino import HapticEffect
+        from telemffb.IPCNetworkThread import IPCNetworkThread
+
+        class Spy:
+            flagged = False
+            def request_axis_map_reapply(self):
+                self.flagged = True
+        spy = Spy()
+        monkeypatch.setattr(HapticEffect, 'device', spy, raising=False)
+        IPCNetworkThread._handle_message(
+            IPCNetworkThread.__new__(IPCNetworkThread),
+            "REAPPLY_AXIS_MAP", ("127.0.0.1", 0))
+        assert spy.flagged
+
+    def test_the_save_reaches_master_and_children(self, monkeypatch):
+        import telemffb.globals as G
+        from telemffb.hw.ffb_rhino import HapticEffect
+        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+
+        class Spy:
+            flagged = False
+            def request_axis_map_reapply(self):
+                self.flagged = True
+
+        class Ipc:
+            sent = []
+            def send_broadcast_message(self, msg):
+                self.sent.append(msg)
+        spy, ipc = Spy(), Ipc()
+        monkeypatch.setattr(HapticEffect, 'device', spy, raising=False)
+        monkeypatch.setattr(G, 'ipc_instance', ipc, raising=False)
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        monkeypatch.setattr(G, 'launched_instances', ['pedals'],
+                            raising=False)
+        SystemSettingsDialog._request_axis_map_reapply_everywhere()
+        assert spy.flagged
+        assert ipc.sent == ['REAPPLY_AXIS_MAP']

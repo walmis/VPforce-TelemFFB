@@ -143,7 +143,7 @@ class DeviceRow(QWidget):
     icon_changed = pyqtSignal(str)
 
     def __init__(self, selector_name, alternates=False, primary=True,
-                 parent=None):
+                 axis_choice=False, parent=None):
         super().__init__(parent)
         self.primary = primary
         row = QHBoxLayout(self)
@@ -188,6 +188,36 @@ class DeviceRow(QWidget):
         self.ids_label.setAlignment(Qt.AlignmentFlag.AlignLeft |
                                     Qt.AlignmentFlag.AlignVCenter)
         row.addWidget(self.ids_label)
+
+        # roles whose effects address one logical axis (pedals X,
+        # collective Y, trim wheel X) can point it at whichever axis a
+        # DirectInput device actually renders force on.  Hidden until a
+        # [DI] device is selected; the dialog fills it with the axes the
+        # device reports.  The joystick never gets one - X/Y untouched.
+        self.axis_label = None
+        self.axis_combo = None
+        self.axis_invert = None
+        if axis_choice:
+            self.axis_label = QLabel('FFB Axis:')
+            self.axis_combo = QComboBox()
+            self.axis_combo.setObjectName(
+                selector_name.replace('cb_select', 'cb_axis'))
+            self.axis_combo.setToolTip(
+                "Which of the device's force feedback axes this role "
+                "drives.\nAuto uses the role's own axis when the device "
+                "has it, otherwise the device's first force-capable "
+                "axis.\nOnly force-capable axes are listed.")
+            self.axis_invert = QCheckBox('Invert')
+            self.axis_invert.setObjectName(
+                selector_name.replace('cb_select', 'cb_axis_inv'))
+            self.axis_invert.setToolTip(
+                "Reverse the axis's direction - forces and position "
+                "both,\nas if the hardware ran the other way.  The "
+                "DirectInput\nequivalent of reversing the axis in "
+                "VPConfigurator.")
+            for w in (self.axis_label, self.axis_combo, self.axis_invert):
+                w.setVisible(False)
+                row.addWidget(w)
         row.addStretch(1)
 
         if alternates:
@@ -229,6 +259,43 @@ class DeviceRow(QWidget):
 
         self.selector.currentIndexChanged.connect(self._refresh_ids)
         self._refresh_ids()
+
+    def show_axis_choice(self, names, current='auto', inverted=False):
+        """List the device's force axes; empty hides the chooser (a
+        VPforce device, or nothing known)."""
+        if self.axis_combo is None:
+            return
+        show = bool(names)
+        self.axis_label.setVisible(show)
+        self.axis_combo.setVisible(show)
+        self.axis_invert.setVisible(show)
+        self.axis_combo.blockSignals(True)
+        self.axis_combo.clear()
+        if show:
+            self.axis_combo.addItem('Auto', 'auto')
+            for name in names:
+                self.axis_combo.addItem(name, name)
+            idx = self.axis_combo.findData(current)
+            self.axis_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.axis_combo.blockSignals(False)
+        self.axis_invert.blockSignals(True)
+        self.axis_invert.setChecked(bool(inverted) if show else False)
+        self.axis_invert.blockSignals(False)
+
+    def axis_choice_value(self):
+        """The stored form of the chooser ('auto' or an axis name), or
+        None while it is hidden - nothing to persist then.  isHidden, not
+        isVisibleTo: a widget on a background tab page reports invisible
+        while very much in play, and the save must see it."""
+        if self.axis_combo is None or self.axis_combo.isHidden():
+            return None
+        return self.axis_combo.currentData() or 'auto'
+
+    def axis_invert_value(self):
+        """The inversion flag, or None while the chooser is hidden."""
+        if self.axis_invert is None or self.axis_invert.isHidden():
+            return None
+        return self.axis_invert.isChecked()
 
     def device_icon(self) -> str:
         if self.icon_group is None:
@@ -376,7 +443,8 @@ class RoleCard(QFrame):
         # primary device row (the active device whenever the card is at
         # rest; the marker may move to an alternate within a session)
         self.primary_row = DeviceRow(f'cb_select_{suffix}',
-                                     alternates=alternates, primary=True)
+                                     alternates=alternates, primary=True,
+                                     axis_choice=(role != 'joystick'))
         self.body.addWidget(self.primary_row)
         self.selector = self.primary_row.selector
         self.marker_group = None
@@ -517,6 +585,7 @@ class DeviceCardsPanel(QWidget):
     #: attribute names the dialog re-binds onto itself for compatibility
     LEGACY_WIDGETS = (
         'cb_select_j', 'cb_select_p', 'cb_select_c', 'cb_select_t',
+        'cb_axis_p', 'cb_axis_c', 'cb_axis_t',
         'rb_master_j', 'rb_master_p', 'rb_master_c', 'rb_master_t',
         'cb_al_enable',
         'cb_al_enable_j', 'cb_al_enable_p', 'cb_al_enable_c', 'cb_al_enable_t',
@@ -558,6 +627,8 @@ class DeviceCardsPanel(QWidget):
             self.cards[role] = card
             layout.addWidget(card)
             setattr(self, f'cb_select_{suffix}', card.selector)
+            if role != 'joystick':
+                setattr(self, f'cb_axis_{suffix}', card.primary_row.axis_combo)
             setattr(self, f'rb_master_{suffix}', card.master_radio)
         self.joystick_card = self.cards['joystick']
 
