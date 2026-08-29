@@ -76,6 +76,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._trim_curve_y_pts = None   # transitional single-curve view (median entry) for display
         self._trim_blend_last_v = None  # last valid IAS (kt) fed to the blend — in-frame dropout guard
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
+        self._fw_override_supported_last = None
 
     @property
     def joystick_trim_follow_curve_y(self) -> Optional[str]:
@@ -253,18 +254,38 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     def _firmware_axis_override_supported(self) -> bool:
         if not HapticEffect.device:
             return False
+        if not HapticEffect.device.connected:
+            return False
         return HapticEffect.device.supports_axis_override()
 
     def _use_firmware_axis_backend(self) -> bool:
         if not (self._axis_control_enabled() and self.use_firmware_axis_override):
             return False
         supported = self._firmware_axis_override_supported()
-        if not supported:
-            logging.warning("Firmware axis override requested but not supported; falling back to simulator backend")
+        if supported != self._fw_override_supported_last:
+            self._fw_override_supported_last = supported
+            if not supported:
+                logging.warning(
+                    "Firmware axis override requested but not supported; "
+                    "falling back to simulator backend")
         return supported
 
     def _use_sim_axis_backend(self) -> bool:
         return self._axis_control_enabled() and not self._use_firmware_axis_backend()
+
+    def _device_feeding(self) -> bool:
+        """Whether the FFB device is connected and delivering HID input.
+
+        Axis overrides must never be claimed without a live device: the
+        plugin pins the virtual yoke/rudder to whatever we send, so a dead
+        instance would feed zeros/stale values and silence the user's real
+        controller. Re-checked every frame, so a hot-unplug releases the
+        override and a reconnect reclaims it.
+        """
+        device = HapticEffect.device
+        if device is None or not device.connected:
+            return False
+        return device.get_input() is not None
 
     def _send_firmware_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
         if not self._use_firmware_axis_backend():
@@ -368,16 +389,21 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
                 self.__xplane_axis_override_active = False
             return
 
+        feeding = self._device_feeding()
+
         if (
             self.telemffb_controls_axes
             and not self.local_disable_axis_control
+            and feeding
             and not self.__xplane_axis_override_active
         ):
             sendstr = f"OVERRIDE:{self.telem_data.FFBType}=true"
             self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
             self.__xplane_axis_override_active = True
-        elif self.__xplane_axis_override_active and not self.telemffb_controls_axes:
+        elif self.__xplane_axis_override_active and (
+            not self.telemffb_controls_axes or not feeding
+        ):
             sendstr = f"OVERRIDE:{self.telem_data.FFBType}=false"
             self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
