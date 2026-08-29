@@ -206,8 +206,9 @@ def userconfig_with_refs(monkeypatch, *values):
     monkeypatch.setattr(store, '_user_root', root, raising=False)
     monkeypatch.setattr(store, '_user_tree', tree, raising=False)
     writes = []
-    monkeypatch.setattr(xmlutils, 'write_userconfig_xml',
-                        lambda t: writes.append(t))
+    # the persist goes through the store too, for the same reason
+    monkeypatch.setattr(store, 'write_userconfig',
+                        lambda t=None: writes.append(t))
     return root, writes
 
 
@@ -682,3 +683,4 @@ class TestEventHubLifetime:
     def test_a_live_hub_is_reused(self, app):
         from telemffb import app_events
         assert app_events.events() is app_events.events()
+

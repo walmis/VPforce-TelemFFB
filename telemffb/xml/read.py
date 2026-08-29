@@ -159,7 +159,9 @@ class ConfigResolver:
             # A stored preference goes inert, not lost - it resurfaces
             # when a second device is configured again.
             if name in ('device_group', 'joystick_device'):
-                from telemffb.xmlutils import multiple_joystick_devices
+                # imported here, not at module scope: telemffb.utils
+                # imports the xmlutils shim, which imports this module
+                from telemffb.utils import multiple_joystick_devices
                 if not multiple_joystick_devices():
                     continue
             exclusive_with = elem.findtext('exclusive_with', '')

@@ -48,7 +48,6 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Optional
 
-import telemffb.globals as G
 from telemffb.xml.store import XmlStore, try_parse as _store_try_parse
 from telemffb.xml.read import ConfigResolver
 from telemffb.xml.write import ConfigWriter
@@ -972,61 +971,3 @@ def apply_validvalue_overrides_from_root(data_list: list[DefaultDataRow], sim: s
     """
     return _resolver()._apply_validvalue_overrides(
         data_list, sim, model_class, instance_device)
-
-# ── Per-aircraft joystick device selection ─────────────────────────
-# The 'joystick_device' aircraft setting names one of the joystick
-# role's configured devices by devpath, so a device change in System
-# Settings is what makes these entries stale.  Kept here rather than in
-# telemffb.xml because they are TelemFFB policy over the user config,
-# not part of the XML layer's own read/write contract.
-
-def find_joystick_device_references(devpath):
-    """User-config entries whose per-aircraft device setting names this
-    devpath, across every scope (sim, class, model).
-
-    The caller offers to rewrite them - see
-    update_joystick_device_references.
-    """
-    root = _store().auto_user_root
-    if root is None:
-        return []
-    refs = []
-    for tag in ('models', 'classSettings', 'simSettings'):
-        for elem in root.findall(tag):
-            if elem.findtext('name') != 'joystick_device':
-                continue
-            if (elem.findtext('value') or '') == devpath:
-                refs.append(elem)
-    return refs
-
-
-def describe_setting_scope(elem):
-    """A user-config entry's scope, phrased for a prompt."""
-    if elem.tag == 'models':
-        return elem.findtext('model') or 'unknown aircraft'
-    if elem.tag == 'classSettings':
-        return f"{elem.findtext('type') or 'unknown'} (class default)"
-    return f"all {elem.findtext('sim') or 'sim'} aircraft (sim default)"
-
-
-def update_joystick_device_references(old_path, new_path):
-    """Rewrite every user-config reference to a replaced joystick device
-    and persist.  Returns the number of entries changed."""
-    refs = find_joystick_device_references(old_path)
-    for elem in refs:
-        elem.find('value').text = new_path
-    if refs:
-        write_userconfig_xml(_store().auto_user_tree)
-    return len(refs)
-
-
-def multiple_joystick_devices():
-    """Whether the joystick role has more than one device configured -
-    the gate for the per-aircraft device selection (a single-device rig
-    has nothing to choose between).  Never hides on plumbing failure."""
-    try:
-        return sum(1 for suffix in ('', '_2', '_3')
-                   if G.system_settings.get(
-                       f'devpath_joystick{suffix}', '')) > 1
-    except Exception:
-        return True

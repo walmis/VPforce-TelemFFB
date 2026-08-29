@@ -4409,6 +4409,24 @@ def active_joystick_slot_suffix(settings, devpath):
     return None
 
 
+def multiple_joystick_devices(settings=None):
+    """Whether the joystick role has more than one device configured.
+
+    The gate for the per-aircraft device selection: a single-device rig
+    has nothing to choose between, so that setting and its section
+    header disappear from the form and from runtime resolution.  A
+    stored preference goes inert, not lost - it resurfaces when a
+    second device is configured again.  Never hides on plumbing
+    failure: an unreadable settings store returns True, which shows
+    the setting rather than silently dropping it.
+    """
+    try:
+        settings = settings if settings is not None else G.system_settings
+        return len(joystick_device_choices(settings)) > 1
+    except Exception:
+        return True
+
+
 def joystick_device_choices(settings):
     """The joystick role's configured devices, as (devpath, label) pairs.
 

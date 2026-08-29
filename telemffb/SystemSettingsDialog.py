@@ -141,6 +141,19 @@ class _ImportedSettings:
             return val
 
 
+def _describe_setting_scope(elem):
+    """A user-config entry's scope, phrased for a prompt.
+
+    Presentation, so it lives with the prompt it serves rather than in
+    the XML layer that produced the element.
+    """
+    if elem.tag == 'models':
+        return elem.findtext('model') or 'unknown aircraft'
+    if elem.tag == 'classSettings':
+        return f"{elem.findtext('type') or 'unknown'} (class default)"
+    return f"all {elem.findtext('sim') or 'sim'} aircraft (sim default)"
+
+
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None,):
         super(SystemSettingsDialog, self).__init__(parent)
@@ -2541,6 +2554,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         nothing sensible to rewrite to.
         """
         from telemffb import xmlutils
+        from telemffb.xml import devices as xml_devices
         before_idents = before_idents or {}
         after = {suffix: str(G.system_settings.get(
                      f'devpath_joystick{suffix}', '') or '')
@@ -2554,14 +2568,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if old in after_paths or new in before_paths:
                 continue        # a shuffle between slots, not a departure
             try:
-                refs = xmlutils.find_joystick_device_references(old)
+                refs = xml_devices.find_references(xmlutils._store(), old)
             except Exception:
                 logging.exception('Aircraft device reference scan failed')
                 continue
             if not refs:
                 continue
-            scopes = sorted({xmlutils.describe_setting_scope(e)
-                             for e in refs})
+            scopes = sorted({_describe_setting_scope(e) for e in refs})
             shown = '\n'.join(f'    {s}' for s in scopes[:12])
             if len(scopes) > 12:
                 shown += f'\n    ... and {len(scopes) - 12} more'
@@ -2578,7 +2591,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes)
             if answer == QMessageBox.StandardButton.Yes:
-                count = xmlutils.update_joystick_device_references(old, new)
+                count = xml_devices.update_references(
+                    xmlutils._store(), old, new)
                 logging.info(f'Updated {count} aircraft device '
                              f'reference(s) to {new_name}')
 
