@@ -651,6 +651,7 @@ class FFBEffectHandle:
         self.type = effect_type
         self._finalizer = weakref.finalize(self, lambda ref: ref() and ref().destroy(), weakref.ref(self))
         self._cache = {}
+        self._cache_device_alive = True  # liveness snapshot for change-cache flushes
         self._started = False
 
     def invalidate(self):
@@ -669,12 +670,36 @@ class FFBEffectHandle:
 
     def _data_changed(self, key, data) -> bool:
         h = hash(data)
+        alive = self._device_alive()
+        if alive != self._cache_device_alive:
+            # Liveness flipped: while dead, writes were skipped, so the
+            # cache no longer reflects what the firmware actually holds.
+            # Forget it, and the current value re-sends once.
+            self._cache.clear()
+            self._cache_device_alive = alive
         if not self._cache.get(key):
             self._cache[key] = h
             return True
         changed = self._cache[key] != h
         self._cache[key] = h
-        return changed  
+        return changed
+
+    def forget_playback(self):
+        """Clear in-memory playback state without touching the device."""
+        self._started = False
+
+    def _write(self, data) -> int:
+        """Offline-safe device write for per-frame configuration writers.
+
+        A dead handle (hot-unplug or failed open) must not raise into the
+        60-120 Hz telemetry path, so the write is skipped.  The change
+        cache is flushed on the dead->alive transition (see
+        ``_data_changed``), so skipped configuration re-sends exactly once
+        after the device returns.
+        """
+        if not self._device_alive():
+            return 0
+        return self.ffb.write(data)
 
     def __del__(self):
         self.destroy()
@@ -755,7 +780,7 @@ class FFBEffectHandle:
 
         op = bytes(FFBReport_SetConstantForce(magnitude=round(4096*magnitude), effectBlockIndex=self.effect_id))
         if self._data_changed("SetConstantForce", op): 
-            self.ffb.write(op)
+            self._write(op)
 
         return self
 
@@ -770,7 +795,7 @@ class FFBEffectHandle:
 
         op = bytes(FFBReport_SetEffect(**args))
         if self._data_changed("setEffect", op):  
-            self.ffb.write(op)
+            self._write(op)
     
     def setCondition(self, cond : FFBReport_SetCondition):
         cond.effectBlockIndex = self.effect_id
@@ -784,7 +809,7 @@ class FFBEffectHandle:
             cond.negativeCoefficient = clamp(cond.negativeCoefficient, -4096, 4096)
         data = bytes(cond)
         if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
-            self.ffb.write(data)
+            self._write(data)
 
     def setEnvelope(self, envelope: FFBReport_SetEnvelope):
         """Set envelope parameters for the effect.
@@ -795,7 +820,7 @@ class FFBEffectHandle:
         envelope.effectBlockIndex = self.effect_id
         data = bytes(envelope)
         if self._data_changed("setEnvelope", data):
-            self.ffb.write(data)
+            self._write(data)
 
     def setPeriodic(self, freq, magnitude, direction, duration=0, **kwargs):
         assert(self.type in PERIODIC_EFFECTS)
@@ -814,7 +839,7 @@ class FFBEffectHandle:
         op = bytes(FFBReport_SetPeriodic(magnitude=mag, effectBlockIndex=self.effect_id, period=period, **kwargs))
 
         if self._data_changed("SetPeriodic", op):
-            self.ffb.write(op)
+            self._write(op)
 
         return self
 
@@ -1169,6 +1194,18 @@ class HapticEffect(Destroyable):
 
     device : Optional[FFBRhino] = None
 
+    @staticmethod
+    def _device_alive() -> bool:
+        """Whether the shared device can accept writes right now.
+
+        A device is alive only when the class-level reference is set and
+        its HID handle is open.  ``None`` covers a failed startup open
+        (the app keeps running as a zombie); a live-but-disconnected
+        handle covers a hot-unplug mid-run.
+        """
+        dev = HapticEffect.device
+        return dev is not None and dev.connected
+
     #: Every effect this application has created, so a session can be torn
     #: down completely.  Most effects live in the global `G.effects`
     #: dispenser, but some are held directly on a mixin (the advanced spring
@@ -1190,6 +1227,7 @@ class HapticEffect(Destroyable):
         self._h_effect : Optional[FFBEffectHandle] = None
         self.modulator : Optional[FFBReport_SetCondition] = None
         self.effect_type : Optional[int] = None
+        self._defer_start_logged : bool = False  # rate-limit the offline no-op debug log
         # Lazy initialization state
         self._pending_create = None  # function for creating the effect (lazy initialization)
         self._pending_conditions = {} # functions for setting condition (lazy initialization)
@@ -1233,11 +1271,18 @@ class HapticEffect(Destroyable):
         """Allocate the underlying effect on the device if it hasn't been yet.
 
         If this object was configured before allocation, the pending create
-        function and any pending condition setters will be executed. Raises
-        an AssertionError if the effect was previously destroyed.
+        function and any pending condition setters will be executed. If the
+        device is not alive the pending creation is left intact so the
+        effect replays unchanged on recovery.
         """
         if not self._h_effect:
             assert self._pending_create is not None
+            if not self._device_alive():
+                # Defense in depth: the handle was dropped between the
+                # caller check and now.  Keep _pending_create untouched.
+                logging.debug(
+                    f"HapticEffect._ensure_effect_created: device not connected, deferring {self.name!r}")
+                return
             # Execute the pending create function
             self._pending_create()
             # If there are pending conditions to set, do it now
@@ -1687,9 +1732,36 @@ class HapticEffect(Destroyable):
 
         Returns:
             Self for chaining.
+
+        With a missing or disconnected device this is a silent no-op that
+        keeps ``_pending_create`` intact, so the effect replays exactly
+        when the device returns.  It never raises into the 60-120 Hz
+        telemetry path.
         """
+        if not self._device_alive():
+            if self._h_effect and self._h_effect.started:
+                # The (now impossible) playback is forgotten, so a live
+                # start() after recovery re-sends OP_START.
+                self._h_effect.forget_playback()
+            if not self._defer_start_logged:
+                self._defer_start_logged = True
+                logging.debug(
+                    f"HapticEffect.start: device not connected, deferring effect {self.name!r} until recovery")
+            return self
+        self._defer_start_logged = False
+
         # Ensure effect is created before starting
-        self._ensure_effect_created()
+        try:
+            self._ensure_effect_created()
+        except HIDDisconnectedError:
+            # The handle was dropped mid-creation; its block is gone with
+            # it, so drop the half-configured handle and replay from the
+            # pending creation on the next live frame.
+            self._h_effect = None
+            self._envelope_applied = False
+            logging.debug(
+                f"HapticEffect.start: device disconnected during creation, effect {self.name!r} will replay")
+            return self
 
         if self._h_effect and (not self.started or force):
             if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -1698,7 +1770,13 @@ class HapticEffect(Destroyable):
                 logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""
             logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
-            self._h_effect.start(**kw)
+            try:
+                self._h_effect.start(**kw)
+            except HIDDisconnectedError:
+                # Lost the handle between the liveness check and the write;
+                # recreate on the next live frame.
+                self._h_effect = None
+                return self
             self._stopped_time = 0
 
         return self
@@ -1714,16 +1792,25 @@ class HapticEffect(Destroyable):
             Self for chaining.
         """
         if self._h_effect and self._h_effect.started:
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                caller_frame = inspect.currentframe().f_back
-                caller_name = caller_frame.f_code.co_name
-                logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
-            name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            if self._device_alive():
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    caller_frame = inspect.currentframe().f_back
+                    caller_name = caller_frame.f_code.co_name
+                    logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
+                name = f" (\"{self.name}\")" if self.name else ""  
+                logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            else:
+                # Device is gone: stop playback in memory only.  The
+                # one-time envelope stays pending so it is (re)applied on
+                # the next live start, matching live stop() semantics.
+                logging.debug(
+                    f"HapticEffect.stop: device disconnected, stopping effect {self._h_effect.effect_id} in-memory only")
+            # FFBEffectHandle.stop() is itself offline-safe.
             self._h_effect.stop()
-            
-            # Clear envelope if it was marked as one-time use
-            if self._envelope_once and self._pending_envelope:
+
+            # Clear envelope if it was marked as one-time use (and the
+            # device can actually receive the clear).
+            if self._device_alive() and self._envelope_once and self._pending_envelope:
                 clear_envelope = FFBReport_SetEnvelope(
                     attackFromForce=0,
                     decayToForce=0,
@@ -1734,7 +1821,7 @@ class HapticEffect(Destroyable):
                 self._pending_envelope = None
                 self._envelope_applied = False
                 self._envelope_once = False
-            
+
             if destroy_after:
                 if not self._stopped_time:
                     self._stopped_time = millis()
@@ -1752,12 +1839,19 @@ class HapticEffect(Destroyable):
         that require an allocated effect will recreate it lazily.
         """
         if self._h_effect:
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                caller_frame = inspect.currentframe().f_back
-                caller_name = caller_frame.f_code.co_name
-                logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
-            name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            if self._device_alive():
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    caller_frame = inspect.currentframe().f_back
+                    caller_name = caller_frame.f_code.co_name
+                    logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
+                name = f" (\"{self.name}\")" if self.name else ""  
+                logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            else:
+                # The block dies with the handle; freeing it in memory only
+                # keeps teardown/finalizer paths exception-free.
+                logging.debug(
+                    f"HapticEffect.destroy: device disconnected, freeing effect {self._h_effect.effect_id} in-memory only")
+            # FFBEffectHandle.destroy() is itself offline-safe.
             self._h_effect.destroy()
             self._h_effect = None
 
