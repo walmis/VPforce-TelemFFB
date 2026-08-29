@@ -634,8 +634,8 @@ def _convert_user_config():
     Converts user config from legacy single user profile to multi-user profile capabilities.
     """
     if G.master_instance:
-        xmlutils.update_roots()
         xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+        xmlutils.update_roots()
         utils.convert_legacy_userconfig(G.userconfig_path)
 
 
@@ -650,8 +650,8 @@ def _initialize_settings_manager():
     3. If corruption detected, offer backup/reset option
     4. Create new default config if user agrees
     """
-    xmlutils.update_roots()
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+    xmlutils.update_roots()
     try:
         G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
                                       userconfig_path=G.userconfig_path,
