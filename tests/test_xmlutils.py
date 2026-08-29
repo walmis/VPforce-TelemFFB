@@ -372,6 +372,34 @@ class TestUpdateVarsAndRoots:
 # read_xml_file
 # ─────────────────────────────────────────────────────────────
 
+class TestDeviceScopeSwitchKeepsTrees:
+    """Changing the active device must not lose the parsed trees.
+
+    The legacy module's update_vars() only set globals; the parsed trees
+    persisted until the next update_roots().  The master's device-scope
+    switch (MainWindow, viewing a child instance's settings) changes the
+    device and reads immediately - with the facade rebuilding an EMPTY
+    store on device change, every read returned nothing, the loaded
+    aircraft came back unknown, and the new-aircraft wizard fired
+    (field regression after the merge)."""
+
+    def test_reads_survive_a_device_change_without_update_roots(
+            self, xml_tmpdir):
+        before = xmlutils.read_xml_file("MSFS", "joystick")
+        assert before                      # parsed and readable
+
+        xmlutils.update_vars("pedals", xml_tmpdir["userconfig"],
+                             xml_tmpdir["defaults"])
+        after = xmlutils.read_xml_file("MSFS", "joystick")
+        assert after == before             # same trees, no re-parse needed
+
+    def test_switching_back_and_forth_keeps_reading(self, xml_tmpdir):
+        for dev in ("pedals", "collective", "joystick", "trimwheel"):
+            xmlutils.update_vars(dev, xml_tmpdir["userconfig"],
+                                 xml_tmpdir["defaults"])
+            assert xmlutils.read_xml_file("MSFS", "joystick")
+
+
 class TestReadXmlFile:
     def test_returns_settings_for_matching_sim_device(self, xml_tmpdir):
         result = xmlutils.read_xml_file("MSFS", "joystick")
