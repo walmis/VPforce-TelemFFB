@@ -730,8 +730,9 @@ def _setup_ipc_and_connections():
 def _maybe_start_api_server(src):
     # MSFS toolbar panel only: the API server has nothing to serve for other
     # sims, and only the master instance's SettingsManager reflects a device
-    # worth exposing, so gate on both.
-    if G.master_instance and src == "MSFS":
+    # worth exposing, so gate on both - plus the System Settings > Simulator
+    # Setup > MSFS > Options toggle (default on).
+    if G.master_instance and src == "MSFS" and G.system_settings.get('enableMsfsApiServer', True):
         start_api_server(G.settings_mgr)
 
 

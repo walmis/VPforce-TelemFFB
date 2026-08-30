@@ -11,6 +11,7 @@ idempotent and safe to call from the Qt thread.
 """
 
 import logging
+import re
 import threading
 from typing import Any, Optional
 
@@ -71,6 +72,22 @@ def _validvalues_bounds(item: dict, default=(0.0, 100.0)) -> tuple[float, float]
     return default
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def _strip_html(text: str, max_len: Optional[int] = None) -> str:
+    """Desktop 'info' and even some 'displayname' strings are sometimes full
+    HTML (with <br>, <b>, <img> tags etc.) meant for a QLabel. The panel only
+    ever shows this as plain text, and the in-sim browser doesn't render it
+    as HTML at all - so strip markup (and cap length for the long ones)
+    rather than shipping raw tags down to the panel."""
+    text = _WS_RE.sub(" ", _TAG_RE.sub(" ", text)).strip()
+    if max_len is not None and len(text) > max_len:
+        text = text[: max_len - 3].rstrip() + "..."
+    return text
+
+
 def _build_control(item: dict) -> Optional[dict]:
     """Turn one settings row into a JSON-friendly control spec, or None to
     exclude it (group headers, dialogs, free-text fields)."""
@@ -80,12 +97,12 @@ def _build_control(item: dict) -> Optional[dict]:
         return None
     base = {
         "name": name,
-        "displayname": item.get("displayname") or name,
+        "displayname": _strip_html(item.get("displayname") or name),
         "grouping": item.get("grouping") or "",
         "order": item.get("order") or "",
         "indent": item.get("indent") or 0,
         "unit": item.get("unit") or "",
-        "info": item.get("info") or "",
+        "info": _strip_html(item.get("info") or "", max_len=200),
     }
 
     if datatype in _BOOL_TYPES:
@@ -165,10 +182,19 @@ def _current_state() -> dict:
     return {
         "sim": sm.current_sim,
         "aircraft": sm.current_aircraft_name,
+        "pattern": sm.current_pattern,
         "class": sm.current_class,
         "device": sm.device,
         "connected": sm.current_sim == "MSFS" and not sm.timed_out,
     }
+
+
+@app.get("/")
+def root():
+    # No content lives here - it's just a sanity-check landing point for
+    # anyone hitting the bare host:port in a browser. See /docs for the
+    # interactive API explorer FastAPI generates automatically.
+    return {"ok": True, "see": ["/api/status", "/api/settings", "/docs"]}
 
 
 @app.get("/api/status")
@@ -232,7 +258,7 @@ _thread: Optional[threading.Thread] = None
 _lock = threading.Lock()
 
 
-def start_api_server(settings_mgr, host="127.0.0.1", port=9010):
+def start_api_server(settings_mgr, host="127.0.0.1", port=9873):
     """Start the API server if it isn't already running. Safe to call
     repeatedly (e.g. on every MSFS reconnect) - idempotent."""
     global _settings_mgr, _server, _thread

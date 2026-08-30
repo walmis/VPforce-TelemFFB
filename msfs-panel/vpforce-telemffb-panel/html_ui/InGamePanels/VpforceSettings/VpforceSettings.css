@@ -1,4 +1,4 @@
-ingame-ui#VpforceSettings {
+ingame-ui.vpforce-panel {
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -6,7 +6,7 @@ ingame-ui#VpforceSettings {
   height:100% !important;
   width: 100% !important;
 }
-ingame-ui#VpforceSettings #VpforceSettingsWrap {
+ingame-ui.vpforce-panel #VpforceSettingsWrap {
   display: flex;
   flex-direction: column;
   width: 100% !important;
@@ -17,17 +17,17 @@ ingame-ui#VpforceSettings #VpforceSettingsWrap {
   align-items: stretch !important;
   flex: 1 1 auto !important;
 }
-ingame-ui#VpforceSettings #VpforceSettingsWrap #VpforceSettingsIframe {
+ingame-ui.vpforce-panel #VpforceSettingsWrap #VpforceSettingsIframe {
   flex: 1 1 auto !important;
   border: 0;
 }
-ingame-ui#VpforceSettings #MainDisplay.hidden {
+ingame-ui.vpforce-panel #MainDisplay.hidden {
   display: none;
 }
-ingame-ui#VpforceSettings #Footer.hidden {
+ingame-ui.vpforce-panel #Footer.hidden {
   display: none;
 }
-ingame-ui#VpforceSettings .ingameUiContent {
+ingame-ui.vpforce-panel .ingameUiContent {
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;
@@ -38,7 +38,7 @@ ingame-ui#VpforceSettings .ingameUiContent {
   align-items: stretch !important;
   flex: 1 1 auto !important;
 }
-ingame-ui#VpforceSettings .ingameUiWrapper {
+ingame-ui.vpforce-panel .ingameUiWrapper {
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;

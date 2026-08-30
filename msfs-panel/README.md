@@ -14,7 +14,7 @@ stopped on sim exit. The panel itself is a static page bundled into the MSFS
 package (`html_ui/InGamePanels/VpforceSettings/panel.html`), so opening the
 toolbar panel works regardless of exactly when the API server comes up; it
 just shows "Waiting for TelemFFB / MSFS aircraft..." until `GET
-http://127.0.0.1:9010/api/status` reports connected.
+http://127.0.0.1:9873/api/status` reports connected.
 
 ## What's exposed
 
@@ -57,30 +57,38 @@ regenerates `layout.json` via `build_layout.py` (which just walks the
 package folder and writes real file sizes/timestamps - no need to
 hand-maintain that file after edits).
 
-**Unverified:** the `.spb` output filename in `build.bat` is inferred from
-how the upstream template's build.bat named it (matching the `AssetGroup`
-name, not the `<Filename>` tag in the `PackageSources` XML) - I couldn't
-run `fspackagetool` myself to confirm. If the copy step in `build.bat`
-fails, check what `fspackagetool` actually produced under
-`vpforce-telemffb-panel\Build\Packages\vpforce-telemffb-panel\Build\` and
-adjust the source filename in `build.bat` to match.
-
 Then copy the `vpforce-telemffb-panel` folder (**not** its `Build`
-subfolder) into your Community folder.
+subfolder) into your Community folder, and fully restart MSFS after any
+edit under `html_ui/` - those files aren't compiled into the `.spb`, MSFS
+just reads them directly from Community, but the toolbar seems to cache
+panel/icon content for the life of the sim session.
 
-## Not yet tuned / tested in-sim
+Confirmed working on the MSFS 2024 SDK (`fspackagetool` needs `-nopause`,
+not the 2020 template's `-nomirroring`, which doesn't exist there - the
+`.spb` lands at `vpforce-telemffb-panel\Build\Packages\vpforce-telemffb-panel\Build\vpforce-telemffb-panel.spb`
+as `build.bat` assumes). Toolbar icons load from
+`html_ui/icons/toolbar/<icon-attribute-lowercased>.svg` - a different
+convention than the 2020-era template used
+(`html_ui/Textures/Menu/toolbar/`), found via the exact path MSFS's debug
+console reported when the icon failed to load.
 
-I don't have an MSFS install to test against, so a few things are
-placeholder and worth checking once you can actually open the panel:
+`panel.js` talks to the API on port 9873 (`API_BASE` at the top of the
+file) - keep this in sync with the `start_api_server()` call in `main.py`
+if you ever change it.
+
+**Coherent GT's JS engine doesn't implement `Promise.prototype.finally()`**
+(ES2018) - it throws `TypeError: undefined is not a function` at the call
+site, silently killing whatever promise chain it's in. `panel.js` avoids it
+everywhere in favor of the two-argument `.then(onSuccess, onError)` form
+(ES2015). Keep that in mind if you extend the script - it's not just this
+one method that might be missing; the safe move is to stick to broadly
+-supported Promise/fetch APIs and check the in-sim debug console (Options →
+General → Developer Options) after any change that touches promises.
+
+## Not yet tuned
 
 - `minWidth`/`minHeight`/`defaultWidth`/`defaultHeight`/`defaultTop`/`defaultRight`
   in `Build/PackageSources/vpforce-telemffb-panel.xml` are guessed (scaled
   up from the template's tiny single-webpage-viewer defaults to something
   more reasonable for a scrollable settings list) - resize/reposition to
   taste.
-- The toolbar icon is a plain placeholder SVG (three sliders) - swap
-  `html_ui/Textures/Menu/toolbar/ICON_TOOLBAR_VPFORCE_TELEMFFB_SETTINGS.svg`
-  for real artwork if you want.
-- `panel.js` hardcodes `http://127.0.0.1:9010` as the API base - keep this
-  in sync if you ever start the server on a different port (see the
-  `start_api_server()` call in `main.py`).

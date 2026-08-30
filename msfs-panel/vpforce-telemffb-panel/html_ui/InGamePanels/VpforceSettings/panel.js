@@ -5,22 +5,50 @@
 // here is: poll for connectivity, render whatever it currently offers, and
 // don't fight the user while they're mid-drag on a control.
 
-const API_BASE = "http://127.0.0.1:9010";
+const API_BASE = "http://127.0.0.1:9873";
 const STATUS_POLL_MS = 2000;
 const SETTINGS_POLL_MS = 3000;
-const RANGE_COMMIT_DEBOUNCE_MS = 400;
+const FETCH_TIMEOUT_MS = 5000;
+const LOG_PREFIX = "[VPFORCE-PANEL]";
+// Requested order had 175 before 150 - reordered to ascending so a +/- stepper
+// actually moves monotonically in one direction.
+const SCALE_STEPS = [100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500];
+
+function log(...args) {
+    console.log(LOG_PREFIX, ...args);
+}
 
 const state = {
     connected: false,
     settings: [],       // last-known list from the server
-    pendingRangeTimers: new Map(),  // name -> setTimeout id
 };
 
 function apiGet(path) {
-    return fetch(API_BASE + path, { cache: "no-store" }).then((r) => {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-    });
+    let timer = null;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    if (controller) {
+        timer = setTimeout(() => {
+            log("timing out request:", path);
+            controller.abort();
+        }, FETCH_TIMEOUT_MS);
+    }
+    const opts = { cache: "no-store" };
+    if (controller) opts.signal = controller.signal;
+
+    // Coherent GT's JS engine doesn't implement Promise.prototype.finally
+    // (ES2018) - use the two-argument .then(onSuccess, onError) form
+    // everywhere instead, which is supported since ES2015.
+    return fetch(API_BASE + path, opts).then(
+        (r) => {
+            if (timer) clearTimeout(timer);
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+        },
+        (err) => {
+            if (timer) clearTimeout(timer);
+            throw err;
+        }
+    );
 }
 
 function apiPost(name, value, unit) {
@@ -39,41 +67,51 @@ function setConnected(connected, statusPayload) {
     document.body.classList.toggle("disconnected", !connected);
     const sub = document.getElementById("headerSub");
     if (connected && statusPayload) {
-        sub.textContent = (statusPayload.aircraft || "?") + "  •  " + (statusPayload.class || "");
+        const name = statusPayload.pattern || statusPayload.aircraft || "?";
+        sub.textContent = statusPayload.device ? name + " - " + statusPayload.device : name;
     } else {
         sub.textContent = "Not connected";
     }
 }
 
 function pollStatus() {
-    apiGet("/api/status")
-        .then((s) => {
+    apiGet("/api/status").then(
+        (s) => {
             setConnected(!!s.connected, s);
-        })
-        .catch(() => {
-            setConnected(false, null);
-        })
-        .finally(() => {
             setTimeout(pollStatus, STATUS_POLL_MS);
-        });
+        },
+        (err) => {
+            log("status poll failed:", err && err.message);
+            setConnected(false, null);
+            setTimeout(pollStatus, STATUS_POLL_MS);
+        }
+    );
 }
 
 function pollSettings() {
-    if (state.connected) {
-        apiGet("/api/settings")
-            .then((data) => {
-                state.settings = data.settings || [];
-                renderSettings(state.settings);
-            })
-            .catch(() => {
-                /* leave last-rendered list in place; status poll will flag disconnect */
-            })
-            .finally(() => {
-                setTimeout(pollSettings, SETTINGS_POLL_MS);
-            });
-    } else {
-        setTimeout(pollSettings, SETTINGS_POLL_MS);
-    }
+    log("fetching /api/settings...");
+    apiGet("/api/settings").then(
+        (data) => {
+            log("got settings response, count =", (data.settings || []).length);
+            state.settings = data.settings || [];
+            renderSettings(state.settings);
+            setTimeout(pollSettings, SETTINGS_POLL_MS);
+        },
+        (err) => {
+            log("settings poll failed:", err && err.message);
+            showError("Couldn't load settings: " + (err && err.message));
+            setTimeout(pollSettings, SETTINGS_POLL_MS);
+        }
+    );
+}
+
+function showError(message) {
+    const root = document.getElementById("settingsList");
+    root.innerHTML = "";
+    const el = document.createElement("div");
+    el.className = "errorBanner";
+    el.textContent = message;
+    root.appendChild(el);
 }
 
 function groupKey(item) {
@@ -88,51 +126,66 @@ function orderValue(v) {
 function renderSettings(settings) {
     const root = document.getElementById("settingsList");
 
-    // Don't blow away a control the user is currently touching.
-    const active = document.activeElement;
-    const activeName = active && active.dataset ? active.dataset.name : null;
-
-    const groups = new Map();
-    for (const item of settings) {
-        const key = groupKey(item);
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(item);
+    if (!settings.length) {
+        root.innerHTML = "";
+        const el = document.createElement("div");
+        el.className = "errorBanner";
+        el.textContent = "Connected, but the server has no editable settings for this aircraft right now.";
+        root.appendChild(el);
+        return;
     }
-    const groupNames = Array.from(groups.keys()).sort((a, b) => {
-        const ao = orderValue(groups.get(a)[0].order);
-        const bo = orderValue(groups.get(b)[0].order);
-        return ao - bo;
-    });
 
-    root.innerHTML = "";
-    for (const groupName of groupNames) {
-        const items = groups.get(groupName).sort((a, b) => orderValue(a.order) - orderValue(b.order));
+    try {
+        // Don't blow away a control the user is currently touching.
+        const active = document.activeElement;
+        const activeName = active && active.dataset ? active.dataset.name : null;
 
-        const groupEl = document.createElement("div");
-        groupEl.className = "group";
-
-        const title = document.createElement("div");
-        title.className = "groupTitle";
-        title.textContent = groupName;
-        groupEl.appendChild(title);
-
-        for (const item of items) {
-            if (item.name === activeName) continue; // skip re-render of the row being edited
-            groupEl.appendChild(renderRow(item));
+        const groups = new Map();
+        for (const item of settings) {
+            const key = groupKey(item);
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(item);
         }
+        const groupNames = Array.from(groups.keys()).sort((a, b) => {
+            const ao = orderValue(groups.get(a)[0].order);
+            const bo = orderValue(groups.get(b)[0].order);
+            return ao - bo;
+        });
 
-        root.appendChild(groupEl);
+        const frag = document.createDocumentFragment();
+        for (const groupName of groupNames) {
+            const items = groups.get(groupName).sort((a, b) => orderValue(a.order) - orderValue(b.order));
+
+            const groupEl = document.createElement("div");
+            groupEl.className = "group";
+
+            const title = document.createElement("div");
+            title.className = "groupTitle";
+            title.textContent = groupName;
+            groupEl.appendChild(title);
+
+            for (const item of items) {
+                if (item.name === activeName) continue; // skip re-render of the row being edited
+                groupEl.appendChild(renderRow(item));
+            }
+
+            frag.appendChild(groupEl);
+        }
+        root.innerHTML = "";
+        root.appendChild(frag);
+    } catch (err) {
+        showError("Error rendering settings: " + err.message);
     }
 }
 
 function renderRow(item) {
     const row = document.createElement("div");
-    row.className = "row";
+    row.className = item.control === "choice" ? "row row--choice" : "row";
 
     const label = document.createElement("div");
     label.className = "rowLabel";
     label.textContent = item.displayname;
-    if (item.info) label.title = stripHtml(item.info);
+    if (item.info) label.title = item.info; // already plain text - server strips HTML
     row.appendChild(label);
 
     const control = document.createElement("div");
@@ -150,15 +203,19 @@ function renderRow(item) {
     return row;
 }
 
-function stripHtml(s) {
-    const div = document.createElement("div");
-    div.innerHTML = s;
-    return div.textContent || "";
-}
-
 function markUpdating(row, promise) {
     row.classList.add("updating");
-    promise.finally(() => row.classList.remove("updating"));
+    promise.then(
+        () => {
+            row.classList.remove("updating");
+        },
+        (err) => {
+            row.classList.remove("updating");
+            log("write failed:", err && err.message);
+            row.classList.add("writeFailed");
+            setTimeout(() => row.classList.remove("writeFailed"), 2000);
+        }
+    );
 }
 
 function renderBool(item, row) {
@@ -199,43 +256,86 @@ function renderChoice(item, row) {
 }
 
 function renderRange(item, row) {
+    // A plain <input type=range> styled via -webkit-appearance/pseudo-elements
+    // renders much taller than the CSS asks for in Coherent GT (the same
+    // engine that silently ignores Promise.prototype.finally) - built as
+    // plain divs instead, same approach as the toggle, for full height control.
     const wrap = document.createElement("div");
     wrap.className = "rangeControl";
 
-    const input = document.createElement("input");
-    input.type = "range";
-    input.min = item.min;
-    input.max = item.max;
-    input.step = item.step || 0.01;
-    input.value = item.value;
-    input.dataset.name = item.name;
+    const track = document.createElement("div");
+    track.className = "sliderTrack";
+    track.dataset.name = item.name;
+
+    const fill = document.createElement("div");
+    fill.className = "sliderFill";
+    const thumb = document.createElement("div");
+    thumb.className = "sliderThumb";
+    track.appendChild(fill);
+    track.appendChild(thumb);
 
     const valueLabel = document.createElement("div");
     valueLabel.className = "rangeValue";
-    valueLabel.textContent = formatRangeValue(item.value, item.display, item.unit);
 
-    function commit() {
-        const v = parseFloat(input.value);
-        valueLabel.textContent = formatRangeValue(v, item.display, item.unit);
-        markUpdating(row, apiPost(item.name, v, item.unit));
+    const min = item.min;
+    const max = item.max;
+    const step = item.step || 0.01;
+    let value = item.value;
+
+    function clamp01(p) {
+        if (p < 0) return 0;
+        if (p > 1) return 1;
+        return p;
     }
 
-    input.addEventListener("input", () => {
-        valueLabel.textContent = formatRangeValue(parseFloat(input.value), item.display, item.unit);
-        const timers = state.pendingRangeTimers;
-        if (timers.has(item.name)) clearTimeout(timers.get(item.name));
-        timers.set(item.name, setTimeout(commit, RANGE_COMMIT_DEBOUNCE_MS));
-    });
-    input.addEventListener("change", () => {
-        const timers = state.pendingRangeTimers;
-        if (timers.has(item.name)) {
-            clearTimeout(timers.get(item.name));
-            timers.delete(item.name);
-        }
+    function snap(v) {
+        let stepped = Math.round((v - min) / step) * step + min;
+        if (stepped < min) stepped = min;
+        if (stepped > max) stepped = max;
+        return Math.round(stepped * 1e6) / 1e6; // shake off float noise
+    }
+
+    function paint(v) {
+        const pct = max === min ? 0 : clamp01((v - min) / (max - min)) * 100;
+        fill.style.width = pct + "%";
+        thumb.style.left = pct + "%";
+        valueLabel.textContent = formatRangeValue(v, item.display, item.unit);
+    }
+
+    function valueFromClientX(clientX) {
+        const rect = track.getBoundingClientRect();
+        const pct = rect.width ? clamp01((clientX - rect.left) / rect.width) : 0;
+        return snap(min + pct * (max - min));
+    }
+
+    function commit() {
+        markUpdating(row, apiPost(item.name, value, item.unit));
+    }
+
+    let dragging = false;
+    function onMove(e) {
+        if (!dragging) return;
+        value = valueFromClientX(e.clientX);
+        paint(value);
+    }
+    function onUp() {
+        if (!dragging) return;
+        dragging = false;
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
         commit();
+    }
+    track.addEventListener("mousedown", (e) => {
+        dragging = true;
+        value = valueFromClientX(e.clientX);
+        paint(value);
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        e.preventDefault();
     });
 
-    wrap.appendChild(input);
+    paint(value);
+    wrap.appendChild(track);
     wrap.appendChild(valueLabel);
     return wrap;
 }
@@ -246,5 +346,47 @@ function formatRangeValue(v, display, unit) {
     return v.toFixed(2) + (unit || "");
 }
 
+function initScaleControl() {
+    const label = document.getElementById("scaleLabel");
+    let index = 0; // SCALE_STEPS[0] === 100%
+
+    function apply() {
+        const pct = SCALE_STEPS[index];
+        label.textContent = pct + "%";
+        // 'zoom' (not transform: scale) so layout/scroll extent actually
+        // reflow to match - transform would need manual size compensation
+        // to avoid clipping or dead scroll space. Applied to the whole page
+        // (not just #settingsList) so the header scales along with it.
+        document.body.style.zoom = pct / 100;
+    }
+
+    document.getElementById("scaleDown").addEventListener("click", () => {
+        if (index > 0) {
+            index -= 1;
+            apply();
+        }
+    });
+    document.getElementById("scaleUp").addEventListener("click", () => {
+        if (index < SCALE_STEPS.length - 1) {
+            index += 1;
+            apply();
+        }
+    });
+}
+
+window.addEventListener("error", (e) => {
+    log("uncaught error:", e.message, "at", e.filename + ":" + e.lineno);
+    showError("Script error: " + e.message);
+});
+window.addEventListener("unhandledrejection", (e) => {
+    const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+    log("unhandled promise rejection:", msg);
+    showError("Unhandled error: " + msg);
+});
+
+log("panel.js loaded, starting poll loops");
+document.getElementById("settingsList").textContent = "Loading...";
+
+initScaleControl();
 pollStatus();
 pollSettings();

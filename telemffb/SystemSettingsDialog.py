@@ -60,6 +60,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # Add tooltips
         self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
+        self.enableMsfsApiServer.setToolTip('If enabled, the master instance starts a local HTTP server while MSFS is the active sim, letting the VPforce Settings in-sim toolbar panel view and edit the current aircraft\'s settings')
         self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
         # self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
         self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
@@ -597,6 +598,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         msfs_enabled = self.enableMSFS.isChecked()
         icon = self.MSFS_ICON_ENABLED if msfs_enabled else self.MSFS_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.MSFS_TAB, icon)
+        self.enableMsfsApiServer.setEnabled(msfs_enabled)
 
     def toggle_xplane_widgets(self):
         xplane_enabled = self.enableXPLANE.isChecked()
@@ -862,6 +864,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "enableDCS": self.enableDCS.isChecked(),
             "validateDCS": self.validateDCS.isChecked(),
             "enableMSFS": self.enableMSFS.isChecked(),
+            "enableMsfsApiServer": self.enableMsfsApiServer.isChecked(),
             "enableXPLANE": self.enableXPLANE.isChecked(),
             "validateXPLANE": self.validateXPLANE.isChecked(),
             "pathXPLANE": self.pathXPLANE.text(),
@@ -1017,6 +1020,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.validateDCS.setChecked(settings_dict.get('validateDCS', True))
 
         self.enableMSFS.setChecked(settings_dict.get('enableMSFS', False))
+        self.enableMsfsApiServer.setChecked(settings_dict.get('enableMsfsApiServer', True))
         self.toggle_msfs_widgets()
 
         self.enableXPLANE.setChecked(settings_dict.get('enableXPLANE', False))

@@ -136,4 +136,16 @@ import shutil
 import os
 shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt'))
 
+# MSFS toolbar panel: ship the built package (source-only, not the Build/
+# subfolder or dev helper script - see msfs-panel/README.md) in a folder the
+# user can drag straight into their Community folder.
+msfs_panel_src = os.path.join('msfs-panel', 'vpforce-telemffb-panel')
+msfs_panel_dst = os.path.join(distpath, 'Copy to MSFS Community', 'vpforce-telemffb-panel')
+shutil.copytree(
+    msfs_panel_src,
+    msfs_panel_dst,
+    ignore=shutil.ignore_patterns('Build', 'build_layout.py'),
+    dirs_exist_ok=True,
+)
+
 
