@@ -16,6 +16,7 @@ Two stuck states from the 2026-08-29 field log must self-heal:
    main.py imports winreg).
 """
 import sys
+import warnings
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -35,8 +36,22 @@ from telemffb.hw.ffb_rhino import (
     _next_reconnect_delay,
 )
 
-try:
-    import main as main_module
+# The pysimconnect fork (requirements.txt pins a rolling master zip)
+# loads scvars.json via `json.load(open(...))` and never closes the
+# file.  On Windows the `import main` below pulls `simconnect` into
+# the test session for the first time, and the unclosed FileIO's
+# ResourceWarning becomes an unraisable that pytest attributes to an
+# innocent test.  Pre-import it with ResourceWarning ignored for that
+# one import - the finalizer fires inside this context (refcounting)
+# and dies quietly, and main.py's later `from simconnect import *`
+# hits the sys.modules cache.  Proper fix: close the file in the
+# fork's scvars.py.
+if sys.platform == "win32" and "simconnect" not in sys.modules:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ResourceWarning)
+        import simconnect  # noqa: F401
+
+try:    import main as main_module
 except Exception:  # winreg is Windows-only
     main_module = None
 
@@ -384,7 +399,7 @@ class TestWatcherWiring:
         import pathlib
         p = pathlib.Path(main_module.__file__) if main_module else \
             pathlib.Path(__file__).parent.parent / "main.py"
-        return p.read_text()
+        return p.read_text(encoding="utf-8")
 
     def test_phase14_starts_the_watcher(self):
         src = self._source()

@@ -13,6 +13,7 @@ configurator.  These tests cover:
 """
 import os
 import sys
+import warnings
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -23,8 +24,22 @@ sys.modules.setdefault('telemffb.hw.hid', MagicMock())
 import telemffb.hw.ffb_rhino as ffb_rhino_module
 from telemffb.hw.ffb_rhino import HapticEffect
 
-try:
-    import main as main_module
+# The pysimconnect fork (requirements.txt pins a rolling master zip)
+# loads scvars.json via `json.load(open(...))` and never closes the
+# file.  On Windows the `import main` below pulls `simconnect` into
+# the test session for the first time, and the unclosed FileIO's
+# ResourceWarning becomes an unraisable that pytest attributes to an
+# innocent test.  Pre-import it with ResourceWarning ignored for that
+# one import - the finalizer fires inside this context (refcounting)
+# and dies quietly, and main.py's later `from simconnect import *`
+# hits the sys.modules cache.  Proper fix: close the file in the
+# fork's scvars.py.
+if sys.platform == "win32" and "simconnect" not in sys.modules:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ResourceWarning)
+        import simconnect  # noqa: F401
+
+try:    import main as main_module
 except Exception:  # winreg is Windows-only
     main_module = None
 
@@ -113,7 +128,7 @@ class TestMainWindowWiring:
     @staticmethod
     def _source():
         import pathlib
-        return (pathlib.Path(__file__).parent.parent / "telemffb" / "MainWindow.py").read_text()
+        return (pathlib.Path(__file__).parent.parent / "telemffb" / "MainWindow.py").read_text(encoding="utf-8")
 
     def test_constructor_uses_derived_state(self):
         src = self._source()
