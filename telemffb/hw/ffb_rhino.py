@@ -62,7 +62,6 @@ def _next_reconnect_delay(attempts: int) -> float:
     return float(RECONNECT_BACKOFF_S[idx])
 
 
-
 class HIDDisconnectedError(Exception):
     """Raised by a state-safe HID primitive when the device handle is gone.
 
