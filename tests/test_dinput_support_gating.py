@@ -510,16 +510,19 @@ class TestMinimumBridgeVersion:
         assert status.installed
         assert 'older than the 0.9.2' in status.problem
 
-    def test_the_shipped_dll_meets_the_shipped_minimum(self):
-        """The DLL in dll/ and the minimum in globals.py travel together;
-        a bump to one without the other breaks the app on launch."""
-        import telemffb.globals as G
-        from telemffb.hw.ffb_dinput import bridge_status, version_is_at_least
-        status = bridge_status()
-        if not status.installed or not status.version:
-            pytest.skip('no identifiable bridge DLL in this checkout')
-        assert version_is_at_least(status.version,
-                                   G.dinput_bridge_min_version)
+    # There was a test here that loaded the real DLL and checked its
+    # version against G.dinput_bridge_min_version.  It could never run
+    # where it mattered: DirectLink is distributed separately and
+    # gitignored, so a checkout has no DLL and the test skipped itself -
+    # except on a developer's machine, where it passed or failed on
+    # whichever build happened to be sitting in dll/.
+    #
+    # Nothing synthetic replaces it.  Faking a version and asserting it
+    # clears the minimum only asserts the fixture; the comparison itself
+    # is covered above.  The real invariant - that the DLL we ship is not
+    # older than the minimum this TelemFFB demands - is a release check
+    # between two artifacts, and belongs on the release checklist rather
+    # than in a suite that never sees either one.
 
 
 class TestStatusLineFollowsTheToggle:
