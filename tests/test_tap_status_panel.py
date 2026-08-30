@@ -690,7 +690,7 @@ class TestLegacyWrapperOnThePanel:
 class TestFixOnlyInstall:
     """The wrapper's original job, offered without the tap: block the
     devices the sim will not drive, put the joystick first, relay
-    nothing.  For users who want dcs-force-feedback-fix behaviour and
+    nothing.  For users who want dcs-force-feedback-fix behavior and
     no TelemFFB involvement in the game's own forces."""
 
     def buttons(self, panel):
