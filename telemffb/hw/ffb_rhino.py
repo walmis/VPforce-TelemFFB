@@ -47,6 +47,22 @@ import telemffb.hw.hid as hid
 from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
 
 
+#: Exponential backoff schedule (seconds) for hot-unplug reconnect
+#: attempts: 1s, 3s, 9s, 27s, then capped at 30s per attempt.
+RECONNECT_BACKOFF_S = (1, 3, 9, 27, 30)
+
+
+def _next_reconnect_delay(attempts: int) -> float:
+    """Seconds to wait before the given (0-based) reconnect attempt.
+
+    Capped at the end of the schedule: attempts beyond the last entry
+    wait the final (30 s) delay indefinitely until the device returns.
+    """
+    idx = min(attempts, len(RECONNECT_BACKOFF_S) - 1)
+    return float(RECONNECT_BACKOFF_S[idx])
+
+
+
 class HIDDisconnectedError(Exception):
     """Raised by a state-safe HID primitive when the device handle is gone.
 
@@ -895,18 +911,50 @@ class FFBRhino(QObject):
         self._effect_handles : List[FFBEffectHandle] = []
         self._dev = None
 
+        # hot-unplug recovery bookkeeping (see reconnect()/timerEvent)
+        self._reconnect_attempts = 0
+        self._reconnect_pending = False
+        self._last_connected: Optional[bool] = None
+        #: Optional main-thread callback, invoked once per recovery
+        #: transition (set by main.py to replay one-shot device setup).
+        self.on_reconnected = None
+
         QObject.__init__(self)
         self.startTimer(1) # start Qt timer to read HID reports every 1ms
 
         self.reconnect()
+        self._emit_connection_state()
 
-    def reconnect(self):
-        if self._dev:
-            self._dev.close()
+    def reconnect(self) -> bool:
+        """Reopen the HID handle, returning True on success.
+
+        Re-enumerates by PID instead of reusing the path captured at the
+        last successful open: USB path strings change when the board is
+        replugged (different port, hub, or OS-assigned suffix), so the
+        stored path is not a stable identity - reusing it is exactly why
+        the old reconnect loop never recovered from a replugged board.
+        When a serial number is known, that specific board is preferred.
+        """
+        if self._dev is not None:
+            try:
+                self._dev.close()
+            except Exception:
+                pass
             self._dev = None
 
+        devs = FFBRhino.enumerate(self.pid)
+        known_serial = getattr(self, 'info', None)
+        if known_serial is not None and known_serial.serial_number:
+            same = [d for d in devs if d.serial_number == known_serial.serial_number]
+            if same:
+                devs = same
+        if not devs:
+            raise hid.HIDException(f'no {self.vid:04X}:{self.pid:04X} device found')
+
+        self.info = devs[0]
         self._dev = hid.Device(path=self.info.path)
         self._dev.nonblocking = True
+        return True
 
     @property
     def connected(self) -> bool:
@@ -1010,6 +1058,51 @@ class FFBRhino(QObject):
     def clear_axis_override(self):
         self.send_axis_override(watchdog_ms=0)
 
+    def _emit_connection_state(self):
+        """Emit deviceConnected only on a connection state transition.
+
+        The old code emitted on every one-second reconnect tick, so a
+        prolonged device absence spammed the MainWindow status update.
+        Only True->False and False->True transitions are emitted now.
+        """
+        connected = self.connected
+        if self._last_connected != connected:
+            self._last_connected = connected
+            self.deviceConnected.emit(connected)
+
+    def _schedule_reconnect(self):
+        """Queue one reconnect attempt after the current backoff delay.
+
+        At most one attempt is ever pending: repeated read failures on
+        the 1 ms report timer must not stack up a chain of overlapping
+        singleShot timers (the old do_reconnect recursion did).
+        """
+        if self._reconnect_pending:
+            return
+        self._reconnect_pending = True
+        delay_s = _next_reconnect_delay(self._reconnect_attempts)
+        logging.warning(f"Reconnecting HID device in {delay_s:g}s (attempt {self._reconnect_attempts + 1})")
+        QTimer.singleShot(int(delay_s * 1000), self._try_reconnect)
+
+    def _try_reconnect(self):
+        """One reconnect attempt (Qt main thread, via QTimer.singleShot)."""
+        self._reconnect_pending = False
+        self._reconnect_attempts += 1
+        try:
+            self.reconnect()
+            logging.info("HID reconnected!")
+            self._reconnect_attempts = 0
+            self._emit_connection_state()
+            if self.on_reconnected is not None:
+                try:
+                    self.on_reconnected()
+                except Exception:
+                    logging.exception("Exception")
+        except Exception:
+            logging.exception("Exception")
+            self._emit_connection_state()
+            self._schedule_reconnect()
+
     # runs on mainThread
     @override
     def timerEvent(self, a0: QTimerEvent) -> None:
@@ -1017,21 +1110,14 @@ class FFBRhino(QObject):
             self.read_reports()
         except Exception:
             logging.exception("Exception")
-            self._dev.close()
-            self._dev = None
-
-            logging.warn("Reconnecting HID device in 1s")
-            def do_reconnect():
+            if self._dev is not None:
                 try:
-                    self.reconnect()
-                    logging.info("HID connected!")
-                    self.deviceConnected.emit(True)
+                    self._dev.close()
                 except Exception:
-                    self.deviceConnected.emit(False)
-                    logging.warn("Reconnecting HID device in 1s")
-                    QTimer.singleShot(1000, do_reconnect)
-
-            QTimer.singleShot(1000, do_reconnect)
+                    pass
+            self._dev = None
+            self._emit_connection_state()
+            self._schedule_reconnect()
             
     def _process_hats(self, hats):
         if hats != self._prev_hats:
