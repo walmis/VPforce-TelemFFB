@@ -1088,6 +1088,29 @@ class TestOfflineEffectLifecycle:
         # live start, matching live stop() semantics.
         assert effect._pending_envelope is not None
 
+    def test_start_failure_after_creation_resets_envelope_flag(
+            self, haptic_device):
+        """An envelope applied to the first block must be re-applied to
+        the re-created block when the handle dies between creation and
+        the start write (matching the live stop() semantics)."""
+        self._wire_block_load_response(haptic_device)
+        effect = HapticEffect()
+        effect.name = "boomer"
+        effect.constant(0.5, 90)
+        effect.envelope(attackTime=100, decayTime=100, once=True)
+        effect.start()
+        assert effect._h_effect is not None
+        assert effect._envelope_applied is True
+
+        # The handle dies between the liveness check and the start write.
+        effect._h_effect.start = MagicMock(
+            side_effect=HIDDisconnectedError("gone"))
+        effect.start(force=True)  # must not raise
+
+        assert effect._h_effect is None
+        assert effect._envelope_applied is False   # one-time envelope pending again
+        assert effect._pending_envelope is not None
+
     class _FakeHIDException(Exception):
         """Stand-in for hid.HIDException (the real module is a MagicMock here)."""
 

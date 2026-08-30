@@ -2010,9 +2010,11 @@ class HapticEffect(Destroyable):
             try:
                 self._h_effect.start(**kw)
             except HIDDisconnectedError:
-                # Lost the handle between the liveness check and the write;
-                # recreate on the next live frame.
+                # Lost the handle between the liveness check and the
+                # write; recreate on the next live frame.  The one-time
+                # envelope stays pending so the re-created block gets it.
                 self._h_effect = None
+                self._envelope_applied = False
                 return self
             self._stopped_time = 0
 
