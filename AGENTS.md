@@ -7,7 +7,9 @@ TelemFFB is a Python/PyQt6 desktop application that generates force feedback (FF
 
 **License**: GPL v3
 
-> **Before doing any substantial work, read `docs/dev_guidelines.md` for project-specific coding conventions.**
+**Topic-specific references** (read the matching doc when the task touches that area):
+- Adding or restructuring an **aircraft class** → `docs/adding_an_aircraft_class.md`
+- Editing **`defaults.xml`** (settings, model overrides, sc_overrides) → `docs/defaults_xml_reference.md`
 
 ---
 
@@ -34,156 +36,84 @@ main.py (orchestrator - 16-phase startup)
 ```
 
 ### Startup Flow (main.py phases)
-1. **Phase 1**: Qt app init (Fusion style, Segoe UI 10pt)
-2. **Phase 2**: CLI args (`CmdLineArgs.parse()`), master/child determination, mutex check
-3. **Phase 3**: System settings (`utils.SystemSettings`), theme setup, device config
-4. **Phase 4**: Version info, config paths (dev vs production), legacy config migration
-5. **Phase 5**: Logging init (console + file + dedup + ANSI colorization)
-6. **Phase 6**: LogWindow, stdout/stderr redirection via `OutLog`
-7. **Phase 6.5**: ExceptionTracker init
-8. **Phase 7**: Legacy userconfig conversion
-9. **Phase 8**: SettingsManager init (with corruption recovery)
-10. **Phase 9**: Device connection + firmware validation (min v1.0.18)
-11. **Phase 10**: TelemManager start, TelemetryTap init, MCP server (master only, dev builds)
-12. **Phase 11**: IPC setup + signal connections
-13. **Phase 12a**: Child instance auto-launch (`_launch_children`)
-14. **Phase 12b**: Window display (minimized/tray/normal)
-15. **Phase 14**: Async initialization (VPConf profile push, gain reading)
-16. **Phase 15**: Event loop (`app.exec()`)
-17. **Phase 16**: Cleanup (notify children, stop listeners, reset gains/deadzone)
-
----
+1. Qt app init (Fusion style, Segoe UI 10pt)
+2. CLI args (`CmdLineArgs.parse()`), master/child determination, mutex check
+3. System settings (`utils.SystemSettings`), theme setup, device config
+4. Version info, config paths (dev vs production), legacy config migration
+5. Logging init (console + file + dedup + ANSI colorization)
+6. LogWindow, stdout/stderr redirection via `OutLog`
+6.5. ExceptionTracker init
+7. Legacy userconfig conversion
+8. SettingsManager init (with corruption recovery)
+9. Device connection + firmware validation (min v1.0.18); if the configured device is missing, the app continues and a self-stopping watcher auto-opens it when it appears
+10. TelemManager start, TelemetryTap init, MCP server (master only, dev builds)
+11. IPC setup + signal connections
+12. Child instance auto-launch (`_launch_children`); window display (minimized/tray/normal)
+14. Async initialization (VPConf profile push, gain reading)
+15. Event loop (`app.exec()`)
+16. Cleanup (notify children, stop listeners, reset gains/deadzone)
 
 ### Aircraft Effect System (MixIn Architecture)
+Aircraft classes are **composed from MixIns** using multiple inheritance. Each MixIn implements one effect category, inherits from `AircraftEffectUtilsBase`, and may override `on_telemetry()` / `on_timeout()` / `on_event()`. The MRO order in `AircraftBase` defines the execution order — one MixIn per file.
 
-Aircraft classes are **composed from MixIns** using multiple inheritance. Each MixIn implements a specific effect category and inherits from `AircraftEffectUtilsBase`.
+- **Base MixIns** (`telemffb/sim/aircraft_base.py`, MRO order): PedalSpringOverride, HelicopterEffects, WeaponsEffect, Deadzone, HydraulicLoss, DecelerationEffect, EngineRumble, WindEffect, AdvancedSpring (composes GForce + DynamicSpring), MotionEffects, BuffetingEffect.
+- **Generic MixIns** (`telemffb/sim/base/`): AoAEffects, DynamicSpring, ElevatorDroop, FFBForces, GForceEffect, RotationalDamping.
+- **MSFS/X-Plane MixIns** (`telemffb/sim/msfs_xp/`): FlightControls (non-FBW), FBWFlightControls (AP following, custom axes), HeliControls, SimConnect (event sending), Trimwheel, NosewheelShimmy, SteeringFriction, Turbulence.
+- **Aircraft classes** per sim: `aircrafts_dcs.py` (DCS + BMS, inline), `aircrafts_il2.py` (IL-2, inline), `aircrafts_msfs_xp.py` (re-exports one class per file from `msfs_xp/`: `Aircraft`, `JetAircraft`, `PropellerAircraft`, `TurbopropAircraft`, `GliderAircraft`, and the `Helicopter` family).
 
-#### Base MixIn Chain (in `telemffb/sim/aircraft_base.py`)
-`AircraftBase` composes (in MRO order):
-1. `PedalSpringOverrideMixIn` — Pedal-specific spring behavior
-2. `HelicopterEffectsMixIn` — Rotor RPM rumble, collective effects
-3. `WeaponsEffectMixIn` — Gun vibration, missile/bomb release, chaff/flare
-4. `DeadzoneMixIn` — Deadzone effect handling
-5. `HydraulicLossMixIn` — Reduced forces when hydraulic pressure lost
-6. `DecelerationEffectMixIn` — Longitudinal G deceleration feel
-7. `EngineRumbleMixIn` — RPM-proportional engine vibration
-8. `WindEffectMixIn` — Gust/wind buffeting from relative wind data
-9. `AdvancedSpringMixIn` — Spring override, trim, adjuster (inherits GForceEffectMixIn + DynamicSpringMixin)
-10. `MotionEffectsMixIn` — Gear/flaps/spoiler motion vibration
-11. `BuffetingEffectMixIn` — Stall buffeting effects
+`AircraftEffectUtilsBase` provides: `effects` (the global `Dispenser`), current/previous `telem_data`, `check_button_press()` / `check_master_button_press()`, change detection with timing (`has_changed()` / `anything_has_changed()`), `apply_settings()` (XML params → attributes), device-type checks (`is_joystick()` / `is_pedals()` / `is_collective()` / `is_trimwheel()`), sim checks (`_sim_is_msfs()` etc.), `step_value_over_time()` (per-frame interpolation), and the three hooks.
 
-All MixIns inherit from `AircraftEffectUtilsBase` which provides:
-- `effects` property → global `G.effects` Dispenser
-- `telem_data` / `_last_telem_data` → current & previous `BaseTelemetryData`
-- `check_button_press()`, `check_master_button_press()`
-- `has_changed()`, `anything_has_changed()` — change detection with timing
-- `apply_settings(settings_dict)` — apply XML config params as attributes
-- `is_joystick()`, `is_pedals()`, `is_collective()`, `is_trimwheel()`
-- `_sim_is_msfs()`, `_sim_is_xplane()`, `_sim_is_dcs()`, `_sim_is_bms()`, `_sim_is_il2()`
-- `_get_device_axes()`, `_get_device_forces()`, `_get_device_report()` — static helpers
-- `step_value_over_time()` — animated value interpolation across frames
-- `on_timeout()`, `on_telemetry()`, `on_event()` — hooks each MixIn can override
+**Class resolution**: `TelemManager` first looks up the aircraft name in `defaults.xml`; if not found (MSFS/X-Plane only) it falls back to SimConnect category + engine type:
 
-#### Additional Generic MixIns (in `telemffb/sim/base/`)
-- `AoAEffectsMixIn` — Angle-of-attack reduction force
-- `DynamicSpringMixin` — Dynamic spring coefficient calculation
-- `ElevatorDroopEffectMixIn` — Elevator droop force effect
-- `FFBForcesMixIn` — Raw body-frame force feeding
-- `GForceEffectMixIn` — G-force effect modes (DISABLED/LEGACY/NEW/ADVANCED)
-- `RotationalDampingMixIn` — Rotation-based damping
+| SimConnect data | Class |
+|---|---|
+| `Helicopter` | `Helicopter` |
+| `Jet` / piston engine type 1 | `JetAircraft` |
+| Piston engine type 0 | `PropellerAircraft` |
+| Engine type 5 | `TurbopropAircraft` |
+| Engine type 2 (none) | `GliderAircraft` |
 
-#### MSFS/X-Plane Specific MixIns (in `telemffb/sim/msfs_xp/`)
-- `MsfsXpFlightControlsMixIn` — Stick force simulation for non-FBW aircraft
-- `MsfsXpFBWFlightControlsMixIn` — FBW control force simulation (AP following, custom axes)
-- `MsfsXpHeliControlsMixIn` — Helicopter cyclic/collective/pedal forces
-- `MsfsXpSimConnectMixIn` — SimConnect event sending (rudder/stick commands)
-- `MsfsXpTrimwheelMixIn` — Trim wheel force feedback
-- `MsfsXpNosewheelShimmyMixIn` — Nosewheel shimmy vibration
-- `MfsfXpSteeringFrictionEffectMixIn` — Ground steering friction
-- `TurbulenceMixIn` — Atmospheric turbulence effects
+Full walkthrough of creating a new class (module placement, sc_overrides, registration, tests): `docs/adding_an_aircraft_class.md`.
 
-#### Aircraft Classes
-Each sim has its own module that registers aircraft classes:
-- `aircrafts_dcs.py` — `Aircraft(AircraftBase, DCSCommands)` + DCS-specific overrides
-- `aircrafts_il2.py` — `Aircraft(AircraftBase)` + IL-2 damage/buffet effects
-- `aircrafts_msfs_xp.py` — Re-exports from `msfs_xp/`:
-  - `Aircraft` — base MSFS/XP aircraft (adds TurbulenceMixIn, FlightControlsMixIn, etc.)
-  - `JetAircraft`, `PropellerAircraft`, `TurbopropAircraft`, `GliderAircraft`
-  - `Helicopter`, `HPGHelicopter`, `CowanSimHelicopter`, `FlyInsideHelicopter`, `SASHelicopter`, `TaogH500Helicopter`, `XAW109Helicopter`
-
-**Aircraft class resolution**: TelemManager looks up XML config first; if not found, falls back to SimConnect category/engine type to pick appropriate class.
-
----
-
-### Global State Management (CRITICAL)
-**Never use `global` keyword**. All application-wide state lives in `telemffb.globals`:
+### Global State
+**Never use the `global` keyword.** All application-wide state lives in `telemffb.globals`:
 ```python
 import telemffb.globals as G
 ```
-
-Key globals:
-- `G.device_type` — `"joystick"`, `"pedals"`, `"collective"`, `"trimwheel"`
-- `G.master_instance` / `G.child_instance` — bool flags
-- `G.effects` — `Dispenser(HapticEffect)` — global effect pool (init in `aircraft_base.py`)
-- `G.telem_manager` — TelemManager instance
-- `G.sim_listeners` — SimListenerManager instance
-- `G.main_window` — MainWindow instance
-- `G.settings_mgr` — SettingsManager instance
-- `G.system_settings` — Qt QSettings wrapper (`utils.SystemSettings`)
-- `G.ipc_instance` — IPCNetworkThread instance
-- `G.log_window` — LogWindow instance
-- `G.exception_tracker` — ExceptionTracker instance
-- `G.telemetry_tap` — TelemetryTap instance (ring buffer)
-- `G.device_info`, `G.device_devpath`, `G.device_usbpid`, `G.device_ident`, `G.device_firmware_version`, `G.device_connection_status`
-- `G.userconfig_path`, `G.defaults_path`, `G.userconfig_rootpath`
-- `G.args` — CmdLineArgs parsed object
-- `G.launched_instances` — dict mapping device type → ChildPopen
-- `G.instance_dev_dict` — dict mapping PID → DeviceInfo
-- `G.active_buttons`, `G.master_buttons`, `G.child_buttons`
-- `G.startup_configurator_gains`, `G.vpconf_configurator_gains`, `G.current_configurator_gains`
-- `G.gain_override_dialog` — ConfiguratorDialog instance
-- `G.useDarkMode` — bool
-- `G.dev_build`, `G.release_version`, `G.is_exe`
-- `G.force_reload_aircraft_trigger` — bool
-- `G.il2_ffb_device_ordinal` — int (for IL-2 Korea FFB routing)
-- `G.vpconf_init_pending` — bool (async init gate)
-- `G.current_vpconf_profile` — str path
-
-See `dev_guidelines.md` for coding conventions.
-
----
+Key attributes (the full list, annotation-only, is in the file — they have no runtime value until `main.py` startup phases set them; tests use `monkeypatch.setattr(G, ..., raising=False)`): `G.device_type` (`"joystick"` / `"pedals"` / `"collective"` / `"trimwheel"`), `G.master_instance` / `G.child_instance`, `G.effects` (global `HapticEffect` dispenser), `G.telem_manager`, `G.sim_listeners`, `G.main_window`, `G.settings_mgr`, `G.system_settings`, `G.ipc_instance`, `G.log_window`, `G.exception_tracker`, `G.telemetry_tap`, `G.device_info` / `G.device_devpath` / `G.device_usbpid` / `G.device_firmware_version` / `G.device_connection_status`, `G.userconfig_path` / `G.defaults_path` / `G.userconfig_rootpath`, `G.args`, `G.launched_instances`, `G.instance_dev_dict`, `G.active_buttons` / `G.master_buttons` / `G.child_buttons`, `G.startup_configurator_gains` / `G.vpconf_configurator_gains` / `G.current_configurator_gains`, `G.gain_override_dialog`, `G.useDarkMode`, `G.dev_build` / `G.release_version` / `G.is_exe`, `G.force_reload_aircraft_trigger`, `G.il2_ffb_device_ordinal`, `G.vpconf_init_pending`, `G.current_vpconf_profile`.
 
 ### Configuration System (XML-based)
 Two parallel XML files:
-- `defaults.xml` — shipped defaults (~2400 lines, defines all available settings)
+- `defaults.xml` — shipped defaults (full schema and 6-layer resolution hierarchy: `docs/defaults_xml_reference.md`)
 - `userconfig_v2.xml` — user overrides (in `%LOCALAPPDATA%\VPForce-TelemFFB\`)
 
-`telemffb/xmlutils.py` (~2400 lines) handles all XML operations:
-- `update_roots()` — re-parse both XML files into global ElementTree roots
-- `update_vars(device, userconfig_path, defaults_path)` — set module-level paths
-- `try_parse()` — retry parsing with delay (handles multi-instance file locking)
-- `read_single_model()` — read settings for a given sim+aircraft+device
-- `write_models_to_xml()` — write user overrides
-- `get_pattern_by_sim_fullname()` — match aircraft name to config pattern
-- `get_active_profile_for_model()` — resolve active profile
-- `read_sc_overrides()` — read SimConnect/dataref variable overrides per aircraft
+`telemffb/xmlutils.py` handles all XML operations: `update_roots()` (re-parse both trees — **must be called after any programmatic change**), `try_parse()` (retries on file lock — use for reads, multi-instance safe), `update_vars()`, `read_single_model()`, `write_models_to_xml()`, `get_pattern_by_sim_fullname()`, `get_active_profile_for_model()`, `read_sc_overrides()`.
 
-Config hierarchy: SIM → CLASS → MODEL → PROFILE (profile is optional overlay)
-Call `xmlutils.update_roots()` after any XML changes. Watch for file locking in multi-instance scenarios.
+Config hierarchy: SIM → CLASS → MODEL → PROFILE (profile is an optional overlay). `SettingsManager` wraps XML ops with state tracking, offline mode support, and PyQt signals.
 
-`SettingsManager` wraps XML ops with state tracking, offline mode support, and PyQt signals.
+### Telemetry Flow
+1. Sim-specific listener receives raw data (DCS shared mem/UDP, MSFS SimConnect, IL-2 UDP, BMS shared mem, X-Plane UDP via plugin)
+2. Data normalized to semicolon-delimited string: `KEY1=val1~val2;KEY2=val3;...` (tilde = array)
+3. `TelemManager.submit_frame(data)` queues on a condition variable; `run()` parses into `BaseTelemetryData`, calculates frame timing, merges IPC telemetry (master)
+4. Aircraft resolved by name + source (see resolution table); new aircraft creates a new instance
+5. `aircraft.on_telemetry(telem_data)` runs the MixIn chain; effects update on the device via HID
+6. TelemetryTap captures the frame for analysis; `telemetryReceived` signal emitted for the UI
+
+**Timeout & sim exit detection**: per-frame timeout from `telemTimeout` (default 200 ms) → `on_timeout()` fires once, periodic effects stop. After a 5 s grace, `_check_sim_process()` polls the OS process list every 5 s; if gone → `notify_sim_exited()`, clears aircraft, restarts listeners.
+
+### Multi-Instance Architecture
+- **Master** auto-launches **child** instances (one per additional device); children handle their own device and send button/telemetry data to the master
+- IPC over UDP sockets on localhost (**not** ZMQ): master binds a random port, children connect via `--masterport`; keepalive 1 s interval, 3 missed → exit; message types: `Keepalive`, `Child Keepalive:<dev>:<status>`, `telem:<json>`, `effects:<json>`, `MASTER_INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`
+- Win32 named mutex (`namedmutex.py`) prevents duplicate masters unless `G.allow_multi_instance`; master auto-assigns `devpath_*` settings by product string or VID:PID
 
 ---
 
-## Critical Developer Workflows
+## Key Developer Workflows
 
 ### Building the Application
-1. **Development mode**: `python main.py` (standard Python execution)
+1. **Development mode**: `python main.py`
 2. **Resource compilation**: `makeresources.bat` (generates `resources.py` from `resources.qrc`)
-3. **Production build**: PyInstaller with `VPforce-TelemFFB.spec`
-   - Bundles: X-Plane plugin, hidapi.dll, simconnect.dll, export scripts, defaults.xml, config.ini
-   - Excludes: QtQuick, QtWebEngine, Bluetooth, WebSockets, etc. (aggressive trimming)
-   - Output: `dist/VPforce-TelemFFB/`
+3. **Production build**: PyInstaller with `VPforce-TelemFFB.spec` (bundles X-Plane plugin, hidapi.dll, simconnect.dll, export scripts, defaults.xml, config.ini; aggressively trims Qt modules) → `dist/VPforce-TelemFFB/`
 
 ### Running Tests
 ```bash
@@ -191,41 +121,124 @@ pytest                          # Run all tests
 pytest tests/test_*.py -v      # Verbose output
 pytest --cov=telemffb          # With coverage
 ```
-- Test framework in `tests/framework/`:
-  - `MockInputData` — mock device input (axes, buttons)
-  - `MockFFBDevice` — mock FFB device
-  - `MockConditionEffect` — mock haptic effect with configurable coefficients
-  - `MockHapticEffect` — mock effect container
-  - `MockEffectDispenser` — mock global effects dispenser
-  - `MockSimConnect` — mock SimConnect for MSFS testing
-  - `MockDampener` — pass-through dampening mock
-  - `MockSpringCondition` — mock spring condition struct
-  - `BaseTelemetryEffectTestCase` — base test class with full setup/teardown
+- Test framework in `tests/framework/`: `MockFFBDevice` (`connected` / `set_connected()` for higher-level tests), `MockInputData`, `MockConditionEffect`, `MockHapticEffect`, `MockEffectDispenser`, `MockSimConnect`, `MockDampener`, `MockSpringCondition`, `BaseTelemetryEffectTestCase` (base class with full setup/teardown)
 - `conftest.py` — autouse fixture resets `G.effects` and `G.master_buttons`
 - Markers: `unit`, `integration`, `msfs`, `xplane`, `joystick`, `pedals`, `collective`, `helicopter`, `slow`
 - Warnings treated as errors (except DeprecationWarning)
-
-### Multi-Instance Architecture
-- **Master instance**: Auto-launches child instances for different devices
-- **Child instances**: Handle their own device, send button/telemetry data to master
-- **IPC communication**: UDP sockets on localhost (NOT ZMQ — changed from original design)
-  - Master binds to random port, children connect to master's port via `--masterport`
-  - Keepalive protocol: 1-second interval, 3-missed timeout triggers exit
-  - Message types: `Keepalive`, `Child Keepalive:<dev>:<status>`, `telem:<json>`, `effects:<json>`, `MASTER_INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`
-- Mutex: Win32 named mutex (`namedmutex.py`) prevents duplicate masters unless `G.allow_multi_instance = True`
-- Auto-assign: Master inspects enumerated devices and assigns `devpath_*` settings by product string or VID:PID
+- `HapticEffect.device` is a **class attribute** — tests that construct devices must save/restore it
+- `telemffb.hw.hid` is a `MagicMock` in `sys.modules` — install yours with `sys.modules.setdefault('telemffb.hw.hid', MagicMock())` and patch the module **as `ffb_rhino` sees it** (`ffb_rhino_module.hid`), never via a fresh `import telemffb.hw.hid` (a sibling test may have swapped the `sys.modules` entry, so a fresh import can bind a different mock)
+- `main.py` is **Windows-only** (imports `winreg` via `MainWindow`) — tests that need it must guard with `skipif` or use static source checks
 
 ---
 
-## Code Conventions & Patterns
+## Coding Guidelines
 
-### Device Type Handling
-`G.device_type` is one of: `"joystick"`, `"pedals"`, `"collective"`, `"trimwheel"`
-- Affects which XML config sections are read
-- Determines which effects are active (e.g., pedals skip joystick-only effects)
-- MixIns use `self.is_joystick()`, `self.is_pedals()`, etc. for conditional logic
+### Globals
+All application state lives in `telemffb.globals` (imported as `G`). Never use the `global` keyword, and never use globals as default arguments — they are evaluated once at function definition time, not at call time:
 
-### Effect Lifecycle Pattern
+```python
+# Don't do this
+def foo(val=G.some_setting): ...
+
+# Do this instead
+def foo(val=None):
+    if val is None:
+        val = G.some_setting
+```
+
+### Structure
+One class per file. Large classes belong in their own module under `telemffb/sim/base/` or `telemffb/sim/msfs_xp/`. Prefix private members with `_` to signal they're internal to the class (`self._my_var`) — cross-module code only uses the public API.
+
+### MixIns
+Aircraft effects are built from MixIns that inherit from `AircraftEffectUtilsBase`. When overriding hooks, always chain up:
+
+```python
+@override
+def on_telemetry(self, telem_data):
+    super().on_telemetry(telem_data)
+    # your logic here
+```
+
+Do the same for `on_timeout()` and `on_event()`.
+
+### Performance
+Telemetry runs at 60–120 Hz. Keep `on_telemetry()` lean: no heavy math, no I/O, no allocations you can avoid. Precompute what you can outside the hot path.
+
+### Error Handling
+In the telemetry hot path, never let an exception propagate — it kills the processing loop. Catch broadly, call `logging.exception()`, and keep going. In UI/threaded code, you can be more specific. In the device layer, `HIDDisconnectedError` is raised on a dead handle (no asserts — they die silently under `python -O` and kill the calling thread), and callers that need liveness check `HapticEffect.device_alive()` instead of asserting `device is not None`.
+
+### Threading & GUI
+`TelemManager` runs in its own thread. Never touch Qt widgets from background threads — route everything through `utils.schedule_on_main_thread(lambda: ...)`, or use PyQt signals. `FFBRhino`'s reconnect chain runs on the Qt main thread only (it is scheduled from its 1 ms report timer), so slots connected to its signals may assume main-thread execution.
+
+### Effects & HID Values
+The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficients, offsets, saturation, and magnitude. Float values in MixIns (e.g. `0.5` spring coefficient) are multiplied by 4096 before sending to the device; `FFBReport_SetCondition.set_coefficient()` and `.set_offset()` handle the conversion automatically.
+
+`G.effects` is a `Dispenser` — accessing `G.effects["name"]` lazily creates the effect on first use, then returns the cached instance. Effect names must be unique within an aircraft instance.
+
+When you create a new effect, register its name in the effects translator: `effect_dict` in `telemffb/utils.py`. Each entry maps an effect-name pattern (regex supported, e.g. `"blade_slap.*"`) to `["Human Readable Name", "intensity_setting_name"]`. The translator supplies the readable name shown in the effects panel, and the setting-name half is how the UI links an active effect to its slider (green highlight and live % force display). An unregistered effect still works but appears under its raw internal name with no slider linkage.
+
+### Telemetry Data
+Raw telemetry arrives as semicolon-delimited key-value pairs, with tilde-separated arrays: `KEY1=val1~val2;KEY2=val3;...`. `TelemManager` parses this into `BaseTelemetryData` — a dict-backed container that also supports dot-access (`telem_data.AoA`). All known fields are type-annotated on the class for IDE autocomplete; values default to `None` when absent. Access safely with `telem_data.get("key", default)` or dot-access with a `None` check.
+
+### Style
+Follow PEP 8. Write docstrings in reStructuredText format. Use type hints where they help readability. Prefer `typing.Optional` and `typing.Literal["joystick", "pedals", "collective", "trimwheel"]` for device types.
+
+Imports go at the top of the file, just after any module comments and docstrings, and before module globals and constants, grouped in the standard order:
+
+1. Standard library imports
+2. Third-party imports
+3. Local application imports
+
+This rule may only be broken to avoid circular imports — and even then, the circular dependency should be fixed upstream rather than worked around.
+
+---
+
+## Key Files to Understand
+
+| File | Purpose |
+|------|---------|
+| `main.py` | 16-phase application bootstrap |
+| `telemffb/globals.py` | Single source of truth for app state |
+| `telemffb/hw/ffb_rhino.py` | USB HID protocol, effect definitions, ctypes structs |
+| `telemffb/hw/ffb_sdl.py` | **DEPRECATED** SDL haptic backend (kept for posterity) |
+| `telemffb/xmlutils.py` | All XML config read/write operations |
+| `telemffb/utils.py` | Utilities: Dispenser, LowPassFilter, Dampener, SystemSettings, effects translator (`effect_dict`), etc. |
+| `telemffb/telem/TelemManager.py` | Telemetry routing, aircraft instantiation, sim exit detection |
+| `telemffb/telem/SimTelemListener.py` | SimListenerManager + per-sim listener classes |
+| `telemffb/sim/aircraft_base.py` | MixIn composition + base aircraft behavior |
+| `telemffb/sim/BaseTelemetryData.py` | Dict-backed telemetry container with typed attribute hints |
+| `telemffb/sim/base/AircraftEffectUtilsBase.py` | Base utilities all MixIns inherit from |
+| `telemffb/sim/aircrafts_dcs.py` | DCS aircraft class + DCS command injection |
+| `telemffb/sim/aircrafts_il2.py` | IL-2 aircraft class + damage/buffet effects |
+| `telemffb/sim/aircrafts_msfs_xp.py` | Module exports for MSFS/XP aircraft |
+| `telemffb/sim/msfs_xp/Aircraft.py` | Base MSFS/XP aircraft class |
+| `telemffb/sim/msfs_xp/MsfsXpFBWFlightControlsMixIn.py` | FBW control forces + AP following |
+| `telemffb/sim/msfs_xp/MsfsXpFlightControlsMixIn.py` | Non-FBW stick forces |
+| `telemffb/SettingsManager.py` | XML config manager, profiles, offline mode |
+| `telemffb/IPCNetworkThread.py` | UDP IPC between master/child instances |
+| `telemffb/MainWindow.py` | Main PyQt6 window, settings layout, status indicators |
+| `telemffb/ExceptionTracker.py` | Error capture, logging handler, viewer dialog |
+| `telemffb/mcp/server.py` | MCP analysis server for LLM telemetry queries |
+| `telemffb/analysis/telemetry_tap.py` | Ring buffer tap for telemetry capture |
+| `telemffb/analysis/ring_buffer.py` | Circular buffer with pause/flush/window queries |
+| `telemffb/namedmutex.py` | Win32 named mutex (ctypes) |
+| `telemffb/CmdLineArgs.py` | CLI argument parser |
+| `styles.py` | Light/dark mode QSS stylesheets |
+
+Line counts are large (`xmlutils.py` ~2400, `utils.py` ~3600, `ffb_rhino.py` ~1800) — search within them rather than reading top to bottom.
+
+---
+
+## When Making Changes
+
+1. **Adding new effects**: Create a MixIn in `telemffb/sim/base/` (generic) or `telemffb/sim/msfs_xp/` (sim-specific). Inherit from `AircraftEffectUtilsBase`. Add to `AircraftBase`'s MRO or the aircraft subclass. Use `@override`. Call `super()` in each hook. Register the effect name in `effect_dict` (`telemffb/utils.py`).
+2. **New aircraft type**: Follow `docs/adding_an_aircraft_class.md` — one class per file under `msfs_xp/` (MSFS/X-Plane) or inline in the DCS/IL-2 module; register in `defaults.xml`; MSFS/X-Plane-only: telemetry remapping via `<sc_overrides>`.
+3. **UI changes**: PyQt6 components in `telemffb/*.py` (MainWindow, dialogs). Use existing QSS from `styles.py`, Fusion style conventions. All GUI updates from non-main threads via `utils.schedule_on_main_thread()`.
+4. **Config changes**: See `docs/defaults_xml_reference.md`. Update `defaults.xml` (new default values) and ensure `xmlutils.py` handles the new keys. New enum settings go into `SettingsManager`'s class-level dicts. Multi-instance safe via `try_parse()`; call `update_roots()` after writes.
+5. **Testing new features**: Add tests to `tests/`. Use `BaseTelemetryEffectTestCase` from `tests/framework/base.py`. Mark with the appropriate pytest markers. Run `pytest` before committing.
+6. **New telemetry fields**: Add a typed attribute + docstring (sims, source, units) to `BaseTelemetryData`; populate in the sim-specific listener/parser.
+
+**Effect lifecycle pattern**:
 ```python
 effect = self.effects.get("effect_name")  # Get from global dispenser
 if not effect:
@@ -240,115 +253,30 @@ effect.start()  # Sends to device (updates + restarts)
 effect.stop()  # Frees device resource
 ```
 
-### Telemetry Flow
-1. Sim-specific listener receives raw data (shared memory, UDP, SimConnect)
-2. Data normalized to semicolon-delimited string: `KEY1=val1~val2;KEY2=val3;...`
-3. `TelemManager.submit_frame(data)` queues it on a condition variable
-4. `TelemManager.run()` loop picks up data, parses into `BaseTelemetryData`
-5. Frame timing calculated; IPC telemetry merged (master)
-6. Aircraft resolved by name + source; new aircraft creates new instance
-7. `aircraft.on_telemetry(telem_data)` processes per-MixIn chain
-8. Effects updated on device via HID
-9. TelemetryTap captures frame for analysis ring buffer
-10. `telemetryReceived` signal emitted for UI updates
-
-### Telemetry Timeout & Sim Exit Detection
-- Timeout: configurable via `telemTimeout` system setting (default 200ms)
-- On first timeout: `on_timeout()` fires once, stops periodic effects
-- After 5s grace: `_check_sim_process()` polls OS process list every 5s
-- If process gone: `notify_sim_exited()` fires, clears aircraft, restarts listeners
-- Grace period prevents false exits during loading screens
-
----
-
-## Key Files to Understand
-
-| File | Purpose | Lines |
-|------|---------|-------|
-| `main.py` | 16-phase application bootstrap | ~1200 |
-| `telemffb/globals.py` | Single source of truth for app state | ~158 |
-| `telemffb/hw/ffb_rhino.py` | USB HID protocol, effect definitions, ctypes structs | ~1750 |
-| `telemffb/hw/ffb_sdl.py` | **DEPRECATED** SDL haptic backend (kept for posterity) | ~228 |
-| `telemffb/xmlutils.py` | All XML config read/write operations | ~2383 |
-| `telemffb/utils.py` | Utilities: Dispenser, LowPassFilter, Dampener, SystemSettings, etc. | ~3570 |
-| `telemffb/telem/TelemManager.py` | Telemetry routing, aircraft instantiation, sim exit detection | ~793 |
-| `telemffb/telem/SimTelemListener.py` | SimListenerManager + per-sim listener classes | ~315 |
-| `telemffb/sim/aircraft_base.py` | MixIn composition + base aircraft behavior | ~104 |
-| `telemffb/sim/BaseTelemetryData.py` | Dict-backed telemetry container with typed attribute hints | ~1416 |
-| `telemffb/sim/base/AircraftEffectUtilsBase.py` | Base utilities all MixIns inherit from | ~423 |
-| `telemffb/sim/aircrafts_dcs.py` | DCS aircraft class + DCS command injection | ~695 |
-| `telemffb/sim/aircrafts_il2.py` | IL-2 aircraft class + damage/buffet effects | ~348 |
-| `telemffb/sim/aircrafts_msfs_xp.py` | Module exports for MSFS/XP aircraft | ~33 |
-| `telemffb/sim/msfs_xp/Aircraft.py` | Base MSFS/XP aircraft class | ~210 |
-| `telemffb/sim/msfs_xp/MsfsXpFBWFlightControlsMixIn.py` | FBW control forces + AP following | ~350 |
-| `telemffb/sim/msfs_xp/MsfsXpFlightControlsMixIn.py` | Non-FBW stick forces | ~large |
-| `telemffb/SettingsManager.py` | XML config manager, profiles, offline mode | ~237 |
-| `telemffb/IPCNetworkThread.py` | UDP IPC between master/child instances | ~312 |
-| `telemffb/MainWindow.py` | Main PyQt6 window, settings layout, status indicators | ~large |
-| `telemffb/ExceptionTracker.py` | Error capture, logging handler, viewer dialog | ~378 |
-| `telemffb/mcp/server.py` | MCP analysis server for LLM telemetry queries | ~339 |
-| `telemffb/analysis/telemetry_tap.py` | Ring buffer tap for telemetry capture | ~79 |
-| `telemffb/analysis/ring_buffer.py` | Circular buffer with pause/flush/window queries | ~medium |
-| `telemffb/namedmutex.py` | Win32 named mutex (ctypes) | ~132 |
-| `telemffb/CmdLineArgs.py` | CLI argument parser | ~131 |
-| `telemffb/MainWindow.py` | Main UI window | ~large |
-| `styles.py` | Light/dark mode QSS stylesheets | ~medium |
-
----
-
-## When Making Changes
-
-1. **Adding new effects**: Create MixIn in `telemffb/sim/base/` (generic) or `telemffb/sim/msfs_xp/` (sim-specific). Inherit from `AircraftEffectUtilsBase`. Add to `AircraftBase` MRO or aircraft subclass. Use `@override` decorator. Call `super().on_telemetry()`, `super().on_timeout()`, `super().on_event()` in each hook.
-
-2. **New aircraft type**: Subclass from appropriate sim's `Aircraft` class. Override `on_telemetry()`. Register in `defaults.xml` under appropriate sim/class/model section. For MSFS, consider SimConnect category fallback.
-
-3. **UI changes**: PyQt6 components in `telemffb/*.py` (MainWindow, dialogs). Use existing QSS from `styles.py`. Follow Fusion style conventions. All GUI updates from non-main threads must use `utils.schedule_on_main_thread(lambda: ...)`.
-
-4. **Config changes**: Update both `defaults.xml` (new default values) and ensure XML reading logic in `xmlutils.py` handles the new keys. For enum settings, add to `SettingsManager` enums (e.g., `SpringModeEnum`, `GEffectModeEnum`). Ensure multi-instance safety (file locking via `try_parse`).
-
-5. **Testing new features**: Add tests to `tests/`. Use `BaseTelemetryEffectTestCase` from `tests/framework/base.py`. Mark with appropriate pytest markers. Run `pytest` before committing.
-
-6. **New telemetry fields**: Add typed attribute hint to `BaseTelemetryData` with docstring documenting sims, source, units. Populate in sim-specific listener/parser.
-
 ---
 
 ## Dependencies & External Integrations
 
-### Runtime Dependencies (`requirements.txt`)
-- `pyqt6==6.9.1` — UI framework (fully migrated from PyQt5)
-- `pysimconnect` — MSFS integration (custom fork at github.com/walmis/pysimconnect)
-- `libusb1` — USB device enumeration
-- `numpy==2.3.0` — Math operations
-- `akima` — Spline interpolation for curves
-- `psutil` — Cross-platform process checking for sim exit detection
-- `stransi` — ANSI color code parsing
-- `pygetwindow` — Window focus detection (IL-2)
-- `configobj` — INI config parsing
-
-### Dev Dependencies (`requirements-dev.txt`)
-- `mcp>=1.0.0` — Model Context Protocol server for telemetry analysis
-
-### Binary Dependencies
-- `dll/hidapi.dll` — HID API for direct USB communication
-- `simconnect/simconnect.dll` — MSFS SimConnect SDK DLL
-- `xplane-plugin/` — X-Plane telemetry export plugin (auto-installed)
+**Runtime** (`requirements.txt`): `pyqt6==6.9.1`, `pysimconnect` (custom fork at github.com/walmis/pysimconnect — rolling `master.zip`), `libusb1`, `numpy==2.3.0`, `akima`, `psutil`, `stransi`, `pygetwindow`, `configobj`.
+**Dev** (`requirements-dev.txt`): `mcp>=1.0.0` (telemetry analysis server).
+**Bundled binaries**: `dll/hidapi.dll`, `simconnect/simconnect.dll`, `xplane-plugin/` (auto-installed).
 
 ---
 
 ## Common Pitfalls
 
-1. **Don't use global variables as default args** — see `dev_guidelines.md` line 91-108
-2. **Watch for XML file locking** in multi-instance scenarios — use `try_parse()` with retries
-3. **Effect names must be unique** within an aircraft instance — `G.effects` is a dict-based Dispenser
-   - **Every new effect name must also be registered in the effects translator** — `effect_dict` in `telemffb/utils.py` (~line 318): maps an effect-name pattern (regex supported, e.g. `"blade_slap.*"`) to `["Human Readable Name", "intensity_setting_name"]`. This drives the readable name in the effects panel AND links the effect to its settings slider (green-highlight / % force display). An unregistered effect shows up as its raw internal name.
+1. **Don't use global variables as default args** — see Coding Guidelines → Globals
+2. **Watch for XML file locking** in multi-instance scenarios — read with `try_parse()`, call `update_roots()` after any change
+3. **Every new effect name must be registered in the effects translator** (`effect_dict` in `telemffb/utils.py`) — see Coding Guidelines → Effects & HID Values
 4. **Always check `G.master_instance` vs `G.child_instance`** when implementing features that differ per instance type
 5. **FFBRhino device communication is USB-latency sensitive** — batch HID updates when possible
 6. **GUI updates from worker threads** — use `utils.schedule_on_main_thread()` or Qt signals
 7. **MixIn `super()` chain** — always call `super().on_telemetry()`, `super().on_timeout()`, `super().on_event()`
 8. **Telemetry data is dict-like** — use `telem_data.get('key', default)` for safe access, or dot-access for known fields
-9. **Per-frame performance matters** — telemetry runs at 60-120Hz; avoid heavy computation in `on_telemetry()`
+9. **Per-frame performance matters** — telemetry runs at 60–120 Hz; no per-frame log lines, no exceptions escaping `on_telemetry()`
 10. **IPC is UDP, not TCP** — messages may be dropped; don't assume delivery ordering
 11. **`ffb_sdl.py` is deprecated** — do not use, kept for historical reference only
+12. **Never `assert` on device state in production paths** — asserts are stripped under `-O`; use `HIDDisconnectedError` / `HapticEffect.device_alive()` instead
 
 ---
 
@@ -389,10 +317,10 @@ parameters, or telemetry variables. Note caveats, TODOs, or known limitations.
 - Does this need access to global state? Use `telemffb.globals as G`
 - Is this effect device-type specific? Check `G.device_type` / `self.is_joystick()` etc.
 - Could this run in a child instance? Check `G.master_instance` / `G.child_instance`
-- Will this be called per-frame? Consider performance (60-120Hz telemetry rate)
-- Does this modify XML? Ensure thread-safe via `try_parse()` and multi-instance safe
-- Is this sim-specific behavior? Keep in sim-specific modules, not base classes
-- Does this touch the GUI from a background thread? Use `schedule_on_main_thread()`
+- Will this be called per-frame? Consider performance (60–120 Hz telemetry rate)
+- Does this modify XML? Ensure thread-safe via `try_parse()` and multi-instance safe; `update_roots()` after writes
+- Is this sim-specific behavior? Keep it in sim-specific modules, not base classes
+- Does this touch the GUI from a background thread? Use `schedule_on_main_thread()` or signals
 - Are all `super()` calls present in the MixIn chain?
-- Is the effect name unique within the aircraft instance?
-- Is every new effect name registered in the effects translator (`effect_dict` in `telemffb/utils.py`) with a display name and its intensity setting?
+- Is the effect name unique within the aircraft instance, and registered in `effect_dict`?
+- Do private (`_`-prefixed) members stay private to their class?

@@ -1788,7 +1788,7 @@ class TestSuppression:
             harness.teardown_method()
 
     def test_calibrator_crash_does_not_kill_telemetry_loop(self):
-        # dev_guidelines "Error Handling": an exception in the telemetry hot
+        # AGENTS.md (Error Handling): an exception in the telemetry hot
         # path kills the processing loop. A calibrator bug must be contained
         # by the hook, force-abort the run, and release control.
         from tests.framework.base import BaseTelemetryEffectTestCase
