@@ -100,6 +100,13 @@ class BaseEffectHandle:
         the owning HapticEffect lazily re-creates on next start."""
         raise NotImplementedError
 
+    def forget_playback(self):
+        """Forget in-memory playback state without touching the device:
+        called while the device is dead, when the device-side play state
+        is already gone - the owning HapticEffect then re-starts the
+        effect on the next live frame."""
+        raise NotImplementedError
+
     def start(self, loopCount=1, override=False):
         raise NotImplementedError
 

@@ -829,6 +829,16 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         self._pushed_hash = None
         self._consecutive_failures = 0
 
+    def forget_playback(self):
+        """Forget playback after the device-side state was lost (a
+        reconnect releases the handle, and its play state dies with it):
+        the effect_id is kept, so a live start() re-pushes the effect and
+        _ensure_effect_created re-creates the block if it is gone.
+        _device_playing is cleared too - a stale play flag would make
+        _sync_device_playing skip the effect_start re-push."""
+        self._started = False
+        self._device_playing = False
+
     def _note_call_failed(self, rc) -> None:
         """Self-heal from a device-side effect death.
 
