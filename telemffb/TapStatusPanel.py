@@ -115,6 +115,40 @@ def confirm_legacy_upgrade(sim_name, directories, parent=None):
     return answer == QtWidgets.QMessageBox.StandardButton.Yes
 
 
+def refuse_fix_only_for_directinput(sim_name, devices, parent=None):
+    """Stop an FFB-Fix only install that would leave the stick dead.
+
+    The mode's whole premise is that the game drives the joystick itself,
+    which a DirectInput device cannot do: TelemFFB reaches one only by
+    holding it exclusively, so the game cannot open it whatever the
+    wrapper says.  Installed this way the device would have no forces from
+    the game at all - no tap rule for TelemFFB to render, and no device
+    for the game to claim - while the panel called the install healthy,
+    because the wrapper would be doing exactly what it was asked.
+
+    Refused at the point of acting rather than explained afterwards, and
+    returns True when it refused.  A module-level seam, for the same
+    reason as ask_for_devices.
+    """
+    stick = next((d for d in devices
+                  if d.role == 'joystick' and d.directinput), None)
+    if stick is None:
+        return False
+    name = stick.ident or "the selected joystick"
+    QtWidgets.QMessageBox.warning(
+        parent, "FFB-Fix Only Not Available",
+        f"{name} is a DirectInput device, and FFB-Fix only mode would "
+        f"leave it with no force feedback from {sim_name} at all.\n\n"
+        "That mode installs no capture rules, so that the game drives the "
+        "joystick directly. TelemFFB holds a DirectInput device "
+        "exclusively for as long as it is rendering to it, so the game "
+        "cannot drive it - and with no rules there is nothing for TelemFFB "
+        "to render either.\n\n"
+        "Turn FFB-Fix only mode off to use the tap, which is how a "
+        "DirectInput device receives the game's forces.")
+    return True
+
+
 def confirm_overwrite(sim_name, directories, parent=None):
     """Ask before replacing a dinput8.dll that is not ours and not the
     recognized ffb-fix wrapper.
@@ -412,6 +446,15 @@ class TapStatusPanel(QtWidgets.QWidget):
         the whole update.
         """
         wanted = bool(state)
+        if wanted and refuse_fix_only_for_directinput(
+                self.status.sim.name, self._devices(), parent=self):
+            # Answered where the choice is made, rather than letting the
+            # mode sit there looking available until Install refuses it.
+            # Toggle defers a set made from inside its own signal, so this
+            # lands a pass from now and re-enters with the switch off -
+            # which is what tells the dialog to forget the choice.
+            self._mode_toggle.setChecked(False)
+            return
         self._refresh_mode_label(wanted)
         self.fix_only_toggled.emit(wanted)
 
@@ -486,6 +529,11 @@ class TapStatusPanel(QtWidgets.QWidget):
 
     # ------------------------------------------------------------------
     def _install(self):
+        # before every other question: this one has no answer that lets the
+        # install proceed, so asking anything else first would be asking
+        # about work that is not going to happen
+        if self._fix_only_would_strand_the_stick():
+            return
         # asked before anything else: there is no point choosing devices for
         # an install the user is about to call off.  A recognized ffb-fix
         # wrapper gets the affirmative upgrade question; anything unknown
@@ -521,6 +569,17 @@ class TapStatusPanel(QtWidgets.QWidget):
                                                                 legacy)),
                   "Install", then=self._configure if adopt else None)
 
+    def _fix_only_would_strand_the_stick(self) -> bool:
+        """True when the mode is asked for and the joystick cannot take it.
+
+        Only when the mode is actually selected: turning it back off is
+        the way out, and refusing that would trap the user in it.
+        """
+        if not (self.status.sim.fix_only_key and self._fix_only()):
+            return False
+        return refuse_fix_only_for_directinput(
+            self.status.sim.name, self._devices(), parent=self)
+
     def _config_to_write(self):
         """The config this install should lay down, or None to leave it
         alone; CANCELLED if the user backed out.
@@ -554,6 +613,8 @@ class TapStatusPanel(QtWidgets.QWidget):
         a user arriving from ffb-fix keeps every rule and comment they wrote,
         and the only lines that change are the ones they were asked about.
         """
+        if self._fix_only_would_strand_the_stick():
+            return
         # Every config this sim holds, not just the first.  A sim can hold
         # two that differ, and writing one answer over both would discard
         # whichever was not consulted.

@@ -848,3 +848,119 @@ class TestFixOnlyInstall:
                             fix_only=False)
         line = [t for t in rendered(panel) if "installed as:" in t]
         assert line and "Configure Devices" in line[0]
+
+
+class TestFixOnlyIsRefusedForADirectInputStick:
+    """The mode hands the joystick to the game, which a DirectInput device
+    cannot be handed to.
+
+    TelemFFB reaches one only by holding it exclusively, so installing this
+    way would leave the stick with nothing: no rule for TelemFFB to render,
+    and no device for the game to open - while the panel called the install
+    healthy, because the wrapper would be doing what it was asked.  Refused
+    at the point of acting, not explained afterwards.
+    """
+
+    def _di_panel(self, *targets, fix_only=True):
+        devices = [TapDevice("joystick", 0x044F, 0xB10A, "Foreign Stick",
+                             directinput=True),
+                   TapDevice("pedals", 0xFFFF, 0x2052, "Pedals")]
+        self._held = TapStatusPanel(status(*targets),
+                                    devices=lambda: devices,
+                                    fix_only=lambda: fix_only)
+        return self._held
+
+    @pytest.fixture
+    def refusals(self, monkeypatch):
+        import telemffb.TapStatusPanel as module
+        seen = []
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: seen.append(a[2])))
+        # anything the refusal is supposed to come before
+        monkeypatch.setattr(module, 'ask_for_devices',
+                            lambda *a, **k: pytest.fail(
+                                "the device dialog was opened anyway"))
+        monkeypatch.setattr(module, 'install',
+                            lambda *a, **k: pytest.fail(
+                                "the wrapper was installed anyway"))
+        return seen
+
+    def test_the_toggle_refuses_and_springs_back(self, app, refusals):
+        """Answered where the choice is made.  The switch does not stay on
+        looking like a mode that was accepted."""
+        panel = self._di_panel(target("bin", WrapperState.ABSENT),
+                               fix_only=False)
+        chosen = []
+        panel.fix_only_toggled.connect(chosen.append)
+
+        toggle = self._toggle(panel)
+        toggle.toggle.nextCheckState()              # the user's own click
+        QtWidgets.QApplication.processEvents()      # the revert is deferred
+
+        assert refusals, "the mode was accepted"
+        assert "Foreign Stick" in refusals[0], "the device is not named"
+        assert not toggle.isChecked(), "the switch stayed on"
+        assert True not in chosen, "the dialog was told to store the mode"
+
+    def _toggle(self, panel):
+        from telemffb.custom_widgets import LabeledToggle
+        for widget in panel.findChildren(LabeledToggle):
+            if "FFB-Fix only" in widget.label.text_label.text():
+                return widget
+        return None
+
+    def test_install_is_refused_and_says_why(self, app, refusals):
+        self._di_panel(target("bin", WrapperState.ABSENT))._install()
+        assert refusals, "the install went ahead"
+        assert "Foreign Stick" in refusals[0], "the device is not named"
+
+    def test_configure_devices_never_opens(self, app, refusals):
+        """The dialog is where the user would otherwise spend a while
+        choosing rules for an install that cannot work."""
+        self._di_panel(target("bin", WrapperState.TAP,
+                              has_config=True))._configure()
+        assert refusals
+
+    def test_the_tap_is_unaffected(self, app, monkeypatch):
+        """Only the mode is refused.  With it off, a DirectInput stick is
+        the case the tap exists for."""
+        import telemffb.TapStatusPanel as module
+        seen = []
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: seen.append(a)))
+        monkeypatch.setattr(module, 'ask_for_devices',
+                            lambda *a, **k: ([], [], [], []))
+        monkeypatch.setattr(module, 'install', lambda *a, **k: [])
+        self._di_panel(target("bin", WrapperState.ABSENT),
+                       fix_only=False)._install()
+        assert not seen
+
+    def test_a_natively_driven_stick_is_left_alone(self, app, monkeypatch):
+        """VPforce hardware is what the mode is for."""
+        import telemffb.TapStatusPanel as module
+        seen = []
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: seen.append(a)))
+        monkeypatch.setattr(module, 'install', lambda *a, **k: [])
+        panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)),
+                               devices=lambda: DEVICES,
+                               fix_only=lambda: True)
+        panel._install()
+        assert not seen
+
+    def test_directinput_pedals_do_not_block_it(self, app, monkeypatch):
+        """Only the joystick decides.  DCS renders nothing to pedals, so a
+        DirectInput pedal set loses nothing the mode was going to give it."""
+        import telemffb.TapStatusPanel as module
+        seen = []
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: seen.append(a)))
+        monkeypatch.setattr(module, 'install', lambda *a, **k: [])
+        devices = [TapDevice("joystick", 0xFFFF, 0x2054, "Monster"),
+                   TapDevice("pedals", 0x044F, 0xB10A, "DI Pedals",
+                             directinput=True)]
+        panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)),
+                               devices=lambda: devices,
+                               fix_only=lambda: True)
+        panel._install()
+        assert not seen
