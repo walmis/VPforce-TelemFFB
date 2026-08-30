@@ -463,9 +463,13 @@ def _initialize_device_connection():
     except Exception as e:
         G.device_connection_status = False
         logging.exception("Exception")
-        QMessageBox.warning(None, "Cannot connect to Rhino",
-                          f"Unable to open device: {G.device_type}\nError: {e}\n\n"
-                          "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
+        # the one startup warning for the zombie state; the device panel
+        # stays red (NOT_FOUND) and the phase-14 watcher auto-opens the
+        # board when it appears, so no manual restart is needed.
+        QMessageBox.warning(None, "Configured device not found",
+                          f"Configured device {0xFFFF:04X}:{int(G.device_usbpid, 16):04X} not found - check USB connection.\n"
+                          f"(Error: {e})\n\n"
+                          "The application will open the device automatically when it appears.")
 
     return dev, dev_serial, dev_firmware_version
 
@@ -492,23 +496,12 @@ def _replay_device_setup():
         logging.exception("Exception")
 
 
-def _device_watcher_tick(timer: QTimer):
-    """One ~2 s tick of the zombie-state device watcher (Qt main thread).
+def _wire_opened_device(dev):
+    """Signal wiring and one-shot state population after a successful open.
 
-    The configured board was absent at startup, so ``HapticEffect.device``
-    is still None: telemetry is processed, but no FFB can be sent.  When
-    the board appears this runs the normal open sequence (phase 9 open +
-    firmware validation + phase 14 async init) and stops the watcher.
+    Shared by the zombie-state watcher tick and the switch-device path:
+    the open itself already assigned HapticEffect.device.
     """
-    if HapticEffect.device is not None:
-        # recovered through another path (e.g. a manual settings change)
-        timer.stop()
-        return
-    try:
-        dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
-    except Exception:
-        return  # still absent: stay quiet and retry on the next tick
-
     dev.deviceConnected.connect(G.main_window.update_device_status)
     dev.buttonPressed.connect(G.main_window.get_active_buttons)
     dev.buttonReleased.connect(G.main_window.get_active_buttons)
@@ -526,8 +519,82 @@ def _device_watcher_tick(timer: QTimer):
         logging.exception("Exception")
     G.device_ident = dev.info.ident
     G.device_connection_status = True
-    logging.info(f"Configured device (PID {G.device_usbpid}) appeared; opened and initialized")
     _setup_async_initialization(dev, dev.serial)
+    # the initial True emission happens inside HapticEffect.open, before
+    # the connections above exist - update the panel explicitly.
+    G.main_window.update_device_status(True)
+
+
+def _find_alternate_vpforce_board():
+    """A connected VPforce board that is not the configured PID, or None.
+
+    Feeds the switch-device prompt: the user configured one board but a
+    different VPforce board is the one actually plugged in.
+    """
+    configured = int(G.device_usbpid, 16)
+    try:
+        devs = FFBRhino.enumerate(0)
+    except Exception:
+        return None
+    for d in devs:
+        if d.product_id != configured:
+            return d
+    return None
+
+
+def _offer_device_switch() -> bool:
+    """Ask the user to switch to a different, present VPforce board.
+
+    Returns True when the switch was accepted: the selection is then
+    persisted (pid key + devpath, the same keys the System Settings
+    dialog writes) and the board is opened right away.
+    """
+    other = _find_alternate_vpforce_board()
+    if other is None:
+        return False
+    configured = int(G.device_usbpid, 16)
+    ans = QMessageBox.question(
+        None, "Switch FFB device?",
+        f"Configured device {0xFFFF:04X}:{configured:04X} not found.\n"
+        f"Another VPforce board is connected: {other.vidpid()} \"{other.product_string}\"\n\n"
+        "Use this board instead?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    if ans != QMessageBox.StandardButton.Yes:
+        return False
+
+    new_pid = f"{other.product_id:04X}"
+    G.system_settings.setValue(utils.device_pid_key(G.device_type), new_pid)
+    other_path = other.path
+    if isinstance(other_path, (bytes, bytearray)):
+        other_path = other_path.decode()
+    G.system_settings.setValue(f'devpath_{G.device_type}', other_path)
+    G.device_usbpid = new_pid
+
+    dev = HapticEffect.open(pid=other.product_id)
+    _wire_opened_device(dev)
+    logging.info(f"Device switched to {other.vidpid()} \"{other.product_string}\"; selection persisted to system settings")
+    return True
+
+
+def _device_watcher_tick(timer: QTimer):
+    """One ~2 s tick of the zombie-state device watcher (Qt main thread).
+
+    The configured board was absent at startup, so ``HapticEffect.device``
+    is still None: telemetry is processed, but no FFB can be sent.  When
+    the board appears this runs the normal open sequence (phase 9 open +
+    firmware validation + phase 14 async init) and stops the watcher.
+    """
+    if HapticEffect.device is not None:
+        # recovered through another path (e.g. a manual settings change)
+        timer.stop()
+        return
+    try:
+        dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+    except Exception:
+        return  # still absent: stay quiet and retry on the next tick
+
+    logging.info(f"Configured device (PID {G.device_usbpid}) appeared; opened and initialized")
+    _wire_opened_device(dev)
     timer.stop()
 
 
@@ -539,6 +606,11 @@ def _start_device_watcher():
     itself once the device is open.
     """
     if HapticEffect.device is not None:
+        return
+    # A different VPforce board is the one plugged in? Offer the switch
+    # once (the phase-9 warning already told the user the configured
+    # board is missing, so no second warning here).
+    if _offer_device_switch():
         return
     timer = QTimer()
     timer.setInterval(2000)

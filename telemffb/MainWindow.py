@@ -51,7 +51,7 @@ import telemffb.xmlutils as xmlutils
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
     SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
-from telemffb.DevicePanel import DeviceIconPanel
+from telemffb.DevicePanel import DeviceIconPanel, device_status_state
 from telemffb.ExceptionTracker import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
@@ -406,7 +406,7 @@ class MainWindow(QMainWindow):
 
         if not G.master_instance:
             self.device_panel.set_devices([G.device_type])
-            self.device_panel.set_device_status(G.device_type, "ok")
+            self.device_panel.set_device_status(G.device_type, device_status_state())
             self.device_panel.set_active_device(G.device_type)
 
 
@@ -1362,8 +1362,10 @@ class MainWindow(QMainWindow):
     @pyqtSlot(bool)
     def update_device_status(self, connected):
         G.device_connection_status = connected
-        status = "ACTIVE" if connected else "DISCONNECTED"
-        self.device_panel.set_device_status(G.device_type, status)
+        # three states, derived from the device object itself (the signal
+        # only says a transition happened): never opened (zombie),
+        # opened-but-dead (reconnecting), or alive (active).
+        self.device_panel.set_device_status(G.device_type, device_status_state())
 
     @pyqtSlot(str, str)
     def update_child_status(self, device, status):
@@ -1426,7 +1428,7 @@ class MainWindow(QMainWindow):
         for d in G.launched_instances:
             d_list.append(d)
         self.device_panel.set_devices(d_list)
-        self.device_panel.set_device_status(G.device_type, "ok")
+        self.device_panel.set_device_status(G.device_type, device_status_state())
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)
 

@@ -39,6 +39,28 @@ STATUS_COLORS_DARK = {
     "hover": QColor(180, 180, 180, 100),    # lighter gray in dark mode
     "selected": QColor(0, 120, 215, 200)
 }
+
+def device_status_state() -> str:
+    """Derive the device panel state from the live device object.
+
+    NOT_FOUND: the configured board never opened (zombie startup - the
+    app runs, telemetry is processed, but no FFB can be sent until the
+    board appears).
+    RECONNECTING: the board was opened but its HID handle is dead
+    (hot-unplug) - the reconnect backoff is running.
+    ACTIVE: the handle is alive.
+
+    Pure and side-effect free so it is testable without a window.
+    """
+    from telemffb.hw.ffb_rhino import HapticEffect  # local: keep import light
+    dev = HapticEffect.device
+    if dev is None:
+        return "NOT_FOUND"
+    if not dev.connected:
+        return "RECONNECTING"
+    return "ACTIVE"
+
+
 class DeviceIconWidget(QWidget):
     clicked = pyqtSignal(str)
 
@@ -324,15 +346,28 @@ class DeviceIconPanel(QWidget):
     def set_device_status(self, device_name: str, status: str):
         # utils.dbprint("red", f"Setting status for >{device_name}< to {status}")
 
+        dev_status = status
         if status == 'TIMEOUT':
             status = 'error'
         if status == 'ACTIVE':
             status = 'ok'
         if status == 'DISCONNECTED':
             status = 'warning'
+        if status == 'RECONNECTING':
+            status = 'warning'
+        if status == 'NOT_FOUND':
+            status = 'error'
         widget = self.icons.get(device_name.lower())
         if widget:
             widget.set_status_color(status)
+            tooltip = {
+                'ACTIVE': 'Device connected',
+                'RECONNECTING': 'Device disconnected - reconnecting automatically',
+                'NOT_FOUND': 'Configured device not found - check USB connection',
+                'DISCONNECTED': 'Device disconnected',
+            }.get(dev_status)
+            if tooltip:
+                widget.setToolTip(tooltip)
 
     def update_device_status_icon(self, device_name, new_icon_path):
         if device_name.lower() in self.icons:
