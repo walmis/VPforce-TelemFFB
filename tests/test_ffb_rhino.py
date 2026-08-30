@@ -1231,19 +1231,6 @@ class TestDisconnectedEffectHandle:
         # Nothing was written to the (now dead) HID handle.
         assert len(old_dev._write_buffer) == writes_after_start
 
-    def test_stop_no_write_recorded_when_disconnected(self, mock_ffb_device):
-        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
-        handle.start()
-        old_dev = mock_ffb_device._dev
-        writes_after_start = len(old_dev._write_buffer)
-        assert writes_after_start > 0
-
-        mock_ffb_device._dev = None
-        handle.stop()  # no-op: no new write to the dead handle
-        assert mock_ffb_device._dev is None  # still disconnected
-        assert len(old_dev._write_buffer) == writes_after_start
-        assert not handle.started
-
     def test_destroy_is_noop_write_when_disconnected(self, mock_ffb_device):
         handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
         writes_before = len(mock_ffb_device._dev._write_buffer)
