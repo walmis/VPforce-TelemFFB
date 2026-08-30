@@ -87,7 +87,9 @@ Two parallel XML files:
 - `defaults.xml` — shipped defaults (full schema and 6-layer resolution hierarchy: `docs/defaults_xml_reference.md`)
 - `userconfig_v2.xml` — user overrides (in `%LOCALAPPDATA%\VPForce-TelemFFB\`)
 
-`telemffb/xmlutils.py` handles all XML operations: `update_roots()` (re-parse both trees — **must be called after any programmatic change**), `try_parse()` (retries on file lock — use for reads, multi-instance safe), `update_vars()`, `read_single_model()`, `write_models_to_xml()`, `get_pattern_by_sim_fullname()`, `get_active_profile_for_model()`, `read_sc_overrides()`.
+`telemffb/xmlutils.py` is a **legacy facade** over the `telemffb/xml/` package — `XmlStore` (I/O, parsing, tree management, file locking), `ConfigResolver` (reads), `ConfigWriter` (writes); all read/write operations go through that triple. The module-level names (`auto_user_root` & co) are **one-way sync targets** (store → globals): reading them still works, but assigning to them changes no behavior — in tests, inject fixture trees via `XmlStore`.
+
+Locking: per-file OS-level `FileLock` (`telemffb/namedmutex.py`) — shared for reads, exclusive for writes, and writes go through temp-file + atomic replace, so a crash mid-write never leaves a half-written file. `update_roots()` re-parses both files; the parsed trees persist until the next call (a recreated store — device-scope switch — adopts the previous trees), so **call it after any programmatic change**. `try_parse()` is lock-aware: it holds the shared lock only while reading bytes, retries on `ParseError`, and returns `None` on lock timeout instead of blocking (safe from worker threads). The facade itself is main-thread-only in practice (its singleton is not thread-safe).
 
 Config hierarchy: SIM → CLASS → MODEL → PROFILE (profile is an optional overlay). `SettingsManager` wraps XML ops with state tracking, offline mode support, and PyQt signals.
 
@@ -125,6 +127,7 @@ pytest --cov=telemffb          # With coverage
 - `conftest.py` — autouse fixture resets `G.effects` and `G.master_buttons`
 - Markers: `unit`, `integration`, `msfs`, `xplane`, `joystick`, `pedals`, `collective`, `helicopter`, `slow`
 - Warnings treated as errors (except DeprecationWarning)
+- The `xmlutils` module globals are one-way (store → globals): to inject a fixture tree in tests, use `XmlStore` — setting `xu.auto_user_root` alone no longer affects reads/writes
 - `HapticEffect.device` is a **class attribute** — tests that construct devices must save/restore it
 - `telemffb.hw.hid` is a `MagicMock` in `sys.modules` — install yours with `sys.modules.setdefault('telemffb.hw.hid', MagicMock())` and patch the module **as `ffb_rhino` sees it** (`ffb_rhino_module.hid`), never via a fresh `import telemffb.hw.hid` (a sibling test may have swapped the `sys.modules` entry, so a fresh import can bind a different mock)
 - `main.py` is **Windows-only** (imports `winreg` via `MainWindow`) — tests that need it must guard with `skipif` or use static source checks
@@ -201,7 +204,8 @@ This rule may only be broken to avoid circular imports — and even then, the ci
 | `telemffb/globals.py` | Single source of truth for app state |
 | `telemffb/hw/ffb_rhino.py` | USB HID protocol, effect definitions, ctypes structs |
 | `telemffb/hw/ffb_sdl.py` | **DEPRECATED** SDL haptic backend (kept for posterity) |
-| `telemffb/xmlutils.py` | All XML config read/write operations |
+| `telemffb/xmlutils.py` | Legacy facade over `telemffb/xml/` (module-global API, one-way sync) |
+| `telemffb/xml/` (`store.py`, `read.py`, `write.py`, `merge.py`) | XML I/O, per-file locking, parsing, settings resolution |
 | `telemffb/utils.py` | Utilities: Dispenser, LowPassFilter, Dampener, SystemSettings, effects translator (`effect_dict`), etc. |
 | `telemffb/telem/TelemManager.py` | Telemetry routing, aircraft instantiation, sim exit detection |
 | `telemffb/telem/SimTelemListener.py` | SimListenerManager + per-sim listener classes |
@@ -234,7 +238,7 @@ Line counts are large (`xmlutils.py` ~2400, `utils.py` ~3600, `ffb_rhino.py` ~18
 1. **Adding new effects**: Create a MixIn in `telemffb/sim/base/` (generic) or `telemffb/sim/msfs_xp/` (sim-specific). Inherit from `AircraftEffectUtilsBase`. Add to `AircraftBase`'s MRO or the aircraft subclass. Use `@override`. Call `super()` in each hook. Register the effect name in `effect_dict` (`telemffb/utils.py`).
 2. **New aircraft type**: Follow `docs/adding_an_aircraft_class.md` — one class per file under `msfs_xp/` (MSFS/X-Plane) or inline in the DCS/IL-2 module; register in `defaults.xml`; MSFS/X-Plane-only: telemetry remapping via `<sc_overrides>`.
 3. **UI changes**: PyQt6 components in `telemffb/*.py` (MainWindow, dialogs). Use existing QSS from `styles.py`, Fusion style conventions. All GUI updates from non-main threads via `utils.schedule_on_main_thread()`.
-4. **Config changes**: See `docs/defaults_xml_reference.md`. Update `defaults.xml` (new default values) and ensure `xmlutils.py` handles the new keys. New enum settings go into `SettingsManager`'s class-level dicts. Multi-instance safe via `try_parse()`; call `update_roots()` after writes.
+4. **Config changes**: See `docs/defaults_xml_reference.md`. Update `defaults.xml` (new default values) and ensure the read path in `telemffb/xml/` handles the new keys. New enum settings go into `SettingsManager`'s class-level dicts. Writes go through the store's locked write path, then `update_roots()`.
 5. **Testing new features**: Add tests to `tests/`. Use `BaseTelemetryEffectTestCase` from `tests/framework/base.py`. Mark with the appropriate pytest markers. Run `pytest` before committing.
 6. **New telemetry fields**: Add a typed attribute + docstring (sims, source, units) to `BaseTelemetryData`; populate in the sim-specific listener/parser.
 
@@ -266,7 +270,7 @@ effect.stop()  # Frees device resource
 ## Common Pitfalls
 
 1. **Don't use global variables as default args** — see Coding Guidelines → Globals
-2. **Watch for XML file locking** in multi-instance scenarios — read with `try_parse()`, call `update_roots()` after any change
+2. **Never write the XML config files directly** — the multi-instance setup is protected by the per-file locks and atomic replace inside `XmlStore`; route writes through the store, then refresh the in-memory trees with `update_roots()` (they persist until called)
 3. **Every new effect name must be registered in the effects translator** (`effect_dict` in `telemffb/utils.py`) — see Coding Guidelines → Effects & HID Values
 4. **Always check `G.master_instance` vs `G.child_instance`** when implementing features that differ per instance type
 5. **FFBRhino device communication is USB-latency sensitive** — batch HID updates when possible
@@ -318,7 +322,7 @@ parameters, or telemetry variables. Note caveats, TODOs, or known limitations.
 - Is this effect device-type specific? Check `G.device_type` / `self.is_joystick()` etc.
 - Could this run in a child instance? Check `G.master_instance` / `G.child_instance`
 - Will this be called per-frame? Consider performance (60–120 Hz telemetry rate)
-- Does this modify XML? Ensure thread-safe via `try_parse()` and multi-instance safe; `update_roots()` after writes
+- Does this modify XML? Route writes through the store's locked write path (never raw file I/O), then call `update_roots()`. Note the `xmlutils` facade is main-thread-only in practice
 - Is this sim-specific behavior? Keep it in sim-specific modules, not base classes
 - Does this touch the GUI from a background thread? Use `schedule_on_main_thread()` or signals
 - Are all `super()` calls present in the MixIn chain?
