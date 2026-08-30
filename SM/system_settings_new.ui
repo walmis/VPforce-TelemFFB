@@ -644,7 +644,7 @@
               </font>
              </property>
              <property name="text">
-              <string>DirectInput Tap:</string>
+              <string>DirectInput Tap/FFB-Fix:</string>
              </property>
             </widget>
            </item>

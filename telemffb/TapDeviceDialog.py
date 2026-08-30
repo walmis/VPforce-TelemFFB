@@ -55,9 +55,16 @@ class TapDeviceDialog(QtWidgets.QDialog):
     """Pick the devices to write tap rules for."""
 
     def __init__(self, sim, devices: Sequence, existing: Optional[str] = None,
-                 parent=None, preview=None):
+                 parent=None, preview=None, fix_only: bool = False):
         super().__init__(parent)
-        self.setWindowTitle("DirectInput Tap Devices")
+        #: FFB-Fix only: the wrapper relays nothing, so there is no tap to
+        #: configure.  What is left is genuinely a choice - which devices
+        #: the game must not treat as force feedback capable, and which
+        #: one it should see first - so the dialog still opens, without
+        #: the half that would contradict the mode.
+        self._fix_only = fix_only
+        self.setWindowTitle("FFB-Fix Devices" if fix_only
+                            else "DirectInput Tap Devices")
         self._rows = []                     # (checkbox, device, [(box, rule)])
         self._shadows = {}                  # device key -> existing rules
         self._orphans = []                  # (checkbox, rule) for stale rules
@@ -72,27 +79,43 @@ class TapDeviceDialog(QtWidgets.QDialog):
 
         # a label, not a question: the boxes below are the questions
         heading = QtWidgets.QLabel(
-            f"DirectInput Tap configuration for <b>{sim.name}</b>")
+            (f"FFB-Fix configuration for <b>{sim.name}</b>" if fix_only
+             else f"DirectInput Tap configuration for <b>{sim.name}</b>"))
         heading.setWordWrap(True)
         layout.addWidget(heading)
-        layout.addWidget(self._note(
-            "Checking a device configures the tap to intercept the game's "
-            "effects for it, so TelemFFB can render them in the "
-            "'Game Managed (DirectInput Tap)' spring mode."))
 
-        offered = [d for d in devices if d.usable and sim.renders_to(d.role)]
-        for device in offered:
-            layout.addLayout(self._row(device))
+        driven = [d for d in devices if d.usable and sim.renders_to(d.role)]
+        #: What this sim drives, whatever the mode - ordering is about
+        #: these, and in FFB-Fix only mode nothing else names them.
+        self._driven = driven
+        offered = []
+        if fix_only:
+            named = ", ".join(d.ident or device_display_name(d.role)
+                              for d in driven)
+            layout.addWidget(self._note(
+                "FFB-Fix only mode: nothing is handed to TelemFFB, so no "
+                "device is tapped here." + (
+                    f"  {sim.name} keeps driving {named} itself - it needs "
+                    "no rule, and gets none." if named else "")))
+        else:
+            layout.addWidget(self._note(
+                "Checking a device configures the tap to intercept the "
+                "game's effects for it, so TelemFFB can render them in the "
+                "'Game Managed (DirectInput Tap)' spring mode."))
 
-        if not offered:
-            layout.addWidget(self._nothing_to_offer(devices, sim))
+            offered = driven
+            for device in offered:
+                layout.addLayout(self._row(device))
+
+            if not offered:
+                layout.addWidget(self._nothing_to_offer(devices, sim))
 
         # Ordering: only where the sim is known to need it, and only when
         # there is something to order.  A game that hands force feedback to
         # whichever device it saw first can leave a tapped device with no
         # effects at all - and then there is nothing for TelemFFB to render,
         # with no error to explain it.
-        if sim.supports_ordering and offered:
+        if sim.supports_ordering and driven:
             # Ticked reflects what the file says, the same way a device row
             # does, and unticking is how the ordering comes back out.  This
             # was disabled whenever a [DeviceOrder] section existed, which
@@ -100,7 +123,7 @@ class TapDeviceDialog(QtWidgets.QDialog):
             self._order_entries = [
                 entry for entry in (self._facts.order if self._facts else [])
                 if any(order_matches(entry, (d.vid, d.pid), d.ident)
-                       for d in offered)]
+                       for d in driven)]
             self._order_box = QtWidgets.QCheckBox(
                 f"Make {sim.name} detect this joystick before any other device")
             self._order_box.setChecked(True)
@@ -114,11 +137,22 @@ class TapDeviceDialog(QtWidgets.QDialog):
         # which in this dialog means "not tapped" - so leaving them
         # alone clears them out.  Listed rather than removed silently: the
         # device may simply be unplugged today.
-        stale = (stale_tap_rules(self._facts,
-                                 devices_a_sim_drives(sim, devices))
-                 if self._facts else [])
+        if self._facts is None:
+            stale = []
+        elif fix_only:
+            # In this mode EVERY tap rule contradicts the configuration -
+            # the wrapper is meant to relay nothing - so they are all
+            # listed, not just the ones naming hardware that has gone.
+            stale = [r for r in self._facts.rules if r.is_tap]
+        else:
+            stale = stale_tap_rules(self._facts,
+                                    devices_a_sim_drives(sim, devices))
         if stale:
             layout.addWidget(self._note(
+                "This device still has a tap configuration, which FFB-Fix "
+                "only mode does not use.  Check the box to remove it and "
+                "allow the game to send its effects to the device "
+                "directly." if fix_only else
                 "These are still in the configuration but no longer "
                 "selected in TelemFFB. Leave one unchecked to remove it."))
             for rule in stale:
@@ -224,13 +258,32 @@ class TapDeviceDialog(QtWidgets.QDialog):
         return row
 
     def _orphan_row(self, rule) -> QtWidgets.QHBoxLayout:
-        """A tap rule whose device is not selected any more."""
+        """A tap rule that should not be there.
+
+        Elsewhere in this dialog a ticked box means "tapped", so a rule
+        is removed by leaving its box clear.  That reads backwards in
+        FFB-Fix only mode, where removing is the whole point and there
+        is nothing to tick it for - so there the box IS the action, and
+        says so.
+        """
         label = rule.comment or "device not selected"
-        box = QtWidgets.QCheckBox(f"{label}  ({rule.key})")
-        box.setChecked(False)
-        box.setToolTip(
-            "No configured device has these ids. The name is whatever was "
-            "written when the rule was made, so it may be out of date.")
+        if self._fix_only:
+            box = QtWidgets.QCheckBox(
+                f"Remove the tap rule for {label}  ({rule.key})")
+            box.setToolTip(
+                "Removes this rule, so the game sends its force feedback "
+                "to the device directly instead of it being intercepted.")
+            # Ticked to start: wanting the rule gone is the only reason to
+            # be in this mode.  Clearing it keeps the rule, which leaves
+            # the config tapping in a mode that does not.
+            box.setChecked(True)
+        else:
+            box = QtWidgets.QCheckBox(f"{label}  ({rule.key})")
+            box.setToolTip(
+                "No configured device has these ids. The name is whatever "
+                "was written when the rule was made, so it may be out of "
+                "date.")
+            box.setChecked(False)
         self._orphans.append((box, rule))
         row = QtWidgets.QHBoxLayout()
         row.addSpacing(INDENT)
@@ -330,12 +383,15 @@ class TapDeviceDialog(QtWidgets.QDialog):
     def ordered(self) -> List:
         """The devices to report to the game first, if the user asked.
 
-        The same devices they chose to tap: ordering exists so the game
+        Normally the ones they chose to tap: ordering exists so the game
         drives them, and a device it does not drive has nothing to tap.
+        In FFB-Fix only mode nothing is tapped, and putting the joystick
+        first is half of what the fix is - so it is the devices this sim
+        drives that get ordered.
         """
         if self._order_box is None or not self._order_box.isChecked():
             return []
-        return self.chosen()
+        return list(self._driven) if self._fix_only else self.chosen()
 
     def retire_lines(self) -> List[int]:
         """Every existing rule line that should stop applying.
@@ -358,8 +414,10 @@ class TapDeviceDialog(QtWidgets.QDialog):
         for box, _, existing in self._blocks:
             if not box.isChecked():
                 lines.update(rule.line for rule in existing)
+        # ticked means remove in FFB-Fix only mode (see _orphan_row);
+        # everywhere else a clear box is what takes a rule out
         for box, rule in self._orphans:
-            if not box.isChecked():
+            if box.isChecked() if self._fix_only else not box.isChecked():
                 lines.add(rule.line)
         for box, device, replacements in self._rows:
             if box.isChecked():

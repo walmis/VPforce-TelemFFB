@@ -156,7 +156,8 @@ class Policy:
         self.asked.append(("overwrite", sim_name))
         return self.fixed.get("overwrite", self.rng.random() < 0.7)
 
-    def devices(self, sim, devices, existing=None, parent=None, preview=None):
+    def devices(self, sim, devices, existing=None, parent=None, preview=None,
+                fix_only=False):
         """Build the real device dialog, flip boxes at random, read it back.
 
         Returns None - the user cancelled - when the dialog would not let
@@ -168,7 +169,7 @@ class Policy:
         if self.rng.random() < 0.1:
             return None
         dialog = TapDeviceDialog(sim, devices, existing=existing,
-                                 preview=preview)
+                                 preview=preview, fix_only=fix_only)
         for box in dialog.findChildren(QtWidgets.QCheckBox):
             if self.rng.random() < 0.3:
                 box.setChecked(not box.isChecked())

@@ -39,19 +39,22 @@ from PyQt6 import QtWidgets
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPalette
 
-from telemffb.custom_widgets import InfoLabel
+from telemffb.custom_widgets import InfoLabel, LabeledToggle
 from telemffb.TapDeviceDialog import TapDeviceDialog
 from telemffb import tap_install
 from telemffb.tap_config import (already_blocked, already_ordered,
                                  already_tapped, amend, lines_for,
                                  read as read_config_text,
                                  retired_identities)
-from telemffb.tap_install import (SimStatus, VJOY_RULE, WRAPPER_CONFIG,
+from telemffb.tap_install import (MODE_FIX_ONLY, MODE_TAP, SimStatus,
+                                  VJOY_RULE, WRAPPER_CONFIG,
                                   WRAPPER_NAME, WrapperState, block_line,
                                   config_label,
                                   config_link,
-                                  config_paths, generate_config, read_configs,
-                                  install, order_entries, order_line, remove,
+                                  config_paths, fix_only_config,
+                                  generate_config, read_configs,
+                                  install, installed_mode, order_entries,
+                                  order_line, remove,
                                   rule_line, write_one_config)
 
 #: The user closed the device dialog without choosing.  Distinct from
@@ -59,7 +62,8 @@ from telemffb.tap_install import (SimStatus, VJOY_RULE, WRAPPER_CONFIG,
 CANCELLED = object()
 
 
-def ask_for_devices(sim, devices, existing=None, parent=None, preview=None):
+def ask_for_devices(sim, devices, existing=None, parent=None, preview=None,
+                    fix_only=False):
     """Which of this sim's devices should have their effects relayed to
     TelemFFB.
 
@@ -75,7 +79,7 @@ def ask_for_devices(sim, devices, existing=None, parent=None, preview=None):
     user who is not there.
     """
     dialog = TapDeviceDialog(sim, devices, existing=existing, parent=parent,
-                             preview=preview)
+                             preview=preview, fix_only=fix_only)
     if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
         return None
     return (dialog.chosen(), dialog.retire_lines(), dialog.ordered(),
@@ -159,14 +163,22 @@ class TapStatusPanel(QtWidgets.QWidget):
     #: Emitted after the wrapper is installed or removed, so the dialog can
     #: re-scan rather than trust this panel's idea of what happened.
     changed = pyqtSignal()
+    #: The FFB-fix-only toggle moved.  The dialog owns settings, so it
+    #: persists the choice; this panel only shows and applies it.
+    fix_only_toggled = pyqtSignal(bool)
 
-    def __init__(self, status: SimStatus, parent=None, devices=None):
+    def __init__(self, status: SimStatus, parent=None, devices=None,
+                 fix_only=None):
         super().__init__(parent)
         #: Callable returning the devices configured right now.  A callable
         #: rather than a list: the settings dialog can change the selection
         #: while this panel is on screen, and the answer has to be current
         #: at the moment the user asks, not at the moment we were built.
         self._devices = devices or (lambda: [])
+        #: Callable returning this sim's stored FFB-fix-only choice, for
+        #: the same reason `devices` is one: the dialog can change it
+        #: while the panel is on screen.
+        self._fix_only = fix_only or (lambda: False)
         self._outer = QtWidgets.QVBoxLayout(self)
         self._outer.setContentsMargins(8, 4, 8, 4)
         self._outer.setSpacing(1)
@@ -174,6 +186,15 @@ class TapStatusPanel(QtWidgets.QWidget):
         #: What the files looked like before each action this panel ran,
         #: newest last - so the dialog can put them back on Cancel.
         self._undo = []
+        # The mode row is built once and lives OUTSIDE the body, which is
+        # destroyed and rebuilt on every refresh.  Nothing about the row
+        # depends on the status except what it shows - which set_status
+        # updates in place - so rebuilding it would only churn a stateful
+        # switch and its connections.
+        self._mode_row = None
+        self._mode_toggle = None
+        self._mode_label = None
+        self._installed_mode = None
         self.set_status(status)
 
     # ------------------------------------------------------------------
@@ -252,7 +273,7 @@ class TapStatusPanel(QtWidgets.QWidget):
                 self._label("Install not found. Set the path in this tab, or "
                             "install the sim, and reopen this dialog.", "dim"),
                 indent=INDENT))
-            self._outer.addWidget(self._body)
+            self._outer.insertWidget(0, self._body)
             return
 
         # the resolved root, with how we came to it - a user whose sim was
@@ -313,6 +334,8 @@ class TapStatusPanel(QtWidgets.QWidget):
         grid.setColumnStretch(4, 1)
         body.addWidget(targets)
 
+        self._sync_mode_row(status)
+
         if status.stale_rules:
             # the silent failure worth a line of its own: the game hands a
             # device TelemFFB is not driving, and the one that is configured
@@ -324,7 +347,90 @@ class TapStatusPanel(QtWidgets.QWidget):
                 "Use Configure Devices to point it at what is selected now"),
                 indent=INDENT))
 
-        self._outer.addWidget(self._body)
+        self._outer.insertWidget(0, self._body)
+
+    def _sync_mode_row(self, status: SimStatus):
+        """Show and update the FFB-Fix mode row, building it the first
+        time.  Built once, deliberately - see __init__."""
+        if not status.sim.fix_only_key:
+            if self._mode_row is not None:
+                self._mode_row.setVisible(False)
+            return
+        if self._mode_row is None:
+            self._mode_row = QtWidgets.QWidget(self)
+            row = QtWidgets.QVBoxLayout(self._mode_row)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(1)
+            self._mode_toggle = LabeledToggle(
+                label="FFB-Fix only mode (no tap)",
+                tooltip=(
+                    "<p><b>OFF - Install DirectInput Tap:</b><br>"
+                    "<i>Includes the extra device block functionality of "
+                    "'FFB-Fix only mode'</i></p>"
+                    "<p>The wrapper intercepts the force feedback effects "
+                    "destined for the 'tapped' device and makes them "
+                    "available to TelemFFB to render locally.  This works "
+                    "exclusively with the 'Game Managed (DirectInput Tap)' "
+                    "spring mode.</p>"
+                    "<p><b>ON - Install FFB-Fix only:</b><br>"
+                    "<i>Equivalent to the community "
+                    "'dcs-force-feedback-fix' functionality</i></p>"
+                    "<p>The wrapper stops the game from enumerating devices "
+                    "other than the joystick as being FFB capable.  This "
+                    "prevents incorrect forces being sent to non-joystick "
+                    "devices.  The fix also forces the game to enumerate "
+                    "the joystick device first, which ensures it is treated "
+                    "as the primary FFB device.</p>"
+                    "<p>Install (or Reinstall) applies the mode.</p>"))
+            self._mode_label = self._label(
+                "", "attention",
+                "The wrapper is the same either way; only the dinput8.ini "
+                "differs.  Install never overwrites a config that is "
+                "already there.")
+            row.addWidget(self._row(self._mode_toggle, indent=INDENT))
+            row.addWidget(self._row(self._mode_label, indent=INDENT))
+            self._outer.addWidget(self._mode_row)
+            # stateChanged, not toggled: a LabeledToggle forwards that one,
+            # and as an int rather than a bool
+            self._mode_toggle.stateChanged.connect(self._on_fix_only_toggled)
+
+        self._mode_row.setVisible(True)
+        self._installed_mode = installed_mode(status)
+        wanted = bool(self._fix_only())
+        self._mode_toggle.blockSignals(True)
+        self._mode_toggle.setChecked(wanted)
+        self._mode_toggle.blockSignals(False)
+        self._refresh_mode_label(wanted)
+
+    def _on_fix_only_toggled(self, state):
+        """The mode toggle moved: retext our own line, then let the
+        dialog persist the choice.
+
+        Deliberately no rebuild.  This runs from the toggle's signal, and
+        rebuilding would delete the toggle mid-emit - a Qt fail-fast.
+        Nothing else on the panel depends on the mode, so one label is
+        the whole update.
+        """
+        wanted = bool(state)
+        self._refresh_mode_label(wanted)
+        self.fix_only_toggled.emit(wanted)
+
+    def _refresh_mode_label(self, wanted: bool):
+        """Say what is installed when it differs from what the toggle
+        asks for, and nothing at all when they agree."""
+        label = getattr(self, '_mode_label', None)
+        if label is None:
+            return
+        mode = getattr(self, '_installed_mode', None)
+        asked_for = MODE_FIX_ONLY if wanted else MODE_TAP
+        if mode is None or mode == asked_for:
+            label.setVisible(False)
+            return
+        installed_as = ("FFB-Fix only" if mode == MODE_FIX_ONLY
+                        else "DirectInput Tap")
+        label.setText(f"installed as: {installed_as} - use Configure "
+                      "Devices to change it")
+        label.setVisible(True)
 
     def _buttons(self, status: SimStatus):
         """Install and Remove, offered only where they would do something."""
@@ -342,6 +448,7 @@ class TapStatusPanel(QtWidgets.QWidget):
                 else "Install")
             install_button.clicked.connect(self._install)
             buttons.append(install_button)
+
         else:
             update = QtWidgets.QPushButton("Reinstall")
             update.clicked.connect(self._install)
@@ -415,16 +522,23 @@ class TapStatusPanel(QtWidgets.QWidget):
                   "Install", then=self._configure if adopt else None)
 
     def _config_to_write(self):
-        """The config this install should lay down, or None to leave it alone.
+        """The config this install should lay down, or None to leave it
+        alone; CANCELLED if the user backed out.
 
-        Only asked when the sim has no config at all.  An existing file is
-        the user's - hand-written, or a setup that predates us, or one we
-        wrote and they have since tuned - and rewriting it during what they
-        asked to be an install of the wrapper would discard that silently.
-        Configure Devices is where a config gets changed.
+        Only when the sim has no config at all.  An existing file is the
+        user's - hand-written, or a setup that predates us, or one we
+        wrote and they have since tuned - and rewriting it during what
+        they asked to be an install of the wrapper would discard that
+        silently.  Configure Devices is where a config gets changed,
+        including from one mode to the other.
         """
         if any(target.has_config for target in self.status.targets):
             return None
+
+        if self.status.sim.fix_only_key and self._fix_only():
+            # FFB-Fix only: the mode decides every rule, so there is
+            # nothing to ask about.
+            return fix_only_config(self.status.sim, self._devices())
 
         answer = ask_for_devices(self.status.sim, self._devices(),
                                  parent=self)
@@ -494,8 +608,10 @@ class TapStatusPanel(QtWidgets.QWidget):
                     for directory, current, proposed
                     in each(chosen, retire, ordered, blocked)]
 
-        answer = ask_for_devices(self.status.sim, self._devices(), existing,
-                                 parent=self, preview=preview)
+        answer = ask_for_devices(
+            self.status.sim, self._devices(), existing, parent=self,
+            preview=preview,
+            fix_only=bool(self.status.sim.fix_only_key and self._fix_only()))
         if answer is None:
             return
 

@@ -113,6 +113,12 @@ class TapSim:
     #: most VPforce owners never need, and showing it as part of ordinary
     #: sim setup implies otherwise.
     tap_enable_key: str = ""
+    #: The setting holding this sim's FFB-fix-only choice, where the
+    #: sim offers one.  Set only for sims whose device enumeration order
+    #: decides which stick the game drives - that is what the original
+    #: dcs-force-feedback-fix exists for, and the mode reproduces it.
+    #: Empty elsewhere, which is also what hides the toggle.
+    fix_only_key: str = ""
     #: Whether we offer to put tapped devices first in this sim's device
     #: enumeration.  DCS only for now: it hands force feedback to the
     #: devices it sees first, and we have watched it strand a stick that
@@ -285,6 +291,7 @@ SIMS: Tuple[TapSim, ...] = (
     TapSim(
         key="DCS",
         tap_enable_key="enableTapDCS",
+        fix_only_key="tapFixOnlyDCS",
         supports_ordering=True,
         enable_key="enableDCS",
         name="DCS World",
@@ -480,6 +487,53 @@ def block_line(device: TapDevice) -> str:
         device.key, device.ident or "unnamed", device.role)
 
 
+#: What a config on disk is set up to do (installed_mode).
+MODE_TAP = "tap"
+MODE_FIX_ONLY = "fix"
+
+
+def installed_mode(status: SimStatus) -> Optional[str]:
+    """Which way this sim's config is actually set up, or None when it
+    holds no config at all.
+
+    Read from the file rather than from the setting that asked for it:
+    a config can be hand-edited, can predate TelemFFB, and can be left
+    behind by an earlier choice - so what the panel reports has to come
+    from what is there.  A config with any tap rule is tapping; one
+    without is the fix on its own.
+    """
+    configs = read_configs(status)
+    if not configs:
+        return None
+    from telemffb.tap_config import read
+    for _directory, text in configs:
+        if any(rule.is_tap for rule in read(text).rules):
+            return MODE_TAP
+    return MODE_FIX_ONLY
+
+
+def fix_only_config(sim: TapSim, devices) -> str:
+    """The wrapper configured as the original FFB fix: no tap at all.
+
+    What the community dcs-force-feedback-fix does, which is the whole
+    reason it exists - keep DCS from handing its force feedback to a
+    device that cannot use it, and make sure the stick is the one it
+    finds first.  Blocks for every configured device in a role this sim
+    does not render to, the joystick first in [DeviceOrder], and no tap
+    rules: nothing is relayed to TelemFFB, and the game keeps rendering
+    its own effects on the stick exactly as it always did.
+
+    For users who want that behaviour and not the tap.  TelemFFB does
+    not have to be running for it to work - block and order rules are
+    never gated on the beacon, only tap and sink rules are.
+    """
+    blocked = [d for d in devices
+               if d.usable and not sim.renders_to(d.role)]
+    ordered = [d for d in devices
+               if d.usable and sim.renders_to(d.role)]
+    return generate_config([], ordered=ordered, blocked=blocked)
+
+
 def devices_a_sim_drives(sim: TapSim, devices) -> List["TapDevice"]:
     """The configured devices this sim can actually render force to.
 
@@ -625,9 +679,8 @@ def generate_config(devices: Sequence[TapDevice],
             "[DeviceOrder]",
             "; Which device the game sees first, as position=VVVV:PPPP.  A game",
             "; that gives force feedback to the first device it sees keeps",
-            "; giving it to the same one, so the tapped joystick must be first",
-            "; - ordered elsewhere it can be given no effects at all, and then",
-            "; there is nothing for TelemFFB to render.",
+            "; giving it to the same one, so the joystick must be first - any",
+            "; further down the list can be given no effects at all.",
             *order,
         ])
     lines.append("")

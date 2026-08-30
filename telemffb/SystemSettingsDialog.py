@@ -1327,11 +1327,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
             layout = QVBoxLayout(host)
             layout.setContentsMargins(0, 0, 0, 0)
-            panel = TapStatusPanel(self._tap_status(key), host,
-                                   devices=self.tap_devices)
+            panel = TapStatusPanel(
+                self._tap_status(key), host, devices=self.tap_devices,
+                fix_only=lambda k=key: self._tap_fix_only(k))
             # after an install or removal, re-scan rather than trust the
             # panel's idea of what it just did
             panel.changed.connect(self.refresh_tap_panels)
+            # the panel shows and applies the mode; settings are the
+            # dialog's, so persisting it happens here
+            panel.fix_only_toggled.connect(
+                lambda on, k=key: self._set_tap_fix_only(k, on))
             layout.addWidget(panel)
             self.tap_panels[key] = panel
 
@@ -1472,6 +1477,26 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             # nothing better to offer; let reconcile resolve the sims itself
             return None
         return [self._tap_status(key) for key in self.tap_panels]
+
+    def _tap_fix_only(self, key) -> bool:
+        """This sim's stored FFB-fix-only choice, unsaved picks included -
+        the panel acts on it now, not at Save."""
+        sim = SIMS_BY_KEY.get(key)
+        if sim is None or not sim.fix_only_key:
+            return False
+        return bool(self._stored_or_pending(sim.fix_only_key, False))
+
+    def _set_tap_fix_only(self, key, on: bool):
+        """Record the mode.  Nothing is redrawn from here: the panel
+        updates its own line.  Rebuilding the panels would destroy the
+        toggle whose signal we are inside, and deferring the rebuild to
+        the event loop only moves it - it would then land after the
+        dialog is gone."""
+        sim = SIMS_BY_KEY.get(key)
+        if sim is None or not sim.fix_only_key:
+            return
+        self._pending_devpaths[sim.fix_only_key] = bool(on)
+        G.system_settings.setValue(sim.fix_only_key, bool(on))
 
     def refresh_tap_panels(self):
         """Re-scan the game folders and redraw.

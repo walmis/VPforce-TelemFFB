@@ -15,12 +15,19 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-from telemffb.tap_install import SIMS_BY_KEY, SimStatus, TargetStatus, WrapperState
+from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
+                                  TargetStatus, WrapperState)
 from telemffb.TapStatusPanel import TapStatusPanel
 
 pytestmark = [pytest.mark.unit]
 
 DCS = SIMS_BY_KEY['DCS']
+
+#: A configured rig: the stick DCS should drive, plus two devices it
+#: renders nothing to.
+DEVICES = [TapDevice("joystick", 0xFFFF, 0x2054, "Monster"),
+           TapDevice("pedals", 0xFFFF, 0x2052, "Pedals"),
+           TapDevice("collective", 0xFFFF, 0x2051, "Collective")]
 #: A game root that cannot be a real install.  The panel stats and reads
 #: config files under whatever root it is given, so a plausible-looking
 #: path here would read - and the install paths would write - the machine
@@ -83,16 +90,20 @@ def rendered(panel):
     target rows live in separate layouts so that the sim name cannot set
     the column widths the target rows use.
     """
-    return [label.text() for label in panel.findChildren(QtWidgets.QLabel)]
+    # an empty or hidden label shows the user nothing, so it is not part
+    # of what the panel renders
+    return [label.text() for label in panel.findChildren(QtWidgets.QLabel)
+            if label.text() and not label.isHidden()]
 
 
 class TestHeadline:
     @staticmethod
     def attention_texts(panel):
-        """Labels drawn in the attention color."""
+        """Labels drawn in the attention color - and actually showing
+        something: an empty or hidden one flags nothing."""
         amber = panel._color("attention")
         return [w.text() for w in panel.findChildren(QtWidgets.QLabel)
-                if amber in w.styleSheet()]
+                if amber in w.styleSheet() and w.text() and not w.isHidden()]
 
     def test_fully_installed(self, app):
         panel = TapStatusPanel(status(target("bin", WrapperState.TAP),
@@ -231,6 +242,8 @@ class TestButtons:
         return {b.text(): b for b in panel.findChildren(QtWidgets.QPushButton)}
 
     def test_nothing_installed_offers_install_only(self, app):
+        """One Install button whatever the mode - which mode it lays
+        down is the FFB-Fix toggle's job, not a second button's."""
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)))
         assert set(self.buttons(panel)) == {"Install"}
 
@@ -672,3 +685,166 @@ class TestLegacyWrapperOnThePanel:
                                       target("bin-mt", WrapperState.FOREIGN)))
         panel._install()
         assert calls == ['classify']
+
+
+class TestFixOnlyInstall:
+    """The wrapper's original job, offered without the tap: block the
+    devices the sim will not drive, put the joystick first, relay
+    nothing.  For users who want dcs-force-feedback-fix behaviour and
+    no TelemFFB involvement in the game's own forces."""
+
+    def buttons(self, panel):
+        return {b.text(): b for b in panel.findChildren(QtWidgets.QPushButton)}
+
+    def test_offered_only_where_device_order_decides_the_stick(self, app):
+        """DCS today - the reason the original fix exists.  IL-2
+        identifies devices by position, so it is not offered there."""
+        il2 = SIMS_BY_KEY['IL2']
+        panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT),
+                                      sim=il2))
+        assert "Install FFB Fix Only" not in self.buttons(panel)
+
+    def test_the_config_taps_nothing(self):
+        from telemffb.tap_config import read
+        from telemffb.tap_install import fix_only_config
+        text = fix_only_config(DCS, DEVICES)
+        assert not [r for r in read(text).rules if r.is_tap]
+
+    def test_it_blocks_what_the_sim_will_not_drive(self):
+        from telemffb.tap_config import read
+        from telemffb.tap_install import fix_only_config
+        blocks = {r.key for r in read(fix_only_config(DCS, DEVICES)).rules
+                  if r.value == 'block'}
+        assert 'FFFF:2052' in blocks           # pedals
+        assert 'FFFF:2051' in blocks           # collective
+        assert 'FFFF:2054' not in blocks       # the joystick is the point
+
+    def test_the_joystick_is_ordered_first(self):
+        from telemffb.tap_config import read
+        from telemffb.tap_install import fix_only_config
+        entries = [(e.position, e.match)
+                   for e in read(fix_only_config(DCS, DEVICES)).order]
+        assert entries == [("1", "FFFF:2054")]
+
+    def test_korea_would_not_block_its_pedals(self):
+        """The blocks fall out of the capability table, so a sim that
+        does drive pedals keeps them - no special case."""
+        from telemffb.tap_config import read
+        from telemffb.tap_install import fix_only_config
+        korea = SIMS_BY_KEY['IL2_K']
+        blocks = {r.key for r in read(fix_only_config(korea, DEVICES)).rules
+                  if r.value == 'block'}
+        assert 'FFFF:2052' not in blocks
+
+    def _panel(self, *targets, fix_only=False):
+        # held: a panel nothing references is collected, and Qt deletes
+        # its children out from under the test
+        self._held = TapStatusPanel(status(*targets),
+                                    devices=lambda: DEVICES,
+                                    fix_only=lambda: fix_only)
+        return self._held
+
+    def _toggle(self, panel):
+        """The FFB-Fix toggle, or None.  A LabeledToggle like every other
+        switch in the dialog, so it is found by type and read by its
+        label's text."""
+        from telemffb.custom_widgets import LabeledToggle
+        for widget in panel.findChildren(LabeledToggle):
+            if "FFB-Fix only" in widget.label.text_label.text():
+                return widget
+        return None
+
+    def test_the_toggle_is_shown_for_dcs(self, app):
+        panel = self._panel(target("bin", WrapperState.ABSENT))
+        assert self._toggle(panel) is not None
+
+    def test_no_toggle_where_the_sim_has_no_mode(self, app):
+        """The key is set only for sims whose enumeration order decides
+        which stick the game drives."""
+        il2 = SIMS_BY_KEY['IL2']
+        panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT),
+                                      sim=il2))
+        assert self._toggle(panel) is None
+
+    def test_the_toggle_reflects_the_stored_choice(self, app):
+        panel = self._panel(target("bin", WrapperState.ABSENT),
+                            fix_only=True)
+        assert self._toggle(panel).isChecked()
+
+    def test_it_carries_the_explanation(self, app):
+        """Rich text like the per-sim tap toggles: plain-text tooltips
+        never word-wrap and would run off the screen, while Qt wraps
+        HTML by itself."""
+        from PyQt6.QtGui import QTextDocument
+        tip = self._toggle(self._panel(
+            target("bin", WrapperState.ABSENT))).toolTip()
+        # Qt treats a tooltip as rich text when it carries markup, which
+        # is what makes it wrap; parsing it back proves it is really HTML
+        # rather than angle brackets in a plain string.
+        assert "<p>" in tip and "<b>" in tip
+        doc = QTextDocument()
+        doc.setHtml(tip)
+        rendered_text = doc.toPlainText()
+        assert "OFF - Install DirectInput Tap:" in rendered_text
+        assert "ON - Install FFB-Fix only:" in rendered_text
+        assert "<p>" not in rendered_text, "markup should render, not show"
+
+    def test_moving_it_tells_the_dialog(self, app):
+        """The panel shows and applies the mode; the dialog owns the
+        setting."""
+        panel = self._panel(target("bin", WrapperState.ABSENT))
+        seen = []
+        panel.fix_only_toggled.connect(seen.append)
+        self._toggle(panel).setChecked(True)
+        assert seen == [True]
+
+    def test_a_fresh_install_in_fix_mode_asks_nothing_and_taps_nothing(
+            self, app, monkeypatch):
+        """The mode decides every rule, so there is no device question."""
+        import telemffb.TapStatusPanel as module
+        from telemffb.tap_config import read
+        asked, written = [], []
+        monkeypatch.setattr(module, 'ask_for_devices',
+                            lambda *a, **k: asked.append(True) or ([], [], [], []))
+        monkeypatch.setattr(
+            module, 'install',
+            lambda s, config=None, overwrite_foreign=False:
+            written.append(config) or [])
+        panel = self._panel(target("bin", WrapperState.ABSENT), fix_only=True)
+        panel._buttons(panel.status)
+        {b.text(): b for b in panel.findChildren(
+            QtWidgets.QPushButton)}["Install"].click()
+        assert asked == [], "fix-only needs no device dialog"
+        assert written and not [r for r in read(written[0]).rules if r.is_tap]
+
+    def test_the_panel_says_what_is_actually_installed(self, app,
+                                                       monkeypatch):
+        """The toggle is intent; the file is fact.  When they differ the
+        panel says so rather than letting the toggle imply otherwise."""
+        import telemffb.TapStatusPanel as module
+        monkeypatch.setattr(module, 'installed_mode',
+                            lambda status: module.MODE_TAP)
+        panel = self._panel(target("bin", WrapperState.TAP, has_config=True),
+                            fix_only=True)
+        line = [t for t in rendered(panel) if "installed as:" in t]
+        assert line and "DirectInput Tap" in line[0]
+        assert "Configure Devices" in line[0]
+
+    def test_no_such_line_when_they_agree(self, app, monkeypatch):
+        import telemffb.TapStatusPanel as module
+        monkeypatch.setattr(module, 'installed_mode',
+                            lambda status: module.MODE_FIX_ONLY)
+        panel = self._panel(target("bin", WrapperState.TAP, has_config=True),
+                            fix_only=True)
+        assert not any("installed as:" in t for t in rendered(panel))
+
+    def test_that_case_still_says_what_is_installed(self, app, monkeypatch):
+        """Silent about rewriting, not silent about the state: the line
+        points at Configure Devices instead of Reinstall."""
+        import telemffb.TapStatusPanel as module
+        monkeypatch.setattr(module, 'installed_mode',
+                            lambda status: module.MODE_FIX_ONLY)
+        panel = self._panel(target("bin", WrapperState.TAP, has_config=True),
+                            fix_only=False)
+        line = [t for t in rendered(panel) if "installed as:" in t]
+        assert line and "Configure Devices" in line[0]

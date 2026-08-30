@@ -445,3 +445,92 @@ class TestBlockingWhatTheSimWillNotDrive:
         existing = "[FFBDevices]\nFFFF:2052=block\n"
         dialog = TapDeviceDialog(DCS, [RHINO, PEDALS], existing=existing)
         assert dialog.retire_lines() == []
+
+
+class TestFixOnlyMode:
+    """In FFB-Fix only mode the wrapper relays nothing, so there is no
+    tap to configure.  Opening this dialog on such a config used to
+    offer the joystick as a tap candidate, ticked - and OK wrote
+    FFFF:2054=tap, converting the install back to a tapping one without
+    saying so."""
+
+    FIX = ("[FFBDevices]\r\nFFFF:2052=block\r\nvJoy=block\r\n"
+           "[DeviceOrder]\r\n1=FFFF:2054\r\n")
+    TAPPING = ("[FFBDevices]\r\nFFFF:2054=tap\r\nFFFF:2052=block\r\n"
+               "[DeviceOrder]\r\n1=FFFF:2054\r\n")
+
+    def _dialog(self, app, existing=None, fix_only=True):
+        return TapDeviceDialog(DCS, [RHINO, PEDALS], existing=existing,
+                               fix_only=fix_only)
+
+    def test_no_device_is_offered_for_tapping(self, app):
+        assert self._dialog(app, self.FIX).chosen() == []
+
+    def test_the_joystick_gets_no_rule_at_all(self, app):
+        """The game drives it; a device with no matching rule is
+        untouched by the wrapper, which is exactly what is wanted."""
+        dialog = self._dialog(app, self.FIX)
+        assert RHINO not in dialog.chosen()
+        assert RHINO not in dialog.blocked()
+
+    def test_blocking_is_still_a_choice(self, app):
+        """Half of what the fix does, so it stays configurable."""
+        assert PEDALS in self._dialog(app, self.FIX).blocked()
+
+    def test_the_joystick_is_still_ordered_first(self, app):
+        """The other half.  Ordering follows what the sim drives, not
+        what is tapped - nothing is."""
+        assert self._dialog(app, self.FIX).ordered() == [RHINO]
+
+    def test_existing_tap_rules_are_offered_for_removal(self, app):
+        """Every tap rule contradicts this mode, not just the ones
+        naming hardware that has gone."""
+        dialog = self._dialog(app, self.TAPPING)
+        assert [r.key for _b, r in dialog._orphans] == ["FFFF:2054"]
+
+    def test_the_box_is_the_action_and_starts_ticked(self, app):
+        """Elsewhere a clear box means "not tapped", so removal is what
+        you get by leaving it alone.  That reads backwards here, where
+        removing is the whole point - so the box is the action, and it
+        starts ticked: wanting the rule gone is the only reason to be in
+        this mode."""
+        dialog = self._dialog(app, self.TAPPING)
+        box, _rule = dialog._orphans[0]
+        assert "Remove the tap rule" in box.text()
+        assert box.isChecked()
+        assert dialog.retire_lines() == [1]
+
+    def test_clearing_it_keeps_the_rule(self, app):
+        dialog = self._dialog(app, self.TAPPING)
+        box, _rule = dialog._orphans[0]
+        box.setChecked(False)
+        assert dialog.retire_lines() == []
+
+    def test_it_says_what_removing_it_means(self, app):
+        dialog = self._dialog(app, self.TAPPING)
+        notes = " ".join(w.text() for w in
+                         dialog.findChildren(QtWidgets.QLabel))
+        assert "still has a tap configuration" in notes
+        assert "send its effects to the device directly" in notes
+
+    def test_the_normal_mode_keeps_its_own_polarity(self, app):
+        """A stale rule there is removed by leaving its box clear, and
+        that is unchanged."""
+        gone = "[FFBDevices]\r\n045E:001B=tap    ; SideWinder\r\n"
+        dialog = TapDeviceDialog(DCS, [RHINO], existing=gone,
+                                 fix_only=False)
+        box, _rule = dialog._orphans[0]
+        assert not box.isChecked()
+        assert dialog.retire_lines() == [1], "clear box removes it"
+
+    def test_the_dialog_says_which_mode_it_is_in(self, app):
+        dialog = self._dialog(app, self.FIX)
+        assert "FFB-Fix" in dialog.windowTitle()
+        texts = " ".join(w.text() for w in
+                         dialog.findChildren(QtWidgets.QLabel))
+        assert "nothing is handed to TelemFFB" in texts
+
+    def test_tap_mode_is_unchanged(self, app):
+        """The normal path still offers the joystick, ticked."""
+        dialog = self._dialog(app, self.FIX, fix_only=False)
+        assert dialog.chosen() == [RHINO]
