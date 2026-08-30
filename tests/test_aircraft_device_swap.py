@@ -684,3 +684,51 @@ class TestEventHubLifetime:
         from telemffb import app_events
         assert app_events.events() is app_events.events()
 
+
+class TestMainThreadWatchdog:
+    """A frozen main thread leaves no log signature - the watchdog dumps
+    every thread's stack when the event-loop heartbeat goes stale, so a
+    field freeze names its culprit instead of ending in a kill."""
+
+    def _watchdog(self, rig):
+        watchdog = rig.main._MainThreadWatchdog.__new__(
+            rig.main._MainThreadWatchdog)
+        watchdog._reported = False
+        return watchdog
+
+    def test_a_stale_heartbeat_dumps_all_stacks_once(self, rig, caplog):
+        import logging as _logging
+        import time as _time
+        watchdog = self._watchdog(rig)
+        watchdog._beat = _time.monotonic() - 10
+        with caplog.at_level(_logging.ERROR):
+            watchdog._check()
+            watchdog._check()                    # still stalled: no repeat
+        stalls = [r for r in caplog.records
+                  if 'Main thread stalled' in r.message]
+        assert len(stalls) == 1
+        assert 'Thread ' in stalls[0].message    # the stacks are in there
+
+    def test_recovery_is_noted_and_rearms(self, rig, caplog):
+        import logging as _logging
+        import time as _time
+        watchdog = self._watchdog(rig)
+        watchdog._beat = _time.monotonic() - 10
+        with caplog.at_level(_logging.ERROR):
+            watchdog._check()                    # stall reported
+            watchdog._beat = _time.monotonic()   # heartbeat resumes
+            watchdog._check()                    # recovery noted
+            watchdog._beat = _time.monotonic() - 10
+            watchdog._check()                    # a NEW stall reports again
+        messages = [r.message for r in caplog.records]
+        assert sum('Main thread stalled' in m for m in messages) == 2
+        assert any('recovered' in m for m in messages)
+
+    def test_a_healthy_heartbeat_stays_silent(self, rig, caplog):
+        import logging as _logging
+        import time as _time
+        watchdog = self._watchdog(rig)
+        watchdog._beat = _time.monotonic()
+        with caplog.at_level(_logging.ERROR):
+            watchdog._check()
+        assert caplog.records == []

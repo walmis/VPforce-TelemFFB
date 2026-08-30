@@ -684,6 +684,62 @@ class _DeviceRetryTicker:
 device_retry_ticker = _DeviceRetryTicker()
 
 
+class _MainThreadWatchdog:
+    """Names the culprit when the UI freezes.
+
+    A blocked main thread leaves no log signature at all - the freeze
+    the user sees is silence in the file.  A half-second heartbeat runs
+    on the main event loop; a daemon thread watches it, and when the
+    beat goes stale it dumps every thread's stack into the log at ERROR,
+    once per stall.  Costs one timer tick and one sleeping thread.
+    """
+
+    STALL_SECS = 3.0
+
+    def __init__(self):
+        import threading
+        self._beat = time.monotonic()
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._on_beat)
+        self._timer.start(500)
+        self._reported = False
+        threading.Thread(target=self._watch, daemon=True,
+                         name='main-thread-watchdog').start()
+
+    def _on_beat(self):
+        self._beat = time.monotonic()
+
+    def _watch(self):
+        while True:
+            time.sleep(1.0)
+            try:
+                self._check()
+            except Exception:
+                # never let the diagnostic become a problem itself -
+                # interpreter teardown can fail even the logging call
+                pass
+
+    def _check(self):
+        """One watch iteration: report a fresh stall, note a recovery."""
+        age = time.monotonic() - self._beat
+        if age >= self.STALL_SECS and not self._reported:
+            self._reported = True
+            try:
+                frames = sys._current_frames()
+                dump = []
+                for thread_id, frame in frames.items():
+                    stack = ''.join(traceback.format_stack(frame))
+                    dump.append(f'Thread {thread_id}:\n{stack}')
+                logging.error(
+                    f"Main thread stalled for {age:.1f}s - stacks of "
+                    "all threads follow\n" + '\n'.join(dump))
+            except Exception:
+                logging.exception('Watchdog stack dump failed')
+        elif age < 1.0 and self._reported:
+            logging.error('Main thread recovered from the stall')
+            self._reported = False
+
+
 def _pid_from_devpath(devpath: str):
     """The USB product id embedded in a HID device path, as the hex string
     G.device_usbpid carries ('2054'), or None for paths without one (a
@@ -1571,6 +1627,10 @@ def main():
 
     # Create main application window
     G.main_window = MainWindow()
+
+    # UI freezes leave no log signature; this dumps all stacks when the
+    # event loop stalls, so the next one names its culprit
+    G.main_thread_watchdog = _MainThreadWatchdog()
 
     # ============================================================================
     # PHASE 11: Inter-Process Communication Setup
