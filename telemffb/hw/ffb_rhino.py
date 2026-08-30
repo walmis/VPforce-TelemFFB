@@ -671,7 +671,11 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
         self._started = False
 
     def invalidate(self):
+        # The block is gone, so the playback state is gone with it (the
+        # DInput handle's invalidate does the same); the owning effect
+        # re-creates and re-starts on the next live frame.
         self.effect_id = 0
+        self._started = False
 
     def _device_alive(self) -> bool:
         """Whether the handle's HID handle can still be written to.
@@ -1116,6 +1120,15 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
         try:
             self.reconnect()
             logging.info("HID reconnected!")
+            # The power cycle emptied the firmware's effect pool: every
+            # handle names a block that no longer exists.  Invalidate
+            # them (no CONTROL_RESET - the pool is already empty) so each
+            # owning HapticEffect lazily re-creates on its next start, the
+            # same self-heal reset_effects() performs.
+            for ref in self._effect_handles:
+                handle = ref()
+                if handle is not None:
+                    handle.invalidate()
             self._reconnect_attempts = 0
             self._emit_connection_state()
             try:

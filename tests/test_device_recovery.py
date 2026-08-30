@@ -27,14 +27,22 @@ from types import SimpleNamespace
 # Mock the hid module before importing ffb_rhino (same as test_ffb_rhino)
 sys.modules.setdefault('telemffb.hw.hid', MagicMock())
 
+import weakref
+
 import telemffb.hw.ffb_rhino as ffb_rhino_module
 from telemffb.hw.ffb_rhino import (
     FFBRhino,
+    FFBEffectHandle,
     HapticEffect,
     DeviceInfo,
     HIDDisconnectedError,
     RECONNECT_BACKOFF_S,
     _next_reconnect_delay,
+    EFFECT_SINE,
+    OP_START,
+    HID_REPORT_ID_CREATE_EFFECT,
+    HID_REPORT_ID_EFFECT_OPERATION,
+    HID_REPORT_ID_PID_BLOCK_LOAD,
 )
 
 # The pysimconnect fork (requirements.txt pins a rolling master zip)
@@ -308,6 +316,94 @@ class TestConnectionSignal:
         assert len(shots.shots) == 1
         assert dead._closed  # the dead handle was closed
         assert rhino._dev is None
+
+
+# ---------------------------------------------------------------------------
+# power-cycle recovery: the firmware effect pool is empty again
+# ---------------------------------------------------------------------------
+
+class TestPowerCycleInvalidatesHandles:
+    """A re-plug boots the firmware with an empty effect pool: every
+    handle must forget its block, and the next start must re-create the
+    effect (CREATE_EFFECT before OP_START) instead of writing to a block
+    that no longer exists."""
+
+    class _RecordingHID:
+        def __init__(self, path=b"old-path"):
+            self.path = path
+            self.nonblocking = False
+            self._writes = []
+            self._feature_reports = {}
+
+        def write(self, data):
+            self._writes.append(bytes(data))
+            return len(data)
+
+        def send_feature_report(self, data):
+            self._feature_reports[data[0]] = bytes(data)
+
+        def get_feature_report(self, report_id, size):
+            return self._feature_reports.get(report_id, bytes(size))
+
+        def close(self):
+            pass
+
+    def _handle(self, device, effect_id):
+        handle = FFBEffectHandle(device, effect_id, EFFECT_SINE)
+        device._effect_handles.append(
+            weakref.ref(handle,
+                        lambda ref: ref in device._effect_handles
+                        and device._effect_handles.remove(ref)))
+        return handle
+
+    def test_reconnect_invalidates_handles_and_start_recreates(
+            self, rhino, monkeypatch):
+        # a connected board with one effect running
+        old_dev = self._RecordingHID()
+        rhino._dev = old_dev
+        handle = self._handle(rhino, 3)
+        handle.start()
+        assert handle._started and handle.effect_id == 3
+
+        # the power cycle: the report timer lost the handle, and the
+        # re-enumeration found the re-plugged board
+        rhino._dev = None
+        new_dev = self._RecordingHID(path=b"fresh-path")
+        monkeypatch.setattr(
+            rhino, "reconnect",
+            Mock(side_effect=lambda: setattr(rhino, "_dev", new_dev) or True))
+
+        emitted = []
+        rhino.deviceReconnected.connect(lambda: emitted.append(1))
+        rhino._try_reconnect()
+
+        assert emitted == [1]                  # the recovery hook fired
+        assert new_dev is rhino._dev           # fresh handle in place
+        assert handle.effect_id == 0           # block id forgotten
+        assert not handle._started
+
+        # a fresh start must re-create: CREATE_EFFECT, then OP_START on
+        # the new block - never an OP_START aimed at the stale one
+        effect = HapticEffect()
+        effect._h_effect = handle
+        effect.periodic(20, 0.5, 0)            # re-arms the pending creation
+        new_dev._feature_reports[HID_REPORT_ID_PID_BLOCK_LOAD] = \
+            bytes([HID_REPORT_ID_PID_BLOCK_LOAD, 4, 1, 0, 0])
+        orig = HapticEffect.device
+        HapticEffect.device = rhino
+        try:
+            effect.start()
+        finally:
+            HapticEffect.device = orig
+
+        writes = new_dev._writes
+        assert HID_REPORT_ID_CREATE_EFFECT in new_dev._feature_reports
+        assert any(w[0] == HID_REPORT_ID_EFFECT_OPERATION
+                   and w[2] == OP_START for w in writes)
+        assert not any(w[0] == HID_REPORT_ID_EFFECT_OPERATION
+                       and w[1] == 3 for w in writes)
+        assert effect._h_effect is not handle
+        assert effect._h_effect.effect_id == 4
 
 
 # ---------------------------------------------------------------------------
