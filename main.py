@@ -445,7 +445,7 @@ def _initialize_device_connection():
         QTimer.singleShot(0, connect_signals)
 
         G.device_info = dev.info
-        dev.on_reconnected = _replay_device_setup
+        dev.deviceReconnected.connect(_replay_device_setup)
 
         if G.args.reset:
             dev.reset_effects()
@@ -477,7 +477,7 @@ def _initialize_device_connection():
 def _replay_device_setup():
     """Replay one-shot device setup after a hot-unplug recovery.
 
-    Registered as ``FFBRhino.on_reconnected``.  Effect playback does not
+    Connected to ``FFBRhino.deviceReconnected``.  Effect playback does not
     need a manual restart here: the offline-safe effect writers in
     ffb_rhino detect the dead->alive transition and re-send pending
     effect configuration on the next telemetry frame.  This only covers
@@ -505,7 +505,7 @@ def _wire_opened_device(dev):
     dev.deviceConnected.connect(G.main_window.update_device_status)
     dev.buttonPressed.connect(G.main_window.get_active_buttons)
     dev.buttonReleased.connect(G.main_window.get_active_buttons)
-    dev.on_reconnected = _replay_device_setup
+    dev.deviceReconnected.connect(_replay_device_setup)
     G.device_info = dev.info
     if G.args.reset:
         dev.reset_effects()

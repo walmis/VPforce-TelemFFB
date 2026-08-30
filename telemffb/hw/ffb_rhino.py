@@ -884,6 +884,7 @@ class FFBRhino(QObject):
     buttonPressed = pyqtSignal(int)
     buttonReleased = pyqtSignal(int)
     deviceConnected = pyqtSignal(bool)
+    deviceReconnected = pyqtSignal()
 
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path : Optional[str] = None) -> None:
 
@@ -914,9 +915,6 @@ class FFBRhino(QObject):
         self._reconnect_attempts = 0
         self._reconnect_pending = False
         self._last_connected: Optional[bool] = None
-        #: Optional main-thread callback, invoked once per recovery
-        #: transition (set by main.py to replay one-shot device setup).
-        self.on_reconnected = None
 
         QObject.__init__(self)
         self.startTimer(1) # start Qt timer to read HID reports every 1ms
@@ -1092,11 +1090,13 @@ class FFBRhino(QObject):
             logging.info("HID reconnected!")
             self._reconnect_attempts = 0
             self._emit_connection_state()
-            if self.on_reconnected is not None:
-                try:
-                    self.on_reconnected()
-                except Exception:
-                    logging.exception("Exception")
+            try:
+                self.deviceReconnected.emit()
+            except Exception:
+                # slots run inline on the main thread (direct
+                # connection) - a raising slot must not kill the
+                # reconnect chain
+                logging.exception("Exception")
         except Exception:
             logging.exception("Exception")
             self._emit_connection_state()
@@ -1280,7 +1280,7 @@ class HapticEffect(Destroyable):
     device : Optional[FFBRhino] = None
 
     @staticmethod
-    def _device_alive() -> bool:
+    def device_alive() -> bool:
         """Whether the shared device can accept writes right now.
 
         A device is alive only when the class-level reference is set and
@@ -1304,7 +1304,7 @@ class HapticEffect(Destroyable):
         None as "no input": buttons not pressed, center 0.
         """
         dev = HapticEffect.device
-        if not HapticEffect._device_alive():
+        if not HapticEffect.device_alive():
             return None
         return dev.get_input()
 
@@ -1379,7 +1379,7 @@ class HapticEffect(Destroyable):
         """
         if not self._h_effect:
             assert self._pending_create is not None
-            if not self._device_alive():
+            if not self.device_alive():
                 # Defense in depth: the handle was dropped between the
                 # caller check and now.  Keep _pending_create untouched.
                 logging.debug(
@@ -1840,7 +1840,7 @@ class HapticEffect(Destroyable):
         when the device returns.  It never raises into the 60-120 Hz
         telemetry path.
         """
-        if not self._device_alive():
+        if not self.device_alive():
             if self._h_effect and self._h_effect.started:
                 # The (now impossible) playback is forgotten, so a live
                 # start() after recovery re-sends OP_START.
@@ -1894,7 +1894,7 @@ class HapticEffect(Destroyable):
             Self for chaining.
         """
         if self._h_effect and self._h_effect.started:
-            if self._device_alive():
+            if self.device_alive():
                 if logging.getLogger().isEnabledFor(logging.DEBUG):
                     caller_frame = inspect.currentframe().f_back
                     caller_name = caller_frame.f_code.co_name
@@ -1912,7 +1912,7 @@ class HapticEffect(Destroyable):
 
             # Clear envelope if it was marked as one-time use (and the
             # device can actually receive the clear).
-            if self._device_alive() and self._envelope_once and self._pending_envelope:
+            if self.device_alive() and self._envelope_once and self._pending_envelope:
                 clear_envelope = FFBReport_SetEnvelope(
                     attackFromForce=0,
                     decayToForce=0,
@@ -1941,7 +1941,7 @@ class HapticEffect(Destroyable):
         that require an allocated effect will recreate it lazily.
         """
         if self._h_effect:
-            if self._device_alive():
+            if self.device_alive():
                 if logging.getLogger().isEnabledFor(logging.DEBUG):
                     caller_frame = inspect.currentframe().f_back
                     caller_name = caller_frame.f_code.co_name

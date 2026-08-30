@@ -8,7 +8,7 @@ Two stuck states from the 2026-08-29 field log must self-heal:
    deviceConnected(False) on every tick, spamming the UI.  These tests
    cover re-enumeration on reconnect (fresh path, known-serial preference),
    the 1/3/9/27/30 s exponential backoff, transition-only signal emission,
-   and the once-per-recovery on_reconnected hook.
+   and the once-per-recovery deviceReconnected signal.
 
 2. Absent at startup (zombie state): the app used to run forever without
    FFB until manually restarted.  main.py now watches for the configured
@@ -105,7 +105,6 @@ def _make_rhino(info, dev=None):
     r._reconnect_attempts = 0
     r._reconnect_pending = False
     r._last_connected = None
-    r.on_reconnected = None
     QObject.__init__(r)
     return r
 
@@ -270,16 +269,16 @@ class TestConnectionSignal:
         rhino._emit_connection_state()
         assert emitted == [True, False, True]
 
-    def test_on_reconnected_called_once_per_recovery(self, rhino, shots, monkeypatch):
+    def test_device_reconnected_emitted_once_per_recovery(self, rhino, shots, monkeypatch):
         calls = []
-        rhino.on_reconnected = lambda: calls.append(1)
+        rhino.deviceReconnected.connect(lambda: calls.append(1))
         monkeypatch.setattr(rhino, "reconnect",
                             Mock(side_effect=HIDDisconnectedError("gone")))
         monkeypatch.setattr(rhino, "read_reports",
                             Mock(side_effect=Exception("gone")))
         rhino.timerEvent(None)
         ms, fn = shots.shots.pop(0)
-        fn()  # failed attempt: no callback
+        fn()  # failed attempt: no emission
         assert calls == []
 
         # second failure, then success
@@ -288,7 +287,7 @@ class TestConnectionSignal:
         assert calls == []
         monkeypatch.setattr(rhino, "reconnect", Mock(return_value=True))
         ms, fn = shots.shots.pop(0)
-        fn()  # success: exactly one callback
+        fn()  # success: exactly one emission
         assert calls == [1]
 
     def test_read_failure_closes_dead_handle_and_emits_once(self, rhino, shots, monkeypatch):
@@ -363,7 +362,8 @@ class TestZombieStateWatcher:
         assert fake_he.device is dev
         assert main_module.G.device_connection_status is True
         assert async_calls == [dev]           # phase 14 replayed
-        assert dev.on_reconnected is main_module._replay_device_setup
+        dev.deviceReconnected.connect.assert_called_once_with(
+            main_module._replay_device_setup)
 
         # a later tick sees the live device and does not re-open
         timer.stop.reset_mock()
@@ -410,6 +410,6 @@ class TestWatcherWiring:
 
     def test_phase9_success_registers_replay_hook(self):
         src = self._source()
-        assert "dev.on_reconnected = _replay_device_setup" in src
-        assert src.count("dev.on_reconnected = _replay_device_setup") == 2  # phase 9 + watcher tick
+        assert "dev.deviceReconnected.connect(_replay_device_setup)" in src
+        assert src.count("dev.deviceReconnected.connect(_replay_device_setup)") == 2  # phase 9 + watcher tick
 

@@ -506,7 +506,7 @@ class TelemManager(QObject, threading.Thread):
         # The profile is uploaded to the device firmware and the gains are
         # read back from it - nothing to do (and no dereference) without
         # a live device.  Recovery replays the setup when it returns.
-        if not HapticEffect._device_alive():
+        if not HapticEffect.device_alive():
             return
         if "vpconf" in params:
             if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
@@ -518,7 +518,7 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_global_vpconf_default(self):
         """Handle global VPConf default profile setup."""
-        if not HapticEffect._device_alive():
+        if not HapticEffect.device_alive():
             return
         load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
         global_path = G.system_settings.get("pathVPConfStartup", "")

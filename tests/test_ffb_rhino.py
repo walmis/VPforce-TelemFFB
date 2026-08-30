@@ -446,7 +446,10 @@ class TestFFBRhinoDevice:
     
     def test_enumerate(self):
         """Test device enumeration."""
-        import telemffb.hw.hid as hid
+        # patch the hid module as ffb_rhino sees it - another test
+        # module may have swapped the sys.modules entry for a fresh
+        # mock after ffb_rhino was imported (import-order isolation)
+        hid = ffb_rhino_module.hid
         
         mock_devices = [
             {
