@@ -22,17 +22,15 @@ main.py (orchestrator - 16-phase startup)
 │   ├── SimListenerManager - Manages sim-specific listeners (DCS, MSFS, IL2, BMS, X-Plane)
 │   │   ├── SimDCS    → DcsIpcThread (shared mem IPC) + NetworkThread (UDP fallback port 34380)
 │   │   ├── SimMSFS   → SimConnectSock (pysimconnect fork)
-│   │   ├── SimIL2    → NetworkThread (UDP port 34381) + IL2PacketForwarder
+│   │   ├── SimIL2    → NetworkThread (UDP port 34385, from `portIL2` setting) + IL2PacketForwarder
 │   │   ├── SimBMS    → SharedMemThread + BMSManager
 │   │   └── SimXPLANE → NetworkThread (UDP port 34390) + X-Plane plugin
-│   ├── Aircraft instances (per-sim modules) - Process telemetry per-aircraft
-│   └── TelemetryTap → RingBuffer (high-rate ~30s, low-rate ~5min) for MCP analysis
+│   └── Aircraft instances (per-sim modules) - Process telemetry per-aircraft
 ├── MainWindow (PyQt6) - UI, settings dialogs, status indicators
 ├── FFBRhino / HapticEffect - Direct USB HID device communication (hidapi)
 ├── IPCNetworkThread (UDP sockets) - Multi-instance coordination
 ├── SettingsManager - XML config read/write, profile management, offline mode
-├── ExceptionTracker - Captures errors, provides viewer dialog + reporting API
-└── MCP Server (dev-only) - Streamable HTTP endpoint for LLM telemetry analysis
+└── ExceptionTracker - Captures errors, provides viewer dialog + reporting API
 ```
 
 ### Startup Flow (main.py phases)
@@ -45,8 +43,8 @@ main.py (orchestrator - 16-phase startup)
 6.5. ExceptionTracker init
 7. Legacy userconfig conversion
 8. SettingsManager init (with corruption recovery)
-9. Device connection + firmware validation (min v1.0.18); if the configured device is missing, the app continues and a self-stopping watcher auto-opens it when it appears
-10. TelemManager start, TelemetryTap init, MCP server (master only, dev builds)
+9. Device connection + firmware validation (min v1.0.18)
+10. TelemManager start
 11. IPC setup + signal connections
 12. Child instance auto-launch (`_launch_children`); window display (minimized/tray/normal)
 14. Async initialization (VPConf profile push, gain reading)
@@ -56,8 +54,7 @@ main.py (orchestrator - 16-phase startup)
 ### Aircraft Effect System (MixIn Architecture)
 Aircraft classes are **composed from MixIns** using multiple inheritance. Each MixIn implements one effect category, inherits from `AircraftEffectUtilsBase`, and may override `on_telemetry()` / `on_timeout()` / `on_event()`. The MRO order in `AircraftBase` defines the execution order — one MixIn per file.
 
-- **Base MixIns** (`telemffb/sim/aircraft_base.py`, MRO order): PedalSpringOverride, HelicopterEffects, WeaponsEffect, Deadzone, HydraulicLoss, DecelerationEffect, EngineRumble, WindEffect, AdvancedSpring (composes GForce + DynamicSpring), MotionEffects, BuffetingEffect.
-- **Generic MixIns** (`telemffb/sim/base/`): AoAEffects, DynamicSpring, ElevatorDroop, FFBForces, GForceEffect, RotationalDamping.
+- **All generic effect MixIns live in `telemffb/sim/base/`** — one class per file (17: PedalSpringOverride, HelicopterEffects, Weapons, Deadzone, HydraulicLoss, DecelerationEffect, EngineRumble, WindEffect, AdvancedSpring (composes GForce + DynamicSpring), MotionEffects, BuffetingEffect, ElevatorDroop, AoAEffects, DynamicSpring, FFBForces, GForceEffect, AircraftParams). `AircraftBase` (`telemffb/sim/aircraft_base.py`) composes twelve of them, in this MRO order: PedalSpringOverride → HelicopterEffects → Weapons → Deadzone → HydraulicLoss → Deceleration → EngineRumble → Wind → AdvancedSpring → MotionEffects → Buffeting → ElevatorDroop.
 - **MSFS/X-Plane MixIns** (`telemffb/sim/msfs_xp/`): FlightControls (non-FBW), FBWFlightControls (AP following, custom axes), HeliControls, SimConnect (event sending), Trimwheel, NosewheelShimmy, SteeringFriction, Turbulence.
 - **Aircraft classes** per sim: `aircrafts_dcs.py` (DCS + BMS, inline), `aircrafts_il2.py` (IL-2, inline), `aircrafts_msfs_xp.py` (re-exports one class per file from `msfs_xp/`: `Aircraft`, `JetAircraft`, `PropellerAircraft`, `TurbopropAircraft`, `GliderAircraft`, and the `Helicopter` family).
 
@@ -68,10 +65,11 @@ Aircraft classes are **composed from MixIns** using multiple inheritance. Each M
 | SimConnect data | Class |
 |---|---|
 | `Helicopter` | `Helicopter` |
-| `Jet` / piston engine type 1 | `JetAircraft` |
-| Piston engine type 0 | `PropellerAircraft` |
-| Engine type 5 | `TurbopropAircraft` |
-| Engine type 2 (none) | `GliderAircraft` |
+| `Jet` category, or `Airplane` with engine type 1 | `JetAircraft` |
+| `Airplane` engine type 0 (piston) | `PropellerAircraft` |
+| `Airplane` engine type 5 | `TurbopropAircraft` |
+| `Airplane` engine type 2 (none) | `GliderAircraft` |
+| `Airplane` engine type 3 (helo) | `Helicopter` |
 
 Full walkthrough of creating a new class (module placement, sc_overrides, registration, tests): `docs/adding_an_aircraft_class.md`.
 
@@ -80,7 +78,7 @@ Full walkthrough of creating a new class (module placement, sc_overrides, regist
 ```python
 import telemffb.globals as G
 ```
-Key attributes (the full list, annotation-only, is in the file — they have no runtime value until `main.py` startup phases set them; tests use `monkeypatch.setattr(G, ..., raising=False)`): `G.device_type` (`"joystick"` / `"pedals"` / `"collective"` / `"trimwheel"`), `G.master_instance` / `G.child_instance`, `G.effects` (global `HapticEffect` dispenser), `G.telem_manager`, `G.sim_listeners`, `G.main_window`, `G.settings_mgr`, `G.system_settings`, `G.ipc_instance`, `G.log_window`, `G.exception_tracker`, `G.telemetry_tap`, `G.device_info` / `G.device_devpath` / `G.device_usbpid` / `G.device_firmware_version` / `G.device_connection_status`, `G.userconfig_path` / `G.defaults_path` / `G.userconfig_rootpath`, `G.args`, `G.launched_instances`, `G.instance_dev_dict`, `G.active_buttons` / `G.master_buttons` / `G.child_buttons`, `G.startup_configurator_gains` / `G.vpconf_configurator_gains` / `G.current_configurator_gains`, `G.gain_override_dialog`, `G.useDarkMode`, `G.dev_build` / `G.release_version` / `G.is_exe`, `G.force_reload_aircraft_trigger`, `G.il2_ffb_device_ordinal`, `G.vpconf_init_pending`, `G.current_vpconf_profile`.
+Key attributes (the full list, annotation-only, is in the file — they have no runtime value until `main.py` startup phases set them; tests use `monkeypatch.setattr(G, ..., raising=False)`): `G.device_type` (`"joystick"` / `"pedals"` / `"collective"` / `"trimwheel"`), `G.master_instance` / `G.child_instance`, `G.effects` (global `HapticEffect` dispenser), `G.telem_manager`, `G.sim_listeners`, `G.main_window`, `G.settings_mgr`, `G.system_settings`, `G.ipc_instance`, `G.log_window`, `G.exception_tracker`, `G.device_info` / `G.device_devpath` / `G.device_usbpid` / `G.device_firmware_version` / `G.device_connection_status`, `G.userconfig_path` / `G.defaults_path` / `G.userconfig_rootpath`, `G.args`, `G.launched_instances`, `G.instance_dev_dict`, `G.active_buttons` / `G.master_buttons` / `G.child_buttons`, `G.startup_configurator_gains` / `G.vpconf_configurator_gains` / `G.current_configurator_gains`, `G.gain_override_dialog`, `G.useDarkMode`, `G.dev_build` / `G.release_version` / `G.is_exe`, `G.force_reload_aircraft_trigger`, `G.il2_ffb_device_ordinal`, `G.vpconf_init_pending`, `G.current_vpconf_profile`.
 
 ### Configuration System (XML-based)
 Two parallel XML files:
@@ -105,7 +103,7 @@ Config hierarchy: SIM → CLASS → MODEL → PROFILE (profile is an optional ov
 
 ### Multi-Instance Architecture
 - **Master** auto-launches **child** instances (one per additional device); children handle their own device and send button/telemetry data to the master
-- IPC over UDP sockets on localhost (**not** ZMQ): master binds a random port, children connect via `--masterport`; keepalive 1 s interval, 3 missed → exit; message types: `Keepalive`, `Child Keepalive:<dev>:<status>`, `telem:<json>`, `effects:<json>`, `MASTER_INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`
+- IPC over UDP sockets on localhost (**not** ZMQ): master binds a random port, children connect via `--masterport`; keepalive 1 s interval, 3 missed → exit; message types: `Keepalive`, `Child Keepalive:<dev>:<status>`, `telem:<json>`, `effects:<json>`, `MASTER INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`
 - Win32 named mutex (`namedmutex.py`) prevents duplicate masters unless `G.allow_multi_instance`; master auto-assigns `devpath_*` settings by product string or VID:PID
 
 ---
@@ -168,10 +166,10 @@ Do the same for `on_timeout()` and `on_event()`.
 Telemetry runs at 60–120 Hz. Keep `on_telemetry()` lean: no heavy math, no I/O, no allocations you can avoid. Precompute what you can outside the hot path.
 
 ### Error Handling
-In the telemetry hot path, never let an exception propagate — it kills the processing loop. Catch broadly, call `logging.exception()`, and keep going. In UI/threaded code, you can be more specific. In the device layer, `HIDDisconnectedError` is raised on a dead handle (no asserts — they die silently under `python -O` and kill the calling thread), and callers that need liveness check `HapticEffect.device_alive()` instead of asserting `device is not None`.
+In the telemetry hot path, never let an exception propagate — it kills the processing loop. Catch broadly, call `logging.exception()`, and keep going. In UI/threaded code, you can be more specific. In the device layer, failures surface as explicit exceptions and liveness checks rather than asserts.
 
 ### Threading & GUI
-`TelemManager` runs in its own thread. Never touch Qt widgets from background threads — route everything through `utils.schedule_on_main_thread(lambda: ...)`, or use PyQt signals. `FFBRhino`'s reconnect chain runs on the Qt main thread only (it is scheduled from its 1 ms report timer), so slots connected to its signals may assume main-thread execution.
+`TelemManager` runs in its own thread. Never touch Qt widgets from background threads — route everything through `utils.schedule_on_main_thread(lambda: ...)`, or use PyQt signals.
 
 ### Effects & HID Values
 The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficients, offsets, saturation, and magnitude. Float values in MixIns (e.g. `0.5` spring coefficient) are multiplied by 4096 before sending to the device; `FFBReport_SetCondition.set_coefficient()` and `.set_offset()` handle the conversion automatically.
@@ -222,9 +220,6 @@ This rule may only be broken to avoid circular imports — and even then, the ci
 | `telemffb/IPCNetworkThread.py` | UDP IPC between master/child instances |
 | `telemffb/MainWindow.py` | Main PyQt6 window, settings layout, status indicators |
 | `telemffb/ExceptionTracker.py` | Error capture, logging handler, viewer dialog |
-| `telemffb/mcp/server.py` | MCP analysis server for LLM telemetry queries |
-| `telemffb/analysis/telemetry_tap.py` | Ring buffer tap for telemetry capture |
-| `telemffb/analysis/ring_buffer.py` | Circular buffer with pause/flush/window queries |
 | `telemffb/namedmutex.py` | Win32 named mutex (ctypes) |
 | `telemffb/CmdLineArgs.py` | CLI argument parser |
 | `styles.py` | Light/dark mode QSS stylesheets |
@@ -262,7 +257,7 @@ effect.stop()  # Frees device resource
 ## Dependencies & External Integrations
 
 **Runtime** (`requirements.txt`): `pyqt6==6.9.1`, `pysimconnect` (custom fork at github.com/walmis/pysimconnect — rolling `master.zip`), `libusb1`, `numpy==2.3.0`, `akima`, `psutil`, `stransi`, `pygetwindow`, `configobj`.
-**Dev** (`requirements-dev.txt`): `mcp>=1.0.0` (telemetry analysis server).
+**Testing** (`requirements.txt`): `pytest`, `pytest-cov` — strict markers and warnings-as-errors configured in `pytest.ini`.
 **Bundled binaries**: `dll/hidapi.dll`, `simconnect/simconnect.dll`, `xplane-plugin/` (auto-installed).
 
 ---
@@ -280,7 +275,7 @@ effect.stop()  # Frees device resource
 9. **Per-frame performance matters** — telemetry runs at 60–120 Hz; no per-frame log lines, no exceptions escaping `on_telemetry()`
 10. **IPC is UDP, not TCP** — messages may be dropped; don't assume delivery ordering
 11. **`ffb_sdl.py` is deprecated** — do not use, kept for historical reference only
-12. **Never `assert` on device state in production paths** — asserts are stripped under `-O`; use `HIDDisconnectedError` / `HapticEffect.device_alive()` instead
+12. **Never `assert` on runtime state in production paths** (device liveness included) — asserts are stripped under `python -O` and would silently kill the calling thread; use explicit checks instead
 
 ---
 
