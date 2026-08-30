@@ -247,6 +247,37 @@ class TestButtons:
         assert set(self.buttons(panel)) == {
             "Reinstall", "Configure Devices...", "Remove"}
 
+    def test_reinstall_goes_flat_when_the_installed_build_is_current(
+            self, app, bundled):
+        """Copying identical bytes over identical bytes is a no-op the
+        user cannot tell apart from a real update."""
+        panel = TapStatusPanel(status(
+            target("bin", WrapperState.TAP, version=bundled),
+            target("bin-mt", WrapperState.TAP, version=bundled)))
+        assert not self.buttons(panel)["Reinstall"].isEnabled()
+
+    def test_reinstall_is_live_when_a_newer_build_is_bundled(self, app):
+        panel = TapStatusPanel(status(
+            target("bin", WrapperState.TAP, version="0.8.0.0"),
+            target("bin-mt", WrapperState.TAP, version="0.8.0.0")))
+        assert self.buttons(panel)["Reinstall"].isEnabled()
+
+    def test_one_stale_half_is_enough_to_offer_it(self, app, bundled):
+        """Both halves are written in one go, so either being behind
+        leaves the button something to do."""
+        panel = TapStatusPanel(status(
+            target("bin", WrapperState.TAP, version=bundled),
+            target("bin-mt", WrapperState.TAP, version="0.8.0.0")))
+        assert self.buttons(panel)["Reinstall"].isEnabled()
+
+    def test_a_build_too_old_to_name_itself_can_still_be_replaced(self, app):
+        """Wrappers built before the version resource report nothing, and
+        that is precisely the case worth replacing - so an unknown version
+        must not read as "current"."""
+        panel = TapStatusPanel(status(target("bin", WrapperState.TAP),
+                                      target("bin-mt", WrapperState.TAP)))
+        assert self.buttons(panel)["Reinstall"].isEnabled()
+
     def test_a_foreign_dll_can_be_installed_over_but_not_removed(self, app):
         """Replacing it is the user's call, so Install is offered - but
         Remove would delete a file we did not put there."""

@@ -297,7 +297,7 @@ class TapStatusPanel(QtWidgets.QWidget):
                 bundled = tap_install.bundled_version()
                 if tap_install.version_is_newer(bundled, target.version):
                     version = f"{version} → v{bundled} available"
-                    tip = (f"TelemFFB ships v{bundled}; use Install to "
+                    tip = (f"TelemFFB ships v{bundled}; use Reinstall to "
                            "update this copy")
                     style = "attention"
                 elif bundled and target.version == bundled:
@@ -344,8 +344,20 @@ class TapStatusPanel(QtWidgets.QWidget):
             buttons.append(install_button)
         else:
             update = QtWidgets.QPushButton("Reinstall")
-            update.setToolTip("Copy the bundled wrapper over the installed one")
             update.clicked.connect(self._install)
+            # Offered only when it would change something.  Copying the
+            # bundled wrapper over an identical one is a no-op the user
+            # cannot tell from a real update, so the button goes flat
+            # instead - and an installed build too old to name a version
+            # still counts as worth replacing, which outdated_targets
+            # decides.  The reason is not a tooltip: a disabled widget
+            # never receives one.  The version row beside it already reads
+            # "(current)", permanently and without a hover.
+            if tap_install.outdated_targets(status):
+                update.setToolTip(
+                    "Copy the bundled wrapper over the installed one")
+            else:
+                update.setEnabled(False)
             buttons.append(update)
 
         if WrapperState.TAP in states:
