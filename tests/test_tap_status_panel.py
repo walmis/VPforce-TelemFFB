@@ -21,7 +21,28 @@ from telemffb.TapStatusPanel import TapStatusPanel
 pytestmark = [pytest.mark.unit]
 
 DCS = SIMS_BY_KEY['DCS']
-ROOT = r"C:\Games\DCS World"
+#: A game root that cannot be a real install.  The panel stats and reads
+#: config files under whatever root it is given, so a plausible-looking
+#: path here would read - and the install paths would write - the machine
+#: running the tests.  Guarded below rather than trusted.
+ROOT = r"C:\pytest-tap-fixture\DCS World"
+
+
+@pytest.fixture(autouse=True)
+def nothing_real_is_reachable():
+    """No test here may touch a game that exists on this machine.
+
+    These tests build a SimStatus by hand and hand it to the panel, which
+    stats and reads the config beside each target - and the install paths
+    write one.  Pointed at a real install that reads the user's own
+    configuration and writes test fixtures over it, which is exactly what
+    happened once.  A build machine has no games installed, so this only
+    ever fires on a developer's box.
+    """
+    for root in (ROOT, os.path.dirname(ROOT)):
+        assert not os.path.exists(root), (
+            f"{root} exists on this machine - the tap tests would read and "
+            f"write a real install. Point ROOT at something synthetic.")
 
 
 @pytest.fixture(autouse=True)
@@ -174,7 +195,7 @@ class TestDetail:
     def test_targets_are_named_relative_to_the_root(self, app):
         """IL-2's target basename is "game", which names nothing alone."""
         il2 = SIMS_BY_KEY['IL2']
-        root = r"C:\Games\IL-2 Sturmovik Great Battles"
+        root = r"C:\pytest-tap-fixture\IL-2 Sturmovik Great Battles"
         panel = TapStatusPanel(SimStatus(
             sim=il2, root=root, provenance="configured in TelemFFB",
             targets=[TargetStatus(directory=os.path.join(root, "bin", "game"),
