@@ -37,7 +37,7 @@ def no_real_hardware(monkeypatch):
     a collection error for every test in the suite.
     """
     class NoBridge:
-        """The DirectLink DLL, absent - which is what a build machine has.
+        """DirectLink absent - which is what a build machine has.
         Tests that want devices inject their own bridge."""
         def enumerate(self):
             return []
@@ -46,6 +46,12 @@ def no_real_hardware(monkeypatch):
             ('telemffb.hw.hid', 'enumerate', lambda *a, **k: []),
             ('telemffb.hw.ffb_dinput', 'shared_bridge',
              lambda *a, **k: NoBridge()),
+            # Where the DirectLink installer said it put its DLL.  Reads
+            # HKCU on the machine running the tests, so a developer with
+            # DirectLink installed would get different search paths from a
+            # build agent without it.
+            ('telemffb.hw.ffb_dinput', 'DIBridge.installed_location',
+             staticmethod(lambda *a, **k: None)),
             # Game discovery finds DCS, BMS and the Steam libraries through
             # the registry.  A test that forgets to name a root would
             # otherwise find the developer's own install - and the install
@@ -57,7 +63,12 @@ def no_real_hardware(monkeypatch):
             module = importlib.import_module(module_name)
         except Exception:
             continue          # not importable here, so nothing to enumerate
-        monkeypatch.setattr(module, attribute, stub, raising=False)
+        # attribute may name something inside a class ("DIBridge.foo"), so
+        # walk to whatever owns the final name
+        owner, _, name = attribute.rpartition('.')
+        for step in filter(None, owner.split('.')):
+            module = getattr(module, step)
+        monkeypatch.setattr(module, name, stub, raising=False)
 
 
 @pytest.fixture(autouse=True)

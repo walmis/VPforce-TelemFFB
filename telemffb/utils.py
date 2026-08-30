@@ -4387,7 +4387,7 @@ def directinput_selection_devices(settings, enabled=None):
         # separately distributed bridge DLL not being installed.
         logging.error(
             f"DirectInput support is enabled but no devices could be "
-            f"enumerated: {e}. The DInput bridge DLL is required - see the "
+            f"enumerated: {e}. DirectLink is required - see the "
             "TelemFFB DirectInput documentation.")
         return []
 
