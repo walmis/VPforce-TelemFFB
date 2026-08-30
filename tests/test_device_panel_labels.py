@@ -124,7 +124,7 @@ class TestWidgetLabelAndFlash:
     def test_icon_follows_the_device_choice(self, app):
         """The active joystick device's icon choice (stick vs yoke) shows
         on the panel and reports change for the flash."""
-        import resources, resources_extra  # noqa: F401
+        import resources  # noqa: F401  registers :/image/... including the yoke
         from telemffb.DevicePanel import DeviceIconPanel
         panel = DeviceIconPanel()
         panel.set_devices(['joystick'])

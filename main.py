@@ -67,7 +67,6 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit, QProgress
 
 
 import resources
-import resources_extra  # icons added after resources.py was generated (see its header)
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
