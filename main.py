@@ -621,7 +621,10 @@ def _replay_device_setup():
     need a manual restart here: the offline-safe effect writers in
     ffb_rhino detect the dead->alive transition and re-send pending
     effect configuration on the next telemetry frame.  This only covers
-    the one-shot items that do not replay per frame.
+    the one-shot items that do not replay per frame.  The deadzone is
+    force-re-applied below: its per-frame write is transition-gated, so a
+    steady configured value would never re-send itself after the firmware
+    lost it on the power cycle.
     """
     dev = HapticEffect.device
     if dev is None:
@@ -629,7 +632,14 @@ def _replay_device_setup():
     try:
         dev.set_deadzone(0)
     except Exception:
-        pass  # transient; the deadzone MixIn re-applies on its next transition
+        pass  # transient; the force-apply below restores the configured value
+    # Force-apply the current deadzone: the MixIn's per-frame write only
+    # fires on a value transition, so the value the firmware lost on the
+    # power cycle comes back here, not on the next telemetry frame.
+    telem = getattr(G, 'telem_manager', None)
+    aircraft = telem.currentAircraft if telem is not None else None
+    if aircraft is not None and hasattr(aircraft, 'ac_update_deadzone'):
+        aircraft.ac_update_deadzone(force=True)
     try:
         G.vpconf_configurator_gains = dev.get_gains()
     except Exception:

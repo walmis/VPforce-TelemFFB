@@ -23,6 +23,22 @@ sys.modules.setdefault('telemffb.hw.hid', MagicMock())
 
 import telemffb.hw.ffb_rhino as ffb_rhino_module
 from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.sim.base.DeadzoneMixIn import DeadzoneMixIn
+
+# The recovery replay lives in main.py, which imports winreg (Windows-only).
+# Same treatment as test_device_recovery: pre-import the pysimconnect fork
+# quietly (its unclosed scvars.json FileIO would otherwise become an
+# unraisable attributed to an innocent test), then import main if we can.
+if sys.platform == "win32" and "simconnect" not in sys.modules:
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ResourceWarning)
+        import simconnect  # noqa: F401
+
+try:
+    import main as _main_module
+except Exception:  # winreg is Windows-only
+    _main_module = None
 
 pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -121,3 +137,59 @@ class TestMainWindowWiring:
         body = src[i:i + 600]
         assert "device_status_state()" in body
         assert '"DISCONNECTED"' not in body
+
+
+# ---------------------------------------------------------------------------
+# recovery replay (main._replay_device_setup; Windows-only - main imports
+# winreg, so this class skips elsewhere)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(_main_module is None,
+                    reason="main.py requires winreg (Windows-only)")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
+class TestRecoveryReappliesDeadzone:
+    """The deviceReconnected replay zeroes the firmware deadzone, then
+    force-applies the aircraft's configured value - the MixIn's
+    transition-gated per-frame write would otherwise leave the firmware
+    at 0 after the power cycle lost it."""
+
+    def test_replay_writes_zero_then_configured(self, monkeypatch):
+        import telemffb.globals as G
+
+        dev = MagicMock()
+        dev.connected = True
+        monkeypatch.setattr(HapticEffect, 'device', dev)
+
+        class _M(DeadzoneMixIn):
+            pass
+        m = _M()
+        m.enable_deadzone = True
+        m.deadzone_base_pct = 0.2
+        m.active_deadzone_pct = 0.2   # steady 20%: applied in memory
+        m.deadzone_active = True
+
+        monkeypatch.setattr(G, 'vpconf_configurator_gains', None,
+                            raising=False)
+        monkeypatch.setattr(_main_module.G, 'telem_manager',
+                            SimpleNamespace(currentAircraft=m),
+                            raising=False)
+        _main_module._replay_device_setup()
+
+        calls = [c.args[0] for c in dev.set_deadzone.call_args_list]
+        assert calls[:2] == [0, 819]   # cleared, then pct2dz(0.2) restored
+        assert m.active_deadzone_pct == 0.2
+
+    def test_replay_without_aircraft_still_clears(self, monkeypatch):
+        import telemffb.globals as G
+
+        dev = MagicMock()
+        dev.connected = True
+        monkeypatch.setattr(HapticEffect, 'device', dev)
+        monkeypatch.setattr(G, 'vpconf_configurator_gains', None,
+                            raising=False)
+        monkeypatch.setattr(_main_module.G, 'telem_manager', None,
+                            raising=False)
+        _main_module._replay_device_setup()   # no aircraft: clear only
+
+        calls = [c.args[0] for c in dev.set_deadzone.call_args_list]
+        assert calls == [0]

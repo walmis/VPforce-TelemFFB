@@ -6,7 +6,7 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 def pct2dz(pct: float) -> int:
-    """Convert percentage (0-100) to deadzone value (0-4096)."""
+    """Convert a deadzone fraction (0.0-1.0) to device value (0-4096)."""
     return utils.clamp(round(pct * 4096), 0, 4096)
 
 class DeadzoneMixIn(AircraftEffectUtilsBase):
@@ -51,7 +51,7 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
             logging.info(f"Setting Deadzone override to %{self.active_deadzone_pct_override*100}")
 
 
-    def ac_update_deadzone(self):
+    def ac_update_deadzone(self, force: bool = False):
         if self.active_deadzone_pct_override:
             return
         if not self.enable_deadzone and self.deadzone_active:
@@ -63,6 +63,15 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
                     self.active_deadzone_pct = 0.0
                     logging.info('Disabling deadzone')
                     self.deadzone_active = False
+            return
+        if force:
+            # Recovery replay: the firmware lost its deadzone on the
+            # power cycle, so the transition gate below would never
+            # re-send a steady value - push the current one, with the
+            # same fraction-to-device conversion as the normal path.
+            if self._write_device_deadzone(pct2dz(self.active_deadzone_pct)):
+                if self.active_deadzone_pct:
+                    self.deadzone_active = True
             return
         if self.active_deadzone_pct != self.deadzone_base_pct:
             if self._write_device_deadzone(pct2dz(self.deadzone_base_pct)):
