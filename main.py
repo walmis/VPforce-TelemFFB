@@ -445,6 +445,7 @@ def _initialize_device_connection():
         QTimer.singleShot(0, connect_signals)
 
         G.device_info = dev.info
+        dev.on_reconnected = _replay_device_setup
 
         if G.args.reset:
             dev.reset_effects()
@@ -467,6 +468,84 @@ def _initialize_device_connection():
                           "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
 
     return dev, dev_serial, dev_firmware_version
+
+
+def _replay_device_setup():
+    """Replay one-shot device setup after a hot-unplug recovery.
+
+    Registered as ``FFBRhino.on_reconnected``.  Effect playback does not
+    need a manual restart here: the offline-safe effect writers in
+    ffb_rhino detect the dead->alive transition and re-send pending
+    effect configuration on the next telemetry frame.  This only covers
+    the one-shot items that do not replay per frame.
+    """
+    dev = HapticEffect.device
+    if dev is None:
+        return
+    try:
+        dev.set_deadzone(0)
+    except Exception:
+        pass  # transient; the deadzone MixIn re-applies on its next transition
+    try:
+        G.vpconf_configurator_gains = dev.get_gains()
+    except Exception:
+        logging.exception("Exception")
+
+
+def _device_watcher_tick(timer: QTimer):
+    """One ~2 s tick of the zombie-state device watcher (Qt main thread).
+
+    The configured board was absent at startup, so ``HapticEffect.device``
+    is still None: telemetry is processed, but no FFB can be sent.  When
+    the board appears this runs the normal open sequence (phase 9 open +
+    firmware validation + phase 14 async init) and stops the watcher.
+    """
+    if HapticEffect.device is not None:
+        # recovered through another path (e.g. a manual settings change)
+        timer.stop()
+        return
+    try:
+        dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+    except Exception:
+        return  # still absent: stay quiet and retry on the next tick
+
+    dev.deviceConnected.connect(G.main_window.update_device_status)
+    dev.buttonPressed.connect(G.main_window.get_active_buttons)
+    dev.buttonReleased.connect(G.main_window.get_active_buttons)
+    dev.on_reconnected = _replay_device_setup
+    G.device_info = dev.info
+    if G.args.reset:
+        dev.reset_effects()
+    try:
+        dev_firmware_version = dev.get_firmware_version()
+        G.device_firmware_version = dev_firmware_version
+        if dev_firmware_version:
+            logging.info(f"Rhino Firmware: {dev_firmware_version}")
+            _check_firmware_version(dev_firmware_version, 'v1.0.18')
+    except Exception:
+        logging.exception("Exception")
+    G.device_ident = dev.info.ident
+    G.device_connection_status = True
+    logging.info(f"Configured device (PID {G.device_usbpid}) appeared; opened and initialized")
+    _setup_async_initialization(dev, dev.serial)
+    timer.stop()
+
+
+def _start_device_watcher():
+    """Start the zombie-state watcher when the configured device is absent.
+
+    The timer is owned by this call's closure (no module global), stays
+    alive as long as the timeout connection references it, and stops
+    itself once the device is open.
+    """
+    if HapticEffect.device is not None:
+        return
+    timer = QTimer()
+    timer.setInterval(2000)
+    timer.timeout.connect(lambda: _device_watcher_tick(timer))
+    timer.start()
+    logging.info(f"Waiting for the configured device (PID {G.device_usbpid}) to appear; it will be opened automatically")
+
 
 def _enumerate_and_log_devices() -> List[DeviceInfo]:
     """Enumerate and log available Rhino devices."""
@@ -1170,6 +1249,10 @@ def main():
     # ============================================================================
     # Start background tasks that don't block UI appearance
     _setup_async_initialization(dev, dev_serial)
+
+    # Zombie-state recovery: the configured board was absent at startup.
+    # Watch for it to appear and open it automatically (self-stopping).
+    _start_device_watcher()
 
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop
