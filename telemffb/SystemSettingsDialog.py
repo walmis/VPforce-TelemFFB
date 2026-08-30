@@ -1589,11 +1589,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             available, reason = bridge_availability()
             if not available:
                 QMessageBox.warning(self, "DirectInput Unavailable", reason)
-                # the revert re-enters here with the box off; block it so
-                # the repopulate below runs once, for the settled state
-                self.cb_enable_dinput.blockSignals(True)
+                # Toggle defers a set made from inside its own signal, so
+                # this lands one event-loop pass from now and re-enters
+                # here with the box off - which is what runs the repopulate
+                # below, for the settled state.  Hence the return.
                 self.cb_enable_dinput.setChecked(False)
-                self.cb_enable_dinput.blockSignals(False)
+                return
 
         self.populateUSBSelectors(dinput_enabled=self.cb_enable_dinput.isChecked())
         # the toggle is the moment a user who just installed the

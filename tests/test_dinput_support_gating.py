@@ -12,7 +12,8 @@ import pytest
 pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6 import QtWidgets
+from PyQt6 import QtTest, QtWidgets
+from PyQt6.QtCore import Qt
 
 import telemffb.globals as G
 
@@ -87,11 +88,40 @@ class TestBridgeAvailability:
                             staticmethod(lambda *a, **k: shown.append(a[2])))
 
         dialog.cb_enable_dinput.setChecked(True)
+        # the revert is deferred by one event-loop pass, so that the switch
+        # is not set from inside its own stateChanged - see the repeat-click
+        # test below for what that costs
+        QtWidgets.QApplication.instance().processEvents()
 
         assert shown, "the user was told nothing"
         assert 'no bridge here' in shown[0]
         assert not dialog.cb_enable_dinput.isChecked(), \
             "the box stayed on while doing nothing"
+
+    def test_it_warns_again_every_time_it_is_clicked(self, dialog, monkeypatch):
+        """A refusal must not be a one-shot.
+
+        QCheckBox emits stateChanged only when the new state differs from
+        the last one it published.  Reverting from inside that emission
+        leaves the two out of step, and the *next* click then flips the
+        switch with no signal at all: the track lit up, no warning, and
+        nothing to tell the user why.
+        """
+        monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
+                            lambda *a, **k: (False, 'no bridge here'))
+        shown = []
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: shown.append(a[2])))
+        app = QtWidgets.QApplication.instance()
+
+        for attempt in range(1, 4):
+            QtTest.QTest.mouseClick(dialog.cb_enable_dinput.toggle,
+                                    Qt.MouseButton.LeftButton)
+            app.processEvents()
+            assert len(shown) == attempt, \
+                f"click {attempt} passed without a warning"
+            assert not dialog.cb_enable_dinput.isChecked(), \
+                f"the box stayed on after click {attempt}"
 
     def test_the_toggle_sticks_when_the_bridge_is_there(self, dialog, monkeypatch):
         monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
