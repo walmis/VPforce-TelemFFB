@@ -109,7 +109,7 @@ class TestResolvedLocationsAreUsed:
         assert (unsafe_install_location_reason(
             r"C:\Users\synthetic\OneDrive\Desktop") == "your Desktop")
 
-    def test_redirection_is_honoured_rather_than_assumed(self, resolved):
+    def test_redirection_is_honored_rather_than_assumed(self, resolved):
         """The Desktop is wherever resolution says - under OneDrive here.
         The path it would have had without redirection means nothing."""
         assert unsafe_install_location_reason(

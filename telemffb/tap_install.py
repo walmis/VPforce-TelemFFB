@@ -523,7 +523,7 @@ def fix_only_config(sim: TapSim, devices) -> str:
     rules: nothing is relayed to TelemFFB, and the game keeps rendering
     its own effects on the stick exactly as it always did.
 
-    For users who want that behaviour and not the tap.  TelemFFB does
+    For users who want that behavior and not the tap.  TelemFFB does
     not have to be running for it to work - block and order rules are
     never gated on the beacon, only tap and sink rules are.
     """

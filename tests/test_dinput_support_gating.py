@@ -77,8 +77,8 @@ class TestBridgeAvailability:
         from telemffb.hw.ffb_dinput import bridge_availability
         available, reason = bridge_availability('definitely_not_here.dll')
         assert not available
-        assert 'dinput_ffb.dll' in reason
-        assert 'Looked in' in reason
+        assert 'DirectLink' in reason
+        assert 'must be installed' in reason
 
     def test_the_toggle_reverts_when_the_bridge_is_missing(self, dialog, monkeypatch):
         monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
@@ -206,7 +206,7 @@ class TestBridgeDllLocation:
         self._frozen(monkeypatch)
         paths = DIBridge.library_paths()
         assert paths[0] == os.path.join(os.path.dirname(self.EXE), 'dll',
-                                        'dinput_ffb.dll')
+                                        'directlink.dlk')
 
     def test_a_frozen_build_prefers_the_install_over_the_bundle(self, monkeypatch):
         """The bundle copy is whatever shipped; the install copy is what the
@@ -224,7 +224,7 @@ class TestBridgeDllLocation:
         from telemffb.hw.ffb_dinput import DIBridge
         monkeypatch.delattr(sys, 'frozen', raising=False)
         paths = DIBridge.library_paths()
-        assert paths[0].endswith(os.path.join('dll', 'dinput_ffb.dll'))
+        assert paths[0].endswith(os.path.join('dll', 'directlink.dlk'))
         assert 'telemffb' not in paths[0].lower().split(os.sep)[-3:-1], \
             "the path should be the project root, not the package directory"
 
@@ -236,24 +236,128 @@ class TestBridgeDllLocation:
         self._frozen(monkeypatch)
         assert DIBridge.library_paths() != before
 
+    def test_an_installed_copy_is_looked_for_first(self, monkeypatch):
+        """Once the installer exists, its copy is the supported one.  A DLL
+        left in dll/ by an earlier beta must not outrank it - the version
+        gate would then report a shortfall the user has already fixed."""
+        from telemffb.hw.ffb_dinput import DIBridge
+        installed = r"C:\Users\someone\AppData\Local\DirectLink\directlink.vpx"
+        monkeypatch.setattr(DIBridge, 'installed_location',
+                            staticmethod(lambda: installed))
+        paths = DIBridge.library_paths()
+        assert paths[0] == installed
+        assert len(paths) > 1, "the local fallback was dropped"
+
+    def test_the_local_paths_are_all_there_is_without_one(self, monkeypatch):
+        """Nothing installed is the normal case during the beta, when the
+        DLL is dropped into dll/ by hand."""
+        from telemffb.hw.ffb_dinput import DIBridge
+        monkeypatch.setattr(DIBridge, 'installed_location',
+                            staticmethod(lambda: None))
+        assert all('DirectLink' not in p for p in DIBridge.library_paths())
+
+    def test_the_installed_name_is_not_assumed_to_be_a_dll(self, monkeypatch):
+        """The registry names the file, not the folder: the installed copy
+        may carry a licensee or an extension that is not .dll, and none of
+        that is TelemFFB's business."""
+        from telemffb.hw.ffb_dinput import DIBridge
+        odd = r"C:\somewhere\DirectLink\dl-4417.vpx"
+        monkeypatch.setattr(DIBridge, 'installed_location',
+                            staticmethod(lambda: odd))
+        assert DIBridge.library_paths()[0] == odd
+
+    def test_a_blank_registry_value_is_not_a_path(self, monkeypatch):
+        """An empty string joins into the working directory and would load
+        whatever happened to be sitting there."""
+        from telemffb.hw.ffb_dinput import DIBridge
+        monkeypatch.setattr(DIBridge, 'installed_location',
+                            staticmethod(lambda: None))
+        for path in DIBridge.library_paths():
+            assert path.strip(), "an empty candidate reached the search list"
+
     def test_every_candidate_is_an_absolute_location(self):
         """No bare name: letting Windows search its own DLL path makes "not
         found" depend on the working directory and on whatever is already
-        loaded in the process, and could pick up a dinput_ffb.dll from
+        loaded in the process, and could pick up a directlink.dlk from
         somewhere nobody intended."""
         from telemffb.hw.ffb_dinput import DIBridge
         for path in DIBridge.library_paths():
             assert os.path.isabs(path), f"{path} is not an absolute location"
 
-    def test_a_frozen_build_tells_the_user_a_path_they_can_act_on(self, monkeypatch):
-        """The message has to name somewhere the user can put the file."""
-        from telemffb.hw.ffb_dinput import bridge_availability
-        self._frozen(monkeypatch)
-        available, reason = bridge_availability()
-        assert not available, "no DLL exists at the simulated install"
-        assert os.path.dirname(self.EXE) in reason
-        offered = [ln.strip() for ln in reason.splitlines() if ln.startswith('    ')]
-        assert not offered[0].startswith(self.MEIPASS),             "the first path offered should not be the temp bundle"
+    def test_no_key_reads_as_not_installed(self, monkeypatch):
+        """Absent is the normal state, not a fault: nobody has the installer
+        during the beta, and OSError covers both a missing key and a missing
+        value."""
+        import winreg
+        from telemffb.hw import ffb_dinput
+
+        def refuse(*a, **k):
+            raise OSError(2, 'The system cannot find the file specified')
+        monkeypatch.setattr(winreg, 'OpenKey', refuse)
+        # the reading itself, not the seam conftest stubs
+        assert ffb_dinput._installed_dll_path() is None
+
+    def test_the_recorded_path_is_returned(self, monkeypatch):
+        import winreg
+        from telemffb.hw import ffb_dinput
+        wanted = r"C:\Users\someone\AppData\Local\DirectLink\directlink.vpx"
+
+        class Key:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        monkeypatch.setattr(winreg, 'OpenKey', lambda *a, **k: Key())
+        monkeypatch.setattr(winreg, 'QueryValueEx',
+                            lambda key, name: (wanted, 1))
+        assert ffb_dinput._installed_dll_path() == wanted
+
+    def test_an_empty_value_is_not_a_location(self, monkeypatch):
+        """A key present but blank - a half-finished install, or one the
+        uninstaller emptied - must read as absent rather than as the
+        working directory."""
+        import winreg
+        from telemffb.hw import ffb_dinput
+
+        class Key:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        monkeypatch.setattr(winreg, 'OpenKey', lambda *a, **k: Key())
+        monkeypatch.setattr(winreg, 'QueryValueEx', lambda key, name: ('   ', 1))
+        assert ffb_dinput._installed_dll_path() is None
+
+    def test_it_reads_directlinks_own_key(self, monkeypatch):
+        """The whole interface between TelemFFB and the DirectLink
+        installer, pinned: hive, key and value name together.
+
+        Its own root rather than Software\\VPforce - that one is
+        TelemFFB's, and DirectLink is a separate product.  The value is
+        "Path", named after neither ".dll" nor any other extension, so
+        that the installer stays free to choose the filename.
+
+        Renaming any part of this silently breaks every installer already
+        in the field, which is why it is asserted rather than left to the
+        implementation.
+        """
+        import winreg
+        from telemffb.hw import ffb_dinput
+        opened, asked = [], []
+
+        class Key:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        monkeypatch.setattr(winreg, 'OpenKey',
+                            lambda hive, path, *a, **k: opened.append((hive, path)) or Key())
+        monkeypatch.setattr(winreg, 'QueryValueEx',
+                            lambda key, name: asked.append(name) or ('x', 1))
+        ffb_dinput._installed_dll_path()
+        assert opened == [(winreg.HKEY_CURRENT_USER, r"Software\DirectLink")]
+        assert asked == ["Path"]
+
+    # A test here used to assert that the failure message listed the paths
+    # it searched, real install ahead of the temp bundle.  The message no
+    # longer names any path (see test_no_filesystem_path_is_shown), so the
+    # assertion had no subject.  The ordering it depended on is still
+    # covered, at the level that decides it:
+    # test_a_frozen_build_prefers_the_install_over_the_bundle.
 
 
 class TestTheUserIsToldWhereToGetIt:
@@ -270,7 +374,7 @@ class TestTheUserIsToldWhereToGetIt:
         available, reason = ffb_dinput.bridge_availability('not_here.dll')
         assert not available
         assert ffb_dinput.BRIDGE_DOWNLOAD_LOCATION in reason
-        assert 'obtain it from' in reason
+        assert 'obtain DirectLink from' in reason
 
     def test_an_expired_build_says_where_to_get_a_current_one(self, monkeypatch):
         import telemffb.globals as G
@@ -289,12 +393,17 @@ class TestTheUserIsToldWhereToGetIt:
         assert 'expired on 2020-01-01' in reason
         assert ffb_dinput.BRIDGE_DOWNLOAD_LOCATION in reason
 
-    def test_the_search_list_is_not_printed_twice(self, monkeypatch):
-        """The bridge's own error names every path it tried; the one-per-line
-        list below it is the readable version, so the echo is dropped."""
+    def test_no_filesystem_path_is_shown(self, monkeypatch):
+        """DirectLink is installed by its own installer, so the folders
+        TelemFFB searched answer a question the user cannot act on - and a
+        list of them reads as an invitation to drop a file into one.  The
+        bridge's own "Unable to load ... from: ..." error carries those
+        paths, so it is suppressed rather than passed through."""
         from telemffb.hw import ffb_dinput
         available, reason = ffb_dinput.bridge_availability('not_here.dll')
-        assert reason.count('not_here.dll') == 1, reason
+        assert 'not_here.dll' not in reason, reason
+        assert 'Looked in' not in reason, reason
+        assert ':\\' not in reason and ':/' not in reason, reason
 
     def test_a_failure_that_says_something_else_is_still_shown(self, monkeypatch):
         from telemffb.hw import ffb_dinput
@@ -337,7 +446,7 @@ class TestBridgeStatusReport:
         monkeypatch.setattr(
             ffb_dinput.DIBridge, '_load_library',
             classmethod(lambda cls, path=None: (_ for _ in ()).throw(
-                ffb_dinput.DIBridgeError('Unable to load dinput_ffb.dll from: x'))))
+                ffb_dinput.DIBridgeError('Unable to load directlink.dlk from: x'))))
         status = ffb_dinput.bridge_status()
         assert not status.installed
         assert status.problem == 'not installed'
@@ -510,16 +619,19 @@ class TestMinimumBridgeVersion:
         assert status.installed
         assert 'older than the 0.9.2' in status.problem
 
-    def test_the_shipped_dll_meets_the_shipped_minimum(self):
-        """The DLL in dll/ and the minimum in globals.py travel together;
-        a bump to one without the other breaks the app on launch."""
-        import telemffb.globals as G
-        from telemffb.hw.ffb_dinput import bridge_status, version_is_at_least
-        status = bridge_status()
-        if not status.installed or not status.version:
-            pytest.skip('no identifiable bridge DLL in this checkout')
-        assert version_is_at_least(status.version,
-                                   G.dinput_bridge_min_version)
+    # There was a test here that loaded the real DLL and checked its
+    # version against G.dinput_bridge_min_version.  It could never run
+    # where it mattered: DirectLink is distributed separately and
+    # gitignored, so a checkout has no DLL and the test skipped itself -
+    # except on a developer's machine, where it passed or failed on
+    # whichever build happened to be sitting in dll/.
+    #
+    # Nothing synthetic replaces it.  Faking a version and asserting it
+    # clears the minimum only asserts the fixture; the comparison itself
+    # is covered above.  The real invariant - that the DLL we ship is not
+    # older than the minimum this TelemFFB demands - is a release check
+    # between two artifacts, and belongs on the release checklist rather
+    # than in a suite that never sees either one.
 
 
 class TestStatusLineFollowsTheToggle:

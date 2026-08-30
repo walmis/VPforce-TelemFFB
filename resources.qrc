@@ -3,6 +3,7 @@
     <qresource>
         <file>image/TelemFFB_Logo.png</file>
         <file>image/icon_joystick.png</file>
+        <file>image/icon_yoke.png</file>
         <file>image/icon_pedals.png</file>
         <file>image/icon_collective.png</file>
         <file>image/icon_trimwheel.png</file>
@@ -59,6 +60,9 @@
         <!-- Add other image files as needed -->
     </qresource>
 </RCC>
-<!-- To create resources.py file... -->
-<!-- run 'C:\path_to_your_python\Lib\site-packages\qt6_applications\Qt\bin\rcc.exe -g python -o resources.py resources.qrc' -->
-<!-- **THEN YOU MUST**  OPEN resources.py and change 'from PySide6 import QtCore' to 'from PyQt6 import QtCore'-->
+<!-- To regenerate resources.py after adding a file above, run: -->
+<!--     makeresources.bat          (or: py makeresources.py)   -->
+<!-- and check it with: makeresources.bat --check               -->
+<!-- Do not run pyside6-rcc by hand.  Its output imports PySide6 and the -->
+<!-- compiler cannot be told otherwise; makeresources.py rewrites that one -->
+<!-- line to PyQt6, and stops with an error if it ever cannot find it. -->

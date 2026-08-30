@@ -18,7 +18,7 @@
 
 """Generic DirectInput FFB backend via the TelemFFB-DInput-Bridge DLL.
 
-Speaks to any DirectInput force-feedback device through ``dinput_ffb.dll``
+Speaks to any DirectInput force-feedback device through ``directlink.dlk``
 (separate repo: TelemFFB-DInput-Bridge).  All values cross the DLL boundary in
 TelemFFB's native +-4096 units; the bridge converts to DirectInput's +-10000.
 
@@ -178,6 +178,41 @@ def _trace_enabled() -> bool:
         return False
 
 
+def _installed_dll_path() -> Optional[str]:
+    """The module path the DirectLink installer recorded, or None.
+
+    Read from HKCU\\Software\\DirectLink, value "Path" - the whole
+    interface between TelemFFB and the installer, and the only thing the
+    installer has to write.
+
+    A full path to the file rather than a directory, because the installed
+    name is the installer's to choose: it may carry a licensee, and it is
+    deliberately not a .dll.  Nothing here appends a name or inspects the
+    extension, so that stays true whatever the installer ships.  The value
+    is named "Path" rather than after any extension for the same reason.
+
+    Read directly via winreg, like _trace_enabled, so the hw layer stays
+    independent of the app's settings machinery.  Its own key rather than
+    Software\\VPforce: DirectLink is a separate product, and that root
+    belongs to TelemFFB.
+
+    Absent is the ordinary case, not a fault - during the beta the DLL is
+    dropped into dll/ by hand and no installer has run.
+    """
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\DirectLink") as key:
+            value, _ = winreg.QueryValueEx(key, "Path")
+    except OSError:
+        return None
+    # A key present but blank - a half-finished install, or one an
+    # uninstaller emptied - would otherwise join into the working directory
+    # and load whatever was sitting there.
+    value = str(value).strip()
+    return value or None
+
+
 def _describe_params(effect_type: int, params: DibEffectParams) -> str:
     """One-line decode of DibEffectParams for the DIB_TRACE log."""
     if effect_type in CONDITION_EFFECTS:
@@ -232,19 +267,28 @@ def bridge_availability(dll_path: Optional[str] = None):
         # shared instance is for the device and enumeration paths
         bridge = DIBridge(dll_path)
     except Exception as e:                    # DIBridgeError, OSError, ...
-        searched = (dll_path,) if dll_path else DIBridge.library_paths()
-        where = "\n".join("    " + os.path.abspath(p) for p in searched)
-        # "Unable to load ... from: a, b, c" names the same paths the list
-        # below does, one per line and more readably; anything else - an ABI
-        # mismatch, a load error from Windows - is worth showing.
-        detail = "" if str(e).startswith("Unable to load") else str(e) + "\n\n"
+        # The searched paths are deliberately not shown.  DirectLink is
+        # installed by its own installer, so a list of folders TelemFFB
+        # looked in answers a question the user cannot act on - and reads
+        # as an invitation to drop a file into one of them.  They are in
+        # the log for support.
+        logging.info("DirectLink not loaded: %s", e)
+        # An ABI mismatch or a Windows load error says something the user
+        # can act on ("wrong version", "missing dependency"); a plain
+        # not-found only repeats the first line, so it is dropped.
+        # An ABI mismatch or a Windows load error says something the user
+        # can act on ("wrong version", "missing dependency"); a plain
+        # not-found only repeats the first line, so it is dropped.
+        detail = "" if str(e).startswith("Unable to load") else "\n\n" + str(e)
+        # The product is named once at the start and once at the end - a
+        # sentence apiece opening with "DirectLink" reads like a form
+        # letter.  The gap before the last line separates the diagnosis
+        # from what to do about it.
         return False, (
-            "The DirectLink DLL could not be loaded.\n\n"
-            "{}Looked in:\n{}\n\n"
-            "Place dinput_ffb.dll in the 'dll' folder of your TelemFFB "
-            "installation.\n\n"
-            "If you do not have the DLL, you can obtain it from "
-            "{}.".format(detail, where, BRIDGE_DOWNLOAD_LOCATION))
+            "DirectLink could not be loaded. It must be installed in order "
+            "to enable the integration.{}\n\n\n"
+            "You can obtain DirectLink from {}.".format(
+                detail, BRIDGE_DOWNLOAD_LOCATION))
 
     minimum = getattr(G, 'dinput_bridge_min_version', '') or ''
     if minimum:
@@ -435,24 +479,41 @@ def resolve_axis_map(role, choice, actuators):
 
 
 class DIBridge:
-    """ctypes binding to dinput_ffb.dll.
+    """ctypes binding to directlink.dlk.
 
     The device backend takes any object with this method surface, so tests
     substitute a pure-Python fake without touching ctypes.
     """
 
     @staticmethod
-    def library_paths():
-        """Where dinput_ffb.dll is looked for, in order.
+    def installed_location() -> Optional[str]:
+        """Where the DirectLink installer said it put the DLL, or None.
 
-        Worked out when asked rather than at import: frozen and source
-        installs keep it in different places, and os.path.dirname(__file__)
-        in a PyInstaller build points inside the unpacked bundle - a
-        temporary directory, not the installation the user drops the DLL
-        into. Matches get_resource_path(prefer_root=True): beside the
-        executable first, then whatever shipped in the bundle.
+        The seam the tests replace, so that a suite never depends on
+        whether the machine running it happens to have DirectLink
+        installed.  The reading itself is _installed_dll_path.
         """
-        name = "dinput_ffb.dll"
+        return _installed_dll_path()
+
+    @classmethod
+    def library_paths(cls):
+        """Where DirectLink is looked for, in order.
+
+        An installed copy comes first.  It is the supported arrangement
+        once the installer exists, and a DLL left behind in dll/ by an
+        earlier beta should not quietly outrank the one the user just
+        installed - the version gate would then report a shortfall the
+        user has already fixed.
+
+        The rest are worked out when asked rather than at import: frozen
+        and source installs keep it in different places, and
+        os.path.dirname(__file__) in a PyInstaller build points inside the
+        unpacked bundle - a temporary directory, not the installation the
+        user drops the DLL into. Matches get_resource_path(prefer_root=True):
+        beside the executable first, then whatever shipped in the bundle.
+        """
+        name = "directlink.dlk"
+        installed = cls.installed_location()
         if getattr(sys, "frozen", False):
             beside_exe = os.path.dirname(sys.executable)
             bundled = getattr(sys, "_MEIPASS", beside_exe)
@@ -467,7 +528,9 @@ class DIBridge:
         # Deliberately no bare-name fallback: letting Windows search its own
         # DLL path makes "not found" depend on the working directory and on
         # whatever is already loaded in the process, and could pick up a
-        # dinput_ffb.dll from somewhere nobody intended.
+        # directlink.dlk from somewhere nobody intended.
+        if installed:
+            candidates.insert(0, installed)
         return tuple(candidates)
 
     @classmethod
@@ -483,11 +546,11 @@ class DIBridge:
             except OSError:
                 pass
         if not dll:
-            raise DIBridgeError(f"Unable to load dinput_ffb.dll from: {', '.join(paths)}")
+            raise DIBridgeError(f"Unable to load directlink.dlk from: {', '.join(paths)}")
 
         abi = dll.dib_abi_version()
         if abi != DIB_ABI_VERSION:
-            raise DIBridgeError(f"dinput_ffb.dll ABI version {abi}, expected {DIB_ABI_VERSION}")
+            raise DIBridgeError(f"directlink.dlk ABI version {abi}, expected {DIB_ABI_VERSION}")
         return dll
 
     def __init__(self, dll_path: Optional[str] = None):

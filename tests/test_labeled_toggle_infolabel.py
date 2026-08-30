@@ -65,7 +65,7 @@ class TestUnchangedBehavior:
 
 
 class TestTheHandleFollowsTheState:
-    """The switch is drawn from two things: the track colour, which comes
+    """The switch is drawn from two things: the track color, which comes
     from isChecked(), and the handle position, which the slide animation
     drives.  They have to agree - a track drawn off with the handle
     sitting on reads as neither state (field report, 2026-08-29: the

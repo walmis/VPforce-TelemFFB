@@ -213,7 +213,98 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="0" colspan="2">
+       <item row="5" column="1" colspan="2">
+        <widget class="Line" name="systab_line3">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>10</height>
+          </size>
+         </property>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="1" colspan="2">
+        <layout class="QGridLayout" name="gridLayout_integrations">
+         <property name="horizontalSpacing">
+          <number>15</number>
+         </property>
+         <item row="0" column="0" colspan="2">
+          <widget class="QLabel" name="labelIntegrations">
+           <property name="font">
+            <font>
+             <bold>true</bold>
+             <underline>true</underline>
+            </font>
+           </property>
+           <property name="text">
+            <string>Integrations:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="LabeledToggle" name="cb_enable_dinput">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>DirectLink for TelemFFB</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QLabel" name="lab_dinput_status">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="indent">
+            <number>28</number>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <spacer name="spacer_integrations">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>2</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="1" column="2" rowspan="2">
+          <spacer name="spacer_integrations_fill">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item row="7" column="0" colspan="2">
         <spacer name="verticalSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -235,7 +326,7 @@
              <property name="horizontalSpacing">
               <number>15</number>
              </property>
-             <item row="5" column="1" colspan="2">
+             <item row="3" column="1" colspan="2">
               <layout class="QGridLayout" name="gridLayout_2">
                <item row="1" column="0">
                 <spacer name="horizontalSpacer_12">
@@ -332,7 +423,7 @@
                </item>
               </layout>
              </item>
-             <item row="4" column="1" colspan="2">
+             <item row="2" column="1" colspan="2">
               <widget class="LabeledToggle" name="ignoreUpdate">
                <property name="sizePolicy">
                 <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -345,7 +436,7 @@
                </property>
               </widget>
              </item>
-             <item row="1" column="0">
+             <item row="2" column="0">
               <spacer name="horizontalSpacer_28">
                <property name="orientation">
                 <enum>Qt::Horizontal</enum>
@@ -371,32 +462,6 @@
                </property>
                <property name="text">
                 <string>Global System Settings:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1" colspan="2">
-              <widget class="LabeledToggle" name="cb_enable_dinput">
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
-               </property>
-               <property name="toolTip">
-                <string>List generic DirectInput force feedback devices (shown as "[DI]") alongside VPforce hardware, so they can be selected as an instance's device. Requires the separately distributed DirectLink DLL.</string>
-               </property>
-               <property name="text">
-                <string>Enable DirectInput Devices</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1" colspan="2">
-              <widget class="QLabel" name="lab_dinput_status">
-               <property name="text">
-                <string/>
-               </property>
-               <property name="indent">
-                <number>28</number>
                </property>
               </widget>
              </item>
