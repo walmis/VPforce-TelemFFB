@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <ui version="4.0">
  <class>SystemDialog</class>
  <widget class="QDialog" name="SystemDialog">
@@ -23,13 +23,6 @@
    <item row="1" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_25">
      <item>
-      <widget class="QPushButton" name="resetButton">
-       <property name="text">
-        <string>Reset to  Defaults</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QDialogButtonBox" name="buttonBox">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
@@ -52,6 +45,47 @@
      <property name="currentIndex">
       <number>1</number>
      </property>
+     <widget class="QWidget" name="tab_Devices">
+      <attribute name="title">
+       <string>Devices</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="devicesTabLayout">
+       <item>
+        <widget class="QWidget" name="masterLaunchOptions" native="true">
+         <layout class="QVBoxLayout" name="deviceCardsHostLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelInstanceDevices">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+           <underline>true</underline>
+          </font>
+         </property>
+         <property name="text">
+          <string>Device Settings:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTabWidget" name="instance_tabs_devices" />
+       </item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="tab_System">
       <attribute name="title">
        <string>System</string>
@@ -113,8 +147,14 @@
           </item>
           <item row="0" column="0" colspan="3">
            <widget class="QLabel" name="labelTheme">
+            <property name="font">
+             <font>
+              <bold>true</bold>
+              <underline>true</underline>
+             </font>
+            </property>
             <property name="text">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700; text-decoration: underline;"&gt;Theme (Global):&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string>Theme:</string>
             </property>
            </widget>
           </item>
@@ -186,446 +226,6 @@
          </property>
         </spacer>
        </item>
-       <item row="4" column="1" colspan="2">
-        <widget class="QWidget" name="masterLaunchOptions" native="true">
-         <layout class="QGridLayout" name="gridLayout_7">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-          <item row="0" column="0">
-           <widget class="QLabel" name="labelLaunch">
-            <property name="font">
-             <font>
-              <bold>true</bold>
-              <underline>true</underline>
-             </font>
-            </property>
-            <property name="text">
-             <string>Master Launch Options:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <layout class="QGridLayout" name="gridLayout_3">
-            <property name="horizontalSpacing">
-             <number>20</number>
-            </property>
-            <item row="1" column="7">
-             <spacer name="horizontalSpacer_23">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>29</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="2" column="1">
-             <widget class="QRadioButton" name="rb_master_j">
-              <property name="text">
-               <string>Joystick</string>
-              </property>
-              <property name="checked">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="5">
-             <widget class="QCheckBox" name="cb_min_enable_j">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="6">
-             <widget class="QCheckBox" name="cb_headless_c">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="6">
-             <widget class="QLabel" name="lab_start_headless">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="text">
-               <string>Start
-Headless:</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="1">
-             <widget class="QRadioButton" name="rb_master_p">
-              <property name="text">
-               <string>Pedals</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QLabel" name="label_9">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>Master
-Instance</string>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="7">
-             <spacer name="horizontalSpacer_25">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>19</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="4" column="7">
-             <spacer name="horizontalSpacer_26">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>19</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="1" column="4">
-             <widget class="QLabel" name="lab_auto_launch">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>Auto
-Launch:</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="6">
-             <widget class="QCheckBox" name="cb_headless_p">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="7">
-             <spacer name="horizontalSpacer_24">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>19</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="5" column="6">
-             <widget class="QCheckBox" name="cb_headless_t">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="6">
-             <widget class="QCheckBox" name="cb_headless_j">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="4">
-             <widget class="QCheckBox" name="cb_al_enable_p">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="5">
-             <widget class="QCheckBox" name="cb_min_enable_c">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="4" colspan="3">
-             <widget class="QCheckBox" name="cb_al_enable">
-              <property name="font">
-               <font>
-                <bold>false</bold>
-                <underline>false</underline>
-               </font>
-              </property>
-              <property name="text">
-               <string>Enable Auto-Launch</string>
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="1">
-             <widget class="QRadioButton" name="rb_master_t">
-              <property name="text">
-               <string>Trim Wheel</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <spacer name="horizontalSpacer_29">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeType">
-               <enum>QSizePolicy::Fixed</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>2</width>
-                <height>17</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="5" column="5">
-             <widget class="QCheckBox" name="cb_min_enable_t">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="1">
-             <widget class="QRadioButton" name="rb_master_c">
-              <property name="text">
-               <string>Collective</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="4">
-             <widget class="QCheckBox" name="cb_al_enable_j">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="4">
-             <widget class="QCheckBox" name="cb_al_enable_t">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="5">
-             <widget class="QCheckBox" name="cb_min_enable_p">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="4">
-             <widget class="QCheckBox" name="cb_al_enable_c">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>15</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="text">
-               <string />
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="5">
-             <widget class="QLabel" name="lab_start_min">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="text">
-               <string>Start
-Minimized:</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="3">
-             <widget class="QComboBox" name="cb_select_j" />
-            </item>
-            <item row="3" column="3">
-             <widget class="QComboBox" name="cb_select_p" />
-            </item>
-            <item row="4" column="3">
-             <widget class="QComboBox" name="cb_select_c" />
-            </item>
-            <item row="5" column="3">
-             <widget class="QComboBox" name="cb_select_t" />
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </widget>
-       </item>
        <item row="0" column="0" colspan="3">
         <layout class="QHBoxLayout" name="systemSplit" stretch="0,0,1">
          <item>
@@ -635,7 +235,7 @@ Minimized:</string>
              <property name="horizontalSpacing">
               <number>15</number>
              </property>
-             <item row="4" column="1" colspan="2">
+             <item row="5" column="1" colspan="2">
               <layout class="QGridLayout" name="gridLayout_2">
                <item row="1" column="0">
                 <spacer name="horizontalSpacer_12">
@@ -732,7 +332,7 @@ Minimized:</string>
                </item>
               </layout>
              </item>
-             <item row="3" column="1" colspan="2">
+             <item row="4" column="1" colspan="2">
               <widget class="LabeledToggle" name="ignoreUpdate">
                <property name="sizePolicy">
                 <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -774,6 +374,32 @@ Minimized:</string>
                </property>
               </widget>
              </item>
+             <item row="2" column="1" colspan="2">
+              <widget class="LabeledToggle" name="cb_enable_dinput">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="toolTip">
+                <string>List generic DirectInput force feedback devices (shown as "[DI]") alongside VPforce hardware, so they can be selected as an instance's device. Requires the separately distributed DirectLink DLL.</string>
+               </property>
+               <property name="text">
+                <string>Enable DirectInput Devices</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1" colspan="2">
+              <widget class="QLabel" name="lab_dinput_status">
+               <property name="text">
+                <string/>
+               </property>
+               <property name="indent">
+                <number>28</number>
+               </property>
+              </widget>
+             </item>
             </layout>
            </item>
            <item>
@@ -796,36 +422,78 @@ Minimized:</string>
            </item>
           </layout>
          </item>
-         <item>
-          <widget class="Line" name="systab_vline">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
+        </layout>
+       </item>
+       <item row="4" column="1" colspan="2">
+        <layout class="QGridLayout" name="gridLayout_4">
+         <property name="horizontalSpacing">
+          <number>15</number>
+         </property>
+         <item row="0" column="0" colspan="2">
+          <widget class="QLabel" name="label_11">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="font">
+            <font>
+             <bold>true</bold>
+             <underline>true</underline>
+            </font>
+           </property>
+           <property name="text">
+            <string>Startup Behavior:</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
            </property>
           </widget>
          </item>
-         <item>
-          <layout class="QVBoxLayout" name="instanceSystemColumn">
-           <item>
-            <widget class="QLabel" name="labelInstanceSystem">
-             <property name="font">
-              <font>
-               <bold>true</bold>
-               <underline>true</underline>
-              </font>
-             </property>
-             <property name="text">
-              <string>Instance System Settings:</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QTabWidget" name="instance_tabs_system">
-             <property name="currentIndex">
-              <number>0</number>
-             </property>
-            </widget>
-           </item>
-          </layout>
+         <item row="1" column="1">
+          <widget class="LabeledToggle" name="cb_startWithWindows">
+           <property name="text">
+            <string>Start with Windows</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="2">
+          <widget class="LabeledToggle" name="cb_masterStartMin">
+           <property name="text">
+            <string>Start Minimized</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="LabeledToggle" name="cb_startToTray">
+           <property name="text">
+            <string>Start in System Tray</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="2">
+          <widget class="LabeledToggle" name="cb_closeToTray">
+           <property name="text">
+            <string>Closing App Sends to Tray</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <spacer name="spacer_startup">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>2</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </item>
@@ -855,7 +523,7 @@ Minimized:</string>
            <string>DCS</string>
           </attribute>
           <layout class="QGridLayout" name="gridLayout_12">
-           <item row="5" column="0">
+           <item row="9" column="0">
             <spacer name="verticalSpacer_5">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -959,6 +627,39 @@ Minimized:</string>
               <string>Auto DCS setup 🛈</string>
              </property>
             </widget>
+           </item>
+           <item row="5" column="0" colspan="2">
+            <widget class="Line" name="tapLine_tab_DCS">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0" colspan="2">
+            <widget class="QLabel" name="tapHeader_tab_DCS">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+               <underline>true</underline>
+              </font>
+             </property>
+             <property name="text">
+              <string>DirectInput Tap/FFB-Fix:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_DCS">
+             <property name="text">
+              <string>Enable for DCS World</string>
+             </property>
+             <property name="toolTip">
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item row="8" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_DCS" />
            </item>
           </layout>
          </widget>
@@ -1720,7 +1421,7 @@ Minimized:</string>
              </item>
             </layout>
            </item>
-           <item row="15" column="1">
+           <item row="21" column="1">
             <spacer name="verticalSpacer_2">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1732,6 +1433,52 @@ Minimized:</string>
               </size>
              </property>
             </spacer>
+           </item>
+           <item row="15" column="0" colspan="2">
+            <widget class="Line" name="tapLine_tab_IL2">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="16" column="0" colspan="2">
+            <widget class="QLabel" name="tapHeader_tab_IL2">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+               <underline>true</underline>
+              </font>
+             </property>
+             <property name="text">
+              <string>DirectInput Tap:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="17" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_IL2">
+             <property name="text">
+              <string>Enable for IL-2 Sturmovik Great Battles</string>
+             </property>
+             <property name="toolTip">
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item row="18" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_IL2" />
+           </item>
+           <item row="19" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_IL2_K">
+             <property name="text">
+              <string>Enable for IL-2 Korea</string>
+             </property>
+             <property name="toolTip">
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item row="20" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_IL2_K" />
            </item>
           </layout>
          </widget>
@@ -1815,7 +1562,7 @@ Minimized:</string>
              </property>
             </spacer>
            </item>
-           <item row="4" column="0">
+           <item row="8" column="0">
             <spacer name="verticalSpacer_8">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1828,142 +1575,42 @@ Minimized:</string>
              </property>
             </spacer>
            </item>
+           <item row="4" column="0" colspan="2">
+            <widget class="Line" name="tapLine_tab_BMS">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0" colspan="2">
+            <widget class="QLabel" name="tapHeader_tab_BMS">
+             <property name="font">
+              <font>
+               <bold>true</bold>
+               <underline>true</underline>
+              </font>
+             </property>
+             <property name="text">
+              <string>DirectInput Tap:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0" colspan="2">
+            <widget class="LabeledToggle" name="enableTap_BMS">
+             <property name="text">
+              <string>Enable for Falcon BMS</string>
+             </property>
+             <property name="toolTip">
+              <string>&lt;p&gt;&lt;b&gt;DirectInput Tap:&lt;/b&gt; lets TelemFFB render the force feedback the game itself generates.&lt;/p&gt;&lt;p&gt;A small wrapper (dinput8.dll) is placed in the game's folder.  The game keeps computing its forces and believes it is rendering them, while the wrapper captures its live effects and TelemFFB re-renders them on the device - alongside TelemFFB's own telemetry-driven effects.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For VPforce devices&lt;/b&gt; the tap is optional: it brings the game's own effects into TelemFFB, where their forces can be tuned in ways the game itself does not offer.  The game's spring is rendered when the 'Game Managed (DirectInput Tap)' spring mode is selected.&lt;/p&gt;&lt;p&gt;&lt;b&gt;For generic DirectInput devices&lt;/b&gt; the tap is required: TelemFFB holds those devices exclusively, so the game's forces can only reach them through the tap.&lt;/p&gt;&lt;p&gt;Enabling shows a status panel below for installing the wrapper into the game and choosing which devices it captures.&lt;/p&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0" colspan="2">
+            <widget class="QWidget" name="tapStatusHost_BMS" />
+           </item>
           </layout>
          </widget>
         </widget>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="tab_Startup">
-      <attribute name="title">
-       <string>Startup Behavior</string>
-      </attribute>
-      <layout class="QGridLayout" name="gridLayout_17">
-       <item row="2" column="0">
-        <layout class="QGridLayout" name="gridLayout_6">
-         <property name="horizontalSpacing">
-          <number>15</number>
-         </property>
-         <item row="0" column="0" colspan="3">
-          <widget class="QLabel" name="labelInstanceStartup">
-           <property name="font">
-            <font>
-             <bold>true</bold>
-             <underline>true</underline>
-            </font>
-           </property>
-           <property name="text">
-            <string>Per-Device Startup Behavior:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0" colspan="3">
-          <widget class="QTabWidget" name="instance_tabs_startup">
-           <property name="currentIndex">
-            <number>0</number>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="0" column="0">
-        <layout class="QGridLayout" name="gridLayout_4">
-         <property name="horizontalSpacing">
-          <number>15</number>
-         </property>
-         <item row="0" column="0" colspan="2">
-          <widget class="QLabel" name="label_11">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700; text-decoration: underline;"&gt;Startup Behavior:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="LabeledToggle" name="cb_startWithWindows">
-           <property name="text">
-            <string>Start with Windows</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2">
-          <widget class="LabeledToggle" name="cb_masterStartMin">
-           <property name="text">
-            <string>Start Minimized</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="LabeledToggle" name="cb_startToTray">
-           <property name="text">
-            <string>Start in System Tray</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="2">
-          <widget class="LabeledToggle" name="cb_closeToTray">
-           <property name="text">
-            <string>Closing App Sends to Tray</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0">
-          <spacer name="spacer_startup">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>2</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </item>
-       <item row="1" column="0">
-        <widget class="Line" name="line_6">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>15</height>
-          </size>
-         </property>
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <spacer name="verticalSpacer_6">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>188</height>
-          </size>
-         </property>
-        </spacer>
        </item>
       </layout>
      </widget>
@@ -1986,27 +1633,6 @@ Minimized:</string>
   <tabstop>rb_LightTheme</tabstop>
   <tabstop>rb_DarkTheme</tabstop>
   <tabstop>rb_SystemTheme</tabstop>
-  <tabstop>cb_al_enable</tabstop>
-  <tabstop>rb_master_j</tabstop>
-  <tabstop>cb_select_j</tabstop>
-  <tabstop>cb_al_enable_j</tabstop>
-  <tabstop>cb_min_enable_j</tabstop>
-  <tabstop>cb_headless_j</tabstop>
-  <tabstop>rb_master_p</tabstop>
-  <tabstop>cb_select_p</tabstop>
-  <tabstop>cb_al_enable_p</tabstop>
-  <tabstop>cb_min_enable_p</tabstop>
-  <tabstop>cb_headless_p</tabstop>
-  <tabstop>rb_master_c</tabstop>
-  <tabstop>cb_select_c</tabstop>
-  <tabstop>cb_al_enable_c</tabstop>
-  <tabstop>cb_min_enable_c</tabstop>
-  <tabstop>cb_headless_c</tabstop>
-  <tabstop>rb_master_t</tabstop>
-  <tabstop>cb_select_t</tabstop>
-  <tabstop>cb_al_enable_t</tabstop>
-  <tabstop>cb_min_enable_t</tabstop>
-  <tabstop>cb_headless_t</tabstop>
   <tabstop>simTabWidget</tabstop>
   <tabstop>enableIL2</tabstop>
   <tabstop>focus_pauseIL2</tabstop>
@@ -2024,11 +1650,6 @@ Minimized:</string>
   <tabstop>cb_motion</tabstop>
   <tabstop>cb_ffb</tabstop>
   <tabstop>pb_add_dest</tabstop>
-  <tabstop>cb_startWithWindows</tabstop>
-  <tabstop>cb_masterStartMin</tabstop>
-  <tabstop>cb_startToTray</tabstop>
-  <tabstop>cb_closeToTray</tabstop>
-  <tabstop>resetButton</tabstop>
   <tabstop>pathXPLANE</tabstop>
   <tabstop>browseXPLANE</tabstop>
   <tabstop>tb_logPrune</tabstop>

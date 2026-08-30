@@ -4,6 +4,13 @@ Contains both dark mode and light mode stylesheets.
 """
 
 DARK_MODE_STYLESHEET = """
+QComboBox {
+    /* dropdowns expand DOWNWARD as a plain list (capped by
+       maxVisibleItems) instead of the style's overlay popup, which
+       opens over the control and flips direction with its position on
+       the form */
+    combobox-popup: 0;
+}
 QPushButton:!pressed, #styledButton:!pressed {
     background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:0, y2:0.0397727, stop:0 rgba(160, 0, 200, 255), stop:1 rgba(174, 106, 206, 255));
     border-radius: 6px;
@@ -238,6 +245,13 @@ QGroupBox::title {
 """
 
 LIGHT_MODE_STYLESHEET = """
+QComboBox {
+    /* dropdowns expand DOWNWARD as a plain list (capped by
+       maxVisibleItems) instead of the style's overlay popup, which
+       opens over the control and flips direction with its position on
+       the form */
+    combobox-popup: 0;
+}
 QPushButton:!pressed, #styledButton:!pressed {
     background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:0, y2:0.0397727, stop:0 rgba(160, 0, 200, 255), stop:1 rgba(174, 106, 206, 255));
     border-radius: 6px;

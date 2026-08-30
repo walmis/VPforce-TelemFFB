@@ -160,6 +160,12 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         spring_condition.cpOffset = spring_offset
         self._spring_handle.setCondition(spring_condition)
         self._spring_handle.start()
+        caps = getattr(HapticEffect.device, 'caps', None)
+        if caps is not None and not caps.has_detents:
+            # no detents to hold the axis: keep the centering spring engaged
+            # instead of handing off to the (unavailable) lock detents
+            logging.debug("controls lock: detents not supported on this device, using spring-only lock")
+            return
         self.effects['lock_1'].detent(**detent_1).start()
         self.effects['lock_2'].detent(**detent_2).start()
         self._spring_handle.stop()

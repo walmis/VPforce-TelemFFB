@@ -53,10 +53,18 @@ def rendered(qapp, tmp_path):
         G.current_device_config_scope = 'joystick'
         G.launched_instances = {}
         G.ipc_instance = None
+        from telemffb.SettingsManager import SettingsManager
         G.settings_mgr = types.SimpleNamespace(
             current_sim='MSFS', current_aircraft_name='Cessna 172',
             current_class='PropellerAircraft', current_pattern='',
-            offline_mode=False, timed_out=True, active_profile=None)
+            offline_mode=False, timed_out=True, active_profile=None,
+            # the layout resolves enumlist collections through the manager;
+            # borrow the real resolver, bound to this stand-in
+            resolve_enum_list=lambda name, value='': (
+                SettingsManager.resolve_enum_list(G.settings_mgr, name, value)),
+            _tap_mode_offered=lambda: (
+                SettingsManager._tap_mode_offered(G.settings_mgr)),
+            TAP_SIM_KEYS=SettingsManager.TAP_SIM_KEYS)
         from telemffb import xmlutils
         import telemffb.SettingsLayout as SLmod
         SLmod.HapticEffect = lambda *a, **k: types.SimpleNamespace()

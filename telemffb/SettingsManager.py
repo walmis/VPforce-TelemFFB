@@ -23,6 +23,7 @@ class SpringModeEnum(Enum):
     DYNAMIC = auto()
     CUSTOM = auto()
     FORCETRIM = auto()
+    DINPUT_TAP = auto()
 
 class GEffectModeEnum(Enum):
     DISABLED = auto()
@@ -56,6 +57,51 @@ class SettingsManager(QObject):
 
     def set_sim(self, sim):
         self.current_sim = sim
+
+    #: Settings-tab sim -> the DirectInput Tap sims whose enable toggle
+    #: offers the DINPUT_TAP spring mode there.  IL-2 Great Battles and
+    #: Korea are indistinguishable at the telemetry/profile level (both
+    #: arrive as 'IL2'), so either toggle offers the mode for IL2.
+    TAP_SIM_KEYS = {
+        'DCS': ('DCS',),
+        'IL2': ('IL2', 'IL2_K'),
+        'BMS': ('BMS',),
+    }
+
+    def resolve_enum_list(self, name, current_value=''):
+        """The enum label dict for a ``validvalues`` collection name, with
+        options that do not apply right now removed.
+
+        Today that is one rule: 'Game Managed (DirectInput Tap)' is only
+        offered for a sim whose DirectInput Tap toggle is on in System
+        Settings (see TAP_SIM_KEYS) - the mode cannot work without the
+        tap wrapper, so listing it everywhere just invites a dead pick.
+        A row whose CURRENT value is DINPUT_TAP keeps the entry, however
+        it got there: an existing selection must display and be
+        deselectable normally, never fall into the invalid-value branch.
+        """
+        label_dict = getattr(self, name, None)
+        if not isinstance(label_dict, dict):
+            return label_dict
+        if (SpringModeEnum.DINPUT_TAP in label_dict
+                and current_value != SpringModeEnum.DINPUT_TAP.name
+                and not self._tap_mode_offered()):
+            label_dict = {k: v for k, v in label_dict.items()
+                          if k is not SpringModeEnum.DINPUT_TAP}
+        return label_dict
+
+    def _tap_mode_offered(self):
+        try:
+            from telemffb.tap_install import SIMS_BY_KEY
+            from telemffb.tap_reconcile import tap_is_enabled
+            return any(
+                tap_is_enabled(SIMS_BY_KEY[key], G.system_settings)
+                for key in self.TAP_SIM_KEYS.get(self.current_sim, ()))
+        except Exception:
+            # settings display must never break on tap plumbing; offer the
+            # mode rather than hide a configured one
+            logging.exception("tap-mode availability check failed")
+            return True
 
     def get_state_vars(self):
         return {
@@ -196,6 +242,7 @@ class SettingsManager(QObject):
     IL2_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap, Korea Only)",
         SpringModeEnum.STATIC: "Static Spring",
         SpringModeEnum.DYNAMIC: "Dynamic Spring",
         SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
@@ -205,6 +252,7 @@ class SettingsManager(QObject):
     IL2_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
@@ -219,12 +267,14 @@ class SettingsManager(QObject):
     }
     DCS_IL2_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
 
     DCS_HELI_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim"
     }
 

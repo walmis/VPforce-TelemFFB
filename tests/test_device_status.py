@@ -7,15 +7,15 @@ configurator.  These tests cover:
 
 - the pure state derivation (not found / reconnecting / active);
 - the panel's status->color mapping and tooltips for the three states;
-- the switch-device prompt (Windows-only: main.py imports winreg),
-  including that a user-No leaves every setting untouched and a Yes
-  persists the new selection and opens the board.
+- the static wiring of the derived state into MainWindow.
+
+The PR74 switch-device prompt was dropped in the dinput merge: dinput's
+per-slot device selection plus main.switch_to_device covers that flow.
 """
 import os
 import sys
-import warnings
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -24,32 +24,12 @@ sys.modules.setdefault('telemffb.hw.hid', MagicMock())
 import telemffb.hw.ffb_rhino as ffb_rhino_module
 from telemffb.hw.ffb_rhino import HapticEffect
 
-# The pysimconnect fork (requirements.txt pins a rolling master zip)
-# loads scvars.json via `json.load(open(...))` and never closes the
-# file.  On Windows the `import main` below pulls `simconnect` into
-# the test session for the first time, and the unclosed FileIO's
-# ResourceWarning becomes an unraisable that pytest attributes to an
-# innocent test.  Pre-import it with ResourceWarning ignored for that
-# one import - the finalizer fires inside this context (refcounting)
-# and dies quietly, and main.py's later `from simconnect import *`
-# hits the sys.modules cache.  Proper fix: close the file in the
-# fork's scvars.py.
-if sys.platform == "win32" and "simconnect" not in sys.modules:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", ResourceWarning)
-        import simconnect  # noqa: F401
-
-try:    import main as main_module
-except Exception:  # winreg is Windows-only
-    main_module = None
-
 pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
 
 from telemffb.DevicePanel import DeviceIconPanel, device_status_state
-from telemffb.utils import device_pid_key
 
 
 @pytest.fixture(scope="module")
@@ -141,83 +121,3 @@ class TestMainWindowWiring:
         body = src[i:i + 600]
         assert "device_status_state()" in body
         assert '"DISCONNECTED"' not in body
-
-
-# ---------------------------------------------------------------------------
-# switch-device prompt (Windows-only: main.py imports winreg)
-# ---------------------------------------------------------------------------
-
-@pytest.mark.skipif(main_module is None,
-                    reason="main.py requires winreg (Windows-only)")
-class TestSwitchPrompt:
-
-    def _env(self, monkeypatch, boards):
-        """boards: list of (pid, product_string, path) tuples."""
-        from telemffb.hw.ffb_rhino import DeviceInfo
-        infos = [
-            DeviceInfo(
-                interface_number=0, manufacturer_string="VPforce",
-                path=path, product_id=pid, product_string=ps,
-                release_number=516, serial_number=f"S{pid}",
-                usage=4, usage_page=1, vendor_id=0xFFFF,
-            )
-            for pid, ps, path in boards
-        ]
-        monkeypatch.setattr(main_module.FFBRhino, "enumerate",
-                            staticmethod(lambda pid=0: infos))
-        monkeypatch.setattr(main_module.G, "device_usbpid", "2055",
-                            raising=False)
-        fake_he = MagicMock()
-        fake_he.device = None
-        monkeypatch.setattr(main_module, "HapticEffect", fake_he)
-        monkeypatch.setattr(main_module.G, "system_settings",
-                            MagicMock(), raising=False)
-        monkeypatch.setattr(main_module.G, "args",
-                            SimpleNamespace(reset=False), raising=False)
-        monkeypatch.setattr(main_module.G, "main_window", MagicMock(),
-                            raising=False)
-        wired = []
-        monkeypatch.setattr(main_module, "_wire_opened_device",
-                            lambda dev: wired.append(dev))
-        return fake_he, wired
-
-    def test_no_alternate_when_only_configured_board_present(self, monkeypatch):
-        self._env(monkeypatch, [(0x2055, "Rhino FFB Joystick", b"p1")])
-        assert main_module._find_alternate_vpforce_board() is None
-
-    def test_finds_differing_pid(self, monkeypatch):
-        self._env(monkeypatch, [
-            (0x2055, "Rhino FFB Joystick", b"p1"),
-            (0x2054, "Rhino FFB RhinoMFG", b"p2"),
-        ])
-        found = main_module._find_alternate_vpforce_board()
-        assert found is not None
-        assert found.product_id == 0x2054
-
-    def test_no_answer_leaves_settings_untouched(self, monkeypatch):
-        fake_he, wired = self._env(monkeypatch,
-                                   [(0x2054, "Rhino FFB RhinoMFG", b"p2")])
-        with patch.object(main_module.QMessageBox, "question",
-                          return_value=main_module.QMessageBox.StandardButton.No):
-            assert main_module._offer_device_switch() is False
-        assert main_module.G.system_settings.setValue.call_count == 0
-        assert main_module.G.device_usbpid == "2055"
-        assert fake_he.open.call_count == 0
-        assert wired == []
-
-    def test_yes_persists_selection_and_opens_board(self, monkeypatch):
-        fake_he, wired = self._env(monkeypatch,
-                                   [(0x2054, "Rhino FFB RhinoMFG", b"p2")])
-        dev = MagicMock()
-        fake_he.open.return_value = dev
-        with patch.object(main_module.QMessageBox, "question",
-                          return_value=main_module.QMessageBox.StandardButton.Yes):
-            assert main_module._offer_device_switch() is True
-
-        calls = {c.args[0]: c.args[1]
-                 for c in main_module.G.system_settings.setValue.call_args_list}
-        assert calls[device_pid_key("joystick")] == "2054"
-        assert calls["devpath_joystick"] == "p2"
-        assert main_module.G.device_usbpid == "2054"
-        fake_he.open.assert_called_once_with(pid=0x2054)
-        assert wired == [dev]

@@ -241,6 +241,7 @@ class Aircraft(AircraftBase, DCSCommands):
         self.dcs_update_damage(telem_data)
         self.dcs_update_stick_shaker(telem_data)
         self.dcs_override_spring()
+        self.ffb_tap_spring()
         self.dcs_override_copilot_spring(telem_data)
         self.dcs_update_ap_deadzone(telem_data)
 

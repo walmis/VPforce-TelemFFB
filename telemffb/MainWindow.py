@@ -47,6 +47,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
+from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
@@ -68,6 +69,22 @@ from telemffb.utils import exit_application, HiDpiPixmap
 class MainWindow(QMainWindow):
     version_check_complete = pyqtSignal()
 
+    #: Number-sliders whose handle shows a live force readout: setting name
+    #: -> the telemetry key its aircraft code publishes (fraction 0..1 of
+    #: the relevant full scale, so 100% on the handle means clipping/max).
+    N_SLIDER_LIVE_KEYS = {
+        'max_elevator_coeff': '_pct_max_e',
+        'max_aileron_coeff': '_pct_max_a',
+        'max_rudder_coeff': '_pct_max_r',
+        'steering_friction_intensity': '_pct_steer_f',
+        'tap_spring_gain_x': '_pct_tap_x',
+        'tap_spring_gain_y': '_pct_tap_y',
+        'tap_effect_constant_gain': '_pct_tap_const',
+        'tap_effect_periodic_gain': '_pct_tap_periodic',
+        'tap_effect_damper_gain': '_pct_tap_damper',
+        'tap_effect_inertia_gain': '_pct_tap_inertia',
+        'tap_effect_friction_gain': '_pct_tap_friction',
+    }
     #: How long the error status is held after the LAST error-bearing
     #: frame before it clears.  Wall-clock on purpose: child-instance
     #: errors reach the master over IPC on whichever frames catch them,
@@ -408,6 +425,7 @@ class MainWindow(QMainWindow):
             self.device_panel.set_devices([G.device_type])
             self.device_panel.set_device_status(G.device_type, device_status_state())
             self.device_panel.set_active_device(G.device_type)
+            self.refresh_device_labels()
 
 
         """ Create Status Panel """
@@ -898,15 +916,7 @@ class MainWindow(QMainWindow):
         self.version_label.setOpenExternalLinks(True)
         self.setStatusBar(self.status_bar)
         self.firmware_label = QLabel()
-        if not HapticEffect.device:
-            f_vers = 'Device Disconnected'
-            self.firmware_label.setText("Device Disconnected")
-        else:
-            try:
-                f_vers = HapticEffect.device.get_firmware_version()
-            except:
-                f_vers = 'error fetching'
-            self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
+        self.refresh_firmware_label()
 
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -945,6 +955,11 @@ class MainWindow(QMainWindow):
 
         reload_shortcut = QShortcut(QKeySequence('Ctrl+Shift+R'), self)
         reload_shortcut.activated.connect(self.force_reload_aircraft)
+
+        # System Settings announces device-configuration changes here
+        # rather than calling each UI consumer by hand
+        app_events().device_config_changed.connect(
+            self.on_device_config_changed)
 
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
@@ -1229,6 +1244,91 @@ class MainWindow(QMainWindow):
             "Enable or Disable in System -> System Settings"
         )
 
+    def refresh_firmware_label(self):
+        if not HapticEffect.device:
+            self.firmware_label.setText("Device Disconnected")
+        elif not HapticEffect.device.caps.has_firmware_version:
+            self.firmware_label.setText('DirectInput device')
+        else:
+            try:
+                f_vers = HapticEffect.device.get_firmware_version()
+            except:
+                f_vers = 'error fetching'
+            self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
+
+    def refresh_configurator_gating(self):
+        # the action is part of the Debug menu, which only exists with the
+        # debug registry key (or Alt+D) - on a normal install there is
+        # nothing to gate
+        action = getattr(self, 'configurator_settings_action', None)
+        if action is None:
+            return
+        caps = getattr(HapticEffect.device, 'caps', None)
+        no_gains = caps is not None and not caps.has_gains
+        action.setEnabled(not no_gains)
+        action.setToolTip(
+            'Not supported on this device (no Configurator gains)'
+            if no_gains else '')
+
+    def refresh_device_identity(self):
+        """Bring every device-identity-derived piece of the UI in line with
+        the currently open device - called after a live device switch."""
+        self.refresh_firmware_label()
+        self.refresh_configurator_gating()
+        self.update_device_status(G.device_connection_status)
+        self.refresh_device_labels()
+
+    def on_device_config_changed(self, before, after):
+        """The stored device configuration changed (System Settings save,
+        announced via app_events) - bring every UI consumer in line.
+
+        The status labels refresh unconditionally: identity details the
+        path snapshots cannot see (idents, icon choices) may have
+        changed.  The aircraft settings form only rebuilds when the
+        joystick slots really changed - its Device section and dropdown
+        are read at build time - and a section APPEARING at the top
+        (one device becoming several) also scrolls there, since holding
+        the reading position would leave it silently off-screen above.
+        """
+        try:
+            self.refresh_device_labels()
+        except Exception:
+            logging.exception('Device label refresh failed')
+        try:
+            joy = [key for key in after if key.startswith('devpath_joystick')]
+            if any(before.get(key, '') != after.get(key, '') for key in joy):
+                was_multi = sum(1 for key in joy if before.get(key)) > 1
+                now_multi = sum(1 for key in joy if after.get(key)) > 1
+                self.settings_layout.reload_caller(
+                    reveal_top=now_multi and not was_multi)
+        except Exception:
+            logging.exception('Aircraft settings form refresh failed')
+
+    def refresh_device_labels(self):
+        """Name the hardware under each status icon (the stored per-slot
+        identity) and show its icon choice, flashing any icon whose device
+        just changed."""
+        for role in self.device_panel.get_device_names():
+            try:
+                slot_suffix = ''
+                if role == 'joystick' and G.device_type == 'joystick':
+                    # a per-aircraft swap may have an ALTERNATE slot's
+                    # device in hand; the icon names what is actually
+                    # connected, not the stored primary
+                    slot_suffix = utils.active_joystick_slot_suffix(
+                        G.system_settings,
+                        getattr(G, 'device_devpath', '')) or ''
+                label = utils.device_panel_label(
+                    role, G.system_settings, slot_suffix=slot_suffix)
+                icon = utils.device_panel_icon(
+                    role, G.system_settings, slot_suffix=slot_suffix)
+            except Exception:
+                label, icon = '', ''
+            changed = self.device_panel.set_device_label(role, label)
+            changed = self.device_panel.set_device_icon(role, icon) or changed
+            if changed:
+                self.device_panel.flash_device(role)
+
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
         G.telem_manager.currentAircraftName = None
@@ -1329,6 +1429,8 @@ class MainWindow(QMainWindow):
             dialog.activateWindow()
             dialog.show()
         configurator_settings_action.triggered.connect(do_open_configurator_dialog)
+        self.configurator_settings_action = configurator_settings_action
+        self.refresh_configurator_gating()
         debug_menu.addAction(configurator_settings_action)
 
         sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
@@ -1431,6 +1533,7 @@ class MainWindow(QMainWindow):
         self.device_panel.set_device_status(G.device_type, device_status_state())
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)
+        self.refresh_device_labels()
 
 
     def show_device_logo(self):
@@ -2464,10 +2567,6 @@ class MainWindow(QMainWindow):
 
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
-            pct_max_a = data.get('_pct_max_a', 0)
-            pct_max_e = data.get('_pct_max_e', 0)
-            pct_max_r = data.get('_pct_max_r', 0)
-            pct_steer_f = data.get('_pct_steer_f', 0)
             qcolor_green = QColor("#17c411")
             qcolor_grey = QColor("grey")
             if window_mode == 1:
@@ -2491,28 +2590,11 @@ class MainWindow(QMainWindow):
                     slidername = my_slider.objectName().replace('sld_', '')
                     my_slider.blockSignals(True)
 
-                    if slidername == 'max_elevator_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_e)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_e *100)}%")
-                        # print(int(pct_max_e * 100))
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'max_aileron_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_a)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_a * 100)}%")
-                        # print(new_color)
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'max_rudder_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_r)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_r * 100)}%")
-                        # print(new_color)
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'steering_friction_intensity':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_steer_f)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_steer_f * 100)}%")
-                        # print(new_color)
+                    live_key = self.N_SLIDER_LIVE_KEYS.get(slidername)
+                    if live_key is not None:
+                        pct = min(data.get(live_key, 0), 1.0)
+                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
+                        my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
                         my_slider.blockSignals(False)
                         continue
                     for a_s in active_settings:

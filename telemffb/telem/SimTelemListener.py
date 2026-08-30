@@ -75,6 +75,13 @@ class SimTelemListener(QtCore.QObject):
 
     @property
     def is_enabled(self) -> bool:
+        # No sim is gated for DirectInput devices: sims that render their
+        # own native FFB (DCS/IL-2/BMS) work on a DI device with the
+        # tap/sink dinput8 wrapper in the game folder (native FFB absorbed;
+        # tap mode mirrors the game spring for the 'FFB Telemetry (Game
+        # Managed)' spring mode).  Without the wrapper, the game taking
+        # foreground FFB priority surfaces as an actionable error in the
+        # exception tracker (see ffb_dinput's DIB_ERR_ACQUISITION handling).
         return bool(G.system_settings.get(f'enable{self.name}') or G.args.sim == self.name)
 
     @property

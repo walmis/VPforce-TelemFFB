@@ -51,6 +51,7 @@ class Field:
     path_key: Optional[str] = None   # 'path' fields pair a toggle with a file path
     depends_on: Optional[str] = None # only usable while another field is on
     inline_with: Optional[str] = None  # share a row with an earlier field
+    vpforce_only: bool = False       # meaningless on a generic DirectInput device
 
 
 #: The System page's instance settings.
@@ -69,16 +70,17 @@ STARTUP_FIELDS: List[Field] = [
     Field("saveLastTab", "toggle", "Restore last tab view", default=True,
           inline_with="saveWindow"),
     Field("enableVPConfStartup", "path", "Load on Startup:", default=False,
-          path_key="pathVPConfStartup",
+          path_key="pathVPConfStartup", vpforce_only=True,
           tooltip="VPforce Configurator profile to load when TelemFFB starts"),
     Field("enableVPConfGlobalDefault", "toggle",
           "Make Startup Profile Global Default", default=False,
-          depends_on="enableVPConfStartup", inline_with="enableVPConfStartup"),
+          depends_on="enableVPConfStartup", inline_with="enableVPConfStartup",
+          vpforce_only=True),
     Field("enableVPConfExit", "path", "Load on Exit:", default=False,
-          path_key="pathVPConfExit",
+          path_key="pathVPConfExit", vpforce_only=True,
           tooltip="VPforce Configurator profile to load when TelemFFB exits"),
     Field("enableResetGainsExit", "toggle", "Restore Startup Gains on Exit",
-          default=False),
+          default=False, vpforce_only=True),
 ]
 
 ALL_FIELDS: List[Field] = SYSTEM_FIELDS + STARTUP_FIELDS
@@ -227,6 +229,8 @@ class InstanceSettingsPanel(QtWidgets.QWidget):
     def _apply_dependencies(self):
         """Grey out whatever a switched-off parent setting makes meaningless."""
         for f in self.fields:
+            if f.vpforce_only and self.vpforce_blocked:
+                continue          # held disabled by set_vpforce_features_enabled
             if f.kind == "path":
                 on = self.widgets[f.key].isChecked()
                 self.widgets[f.path_key].setEnabled(on)
@@ -236,6 +240,40 @@ class InstanceSettingsPanel(QtWidgets.QWidget):
                 self.widgets[f.key].setEnabled(on)
                 if not on and f.kind == "toggle":
                     self.widgets[f.key].setChecked(False)
+
+    # ------------------------------------------------------------------
+    def vpforce_fields(self):
+        """Every widget belonging to a VPforce-only setting."""
+        out = []
+        for f in self.fields:
+            if not f.vpforce_only:
+                continue
+            out.append(self.widgets[f.key])
+            if f.path_key:
+                out.append(self.widgets[f.path_key])
+                out.append(self.widgets[f.path_key + "__browse"])
+        return out
+
+    def set_vpforce_features_enabled(self, enabled, reason=""):
+        """Grey out the Configurator settings, without clearing them.
+
+        A device can be swapped back to VPforce hardware, so the stored
+        values have to survive the trip - only the controls are disabled,
+        and the runtime pushes are gated separately.
+        """
+        self._vpforce_blocked = not enabled
+        for widget in self.vpforce_fields():
+            if not hasattr(widget, '_vpforce_tooltip'):
+                widget._vpforce_tooltip = widget.toolTip()
+            widget.setEnabled(enabled)
+            widget.setToolTip(widget._vpforce_tooltip if enabled else reason)
+        if enabled:
+            # dependent enable-states follow their own toggles again
+            self._apply_dependencies()
+
+    @property
+    def vpforce_blocked(self):
+        return getattr(self, '_vpforce_blocked', False)
 
     # ------------------------------------------------------------------
     def load(self, settings, defaults_only=False):

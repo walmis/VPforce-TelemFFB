@@ -72,11 +72,15 @@ class MockInputData:
 
 class MockFFBDevice:
     """Mock FFB device for testing."""
-    
+
     def __init__(self):
         self._input_data = MockInputData()
         self._connected = True
         self.axis_override_commands = []
+        # full native capability set: existing tests model the VPforce device
+        from telemffb.hw.ffb_backend import VPFORCE_CAPABILITIES
+        self.caps = VPFORCE_CAPABILITIES
+    
 
     @property
     def connected(self) -> bool:

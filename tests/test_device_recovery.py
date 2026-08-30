@@ -11,8 +11,9 @@ Two stuck states from the 2026-08-29 field log must self-heal:
    and the once-per-recovery deviceReconnected signal.
 
 2. Absent at startup (zombie state): the app used to run forever without
-   FFB until manually restarted.  main.py now watches for the configured
-   PID and opens it when it appears (watcher tests; Windows-only because
+   FFB until manually restarted.  main.py's _DeviceRetryTicker (unified
+   with the dinput live-switch watcher in the dinput merge) opens the
+   configured device when it appears (watcher tests; Windows-only because
    main.py imports winreg).
 """
 import sys
@@ -105,6 +106,7 @@ def _make_rhino(info, dev=None):
     r._reconnect_attempts = 0
     r._reconnect_pending = False
     r._last_connected = None
+    r._shutdown = False
     QObject.__init__(r)
     return r
 
@@ -315,74 +317,65 @@ class TestConnectionSignal:
 @pytest.mark.skipif(main_module is None,
                     reason="main.py requires winreg (Windows-only)")
 class TestZombieStateWatcher:
+    """The open-failed case (no device object at all) is covered by
+    main._DeviceRetryTicker, which the dinput merge made the single
+    watcher for both the zombie state and live device switches: while
+    the instance has no open device it checks every couple of seconds
+    whether the configured device has appeared, and only then runs
+    switch_to_device quietly.  The mid-run hot-unplug case is covered
+    by the device object's own reconnect loop (tests above)."""
 
-    def _watcher_env(self, monkeypatch):
+    def _env(self, monkeypatch):
         fake_he = MagicMock()
         fake_he.device = None
         monkeypatch.setattr(main_module, "HapticEffect", fake_he)
-        # annotation-only in globals.py -> raising=False required
-        monkeypatch.setattr(main_module.G, "device_usbpid", "2055",
+        monkeypatch.setattr(main_module.G, "device_type", "joystick",
                             raising=False)
-        monkeypatch.setattr(main_module.G, "main_window", MagicMock(),
+        monkeypatch.setattr(main_module.G, "system_settings", MagicMock(),
                             raising=False)
-        monkeypatch.setattr(main_module.G, "args",
-                            SimpleNamespace(reset=False), raising=False)
-        async_calls = []
-        monkeypatch.setattr(main_module, "_setup_async_initialization",
-                            lambda dev, serial: async_calls.append(dev))
-        monkeypatch.setattr(main_module, "_check_firmware_version",
-                            lambda *a: None)
-        return fake_he, async_calls
+        monkeypatch.setattr(main_module.G, "device_connection_status",
+                            False, raising=False)
+        fake_he.G.system_settings.get.return_value = "2055"  # devpath set
+        return fake_he
+
+    def _ticker(self):
+        ticker = main_module._DeviceRetryTicker()
+        timer = MagicMock()
+        timer.isActive.return_value = True
+        ticker._timer = timer
+        return ticker, timer
 
     def test_absent_device_is_quiet_and_retries(self, monkeypatch):
-        fake_he, _ = self._watcher_env(monkeypatch)
-        fake_he.open = MagicMock(side_effect=Exception("unable to open device"))
-        timer = MagicMock()
-        main_module._device_watcher_tick(timer)
-        assert fake_he.open.call_count == 1
-        assert not timer.stop.called          # keep watching
-        assert fake_he.device is None
+        self._env(monkeypatch)
+        switches = []
+        monkeypatch.setattr(main_module, "_configured_device_present",
+                            lambda: False)
+        monkeypatch.setattr(main_module, "switch_to_device",
+                            lambda show_error=True: switches.append(1) or True)
+        ticker, timer = self._ticker()
+        ticker._tick()
+        assert switches == []           # still absent: stay quiet
+        assert not timer.stop.called    # keep watching
 
-    def test_appearing_device_opens_once_and_stops(self, monkeypatch):
-        fake_he, async_calls = self._watcher_env(monkeypatch)
-        dev = MagicMock()
-        dev.info = _info(b"fresh-path")
-        dev.serial = "SERIAL1"
-        dev.get_firmware_version.return_value = "v1.0.19"
+    def test_appearing_device_switches_once_and_stops(self, monkeypatch):
+        self._env(monkeypatch)
+        switches = []
+        monkeypatch.setattr(main_module, "_configured_device_present",
+                            lambda: True)
+        monkeypatch.setattr(main_module, "switch_to_device",
+                            lambda show_error=True: (switches.append(1), True)[1])
+        ticker, timer = self._ticker()
+        ticker._tick()
+        assert switches == [1]          # opened unattended
+        assert timer.stop.called        # self-deactivating
 
-        def fake_open(pid):
-            fake_he.device = dev
-            return dev
-        fake_he.open = MagicMock(side_effect=fake_open)
-
-        timer = MagicMock()
-        main_module._device_watcher_tick(timer)
-        assert fake_he.open.call_count == 1
-        assert timer.stop.called              # self-deactivating
-        assert fake_he.device is dev
-        assert main_module.G.device_connection_status is True
-        assert async_calls == [dev]           # phase 14 replayed
-        dev.deviceReconnected.connect.assert_called_once_with(
-            main_module._replay_device_setup)
-
-        # a later tick sees the live device and does not re-open
-        timer.stop.reset_mock()
-        main_module._device_watcher_tick(timer)
-        assert fake_he.open.call_count == 1
+    def test_already_connected_stops_immediately(self, monkeypatch):
+        self._env(monkeypatch)
+        monkeypatch.setattr(main_module.G, "device_connection_status", True,
+                            raising=False)
+        ticker, timer = self._ticker()
+        ticker._tick()
         assert timer.stop.called
-
-    def test_start_watcher_only_when_device_missing(self, monkeypatch):
-        fake_he, _ = self._watcher_env(monkeypatch)
-        fake_timer = MagicMock()
-        monkeypatch.setattr(main_module, "QTimer", lambda: fake_timer)
-
-        main_module._start_device_watcher()
-        assert fake_timer.start.called
-
-        fake_he.device = MagicMock()          # device present
-        fake_timer.start.reset_mock()
-        main_module._start_device_watcher()
-        assert not fake_timer.start.called
 
 
 class TestWatcherWiring:
@@ -401,15 +394,23 @@ class TestWatcherWiring:
             pathlib.Path(__file__).parent.parent / "main.py"
         return p.read_text(encoding="utf-8")
 
-    def test_phase14_starts_the_watcher(self):
+    def test_phase9_starts_the_retry_ticker_when_open_fails(self):
         src = self._source()
-        # the phase-14 call (indented), not the def line
-        call = "    _start_device_watcher()"
-        assert call in src
-        assert src.index(call) > src.index("_setup_async_initialization(dev, dev_serial)")
+        block = """    dev, dev_serial, dev_firmware_version = _open_device_and_derive(
+        min_firmware_version)
+    if dev is None:
+        # the configured device may simply not be plugged in yet; connect
+        # unattended when it appears
+        device_retry_ticker.start()"""
+        assert block in src
 
-    def test_phase9_success_registers_replay_hook(self):
+    def test_phase14_rearms_the_retry_ticker(self):
+        src = self._source()
+        rearm = "    if dev is None:\n        device_retry_ticker.start()"
+        assert rearm in src
+        assert src.index(rearm) > src.index("_setup_async_initialization(dev, dev_serial)")
+
+    def test_open_registers_replay_hook_once(self):
         src = self._source()
         assert "dev.deviceReconnected.connect(_replay_device_setup)" in src
-        assert src.count("dev.deviceReconnected.connect(_replay_device_setup)") == 2  # phase 9 + watcher tick
-
+        assert src.count("dev.deviceReconnected.connect(_replay_device_setup)") == 1  # shared open path

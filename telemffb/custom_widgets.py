@@ -1667,6 +1667,7 @@ class Toggle(QCheckBox):
         self._checked_color = QColor(checked_color)
         self._hover = False
         self._interactive = False
+        self._settling = False
         self._handle_position = 0.0
 
         # The whole widget is the switch, so all of it should be clickable.
@@ -1696,10 +1697,54 @@ class Toggle(QCheckBox):
         switches all sliding at once is noise.
         """
         self._interactive = True
+        self._settling = True
         try:
             super().nextCheckState()
         finally:
             self._interactive = False
+            self._settling = False
+
+    def setChecked(self, checked):
+        """Set the state, put the handle where that state says, and stay
+        safe to call from a slot reacting to this very switch.
+
+        Two things are handled here.
+
+        The handle: Qt calls its own C++ setChecked for clicks, so this
+        override only sees changes the app makes - exactly the ones that
+        should snap rather than slide.  Doing it here rather than only in
+        the stateChanged slot matters because a caller may block signals,
+        which would leave the track drawn one way and the handle sitting
+        the other.
+
+        The timing: a slot that answers stateChanged by setting the state
+        back - "you can't turn that on, here's why" - would otherwise
+        wedge the switch.  QCheckBox emits stateChanged only when the new
+        state differs from the last one it published, and setting it from
+        inside that emission leaves those two out of step; the next click
+        then flips the switch silently, with no signal for anyone to
+        answer.  So a re-entrant call is deferred by one pass of the event
+        loop, arriving as a change in its own right.  Only that case
+        waits: an ordinary call still takes effect before it returns.
+        """
+        if self._settling:
+            QTimer.singleShot(0, lambda: self._settle(checked))
+            return
+        self._settling = True
+        try:
+            super().setChecked(checked)
+        finally:
+            self._settling = False
+        self._animation.stop()
+        self.handle_position = 1.0 if checked else 0.0
+
+    def _settle(self, checked):
+        """A deferred setChecked, landing a pass after it was asked for -
+        by which time the widget may have been destroyed."""
+        try:
+            self.setChecked(checked)
+        except RuntimeError:
+            pass
 
     def enterEvent(self, event):
         self._hover = True

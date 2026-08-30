@@ -365,6 +365,23 @@ Dropdown populated from a named Python enum dict in `SettingsManager`.
 
 ---
 
+### `devicelist`
+
+Dropdown of the joystick role's configured devices (the per-aircraft device selection).
+
+- Stored value: the devpath of a configured joystick slot, or `"primary"` (the default) for
+  whichever device is marked active in System Settings.
+- `validvalues`: not used — the options are built at render time from the configured slots
+  (`utils.joystick_device_choices`), labeled by stored ident with USB ids appended.
+- A stored devpath that no longer matches a configured slot renders as
+  "(no longer configured)" and stays deselectable; at aircraft load such a reference falls
+  back to the primary device.
+- Used by exactly one setting: `joystick_device`. When a slot's device is replaced in System
+  Settings, the save offers to rewrite user-config references to the outgoing devpath
+  (`xmlutils.update_joystick_device_references`).
+
+---
+
 ### `button`
 
 USB HID button capture. Clicking the button prompts the user to press a physical button.

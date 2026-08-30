@@ -262,6 +262,10 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         except Exception as e:
             logging.warning(f"Error getting gain values from the device: {e}")
             return
+        if gains is None:
+            # device backend has no Configurator gains (generic DirectInput)
+            logging.debug("construct_setting_table: no gains available from this device")
+            return
         state = {
             "master_gain": {"enabled": self.cb_MasterGain.isChecked(), "value": gains.master_gain},
             "periodic_gain": {"enabled": self.cb_Periodic.isChecked(), "value": gains.periodic_gain},
@@ -347,7 +351,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
         if state:
             slider.setEnabled(True)
-            slider.setValue(getattr(current_gains, cb.setting_key))
+            slider.setValue(getattr(current_gains, cb.setting_key) if current_gains is not None else 0)
             label.setText(f"%{slider.value()}")
         else:
             print(f"Disabling {cb.setting_key}")
