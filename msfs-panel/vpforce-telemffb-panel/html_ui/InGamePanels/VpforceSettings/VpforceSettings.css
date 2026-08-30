@@ -1,0 +1,51 @@
+ingame-ui#VpforceSettings {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content: center;
+  height:100% !important;
+  width: 100% !important;
+}
+ingame-ui#VpforceSettings #VpforceSettingsWrap {
+  display: flex;
+  flex-direction: column;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0;
+  min-width: 0;
+  overflow:hidden;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+}
+ingame-ui#VpforceSettings #VpforceSettingsWrap #VpforceSettingsIframe {
+  flex: 1 1 auto !important;
+  border: 0;
+}
+ingame-ui#VpforceSettings #MainDisplay.hidden {
+  display: none;
+}
+ingame-ui#VpforceSettings #Footer.hidden {
+  display: none;
+}
+ingame-ui#VpforceSettings .ingameUiContent {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow:hidden !important;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+}
+ingame-ui#VpforceSettings .ingameUiWrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  overflow:hidden !important;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+}

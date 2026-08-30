@@ -1,0 +1,182 @@
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #14161a;
+    color: #e8e8ec;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 18px;
+    background: #1c1f26;
+    border-bottom: 2px solid #6a2fb0;
+}
+#headerTitle {
+    font-size: 24px;
+    font-weight: 700;
+    color: #b988ff;
+}
+#headerSub {
+    font-size: 16px;
+    color: #9aa0ac;
+}
+
+#waiting {
+    display: none;
+    padding: 40px 20px;
+    text-align: center;
+    font-size: 22px;
+    color: #9aa0ac;
+}
+body.disconnected #waiting { display: block; }
+body.disconnected #settingsList { display: none; }
+
+#settingsList {
+    padding: 8px 12px 40px 12px;
+}
+
+.group {
+    margin-top: 18px;
+}
+.group:first-child {
+    margin-top: 8px;
+}
+.groupTitle {
+    font-size: 18px;
+    font-weight: 700;
+    color: #b988ff;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 6px 6px;
+    border-bottom: 1px solid #333947;
+    margin-bottom: 6px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 8px;
+    border-bottom: 1px solid #22252c;
+}
+.row.updating {
+    opacity: 0.55;
+}
+.rowLabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 19px;
+    line-height: 1.25;
+}
+.rowControl {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Bool toggle */
+.toggle {
+    width: 76px;
+    height: 44px;
+    border-radius: 22px;
+    border: 2px solid #444a58;
+    background: #2a2e38;
+    position: relative;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+}
+.toggle .knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #9aa0ac;
+    transition: left 0.12s ease, background 0.12s ease;
+}
+.toggle.on {
+    background: #6a2fb0;
+    border-color: #8a4fd0;
+}
+.toggle.on .knob {
+    left: 34px;
+    background: #ffffff;
+}
+
+/* Choice pills */
+.choiceGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    max-width: 60%;
+}
+.pill {
+    padding: 10px 16px;
+    border-radius: 18px;
+    border: 2px solid #444a58;
+    background: #2a2e38;
+    color: #cfd2d8;
+    font-size: 16px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.pill.selected {
+    background: #6a2fb0;
+    border-color: #8a4fd0;
+    color: #fff;
+}
+
+/* Range slider */
+.rangeControl {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 260px;
+}
+.rangeControl input[type=range] {
+    -webkit-appearance: none;
+    width: 220px;
+    height: 44px;
+    background: transparent;
+}
+.rangeControl input[type=range]::-webkit-slider-runnable-track {
+    height: 10px;
+    border-radius: 5px;
+    background: #2a2e38;
+}
+.rangeControl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 32px;
+    height: 32px;
+    margin-top: -11px;
+    border-radius: 50%;
+    background: #b988ff;
+    border: 3px solid #6a2fb0;
+    cursor: pointer;
+}
+.rangeValue {
+    min-width: 64px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 18px;
+    color: #cfd2d8;
+}
