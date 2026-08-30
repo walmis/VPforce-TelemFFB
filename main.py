@@ -624,7 +624,12 @@ def _replay_device_setup():
     the one-shot items that do not replay per frame.  The deadzone is
     force-re-applied below: its per-frame write is transition-gated, so a
     steady configured value would never re-send itself after the firmware
-    lost it on the power cycle.
+    lost it on the power cycle.  It re-reads the Configurator gains, but
+    a VPConf profile push that was dropped while the device was dead is
+    NOT re-pushed here.
+    TODO: verify whether the Rhino firmware persists uploaded VPConf
+    profiles across power cycles; if RAM-only, recovery must re-push
+    G.current_vpconf_profile here.
     """
     dev = HapticEffect.device
     if dev is None:
