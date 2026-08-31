@@ -7,12 +7,32 @@ import os
 distpath = PyInstaller.config.CONF['distpath'] + "/VPforce-TelemFFB"
 block_cipher = None
 
+
+def _collect_msfs_panel_datas():
+    # Bundles the panel source (minus Build/ and the dev helper script) into
+    # the frozen app's own resources, at the same relative location
+    # telemffb/msfs_panel_install.py resolves via
+    # get_resource_path(..., prefer_root=True) - this is what the System
+    # Settings > MSFS > Install button reads from at runtime.
+    src_root = os.path.join('assets', 'msfs-panel', 'vpforce-telemffb-panel')
+    entries = []
+    for dirpath, dirnames, filenames in os.walk(src_root):
+        dirnames[:] = [d for d in dirnames if d != 'Build']
+        for fname in filenames:
+            if fname == 'build_layout.py':
+                continue
+            src_file = os.path.join(dirpath, fname)
+            rel_dir = os.path.relpath(dirpath, 'assets')
+            entries.append((src_file, rel_dir))
+    return entries
+
+
 print(distpath)
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', '.'), ('simconnect/simconnect.dll', 'simconnect')],
-    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')],
+    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')] + _collect_msfs_panel_datas(),
     hiddenimports=[
         'numpy._core._exceptions',
         'numpy._core.multiarray',
@@ -136,16 +156,9 @@ import shutil
 import os
 shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt'))
 
-# MSFS toolbar panel: ship the built package (source-only, not the Build/
-# subfolder or dev helper script - see msfs-panel/README.md) in a folder the
-# user can drag straight into their Community folder.
-msfs_panel_src = os.path.join('msfs-panel', 'vpforce-telemffb-panel')
-msfs_panel_dst = os.path.join(distpath, 'Copy to MSFS Community', 'vpforce-telemffb-panel')
-shutil.copytree(
-    msfs_panel_src,
-    msfs_panel_dst,
-    ignore=shutil.ignore_patterns('Build', 'build_layout.py'),
-    dirs_exist_ok=True,
-)
+# The MSFS toolbar panel is bundled via _collect_msfs_panel_datas() above and
+# installed at runtime through System Settings > MSFS > Install (see
+# telemffb/msfs_panel_install.py) - no separate "Copy to MSFS Community"
+# convenience folder is produced at build time anymore.
 
 
