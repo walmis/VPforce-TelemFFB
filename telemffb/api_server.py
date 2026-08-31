@@ -8,31 +8,27 @@ Lifecycle: only meaningful while MSFS is the connected sim, so main.py starts
 this on the first MSFS telemetry frame and stops it on sim exit (see
 _maybe_start_api_server / _maybe_stop_api_server in main.py). start/stop are
 idempotent and safe to call from the Qt thread.
+
+Built on Bottle + wsgiref rather than FastAPI/uvicorn: Bottle has no built-in
+CORS support (added by hand below - the panel's JSON POSTs are not "simple"
+requests, so browsers preflight them with OPTIONS first) or graceful
+start/stop (bottle.run() blocks forever), so this drives
+wsgiref.simple_server directly - the same server Bottle's own default
+adapter uses - to get a start()/shutdown() pair to call from Qt.
 """
 
 import logging
 import re
 import threading
+from socketserver import ThreadingMixIn
 from typing import Any, Optional
+from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from bottle import Bottle, request, response
 
 from telemffb import xmlutils
 
-app = FastAPI()
-
-# Dev-time CORS: the panel's iframe origin will usually match this server's
-# own origin (it's loading the page you serve), but keep this open while
-# you're testing the page in a normal browser tab too.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = Bottle()
 
 _settings_mgr = None  # injected by start_api_server()
 
@@ -189,12 +185,30 @@ def _current_state() -> dict:
     }
 
 
+# --- CORS ---------------------------------------------------------------
+# Dev-time CORS: the panel's iframe origin will usually match this server's
+# own origin (it's loading the page you serve), but keep this open while
+# you're testing the page in a normal browser tab too. Bottle has no
+# built-in CORS handling, unlike FastAPI's CORSMiddleware this replaces -
+# both pieces (the header hook, and the OPTIONS preflight route) are
+# required for the panel's JSON POSTs to work from a browser context.
+@app.hook("after_request")
+def _cors_headers():
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+
+
+@app.route("/<_path:path>", method="OPTIONS")
+def _cors_preflight(_path):
+    return {}
+
+
 @app.get("/")
 def root():
     # No content lives here - it's just a sanity-check landing point for
-    # anyone hitting the bare host:port in a browser. See /docs for the
-    # interactive API explorer FastAPI generates automatically.
-    return {"ok": True, "see": ["/api/status", "/api/settings", "/docs"]}
+    # anyone hitting the bare host:port in a browser.
+    return {"ok": True, "see": ["/api/status", "/api/settings"]}
 
 
 @app.get("/api/status")
@@ -222,24 +236,28 @@ def get_settings():
     return {**_current_state(), "settings": settings}
 
 
-class SettingUpdate(BaseModel):
-    name: str
-    value: Any
-    unit: str = ""
-
-
 @app.post("/api/settings")
-def set_setting(update: SettingUpdate):
+def set_setting():
+    data = request.json
+    if not data or "name" not in data or "value" not in data:
+        response.status = 400
+        return {"detail": "Request body must include 'name' and 'value'"}
+
+    name = data["name"]
+    raw_value = data["value"]
+    unit = data.get("unit") or ""
+
     sm = _settings_mgr
     if not sm.current_sim or sm.current_sim == "nothing":
-        raise HTTPException(status_code=409, detail="No sim/aircraft is currently active")
+        response.status = 409
+        return {"detail": "No sim/aircraft is currently active"}
 
-    if isinstance(update.value, bool):
-        value = "true" if update.value else "false"
+    if isinstance(raw_value, bool):
+        value = "true" if raw_value else "false"
     else:
-        value = str(update.value)
+        value = str(raw_value)
 
-    sm.write_to_xml(sm.current_sim, sm.current_class, sm.current_pattern, value, update.name, unit=update.unit)
+    sm.write_to_xml(sm.current_sim, sm.current_class, sm.current_pattern, value, name, unit=unit)
 
     # Writing to a 'Built-In' profile forks it into a new 'Auto User' profile
     # (see ConfigWriter.write_models_to_xml). TelemManager normally re-derives
@@ -253,7 +271,21 @@ def set_setting(update: SettingUpdate):
     return {"ok": True}
 
 
-_server: Optional[uvicorn.Server] = None
+class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
+    """Handle concurrent requests (a status/settings poll landing while a
+    write is in flight) rather than wsgiref's default one-at-a-time."""
+    daemon_threads = True
+
+
+class _QuietWSGIRequestHandler(WSGIRequestHandler):
+    """wsgiref logs every request to stderr by default; route it through
+    logging instead, at debug level, matching uvicorn's log_level='warning'
+    quiet-by-default behavior this replaces."""
+    def log_message(self, format, *args):
+        logging.debug("TelemFFB API: " + format, *args)
+
+
+_server: Optional[WSGIServer] = None
 _thread: Optional[threading.Thread] = None
 _lock = threading.Lock()
 
@@ -267,11 +299,11 @@ def start_api_server(settings_mgr, host="127.0.0.1", port=9873):
         if _thread is not None and _thread.is_alive():
             return _thread
 
-        config = uvicorn.Config(app, host=host, port=port, log_level="warning")
-        _server = uvicorn.Server(config)
+        _server = make_server(host, port, app, server_class=_ThreadingWSGIServer,
+                               handler_class=_QuietWSGIRequestHandler)
 
         def _run():
-            _server.run()
+            _server.serve_forever()
 
         _thread = threading.Thread(target=_run, daemon=True, name="TelemFFB-API")
         _thread.start()
@@ -285,7 +317,8 @@ def stop_api_server():
     global _server, _thread
     with _lock:
         if _server is not None:
-            _server.should_exit = True
+            _server.shutdown()  # blocks until serve_forever()'s loop exits
+            _server.server_close()
         if _thread is not None:
             _thread.join(timeout=5)
         _server = None

@@ -7,8 +7,7 @@ libusb1
 pygetwindow
 numpy==2.3.0
 akima
-fastapi
-uvicorn
+bottle
 
 # Testing dependencies
 pytest>=7.0.0
