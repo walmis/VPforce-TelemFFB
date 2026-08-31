@@ -80,6 +80,7 @@ from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             upload_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
+from telemffb.api_server import start_api_server, stop_api_server
 import styles
 resources # used
 mutex = None
@@ -726,6 +727,20 @@ def _setup_ipc_and_connections():
     G.ipc_instance.start()
 
 
+def _maybe_start_api_server(src):
+    # MSFS toolbar panel only: the API server has nothing to serve for other
+    # sims, and only the master instance's SettingsManager reflects a device
+    # worth exposing, so gate on both - plus the System Settings > Simulator
+    # Setup > MSFS > Options toggle (default on).
+    if G.master_instance and src == "MSFS" and G.system_settings.get('enableMsfsApiServer', True):
+        start_api_server(G.settings_mgr)
+
+
+def _maybe_stop_api_server(src):
+    if src == "MSFS":
+        stop_api_server()
+
+
 def _sim_connected_events():
     G.sim_listeners.allStarted.connect(G.telem_manager.reset_sim_connected)
     G.telem_manager.first_frame_received.connect(G.sim_listeners.stop_inactive)
@@ -734,8 +749,10 @@ def _sim_connected_events():
     # so this fires on initial startup AND after each sim_exited → restart_all() cycle.
     # on_first_sim_frame guards against clobbering an error the same frame raised.
     G.telem_manager.first_frame_received.connect(G.main_window.on_first_sim_frame)
+    G.telem_manager.first_frame_received.connect(_maybe_start_api_server)
     G.telem_manager.sim_exited.connect(lambda src: G.sim_listeners.restart_all())
     G.telem_manager.sim_exited.connect(G.main_window.on_sim_exited)
+    G.telem_manager.sim_exited.connect(_maybe_stop_api_server)
 
 def _handle_window_display(headless_mode):
     """Handle initial window display based on configuration."""
