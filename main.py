@@ -624,12 +624,11 @@ def _replay_device_setup():
     the one-shot items that do not replay per frame.  The deadzone is
     force-re-applied below: its per-frame write is transition-gated, so a
     steady configured value would never re-send itself after the firmware
-    lost it on the power cycle.  It re-reads the Configurator gains, but
-    a VPConf profile push that was dropped while the device was dead is
-    NOT re-pushed here.
-    TODO: verify whether the Rhino firmware persists uploaded VPConf
-    profiles across power cycles; if RAM-only, recovery must re-push
-    G.current_vpconf_profile here.
+    lost it on the power cycle.  The VPConf profile is re-pushed too:
+    firmware holds it in RAM only, so the power cycle wiped it - the
+    profile the current context should hold is resolved by
+    _recovery_vpconf_profile().  Configurator gains are re-read last,
+    after the re-push, so they reflect the restored profile.
     """
     dev = HapticEffect.device
     if dev is None:
@@ -642,13 +641,40 @@ def _replay_device_setup():
     # fires on a value transition, so the value the firmware lost on the
     # power cycle comes back here, not on the next telemetry frame.
     telem = getattr(G, 'telem_manager', None)
-    aircraft = telem.currentAircraft if telem is not None else None
+    aircraft = getattr(telem, 'currentAircraft', None) if telem is not None else None
     if aircraft is not None and hasattr(aircraft, 'ac_update_deadzone'):
         aircraft.ac_update_deadzone(force=True)
+    profile = _recovery_vpconf_profile()
+    if profile:
+        logging.info(f"Re-pushing VPConf profile after recovery: {profile}")
+        try:
+            upload_vpconf_profile(profile, dev.serial)
+        except Exception:
+            logging.exception("Unable to re-push VPConf profile after recovery")
     try:
         G.vpconf_configurator_gains = dev.get_gains()
     except Exception:
         logging.exception("Exception")
+
+
+def _recovery_vpconf_profile():
+    """The VPConf profile the device should hold after a power-cycle
+    recovery - the same resolution _handle_vpconf_setup applies on an
+    aircraft change, so the pre-unplug state comes back.
+
+    Priority: the active aircraft's own profile, then the global default
+    (enabled and configured), then the last successfully pushed profile
+    (e.g. the startup push).  None when nothing was ever configured.
+    """
+    telem = getattr(G, 'telem_manager', None)
+    cfg = getattr(telem, 'currentAircraftConfig', None)
+    if isinstance(cfg, dict) and cfg.get('vpconf'):
+        return cfg['vpconf']
+    if G.system_settings.get('enableVPConfGlobalDefault', False):
+        path = G.system_settings.get('pathVPConfStartup', '')
+        if path:
+            return path
+    return G.current_vpconf_profile
 
 
 

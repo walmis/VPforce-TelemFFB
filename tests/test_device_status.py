@@ -173,6 +173,12 @@ class TestRecoveryReappliesDeadzone:
         monkeypatch.setattr(_main_module.G, 'telem_manager',
                             SimpleNamespace(currentAircraft=m),
                             raising=False)
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings(),
+                            raising=False)
+        monkeypatch.setattr(G, 'current_vpconf_profile', None,
+                            raising=False)
+        monkeypatch.setattr(_main_module, 'upload_vpconf_profile',
+                            MagicMock())
         _main_module._replay_device_setup()
 
         calls = [c.args[0] for c in dev.set_deadzone.call_args_list]
@@ -189,7 +195,127 @@ class TestRecoveryReappliesDeadzone:
                             raising=False)
         monkeypatch.setattr(_main_module.G, 'telem_manager', None,
                             raising=False)
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings(),
+                            raising=False)
+        monkeypatch.setattr(G, 'current_vpconf_profile', None,
+                            raising=False)
+        monkeypatch.setattr(_main_module, 'upload_vpconf_profile',
+                            MagicMock())
         _main_module._replay_device_setup()   # no aircraft: clear only
 
         calls = [c.args[0] for c in dev.set_deadzone.call_args_list]
         assert calls == [0]
+
+
+class _FakeSettings:
+    """Minimal stand-in for G.system_settings (a .get(key, default) API)."""
+
+    def __init__(self, values=None):
+        self.values = dict(values or {})
+
+    def get(self, key, default=None):
+        return self.values.get(key, default)
+
+
+@pytest.mark.skipif(_main_module is None,
+                    reason="main.py requires winreg (Windows-only)")
+class TestRecoveryRepushesVpconfProfile:
+    """The firmware holds the VPConf profile in RAM only: a power cycle
+    wipes it, so the deviceReconnected replay must re-push the profile
+    the current context should hold - the aircraft's own profile, else
+    the enabled global default, else the last successfully pushed one."""
+
+    @pytest.fixture(autouse=True)
+    def _neutral_context(self, monkeypatch):
+        import telemffb.globals as G
+
+        dev = MagicMock()
+        dev.connected = True
+        dev.serial = "SER1"
+        push = MagicMock()
+        monkeypatch.setattr(HapticEffect, 'device', dev)
+        monkeypatch.setattr(_main_module, 'upload_vpconf_profile', push)
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings(),
+                            raising=False)
+        monkeypatch.setattr(G, 'current_vpconf_profile', None, raising=False)
+        monkeypatch.setattr(G, 'telem_manager', None, raising=False)
+        self.dev = dev
+        self.push = push
+
+    def test_aircraft_profile_wins_over_global_and_last(self, monkeypatch):
+        import telemffb.globals as G
+
+        monkeypatch.setattr(G, 'telem_manager',
+                            SimpleNamespace(
+                                currentAircraft=None,
+                                currentAircraftConfig={
+                                    'vpconf': 'C:/ac/ace.json'}),
+                            raising=False)
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings(
+            {'enableVPConfGlobalDefault': True,
+             'pathVPConfStartup': 'C:/global.json'}), raising=False)
+        monkeypatch.setattr(G, 'current_vpconf_profile', 'C:/last.json',
+                            raising=False)
+        _main_module._replay_device_setup()
+        self.push.assert_called_once_with('C:/ac/ace.json', "SER1")
+        self.dev.get_gains.assert_called_once()
+
+    def test_global_default_when_the_aircraft_has_no_profile(self, monkeypatch):
+        import telemffb.globals as G
+
+        monkeypatch.setattr(G, 'telem_manager',
+                            SimpleNamespace(currentAircraft=None,
+                            currentAircraftConfig={}),
+                            raising=False)
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings(
+            {'enableVPConfGlobalDefault': True,
+             'pathVPConfStartup': 'C:/global.json'}), raising=False)
+        monkeypatch.setattr(G, 'current_vpconf_profile', 'C:/last.json',
+                            raising=False)
+        _main_module._replay_device_setup()
+        self.push.assert_called_once_with('C:/global.json', "SER1")
+
+    def test_last_pushed_profile_is_the_fallback(self, monkeypatch):
+        import telemffb.globals as G
+
+        monkeypatch.setattr(G, 'telem_manager',
+                            SimpleNamespace(currentAircraft=None,
+                            currentAircraftConfig={}),
+                            raising=False)
+        monkeypatch.setattr(G, 'current_vpconf_profile', 'C:/last.json',
+                            raising=False)
+        _main_module._replay_device_setup()
+        self.push.assert_called_once_with('C:/last.json', "SER1")
+
+    def test_nothing_configured_never_pushes(self):
+        _main_module._replay_device_setup()
+        self.push.assert_not_called()
+        self.dev.get_gains.assert_called_once()   # gains re-read regardless
+
+    def test_push_failure_does_not_break_the_replay(self):
+        import telemffb.globals as G
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(G, 'current_vpconf_profile', 'C:/last.json',
+                            raising=False)
+        self.push.side_effect = RuntimeError("configurator died")
+        try:
+            _main_module._replay_device_setup()    # must not raise
+            self.dev.get_gains.assert_called_once()
+        finally:
+            monkeypatch.undo()
+
+    def test_gains_are_reread_after_the_push(self):
+        import telemffb.globals as G
+
+        monkeypatch = pytest.MonkeyPatch()
+        order = []
+        monkeypatch.setattr(G, 'current_vpconf_profile', 'C:/last.json',
+                            raising=False)
+        self.push.side_effect = lambda *a: order.append("push")
+        self.dev.get_gains.side_effect = lambda: order.append("gains")
+        try:
+            _main_module._replay_device_setup()
+        finally:
+            monkeypatch.undo()
+        assert order == ["push", "gains"]

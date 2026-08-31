@@ -573,11 +573,10 @@ class TelemManager(QObject, threading.Thread):
     def _handle_vpconf_setup(self, params):
         """Handle VPConf profile setup for the aircraft."""
         # Nothing to do (and no dereference) without a live device.  A
-        # push arriving while the device is dead is dropped, and
-        # recovery re-reads the gains but does NOT re-push the profile.
-        # TODO: verify whether the Rhino firmware persists uploaded
-        # VPConf profiles across power cycles; if RAM-only, recovery
-        # must re-push G.current_vpconf_profile
+        # push arriving while the device is dead is dropped here, but
+        # the firmware holds profiles in RAM only, so the recovery
+        # replay (main._replay_device_setup) re-pushes the current
+        # context's profile when the device comes back.
         if not HapticEffect.device_alive():
             return
         if not self._device_has_gains():
@@ -595,11 +594,9 @@ class TelemManager(QObject, threading.Thread):
     def _handle_global_vpconf_default(self):
         """Handle global VPConf default profile setup."""
         # Same drop rule as _handle_vpconf_setup: a push while the device
-        # is dead is dropped; recovery re-reads the gains but does not
-        # re-push the profile.
-        # TODO: verify whether the Rhino firmware persists uploaded
-        # VPConf profiles across power cycles; if RAM-only, recovery
-        # must re-push G.current_vpconf_profile
+        # is dead is dropped here; the recovery replay re-pushes the
+        # global default on the device's return, since the firmware
+        # profile is RAM-only and died with the power cycle.
         if not HapticEffect.device_alive():
             return
         load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
