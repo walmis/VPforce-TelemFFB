@@ -1081,7 +1081,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                 self._trim_calibrator.update(telem_data)
             except Exception:
                 # Telemetry hot path: a calibrator bug must never kill the
-                # processing loop (docs/dev_guidelines.md "Error Handling"),
+                # processing loop (AGENTS.md, Error Handling),
                 # least of all while it is flying the aircraft. Abort the run
                 # and hand control back to normal flight controls next frame.
                 logging.exception("Trim calibration crashed; aborting run")
