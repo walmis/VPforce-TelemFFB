@@ -1658,8 +1658,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if (grown_w, grown_h) != (width, height):
             self.resize(grown_w, grown_h)
 
-    #: A beta fuse this close is worth flagging before launch day.
+    #: A beta fuse or an evaluation this close is worth flagging before
+    #: the day it runs out.
     BRIDGE_EXPIRY_WARN_DAYS = 14
+
+    #: An evaluation is shorter than the fuse and is *expected* to be
+    #: counting down, so warning on the same 14 days would paint it amber
+    #: from the moment it was installed and say nothing by the last day.
+    EVALUATION_WARN_DAYS = 3
+
+    @staticmethod
+    def _expiry_phrase(when: str, days: int) -> str:
+        """'expires 2026-09-09 (10 days left)', or what to say once it has.
+
+        Shared by the build fuse and the evaluation because they read the
+        same to a user - a date and how long is left - and only differ in
+        what precedes them."""
+        if days < 0:
+            return f"expired {when}"
+        if days == 0:
+            return f"expires today ({when})"
+        return f"expires {when} ({days} day{'' if days == 1 else 's'} left)"
 
     def refresh_dinput_status(self):
         """Say which bridge utility is installed, and whether it is
@@ -1692,15 +1711,52 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         elif not status.version:
             text = "DirectLink: installed (build identity unavailable)"
             attention = False
-        elif status.days_left is None:
-            text = f"DirectLink {status.version}: installed"
-            attention = False
         else:
-            days = status.days_left
-            when = (f"expires {status.expires} "
-                    f"({days} day{'' if days == 1 else 's'} left)")
-            text = f"DirectLink {status.version}: beta build, {when}"
-            attention = days <= self.BRIDGE_EXPIRY_WARN_DAYS
+            # One clock, never two.  A build with a fuse is a beta and
+            # goes to testers; a build without one is a release and goes
+            # to buyers.  They overlap only in a build made during this
+            # pre-release window, and there the fuse wins: it is the one
+            # that actually refuses to open a device.
+            head = f"DirectLink {status.version}: "
+            if not status.location_ok:
+                # It loads and reports fine from here, but will refuse
+                # every device open - the one fact that outranks all the
+                # clocks below, because none of them matter until the
+                # build runs where its installer put it.
+                text = (head + "not installed with its installer - "
+                        "devices will be refused until it is")
+                attention = True
+            elif status.days_left is not None:
+                text = head + "beta build, " + self._expiry_phrase(
+                    status.expires, status.days_left)
+                attention = status.days_left <= self.BRIDGE_EXPIRY_WARN_DAYS
+            elif status.license_days_left is not None:
+                text = head + "evaluation, " + self._expiry_phrase(
+                    status.license_expires, status.license_days_left)
+                # Worth flagging even while nothing enforces it: what
+                # the user has to do about it takes longer than the
+                # last day.
+                attention = (status.license_days_left
+                             <= self.EVALUATION_WARN_DAYS)
+            elif status.licensed:
+                text = head + "licensed"
+                attention = False
+            elif status.license_present:
+                # A file that is there and will not verify sends the
+                # user somewhere different from no file at all: replace
+                # this one, rather than go find one.  Flagged where a
+                # missing file is not - they put this here on purpose
+                # and it is not doing what they think it is.
+                text = head + "license file is not valid"
+                attention = True
+            else:
+                # Not "installed": that read the same whether a paid
+                # license was present or the file had never been put
+                # there - the difference someone checks this line for.
+                # Unflagged: nothing is enforced yet, so this is a fact
+                # about the install rather than a fault.
+                text = head + "no license file"
+                attention = False
         self.lab_dinput_status.setText(text)
         self.lab_dinput_status.setStyleSheet(
             f"color: {self._attention_color().name()};" if attention else "")

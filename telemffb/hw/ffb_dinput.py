@@ -368,6 +368,21 @@ class BridgeStatus:
     days_left: Optional[int] = None
     problem: str = ""            # '' when nothing is wrong
 
+    #: License state.  Deliberately no licensee name or email: those are
+    #: in the log, where support can ask for them, rather than on a
+    #: settings page where they are of no use to the person reading it.
+    #: Whether the DLL accepts where it is running from.  Release builds
+    #: are bound to the location their installer recorded; a copy placed
+    #: anywhere else loads and reports fine but refuses every device
+    #: open, so the page must say so up front rather than letting the
+    #: first connection attempt be the messenger.
+    location_ok: bool = True
+
+    license_present: bool = False   # a file was found, valid or not
+    licensed: bool = False          # found, verified, and not lapsed
+    license_expires: str = ""    # ISO date; '' when the license never expires
+    license_days_left: Optional[int] = None
+
 
 def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
     """Identity and health of the installed bridge DLL, for display.
@@ -417,6 +432,23 @@ def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
             return status
         if status.days_left < 0:
             status.problem = f"expired {status.expires}"
+
+    # License state, kept out of `problem`: that one is about the build
+    # itself, and its wording points at downloading a current one, which
+    # is not what an expired evaluation needs.  A DLL that predates the
+    # license fields simply reports neither and reads as unlicensed.
+    # absent on pre-0.9.5 DLLs, which had no binding to report
+    status.location_ok = bool(info.get("location_ok", True))
+    status.license_present = bool(info.get("license_present"))
+    status.licensed = bool(info.get("licensed"))
+    status.license_expires = str(info.get("license_expires", "") or "")
+    if status.license_expires:
+        try:
+            from datetime import date
+            status.license_days_left = (
+                date.fromisoformat(status.license_expires) - date.today()).days
+        except ValueError:
+            status.license_expires = ""
     return status
 
 
@@ -568,12 +600,18 @@ class DIBridge:
 
     def _read_build_info(self) -> dict:
         """Version/built/expires of the loaded DLL.  The export is additive
-        in ABI 1, so older DLLs simply don't have it."""
+        in ABI 1, so older DLLs simply don't have it - and so are
+        individual keys, so a missing one is not an error either."""
         try:
             fn = self._dll.dib_build_info
         except AttributeError:
             return {}
-        buf = ctypes.create_string_buffer(256)
+        # 512, not 256: the fixed keys are ~150 bytes and the licensee
+        # runs to 128 characters, so a long name overflows a 256-byte
+        # buffer.  The DLL returns DIB_ERR_BAD_ARG rather than truncating,
+        # which arrives here as no build info at all - and a DLL with no
+        # build info reads as too old for this TelemFFB.
+        buf = ctypes.create_string_buffer(512)
         if fn(buf, len(buf)) <= 0:
             return {}
         try:
@@ -591,6 +629,25 @@ class DIBridge:
         built = self.build_info.get("built", "?")
         expires = self.build_info.get("expires")
         logging.info(f"DInput bridge {version} (ABI {self.build_info.get('abi', '?')}, built {built})")
+
+        # Who the license names, in the log only.  The settings page says
+        # no more than "licensed": a licensee's own name tells them
+        # nothing they did not already know, while support asking for a
+        # log gets the identity it needs to match an order.
+        licensee = self.build_info.get("licensee")
+        if licensee:
+            lic_expires = self.build_info.get("license_expires")
+            logging.info("DirectLink licensed to %s%s", licensee,
+                         f" (evaluation, expires {lic_expires})"
+                         if lic_expires else "")
+        elif self.build_info.get("license_present"):
+            # a file is there and did not verify - worth an actual
+            # warning, unlike an absent one: someone put it there
+            logging.warning("DirectLink license file found but not valid")
+        elif "licensed" in self.build_info:
+            # the DLL reports license state and found none - normal
+            # today, since nothing is enforced yet
+            logging.info("DirectLink: no license file found beside the DLL")
         if not expires:
             return
         try:

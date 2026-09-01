@@ -458,10 +458,21 @@ class TestBridgeStatusReport:
         assert status.installed and status.version == '1.0.0'
         assert status.days_left is None and not status.problem
 
+    def current(self):
+        """A version this TelemFFB accepts.
+
+        These tests are about what an expiry reports, so the version they
+        carry is incidental - but a hardcoded one stops being current the
+        next time the minimum is raised, and then they fail for a reason
+        that has nothing to do with expiry.  Taken from the minimum
+        itself, which is by definition acceptable."""
+        import telemffb.globals as G
+        return G.dinput_bridge_min_version or '1.0.0'
+
     def test_a_live_beta_reports_its_remaining_days(self, monkeypatch):
         from datetime import date, timedelta
         expires = (date.today() + timedelta(days=6)).isoformat()
-        mod = self._fake_dll(monkeypatch, {'version': '0.9.2', 'abi': 1,
+        mod = self._fake_dll(monkeypatch, {'version': self.current(), 'abi': 1,
                                            'expires': expires})
         status = mod.bridge_status()
         assert status.days_left == 6 and not status.problem
@@ -469,14 +480,14 @@ class TestBridgeStatusReport:
     def test_an_expired_beta_is_a_problem(self, monkeypatch):
         from datetime import date, timedelta
         expires = (date.today() - timedelta(days=2)).isoformat()
-        mod = self._fake_dll(monkeypatch, {'version': '0.9.2', 'abi': 1,
+        mod = self._fake_dll(monkeypatch, {'version': self.current(), 'abi': 1,
                                            'expires': expires})
         status = mod.bridge_status()
         assert status.days_left == -2
         assert status.problem.startswith('expired')
 
     def test_an_unreadable_expiry_is_a_problem(self, monkeypatch):
-        mod = self._fake_dll(monkeypatch, {'version': '0.9.2', 'abi': 1,
+        mod = self._fake_dll(monkeypatch, {'version': self.current(), 'abi': 1,
                                            'expires': 'soonish'})
         status = mod.bridge_status()
         assert 'unreadable expiry' in status.problem
@@ -485,6 +496,104 @@ class TestBridgeStatusReport:
         mod = self._fake_dll(monkeypatch, None)      # no build-info export
         status = mod.bridge_status()
         assert status.installed and not status.version
+
+    def test_a_build_that_says_nothing_about_licensing_reads_unlicensed(
+            self, monkeypatch):
+        """A DLL predating the license fields must not read as licensed."""
+        mod = self._fake_dll(monkeypatch, {'version': self.current(),
+                                           'abi': 1})
+        status = mod.bridge_status()
+        assert not status.licensed
+        assert status.license_days_left is None
+
+    def test_a_full_license_has_no_expiry_to_count(self, monkeypatch):
+        mod = self._fake_dll(monkeypatch, {'version': self.current(),
+                                           'abi': 1, 'licensed': True})
+        status = mod.bridge_status()
+        assert status.licensed
+        assert status.license_expires == ''
+        assert status.license_days_left is None
+
+    def test_an_evaluation_reports_its_remaining_days(self, monkeypatch):
+        from datetime import date, timedelta
+        expires = (date.today() + timedelta(days=8)).isoformat()
+        mod = self._fake_dll(monkeypatch, {
+            'version': self.current(), 'abi': 1,
+            'licensed': True, 'license_expires': expires})
+        status = mod.bridge_status()
+        assert status.licensed and status.license_days_left == 8
+
+    def test_a_lapsed_evaluation_counts_past_zero(self, monkeypatch):
+        """Nothing enforces it yet, so the count simply goes negative -
+        the dialog says 'expired' off the sign rather than off a flag."""
+        from datetime import date, timedelta
+        expires = (date.today() - timedelta(days=4)).isoformat()
+        mod = self._fake_dll(monkeypatch, {
+            'version': self.current(), 'abi': 1,
+            'licensed': False, 'license_expires': expires})
+        status = mod.bridge_status()
+        assert status.license_days_left == -4
+
+    def test_an_unreadable_license_expiry_is_dropped_not_shown(
+            self, monkeypatch):
+        """A date nothing can parse is worse than no date: it would be
+        printed verbatim beside a day count that could not be computed."""
+        mod = self._fake_dll(monkeypatch, {
+            'version': self.current(), 'abi': 1,
+            'licensed': True, 'license_expires': 'whenever'})
+        status = mod.bridge_status()
+        assert status.licensed
+        assert status.license_expires == ''
+        assert status.license_days_left is None
+
+    def test_a_file_that_will_not_verify_is_present_but_not_licensed(
+            self, monkeypatch):
+        """The two have to stay separable: one says replace this file,
+        the other says go and get one."""
+        mod = self._fake_dll(monkeypatch, {
+            'version': self.current(), 'abi': 1,
+            'license_present': True, 'licensed': False})
+        status = mod.bridge_status()
+        assert status.license_present and not status.licensed
+
+    def test_a_dll_predating_the_present_flag_reads_as_absent(
+            self, monkeypatch):
+        """Keys are additive, so an older 0.9.x reports no flag at all.
+        Absent is the safe reading: it makes the line say 'no license
+        file', which is what that build could already say."""
+        mod = self._fake_dll(monkeypatch, {'version': self.current(),
+                                           'abi': 1, 'licensed': False})
+        status = mod.bridge_status()
+        assert not status.license_present
+
+    def test_a_build_refusing_its_location_says_so_in_the_report(
+            self, monkeypatch):
+        """location_ok=false means every device open will be refused -
+        the page must learn it here, not from the first failed open."""
+        mod = self._fake_dll(monkeypatch, {'version': self.current(),
+                                           'abi': 1, 'location_ok': False})
+        status = mod.bridge_status()
+        assert status.location_ok is False
+
+    def test_a_dll_predating_the_location_verdict_reads_as_fine(
+            self, monkeypatch):
+        """Pre-0.9.5 DLLs had no binding, so absence means unbound -
+        and unbound builds accept any location."""
+        mod = self._fake_dll(monkeypatch, {'version': self.current(),
+                                           'abi': 1})
+        status = mod.bridge_status()
+        assert status.location_ok is True
+
+    def test_the_licensee_never_reaches_the_settings_page(self, monkeypatch):
+        """Name and email stay in the log.  On a settings page they tell
+        the reader nothing they did not already know, and would put an
+        email address into every screenshot of the dialog."""
+        mod = self._fake_dll(monkeypatch, {
+            'version': self.current(), 'abi': 1, 'licensed': True,
+            'licensee': 'Ada Lovelace <ada@example.com>'})
+        status = mod.bridge_status()
+        assert 'ada@example.com' not in repr(status)
+        assert 'Lovelace' not in repr(status)
 
 
 class TestBridgeStatusLabel:
@@ -539,6 +648,190 @@ class TestBridgeStatusLabel:
             installed=True, version='0.9.2', expires='2026-08-01',
             days_left=-25, problem='expired 2026-08-01'))
         assert 'expired 2026-08-01' in dlg.lab_dinput_status.text()
+        assert dlg.lab_dinput_status.styleSheet()
+
+class TestLicenseStatusLabel:
+    """What the same line says about licensing.  Deliberately terse:
+    a licensed build should say so and stop, an evaluation should say
+    how long is left, and neither should name the licensee.
+    """
+
+    def _dialog_with(self, app, tmp_path, monkeypatch, status):
+        from tests.test_tap_workflows import World
+        world = World(tmp_path, monkeypatch, random.Random(0), settings={
+            'pidJoystick': '2054', 'pidPedals': '2052', 'masterInstance': 1,
+            'themeId': 2, 'enableDirectInput': True}, bridge=status)
+        return world.dialog
+
+    def status(self, **kw):
+        from telemffb.hw.ffb_dinput import BridgeStatus
+        kw.setdefault('version', '1.0.0')
+        return BridgeStatus(installed=True, **kw)
+
+    def test_a_licensed_build_says_licensed_and_no_more(
+            self, app, tmp_path, monkeypatch):
+        dlg = self._dialog_with(app, tmp_path, monkeypatch,
+                                self.status(licensed=True))
+        text = dlg.lab_dinput_status.text()
+        assert 'licensed' in text
+        assert 'expire' not in text
+        assert not dlg.lab_dinput_status.styleSheet()
+
+    def test_a_missing_license_is_named_not_called_installed(
+            self, app, tmp_path, monkeypatch):
+        """The state a reader most needs told apart from 'licensed'.
+        Saying 'installed' for both left no way to see whether the key
+        file had actually been put where the installer asked."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status())
+        text = dlg.lab_dinput_status.text()
+        assert 'DirectLink 1.0.0' in text
+        assert 'no license file' in text
+
+    def test_a_missing_license_is_not_flagged_as_a_fault(
+            self, app, tmp_path, monkeypatch):
+        """Nothing is enforced yet, so the device works regardless.
+        Amber here would promise a consequence that does not exist -
+        and this flips deliberately when enforcement lands."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status())
+        assert not dlg.lab_dinput_status.styleSheet()
+
+    def test_an_invalid_license_file_says_so_rather_than_missing(
+            self, app, tmp_path, monkeypatch):
+        """Telling someone to find a license file that is already on
+        disk sends them looking for something they have.  A corrupt or
+        truncated one needs replacing, which is a different errand."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            license_present=True, licensed=False))
+        text = dlg.lab_dinput_status.text()
+        assert 'not valid' in text
+        assert 'no license file' not in text
+
+    def test_an_invalid_license_file_is_flagged(
+            self, app, tmp_path, monkeypatch):
+        """Unlike an absent one: the user put this file there on purpose
+        and it is not doing what they think it is."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            license_present=True, licensed=False))
+        assert dlg.lab_dinput_status.styleSheet()
+
+    def test_a_valid_license_is_not_second_guessed_by_the_flag(
+            self, app, tmp_path, monkeypatch):
+        """present=True is true of a good license too - it must not
+        divert a licensed build into the invalid branch."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            license_present=True, licensed=True))
+        text = dlg.lab_dinput_status.text()
+        assert text.endswith('licensed')
+        assert not dlg.lab_dinput_status.styleSheet()
+
+    def test_a_misplaced_build_outranks_every_clock(
+            self, app, tmp_path, monkeypatch):
+        """A hand-copied release DLL loads, reports a version, and
+        refuses every device open.  Saying anything else first - the
+        license, the evaluation - would describe a build the user
+        cannot actually use from where it sits."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            location_ok=False, licensed=True,
+            license_expires='2026-09-09', license_days_left=10))
+        text = dlg.lab_dinput_status.text()
+        assert 'not installed with its installer' in text
+        assert 'evaluation' not in text
+        assert dlg.lab_dinput_status.styleSheet()
+
+    def test_a_lapsed_evaluation_is_not_called_invalid(
+            self, app, tmp_path, monkeypatch):
+        """Its file is present and unlicensed, which is the invalid
+        branch's shape - but it verified fine and simply ran out, and
+        the expiry is the useful thing to say."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            license_present=True, licensed=False,
+            license_expires='2026-08-01', license_days_left=-29))
+        text = dlg.lab_dinput_status.text()
+        assert 'expired 2026-08-01' in text
+        assert 'not valid' not in text
+
+    def test_a_fresh_evaluation_shows_its_days_without_alarm(
+            self, app, tmp_path, monkeypatch):
+        """A trial is *expected* to be counting down.  Painting it amber
+        on the day it was installed would spend the warning color on
+        news the user just chose."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            licensed=True, license_expires='2026-09-09',
+            license_days_left=10))
+        text = dlg.lab_dinput_status.text()
+        assert 'evaluation' in text and '2026-09-09' in text
+        assert '10 days' in text
+        assert not dlg.lab_dinput_status.styleSheet()
+
+    def test_an_evaluation_about_to_run_out_is_flagged(
+            self, app, tmp_path, monkeypatch):
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            licensed=True, license_expires='2026-09-01',
+            license_days_left=2))
+        assert '2 days' in dlg.lab_dinput_status.text()
+        assert dlg.lab_dinput_status.styleSheet()
+
+    def test_the_last_day_does_not_say_zero_days_left(
+            self, app, tmp_path, monkeypatch):
+        """'0 days left' reads as already gone; it still works today."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            licensed=True, license_expires='2026-08-30',
+            license_days_left=0))
+        text = dlg.lab_dinput_status.text()
+        assert 'expires today' in text and '0 day' not in text
+        assert dlg.lab_dinput_status.styleSheet()
+
+    def test_one_day_left_is_not_pluralized(
+            self, app, tmp_path, monkeypatch):
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            licensed=True, license_expires='2026-08-31',
+            license_days_left=1))
+        assert '1 day left' in dlg.lab_dinput_status.text()
+
+    def test_a_lapsed_evaluation_says_expired_not_a_negative_count(
+            self, app, tmp_path, monkeypatch):
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            licensed=False, license_expires='2026-08-01',
+            license_days_left=-29))
+        text = dlg.lab_dinput_status.text()
+        assert 'expired 2026-08-01' in text
+        assert '-29' not in text
+        assert dlg.lab_dinput_status.styleSheet()
+
+    def test_a_fuse_is_the_only_clock_shown(
+            self, app, tmp_path, monkeypatch):
+        """A beta goes to testers and a release goes to buyers, so the
+        two clocks overlap only in a build made during the pre-release
+        window.  The fuse wins there: it is the one that actually
+        refuses to open a device, while the license fails open."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            version='0.9.3', expires='2026-09-06', days_left=7,
+            licensed=True, license_expires='2026-09-20',
+            license_days_left=21))
+        text = dlg.lab_dinput_status.text()
+        assert 'beta build' in text and '2026-09-06' in text
+        assert 'evaluation' not in text and '2026-09-20' not in text
+
+    def test_a_licensed_beta_still_says_only_beta(
+            self, app, tmp_path, monkeypatch):
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            version='0.9.3', expires='2026-09-06', days_left=7,
+            licensed=True))
+        text = dlg.lab_dinput_status.text()
+        assert 'beta build' in text
+        assert 'licensed' not in text
+
+    def test_a_broken_build_is_not_softened_by_a_license(
+            self, app, tmp_path, monkeypatch):
+        """`problem` wins the whole line: a build TelemFFB will not use
+        is the only thing worth saying, and 'licensed' beside it would
+        read as reassurance."""
+        dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
+            version='0.9.1', licensed=True,
+            problem='version 0.9.1 is older than the 0.9.3 this TelemFFB needs'))
+        text = dlg.lab_dinput_status.text()
+        assert 'older than' in text
+        assert 'licensed' not in text
         assert dlg.lab_dinput_status.styleSheet()
 
 
