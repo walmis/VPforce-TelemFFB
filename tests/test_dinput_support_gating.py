@@ -621,8 +621,11 @@ class TestBridgeStatusLabel:
 
     def test_a_settled_build_is_named_and_unflagged(
             self, app, tmp_path, monkeypatch):
+        """Since enforcement, the calm baseline state is LICENSED - a
+        release build with no license shows amber, because it will
+        refuse every device open (see TestLicenseStatusLabel)."""
         dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
-            installed=True, version='1.0.0'))
+            installed=True, version='1.0.0', licensed=True))
         assert 'DirectLink 1.0.0' in dlg.lab_dinput_status.text()
         assert not dlg.lab_dinput_status.styleSheet()
 
@@ -687,13 +690,19 @@ class TestLicenseStatusLabel:
         assert 'DirectLink 1.0.0' in text
         assert 'no license file' in text
 
-    def test_a_missing_license_is_not_flagged_as_a_fault(
+    def test_a_missing_license_is_flagged_and_names_the_consequence(
             self, app, tmp_path, monkeypatch):
-        """Nothing is enforced yet, so the device works regardless.
-        Amber here would promise a consequence that does not exist -
-        and this flips deliberately when enforcement lands."""
+        """The flip the fail-open era promised: since DirectLink 0.9.5
+        every release build this TelemFFB accepts enforces, so a missing
+        license means every device open will be refused - the page must
+        say so before the first failed connect does.  (This test's
+        predecessor asserted the deliberate calm of the unenforced era,
+        with a docstring predicting this flip.)"""
         dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status())
-        assert not dlg.lab_dinput_status.styleSheet()
+        text = dlg.lab_dinput_status.text()
+        assert 'devices will be refused' in text
+        assert 'beside the DLL' in text
+        assert dlg.lab_dinput_status.styleSheet()
 
     def test_an_invalid_license_file_says_so_rather_than_missing(
             self, app, tmp_path, monkeypatch):
@@ -704,6 +713,7 @@ class TestLicenseStatusLabel:
             license_present=True, licensed=False))
         text = dlg.lab_dinput_status.text()
         assert 'not valid' in text
+        assert 'devices will be refused' in text
         assert 'no license file' not in text
 
     def test_an_invalid_license_file_is_flagged(

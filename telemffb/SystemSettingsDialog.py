@@ -1744,19 +1744,20 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             elif status.license_present:
                 # A file that is there and will not verify sends the
                 # user somewhere different from no file at all: replace
-                # this one, rather than go find one.  Flagged where a
-                # missing file is not - they put this here on purpose
-                # and it is not doing what they think it is.
-                text = head + "license file is not valid"
+                # this one, rather than go find one.
+                text = (head + "license file is not valid - devices "
+                        "will be refused; replace the file or reinstall")
                 attention = True
             else:
-                # Not "installed": that read the same whether a paid
-                # license was present or the file had never been put
-                # there - the difference someone checks this line for.
-                # Unflagged: nothing is enforced yet, so this is a fact
-                # about the install rather than a fault.
-                text = head + "no license file"
-                attention = False
+                # Amber since enforcement: every release build this
+                # TelemFFB accepts (the min-version gate guarantees
+                # 0.9.5+, and 0.9.5 enforces) will refuse device opens
+                # without a license, so a calm line here would describe
+                # a setup that fails at the first connect.  Fused betas
+                # never reach this branch - the fuse clause above wins.
+                text = (head + "no license file - devices will be "
+                        "refused until one is placed beside the DLL")
+                attention = True
         self.lab_dinput_status.setText(text)
         self.lab_dinput_status.setStyleSheet(
             f"color: {self._attention_color().name()};" if attention else "")
