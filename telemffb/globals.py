@@ -65,7 +65,7 @@ dev_build_str: str = "DEV_BUILD"
 allow_multi_instance: bool = False
 """if true, will skip mutex lock checks and allow multiple instances to run simultaneously"""
 
-dinput_bridge_min_version: str = "0.9.2"
+dinput_bridge_min_version: str = "0.9.5"
 """Oldest DInput bridge build this TelemFFB accepts, as the bridge's own
 'x.y.z' version string ('' disables the check).
 
