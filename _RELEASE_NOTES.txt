@@ -19,6 +19,12 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
 
+## MSFS
+- **NEW: In-sim settings panel (toolbar window)**
+  - View and change the current aircraft's TelemFFB settings from a toolbar window inside MSFS - toggles, choice pills, and sliders sized for VR laser-pointer/controller use, so you don't have to leave the cockpit or pull up the desktop app
+  - System Settings > MSFS now detects your installed MSFS 2020/2024 copies (Microsoft Store or Steam) and installs or updates the panel into the right Community folder with one click, showing the installed version alongside what's available
+  - Backed by a local HTTP server that only runs while MSFS is the active sim; can be turned off in System Settings > MSFS > Options if you don't use the panel
+
 ---
 
 ## Included from 2.1.260815 - August 15, 2026

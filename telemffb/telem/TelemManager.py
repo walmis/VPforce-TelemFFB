@@ -55,25 +55,34 @@ class AircraftInfo:
 _config_mtime = 0
 _future_config_update_time = time.time()
 _pending_config_update = False
+# time.time() of the last mtime stat(); None until the first check. The mtime()
+# syscall previously ran on every telemetry frame (60-120 Hz). Config edits are
+# human-scale, so re-statting at most once per _MTIME_CHECK_INTERVAL removes the
+# per-frame filesystem I/O from the frame thread, at the cost of at most
+# _MTIME_CHECK_INTERVAL of extra change-detection latency.
+_last_mtime_check = None
+_MTIME_CHECK_INTERVAL = 0.1
 
 def config_has_changed(update=False) -> bool:
     # if update is true, update the current modified time
-    global _config_mtime, _future_config_update_time, _pending_config_update
-    # "hash" both mtimes together
-    tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(G.defaults_path))
+    global _config_mtime, _future_config_update_time, _pending_config_update, _last_mtime_check
     time_now = time.time()
     update_delay = 0.1  # Delay added here to avoid file access errors with multiple instances
 
-    if not _config_mtime:
-        # if the first time called, initialize times and return - to avoid double config load on first call
-        _config_mtime = tm
-        return False
+    if _last_mtime_check is None or time_now - _last_mtime_check >= _MTIME_CHECK_INTERVAL:
+        _last_mtime_check = time_now
+        # "hash" both mtimes together
+        tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(G.defaults_path))
+        if not _config_mtime:
+            # First real check: seed the baseline and report no change, to avoid
+            # a spurious config load on the very first frame.
+            _config_mtime = tm
+        elif _config_mtime != tm:
+            _future_config_update_time = time_now + update_delay
+            _pending_config_update = True
+            _config_mtime = tm
+            logging.info(f'Config changed: Waiting {update_delay} seconds to read changes')
 
-    if _config_mtime != tm:
-        _future_config_update_time = time_now + update_delay
-        _pending_config_update = True
-        _config_mtime = tm
-        logging.info(f'Config changed: Waiting {update_delay} seconds to read changes')
     if _pending_config_update and time_now >= _future_config_update_time:
         _pending_config_update = False
         logging.info(f'Config changed: {update_delay} second timer expired, reading changes')

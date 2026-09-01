@@ -27,9 +27,11 @@ import time
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout
+from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QHBoxLayout, QLabel,
+                             QMessageBox, QPushButton, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout, QWidget)
 
 from . import globals as G
+from . import msfs_panel_install
 from . import utils
 from .app_events import events as app_events
 from .ui.Ui_SystemDialog import Ui_SystemDialog
@@ -235,6 +237,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # Add tooltips
         self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
+        self.enableMsfsApiServer.setToolTip('If enabled, the master instance starts a local HTTP server while MSFS is the active sim, letting the VPforce Settings in-sim toolbar panel view and edit the current aircraft\'s settings')
         self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
         # self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
         self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
@@ -1295,6 +1298,85 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         msfs_enabled = self.enableMSFS.isChecked()
         icon = self.MSFS_ICON_ENABLED if msfs_enabled else self.MSFS_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.MSFS_TAB, icon)
+        self.enableMsfsApiServer.setEnabled(msfs_enabled)
+
+    def refresh_msfs_panel_installs(self):
+        """(Re)populate the MSFS tab's install-status rows: one per detected
+        MSFS 2020/2024 install (Store or Steam), each with an Install/Update
+        button. Called whenever the dialog loads settings (each time it's
+        opened) - detection does registry/filesystem I/O, not something to
+        run continuously."""
+        layout = self.msfsInstallsLayout
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        installs = msfs_panel_install.find_msfs_installs()
+        if not installs:
+            empty_label = QLabel("No MSFS 2020/2024 install detected (Microsoft Store or Steam).")
+            empty_label.setWordWrap(True)
+            layout.addWidget(empty_label)
+            return
+
+        bundled_version = msfs_panel_install.get_bundled_panel_version()
+
+        for install in installs:
+            row = QWidget(self.msfsInstallsContainer)
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 4, 0, 4)
+
+            title = f"MSFS {install['version']} ({install['edition']})"
+            community_path = install['community_path']
+            installed_version = install['installed_panel_version']
+
+            button = QPushButton()
+            if not community_path:
+                desc = f"{title}\nCouldn't find Community folder (check UserCfg.opt)"
+                status = ""
+                button.setText("Install")
+                button.setEnabled(False)
+            elif installed_version is None:
+                desc = f"{title}\n{community_path}"
+                status = "Not installed"
+                button.setText("Install")
+            elif bundled_version and installed_version != bundled_version:
+                desc = f"{title}\n{community_path}"
+                status = f"Installed: {installed_version}  ->  {bundled_version} available"
+                button.setText("Update")
+            else:
+                desc = f"{title}\n{community_path}"
+                status = f"Installed: {installed_version} (up to date)"
+                button.setText("Reinstall")
+
+            desc_label = QLabel(desc)
+            desc_label.setWordWrap(True)
+            row_layout.addWidget(desc_label, 1)
+
+            status_label = QLabel(status)
+            row_layout.addWidget(status_label)
+
+            button.clicked.connect(lambda checked=False, cp=community_path: self._install_msfs_panel(cp))
+            row_layout.addWidget(button)
+
+            layout.addWidget(row)
+
+    def _install_msfs_panel(self, community_path):
+        ans = QMessageBox.question(
+            self, "Install MSFS Panel",
+            f"Install/update the VPforce settings panel to:\n\n{community_path}\n\nContinue?")
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            msfs_panel_install.install_panel(community_path)
+        except OSError as e:
+            logging.exception(f"Failed to install MSFS panel to {community_path}")
+            QMessageBox.warning(self, "Install Failed", f"Couldn't install the panel:\n\n{e}")
+            return
+        QMessageBox.information(self, "Panel Installed",
+                                 f"Installed to:\n{community_path}\n\nRestart MSFS to see the change.")
+        self.refresh_msfs_panel_installs()
 
     def toggle_xplane_widgets(self):
         xplane_enabled = self.enableXPLANE.isChecked()
@@ -1942,6 +2024,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "enableDCS": self.enableDCS.isChecked(),
             "validateDCS": self.validateDCS.isChecked(),
             "enableMSFS": self.enableMSFS.isChecked(),
+            "enableMsfsApiServer": self.enableMsfsApiServer.isChecked(),
             "enableXPLANE": self.enableXPLANE.isChecked(),
             "validateXPLANE": self.validateXPLANE.isChecked(),
             "pathXPLANE": self.pathXPLANE.text(),
@@ -2751,7 +2834,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.validateDCS.setChecked(settings_dict.get('validateDCS', True))
 
         self.enableMSFS.setChecked(settings_dict.get('enableMSFS', False))
+        self.enableMsfsApiServer.setChecked(settings_dict.get('enableMsfsApiServer', True))
         self.toggle_msfs_widgets()
+        self.refresh_msfs_panel_installs()
 
         self.enableXPLANE.setChecked(settings_dict.get('enableXPLANE', False))
         self.toggle_xplane_widgets()
