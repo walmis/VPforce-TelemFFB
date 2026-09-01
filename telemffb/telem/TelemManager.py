@@ -89,6 +89,15 @@ def config_has_changed(update=False) -> bool:
         return True
     return False
 
+def force_config_change() -> None:
+    """Force the next config_has_changed() call to report a change, regardless
+    of the file mtime. Used after a programmatic XML write (e.g. the DCS
+    settings channel) where two writes in the same wall-clock second would
+    otherwise produce an identical integer-second mtime and be missed."""
+    global _pending_config_update, _future_config_update_time
+    _pending_config_update = True
+    _future_config_update_time = time.time()
+
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
     eventReceived = pyqtSignal(tuple)
@@ -729,6 +738,13 @@ class TelemManager(QObject, threading.Thread):
     def getTelemValue(self, key):
         if self.currentAircraft:
             return self.currentAircraft._telem_data.get(key, None)
+
+    def force_config_change(self) -> None:
+        """Force a config re-read on the next frame (see module-level
+        force_config_change). Called after a programmatic XML write so the
+        change is picked up even if the file mtime didn't advance a whole
+        second."""
+        force_config_change()
 
     def on_timeout(self):
         """Called by the run() loop each time the telemetry condition variable times out

@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from telemffb.telem.TelemManager import TelemManager
 
 class DcsIpcThread(threading.Thread):
+    _instance: Optional['DcsIpcThread'] = None
+
     def __init__(self, telemetry: 'TelemManager') -> None:
         # Daemon: a telemetry reader must never hold the process open.  These
         # threads are told to stop at exit, but one asleep in a retry backoff
@@ -60,6 +62,9 @@ class DcsIpcThread(threading.Thread):
         :param command: Command string to send.
         """
         self = cls._instance
+        if self is None:
+            logging.debug("DcsIpcThread.send_commands: no DCS thread yet, dropping command")
+            return
         port = self._telem.getTelemValue("UDP_Port")
         if port:
             try:
