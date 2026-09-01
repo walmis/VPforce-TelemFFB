@@ -26,6 +26,7 @@ from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 from bottle import Bottle, request, response
 
+import telemffb.globals as G
 from telemffb import xmlutils
 
 app = Bottle()
@@ -328,3 +329,24 @@ def stop_api_server():
 
 def is_running() -> bool:
     return _thread is not None and _thread.is_alive()
+
+
+def on_first_frame(src):
+    """Qt signal handler: start the panel when MSFS first sends a frame.
+
+    Self-gating so main.py stays pure wiring: only the master instance's
+    SettingsManager reflects a device worth exposing, and the panel has
+    nothing to serve for other sims, so gate on both - plus the System
+    Settings > Simulator Setup > MSFS > Options toggle (default on).
+    """
+    if src != "MSFS" or not G.master_instance:
+        return
+    if not G.system_settings.get('enableMsfsApiServer', True):
+        return
+    start_api_server(G.settings_mgr)
+
+
+def on_sim_exited(src):
+    """Qt signal handler: stop the panel when MSFS exits."""
+    if src == "MSFS":
+        stop_api_server()
