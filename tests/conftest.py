@@ -10,6 +10,26 @@ parent_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(parent_dir))
 
 import pytest
+
+# pysimconnect leaks a file handle at import (scvars.py: json.load(open(...))
+# with no close).  The abandoned handle is garbage-collected at some
+# arbitrary later moment, raising a ResourceWarning inside __del__, which
+# pytest's unraisable-exception plugin pins on whichever test happens to be
+# running - a floating error that moves between runs.  Importing it here,
+# with the warning suppressed and an immediate collect, spends the leak
+# once before any test exists to take the blame.  Fixed properly it would
+# be one line upstream in walmis/pysimconnect.
+import gc
+import warnings
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", ResourceWarning)
+    try:
+        import simconnect.scvars  # noqa: F401  (imported for its side effect)
+    except ImportError:
+        pass
+    gc.collect()
+
 from tests.framework.base import MockHapticEffect, MockSimConnect, MockFFBDevice
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 import telemffb.globals as G
