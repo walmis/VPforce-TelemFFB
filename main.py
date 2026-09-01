@@ -564,9 +564,29 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
                 dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
 
         def connect_signals():
-            dev.deviceConnected.connect(G.main_window.update_device_status)
-            dev.buttonPressed.connect(G.main_window.get_active_buttons)
-            dev.buttonReleased.connect(G.main_window.get_active_buttons)
+            # Deferred one event-loop pass so startup can build the main
+            # window first - but by the time this fires the world may
+            # have moved on: no window at all (headless, tests), or the
+            # device already replaced by a newer switch.  An exception
+            # in a Qt-invoked callback is fatal (PyQt turns it into
+            # qFatal, killing the process with 0xC0000409 and no
+            # traceback), so refuse quietly instead of assuming.
+            mw = getattr(G, 'main_window', None)
+            if mw is None:
+                logging.warning(
+                    "Deferred device-signal hookup skipped: no main "
+                    "window - device status and button events will not "
+                    "reach the UI")
+                return
+            if getattr(HapticEffect, 'device', None) is not dev:
+                logging.info(
+                    "Deferred device-signal hookup skipped: the device "
+                    "was replaced before the hookup fired; the "
+                    "replacement device gets its own")
+                return
+            dev.deviceConnected.connect(mw.update_device_status)
+            dev.buttonPressed.connect(mw.get_active_buttons)
+            dev.buttonReleased.connect(mw.get_active_buttons)
         # Use QTimer.singleShot to connect signals after event loop starts
         # (at startup the main window does not exist yet)
         QTimer.singleShot(0, connect_signals)
