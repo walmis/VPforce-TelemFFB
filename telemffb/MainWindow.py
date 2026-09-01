@@ -317,6 +317,15 @@ class MainWindow(QMainWindow):
         trim_cal_action.triggered.connect(self.open_trim_calibration_dialog)
         utilities_menu.addAction(trim_cal_action)
 
+        # A window on the tap's shared-memory mirror: whether a game is
+        # publishing, which devices the wrapper captured, and what every
+        # effect slot is being told - with a timestamped change log to
+        # save and send in.  The remote-troubleshooting answer to "no
+        # forces in DCS".
+        tap_monitor_action = QAction('DirectInput Tap Monitor...', self)
+        tap_monitor_action.triggered.connect(self.open_tap_monitor)
+        utilities_menu.addAction(tap_monitor_action)
+
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             """
             Add Window menu to manage child instances if it is a master instance
@@ -2165,6 +2174,18 @@ class MainWindow(QMainWindow):
         except Exception:
             logging.exception("Exception")
         # dialog.exec_()
+
+    def open_tap_monitor(self):
+        """One monitor, re-raised rather than duplicated: two pollers
+        on the same mapping would only double the wakeups."""
+        from telemffb.TapMonitorDialog import TapMonitorDialog
+        dlg = getattr(self, '_tap_monitor', None)
+        if dlg is not None and dlg.isVisible():
+            dlg.raise_()
+            dlg.activateWindow()
+            return
+        self._tap_monitor = TapMonitorDialog(self)
+        self._tap_monitor.show()
 
     def open_trim_calibration_dialog(self):
         """Open (or focus) the elevator trim calibration dialog.

@@ -91,6 +91,12 @@ DIEFF_SPHERICAL = 0x40
 DIJOFS_Y = 4          # offsetof(DIJOYSTATE, lY), identifies the Y axis
 DI_INFINITE = 0xFFFFFFFF
 
+#: reserved[0] flag stamped by wrapper 0.9.3+: at least one tap/sink
+#: rule was ignored at device bind because TelemFFB was not running.
+#: The one fact only the wrapper knows - from outside, a refused tap
+#: and no tap at all are identical.
+TAP_DIAG_GATE_CLOSED = 0x1
+
 STILL_ACTIVE = 259
 
 PID_CHECK_INTERVAL_S = 1.0   # amortize the writer-liveness syscall
@@ -693,6 +699,57 @@ def device_is_tapped() -> bool:
         logging.exception("DirectInput tap: presence check failed")
         return False
 
+
+def gate_refusal(shm) -> Optional[tuple]:
+    """(count, vid, pid) when the wrapper declined to tap, else None.
+
+    vid/pid are of the most recently refused device, both 0 when the
+    wrapper could not read ids.  Pre-0.9.3 wrappers never set the flag,
+    so absence simply reads as None - additive within the protocol."""
+    if shm is None or shm.magic != TAP_MAGIC:
+        return None
+    if not (shm.reserved[0] & TAP_DIAG_GATE_CLOSED):
+        return None
+    packed = shm.reserved[2]
+    return (shm.reserved[1], (packed >> 16) & 0xFFFF, packed & 0xFFFF)
+
+
+#: game_started_first is asked from the per-frame warning path; the
+#: answer changes at most once per game session, so a couple of
+#: seconds of cache removes a full snapshot per frame
+_gate_cache = (0.0, False)
+
+
+def game_started_first() -> bool:
+    """Whether the wrapper reports it refused to tap THIS instance's
+    device because TelemFFB was absent at bind - the start-order trap,
+    answered by the one party that was there.  ids-unavailable refusals
+    (vid/pid 0) count too: one un-identified refusal on a machine with
+    one problem is the same story."""
+    global _reader, _gate_cache
+    checked_at, cached = _gate_cache
+    now = time.monotonic()
+    if now - checked_at < 2.0:
+        return cached
+    if _reader is None:
+        _reader = FfbTapReader()
+    try:
+        shm = _reader.snapshot()
+        refusal = gate_refusal(shm)
+        if refusal is None:
+            value = False
+        else:
+            _, vid, pid = refusal
+            if (vid, pid) == (0, 0):
+                value = True
+            else:
+                ids = _reader._target_ids()
+                value = ids is None or ids == (vid, pid)
+        _gate_cache = (now, value)
+        return value
+    except Exception:
+        logging.exception("DirectInput tap: gate-refusal check failed")
+        return False
 
 def read_game_effects() -> Optional[TapGameEffects]:
     """Aircraft-facing entry point (see FfbTapReader.read_game_effects)."""

@@ -964,16 +964,19 @@ class TestSwallowedForcesWarning:
         harness = TestTapSpringMode()
         return harness._make_instance(spring_mode)
 
-    def _run(self, spring_mode, tapped, di_guid=None):
+    def _run(self, spring_mode, tapped, di_guid=None,
+             started_first=False):
         import unittest.mock as mock
         import telemffb.globals as G
         case, inst = self._instance(spring_mode)
         with mock.patch.object(G, 'device_di_guid', di_guid, create=True):
             with mock.patch("telemffb.hw.ffb_tap.device_is_tapped",
                             return_value=tapped):
-                with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
-                                return_value=None):
-                    inst.ffb_tap_spring()
+                with mock.patch("telemffb.hw.ffb_tap.game_started_first",
+                                return_value=started_first):
+                    with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
+                                    return_value=None):
+                        inst.ffb_tap_spring()
         return inst
 
     def test_none_with_a_live_tap_is_reported(self):
@@ -1007,14 +1010,26 @@ class TestTapNotCapturingWarning:
     started before TelemFFB, and the wrapper only engages when TelemFFB
     is already running."""
 
-    def _run(self, spring_mode, tapped):
-        return TestSwallowedForcesWarning()._run(spring_mode, tapped)
+    def _run(self, spring_mode, tapped, started_first=False):
+        return TestSwallowedForcesWarning()._run(
+            spring_mode, tapped, started_first=started_first)
 
     def test_tap_mode_without_a_tap_is_reported(self):
         inst = self._run("DINPUT_TAP", tapped=False)
         error = inst._telem_data.get('error', '')
         assert 'is not capturing' in error
         assert 'started before TelemFFB' in error
+
+    def test_a_confirmed_start_order_trap_is_a_diagnosis_not_a_guess(self):
+        """Wrapper 0.9.3+ stamps that it refused the tap at bind; the
+        warning then commits to the one actual fix instead of listing
+        every possibility."""
+        inst = self._run("DINPUT_TAP", tapped=False, started_first=True)
+        error = inst._telem_data.get('error', '')
+        assert 'started before TelemFFB' in error
+        assert 'Restart the game with TelemFFB already running' in error
+        # the speculative catch-all is gone from the confirmed case
+        assert 'check that the tap is installed' not in error
 
     def test_a_stopped_game_spring_is_not_this(self):
         """Device in the mirror, spring merely stopped (the menus): the

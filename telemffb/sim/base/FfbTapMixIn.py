@@ -178,6 +178,16 @@ class FfbTapMixIn:
         from telemffb.hw import ffb_tap
         if ffb_tap.device_is_tapped():
             return
+        # Wrapper 0.9.3+ stamps WHY nothing was captured; when it says
+        # the gate was closed at bind, the speculation below becomes a
+        # diagnosis and the message can commit to the one actual fix.
+        if ffb_tap.game_started_first():
+            self.flag_error(
+                "Spring mode is 'Game Managed (DirectInput Tap)', but "
+                "the game was started before TelemFFB, so the tap did "
+                "not engage for this session.  Restart the game with "
+                "TelemFFB already running.")
+            return
         self.flag_error(
             "Spring mode is 'Game Managed (DirectInput Tap)', but the "
             "DirectInput Tap is not capturing this game's force feedback "
