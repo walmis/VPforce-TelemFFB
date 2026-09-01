@@ -707,8 +707,12 @@ class ConfigResolver:
         root = self._store.defaults_root
         if root is None:
             return
+        # The findall carries no per-item predicate, so its result is identical
+        # on every pass; hoisting it out of the per-item loop turns one full-tree
+        # walk per setting into one full-tree walk per resolve().
+        overrides = root.findall('.//validvalues_overrides')
         for item in data_list:
-            for ov in root.findall('.//validvalues_overrides'):
+            for ov in overrides:
                 if (ov.findtext('name') == item['name']
                         and ov.findtext('sim') == sim
                         and ov.findtext('class') == model_class
