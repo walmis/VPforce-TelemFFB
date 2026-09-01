@@ -3302,6 +3302,79 @@ class OutLog(QtCore.QObject):
         pass
 
 
+#: Records logged before _init_logging can run.  It needs the LogWindow
+#: widget, so it cannot run until Qt is up - but startup logs plenty
+#: before that, including the version banner and the DirectLink build
+#: identity.  Without this those records went to the throwaway handler
+#: logging.info() installs when root has none, and _init_logging's
+#: handlers.clear() then dropped them: never written to the log file, so
+#: the one line support always asks for was the one line not on disk.
+_early_log_buffer: 'logging.handlers.MemoryHandler | None' = None
+_early_log_replayed = False
+
+
+def begin_early_logging():
+    """Start buffering log records until the real handlers exist.
+
+    Called before anything else in main() logs.  Holding a handler on
+    root also stops logging.info() from installing its own, which is
+    what produced the unformatted 'INFO:root:' lines."""
+    global _early_log_buffer
+    import atexit
+    import logging.handlers
+    if _early_log_buffer is not None:
+        return
+    # capacity is a flush trigger, not a cap on what is kept, and a
+    # MemoryHandler with no target DISCARDS on flush - so it is set far
+    # above any plausible startup, and flushLevel above CRITICAL so that
+    # an early error does not trigger the same discard.
+    buf = logging.handlers.MemoryHandler(capacity=100000,
+                                         flushLevel=logging.CRITICAL + 1)
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.addHandler(buf)
+    _early_log_buffer = buf
+    atexit.register(flush_early_logging_to_stderr)
+
+
+def replay_early_logging(target):
+    """Hand the buffered records to the real handlers, timestamps intact.
+
+    Called by _init_logging once they exist.  Nothing is re-formatted:
+    each record carries its own creation time, so the order holds."""
+    global _early_log_replayed
+    buf = _early_log_buffer
+    if buf is None or _early_log_replayed:
+        return
+    _early_log_replayed = True
+    buf.setTarget(target)
+    buf.flush()
+    buf.close()
+
+
+def flush_early_logging_to_stderr():
+    """Last resort: print buffered records if the real handlers never came.
+
+    Startup can exit before _init_logging - the single-instance mutex, the
+    unsafe-location refusal - and those paths are exactly the ones whose
+    reason someone needs.  Buffering them must not be what makes the
+    reason disappear."""
+    buf = _early_log_buffer
+    if buf is None or _early_log_replayed or not buf.buffer:
+        return
+    # the original stderr, not sys.stderr: by now that may be the OutLog
+    # wrapper around a widget that is being torn down.  A frozen windowed
+    # build has neither, and print(file=None) would quietly go to stdout.
+    stream = sys.__stderr__ or sys.stderr
+    if stream is None:
+        return
+    try:
+        for record in buf.buffer:
+            print(f"{record.levelname}: {record.getMessage()}", file=stream)
+    except Exception:
+        pass
+
+
 class DedupHandler(logging.Handler):
     """Handler that suppresses immediate duplicate log records and emits
     a summary when a different message arrives or periodically while the

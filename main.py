@@ -1469,6 +1469,10 @@ def main():
 
     dev : FFBRhino = None
 
+    # Before anything in startup logs: everything from here to
+    # _init_logging is buffered rather than lost.
+    utils.begin_early_logging()
+
     # Initialize Qt application with Fusion style for consistent cross-platform appearance
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
@@ -1879,6 +1883,10 @@ def _init_logging(log_widget : QPlainTextEdit):
     dedup = DedupHandler(handlers=[console_handler, file_handler])
     # Attach the dedup handler to the root logger. Individual handlers are still owned by DedupHandler.
     logger.addHandler(dedup)
+
+    # handlers.clear() above dropped the early buffer along with anything
+    # else on root; replay what it held into the handlers that will keep it.
+    utils.replay_early_logging(dedup)
 
     # Create a list of keywords to filter
     log_filter_strings = [
