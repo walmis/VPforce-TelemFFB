@@ -705,8 +705,15 @@ class FFBEffectHandle:
             logging.warn("setConstantForce on an invalidated effect")
             return
 
-        assert(self.type == EFFECT_CONSTANT)
-        assert(magnitude >= -1.0 and magnitude <= 1.0)
+        if self.type != EFFECT_CONSTANT:
+            logging.warning("setConstantForce called on a non-constant effect (type=%s), ignoring", self.type)
+            return
+        if not -1.0 <= magnitude <= 1.0:
+            # Don't assert in the 60-120 Hz telemetry path; clamp and warn once
+            if not getattr(self, "_magnitude_clamp_warned", False):
+                logging.warning("setConstantForce magnitude %s out of [-1, 1], clamping", magnitude)
+                self._magnitude_clamp_warned = True
+            magnitude = clamp(magnitude, -1.0, 1.0)
 
         direction %= 360
         direction = round((direction*255/360))
@@ -758,8 +765,15 @@ class FFBEffectHandle:
             self.ffb.write(data)
 
     def setPeriodic(self, freq, magnitude, direction, duration=0, **kwargs):
-        assert(self.type in PERIODIC_EFFECTS)
-        assert(magnitude >= 0 and magnitude <= 1.0)
+        if self.type not in PERIODIC_EFFECTS:
+            logging.warning("setPeriodic called on a non-periodic effect (type=%s), ignoring", self.type)
+            return self
+        if not 0 <= magnitude <= 1.0:
+            # Don't assert in the 60-120 Hz telemetry path; clamp and warn once
+            if not getattr(self, "_magnitude_clamp_warned", False):
+                logging.warning("setPeriodic magnitude %s out of [0, 1], clamping", magnitude)
+                self._magnitude_clamp_warned = True
+            magnitude = clamp(magnitude, 0, 1)
         direction %= 360
         direction = round(direction*255/360)
 

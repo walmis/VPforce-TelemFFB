@@ -205,7 +205,7 @@ class Aircraft(AircraftBase):
             return
 
         frequency = float(frequency) + freq_offset
-        amplitude = float(amplitude) * factor * 3
+        amplitude = utils.clamp(float(amplitude) * factor * 3, 0.0, 1.0)
 
         if frequency <= 0:
             self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "il2_eng_shk3", "il2_eng_shk4", "il2_jet_shk1", "il2_jet_shk2")
