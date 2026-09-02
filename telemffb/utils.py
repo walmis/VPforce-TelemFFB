@@ -3277,24 +3277,61 @@ class OutLog(QtCore.QObject):
 
 
 class DedupHandler(logging.Handler):
-    """Handler that suppresses immediate duplicate log records and emits
-    a summary when a different message arrives or periodically while the
-    same message keeps repeating.
+    """Handler that suppresses repeated log records and summarizes them.
 
     It forwards records to one or more inner handlers passed during
     construction. Thread-safe.
+
+    Two suppression behaviors, both driven by a rolling window of the last
+    ``period_seconds`` of records:
+
+    - *Consecutive repeats*: the same message arriving back-to-back is emitted
+      once, then a "(message repeated N times)" summary every ``period_seconds``
+      and a final summary when a different message arrives. Same as the
+      original single-message dedup.
+    - *Repeating cycles*: a message that was already seen earlier in the window
+      (e.g. A, B, A, B) confirms a cycle; the whole cycle is then summarized in
+      a single line and subsequent repetitions of its members are suppressed
+      (with a periodic update) until the log goes quiet for ``period_seconds``
+      or a genuinely different message arrives.
     """
+
+    #: max distinct messages listed in a cycle summary (more are folded into a
+    #: "+N more" count)
+    MAX_LISTED_TYPES = 5
 
     def __init__(self, handlers=None, period_seconds: float = 5.0):
         super().__init__()
         self.handlers = handlers or []
         self._lock = threading.Lock()
-        self._last_key = None
-        self._count = 0
-        self._last_record = None
-        self._first_ts = 0.0
-        self._last_periodic_emit_ts = 0.0
         self.period_seconds = float(period_seconds)
+        # clock indirection so tests can advance time without sleeping
+        self._clock = time.monotonic
+        # rolling window of (timestamp, key) for the last period_seconds
+        self._window: deque = deque()
+        # keys already seen in the current window generation
+        self._seen: set = set()
+        # True once a cycle summary has been emitted for the current generation;
+        # while set, cycle members are suppressed instead of forward-checked
+        self._collapsed = False
+        # per-key bookkeeping for summaries (last record, occurrence count,
+        # first-seen timestamp, most-recent-seen timestamp)
+        # _key_last_ts drives window-pruning so long-running cycles stay alive
+        self._records: dict = {}
+        self._counts: dict = {}
+        self._first_ts: dict = {}
+        self._key_last_ts: dict = {}
+        self._last_key = None
+        self._last_entry_ts = 0.0
+        # consecutive-repetition bookkeeping (preserves the original
+        # single-message "(repeated N times)" behavior)
+        self._repeat_count = 0
+        self._repeat_record = None
+        self._repeat_first_ts = 0.0
+        self._repeat_periodic_ts = 0.0
+        # timestamp of the last emitted cycle summary (initial or periodic);
+        # only refreshed when a summary is actually emitted
+        self._last_cycle_ts = 0.0
 
     def _normalize_message(self, record: logging.LogRecord) -> str:
         """
@@ -3347,54 +3384,177 @@ class DedupHandler(logging.Handler):
         new_rec.created = base_record.created
         return new_rec
 
+    def _make_cycle_summary_record(self, keys, periodic: bool = False) -> logging.LogRecord:
+        """Build one record summarizing an entire repeated message cycle.
+
+        ``keys`` is the list of distinct message keys (in first-seen order) in
+        the current window. The summary lists up to ``MAX_LISTED_TYPES``
+        messages and reports per-type occurrence counts, for example::
+
+            Cycle detected: 24 messages across 2 types over the last 5s.
+                - Start effect 8 (Sine) ("flapsmovement"): 12
+                - Stop effect 8 (Sine) ("flapsmovement"): 12
+                (see DEBUG for details)
+        """
+        if not keys:
+            raise ValueError("no keys to summarize")
+        listed = keys[:self.MAX_LISTED_TYPES]
+        extra = len(keys) - len(listed)
+        total = sum(self._counts.get(k, 0) for k in keys)
+        suffix = " so far" if periodic else ""
+
+        lines = [f"Cycle detected: {total} messages across {len(keys)} types over the last {self.period_seconds:g}s{suffix}."]
+        for k in listed:
+            lines.append(f"    - {self._normalize_message(self._records[k])}: {self._counts[k]}")
+        if extra > 0:
+            lines.append(f"    \u2026 +{extra} more")
+        if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
+            lines.append("    (see DEBUG for details)")
+        msg = "\n".join(lines)
+
+        ref = self._records[keys[0]]
+        new_rec = logging.LogRecord(
+            name=ref.name,
+            level=ref.levelno,
+            pathname=ref.pathname,
+            lineno=ref.lineno,
+            msg=msg,
+            args=(),
+            exc_info=None,
+            func=ref.funcName,
+        )
+        # preserve the original record's wall-clock timestamp
+        new_rec.created = ref.created
+        return new_rec
+
+    def _prune_window(self, now):
+        """Drop keys whose most-recent appearance is older than period_seconds.
+
+        Uses ``_key_last_ts`` (not the first-seen timestamps in ``_window``)
+        so that a long-running cycle whose members keep recurring stays in
+        the window even after their first-seen entries have aged out.
+        """
+        cutoff = now - self.period_seconds
+        self._key_last_ts = {
+            k: ts for k, ts in self._key_last_ts.items() if ts >= cutoff
+        }
+        self._window = deque(
+            (ts, k) for ts, k in self._window if k in self._key_last_ts
+        )
+
+    def _reset(self):
+        self._window.clear()
+        self._seen.clear()
+        self._collapsed = False
+        self._records.clear()
+        self._counts.clear()
+        self._first_ts.clear()
+        self._key_last_ts.clear()
+        self._last_key = None
+        self._last_entry_ts = 0.0
+        self._repeat_count = 0
+        self._repeat_record = None
+        self._repeat_first_ts = 0.0
+        self._repeat_periodic_ts = 0.0
+        self._last_cycle_ts = 0.0
+
+    def _forward(self, record):
+        for h in self.handlers:
+            try:
+                h.emit(record)
+            except Exception:
+                pass
+
+    def _emit_summary_record(self, summary_record):
+        for h in self.handlers:
+            try:
+                h.emit(summary_record)
+            except Exception:
+                pass
+
+    def _distinct_keys_in_window(self):
+        return list(dict.fromkeys(k for _, k in self._window))
+
     def emit(self, record: logging.LogRecord):
         try:
             key = self._make_key(record)
-            now = time.time()
+            now = self._clock()
             with self._lock:
-                if key == self._last_key:
-                    # same as previous: increment and buffer
-                    self._count += 1
-                    self._last_record = record
+                # The window is pruned by time only (period_seconds); a full reset
+                # happens only after the log has been quiet for at least one
+                # period, so an episode is over and the next identical message
+                # should print normally again.
+                self._prune_window(now)
+                if self._last_entry_ts and (now - self._last_entry_ts) >= self.period_seconds:
+                    self._reset()
+                self._last_entry_ts = now
 
-                    # On first repeat, set first timestamp if not set
-                    if not self._first_ts:
-                        self._first_ts = now
-
-                    # If enough time passed since last periodic emit, emit a periodic summary
-                    if self.period_seconds and (now - self._last_periodic_emit_ts) >= self.period_seconds and self._count > 1:
-                        summary = self._make_summary_record(self._last_record, self._count, periodic=True)
-                        for h in self.handlers:
-                            try:
-                                h.emit(summary)
-                            except Exception:
-                                pass
-                        self._last_periodic_emit_ts = now
-
+                if key == self._last_key and self._repeat_count and not self._collapsed:
+                    # same message back-to-back, and no cycle in play yet: keep
+                    # the original consecutive-repetition behavior
+                    if self._repeat_count == 1:
+                        self._repeat_first_ts = now
+                    self._repeat_count += 1
+                    self._repeat_record = record
+                    if (now - self._repeat_periodic_ts) >= self.period_seconds:
+                        self._emit_summary_record(
+                            self._make_summary_record(record, self._repeat_count, periodic=True)
+                        )
+                        self._repeat_periodic_ts = now
                     return
 
-                # Different message: if previous one was repeated, emit final summary
-                if self._count > 1 and self._last_record is not None:
-                    summary = self._make_summary_record(self._last_record, self._count, periodic=False)
-                    for h in self.handlers:
-                        try:
-                            h.emit(summary)
-                        except Exception:
-                            pass
+                if key in self._seen:
+                    self._counts[key] = self._counts.get(key, 0) + 1
+                    self._key_last_ts[key] = now
+                    if self._collapsed:
+                        # cycle already summarized: refresh it periodically only;
+                        # the interval is measured from the last emitted summary
+                        if (now - self._last_cycle_ts) >= self.period_seconds:
+                            self._emit_summary_record(
+                                self._make_cycle_summary_record(self._distinct_keys_in_window(), periodic=True)
+                            )
+                            self._last_cycle_ts = now
+                        return
+                    # this arrival means a previously-seen message is recurring,
+                    # i.e. a genuine multi-message cycle: summarize it once and
+                    # stop forwarding its individual repetitions from here on
+                    self._emit_summary_record(self._make_cycle_summary_record(self._distinct_keys_in_window()))
+                    self._collapsed = True
+                    self._last_cycle_ts = now
+                    return
 
-                # Forward current record to inner handlers
-                for h in self.handlers:
-                    try:
-                        h.emit(record)
-                    except Exception:
-                        pass
+                # first time this key is seen within this episode
 
-                # update tracking state
+                # When a distinct message interrupts a run of consecutive
+                # repeats (and no cycle collapse is in progress), emit the
+                # original final summary for the interrupted message, mirroring
+                # the original single-message dedup behavior.
+                if (
+                    not self._collapsed
+                    and self._repeat_count > 1
+                    and self._repeat_record is not None
+                ):
+                    self._emit_summary_record(
+                        self._make_summary_record(
+                            self._repeat_record, self._repeat_count, periodic=False
+                        )
+                    )
+
+                # register this key in the rolling window
+                self._window.append((now, key))
+                self._seen.add(key)
+                self._records[key] = record
+                self._counts[key] = 1
+                self._first_ts[key] = now
+                self._key_last_ts[key] = now
+                # a new distinct message starts fresh consecutive-repeat
+                # bookkeeping for itself
                 self._last_key = key
-                self._count = 1
-                self._last_record = record
-                self._first_ts = now
-                self._last_periodic_emit_ts = now
+                self._repeat_count = 1
+                self._repeat_record = record
+                self._repeat_first_ts = now
+                self._repeat_periodic_ts = now
+                self._forward(record)
         except Exception:
             # In case of any failure in dedup logic, fallback to best-effort forwarding
             for h in self.handlers:
@@ -3412,11 +3572,12 @@ class DedupHandler(logging.Handler):
                 pass
 
     def close(self):
-        # Emit pending summary if any
+        # flush a collapsed cycle summary before shutting down so the final
+        # occurrence counts are not lost
         try:
             with self._lock:
-                if self._count > 1 and self._last_record is not None:
-                    summary = self._make_summary_record(self._last_record, self._count)
+                if self._collapsed and self._window:
+                    summary = self._make_cycle_summary_record(self._distinct_keys_in_window())
                     for h in self.handlers:
                         try:
                             h.emit(summary)
