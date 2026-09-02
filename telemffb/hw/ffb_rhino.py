@@ -1197,6 +1197,13 @@ class HapticEffect(Destroyable):
             if self._h_effect and self._pending_envelope and not self._envelope_applied:
                 self._h_effect.setEnvelope(self._pending_envelope)
                 self._envelope_applied = True
+            # Log a one-shot allocation line.  Start/stop playback logging is
+            # DEBUG-only (it can fire every telemetry frame), so this is the
+            # single INFO-level anchor for an effect's device lifecycle; a
+            # re-allocation after destroy() logs again here.
+            if self._h_effect:
+                name = f" (\"{self.name}\")" if self.name else ""
+                logging.info(f"Effect created {self._h_effect.effect_id} ({self._h_effect.name}){name}")
 
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
         """Set condition parameters for condition-style effects.
@@ -1646,7 +1653,7 @@ class HapticEffect(Destroyable):
                 caller_name = caller_frame.f_code.co_name
                 logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""
-            logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            logging.debug(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.start(**kw)
             self._stopped_time = 0
 
@@ -1668,7 +1675,7 @@ class HapticEffect(Destroyable):
                 caller_name = caller_frame.f_code.co_name
                 logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            logging.debug(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.stop()
             
             # Clear envelope if it was marked as one-time use
