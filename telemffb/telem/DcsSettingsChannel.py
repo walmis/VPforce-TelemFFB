@@ -21,15 +21,17 @@ The DCS DLL (telemffb) renders a Dear ImGui settings overlay. It cannot read
 the user config XML itself, so this module is the bridge:
 
   * DLL -> Python: the DLL sends one-line, tab-delimited commands over UDP to
-    a fixed local port (``DCS_SETTINGS_PORT``):
+    this module's dynamic listener port (OS-chosen on bind, then re-announced
+    to the DLL on every push via ``telemffb_set_settings_port``):
         SET\\t<device>\\t<name>\\t<value>   (user changed a control)
         SHOW\\t<device>                     (user switched the device combo)
     ``device`` is one of joystick / pedals / collective / trimwheel.
 
   * Python -> DLL: we push a fresh snapshot of the editable settings by
     sending a batch of Lua calls over the DLL's advertised ``UDP_Port`` (the
-    same execute-as-Lua channel ``DcsIpcThread.send_commands`` uses). The DLL
-    stores the items and renders them in the overlay.
+    same execute-as-Lua channel ``DcsIpcThread.send_commands`` uses); each
+    batch also re-announces our listener port so the overlay's return path
+    self-corrects after a restart. The DLL stores the items and renders them.
 
 Python is the single source of truth: a ``SET`` is written to the user config
 XML (via ``SettingsManager.write_to_xml``), then a fresh snapshot is pushed
@@ -51,10 +53,6 @@ import telemffb.globals as G
 import telemffb.api_server as api_server
 import telemffb.xmlutils as xmlutils
 from telemffb.utils import schedule_on_main_thread
-
-# Fixed local port the DLL sends its SET/SHOW commands to. Only the master
-# instance binds it (a second master is prevented by the named mutex).
-DCS_SETTINGS_PORT = 34381
 
 # Devices the overlay's combo can show. Fixed enum - the DLL hard-codes the
 # same list, so keep them in sync.
@@ -99,6 +97,7 @@ class DcsSettingsChannel(threading.Thread):
         self._run = False
         self._settings_mgr = None
         self._socket: Optional[socket.socket] = None
+        self._port = 0  # OS-chosen port of the listener, announced to the DLL
         self._lock = threading.Lock()
 
     # -- lifecycle ---------------------------------------------------------
@@ -116,17 +115,18 @@ class DcsSettingsChannel(threading.Thread):
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                sock.bind(("127.0.0.1", DCS_SETTINGS_PORT))
+                sock.bind(("127.0.0.1", 0))  # OS-chosen free loopback port
             except OSError as e:
-                logging.error(f"DCS settings channel: cannot bind 127.0.0.1:{DCS_SETTINGS_PORT}: {e}")
+                logging.error(f"DCS settings channel: cannot bind 127.0.0.1:0: {e}")
                 sock.close()
                 return False
 
             sock.settimeout(0.5)
             self._socket = sock
+            self._port = sock.getsockname()[1]
             self._run = True
             super().start()
-            logging.info(f"DCS settings channel listening on 127.0.0.1:{DCS_SETTINGS_PORT}")
+            logging.info(f"DCS settings channel listening on 127.0.0.1:{self._port}")
             return True
 
     def stop(self) -> None:
@@ -290,6 +290,15 @@ class DcsSettingsChannel(threading.Thread):
 
         controls = self.build_snapshot(device, override=override)
         batch = self._build_lua_batch(device, controls)
+
+        # Tell the DLL where to send its SET/SHOW events back to us. This rides
+        # on every push (start, aircraft change, each SET) so a port learned
+        # during a restart is re-delivered if DCS/TelemFFB came up first - the
+        # DLL drops events until it learns our port, so nothing can get lost
+        # permanently. The batch is always a valid Lua chunk, and this just adds
+        # one more statement.
+        if self._port:
+            batch = f"telemffb_set_settings_port({self._port})\n{batch}"
 
         port = G.telem_manager.getTelemValue("UDP_Port") if G.telem_manager else None
         if not port:
