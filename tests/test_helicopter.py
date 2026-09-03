@@ -570,8 +570,9 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         assert len(self.mock_simconnect.sent_events) == 0
         assert self.mock_effects["lock_1"].started
         assert self.mock_effects["lock_1"].detent_config is not None
-        assert self.mock_effects["lock_1"].detent_config["position_x"] == 1500
-        assert self.mock_effects["lock_2"].detent_config["position_x"] == -1500
+        # position_x is now a normalized -1..1 float (1500/4096); the device scales it back
+        assert self.mock_effects["lock_1"].detent_config["position_x"] == 1500 / 4096
+        assert self.mock_effects["lock_2"].detent_config["position_x"] == -1500 / 4096
 
     def test_pedals_controls_lock_started_effect_short_circuits_axis_updates(self):
         """Test pedal lock path exits early when lock effects are already active."""

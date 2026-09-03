@@ -61,6 +61,7 @@ import time
 
 import telemffb.globals as G
 from telemffb.utils import PID, clamp, piecewise_linear
+from telemffb.util import conversions
 
 logger = logging.getLogger(__name__)
 
@@ -412,7 +413,7 @@ class TrimCalibrator:
 
     HOLD_SPRING_COEFF = 1.0      # firm centered spring to keep hands-off stick put
     TRIM_AXIS_RANGE = 16383      # AXIS_ELEV_TRIM_SET: -16383..16384
-    CPOFFSET_RANGE = 4096        # spring cpOffset units per full axis deflection
+    CPOFFSET_RANGE = conversions.FFB_UNITS  # spring cpOffset units per full axis deflection
     HOLD_WALK_RATE = 3000        # cpOffset units/s for repositioning the parked
                                  # stick at handback — an instant center set under
                                  # the firm spring snaps the stick hard enough to

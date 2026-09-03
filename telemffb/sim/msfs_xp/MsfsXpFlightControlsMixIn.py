@@ -5,17 +5,17 @@ import math
 from math import atan2, sin, sqrt
 
 from telemffb.sim.base.AoAEffectsMixIn import AoAEffectsMixIn
-from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
+from telemffb.sim.msfs_xp.MsfsXpSteeringFrictionMixIn import MsfsXpSteeringFrictionMixIn
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFBWFlightControlsMixIn import MsfsXpFBWFlightControlsMixIn
 from telemffb.util.Vector import Vector, Vector2D
-from telemffb.util.conversions import P0, deg, math, ms2kt, rad, std_air_pressure, vsound
+from telemffb.util.conversions import P0, deg, ms2kt, rad, std_air_pressure, to_device_units, vsound
 from telemffb.utils import clamp
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
-class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlightControlsMixIn, AoAEffectsMixIn):
+class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightControlsMixIn, AoAEffectsMixIn):
     """Mixin for MSFS and X-Plane specific flight control handling."""
 
     # user parameters
@@ -48,7 +48,9 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
     ## end of user parameters
 
-    g_force_gain = 0.1  # this appears constant, not set anywhere else?
+    # internal parameters (no defaults.xml entries; tuned in code only)
+    g_force_gain = 0.1  # scale for the AccBody[1] -> pitch bias (_G_term) contribution
+    slip_gain = 1.0     # scale for sideslip -> rudder force attenuation (1.0 = full)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,7 +58,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self._trim_calibrator = None  # lazily created TrimCalibrator (elevator virtual_y auto-cal)
 
         self.use_fbw_for_ap_follow = True
-        self.slip_gain = 1.0        
+        
         
         self.aileron_gain = 0.1
         self.elevator_gain = 0.1
@@ -156,8 +158,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         if stop_control_weight:
             self.effects['control_weight'].stop()
 
-        spring_condition.set_coefficient(4096)
-        spring_condition.cpOffset = spring_offset
+        spring_condition.set_coefficient(1.0)
+        spring_condition.cpOffset = to_device_units(spring_offset)
         self._spring_handle.setCondition(spring_condition)
         self._spring_handle.start()
         self.effects['lock_1'].detent(**detent_1).start()
@@ -175,8 +177,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         if lock_result is None:
             phys_x, phys_y = self._get_device_axes()
 
-            self.spring_y.set_coefficient(4096)
-            self.spring_x.set_coefficient(4096)
+            self.spring_y.set_coefficient(1.0)
+            self.spring_x.set_coefficient(1.0)
             self.spring_y.cpOffset = 0
             self.spring_x.cpOffset = 0
             self._spring_handle.setCondition(self.spring_y)
@@ -184,13 +186,14 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self._spring_handle.start()
 
             if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
-                detent_params = dict(peak_x=4096, range_x=4096, gate_pos_y=0, gate_neg_y=0,
-                                     peak_y=4096, range_y=4096, gate_pos_x=0, gate_neg_x=0)
+                # normalized -1..1 values; HapticEffect.detent converts to device units
+                detent_params = dict(peak_x=1.0, range_x=1.0, gate_pos_y=0, gate_neg_y=0,
+                                     peak_y=1.0, range_y=1.0, gate_pos_x=0, gate_neg_x=0)
                 self._engage_controls_lock_detents(
                     self.spring_x,
                     spring_offset=0,
-                    detent_1=dict(position_x=1500, position_y=1500, **detent_params),
-                    detent_2=dict(position_x=-1500, position_y=-1500, **detent_params),
+                    detent_1=dict(position_x=1500 / 4096, position_y=1500 / 4096, **detent_params),
+                    detent_2=dict(position_x=-1500 / 4096, position_y=-1500 / 4096, **detent_params),
                     stop_control_weight=True,
                 )
                 telem_data["_controls_locked"] = controls_locked
@@ -209,18 +212,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         if lock_result is None:
             phys_x, _ = self._get_device_axes()
 
-            self.spring_x.set_coefficient(4096)
+            self.spring_x.set_coefficient(1.0)
             self.spring_x.cpOffset = 0
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
 
             if -0.15 < phys_x < 0.15:
-                detent_params = dict(peak_x=4096, range_x=4096, gate_pos_y=0, gate_neg_y=0)
+                # normalized -1..1 values; HapticEffect.detent converts to device units
+                detent_params = dict(peak_x=1.0, range_x=1.0, gate_pos_y=0, gate_neg_y=0)
                 self._engage_controls_lock_detents(
                     self.spring_x,
                     spring_offset=0,
-                    detent_1=dict(position_x=1500, **detent_params),
-                    detent_2=dict(position_x=-1500, **detent_params),
+                    detent_1=dict(position_x=1500 / 4096, **detent_params),
+                    detent_2=dict(position_x=-1500 / 4096, **detent_params),
                 )
                 telem_data["_controls_locked"] = controls_locked
 
@@ -502,9 +506,16 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         Note: Vso (XPLANE) is fetched but not used in any downstream computation.
         """
-        if telem_data.src == "XPLANE":
+        if self.vne_override:
+            vne = self.vne_override  # user override (kt); use it instead of sim data
+        elif telem_data.src == "XPLANE":
             vne = telem_data.Vne
-            vs0 = telem_data.Vso
+            if not vne:
+                # X-Plane acf without Vne dataref: keep the raw (0) value and
+                # skip downstream computations that would divide by zero.
+                telem_data.Vne_ms_calc = 0
+                telem_data.Vne_kt = 0
+                return vne, 0.0
         else:
             vc, vs0, vs1 = telem_data.DesignSpeed
             telem_data.Vc_kt = vc * ms2kt
@@ -518,6 +529,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             if self.vne_override:
                 vne = self.vne_override
 
+        # Vne_kt / Qvne / Q Gain all use `vne` (potentially overridden) from here on
         telem_data.Vne_kt = vne * ms2kt
 
         Qvne = 0.5 * std_air_pressure * vne**2
@@ -626,7 +638,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                                    index [1] scaled by normalized stick Y position
             Written: _G_term    (float; pitch bias term sent to control_weight effect)
         """
-        assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
+        if not self._device_feeding():  # device unplugged; skip the grip-weighted G term this frame
+            return 0.0
 
         input_data = HapticEffect.device.get_input()
         dx, dy = input_data.CP_scaled_axisXY()
@@ -696,9 +709,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         -------
         tuple
             (phys_stick_x_offs, virtual_stick_x_offs, phys_stick_y_offs, virtual_stick_y_offs)
-            where physical offsets are integer device offsets (0..4096) and
-            virtual offsets are normalized [-1..1] values applied to virtual
-            stick commands.
+            where physical offsets are normalized [-1..1] spring-center values
+            (the device-unit conversion happens in the FFBReport_SetCondition
+            setters) and virtual offsets are normalized [-1..1] values applied
+            to virtual stick commands.
 
         Telemetry:
             Read: ElevTrimPct      - float (–1.0 to 1.0); normalized elevator trim pct;
@@ -728,7 +742,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         # Curve mode walks the spring center along the measured curve (axis
         # units) so held-stick force trims off at the aircraft's true rate;
         # legacy mode keeps the raw-trim center.
-        phys_stick_y_offs = int(self._trim_follow_center_y(elev_trim, virtual_stick_y_offs) * 4096)
+        phys_stick_y_offs = self._trim_follow_center_y(elev_trim, virtual_stick_y_offs)
 
         if self.ap_following and ap_active:
             if self._sim_is_msfs():
@@ -739,9 +753,9 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                 aileron_pos = telem_data.APRollServo or 0
             else:
                 aileron_pos = 0
-            phys_stick_x_offs = int(aileron_pos * 4096)
+            phys_stick_x_offs = aileron_pos
         else:
-            phys_stick_x_offs = int(aileron_trim * 4096)
+            phys_stick_x_offs = aileron_trim
 
         return phys_stick_x_offs, virtual_stick_x_offs, phys_stick_y_offs, virtual_stick_y_offs
 
@@ -764,7 +778,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         """
         if not self._axis_control_enabled():
             return
-        assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
+        if not self._device_feeding():  # device unplugged; nothing to send
+            return
         phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
@@ -800,6 +815,9 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                                       tot = ElevDefl / ElevDeflPct gives total range
                   WeightOnWheels   - List[float] (0.0–1.0 per wheel); max() > 0 skips AoA offset
         """
+        # All terms are normalized (-1..1); the single device-unit conversion
+        # happens in the FFBReport_SetCondition setter (float args are scaled
+        # by 4096 internally).
         if (
             self.aoa_effect_enabled
             and (telem_data.ElevDeflPct or 0) != 0
@@ -808,13 +826,12 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             tot = telem_data.ElevDefl / telem_data.ElevDeflPct
             speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
             y_offs = _aoa / tot
-            y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
+            y_offs = y_offs + force_trim_y_offset + phys_stick_y_offs
             y_offs = clamp(y_offs, -1, 1)
-            y_offs = int(y_offs * 4096 * speed_factor * self.aoa_effect_gain)
+            y_offs = y_offs * speed_factor * self.aoa_effect_gain
         else:
-            y_offs = force_trim_y_offset + (phys_stick_y_offs / 4096)
+            y_offs = force_trim_y_offset + phys_stick_y_offs
             y_offs = clamp(y_offs, -1, 1)
-            y_offs = int(y_offs * 4096)
 
         return y_offs
 
@@ -824,13 +841,16 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         Telemetry:
             Read:    (no direct telem_data reads; all inputs are pre-computed)
             Written: _pct_max_e (debug: elevator coeff as fraction of max)
-                     _ec        (debug: final elevator spring coefficient in device units)
+                     _ec        (debug: final elevator spring coefficient, normalized -1..1)
                      _pct_max_a (debug: aileron coeff as fraction of max)
-                     _ac        (debug: final aileron spring coefficient in device units)
+                     _ac        (debug: final aileron spring coefficient, normalized -1..1)
         """
-        max_coeff_y = int(4096 * self.max_elevator_coeff)
-        realtime_coeff_y = int(4096 * elevator_coeff)
-        ec = int(utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 4096), (base_elev_coeff, max_coeff_y)))
+        # All coefficients are normalized (-1..1); the device-unit conversion
+        # happens in the FFBReport_SetCondition setter (float args are scaled
+        # by 4096 internally).
+        max_coeff_y = self.max_elevator_coeff
+        realtime_coeff_y = elevator_coeff
+        ec = utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 1.0), (base_elev_coeff, max_coeff_y))
 
         pct_max_e = ec / max_coeff_y
         telem_data._pct_max_e = pct_max_e
@@ -838,9 +858,9 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         logging.debug(f"Elev Coef: {ec}")
         telem_data._ec = ec
 
-        max_coeff_x = int(4096 * self.max_aileron_coeff)
-        realtime_coeff_x = int(4096 * aileron_coeff)
-        ac = int(utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 4096), (base_ailer_coeff, max_coeff_x)))
+        max_coeff_x = self.max_aileron_coeff
+        realtime_coeff_x = aileron_coeff
+        ac = utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 1.0), (base_ailer_coeff, max_coeff_x))
 
         pct_max_a = ac / max_coeff_x
         telem_data._pct_max_a = pct_max_a
@@ -882,8 +902,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self._send_joystick_axis_commands(telem_data, virtual_stick_x_offs, virtual_stick_y_offs)
 
         y_offs = self._calculate_aoa_offset(telem_data, _aoa, force_trim_y_offset, phys_stick_y_offs, IAS, vne)
-        self.spring_y.cpOffset = y_offs
-        self.spring_x.cpOffset = phys_stick_x_offs
+        # cpOffset is a raw c_int16 device field; convert the normalized value
+        # here at the end of the pipeline.
+        self.spring_y.cpOffset = to_device_units(y_offs)
+        self.spring_x.cpOffset = to_device_units(phys_stick_x_offs)
 
         ec, ac = self._calculate_joystick_spring_coefficients(telem_data, elevator_coeff, aileron_coeff, 
                                                                base_elev_coeff, base_ailer_coeff)
@@ -914,7 +936,9 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         rudder_trim = telem_data.RudderTrimPct or 0
         rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
         virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
-        phys_rudder_x_offs = int(rudder_trim * 4096)
+        # normalized -1..1; the device-unit conversion happens in the
+        # FFBReport_SetCondition setter (float args are scaled by 4096 internally)
+        phys_rudder_x_offs = rudder_trim
 
         return phys_rudder_x_offs, virtual_rudder_x_offs
 
@@ -925,7 +949,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             Read (ADVANCED spring mode only): IAS - float (m/s, ≥ 0); indicated airspeed;
                                                       used to look up gains from adv_spr_gains table
             Written: _pct_max_r (float, 0.0–1.0; rudder coeff as fraction of max)
-                     _rc        (int, 0–4096; final rudder spring coefficient in device units)
+                     _rc        (float, 0–1; final rudder spring coefficient, normalized -1..1)
         """
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
             if not self.adv_spr_gains:
@@ -936,9 +960,12 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                 self.spring_x.set_coefficient(gains.get("x", 0))
                 rudder_coeff = gains.get("x", 0)
         else:
-            max_coeff_x = int(4096 * self.max_rudder_coeff)
-            realtime_coeff_x = int(4096 * rudder_coeff)
-            rudder_coeff = int(utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 4096), (base_rudder_coeff, max_coeff_x)))
+            # All coefficients are normalized (-1..1); the device-unit conversion
+            # happens in the FFBReport_SetCondition setter (float args are scaled
+            # by 4096 internally).
+            max_coeff_x = self.max_rudder_coeff
+            realtime_coeff_x = rudder_coeff
+            rudder_coeff = utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 1.0), (base_rudder_coeff, max_coeff_x))
 
             pct_max_r = rudder_coeff / max_coeff_x
             telem_data._pct_max_r = pct_max_r
@@ -947,45 +974,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self.spring_x.set_coefficient(rudder_coeff)
 
         return rudder_coeff
-    
-    @override
-    def msfs_update_steering_friction_effect(self, telem_data: BaseTelemetryData):
-        pass
-
-    def _apply_steering_friction(self, telem_data: BaseTelemetryData, phys_rudder_x_offs, rudder_coeff):
-        """Apply steering friction effect when on ground."""
-        if not self.steering_friction:
-            return
-
-        on_ground = telem_data.SimOnGround or 0
-        wos = (telem_data.WeightOnWheels or [0])[0]
-        surface = telem_data.SurfaceType or 0
-
-        if on_ground and (wos or surface == "Water"):
-            rudder_angle = 30  # assumed rudder travel
-            dynamic_angle = phys_rudder_x_offs * rudder_angle / 4096
-            dynamic_force = rudder_coeff / 4096
-            csa = telem_data.CenterSteerAnglePct or 0
-            steer_angle = csa * rudder_angle
-            steer_force = self.steering_friction_spring / 40
-
-            wr = telem_data.WaterRudderExt or 0
-            if surface == "Water":
-                steer_force *= wr
-
-            result_angle_percent, result_mag = utils.add_vectors_deg(
-                dynamic_angle, dynamic_force, steer_angle, steer_force
-            )
-
-            self.spring_x.set_coefficient(result_mag, True)
-            self.spring_x.set_offset(result_angle_percent / rudder_angle)
 
     def _send_rudder_axis_commands(self, telem_data: BaseTelemetryData, virtual_rudder_x_offs):
         """Send axis control commands to the simulator for rudder pedals."""
         if not self._axis_control_enabled():
             return
-        
-        assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
+        if not self._device_feeding():  # device unplugged; nothing to send
+            return
 
         phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
@@ -1011,9 +1006,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         rc = self._calculate_rudder_spring_coefficient(telem_data, rudder_coeff, base_rudder_coeff)
 
-        self.spring_x.cpOffset = phys_rudder_x_offs
+        # cpOffset is a raw c_int16 device field; convert the normalized value
+        # here at the end of the pipeline.
+        self.spring_x.cpOffset = to_device_units(phys_rudder_x_offs)
 
-        self._apply_steering_friction(telem_data, phys_rudder_x_offs, rc)
+        self._update_pedals_spring(telem_data, phys_rudder_x_offs, rc)
 
         if self._apply_pedal_controls_lock(telem_data, controls_locked):
             return
@@ -1157,7 +1154,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         vne, Q_gain = self._calculate_vne_and_gains(telem_data)
         
         # Calculate slip gain
-        _slip_gain = 1.0 - self.slip_gain * abs(sin(slip_angle))
+        _slip_gain = 1.0 - self.slip_gain * abs(slip_angle)
         telem_data._slip_gain = _slip_gain
         
         g_force = telem_data.G
@@ -1172,10 +1169,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         # Calculate rudder force
         rud_force = self._calculate_rudder_force(telem_data, slip_angle, rudder_angle, _dyn_pressure, _slip_gain, vne)
         
-        # Calculate base coefficients for scaling
-        base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
-        base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
-        base_rudder_coeff = round(clamp((rudder_base_gain * 4096), 0, 4096))
+        # Calculate base coefficients for scaling (normalized -1..1; the
+        # device-unit conversion happens in the FFBReport_SetCondition setters)
+        base_elev_coeff = clamp(elev_base_gain, 0, 1)
+        base_ailer_coeff = clamp(ailer_base_gain, 0, 1)
+        base_rudder_coeff = clamp(rudder_base_gain, 0, 1)
 
         # Apply device-specific FFB updates
         if ffb_type == "joystick":

@@ -364,7 +364,21 @@ class AircraftEffectUtilsBase(object):
         if input_data is None:
             return 0.0, 0.0
         return input_data.forceXY()
-    
+
+    def _device_feeding(self) -> bool:
+        """Whether the FFB device is connected and delivering HID input.
+
+        Axis overrides must never be claimed without a live device: the
+        plugin pins the virtual yoke/rudder to whatever we send, so a dead
+        instance would feed zeros/stale values and silence the user's real
+        controller. Re-checked every frame, so a hot-unplug releases the
+        override and a reconnect reclaims it.
+        """
+        device = HapticEffect.device
+        if device is None or not device.connected:
+            return False
+        return device.get_input() is not None
+
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""
         import random

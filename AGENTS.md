@@ -172,11 +172,28 @@ In the telemetry hot path, never let an exception propagate — it kills the pro
 `TelemManager` runs in its own thread. Never touch Qt widgets from background threads — route everything through `utils.schedule_on_main_thread(lambda: ...)`, or use PyQt signals.
 
 ### Effects & HID Values
-The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficients, offsets, saturation, and magnitude. Float values in MixIns (e.g. `0.5` spring coefficient) are multiplied by 4096 before sending to the device; `FFBReport_SetCondition.set_coefficient()` and `.set_offset()` handle the conversion automatically.
+The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficients, offsets, saturation, and magnitude. **All intermediate math in the FFB pipeline stays in normalized −1..1**; the ×4096 conversion happens only at the final boundary, inside the type-sniffing setters:
+
+- `FFBReport_SetCondition.set_coefficient()` / `.set_offset()` / `.set_saturation()` — a `float` argument is scaled by 4096 (rounded, clamped) internally; an `int` is passed through as device units.
+- `HapticEffect._conditional_effect` (damper/inertia/friction) and `HapticEffect.detent` — same sniffing via the `_to_device_units()` helper.
+- `cpOffset` is a raw `c_int16` field with **no** sniffing — a raw write needs explicit conversion (`to_device_units()` from `telemffb.util.conversions`). Prefer `spring.set_offset(value)` over a raw `cpOffset =` assignment.
+
+**Never** pre-scale a value before calling a setter: passing a device-unit float (e.g. `2048.0`) to `set_offset()` would be scaled again and clamped to 4096. If a value is already in device units, pass it as an `int`.
 
 `G.effects` is a `Dispenser` — accessing `G.effects["name"]` lazily creates the effect on first use, then returns the cached instance. Effect names must be unique within an aircraft instance.
 
 When you create a new effect, register its name in the effects translator: `effect_dict` in `telemffb/utils.py`. Each entry maps an effect-name pattern (regex supported, e.g. `"blade_slap.*"`) to `["Human Readable Name", "intensity_setting_name"]`. The translator supplies the readable name shown in the effects panel, and the setting-name half is how the UI links an active effect to its slider (green highlight and live % force display). An unregistered effect still works but appears under its raw internal name with no slider linkage.
+
+### Device Input Access
+`HapticEffect.device` is a **class attribute** holding the connected `FFBRhino` (or `None` when unplugged). In the telemetry hot path, never dereference it raw — a hot-unplug mid-frame raises `AttributeError` and kills the processing loop. Use the shared helpers on `AircraftEffectUtilsBase`:
+
+- `self._device_feeding()` — `True` only when the device is connected **and** delivering HID input. Use as the per-frame guard before any device access (axis reads, axis-override sends). Re-checked every frame so a hot-unplug releases sim axis overrides and a reconnect reclaims them.
+- `self._get_device_axes()` / `_get_device_raw_axes()` / `_get_device_CP_XY()` / `_get_device_forces()` — return `(0.0, 0.0)` when the device or its input report is absent. `_get_device_raw_axes()` returns `rawAxisXY()` when the firmware axis override is active, else `axisXY()`.
+- `self._get_device_report()` — the raw `FFBReport_Input` or `None`; `check_button_press()` already uses it.
+
+When you need the full input report (buttons, `CP_XY`, `CP_scaled_axisXY`), guard with `self._device_feeding()` first, then `HapticEffect.device.get_input()` — the guard makes the subsequent dereference safe. Do **not** use `assert HapticEffect.device is not None` in production paths (asserts are stripped under `python -O` and a failed assert kills the telemetry thread).
+
+Non-hot-path code (UI, startup, IPC handlers) may check `HapticEffect.device is None` directly.
 
 ### Telemetry Data
 Raw telemetry arrives as semicolon-delimited key-value pairs, with tilde-separated arrays: `KEY1=val1~val2;KEY2=val3;...`. `TelemManager` parses this into `BaseTelemetryData` — a dict-backed container that also supports dot-access (`telem_data.AoA`). All known fields are type-annotated on the class for IDE autocomplete; values default to `None` when absent. Access safely with `telem_data.get("key", default)` or dot-access with a `None` check.
@@ -276,6 +293,7 @@ effect.stop()  # Frees device resource
 10. **IPC is UDP, not TCP** — messages may be dropped; don't assume delivery ordering
 11. **`ffb_sdl.py` is deprecated** — do not use, kept for historical reference only
 12. **Never `assert` on runtime state in production paths** (device liveness included) — asserts are stripped under `python -O` and would silently kill the calling thread; use explicit checks instead
+13. **Never dereference `HapticEffect.device` raw in the telemetry hot path** — a hot-unplug mid-frame raises `AttributeError` and kills the processing loop. Guard with `self._device_feeding()` first, or use the `_get_device_*()` helpers which return safe defaults. See Coding Guidelines → Device Input Access
 
 ---
 
@@ -323,3 +341,4 @@ parameters, or telemetry variables. Note caveats, TODOs, or known limitations.
 - Are all `super()` calls present in the MixIn chain?
 - Is the effect name unique within the aircraft instance, and registered in `effect_dict`?
 - Do private (`_`-prefixed) members stay private to their class?
+- Does this touch `HapticEffect.device` in the hot path? Guard with `self._device_feeding()` or use the `_get_device_*()` helpers — never a raw dereference or `assert`

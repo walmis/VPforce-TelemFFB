@@ -1,5 +1,5 @@
 """
-Comprehensive unit tests for MfsfXpSteeringFrictionEffectMixIn.
+Comprehensive unit tests for MsfsXpSteeringFrictionMixIn.
 
 This module tests the steering friction effect for MSFS aircraft on ground,
 including various scenarios like different speeds, surfaces, and water operations.
@@ -12,16 +12,16 @@ from tests.framework.utils import (
     assert_effect_stopped,
     assert_friction_coefficient_in_range,
 )
-from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
+from telemffb.sim.msfs_xp.MsfsXpSteeringFrictionMixIn import MsfsXpSteeringFrictionMixIn
 
 
-class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
+class TestMsfsXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     """Test suite for MSFS steering friction effect."""
     
     def test_effect_disabled_by_default(self):
         """Test that effect does not activate when disabled."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 0  # Disabled
         instance.enable_friction_ovd = True
@@ -38,7 +38,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_effect_requires_pedals(self):
         """Test that effect only works with pedals FFB type."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -55,7 +55,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_effect_requires_msfs(self):
         """Test that effect only works with MSFS simulator."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = False
         instance._test_sim_is_xplane = True
         instance.steering_friction = 1
@@ -74,7 +74,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_effect_requires_friction_override_enabled(self):
         """Test that effect flags error when friction override not enabled."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = False  # Not enabled
@@ -93,7 +93,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_effect_activates_on_ground_with_weight(self):
         """Test that effect activates when aircraft is on ground with weight on wheels."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -120,7 +120,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_friction_scales_with_speed(self):
         """Test that friction coefficient decreases with increasing speed."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -179,7 +179,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_friction_intensity_parameter(self):
         """Test that steering_friction_intensity scales the effect magnitude."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -217,7 +217,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_water_surface_with_rudder(self):
         """Test friction behavior on water surface with water rudder."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -283,7 +283,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_effect_cleanup_when_airborne(self):
         """Test that effect properly cleans up when aircraft goes airborne."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -325,7 +325,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_effect_cleanup_when_disabled(self):
         """Test that effect properly cleans up when disabled after being active."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -362,7 +362,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_friction_respects_base_friction_force(self):
         """Test that effect respects base friction_force setting."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -385,7 +385,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
         # Assert
         effect = self.mock_effects['friction']
         coeff = effect.get_coefficients()[0]
-        expected_base = int(0.5 * 4096)
+        expected_base = 0.5  # normalized -1..1; the setter scales by 4096 internally
         assert coeff >= expected_base, (
             f"Friction coefficient ({coeff}) should be at least base friction ({expected_base})"
         )
@@ -393,7 +393,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_friction_coefficient_clamped_to_maximum(self):
         """Test that friction coefficient never exceeds maximum value of 4096."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -416,12 +416,12 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
         # Assert
         effect = self.mock_effects['friction']
         coeff = effect.get_coefficients()[0]
-        assert coeff <= 4096, f"Friction coefficient ({coeff}) should not exceed 4096"
+        assert coeff <= 1.0, f"Friction coefficient ({coeff}) should not exceed 1.0 (normalized)"
     
     def test_telemetry_data_updated(self):
         """Test that telemetry data includes steering friction percentage."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -450,7 +450,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
     def test_expo_curve_effect(self):
         """Test that expo parameter affects the friction curve."""
         # Arrange
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True

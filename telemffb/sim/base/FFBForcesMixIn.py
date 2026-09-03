@@ -33,11 +33,13 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
             None - no telem_data keys are read; effect parameters come entirely
                    from instance configuration (damper_force, inertia_force, friction_force).
         """
+        # All forces are normalized (0..1); the device-unit conversion happens
+        # in the effect setter (float args are scaled by 4096 internally).
         # Damper
         if self.enable_damper_ovd:
             if self.anything_has_changed('damper_value', self.damper_force) or not self.effects['damper'].started:
                 force = utils.clamp(self.damper_force, 0.0, 1.0)
-                self.effects["damper"].damper(int(4096*force), int(4096*force)).start()
+                self.effects["damper"].damper(force, force).start()
         else:
             if self.effects['damper'].started:
                 self.effects["damper"].destroy()
@@ -46,7 +48,7 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
         if self.enable_inertia_ovd:
             if self.anything_has_changed('inertia_value', self.inertia_force) or not self.effects['inertia'].started:
                 force = utils.clamp(self.inertia_force, 0.0, 1.0)
-                self.effects["inertia"].inertia(int(4096*force), int(4096*force)).start()
+                self.effects["inertia"].inertia(force, force).start()
         else:
             if self.effects['inertia'].started:
                 self.effects["inertia"].destroy()
@@ -56,7 +58,7 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
             if self.enable_friction_ovd:
                 force = utils.clamp(self.friction_force, 0.0, 1.0)
                 self.effects['friction'].name = 'friction'
-                self.effects["friction"].friction(int(4096*force), int(4096*force)).start()
+                self.effects["friction"].friction(force, force).start()
             else:
                 if self.effects['friction'].started:
                     self.effects["friction"].destroy()

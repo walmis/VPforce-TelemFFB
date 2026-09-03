@@ -1229,7 +1229,7 @@ class TestAPFollowing(BaseTelemetryEffectTestCase):
         spring = self.mock_effects['dynamic_spring']
         x_offset, _ = spring.get_offsets()
         # AP following should use aileron deflection for x offset
-        expected_x = int(0.3 * 4096)
+        expected_x = round(0.3 * 4096)
         assert x_offset == expected_x, f"X offset should reflect AileronDeflPctLR[0], got {x_offset}"
 
     def test_ap_following_xplane_uses_roll_servo(self):
@@ -1260,7 +1260,7 @@ class TestAPFollowing(BaseTelemetryEffectTestCase):
 
         spring = self.mock_effects['dynamic_spring']
         x_offset, _ = spring.get_offsets()
-        expected_x = int(0.4 * 4096)
+        expected_x = round(0.4 * 4096)
         assert x_offset == expected_x, f"X offset should reflect APRollServo, got {x_offset}"
 
     def test_ap_following_inactive_uses_aileron_trim(self):
@@ -1287,7 +1287,7 @@ class TestAPFollowing(BaseTelemetryEffectTestCase):
 
         spring = self.mock_effects['dynamic_spring']
         x_offset, _ = spring.get_offsets()
-        expected_x = int(0.3 * 4096)
+        expected_x = round(0.3 * 4096)
         assert x_offset == expected_x, f"X offset should use AileronTrimPct when AP inactive, got {x_offset}"
 
 

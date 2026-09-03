@@ -20,7 +20,6 @@ from typing import override
 from .Helicopter import Helicopter
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
-from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.util.conversions import kt2ms
 from telemffb.utils import clamp, PerformanceTracker
 
@@ -283,9 +282,9 @@ class HPGHelicopter(Helicopter):
             trim_reset = telem_data.hpgTrimRelease or 0
         else:
             trim_reset = False
-        input_data = HapticEffect.device.get_input()
+        input_data = self._get_device_report()
         # Force-trim button is only meaningful after the cyclic has initialised.
-        force_trim_pressed = input_data.isButtonPressed(self.force_trim_button) if self.cyclic_spring_init else False
+        force_trim_pressed = (input_data is not None and input_data.isButtonPressed(self.force_trim_button)) if self.cyclic_spring_init else False
         if force_trim_pressed:
             # Tell the HPG AFCS to reset its cyclic trim reference to the current
             # physical stick position, aligning the sim's trim state with the FFB center.
@@ -688,7 +687,6 @@ class HPGHelicopter(Helicopter):
         self._spring_handle.name = "collective_ap_spring"
         force_trim_pressed = False
         if self.spring_mode_is(SpringModeEnum.FORCETRIM) and self.force_trim_button:
-            input_data = HapticEffect.device.get_input()
             force_trim_pressed = self.check_button_press(self.force_trim_button, self.collective_ft_use_master_buttons)
             if self._sim_is_msfs() and force_trim_pressed:
                 # Disengage any active throttle/collective hold so the pilot's

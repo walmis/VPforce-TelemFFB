@@ -17,7 +17,6 @@
 #
 from typing import override
 
-from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
 from telemffb.sim.msfs_xp.MsfsXpNosewheelShimmyMixIn import MsfsXpNosewheelShimmyMixIn
 from telemffb.sim.msfs_xp.MsfsXpTrimwheelMixIn import MsfsXpTrimwheelMixIn
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn

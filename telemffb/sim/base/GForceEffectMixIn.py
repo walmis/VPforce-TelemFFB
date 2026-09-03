@@ -215,11 +215,8 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
             self.effects["new_gforce"].stop()
             return
 
-        input_data = HapticEffect.device.get_input()
         x, y = self._get_device_axes()
-        _, spring_y_center = input_data.CP_XY()
-        if spring_y_center is None:
-            spring_y_center = 0
+        _, spring_y_center = self._get_device_CP_XY()
         derivative_k = 0.1  # derivative gain value, or damping ratio
 
         dGs = self.__dGs

@@ -8,7 +8,6 @@ from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 
 from telemffb.utils import clamp
 
-
 import logging
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
@@ -145,8 +144,11 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 # Curve mode walks the spring center along the measured curve
                 # (axis units) so held-stick force trims off at the aircraft's
                 # true rate; legacy mode keeps the raw-trim center.
+                # Normalized -1..1; the device-unit conversion happens in the
+                # FFBReport_SetCondition setter (float args are scaled by 4096
+                # internally).
                 center_y = self._trim_follow_center_y(elev_trim, virtual_stick_y_offs)
-                phys_stick_y_offs = int(center_y * 4096)
+                phys_stick_y_offs = center_y
 
                 # With a calibrated curve active, the AP-follow branches below
                 # must NOT overwrite the curve-aware Y center/virtual offset
@@ -192,7 +194,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             elevator_pos = clamp((telem_data.ElevDeflPct or 0)
                                                  * self.joystick_ap_follow_gain_physical_y, -1, 1)
                             virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
-                            phys_stick_y_offs = int(elevator_pos * 4096)
+                            phys_stick_y_offs = elevator_pos
                         else:
                             # Follow the trim (default). Reuse this frame's
                             # dampened trim (t_damp) — the pre-refactor path
@@ -200,7 +202,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             # double-filtering it and corrupting its state.
                             elevator_pos = clamp(t_damp * self.joystick_ap_follow_gain_physical_y, -1, 1)
                             virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
-                            phys_stick_y_offs = int(elevator_pos * 4096)
+                            phys_stick_y_offs = elevator_pos
 
                         if isinstance(aileron_pos, (list, tuple)):
                             aileron_pos = aileron_pos[0] if aileron_pos else 0
@@ -233,16 +235,16 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             # snap at engage/disengage), and the delivered
                             # input (center minus the curve virtual offset)
                             # equals the servo command.
-                            phys_stick_y_offs = int(clamp(
-                                center_y + elevator_pos, -1, 1) * 4096)
+                            phys_stick_y_offs = clamp(
+                                center_y + elevator_pos, -1, 1)
                         else:
-                            phys_stick_y_offs = int(elevator_pos * 4096)
+                            phys_stick_y_offs = elevator_pos
 
-                    phys_stick_x_offs = int(aileron_pos * 4096)
+                    phys_stick_x_offs = aileron_pos
                     if self.invert_ap_x_axis:
                         phys_stick_x_offs = -phys_stick_x_offs
                 else:
-                    phys_stick_x_offs = int(aileron_trim * 4096)
+                    phys_stick_x_offs = aileron_trim
 
             else:
                 phys_stick_x_offs = 0
@@ -331,10 +333,11 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
             self.spring_y.set_coefficient(y_coeff)
             # logging.debug(f"Elev Coeef: {elevator_coeff}")
-            self.spring_y.cpOffset = phys_stick_y_offs
+            # set_offset() type-sniffs: normalized float → ×4096 (rounded), int → passthrough.
+            self.spring_y.set_offset(phys_stick_y_offs)
 
             self.spring_x.set_coefficient(x_coeff)
-            self.spring_x.cpOffset = phys_stick_x_offs
+            self.spring_x.set_offset(phys_stick_x_offs)
 
             self._spring_handle.setCondition(self.spring_y)
             self._spring_handle.setCondition(self.spring_x)
@@ -347,7 +350,10 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
                 virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
 
-                phys_rudder_x_offs = int(rudder_trim * 4096)
+                # normalized -1..1; the device-unit conversion happens in the
+                # FFBReport_SetCondition setter (float args are scaled by 4096
+                # internally)
+                phys_rudder_x_offs = rudder_trim
 
                 if self.ap_following and ap_active:
                     # print("I am here")
@@ -372,10 +378,10 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     #
                     # rudder_pos += rudder_pos_deriv
 
-                    phys_rudder_x_offs = int(rudder_pos * 4096)
+                    phys_rudder_x_offs = rudder_pos
 
                 else:
-                    phys_rudder_x_offs = int(rudder_trim * 4096)
+                    phys_rudder_x_offs = rudder_trim
 
             else:
                 phys_rudder_x_offs = 0
@@ -412,13 +418,15 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 # update spring data
 
             if self.ap_following and ap_active:
-                x_coeff = 4096
+                x_coeff = 1.0
             else:
-                x_coeff = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
+                # normalized -1..1 float; the setter scales by 4096 (matches the joystick branch)
+                x_coeff = utils.clamp(self.fbw_rudder_gain, 0.0, 1.0)
 
             self.spring_x.set_coefficient(x_coeff)
             # print(f"{phys_rudder_x_offs}")
-            self.spring_x.cpOffset = phys_rudder_x_offs
+            # set_offset() type-sniffs: normalized float → ×4096 (rounded), int → passthrough.
+            self.spring_x.set_offset(phys_rudder_x_offs)
             logging.debug(f"Elev Coeef: {x_coeff}")
 
             self._spring_handle.setCondition(self.spring_x)

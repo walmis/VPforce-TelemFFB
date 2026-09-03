@@ -294,20 +294,6 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     def _use_sim_axis_backend(self) -> bool:
         return self._axis_control_enabled() and not self._use_firmware_axis_backend()
 
-    def _device_feeding(self) -> bool:
-        """Whether the FFB device is connected and delivering HID input.
-
-        Axis overrides must never be claimed without a live device: the
-        plugin pins the virtual yoke/rudder to whatever we send, so a dead
-        instance would feed zeros/stale values and silence the user's real
-        controller. Re-checked every frame, so a hot-unplug releases the
-        override and a reconnect reclaims it.
-        """
-        device = HapticEffect.device
-        if device is None or not device.connected:
-            return False
-        return device.get_input() is not None
-
     def _send_firmware_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
         if not self._use_firmware_axis_backend():
             return False

@@ -317,7 +317,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             telem_data.get("ForceTrimSW", True) if self.custom_ft_sw_var_enabled else True  # non-zero default: keep .get()
         )  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
-            assert HapticEffect.device is not None, "HapticEffect.device is None"
+            if not self._device_feeding():  # device unplugged; nothing to send
+                return
             x, y = self._get_device_raw_axes()
             telem_data.phys_x = x
             telem_data.phys_y = y

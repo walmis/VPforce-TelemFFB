@@ -2,7 +2,6 @@ import time
 
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
 
 
@@ -80,16 +79,16 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         # the sim's trim axis.
         if not self.telemffb_controls_axes or self.local_disable_axis_control:
             return
-        
-        assert HapticEffect.device is not None, "Haptic device not initialized"
-        
+
+        if not self._device_feeding():  # device unplugged; nothing to send
+            return
+
         ap_active = 0
         if self._sim_is_msfs():
             ap_active = telem_data.APMaster or 0
         if self._sim_is_xplane():
             ap_active = telem_data.APServos or 0
 
-        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = self._get_device_axes()
         self._spring_handle.name = "trimwheel_ap_spring"
 
@@ -179,9 +178,6 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                 else:
                     y_var = "AXIS_ELEV_TRIM_SET"
                     y_range = 16384
-
-                input_data = HapticEffect.device.get_input()
-                # phys_x, phys_y = input_data.axisXY()
 
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
                 telem_data._tw_phys_y_pos = phys_y
