@@ -820,8 +820,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
 
         result = inst._initialize_cyclic_if_needed(telem)
 
-        assert inst.cpO_x == round(0.25 * 4096)
-        assert inst.cpO_y == round(-0.3 * 4096)
+        assert inst.cpO_x == 0.25
+        assert inst.cpO_y == -0.3
         # stick is at target → completes
         assert result is False
         assert inst.cyclic_spring_init == 1
@@ -973,8 +973,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         assert result is False
         assert inst.cyclic_trim_release_active == 0
         assert inst.cyclic_center == [0.4, 0.5]
-        assert inst.cpO_x == round(0.4 * 4096)
-        assert inst.cpO_y == round(0.5 * 4096)
+        assert inst.cpO_x == 0.4
+        assert inst.cpO_y == 0.5
 
     def test_force_trim_idle_sets_initial_coefficient(self):
         inst = self._make_instance()
@@ -1005,8 +1005,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
 
         assert result is False
         assert inst.ft_was_inactive is True
-        assert inst.cpO_x == round(0.3 * 4096)
-        assert inst.cpO_y == round(-0.2 * 4096)
+        assert inst.cpO_x == 0.3
+        assert inst.cpO_y == -0.2
 
     def test_force_trim_non_forcetrim_mode_zeroes_spring(self):
         inst = self._make_instance()
