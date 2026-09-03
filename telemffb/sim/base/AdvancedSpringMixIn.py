@@ -9,6 +9,7 @@ from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.util.conversions import FFB_UNITS
 
 perftracker = utils.PerformanceTracker()
 
@@ -125,8 +126,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
 
         if self.adv_spr_use_hardware_trim:
             dt = perftracker.get_time_delta('override_spring_perf')
-            trim_step_size = self.override_spring_trim_rate * dt
-            # trim_step_size = 200 * dt
+            trim_step_size = self.override_spring_trim_rate * dt / FFB_UNITS
             self.telem_data._ovrd_spr_step = trim_step_size
             self.telem_data._ovrd_spr_dt = dt
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
@@ -135,8 +135,8 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             x, y = self._get_device_axes()
             current_buttons = input_data.getPressedButtons() if input_data is not None else ()
             if self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
-                self.override_spring_cp0_x = 0
-                self.override_spring_cp0_y = 0
+                self.override_spring_cp0_x = 0.0
+                self.override_spring_cp0_y = 0.0
 
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 self.override_spring_cp0_y -= trim_step_size
@@ -148,17 +148,21 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
                 self.override_spring_cp0_x += trim_step_size
 
-            self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
-            self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
+            self.override_spring_cp0_x = utils.clamp(self.override_spring_cp0_x, -1.0, 1.0)
+            self.override_spring_cp0_y = utils.clamp(self.override_spring_cp0_y, -1.0, 1.0)
         else:
-            self.override_spring_cp0_x = 0
-            self.override_spring_cp0_y = 0
+            self.override_spring_cp0_x = 0.0
+            self.override_spring_cp0_y = 0.0
 
         offset = super().ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
-        g_y_offset = offset if offset is not None else 0
-        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), g_y_offset]
-        self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + g_y_offset))
-        self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
+        g_y_offset = offset if offset is not None else 0.0
+        self.telem_data._ovrd_spr_trim_pos = [
+            self.override_spring_cp0_x,
+            self.override_spring_cp0_y,
+            g_y_offset,
+        ]
+        self.spring_adjuster_y.set_offset(self.override_spring_cp0_y + g_y_offset)
+        self.spring_adjuster_x.set_offset(self.override_spring_cp0_x)
 
         adjuster = self.effects['adv_spr'].spring_adjuster()
         adjuster.setCondition(self.spring_adjuster_y)
@@ -166,7 +170,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         adjuster.start()
 
     @override
-    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr: bool = False) -> Optional[int]:
+    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr: bool = False) -> Optional[float]:
         """If advanced spring is enabled and in offset mode, handle gforce effect as part of advanced spring processing.
         else defer to GForceEffectMixIn implementation."""
         if not (self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED) and self.g_effect_get_adv_mode() == "offset"):

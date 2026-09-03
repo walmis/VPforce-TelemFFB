@@ -6,6 +6,7 @@ from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SQUARE
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.util.conversions import FFB_UNITS
 
 perftracker = utils.PerformanceTracker()
 
@@ -62,7 +63,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
     collective_ft_init: bool = False
     collective_ft_ovd_trim_down = 0
     collective_ft_ovd_trim_up = 0
-    collective_ft_ovd_cp0_y = 4096
+    collective_ft_ovd_cp0_y: float = 1.0
     collective_ft_use_master_buttons: bool = False
     # end of user parameters
     
@@ -257,8 +258,8 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
                      ForceTrimSW    - bool; cockpit force-trim switch state; when False
                                       the spring follows the stick position without locking
             Written: _coll_ft_dt      (float, s; frame delta time)
-                     _coll_ft_step    (float; trim step size in device units/frame)
-                     _coll_ft_trim_pos (int, –4096 to 4096; current trim offset in device units)
+                     _coll_ft_step    (float; normalized trim step per frame)
+                     _coll_ft_trim_pos (float, -1.0 to 1.0; normalized trim offset)
         """
 
         if not self.is_collective():
@@ -291,7 +292,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         if not force_trim_active:
             # Force trim is enabled, but the 'ForceTrimSW' flag is false, just move
             self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
-            self.collective_ft_ovd_cp0_y = round(y * 4096)
+            self.collective_ft_ovd_cp0_y = float(utils.clamp(y, -1.0, 1.0))
             self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
             return
@@ -303,7 +304,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # return from method so default spring gains do not get applied at the end of the method
             self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
 
-            self.collective_ft_ovd_cp0_y = round(y * 4096)
+            self.collective_ft_ovd_cp0_y = float(utils.clamp(y, -1.0, 1.0))
             self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
             spring.start(override=True)
@@ -312,12 +313,12 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         elif self.check_button_press(self.collective_ft_ovd_reset, self.collective_ft_use_master_buttons):
             # if trim reset button pressed, set offsets back to 0
             # print("TRIM RESET")
-            self.collective_ft_ovd_cp0_y = 4096
+            self.collective_ft_ovd_cp0_y = 1.0
             self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
 
         # calculate step size based on configured rate and delta time
-        trim_step_size = self.collective_ft_ovd_trim_rate * dt
+        trim_step_size = self.collective_ft_ovd_trim_rate * dt / FFB_UNITS
 
         self.telem_data._coll_ft_step = trim_step_size
 
@@ -325,16 +326,18 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM DOWN")
             self.collective_ft_ovd_cp0_y += trim_step_size
-            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
-            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
+            self.collective_ft_ovd_cp0_y = utils.clamp(
+                self.collective_ft_ovd_cp0_y, -1.0, 1.0)
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
         elif self.check_button_press(self.collective_ft_ovd_trim_up, self.collective_ft_use_master_buttons):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM UP")
             self.collective_ft_ovd_cp0_y -= trim_step_size
-            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
-            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
+            self.collective_ft_ovd_cp0_y = utils.clamp(
+                self.collective_ft_ovd_cp0_y, -1.0, 1.0)
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
 
-        self.telem_data._coll_ft_trim_pos = round(self.collective_ft_ovd_cp0_y)
+        self.telem_data._coll_ft_trim_pos = self.collective_ft_ovd_cp0_y
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_y.set_coefficient(self.collective_ft_ovd_spring_gain)

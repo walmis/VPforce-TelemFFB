@@ -56,7 +56,7 @@ class TestGForceOffsetCenterUnits(BaseTelemetryEffectTestCase):
 
         result = instance.ac_update_gforce_effect(telem, adv_spr=True)
 
-        assert result == -2048
+        assert result == pytest.approx(-0.5)
         assert "gforce_spr" not in self.mock_effects.dict
 
     def test_standalone_offset_upload_and_negative_sign(self, monkeypatch):
@@ -110,16 +110,16 @@ class TestAdvancedSpringCenterUnits(BaseTelemetryEffectTestCase):
 
         instance.ac_modify_game_spring()
 
-        assert instance.override_spring_cp0_x == 50
-        assert instance.override_spring_cp0_y == -50
-        assert instance.telem_data._ovrd_spr_step == 50
-        assert instance.telem_data._ovrd_spr_trim_pos[:2] == [50, -50]
+        assert instance.override_spring_cp0_x == pytest.approx(50 / 4096)
+        assert instance.override_spring_cp0_y == pytest.approx(-50 / 4096)
+        assert instance.telem_data._ovrd_spr_step == pytest.approx(50 / 4096)
+        assert instance.telem_data._ovrd_spr_trim_pos[:2] == pytest.approx([50 / 4096, -50 / 4096])
         assert self.mock_effects["adv_spr"].get_offsets() == (50, -50)
 
     def test_trim_clamps_and_reset_uploads_zero(self, monkeypatch):
         instance = self._instance()
-        instance.override_spring_cp0_x = 4080
-        instance.override_spring_cp0_y = -4080
+        instance.override_spring_cp0_x = 4080 / 4096
+        instance.override_spring_cp0_y = -4080 / 4096
         instance.override_spring_trim_rate = 200
         instance.override_spring_trim_right = 2
         instance.override_spring_trim_down = 1
@@ -131,7 +131,7 @@ class TestAdvancedSpringCenterUnits(BaseTelemetryEffectTestCase):
             advanced_spring_module.utils, "get_gain_from_speed", lambda *_args: {"x": 0.5, "y": 0.5})
 
         instance.ac_modify_game_spring()
-        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (4096, -4096)
+        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (1.0, -1.0)
         assert self.mock_effects["adv_spr"].get_offsets() == (4096, -4096)
 
         self.mock_device.get_input().release_button(1)
@@ -157,7 +157,7 @@ class TestPedalForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         self.mock_device.get_input().press_button(7)
 
         assert instance.ac_update_pedal_force_trim(instance.telem_data)
-        assert instance.cpO_x == 1024
+        assert instance.cpO_x == pytest.approx(0.25)
         assert instance.spring_x.cpOffset == 1024
 
     def test_cockpit_switch_off_uses_same_capture_path(self):
@@ -165,25 +165,25 @@ class TestPedalForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         self.mock_device.get_input().set_axis(x=-0.3)
 
         assert instance.ac_update_pedal_force_trim(instance.telem_data, ft_active=False)
-        assert instance.cpO_x == round(-0.3 * 4096)
+        assert instance.cpO_x == pytest.approx(-0.3)
         assert instance.spring_x.cpOffset == round(-0.3 * 4096)
 
     def test_reset_uploads_each_intermediate_center(self):
         instance = self._instance()
-        instance.cpO_x = 1024
+        instance.cpO_x = 0.25
         instance.pedal_trim_reset_complete = False
         calls = []
 
         def step(key, value, timeframe_ms, destination, **kwargs):
             calls.append((key, value, timeframe_ms, destination, kwargs))
-            return 768
+            return 768 / 4096
 
         instance.step_value_over_time = step
         assert instance.ac_update_pedal_force_trim(instance.telem_data)
-        assert instance.cpO_x == 768
+        assert instance.cpO_x == pytest.approx(768 / 4096)
         assert instance.spring_x.cpOffset == 768
         assert not instance.pedal_trim_reset_complete
-        assert calls == [("center_x", 1024, 1000, 0, {})]
+        assert calls == [("center_x", 0.25, 1000, 0.0, {"floatpoint": True})]
 
 
 class TestCollectiveForceTrimCenterUnits(BaseTelemetryEffectTestCase):
@@ -216,7 +216,7 @@ class TestCollectiveForceTrimCenterUnits(BaseTelemetryEffectTestCase):
 
         instance.ac_collective_force_trim_override(telem, spring)
 
-        assert instance.collective_ft_ovd_cp0_y == 1024
+        assert instance.collective_ft_ovd_cp0_y == pytest.approx(0.25)
         assert instance.spring_y.cpOffset == 1024
         assert spring.get_offsets()[1] == 1024
         assert spring.start_count == 0
@@ -230,7 +230,7 @@ class TestCollectiveForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         instance.ac_collective_force_trim_override(instance.telem_data, spring)
 
         expected = round(-0.3 * 4096)
-        assert instance.collective_ft_ovd_cp0_y == expected
+        assert instance.collective_ft_ovd_cp0_y == pytest.approx(-0.3)
         assert instance.spring_y.cpOffset == expected
         assert spring.get_offsets()[1] == expected
         assert spring.started
@@ -243,17 +243,17 @@ class TestCollectiveForceTrimCenterUnits(BaseTelemetryEffectTestCase):
             helicopter_effects_module.perftracker, "get_time_delta", lambda _key: 0.5)
 
         instance.ac_collective_force_trim_override(instance.telem_data, spring)
-        assert instance.collective_ft_ovd_cp0_y == 4096
+        assert instance.collective_ft_ovd_cp0_y == 1.0
         assert instance.spring_y.cpOffset == 4096
-        assert instance.telem_data._coll_ft_step == 100
-        assert instance.telem_data._coll_ft_trim_pos == 4096
+        assert instance.telem_data._coll_ft_step == pytest.approx(100 / 4096)
+        assert instance.telem_data._coll_ft_trim_pos == 1.0
 
         self.mock_device.get_input().release_button(6)
         self.mock_device.get_input().press_button(8)
         instance.ac_collective_force_trim_override(instance.telem_data, spring)
-        assert instance.collective_ft_ovd_cp0_y == 3996
+        assert instance.collective_ft_ovd_cp0_y == pytest.approx(3996 / 4096)
         assert instance.spring_y.cpOffset == 3996
-        assert instance.telem_data._coll_ft_trim_pos == 3996
+        assert instance.telem_data._coll_ft_trim_pos == pytest.approx(3996 / 4096)
 
 
 class TestDcsSpringCenterUnits(BaseTelemetryEffectTestCase):
@@ -275,13 +275,13 @@ class TestDcsSpringCenterUnits(BaseTelemetryEffectTestCase):
         self.mock_device.get_input().set_axis(y=1.0)
 
         instance.dcs_override_collective_spring(telem)
-        assert instance.cpO_y == 4096
+        assert instance.cpO_y == 1.0
         assert instance.spring_y.cpOffset == 4096
         assert instance.collective_init == 1
 
         self.mock_device.get_input().set_axis(y=0.35)
         instance.dcs_override_collective_spring(telem)
-        assert instance.cpO_y == round(0.35 * 4096)
+        assert instance.cpO_y == pytest.approx(0.35)
         assert instance.spring_y.cpOffset == round(0.35 * 4096)
 
     def test_pedal_trim_converts_only_at_condition_boundary(self, monkeypatch):
@@ -309,7 +309,7 @@ class TestDcsSpringCenterUnits(BaseTelemetryEffectTestCase):
         monkeypatch.setattr(dcs_module.perftracker, "get_time_delta", lambda _key: 0.25)
 
         instance.dcs_override_spring()
-        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (1024, -2048)
+        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (0.25, -0.5)
         assert (instance.spring_x.cpOffset, instance.spring_y.cpOffset) == (1024, -2048)
 
         self.mock_device.get_input().release_button(4)
@@ -318,10 +318,12 @@ class TestDcsSpringCenterUnits(BaseTelemetryEffectTestCase):
         self.mock_device.get_input().press_button(5)
         self.mock_device.get_input().press_button(6)
         instance.dcs_override_spring()
-        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (1074, -2098)
+        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == pytest.approx(
+            (1074 / 4096, -2098 / 4096))
         assert (instance.spring_x.cpOffset, instance.spring_y.cpOffset) == (1074, -2098)
-        assert instance.telem_data._ovrd_spr_step == 50
-        assert instance.telem_data._ovrd_spr_trim_pos == [1074, -2098]
+        assert instance.telem_data._ovrd_spr_step == pytest.approx(50 / 4096)
+        assert instance.telem_data._ovrd_spr_trim_pos == pytest.approx(
+            [1074 / 4096, -2098 / 4096])
 
 
 class TestIl2SpringCenterUnits(BaseTelemetryEffectTestCase):
@@ -335,16 +337,16 @@ class TestIl2SpringCenterUnits(BaseTelemetryEffectTestCase):
         instance.override_spring_trim_rate = 200
         instance.override_spring_trim_right = 5
         instance.override_spring_trim_down = 6
-        instance.override_spring_cp0_x = 4080
-        instance.override_spring_cp0_y = -4080
+        instance.override_spring_cp0_x = 4080 / 4096
+        instance.override_spring_cp0_y = -4080 / 4096
         self.mock_device.get_input().press_button(5)
         self.mock_device.get_input().press_button(6)
         monkeypatch.setattr(il2_module.perftracker, "get_time_delta", lambda _key: 0.25)
 
         instance.il2_override_spring()
 
-        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (4096, -4096)
+        assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (1.0, -1.0)
         assert (instance.spring_x.cpOffset, instance.spring_y.cpOffset) == (4096, -4096)
-        assert instance.telem_data._ovrd_spr_step == 50
-        assert instance.telem_data._ovrd_spr_trim_pos == [4096, -4096]
+        assert instance.telem_data._ovrd_spr_step == pytest.approx(50 / 4096)
+        assert instance.telem_data._ovrd_spr_trim_pos == [1.0, -1.0]
         assert self.mock_effects["il2_spr_override"].started
