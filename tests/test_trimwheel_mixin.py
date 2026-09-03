@@ -338,8 +338,8 @@ class TestTrimwheelSpringInit(BaseTelemetryEffectTestCase):
         instance.msfs_update_trimwheel(telem)
 
         assert instance.trimwheel_init == 1
-        # init point = sim trim (ElevTrimPct 0.2) in device units
-        assert instance.cpO_y == round(0.2 * 4096)
+        # Init point is retained internally in normalized units.
+        assert instance.cpO_y == pytest.approx(0.2)
         # THE invariant guard: hardware sees the same device-unit offset
         assert instance.spring_y.cpOffset == round(0.2 * 4096)
 

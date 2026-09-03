@@ -80,7 +80,7 @@ class TestXAW109PedalAfcs(BaseTelemetryEffectTestCase):
         t = self._telem(SimOnGround=0, AW109_rudder_trim_rate=-1,
                         AW109_rud_trim_zero=0.0, IAS=10.0)
         ac.msfs_update_pedals(t)
-        assert ac.cpO_x == before - ac.afcs_motion_rate
+        assert ac.cpO_x == before - ac.afcs_motion_rate / 4096
 
     def test_ias_fade_reduces_proportional_step(self):
         slow = self._inst()
@@ -111,7 +111,8 @@ class TestXAW109PedalAfcs(BaseTelemetryEffectTestCase):
         t = self._telem(SimOnGround=0,
                         AW109_ped_force_trim_release_pressed=1)
         ac.msfs_update_pedals(t)
-        assert ac.cpO_x == round(0.4 * 4096)
+        assert ac.cpO_x == pytest.approx(0.4)
+        assert ac.spring_x.cpOffset == round(0.4 * 4096)
 
 
 @pytest.mark.unit
@@ -149,14 +150,15 @@ class TestXAW109CyclicAfcs(BaseTelemetryEffectTestCase):
 
     def test_trim_rate_drives_spring_center(self):
         ac = self._inst()
-        # rate=0.5 * afcs_motion_rate=4 -> 2 device units per frame
+        # rate=0.5 * afcs_motion_rate=4 -> historical 2-device-unit step
+        # represented as 2/4096 internally.
         ac.msfs_update_heli_controls(
             self._telem(AW109_aileron_trim_rate=0.5,
                         AW109_elevator_trim_rate=-0.25))
-        assert ac.afcsx_step_size == pytest.approx(2.0)
-        assert ac.afcsy_step_size == pytest.approx(-1.0)
-        assert ac.cpO_x == pytest.approx(2.0)
-        assert ac.cpO_y == pytest.approx(-1.0)
+        assert ac.afcsx_step_size == pytest.approx(2 / 4096)
+        assert ac.afcsy_step_size == pytest.approx(-1 / 4096)
+        assert ac.cpO_x == pytest.approx(2 / 4096)
+        assert ac.cpO_y == pytest.approx(-1 / 4096)
 
     def test_spring_cpOffset_tracks_cpO_in_device_units(self):
         # THE invariant guard: hardware must see the same device-unit offsets
@@ -165,8 +167,8 @@ class TestXAW109CyclicAfcs(BaseTelemetryEffectTestCase):
         ac.msfs_update_heli_controls(
             self._telem(AW109_aileron_trim_rate=0.5,
                         AW109_elevator_trim_rate=0.25))
-        assert ac.spring_x.cpOffset == round(ac.cpO_x)
-        assert ac.spring_y.cpOffset == round(ac.cpO_y)
+        assert ac.spring_x.cpOffset == round(ac.cpO_x * 4096)
+        assert ac.spring_y.cpOffset == round(ac.cpO_y * 4096)
         assert ac.spring_x.cpOffset == 2
         assert ac.spring_y.cpOffset == 1
 
@@ -207,7 +209,7 @@ class TestXAW109Collective(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.0, y=1.0)  # full down
         ac.msfs_update_collective(self._telem(SimOnGround=1))
         assert ac.collective_init == 1
-        assert ac.cpO_y == 4096
+        assert ac.cpO_y == 1.0
         # THE invariant guard: hardware sees full-down device units.
         assert ac.spring_y.cpOffset == 4096
 
@@ -216,7 +218,7 @@ class TestXAW109Collective(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.0, y=0.5)
         ac.msfs_update_collective(self._telem(SimOnGround=0))
         assert ac.collective_init == 1
-        assert ac.cpO_y == round(0.5 * 4096)
+        assert ac.cpO_y == pytest.approx(0.5)
         assert ac.spring_y.cpOffset == round(0.5 * 4096)
 
     def test_afcs_ratio_drives_spring_center(self):
@@ -225,11 +227,11 @@ class TestXAW109Collective(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.0, y=1.0)
         ac.msfs_update_collective(self._telem(SimOnGround=1))
         assert ac.collective_init == 1
-        # AW109_collective_ratio 0.25 -> scale_clamp((0,1)->(4096,-4096)) = 2048
+        # AW109_collective_ratio 0.25 -> normalized center 0.5 -> 2048 on device.
         ac.msfs_update_collective(
             self._telem(SimOnGround=0, AW109_collective_mode=1,
                         AW109_collective_ratio=0.25))
-        assert ac.cpO_y == 2048
+        assert ac.cpO_y == pytest.approx(0.5)
         assert ac.spring_y.cpOffset == 2048
 
     def test_afcs_ratio_full_up_reaches_negative_full_scale(self):
@@ -239,7 +241,7 @@ class TestXAW109Collective(BaseTelemetryEffectTestCase):
         ac.msfs_update_collective(
             self._telem(SimOnGround=0, AW109_collective_mode=1,
                         AW109_collective_ratio=1.0))
-        assert ac.cpO_y == -4096
+        assert ac.cpO_y == -1.0
         assert ac.spring_y.cpOffset == -4096
 
     def test_init_gate_blocks_until_centered(self):

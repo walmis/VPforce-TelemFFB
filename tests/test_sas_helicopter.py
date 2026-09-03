@@ -1,15 +1,11 @@
 """Characterization tests for SASHelicopter cyclic SEMA follow.
 
-These tests pin the observable behavior of the SAS cyclic path BEFORE the
-cpO_* unit normalization (TASK002): the spring center (cpO_x/cpO_y) is
-expressed in DEVICE units (0..4096) and written raw to spring.cpOffset.
+These tests pin the observable behavior of the SAS cyclic path after the
+TASK002 unit normalization: the spring center (cpO_x/cpO_y) is expressed as
+a normalized float while ``set_offset()`` performs the device-unit conversion.
 
 The device-unit ``spring_x/y.cpOffset`` assertions are the invariant
-regression guard: after TASK002 normalizes cpO_* to -1..1, the hardware must
-still receive the same device-unit offsets (via the type-sniffing
-``set_offset()``), so these assertions must keep passing unchanged. Only the
-internal ``cpO_*`` assertions are expected to be rewritten in normalized
-units.
+regression guard: the hardware must still receive the same device-unit offsets.
 """
 import pytest
 
@@ -61,31 +57,31 @@ class TestSASCyclicSemaFollow(BaseTelemetryEffectTestCase):
     def test_sema_x_step_size_is_0_1x(self):
         ac = self._inst()
         # First rolling-average call returns the value itself: sema_x=20
-        # -> afcsx_step_size = 20 * 0.1 = 2 device units.
+        # -> historical 2-device-unit step = 2/4096 normalized.
         ac.msfs_update_heli_controls(self._telem(SEMAx=20, SEMAy=0))
-        assert ac.afcsx_step_size == pytest.approx(2.0)
-        assert ac.cpO_x == pytest.approx(-2.0)
+        assert ac.afcsx_step_size == pytest.approx(2 / 4096)
+        assert ac.cpO_x == pytest.approx(-2 / 4096)
 
     def test_sema_y_step_size_is_0_3x(self):
         ac = self._inst()
-        # sema_y=10 -> afcsy_step_size = 10 * 0.3 = 3 device units
+        # sema_y=10 -> historical 3-device-unit step = 3/4096 normalized
         ac.msfs_update_heli_controls(self._telem(SEMAx=0, SEMAy=10))
-        assert ac.afcsy_step_size == pytest.approx(3.0)
-        assert ac.cpO_y == pytest.approx(-3.0)
+        assert ac.afcsy_step_size == pytest.approx(3 / 4096)
+        assert ac.cpO_y == pytest.approx(-3 / 4096)
 
     def test_sema_sign_direction(self):
         ac = self._inst()
         ac.msfs_update_heli_controls(self._telem(SEMAx=-20, SEMAy=-10))
-        assert ac.cpO_x == pytest.approx(2.0)
-        assert ac.cpO_y == pytest.approx(3.0)
+        assert ac.cpO_x == pytest.approx(2 / 4096)
+        assert ac.cpO_y == pytest.approx(3 / 4096)
 
     def test_spring_cpOffset_tracks_cpO_in_device_units(self):
         # THE invariant guard: the hardware must see the same device-unit
         # offset before and after the TASK002 normalization.
         ac = self._inst()
         ac.msfs_update_heli_controls(self._telem(SEMAx=20, SEMAy=10))
-        assert ac.spring_x.cpOffset == round(ac.cpO_x)
-        assert ac.spring_y.cpOffset == round(ac.cpO_y)
+        assert ac.spring_x.cpOffset == round(ac.cpO_x * 4096)
+        assert ac.spring_y.cpOffset == round(ac.cpO_y * 4096)
         assert ac.spring_x.cpOffset == -2
         assert ac.spring_y.cpOffset == -3
 
