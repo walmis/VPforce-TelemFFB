@@ -9,9 +9,18 @@ rudder_trim_rate whenever it speaks.
 """
 import pytest
 
+import telemffb.globals as G
 from tests.framework.base import BaseTelemetryEffectTestCase
 from tests.framework.utils import TelemetryDataBuilder
 from telemffb.sim.msfs_xp.XAW109Helicopter import XAW109Helicopter
+
+
+@pytest.fixture(autouse=True)
+def _firmware_version():
+    # _get_device_raw_axes() consults the firmware version via the mock device
+    G.device_firmware_version = "1.0.18"
+    yield
+    G.device_firmware_version = None
 
 
 class TestXAW109PedalAfcs(BaseTelemetryEffectTestCase):
@@ -103,3 +112,139 @@ class TestXAW109PedalAfcs(BaseTelemetryEffectTestCase):
                         AW109_ped_force_trim_release_pressed=1)
         ac.msfs_update_pedals(t)
         assert ac.cpO_x == round(0.4 * 4096)
+
+
+@pytest.mark.unit
+@pytest.mark.xplane
+@pytest.mark.helicopter
+class TestXAW109CyclicAfcs(BaseTelemetryEffectTestCase):
+    """Cyclic AFCS follow: trim-rate telemetry drives the spring center.
+
+    Untested before TASK002 — pins the device-unit spring offsets (the
+    invariant hardware contract) and the per-frame step math.
+    """
+
+    def _inst(self):
+        ac = self.create_aircraft_instance(
+            XAW109Helicopter, name="AW109",
+            _test_sim_is_xplane=True, _test_device_type="joystick")
+        from telemffb.SettingsManager import SpringModeEnum
+        ac.spring_mode = SpringModeEnum.BASIC
+        ac.telemffb_controls_axes = True
+        ac.cyclic_spring_init = 1
+        ac.cpO_x = 0
+        ac.cpO_y = 0
+        ac.afcs_motion_rate = 4
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        return ac
+
+    def _telem(self, **kw):
+        b = (TelemetryDataBuilder()
+             .ffb_type("joystick")
+             .on_ground(False)
+             .with_field("APServos", 0))
+        for k, v in kw.items():
+            b = b.with_field(k, v)
+        return b.build()
+
+    def test_trim_rate_drives_spring_center(self):
+        ac = self._inst()
+        # rate=0.5 * afcs_motion_rate=4 -> 2 device units per frame
+        ac.msfs_update_heli_controls(
+            self._telem(AW109_aileron_trim_rate=0.5,
+                        AW109_elevator_trim_rate=-0.25))
+        assert ac.afcsx_step_size == pytest.approx(2.0)
+        assert ac.afcsy_step_size == pytest.approx(-1.0)
+        assert ac.cpO_x == pytest.approx(2.0)
+        assert ac.cpO_y == pytest.approx(-1.0)
+
+    def test_spring_cpOffset_tracks_cpO_in_device_units(self):
+        # THE invariant guard: hardware must see the same device-unit offsets
+        # before and after the TASK002 normalization.
+        ac = self._inst()
+        ac.msfs_update_heli_controls(
+            self._telem(AW109_aileron_trim_rate=0.5,
+                        AW109_elevator_trim_rate=0.25))
+        assert ac.spring_x.cpOffset == round(ac.cpO_x)
+        assert ac.spring_y.cpOffset == round(ac.cpO_y)
+        assert ac.spring_x.cpOffset == 2
+        assert ac.spring_y.cpOffset == 1
+
+    def test_zero_trim_rate_holds_center(self):
+        ac = self._inst()
+        ac.msfs_update_heli_controls(
+            self._telem(AW109_aileron_trim_rate=0,
+                        AW109_elevator_trim_rate=0))
+        assert ac.cpO_x == 0 and ac.cpO_y == 0
+
+
+@pytest.mark.unit
+@pytest.mark.xplane
+@pytest.mark.helicopter
+class TestXAW109Collective(BaseTelemetryEffectTestCase):
+    """Collective spring: init handshake + AFCS ratio tracking."""
+
+    def _inst(self):
+        ac = self.create_aircraft_instance(
+            XAW109Helicopter, name="AW109",
+            _test_sim_is_xplane=True, _test_device_type="collective")
+        ac.telemffb_controls_axes = True
+        ac.collective_init = 0
+        ac.last_collective_y = None
+        return ac
+
+    def _telem(self, **kw):
+        b = (TelemetryDataBuilder()
+             .ffb_type("collective")
+             .on_ground(False)
+             .with_field("APServos", 0))
+        for k, v in kw.items():
+            b = b.with_field(k, v)
+        return b.build()
+
+    def test_ground_init_parks_at_full_down(self):
+        ac = self._inst()
+        self.mock_device._input_data.set_axis(x=0.0, y=1.0)  # full down
+        ac.msfs_update_collective(self._telem(SimOnGround=1))
+        assert ac.collective_init == 1
+        assert ac.cpO_y == 4096
+        # THE invariant guard: hardware sees full-down device units.
+        assert ac.spring_y.cpOffset == 4096
+
+    def test_air_init_uses_physical_position(self):
+        ac = self._inst()
+        self.mock_device._input_data.set_axis(x=0.0, y=0.5)
+        ac.msfs_update_collective(self._telem(SimOnGround=0))
+        assert ac.collective_init == 1
+        assert ac.cpO_y == round(0.5 * 4096)
+        assert ac.spring_y.cpOffset == round(0.5 * 4096)
+
+    def test_afcs_ratio_drives_spring_center(self):
+        ac = self._inst()
+        # init at full down (lever physically at 1.0 matches the init point)
+        self.mock_device._input_data.set_axis(x=0.0, y=1.0)
+        ac.msfs_update_collective(self._telem(SimOnGround=1))
+        assert ac.collective_init == 1
+        # AW109_collective_ratio 0.25 -> scale_clamp((0,1)->(4096,-4096)) = 2048
+        ac.msfs_update_collective(
+            self._telem(SimOnGround=0, AW109_collective_mode=1,
+                        AW109_collective_ratio=0.25))
+        assert ac.cpO_y == 2048
+        assert ac.spring_y.cpOffset == 2048
+
+    def test_afcs_ratio_full_up_reaches_negative_full_scale(self):
+        ac = self._inst()
+        self.mock_device._input_data.set_axis(x=0.0, y=1.0)
+        ac.msfs_update_collective(self._telem(SimOnGround=1))
+        ac.msfs_update_collective(
+            self._telem(SimOnGround=0, AW109_collective_mode=1,
+                        AW109_collective_ratio=1.0))
+        assert ac.cpO_y == -4096
+        assert ac.spring_y.cpOffset == -4096
+
+    def test_init_gate_blocks_until_centered(self):
+        ac = self._inst()
+        # lever far from the full-down init point -> init must not complete
+        self.mock_device._input_data.set_axis(x=0.0, y=-0.5)
+        ac.msfs_update_collective(self._telem(SimOnGround=1))
+        assert ac.collective_init == 0

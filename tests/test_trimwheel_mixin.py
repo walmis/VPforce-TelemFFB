@@ -251,15 +251,14 @@ class TestTrimwheelCalibrationHold(BaseTelemetryEffectTestCase):
             "tolerance must return to the button-trim default after release"
 
     def test_expired_hold_does_not_suppress(self):
-        instance = self._trimwheel()
+        instance = self._trimwheel(phys_y=0.05)
+        G.trimcal_hold_until = time.perf_counter() - 1.0   # already expired
         telem = self._telem()
         instance._telem_data = telem
-        # a crashed master left a stale hold behind: TTL already passed
-        G.trimcal_hold_until = time.perf_counter() - 0.1
 
         instance.msfs_update_trimwheel(telem)
 
-        assert len(self._writes(instance)) == 1, "expired hold must not mute the wheel"
+        assert len(self._writes(instance)) == 1
 
 
 class TestTrimwheelLimitFallbacks(BaseTelemetryEffectTestCase):
@@ -300,3 +299,93 @@ class TestTrimwheelLimitFallbacks(BaseTelemetryEffectTestCase):
         assert instance._trimwheel_sim_pos(telem, None) == pytest.approx(0.9)
         no_trim = TelemetryDataBuilder().set("ElevTrimPct", 0.9).build()
         assert instance._trimwheel_sim_pos(no_trim, (-10.0, 10.0)) == pytest.approx(0.9)
+
+
+class TestTrimwheelSpringInit(BaseTelemetryEffectTestCase):
+    """Init-path spring center: untested before TASK002.
+
+    Pins the device-unit spring offset the hardware receives during the
+    init handshake (the invariant hardware contract) and the normalized
+    telemetry exposure.
+    """
+
+    def _trimwheel(self, phys_y=0.0):
+        instance = self.create_test_instance(
+            MsfsXpTrimwheelMixIn,
+            telemffb_controls_axes=True,
+            trimwheel_use_axis=False,
+        )
+        instance._test_sim_is_msfs = True
+        self.mock_device.get_input().set_axis(x=0.0, y=phys_y)
+        return instance
+
+    def _telem(self, **extra):
+        builder = (
+            TelemetryDataBuilder()
+            .ffb_type("trimwheel")
+            .set("APMaster", 0)
+            .set("ElevTrimPct", 0.0)
+        )
+        for key, value in extra.items():
+            builder.set(key, value)
+        return builder.build()
+
+    def test_air_start_seeds_center_from_sim_trim(self):
+        instance = self._trimwheel(phys_y=0.2)
+        telem = self._telem(ElevTrimPct=0.2)
+        instance._telem_data = telem
+
+        instance.msfs_update_trimwheel(telem)
+
+        assert instance.trimwheel_init == 1
+        # init point = sim trim (ElevTrimPct 0.2) in device units
+        assert instance.cpO_y == round(0.2 * 4096)
+        # THE invariant guard: hardware sees the same device-unit offset
+        assert instance.spring_y.cpOffset == round(0.2 * 4096)
+
+    def test_resume_seeds_center_from_last_position(self):
+        instance = self._trimwheel(phys_y=-0.1)
+        instance.last_trimwheel_y = -0.1
+        telem = self._telem(ElevTrimPct=0.0)
+        instance._telem_data = telem
+
+        instance.msfs_update_trimwheel(telem)
+
+        assert instance.trimwheel_init == 1
+        # The init frame seeds cpO_y from last_trimwheel_y, but the follow
+        # path in the SAME frame immediately re-centers to the sim trim
+        # (ElevTrimPct 0.0) — the hardware sees the follow value.
+        assert instance.spring_y.cpOffset == pytest.approx(0.0, abs=2)
+
+    def test_init_gate_blocks_until_wheel_centered(self):
+        instance = self._trimwheel(phys_y=0.5)   # wheel far from trim 0.0
+        telem = self._telem(ElevTrimPct=0.0)
+        instance._telem_data = telem
+
+        instance.msfs_update_trimwheel(telem)
+
+        assert instance.trimwheel_init == 0
+
+    def test_follow_publishes_normalized_center_to_telemetry(self):
+        instance = self._trimwheel(phys_y=0.3)   # wheel at the sim trim
+        telem = self._telem(ElevTrimPct=0.3, ElevTrim=3.0,
+                            ElevTrimMax=10.0, ElevTrimMin=-10.0)
+        instance._telem_data = telem
+
+        instance.msfs_update_trimwheel(telem)   # init frame
+        instance.msfs_update_trimwheel(telem)   # follow frame
+
+        # _tw_cpO_y is the NORMALIZED spring center (invariant meaning)
+        assert telem.get("_tw_cpO_y") == pytest.approx(0.3, abs=0.01)
+        # hardware still receives device units via the type-sniffing setter
+        assert instance.spring_y.cpOffset == pytest.approx(0.3 * 4096, abs=2)
+
+    def test_ap_active_branch_follows_sim_trim(self):
+        instance = self._trimwheel(phys_y=0.4)   # wheel at the sim trim
+        telem = self._telem(ElevTrimPct=0.4, APMaster=1)
+        instance._telem_data = telem
+
+        instance.msfs_update_trimwheel(telem)   # init frame
+        instance.msfs_update_trimwheel(telem)   # AP-active frame
+
+        assert instance.spring_y.cpOffset == pytest.approx(0.4 * 4096, abs=2)

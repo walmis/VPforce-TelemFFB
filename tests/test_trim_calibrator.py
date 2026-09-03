@@ -9,6 +9,7 @@ import math
 import time
 
 import pytest
+from unittest.mock import Mock
 
 import telemffb.globals as G
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
@@ -37,6 +38,12 @@ class FakeSpring:
 
     def set_coefficient(self, c):
         self.coeff = c
+
+    def set_offset(self, offset):
+        """Mirror the production FFBReport_SetCondition.set_offset type-sniff:
+        a normalized float (|v| <= 1) is scaled by 4096 and rounded; a
+        device-unit int/float (|v| > 1) passes through as an int."""
+        self.cpOffset = round(offset * 4096) if abs(offset) <= 1 else int(offset)
 
 
 class FakeSpringHandle:
@@ -1256,7 +1263,7 @@ class TestTrimCurve:
         assert piecewise_linear(xs, ys, -0.1) == pytest.approx(0.1)
         assert piecewise_linear(xs, ys, 0.1) == pytest.approx(-0.2)
         assert piecewise_linear(xs, ys, 0.2) == pytest.approx(-0.4)
-        # beyond the band the edge segment's slope continues
+       
         assert piecewise_linear(xs, ys, -0.3) == pytest.approx(0.3)
         assert piecewise_linear(xs, ys, 0.3) == pytest.approx(-0.6)
 
@@ -3043,3 +3050,91 @@ class TestInertTrimDetection:
         cal.start()
         state = run_to_completion(cal, ac, clock)
         assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+
+
+# --------------------------------------------------------------------------- #
+#  Hold-spring unit plumbing (TASK002 pre-refactor characterization)
+# --------------------------------------------------------------------------- #
+
+class TestHoldSpringUnits:
+    """Pins the hold-spring unit conventions BEFORE the TASK002 normalization.
+
+    Today the hold center (_hold_offs) is stored in DEVICE units (0..4096),
+    read from the raw axes (x CPOFFSET_RANGE) or from spring.cpOffset, and
+    written back raw. After TASK002 normalizes it to -1..1, the hardware must
+    still receive the same device-unit offsets (via the type-sniffing
+    set_offset), so the device-unit spring.cpOffset assertions here are the
+    invariant regression guard.
+    """
+
+    def test_hold_offs_seeded_from_raw_axes_in_device_units(self, clock):
+        # Primary path: _hold_offs = raw axes x CPOFFSET_RANGE.
+        ac = FakePlantAircraft()
+        ac.phys_stick = (0.10, -0.30)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        assert cal._hold_offs == (int(0.10 * 4096), int(-0.30 * 4096))  # int() truncation is the CURRENT convention
+
+    def test_hold_offs_fallback_reads_spring_cpOffset(self, clock):
+        # Fallback path (raw-axis read fails): _hold_offs comes from the
+        # current spring.cpOffset values. NEVER exercised before TASK002.
+        ac = FakePlantAircraft()
+        ac.spring_x.cpOffset = 800
+        ac.spring_y.cpOffset = -1500
+        # break the raw-axis read to force the fallback
+        ac._get_device_raw_axes = Mock(side_effect=RuntimeError("no axes"))
+        cal = TrimCalibrator(ac)
+        cal.start()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        assert cal._hold_offs == (800, -1500)
+
+    def test_hold_write_back_uses_device_units(self, clock):
+        # The write-back must deliver the same device-unit offsets to the
+        # hardware before AND after the TASK002 normalization.
+        ac = FakePlantAircraft()
+        ac.phys_stick = (0.10, -0.30)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        assert ac.spring_x.cpOffset == pytest.approx(0.10 * 4096, abs=2)
+        assert ac.spring_y.cpOffset == pytest.approx(-0.30 * 4096, abs=2)
+
+    def test_release_hold_targets_are_device_units(self, clock):
+        # _release_hold_targets converts the normalized stick command
+        # (u_ail/u_elev) into device units via CPOFFSET_RANGE.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal._u_ail = 0.25
+        cal._u_elev = -0.5
+        targets = cal._release_hold_targets(ac.telem())
+        assert targets == (int(0.25 * 4096), int(-0.5 * 4096))
+
+    def test_walk_hold_toward_slews_at_hold_walk_rate(self, clock):
+        # _walk_hold_toward moves _hold_offs at HOLD_WALK_RATE device units/s.
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal._hold_offs = (0, 0)
+        dt = 1 / 30.0
+        arrived = cal._walk_hold_toward((1000, -2000), dt)
+        assert not arrived, "one frame cannot cover 1000 units at 3000/s"
+        step = cal.HOLD_WALK_RATE * dt   # 100 device units
+        assert cal._hold_offs == (step, -step)
+
+    def test_walk_hold_toward_arrives_and_snaps(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal._hold_offs = (0, 0)
+        dt = 1 / 30.0
+        # target within one step -> arrives immediately
+        assert cal._walk_hold_toward((50, -50), dt) is True
+        assert cal._hold_offs == (50, -50)
+
+    def test_walk_hold_toward_none_seeds_targets(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        assert cal._walk_hold_toward((123, -456), 1 / 30.0) is True
+        assert cal._hold_offs == (123, -456)
