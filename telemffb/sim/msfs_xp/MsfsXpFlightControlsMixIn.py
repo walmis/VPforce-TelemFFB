@@ -58,8 +58,6 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         self._trim_calibrator = None  # lazily created TrimCalibrator (elevator virtual_y auto-cal)
 
         self.use_fbw_for_ap_follow = True
-        
-        
         self.aileron_gain = 0.1
         self.elevator_gain = 0.1
         self.rudder_gain = 0.1
@@ -507,7 +505,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         Note: Vso (XPLANE) is fetched but not used in any downstream computation.
         """
         if self.vne_override:
-            vne = self.vne_override  # user override (kt); use it instead of sim data
+            vne = self.vne_override  # user override (m/s); use it instead of sim data
         elif telem_data.src == "XPLANE":
             vne = telem_data.Vne
             if not vne:
@@ -525,9 +523,6 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             vne = vsound * sqrt(5 * (kmNs - 1))
 
         telem_data.Vne_ms_calc = vne
-        if isinstance(self.vne_override, (float, int)):
-            if self.vne_override:
-                vne = self.vne_override
 
         # Vne_kt / Qvne / Q Gain all use `vne` (potentially overridden) from here on
         telem_data.Vne_kt = vne * ms2kt
