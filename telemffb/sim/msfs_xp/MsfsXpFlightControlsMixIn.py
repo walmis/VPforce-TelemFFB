@@ -504,8 +504,14 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
 
         Note: Vso (XPLANE) is fetched but not used in any downstream computation.
         """
-        if self.vne_override:
-            vne = self.vne_override  # user override (m/s); use it instead of sim data
+        if isinstance(self.vne_override, (float, int)) and self.vne_override:
+            # user override (m/s); use it instead of sim data. Guarded by type as
+            # defense-in-depth: a non-numeric value (e.g. a unit label a user typed
+            # directly into the field) must not reach the `vne * ms2kt` math below --
+            # it falls through to the sim-computed Vne instead. The root cause is
+            # fixed upstream in get_aircraft_config, which no longer concatenates a
+            # <unit> onto an empty value (TASK004).
+            vne = self.vne_override
         elif telem_data.src == "XPLANE":
             vne = telem_data.Vne
             if not vne:
