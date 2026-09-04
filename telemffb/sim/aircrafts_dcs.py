@@ -48,7 +48,7 @@ from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.SettingsManager import SpringModeEnum
 
-from telemffb.util.conversions import kt2ms, kmh2ms, ms2kmh, deg
+from telemffb.util.conversions import FFB_UNITS, kt2ms, kmh2ms, ms2kmh, deg
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 LPFs = utils.Dispenser(utils.LowPassFilter)
@@ -128,8 +128,8 @@ class Aircraft(AircraftBase, DCSCommands):
     collective_spring_coeff_y = 0
     last_collective_y = 0
     collective_ap_spring_gain = 4096
-    cpO_x = 0
-    cpO_y = 0
+    cpO_x: float = 0.0
+    cpO_y: float = 0.0
 
     dcs_tr_damper_enabled = False
     dcs_tr_button = 0
@@ -146,8 +146,8 @@ class Aircraft(AircraftBase, DCSCommands):
     override_spring_trim_up = 0
     override_spring_trim_right = 0
     override_spring_trim_rate = 200
-    override_spring_cp0_x = 0
-    override_spring_cp0_y = 0
+    override_spring_cp0_x: float = 0.0
+    override_spring_cp0_y: float = 0.0
 
     cp_spr_override_enabled = False
     cp_spr_override_pilot_seat_id = 0
@@ -291,7 +291,7 @@ class Aircraft(AircraftBase, DCSCommands):
         # self.damper = effects["collective_damper"].damper()
         if not self.force_disable_collective_gain:
             self.spring_y.set_coefficient(1.0)
-            self.spring_y.set_offset(0)
+            self.spring_y.set_offset(0.0)
             self.spring.setCondition(self.spring_y)
             self.spring.start(override=True)
             return
@@ -303,12 +303,12 @@ class Aircraft(AircraftBase, DCSCommands):
 
             self.spring_y.set_coefficient(1.0)
             if max(telem_data.WeightOnWheels):
-                self.cpO_y = 4096
+                self.cpO_y = 1.0
             elif self.last_collective_y is None:
                 # Air start or new aircraft.  Use current physical position as init point
-                self.cpO_y = round(4096 * phys_y)
+                self.cpO_y = float(utils.clamp(phys_y, -1.0, 1.0))
             else:
-                self.cpO_y = round(4096 * self.last_collective_y)
+                self.cpO_y = float(utils.clamp(self.last_collective_y, -1.0, 1.0))
 
             self.spring_y.set_offset(self.cpO_y)
 
@@ -316,7 +316,7 @@ class Aircraft(AircraftBase, DCSCommands):
             # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
             self.spring.start(override=True)
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
-            if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+            if self.cpO_y - 0.1 < phys_y < self.cpO_y + 0.1:
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
                 logging.info("Collective Initialized")
@@ -329,7 +329,7 @@ class Aircraft(AircraftBase, DCSCommands):
             self.ac_collective_force_trim_override(telem_data, self.spring)
         else:
             self.spring.name = "collective_ap_spring"
-            self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
+            self.cpO_y = float(utils.clamp(phys_y, -1.0, 1.0))
             self.spring_y.set_offset(self.cpO_y)
 
             # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
@@ -354,7 +354,7 @@ class Aircraft(AircraftBase, DCSCommands):
         lp_x = LPFs.get("x", 5)
         # estimate trim from real stick position and virtual stick position
         offs_x = lp_x.update(pedal_pos - x - lp_x.value)
-        self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
+        self.spring_x.set_offset(float(utils.clamp(offs_x, -1.0, 1.0)))
         self.spring = self.effects["pedal_spring"].spring()
         self.spring.setCondition(self.spring_x)
         self.spring.start(override=True)
@@ -534,10 +534,10 @@ class Aircraft(AircraftBase, DCSCommands):
                 self.spring_x.set_coefficient(gain)
                 self.spring_y.set_coefficient(gain)
 
-                self.override_spring_cp0_x = round(x * 4096)
+                self.override_spring_cp0_x = float(utils.clamp(x, -1.0, 1.0))
                 self.spring_x.set_offset(self.override_spring_cp0_x)
 
-                self.override_spring_cp0_y = round(y * 4096)
+                self.override_spring_cp0_y = float(utils.clamp(y, -1.0, 1.0))
                 self.spring_y.set_offset(self.override_spring_cp0_y)
                 spring.setCondition(self.spring_x)
                 spring.setCondition(self.spring_y)
@@ -547,13 +547,15 @@ class Aircraft(AircraftBase, DCSCommands):
             elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
                 # if trim reset button pressed, set offsets back to 0
                 # print("TRIM RESET")
-                self.spring_x.cpOffset = self.override_spring_cp0_x = 0
-                self.spring_y.cpOffset = self.override_spring_cp0_y = 0
+                self.override_spring_cp0_x = 0.0
+                self.override_spring_cp0_y = 0.0
+                self.spring_x.set_offset(self.override_spring_cp0_x)
+                self.spring_y.set_offset(self.override_spring_cp0_y)
                 spring.setCondition(self.spring_x)
                 spring.setCondition(self.spring_y)
 
             # calculate step size based on configured rate and delta time
-            trim_step_size = self.override_spring_trim_rate * dt
+            trim_step_size = self.override_spring_trim_rate * dt / FFB_UNITS
 
             self.telem_data._ovrd_spr_step = trim_step_size
 
@@ -562,38 +564,33 @@ class Aircraft(AircraftBase, DCSCommands):
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM DOWN")
-                if self.override_spring_cp0_y - trim_step_size < -4096:
-                    self.override_spring_cp0_y = -4096
-                else:
-                    self.override_spring_cp0_y -= trim_step_size
-                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+                self.override_spring_cp0_y = utils.clamp(
+                    self.override_spring_cp0_y - trim_step_size, -1.0, 1.0)
+                self.spring_y.set_offset(self.override_spring_cp0_y)
             elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM UP")
-                if self.override_spring_cp0_y + trim_step_size > 4096:
-                    self.override_spring_cp0_y = 4096
-                else:
-                    self.override_spring_cp0_y += trim_step_size
-                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+                self.override_spring_cp0_y = utils.clamp(
+                    self.override_spring_cp0_y + trim_step_size, -1.0, 1.0)
+                self.spring_y.set_offset(self.override_spring_cp0_y)
 
             if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM LEFT")
-                if self.override_spring_cp0_x - trim_step_size < -4096:
-                    self.override_spring_cp0_x = -4096
-                else:
-                    self.override_spring_cp0_x -= trim_step_size
-                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+                self.override_spring_cp0_x = utils.clamp(
+                    self.override_spring_cp0_x - trim_step_size, -1.0, 1.0)
+                self.spring_x.set_offset(self.override_spring_cp0_x)
             elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM RIGHT")
-                if self.override_spring_cp0_x + trim_step_size > 4096:
-                    self.override_spring_cp0_x = 4096
-                else:
-                    self.override_spring_cp0_x += trim_step_size
-                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+                self.override_spring_cp0_x = utils.clamp(
+                    self.override_spring_cp0_x + trim_step_size, -1.0, 1.0)
+                self.spring_x.set_offset(self.override_spring_cp0_x)
 
-        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
+        self.telem_data._ovrd_spr_trim_pos = [
+            self.override_spring_cp0_x,
+            self.override_spring_cp0_y,
+        ]
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_x.set_coefficient(self.override_spring_gain)

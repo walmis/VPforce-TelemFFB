@@ -128,7 +128,7 @@ class HPGHelicopter(Helicopter):
         self.phys_x, self.phys_y = self._get_device_axes()
         # Initialise collective spring center from the device's current physical position
         # so the spring does not immediately fight the pilot on startup.
-        self.cpO_y = round(self.phys_y * 4096)
+        self.cpO_y = utils.clamp(self.phys_y, -1, 1)
         self.collective_spring_coeff_y = round(4096 * utils.clamp(self.collective_ap_spring_gain, 0, 1))
         self.hands_on_active = 0
         self.hands_on_x_active = 0
@@ -198,15 +198,12 @@ class HPGHelicopter(Helicopter):
         """
         phys_x, phys_y = self._get_device_axes()
 
-        # Scale normalised axis value to the ±4096 internal FFB range
-        phys_x = round(phys_x * 4096)
-
         ref_x = self.cpO_x
 
-        threshold = 4096 * percent
+        threshold = percent
 
         # Normalised (0–1) distance from the spring center
-        deviation_x = abs(phys_x - ref_x) / 4096
+        deviation_x = abs(phys_x - ref_x)
 
         x_exceeds_threshold = abs(phys_x - ref_x) > threshold
 
@@ -356,26 +353,26 @@ class HPGHelicopter(Helicopter):
                 sx = round(abs(sema_x_avg), 3)
                 sy = round(abs(sema_y_avg), 3)
 
-                self.afcsx_step_size = sx * 0.25
-                self.afcsy_step_size = sy * 0.25
+                self.afcsx_step_size = sx * 0.25 / 4096
+                self.afcsy_step_size = sy * 0.25 / 4096
 
                 ias = telem_data.IAS or 0  # Indicated Airspeed in m/s
 
                 self.afcs_followup_trim_rate = 100
 
-                # Frame-rate-independent follow-up trim rate.  Multiply the target
-                # rate (units/s) by the elapsed frame time (dt) to get a consistent
-                # trim step regardless of loop frequency.  Fractional steps are
-                # accumulated across frames and only applied once they reach a whole
-                # unit — this prevents step-size quantisation at high frame rates.
+                # Frame-rate-independent follow-up trim rate.  The configured rate is
+                # in device units/s, but the accumulator and applied center step stay
+                # normalized.  Preserve the historical whole-device-unit quantization
+                # so the effective trim feel remains unchanged.
                 dt = perftracker.get_time_delta('hpg_perf_tracker')
 
                 telem_data.hpg_perf_tracker = round(dt, 6)
 
-                followup_trim_step_size_raw = self.afcs_followup_trim_rate * dt
+                followup_trim_step_size_raw = self.afcs_followup_trim_rate * dt / 4096
 
                 self.followup_trim_accumulator += followup_trim_step_size_raw
-                followup_trim_step_size = int(self.followup_trim_accumulator)
+                whole_device_steps = int(self.followup_trim_accumulator * 4096)
+                followup_trim_step_size = whole_device_steps / 4096
                 self.followup_trim_accumulator -= followup_trim_step_size
 
                 telem_data.hpg_followup_step_size = followup_trim_step_size
@@ -433,8 +430,8 @@ class HPGHelicopter(Helicopter):
                         self.cpO_y -= followup_trim_step_size
 
             # Apply the updated spring centers to the hardware and start the effect.
-            self.spring_x.cpOffset = round(self.cpO_x)
-            self.spring_y.cpOffset = round(self.cpO_y)
+            self.spring_x.set_offset(self.cpO_x)
+            self.spring_y.set_offset(self.cpO_y)
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
 
@@ -518,7 +515,7 @@ class HPGHelicopter(Helicopter):
                 # current physical position so the spring re-centers there on release.
                 self._simconnect.set_simdatum_to_msfs("L:FFB_FEET_ON_PEDALS", 1, units="number")
                 self.feet_on_active = True
-                self.cpO_x = round(phys_x * 4096)
+                self.cpO_x = utils.clamp(phys_x, -1, 1)
 
 
             else:
@@ -545,10 +542,10 @@ class HPGHelicopter(Helicopter):
 
                 self.spring_x.set_coefficient(self.pedal_spring_coeff_x)
                 if telem_data.get("SimOnGround", 1):
-                    self.cpO_x = 0
+                    self.cpO_x = 0.0
                 else:
                     # print(f"last_colelctive_y={self.last_collective_y}")
-                    self.cpO_x = round(4096 * self.last_pedal_x)
+                    self.cpO_x = utils.clamp(self.last_pedal_x, -1, 1)
 
                 self.spring_x.set_coefficient(self.hpg_pedal_spring_gain, True)
 
@@ -558,7 +555,7 @@ class HPGHelicopter(Helicopter):
                 # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
                 self._spring_handle.start()
                 logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
-                if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
+                if self.cpO_x - 0.1 < phys_x < self.cpO_x + 0.1:
                     # dont start sending position until physical pedals have centered
                     self.pedals_init = 1
                     logging.info("Pedals Initialized")
@@ -572,7 +569,7 @@ class HPGHelicopter(Helicopter):
 
             sx = round(abs(sema_yaw_avg), 3)
 
-            self.afcsx_step_size = sx * 0.5
+            self.afcsx_step_size = sx * 0.5 / 4096
 
             telem_data._sx = sx
             telem_data._afcsx_step_size = self.afcsx_step_size
@@ -586,7 +583,7 @@ class HPGHelicopter(Helicopter):
 
             telem_data._cp0_x = self.cpO_x
 
-            self.spring_x.set_offset(round(self.cpO_x))
+            self.spring_x.set_offset(self.cpO_x)
             if pedal_trim_pressed:
                 # Disable spring while button is held so pilot can freely reposition pedals
                 if self.pedal_ft_damper_enabled:
@@ -629,21 +626,21 @@ class HPGHelicopter(Helicopter):
         The collective physical axis is inverted relative to the FFB range:
 
         =====================  ================  ==========================
-        Condition              ``phys_y``        ``cpO_y`` (FFB units)
+        Condition              ``phys_y``        ``cpO_y`` (normalized)
         =====================  ================  ==========================
-        Full down (minimum)     +1.0              +4096
+        Full down (minimum)     +1.0               +1.0
         Center                   0.0                  0
-        Full up (maximum)       −1.0              −4096
+        Full up (maximum)       −1.0               −1.0
         =====================  ================  ==========================
 
         ``CollectivePos`` from MSFS also follows an inverted convention:
-        0.0 = full down → cpO_y = +4096; 1.0 = full up → cpO_y = −4096.
+        0.0 = full down → cpO_y = +1.0; 1.0 = full up → cpO_y = −1.0.
 
         Initialization handshake
         ------------------------
         On first call (``collective_init == 0``) the spring center is set to:
 
-        - **On ground**: full-down position (``cpO_y = 4096``).
+        - **On ground**: full-down position (``cpO_y = 1.0``).
         - **Air start / new aircraft**: current physical stick position.
         - **Resuming from pause**: last known physical position
           (``last_collective_y``).
@@ -654,7 +651,7 @@ class HPGHelicopter(Helicopter):
         AFCS vertical mode OFF (``afcs_mode == 0``)
         --------------------------------------------
         *Force trim pressed*: Anchors the spring center to the current physical
-        position (``cpO_y = phys_y × 4096``), applies the softer
+        position (``cpO_y = phys_y``), applies the softer
         ``trim_release_spring_gain``, and sends the physical axis position to MSFS
         (``AXIS_COLLECTIVE_SET``).  ``AUTO_THROTTLE_DISCONNECT`` is also sent to
         disengage any active throttle hold.
@@ -713,21 +710,21 @@ class HPGHelicopter(Helicopter):
 
             if telem_data.get("SimOnGround", 1):
                 # Sim is on ground - set init point to full down
-                self.cpO_y = 4096
+                self.cpO_y = 1.0
             elif self.last_collective_y is None:
                 # Air start or new aircraft.  Use current physical position as init point
-                self.cpO_y = round(4096 * phys_y)
+                self.cpO_y = utils.clamp(phys_y, -1, 1)
             else:
                 # set init point to last point before pause
-                self.cpO_y = round(4096 * self.last_collective_y)
+                self.cpO_y = utils.clamp(self.last_collective_y, -1, 1)
 
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             self._spring_handle.setCondition(self.spring_y)
 
             self._spring_handle.start(override=True)
 
-            if self.cpO_y/4096 - 0.1 < phys_y < self.cpO_y/4096 + 0.1:
+            if self.cpO_y - 0.1 < phys_y < self.cpO_y + 0.1:
                 # Check if phys y position is within %10 of init point
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
@@ -748,7 +745,7 @@ class HPGHelicopter(Helicopter):
                 telem_data['_dbg_collective_FT_pressed'] = True
                 # self._ipc_telem['_dbg_collective_FT_pressed'] = True
 
-                self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
+                self.cpO_y = utils.clamp(phys_y, -1, 1)
                 self.spring_y.set_offset(self.cpO_y)
 
                 self.spring_y.set_coefficient(self.trim_release_spring_gain, True)
@@ -786,7 +783,7 @@ class HPGHelicopter(Helicopter):
                     # CollectivePos value from the AFCS release frame, causing a noticeable
                     # snap.  Anchoring to phys_y is equivalent to an automatic force-trim
                     # press at the moment of AP disengagement.
-                    self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
+                    self.cpO_y = utils.clamp(phys_y, -1, 1)
                 self.spring_y.set_offset(self.cpO_y)
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.set_coefficient(self.collective_ap_spring_gain, True)
@@ -802,7 +799,7 @@ class HPGHelicopter(Helicopter):
                 telem_data['_dbg_collective_FT_pressed'] = True
                 # self._ipc_telem['_dbg_collective_FT_pressed'] = True
 
-                self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
+                self.cpO_y = utils.clamp(phys_y, -1, 1)
                 # print(self.cpO_y)
                 self.spring_y.set_offset(self.cpO_y)
 
@@ -837,7 +834,7 @@ class HPGHelicopter(Helicopter):
                 telem_data['_dbg_collective_FT_pressed'] = False
                 # self._ipc_telem['_dbg_collective_FT_pressed'] = False
 
-                self.cpO_y = round(utils.scale(collective_pos,(0, 1), (4096, -4096)))
+                self.cpO_y = utils.scale_clamp(collective_pos, (0, 1), (1.0, -1.0))
                 self.spring_y.set_offset(self.cpO_y)
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.set_coefficient(self.collective_ap_spring_gain, True)

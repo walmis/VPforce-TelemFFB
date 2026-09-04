@@ -125,20 +125,20 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
             if self.last_trimwheel_y is None:
                 # Air start or new aircraft.  Use sim defined trim setpoint as init point
                 trimwheel_pos = telem_data.ElevTrimPct
-                self.cpO_y = round(4096 * trimwheel_pos)
+                self.cpO_y = utils.clamp(trimwheel_pos, -1, 1)
             else:
                 # In air, previously paused.  Use stored position to init point
-                self.cpO_y = round(4096 * self.last_trimwheel_y)
+                self.cpO_y = utils.clamp(self.last_trimwheel_y, -1, 1)
 
             self.spring_y.set_coefficient(1.0)
 
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             self._spring_handle.setCondition(self.spring_y)
             # self.damper.damper(coef_y=int(4096*self.trimwheel_dampening_gain)).start()
             self._spring_handle.start(override=True)
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
-            if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+            if self.cpO_y - 0.1 < phys_y < self.cpO_y + 0.1:
                 # dont start sending position until physical stick has centered
                 self.trimwheel_init = 1
                 logging.info("Trim Wheel Initialized")
@@ -156,7 +156,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
             spring_pos = trimwheel_pos
             if hold and self._tw_hold_pos is not None:
                 spring_pos = self._tw_hold_pos
-            self.cpO_y = round(utils.scale(spring_pos, (-1, 1), (-4096, 4096)))
+            self.cpO_y = utils.clamp(spring_pos, -1, 1)
             telem_data._tw_cpO_y = spring_pos
             self.spring_y.set_offset(spring_pos)
 

@@ -217,10 +217,13 @@ class TelemManager(QObject, threading.Thread):
                 u = setting['unit']
                 if v is None:
                     v = '0'
-                if u is not None:
-                    vu = v + u
-                else:
-                    vu = v
+                # Attach the unit only when there is a value to attach it to. An
+                # empty value (e.g. the shipped default for vne_override, which is
+                # the documented "leave blank to use sim data") must stay empty:
+                # concatenating a <unit> to it produced a bare unit string ("kt")
+                # that to_number() returns verbatim, so the value reached aircraft
+                # code as a string and crashed downstream arithmetic (`vne * ms2kt`).
+                vu = (v + u) if v else v
                 if setting['value'] != '-':
                     params[k] = vu
                     logging.debug(f"Got from Settings Manager: {k} : {vu}")

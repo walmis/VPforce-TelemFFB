@@ -58,7 +58,7 @@ class XAW109Helicopter(Helicopter):
         super().__init__(name, **kwargs)
 
         self.phys_x, self.phys_y = self._get_device_axes()
-        self.cpO_y = round(self.phys_y * 4096)
+        self.cpO_y = utils.clamp(self.phys_y, -1, 1)
 
 
     def on_telemetry(self, telem_data: BaseTelemetryData):
@@ -82,15 +82,15 @@ class XAW109Helicopter(Helicopter):
 
             # self.cpO_x += x_rate
             # self.cpO_y += y_rate
-            self.afcsx_step_size = x_rate * self.afcs_motion_rate
-            self.afcsy_step_size = y_rate * self.afcs_motion_rate
+            self.afcsx_step_size = x_rate * self.afcs_motion_rate / 4096
+            self.afcsy_step_size = y_rate * self.afcs_motion_rate / 4096
 
             self.cpO_x += self.afcsx_step_size
             self.cpO_y += self.afcsy_step_size
 
 
-            self.spring_x.cpOffset = round(self.cpO_x)
-            self.spring_y.cpOffset = round(self.cpO_y)
+            self.spring_x.set_offset(self.cpO_x)
+            self.spring_y.set_offset(self.cpO_y)
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
 
@@ -146,16 +146,16 @@ class XAW109Helicopter(Helicopter):
 
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
             if telem_data.get("SimOnGround", 1):
-                self.cpO_x = 0
+                self.cpO_x = 0.0
             else:
-                self.cpO_x = round(4096 * self.last_pedal_x)
+                self.cpO_x = utils.clamp(self.last_pedal_x, -1, 1)
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(
                 4096 * utils.clamp(self.pedal_spring_gain, 0, 1))
 
-            self.spring_x.cpOffset = self.cpO_x
+            self.spring_x.set_offset(self.cpO_x)
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
-            if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
+            if self.cpO_x - 0.1 < phys_x < self.cpO_x + 0.1:
                 # dont start sending position until physical pedals have centered
                 self.pedals_init = 1
             else:
@@ -168,8 +168,8 @@ class XAW109Helicopter(Helicopter):
                 force = int(self.pedal_ft_damper_force * 4096)
             else:
                 force = 0
-            self.cpO_x = round(4096 * utils.clamp(phys_x, -1, 1))
-            self.spring_x.cpOffset = self.cpO_x
+            self.cpO_x = utils.clamp(phys_x, -1, 1)
+            self.spring_x.set_offset(self.cpO_x)
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = force
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
@@ -209,23 +209,23 @@ class XAW109Helicopter(Helicopter):
             if rate_cmd:
                 # Authoritative upper-mode servo command: bang-bang +/-1,
                 # scaled exactly like the cyclic follow.
-                step = rate_cmd * self.afcs_motion_rate
+                step = rate_cmd * self.afcs_motion_rate / 4096
             elif active:
                 ias_kt = (telem_data.IAS or 0) * ms2kt
                 ias_gain = utils.scale_clamp(
                     ias_kt, self.PEDAL_AFCS_IAS_FADE_KT, self.PEDAL_AFCS_IAS_GAIN)
                 mag = utils.clamp(abs(s) / enter, 0.0, self.PEDAL_AFCS_PROP_CAP)
                 step = math.copysign(
-                    self.afcs_motion_rate * mag * ias_gain, s)
+                    self.afcs_motion_rate * mag * ias_gain / 4096, s)
 
-            self.cpO_x = utils.clamp(self.cpO_x + step, -4096, 4096)
+            self.cpO_x = utils.clamp(self.cpO_x + step, -1, 1)
             telem_data._telemffb_moving_rud = bool(step)
             telem_data._pedal_afcs_demand = s
             telem_data._pedal_afcs_active = active
 
             force = round(4096 * self.pedal_spring_gain)
-            self.spring_x.cpOffset = round(self.cpO_x)
-            self.spring_y.cpOffset = 0
+            self.spring_x.set_offset(self.cpO_x)
+            self.spring_y.set_offset(0.0)
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = int(self.pedal_spring_gain * force)
             self._spring_handle.setCondition(self.spring_x)
@@ -248,7 +248,7 @@ class XAW109Helicopter(Helicopter):
         collective_v_mode = telem_data.AW109_collective_mode or 0
 
         collective_afcs_pos = telem_data.AW109_collective_ratio or 0
-        axis_afcs_pos = utils.scale_clamp(collective_afcs_pos, (0,1), (4096, -4096), return_int=True)
+        axis_afcs_pos = utils.scale_clamp(collective_afcs_pos, (0, 1), (1.0, -1.0))
 
         phys_x, phys_y = self._get_device_axes()
         telem_data.phys_y = phys_y
@@ -259,15 +259,15 @@ class XAW109Helicopter(Helicopter):
 
             if telem_data.get("SimOnGround", 1):
                 # Sim is on ground - set init point to full down
-                self.cpO_y = 4096
+                self.cpO_y = 1.0
             elif self.last_collective_y is None:
                 # Air start or new aircraft.  Use current physical position as init point
-                self.cpO_y = round(4096 * phys_y)
+                self.cpO_y = utils.clamp(phys_y, -1, 1)
             else:
                 # set init point to last point before pause
-                self.cpO_y = round(4096 * self.last_collective_y)
+                self.cpO_y = utils.clamp(self.last_collective_y, -1, 1)
 
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             self._spring_handle.setCondition(self.spring_y)
 
@@ -277,7 +277,7 @@ class XAW109Helicopter(Helicopter):
             # the spring and the lever stalls short of the init gate)
             self._spring_handle.start(override=True)
 
-            if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+            if self.cpO_y - 0.1 < phys_y < self.cpO_y + 0.1:
                 # Check if phys y position is within %10 of init point
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
@@ -289,9 +289,9 @@ class XAW109Helicopter(Helicopter):
 
         if collective_ft_released:
 
-            self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
+            self.cpO_y = utils.clamp(phys_y, -1, 1)
             # print(self.cpO_y)
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             # self.damper.damper(coef_y=0).start()
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(
@@ -303,7 +303,7 @@ class XAW109Helicopter(Helicopter):
             if collective_v_mode:
                 self.cpO_y = axis_afcs_pos
             # self.cpO_y -= self.afcsy_step_size
-            self.spring_y.cpOffset = round(self.cpO_y)
+            self.spring_y.set_offset(self.cpO_y)
 
             # self.damper.damper(coef_y=0).start()
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096

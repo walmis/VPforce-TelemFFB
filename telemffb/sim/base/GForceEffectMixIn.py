@@ -258,7 +258,9 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
     def g_effect_get_adv_mode(self) -> Literal["constant", "offset"]:
         return self.gforce_effect_adv_curve.get("mode", "constant") if self.gforce_effect_adv_curve else "constant"
            
-    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr=False):
+    def ac_update_gforce_effect(
+            self, telem_data: BaseTelemetryData, adv_spr: bool = False
+    ) -> Optional[float]:
         """Dispatch to the configured G-force effect mode (DISABLED/LEGACY/ADVANCED/NEW).
 
         Telemetry:
@@ -361,8 +363,10 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
                 g_factor = utils.clamp(g_factor, 0.0, 1.0)
                 self.effects["gforce"].constant(g_factor, direction).start()
 
-            elif mode == "offset":               
-                adjuster_cpOy = int(-g_factor * 4096)
+            elif mode == "offset":
+                # Keep the center shift normalized. set_offset() performs the
+                # sole conversion to Rhino device units at the HID boundary.
+                adjuster_cpOy = -float(g_factor)
 
                 if adv_spr:
                     # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
@@ -383,7 +387,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
                     # change to coefficient=4096/saturation=1 clamped the
                     # adjusted spring's output to ~zero - all spring force died
                     # the moment the effect started.
-                    cond_x.set_offset(0)
+                    cond_x.set_offset(0.0)
                     cond_x.positiveSaturation = cond_x.negativeSaturation = 4096
                     cond_y.set_offset(adjuster_cpOy)
                     cond_y.positiveSaturation = cond_y.negativeSaturation = 4096

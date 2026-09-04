@@ -99,6 +99,24 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         # nothing sent yet, so the plugin's echoed state is trusted at once.
         self.__xplane_override_sent_at = float("-inf")
 
+    def __del__(self):
+        # Close the lazily-created X-Plane UDP socket. An aircraft instance
+        # is dropped by TelemManager simply clearing its reference (sim exit,
+        # aircraft switch) or by the garbage collector (tests, interpreter
+        # shutdown) with no explicit close hook, so without this the socket
+        # is only released by finalization, which raises a ResourceWarning
+        # ("unclosed <socket>") that surfaces as a spurious failure in
+        # whichever test's window the GC happens to run.
+        sock = getattr(self, "_socket", None)
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                # __del__ can run during interpreter shutdown, when the socket
+                # module is already being torn down; never let cleanup raise.
+                pass
+            self._socket = None
+
     @property
     def joystick_trim_follow_curve_y(self) -> Optional[str]:
         return self._trim_curve_y_json
