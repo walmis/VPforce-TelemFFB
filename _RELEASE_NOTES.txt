@@ -1,23 +1,47 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  DRAFT - August 23, 2026
+##  DRAFT - September 2026
 ############################################
 ## Platform
-- **NEW: One System Settings dialog configures every device**
+- **NEW: Multiple joystick devices, with per-aircraft switching (MSFS / X-Plane)**
+  - Configure more than one joystick - a stick and a yoke, for example.  Switch between them by changing the primary device in the settings
+  - MSFS/X-Plane (where we externally provide the control input) get dynamic, per class/aircraft switching of the active joystick device
+- **NEW: The DirectInput Tap (DCS / IL-2 / Falcon BMS)**
+  - Based on the "dcs-force-feedback-fix" wrapper project
+  - "The tap" intercepts the games own FFB effects and lets TelemFFB render them locally.  The game is unaware
+  - New **Game Managed (DirectInput Tap)** spring mode re-renders the game's spring: trim center follow and force-trim collapse reproduce exactly. IL-2 Korea gets the matching pedal spring mode
+    - Per-axis spring and the other five effect types a game may generate get an enable and a gain slider, with the live output strength shown on the slider bar
+  - Per-sim setup in System Settings finds your sims, installs the wrapper and keeps its config in step with your devices. An existing community ffb-fix install is recognized and upgraded in place; DCS can also run the wrapper in **FFB-Fix only mode**, without the tap
+- **NEW: "DCS FFB Fix" installer (DCS)**
+  - Installs the DirectInput Tap wrapper without the tap - in the same way the "dcs-force-feedback-fix" wrapper is used today
+  - An option inside the DirectInput Tap configuration section on the DCS settings page
+- **NEW: DirectLink - force feedback devices from any manufacturer**
+  - An optional integration that lets TelemFFB drive any device exposing force feedback through DirectInput
+  - Usable in any role
+  - Enabled in System Settings > Integrations; DirectLink is a separate free download. VPforce-only features (Configurator, firmware effects, force telemetry) degrade cleanly
+## UI
+- **NEW: Device configuration UI re-work**
+  - Device cards with pull-down selection of detected devices
+  - More logical integration of the old "auto launch" configuration options
+- **NEW: All settings (master and child instances) are now configurable through the master instance system settings**
   - The master's System Settings now carries a panel for each configured device (joystick, pedals, collective, trim wheel) - per-device options are set there and written to that device's settings directly
   - Child instances no longer need (or have) a settings page of their own; they exist to drive their device and process telemetry
   - VPforce Configurator (.vpconf) profiles are validated against the device they are selected for, not against whichever instance you happened to open the dialog from
   - The USB Product ID column is gone; the device selector is the source. A slot with no device assigned can no longer be made the master or given launch options
-- Toggle switches reworked to match the rest of the app.  A flatter look, the handle animates as it slides
-- Safety: compiled builds now refuse to start (with an explanation) when unzipped straight onto the Desktop, into Documents/Downloads, the user profile or OneDrive root, Program Files, Windows, a drive root, or anywhere under Temp. The in-app updater manages the whole folder the executable lives in, so a release run from the Desktop could have had the updater move the entire Desktop into the previous-version backup. A dedicated subfolder of any of those places is fine
+- **NEW: Backup and restore system settings**, from a new File menu on the System Settings dialog
+
+## General fixes
 - Fix: exiting TelemFFB could take up to ten seconds before its processes actually closed, and a restart in that window was refused as "already running"
-- Fix: a setting value this build does not understand (for example a spring mode that only exists in dev build) no longer blocks the aircraft from loading
 - Fix: effects are now properly freed when the sim exits and when TelemFFB exits preventing scenarios that may result in hung effects on the device
+- Fix: resetting the device's effects no longer strands the effects that were running on it
 
 ## MSFS / X-Plane
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
+
+## X-Plane
+- Fix: the axis override is released when the FFB device disconnects, and a per-device axis disable is honored
 
 ## MSFS
 - **NEW: In-sim settings panel (toolbar window)**

@@ -230,10 +230,10 @@ def _describe_params(effect_type: int, params: DibEffectParams) -> str:
     return "?"
 
 
-#: Where a user obtains the bridge DLL.  Placeholder until the download
-#: location is settled - every message that mentions it reads from here, so
-#: finalising the address is a one-line change.
-BRIDGE_DOWNLOAD_LOCATION = "<location to be determined>"
+#: Where a user obtains DirectLink.  Every message that mentions it reads
+#: from here, so the address lives in one place; the site's Download opens
+#: the download step, so the root is the right target, not a file URL.
+BRIDGE_DOWNLOAD_LOCATION = "https://directlink.flyfrisby.com/"
 
 
 #: One DIBridge per process (see shared_bridge).  The DLL's state (the

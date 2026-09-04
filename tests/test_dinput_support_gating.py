@@ -363,10 +363,10 @@ class TestBridgeDllLocation:
 class TestTheUserIsToldWhereToGetIt:
     """"It isn't there" is only half an answer.
 
-    The DLL ships separately from TelemFFB, so a user who has never had it
-    needs to be pointed somewhere - and the address is a placeholder until
-    the download location is settled, which is exactly why every message
-    reads it from one constant instead of spelling it out.
+    DirectLink ships separately from TelemFFB, so a user who has never had
+    it needs to be pointed somewhere - and every message reads the address
+    from one constant instead of spelling it out, so it can never drift
+    between messages.
     """
 
     def test_a_missing_dll_says_where_to_get_one(self, monkeypatch):
@@ -403,7 +403,9 @@ class TestTheUserIsToldWhereToGetIt:
         available, reason = ffb_dinput.bridge_availability('not_here.dll')
         assert 'not_here.dll' not in reason, reason
         assert 'Looked in' not in reason, reason
-        assert ':\\' not in reason and ':/' not in reason, reason
+        # The download address is the one "://" the message may carry.
+        shown = reason.replace(ffb_dinput.BRIDGE_DOWNLOAD_LOCATION, '')
+        assert ':\\' not in shown and ':/' not in shown, reason
 
     def test_a_failure_that_says_something_else_is_still_shown(self, monkeypatch):
         from telemffb.hw import ffb_dinput
@@ -616,7 +618,9 @@ class TestBridgeStatusLabel:
         dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
             installed=False, problem='not installed'))
         text = dlg.lab_dinput_status.text()
-        assert 'not installed' in text
+        assert 'not found' in text
+        # the address is a live link, and the label is allowed to open it
+        assert '<a href="' in text and dlg.lab_dinput_status.openExternalLinks()
         assert dlg.lab_dinput_status.styleSheet()      # flagged for attention
 
     def test_a_settled_build_is_named_and_unflagged(

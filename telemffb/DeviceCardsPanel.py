@@ -62,10 +62,10 @@ DEVICE_ICON_CHOICES = {
 #: One selector width everywhere, so the columns line up across cards.
 SELECTOR_WIDTH = 360
 
-#: Where DirectLink for TelemFFB is offered.  The DLL
-#: DLL deliberately does not ship with TelemFFB; while this is empty the
-#: no-devices hint under the cards omits its where-to-get-it sentence.
-DINPUT_BRIDGE_URL = ''
+#: Where DirectLink for TelemFFB is offered.  DirectLink deliberately does
+#: not ship with TelemFFB; the no-devices hint under the cards points here,
+#: and omits its where-to-get-it sentence if this is ever emptied.
+DINPUT_BRIDGE_URL = 'https://directlink.flyfrisby.com/'
 
 #: Most rows a role card may hold (the active device plus alternates).
 MAX_DEVICES_PER_ROLE = 3
