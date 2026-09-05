@@ -27,7 +27,14 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         super().__init__()
         self.trimwheel_init = 0
         self.last_trimwheel_y = None
-        self.last_pos_y_pos = 0.0
+        # Prefixed, not `last_pos_y_pos`: this mixin shares an MRO with
+        # MsfsXpHeliControlsMixIn, which caches the scaled *cyclic* Y position
+        # under that name and replays it to AXIS_CYCLIC_LONGITUDINAL_SET
+        # unscaled.  That event takes an int, and the value here is a float by
+        # design (direct mode writes trim in radians), so one name for both
+        # meant a helicopter crashed the moment the cyclic spring initialized
+        # before anything had cached an int over it.
+        self._tw_last_pos_y = 0.0
         self.trim_active = False
         self._tw_limits_warned = False
         self._tw_hold_prev = False
@@ -216,8 +223,8 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                         pos_y_pos = pos_y_pos * 0.01745
                         self._simconnect.set_simdatum_to_msfs("ELEVATOR TRIM POSITION", pos_y_pos, units="radians")
                         # print("TRIM TRIM POSITION", pos_y_pos)
-                self.last_pos_y_pos = pos_y_pos
-                telem_data._tw_last = self.last_pos_y_pos
+                self._tw_last_pos_y = pos_y_pos
+                telem_data._tw_last = self._tw_last_pos_y
 
         else:
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)

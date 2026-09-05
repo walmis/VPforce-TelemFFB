@@ -68,7 +68,26 @@ class TestHelicopterInitialization(BaseTelemetryEffectTestCase):
         assert instance.cpO_x == 0
         assert instance.cpO_y == 0
         assert instance.last_collective_y is None
-    
+
+    def test_cached_cyclic_positions_are_ints(self):
+        """The cyclic spring init replays these to AXIS_CYCLIC_*_SET, which is
+        a standard SimConnect event and takes an int.
+
+        MsfsXpTrimwheelMixIn shares this MRO and used to seed a float under
+        the same name (last_pos_y_pos), so a helicopter that initialized its
+        cyclic spring before anything had cached an int over it raised
+        "'float' object cannot be interpreted as an integer" - airborne only,
+        Y axis only, and cleared by a restart, which made it look random.
+        """
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli")
+
+        assert isinstance(instance.last_pos_x_pos, int), \
+            f"lateral cache is {type(instance.last_pos_x_pos).__name__}"
+        assert isinstance(instance.last_pos_y_pos, int), \
+            f"longitudinal cache is {type(instance.last_pos_y_pos).__name__}"
+        # the trimwheel keeps its own float - direct mode sends radians
+        assert isinstance(instance._tw_last_pos_y, float)
+
     def test_helicopter_subscribes_simvars_on_msfs(self):
         """Test that SimConnect variables are subscribed on MSFS."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True)
