@@ -594,6 +594,7 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
 
         G.device_info = dev.info
         G.device_capabilities = dev.caps
+        dev.deviceReconnected.connect(_replay_device_setup)
 
         if G.args.reset:
             dev.reset_effects()
@@ -615,6 +616,9 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
     except Exception as e:
         G.device_connection_status = False
         logging.exception("Exception")
+        # the one warning for the zombie state: the device panel stays red
+        # and the retry ticker auto-opens the device when it appears, so no
+        # manual restart is needed
         if show_error:
             # parent to whatever the user is looking at (the System
             # Settings dialog during a live switch, the main window
@@ -625,9 +629,74 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
                       or getattr(G, 'main_window', None))
             QMessageBox.warning(parent, "Cannot connect to FFB device",
                           f"Unable to open device: {G.device_type}\nError: {e}\n\n"
-                          "Please open the System Settings and verify the Master\ndevice configuration is correct")
+                          "The application will open the device automatically when it appears.\n"
+                          "Please open the System Settings and verify the device configuration is correct")
 
     return dev, dev_serial, dev_firmware_version
+
+
+def _replay_device_setup():
+    """Replay one-shot device setup after a hot-unplug recovery.
+
+    Connected to ``deviceReconnected``.  Effect playback does not
+    need a manual restart here: the offline-safe effect writers in
+    ffb_rhino detect the dead->alive transition and re-send pending
+    effect configuration on the next telemetry frame.  This only covers
+    the one-shot items that do not replay per frame.  The deadzone is
+    force-re-applied below: its per-frame write is transition-gated, so a
+    steady configured value would never re-send itself after the firmware
+    lost it on the power cycle.  The VPConf profile is re-pushed too:
+    firmware holds it in RAM only, so the power cycle wiped it - the
+    profile the current context should hold is resolved by
+    _recovery_vpconf_profile().  Configurator gains are re-read last,
+    after the re-push, so they reflect the restored profile.
+    """
+    dev = HapticEffect.device
+    if dev is None:
+        return
+    try:
+        dev.set_deadzone(0)
+    except Exception:
+        pass  # transient; the force-apply below restores the configured value
+    # Force-apply the current deadzone: the MixIn's per-frame write only
+    # fires on a value transition, so the value the firmware lost on the
+    # power cycle comes back here, not on the next telemetry frame.
+    telem = getattr(G, 'telem_manager', None)
+    aircraft = getattr(telem, 'currentAircraft', None) if telem is not None else None
+    if aircraft is not None and hasattr(aircraft, 'ac_update_deadzone'):
+        aircraft.ac_update_deadzone(force=True)
+    profile = _recovery_vpconf_profile()
+    if profile:
+        logging.info(f"Re-pushing VPConf profile after recovery: {profile}")
+        try:
+            upload_vpconf_profile(profile, dev.serial)
+        except Exception:
+            logging.exception("Unable to re-push VPConf profile after recovery")
+    try:
+        G.vpconf_configurator_gains = dev.get_gains()
+    except Exception:
+        logging.exception("Exception")
+
+
+def _recovery_vpconf_profile():
+    """The VPConf profile the device should hold after a power-cycle
+    recovery - the same resolution _handle_vpconf_setup applies on an
+    aircraft change, so the pre-unplug state comes back.
+
+    Priority: the active aircraft's own profile, then the global default
+    (enabled and configured), then the last successfully pushed profile
+    (e.g. the startup push).  None when nothing was ever configured.
+    """
+    telem = getattr(G, 'telem_manager', None)
+    cfg = getattr(telem, 'currentAircraftConfig', None)
+    if isinstance(cfg, dict) and cfg.get('vpconf'):
+        return cfg['vpconf']
+    if G.system_settings.get('enableVPConfGlobalDefault', False):
+        path = G.system_settings.get('pathVPConfStartup', '')
+        if path:
+            return path
+    return G.current_vpconf_profile
+
 
 
 def _configured_device_present() -> bool:
@@ -1723,6 +1792,12 @@ def main():
     # ============================================================================
     # Start background tasks that don't block UI appearance
     _setup_async_initialization(dev, dev_serial)
+
+    # Zombie-state recovery: the configured board was absent at startup.
+    # The phase-9 retry ticker (self-stopping) opens it automatically
+    # when it appears; re-arm it here as a belt-and-braces no-op.
+    if dev is None:
+        device_retry_ticker.start()
 
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop

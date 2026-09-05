@@ -180,7 +180,12 @@ class TelemManager(QObject, threading.Thread):
         self._process_check_deadline = None  # cancel any pending process check
         logging.info(f"Sim exit received from {src} - resetting sim listeners")
         if self.currentAircraft:
-            self.currentAircraft.on_timeout()
+            try:
+                self.currentAircraft.on_timeout()
+            except Exception as e:
+                # A crashing aircraft hook must not abort the rest of the
+                # sim-exit cleanup (effect release, listener restart).
+                logging.error(f"Aircraft on_timeout failed for {src}: {e}", exc_info=True)
             # on_timeout() is *pause* semantics: with keep_forces_on_pause it
             # deliberately leaves the condition effects running so the stick
             # does not go limp mid-session.  A sim exit ends the session, and
@@ -588,6 +593,13 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_vpconf_setup(self, params):
         """Handle VPConf profile setup for the aircraft."""
+        # Nothing to do (and no dereference) without a live device.  A
+        # push arriving while the device is dead is dropped here, but
+        # the firmware holds profiles in RAM only, so the recovery
+        # replay (main._replay_device_setup) re-pushes the current
+        # context's profile when the device comes back.
+        if not HapticEffect.device_alive():
+            return
         if not self._device_has_gains():
             if "vpconf" in params:
                 logging.info("vpconf profile configured but this device has no Configurator gains; skipping")
@@ -602,6 +614,12 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_global_vpconf_default(self):
         """Handle global VPConf default profile setup."""
+        # Same drop rule as _handle_vpconf_setup: a push while the device
+        # is dead is dropped here; the recovery replay re-pushes the
+        # global default on the device's return, since the firmware
+        # profile is RAM-only and died with the power cycle.
+        if not HapticEffect.device_alive():
+            return
         load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
         global_path = G.system_settings.get("pathVPConfStartup", "")
         if load_global and global_path != G.current_vpconf_profile:
@@ -860,7 +878,13 @@ class TelemManager(QObject, threading.Thread):
                 f"Telemetry timeout from {src} — no data received for {self.timeout_sec * 1000:.0f}ms. "
                 f"Process status will be checked every {self._PROCESS_CHECK_INTERVAL:.0f}s."
             )
-            self.currentAircraft.on_timeout()
+            try:
+                self.currentAircraft.on_timeout()
+            except Exception as e:
+                # A crashing aircraft hook must not block the timed_out
+                # transition, or it would re-fire (and re-log with a stack
+                # trace) on every timeout cycle.  One error per episode.
+                logging.error(f"Aircraft on_timeout failed for {src}: {e}", exc_info=True)
             self.telemetryTimeout.emit(True)
             self.timed_out = True
             G.settings_mgr.timed_out = True
@@ -923,6 +947,21 @@ class TelemManager(QObject, threading.Thread):
             logging.info(f"Process check: {src} process not found ({process_names})— treating as sim exit")
             self.notify_sim_exited(src)
 
+    def _safe_call(self, what: str, fn) -> None:
+        """Run a per-frame/per-event hook without letting exceptions kill this thread.
+
+        The TelemManager thread is the only consumer of telemetry for every
+        aircraft; a single unhandled exception (e.g. from a device that was
+        never opened or was hot-unplugged) used to terminate the thread and
+        freeze FFB permanently.  Exceptions here are logged with a stack
+        trace and the loop continues - the same isolation the per-aircraft
+        on_telemetry path already has.
+        """
+        try:
+            fn()
+        except Exception as e:
+            logging.error(f"TelemManager {what} failed: {e}", exc_info=True)
+
     def run(self):
         """Main telemetry processing loop.
 
@@ -945,7 +984,7 @@ class TelemManager(QObject, threading.Thread):
             with self._cond:
                 if not self._events and not self._data:
                     if not self._cond.wait(self.timeout_sec):
-                        self.on_timeout()
+                        self._safe_call("on_timeout", self.on_timeout)
 
                         # Arm the process-check deadline on the first timeout.
                         # The _PROCESS_CHECK_DELAY grace period lets us ignore brief
@@ -963,7 +1002,7 @@ class TelemManager(QObject, threading.Thread):
                             self._process_check_deadline = (
                                 time.perf_counter() + self._PROCESS_CHECK_INTERVAL
                             )
-                            self._check_sim_process()
+                            self._safe_call("_check_sim_process", self._check_sim_process)
 
                         continue
 
@@ -979,7 +1018,7 @@ class TelemManager(QObject, threading.Thread):
                     G.settings_mgr.timed_out = False
                     data = self._data
                     self._data = None
-                    self.process_data(data)
+                    self._safe_call("process_data", lambda: self.process_data(data))
                 
                 if self._events:
-                    self.process_events()
+                    self._safe_call("process_events", self.process_events)

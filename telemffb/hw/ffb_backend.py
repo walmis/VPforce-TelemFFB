@@ -100,6 +100,13 @@ class BaseEffectHandle:
         the owning HapticEffect lazily re-creates on next start."""
         raise NotImplementedError
 
+    def forget_playback(self):
+        """Forget in-memory playback state without touching the device:
+        called while the device is dead, when the device-side play state
+        is already gone - the owning HapticEffect then re-starts the
+        effect on the next live frame."""
+        raise NotImplementedError
+
     def start(self, loopCount=1, override=False):
         raise NotImplementedError
 
@@ -141,12 +148,27 @@ class BaseFFBDevice(QObject):
     buttonPressed = pyqtSignal(int)
     buttonReleased = pyqtSignal(int)
     deviceConnected = pyqtSignal(bool)
+    deviceReconnected = pyqtSignal()   # fired by backends that self-recover after a hot-unplug
 
     firmware_version: Optional[str] = None
 
     @property
     def caps(self) -> DeviceCapabilities:
         return DeviceCapabilities()
+
+    @property
+    def connected(self) -> bool:
+        """Whether the device handle is alive and can accept writes.
+
+        The HapticEffect lifecycle, the DevicePanel state, and the
+        per-frame guards (deadzone writes, input reads, sim-connect
+        mix-in) all read this; backends with a live or self-recovering
+        handle override it (FFBRhino: HID handle, DInputFFBDevice:
+        bridge handle).  The default reads "dead" so a backend that
+        forgets the property degrades to skipped writes, not a crash
+        in the 60-120 Hz telemetry loop.
+        """
+        return False
 
     @property
     def serial(self) -> Optional[str]:
