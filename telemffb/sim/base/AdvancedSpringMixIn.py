@@ -6,7 +6,7 @@ import telemffb.utils as utils
 import telemffb.globals as G
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
-from telemffb.hw.ffb_rhino import FFBReport_SetCondition
+from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.util.conversions import FFB_UNITS
