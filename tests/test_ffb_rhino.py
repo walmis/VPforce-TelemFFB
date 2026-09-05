@@ -13,6 +13,7 @@ from PyQt6.QtCore import QObject
 import sys
 sys.modules['telemffb.hw.hid'] = MagicMock()
 
+import telemffb.hw.ffb_rhino as ffb_rhino_module
 from telemffb.hw.ffb_rhino import (
     FFBRhino,
     FFBEffectHandle,
@@ -45,6 +46,7 @@ from telemffb.hw.ffb_rhino import (
     OP_STOP,
     OP_START_OVERRIDE,
     CONTROL_RESET,
+    HIDDisconnectedError,
     FFB_GAIN_MASTER,
     FFB_GAIN_SPRING,
     FFB_GAIN_DAMPER,
@@ -444,7 +446,10 @@ class TestFFBRhinoDevice:
     
     def test_enumerate(self):
         """Test device enumeration."""
-        import telemffb.hw.hid as hid
+        # patch the hid module as ffb_rhino sees it - another test
+        # module may have swapped the sys.modules entry for a fresh
+        # mock after ffb_rhino was imported (import-order isolation)
+        hid = ffb_rhino_module.hid
         
         mock_devices = [
             {
@@ -896,6 +901,358 @@ class TestFFBRhinoConnected:
         assert mock_ffb_device.connected is False
         mock_ffb_device._dev = MockHIDDevice()  # what reconnect() restores
         assert mock_ffb_device.connected is True
+
+
+# ============================================================================
+# Offline Effect Lifecycle Tests (Task 2)
+# ============================================================================
+#
+# The exact 2026-08-29 failure signatures:
+#   * startup failure -> HapticEffect.device is None -> create_effect on
+#     NoneType, ~3.27M times per day (per frame)
+#   * hot-unplug -> write() AssertionError on the dead handle
+# After this task a missing/dead device is a silent no-op on every effect
+# call path and the pending creation replays automatically on recovery.
+
+class TestOfflineEffectLifecycle:
+    """HapticEffect start/stop/destroy are safe with an absent or dead device."""
+
+    @pytest.fixture
+    def haptic_device(self, mock_ffb_device):
+        """HapticEffect attached to a mock FFBRhino, with create_effect wired."""
+        orig = HapticEffect.device
+
+        effect_counter = [0]
+
+        def mock_create_effect(effect_type):
+            effect_counter[0] += 1
+            return FFBEffectHandle(mock_ffb_device, effect_counter[0], effect_type)
+
+        mock_ffb_device.create_effect = mock_create_effect
+        HapticEffect.device = mock_ffb_device
+        yield mock_ffb_device
+        HapticEffect.device = orig
+
+    def _wire_block_load_response(self, mock_ffb_device):
+        # Make create_effect() succeed against the mock HID.
+        block_load_response = bytearray([6, 1, 1, 0, 0])  # report 6, id 1, success
+        mock_ffb_device._dev._feature_reports[6] = bytes(block_load_response)
+
+    def test_start_with_no_device_is_noop(self, mock_ffb_device):
+        orig = HapticEffect.device
+        HapticEffect.device = None
+        try:
+            effect = HapticEffect()
+            effect.name = "gun_vibration"
+            effect.periodic(20, 0.5, 0)
+            assert effect._pending_create is not None
+
+            effect.start()  # must not raise, must not raise any exception
+
+            # The pending creation survived, so it can replay on recovery.
+            assert effect._pending_create is not None
+            assert effect._h_effect is None
+            assert effect.started is False
+        finally:
+            HapticEffect.device = orig
+
+    def test_stop_destroy_with_no_device_are_noops(self, mock_ffb_device):
+        orig = HapticEffect.device
+        HapticEffect.device = None
+        try:
+            effect = HapticEffect()
+            effect._h_effect = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+            effect._h_effect._started = True
+
+            effect.stop()   # no device: in-memory bookkeeping only
+            assert effect._h_effect is not None
+            effect.destroy()  # no device: clears the handle, no write
+            assert effect._h_effect is None
+        finally:
+            HapticEffect.device = orig
+
+    def test_start_with_dead_device_is_noop(self, haptic_device):
+        self._wire_block_load_response(haptic_device)
+        effect = HapticEffect()
+        effect.name = "rumble"
+        effect.periodic(20, 0.5, 0)
+
+        haptic_device._dev = None  # hot-unplug
+
+        effect.start()  # must not raise
+        assert effect._pending_create is not None
+        assert effect._h_effect is None
+        assert not effect.started
+
+    def test_start_replays_after_recovery(self, haptic_device):
+        self._wire_block_load_response(haptic_device)
+        effect = HapticEffect()
+        effect.periodic(20, 0.5, 0)
+
+        haptic_device._dev = None
+        effect.start()  # deferred while dead
+        assert effect._h_effect is None
+
+        haptic_device._dev = MockHIDDevice()  # recovery
+        self._wire_block_load_response(haptic_device)
+        effect.start()  # replays the pending creation
+
+        assert effect._h_effect is not None
+        assert effect._h_effect.effect_id == 1
+        assert effect.started
+
+    def test_start_replay_creates_effect_again_after_destroy_while_dead(
+            self, haptic_device):
+        self._wire_block_load_response(haptic_device)
+        effect = HapticEffect()
+        effect.periodic(20, 0.5, 0)
+        effect.start()  # created while alive
+        assert effect._h_effect is not None
+
+        haptic_device._dev = None
+        effect.destroy()  # in-memory free while dead
+        assert effect._h_effect is None
+        assert effect._pending_create is not None  # still replayable
+
+    def test_per_frame_setters_are_noops_when_dead(self, haptic_device):
+        """The 13:55:41 signature: per-frame config writes on a dead handle.
+
+        spring()/setConstantForce()/setPeriodic() must not raise, and no data
+        may be written to the dead handle, even after repeated frames.
+        """
+        self._wire_block_load_response(haptic_device)
+        spring = HapticEffect()
+        spring.name = "dynamic_spring"
+        spring.spring(0.3)
+        periodic = HapticEffect()
+        periodic.periodic(20, 0.5, 0)
+        constant = HapticEffect()
+        constant.constant(0.4, 0)
+        for fx in (spring, periodic, constant):
+            fx.start()
+            assert fx._h_effect is not None
+
+        dead_device = haptic_device._dev
+        dead_writes = len(dead_device._write_buffer)
+        haptic_device._dev = None  # hot-unplug
+
+        for _ in range(10):  # a dozen frames of telemetry updates
+            spring.spring(0.42)
+            periodic.periodic(25, 0.6, 0)
+            constant.constant(0.33, 90)
+            for fx in (spring, periodic, constant):
+                fx.start()  # no-op while dead
+                assert not fx.started
+
+        # Nothing reached the dead handle.
+        assert len(dead_device._write_buffer) == dead_writes
+
+    def test_skipped_config_resends_on_recovery(self, haptic_device):
+        """A coefficient that changed while the device was dead must be
+        written once after the handle is back, even if it then stays constant.
+        """
+        self._wire_block_load_response(haptic_device)
+        effect = HapticEffect()
+        effect.spring(0.3)
+        effect.start()
+        assert effect._h_effect is not None
+        first_device = haptic_device._dev
+        assert len(first_device._write_buffer) > 0
+
+        # Change the coefficient while the device is gone.
+        haptic_device._dev = None
+        effect.spring(0.42)  # skipped, but remembered
+        effect.start()
+
+        # Device returns; the next frame must re-send the skipped value.
+        new_device = MockHIDDevice()
+        haptic_device._dev = new_device
+        self._wire_block_load_response(haptic_device)
+        effect.spring(0.42)  # same value as the skipped one
+        assert len(new_device._write_buffer) > 0
+
+    def test_stop_skips_envelope_write_when_dead(self, haptic_device):
+        self._wire_block_load_response(haptic_device)
+        effect = HapticEffect()
+        effect.constant(0.5, 90)
+        effect.envelope(attackTime=100, decayTime=100, once=True)
+        effect.start()
+        assert effect._h_effect is not None
+
+        old_dev = haptic_device._dev
+        writes_after_start = len(old_dev._write_buffer)
+        haptic_device._dev = None
+        effect.stop()  # envelope must not be written to the dead handle
+        assert len(old_dev._write_buffer) == writes_after_start
+        # The one-time envelope stays pending so it is applied on the next
+        # live start, matching live stop() semantics.
+        assert effect._pending_envelope is not None
+
+    def test_start_failure_after_creation_resets_envelope_flag(
+            self, haptic_device):
+        """An envelope applied to the first block must be re-applied to
+        the re-created block when the handle dies between creation and
+        the start write (matching the live stop() semantics)."""
+        self._wire_block_load_response(haptic_device)
+        effect = HapticEffect()
+        effect.name = "boomer"
+        effect.constant(0.5, 90)
+        effect.envelope(attackTime=100, decayTime=100, once=True)
+        effect.start()
+        assert effect._h_effect is not None
+        assert effect._envelope_applied is True
+
+        # The handle dies between the liveness check and the start write.
+        effect._h_effect.start = MagicMock(
+            side_effect=HIDDisconnectedError("gone"))
+        effect.start(force=True)  # must not raise
+
+        assert effect._h_effect is None
+        assert effect._envelope_applied is False   # one-time envelope pending again
+        assert effect._pending_envelope is not None
+
+    class _FakeHIDException(Exception):
+        """Stand-in for hid.HIDException (the real module is a MagicMock here)."""
+
+    def test_open_raises_hid_exception_when_open_fails(
+            self, monkeypatch, mock_device_info):
+        # The board is enumerated but hid.Device() fails to open it (the
+        # 08:30:31 log scenario). open() must surface a catchable HIDException
+        # so the existing main.py failure handler covers it.
+        # Patch the hid module as ffb_rhino sees it (may be a mock or the
+        # real module, depending on import order in the full suite).
+        hid_mod = ffb_rhino_module.hid
+        monkeypatch.setattr(hid_mod, 'HIDException', self._FakeHIDException)
+        monkeypatch.setattr(
+            FFBRhino, 'enumerate',
+            staticmethod(lambda pid=0: [mock_device_info]))
+
+        def failing_device(path=None):
+            raise self._FakeHIDException('unable to open device')
+
+        monkeypatch.setattr(hid_mod, 'Device', failing_device)
+
+        orig_device = HapticEffect.device
+        try:
+            with pytest.raises(self._FakeHIDException):
+                HapticEffect.open(pid=0x2055)
+        finally:
+            HapticEffect.device = orig_device
+
+    def test_open_raises_hid_exception_when_not_enumerated(self, monkeypatch):
+        hid_mod = ffb_rhino_module.hid
+        monkeypatch.setattr(hid_mod, 'HIDException', self._FakeHIDException)
+        monkeypatch.setattr(FFBRhino, 'enumerate',
+                            staticmethod(lambda pid=0: []))
+        orig_device = HapticEffect.device
+        try:
+            with pytest.raises(self._FakeHIDException):
+                HapticEffect.open(pid=0x2055)
+        finally:
+            HapticEffect.device = orig_device
+
+
+# ============================================================================
+# Disconnected-Primitive Tests (Task 1)
+# ============================================================================
+#
+# A device whose HID handle has been lost (hot-unplug / startup failure) must
+# degrade to a catchable HIDDisconnectedError from the low-level primitives,
+# and effect-handle stop/destroy must become cheap no-ops so the 60-120 Hz hot
+# path never sees an exception (the 13:55:41 thread-death bug).
+
+class TestDisconnectedPrimitives:
+    """Low-level primitives raise HIDDisconnectedError when the handle is gone."""
+
+    def _disconnect(self, mock_ffb_device):
+        """Simulate a hot-unplug: the HID handle is dropped."""
+        mock_ffb_device._dev = None
+
+    def test_write_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.write(b"\x01\x02")
+
+    def test_write_succeeds_when_connected(self, mock_ffb_device):
+        mock_ffb_device.write(b"\x01\x02")
+        assert len(mock_ffb_device._dev._write_buffer) > 0
+
+    def test_get_gains_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.get_gains()
+
+    def test_set_gain_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.set_gain(FFB_GAIN_SPRING, 85)
+
+    def test_set_gain_range_still_validated_when_connected(self, mock_ffb_device):
+        # The range contract is independent of device state.
+        with pytest.raises(ValueError):
+            mock_ffb_device.set_gain(FFB_GAIN_SPRING, 101)
+
+    def test_set_deadzone_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.set_deadzone(100)
+
+    def test_send_axis_override_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.send_axis_override(x_mode=1, x_value=12)
+
+    def test_create_effect_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.create_effect(EFFECT_CONSTANT)
+
+    def test_reset_effects_raises_when_disconnected(self, mock_ffb_device):
+        self._disconnect(mock_ffb_device)
+        with pytest.raises(HIDDisconnectedError):
+            mock_ffb_device.reset_effects()
+
+
+class TestDisconnectedEffectHandle:
+    """stop()/destroy() are in-memory no-ops when the HID handle is gone."""
+
+    def test_stop_is_noop_when_disconnected(self, mock_ffb_device):
+        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+        handle.start()
+        assert handle.started
+        old_dev = mock_ffb_device._dev
+        writes_after_start = len(old_dev._write_buffer)
+        assert writes_after_start > 0
+
+        mock_ffb_device._dev = None  # hot-unplug mid-flight
+
+        handle.stop()  # must not raise
+        assert not handle.started
+        # Nothing was written to the (now dead) HID handle.
+        assert len(old_dev._write_buffer) == writes_after_start
+
+    def test_destroy_is_noop_write_when_disconnected(self, mock_ffb_device):
+        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+        writes_before = len(mock_ffb_device._dev._write_buffer)
+
+        mock_ffb_device._dev = None  # hot-unplug
+
+        handle.destroy()  # must not raise, must not write
+        assert handle.effect_id is None
+        assert handle.type == 0
+        assert not handle.started
+        assert bool(handle) is False  # invalidated, replayable on recovery
+
+    def test_handle_still_usable_after_recovery(self, mock_ffb_device):
+        handle = FFBEffectHandle(mock_ffb_device, 1, EFFECT_CONSTANT)
+        mock_ffb_device._dev = None
+        handle.stop()  # no-op while dead
+        # Restore the handle; a subsequent stop writes again.
+        mock_ffb_device._dev = MockHIDDevice()
+        writes_before = len(mock_ffb_device._dev._write_buffer)
+        handle.start()
+        handle.stop()
+        assert len(mock_ffb_device._dev._write_buffer) > writes_before
 
 
 if __name__ == '__main__':

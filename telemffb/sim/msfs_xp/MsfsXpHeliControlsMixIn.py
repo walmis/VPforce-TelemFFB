@@ -126,12 +126,14 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             if self.force_trim_button == 0:
                 self.flag_error("Force trim enabled but buttons not configured")
                 return True
-            if self.cyclic_spring_init:
+            # A missing/hot-unplugged device (input_data is None) reads
+            # as "no button pressed", so no trim action can fire.
+            if self.cyclic_spring_init and input_data is not None:
                 force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
             else:
                 force_trim_pressed = False
 
-            if self.force_trim_reset_button > 0:
+            if self.force_trim_reset_button > 0 and input_data is not None:
                 trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
             else:
                 trim_reset_pressed = False
@@ -144,7 +146,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             # remember previous "pressed" to detect edge
             force_trim_pressed_prev = getattr(self, "force_trim_pressed_prev", False)
             force_trim_pressed = (
-                input_data.isButtonPressed(self.force_trim_button) if self.cyclic_spring_init else False
+                input_data.isButtonPressed(self.force_trim_button)
+                if (input_data is not None and self.cyclic_spring_init) else False
             )
             self.tr_state_change = force_trim_pressed != force_trim_pressed_prev
             self.force_trim_pressed_prev = force_trim_pressed
@@ -328,7 +331,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             if self._apply_joystick_controls_lock(telem_data, controls_locked):
                 return
 
-            input_data = HapticEffect.device.get_input()
+            input_data = HapticEffect.get_device_input()
             if self._update_cyclic_force_trim(telem_data, input_data, x, y, force_trim_active):
                 return
 

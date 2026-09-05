@@ -645,10 +645,13 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
                                    index [1] scaled by normalized stick Y position
             Written: _G_term    (float; pitch bias term sent to control_weight effect)
         """
-        if not self._device_feeding():  # device unplugged; skip the grip-weighted G term this frame
+        input_data = HapticEffect.get_device_input()
+        if input_data is None:
+            # No live device: the stick hold state is unknown and the
+            # constant-force consumer is a no-op anyway, so the term is
+            # zeroed (and the telemetry key kept) instead of raising.
+            telem_data._G_term = 0.0
             return 0.0
-
-        input_data = HapticEffect.device.get_input()
         dx, dy = input_data.CP_scaled_axisXY()
         _G_term = self.g_force_gain * telem_data.AccBody[1]
         _G_term = _G_term * abs(dy)
@@ -988,7 +991,6 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             return
         if not self._device_feeding():  # device unplugged; nothing to send
             return
-
         phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         x_pos = phys_x - virtual_rudder_x_offs

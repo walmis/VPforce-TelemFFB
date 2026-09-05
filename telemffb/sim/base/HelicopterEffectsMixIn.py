@@ -3,7 +3,7 @@ import math
 
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
-from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SQUARE
+from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SQUARE, HapticEffect
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.util.conversions import FFB_UNITS
@@ -281,8 +281,9 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
 
         wow = sum(telem_data.WeightOnWheels or [1])
 
-        input_data = self._get_device_report()
+        input_data = HapticEffect.get_device_input()
         _, y = self._get_device_axes()
+        # No live device: buttons unreadable, none can be pressed.
         current_buttons = input_data.getPressedButtons() if input_data is not None else ()
 
         force_trim_active = telem_data.get("ForceTrimSW", True)

@@ -38,6 +38,7 @@ class FakeDevice:
         self.shutdown_calls = 0
         # signals the open core connects
         self.deviceConnected = SimpleNamespace(connect=lambda *a: None)
+        self.deviceReconnected = SimpleNamespace(connect=lambda *a: None)
         self.buttonPressed = SimpleNamespace(connect=lambda *a: None)
         self.buttonReleased = SimpleNamespace(connect=lambda *a: None)
 

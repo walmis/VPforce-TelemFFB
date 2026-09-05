@@ -111,6 +111,8 @@ class TestDestroyAll:
         sim unable to recreate it until restarted.
         """
         class SpyDevice:
+            connected = True  # FFBRhino interface, keep the live path
+
             def __init__(self):
                 self.reset_calls = 0
 

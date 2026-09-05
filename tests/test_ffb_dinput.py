@@ -1117,3 +1117,45 @@ class TestLiveAxisMapReapply:
         SystemSettingsDialog._request_axis_map_reapply_everywhere()
         assert spy.flagged
         assert ipc.sent == ['REAPPLY_AXIS_MAP']
+
+
+class TestForgetPlayback:
+    """forget_playback (shared handle contract): while the device is
+    mid-reconnect the handle's play state must be forgettable without
+    touching the bridge, so HapticEffect.start()'s offline branch works
+    for both backends."""
+
+    def test_forget_playback_clears_flags_and_keeps_the_id(self, device, bridge):
+        handle = device.create_effect(EFFECT_SINE)
+        assert handle is not None
+        handle.start()
+        assert handle._started and handle._device_playing
+        eid = handle.effect_id
+
+        handle.forget_playback()
+
+        assert handle._started is False
+        assert handle._device_playing is False
+        assert handle.effect_id == eid          # the slot stays named
+        assert handle.started is False
+
+    def test_haptic_start_offline_forgets_dinput_playback(self, device, bridge):
+        """The AttributeError that hit every telemetry frame while a DInput
+        device was mid-reconnect: the offline branch of HapticEffect.start()
+        must forget the DInput handle's playback without raising."""
+        handle = device.create_effect(EFFECT_SINE)
+        handle.start()
+        assert handle._started and handle._device_playing
+
+        device._handle = None  # mid-reconnect: bridge handle released
+        orig = HapticEffect.device
+        HapticEffect.device = device
+        try:
+            effect = HapticEffect()
+            effect._h_effect = handle
+            effect.start()  # must not raise
+            assert handle._started is False
+            assert handle._device_playing is False
+            assert handle.effect_id is not None  # the id stays
+        finally:
+            HapticEffect.device = orig

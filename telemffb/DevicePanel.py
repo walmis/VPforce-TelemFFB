@@ -39,6 +39,28 @@ STATUS_COLORS_DARK = {
     "hover": QColor(180, 180, 180, 100),    # lighter gray in dark mode
     "selected": QColor(0, 120, 215, 200)
 }
+
+def device_status_state() -> str:
+    """Derive the device panel state from the live device object.
+
+    NOT_FOUND: the configured board never opened (zombie startup - the
+    app runs, telemetry is processed, but no FFB can be sent until the
+    board appears).
+    RECONNECTING: the board was opened but its HID handle is dead
+    (hot-unplug) - the reconnect backoff is running.
+    ACTIVE: the handle is alive.
+
+    Pure and side-effect free so it is testable without a window.
+    """
+    from telemffb.hw.ffb_rhino import HapticEffect  # local: keep import light
+    dev = HapticEffect.device
+    if dev is None:
+        return "NOT_FOUND"
+    if not dev.connected:
+        return "RECONNECTING"
+    return "ACTIVE"
+
+
 class DeviceIconWidget(QWidget):
     clicked = pyqtSignal(str)
 
@@ -393,15 +415,53 @@ class DeviceIconPanel(QWidget):
     def set_device_status(self, device_name: str, status: str):
         # utils.dbprint("red", f"Setting status for >{device_name}< to {status}")
 
+        dev_status = status
         if status == 'TIMEOUT':
             status = 'error'
         if status == 'ACTIVE':
             status = 'ok'
         if status == 'DISCONNECTED':
             status = 'warning'
+        if status == 'RECONNECTING':
+            status = 'warning'
+        if status == 'NOT_FOUND':
+            status = 'error'
         widget = self.icons.get(device_name.lower())
         if widget:
             widget.set_status_color(status)
+            tooltip = {
+                'ACTIVE': 'Device connected',
+                'RECONNECTING': 'Device disconnected - reconnecting automatically',
+                'NOT_FOUND': 'Configured device not found - check USB connection',
+                'DISCONNECTED': 'Device disconnected',
+            }.get(dev_status)
+            if tooltip:
+                widget.setToolTip(tooltip)
+
+    def set_device_label(self, device_name: str, text: str):
+        """The text under a role's icon: the hardware holding the role.
+        Returns True when this actually changed what was displayed."""
+        widget = self.icons.get(device_name.lower())
+        if widget is None:
+            return False
+        changed = widget.text_label.text() != (
+            text or widget.device_name.capitalize())
+        widget.set_label(text)
+        return changed
+
+    def flash_device(self, device_name: str):
+        widget = self.icons.get(device_name.lower())
+        if widget:
+            widget.flash()
+
+    def set_device_icon(self, device_name: str, icon_path: str):
+        """The icon artwork for a role ('' = the role's default icon).
+        Returns True when the image actually changed."""
+        widget = self.icons.get(device_name.lower())
+        if widget is None:
+            return False
+        return widget.set_icon(
+            icon_path or DEVICE_ICONS.get(device_name.lower(), ''))
 
     def set_device_label(self, device_name: str, text: str):
         """The text under a role's icon: the hardware holding the role.
