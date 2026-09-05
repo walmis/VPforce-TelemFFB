@@ -1709,10 +1709,16 @@ def main():
     # Prompt for system settings if no devices are configured
     _check_system_settings_required()
 
-    # A TelemFFB update strands every installed tap wrapper on the old
-    # build until something copies over them; offer to do the rounds.
-    # Master only - the wrappers live in game folders, not per instance.
+    # The tap files live in game folders, not per instance, so both offers
+    # are master only.  A game update empties its folders and takes the
+    # wrapper and config with it: offer to put them back first, then offer
+    # to bring whatever survived up to the bundled build.
     if G.master_instance:
+        try:
+            from telemffb.TapRepairDialog import offer_wrapper_repairs
+            offer_wrapper_repairs(G.main_window)
+        except Exception:
+            logging.exception("DirectInput tap: startup repair offer failed")
         try:
             from telemffb.TapUpdateDialog import offer_wrapper_updates
             offer_wrapper_updates(G.main_window)
