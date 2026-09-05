@@ -100,6 +100,11 @@ def _build_control(item: dict) -> Optional[dict]:
         "indent": item.get("indent") or 0,
         "unit": item.get("unit") or "",
         "info": _strip_html(item.get("info") or "", max_len=200),
+        # Desktop settings UI (SettingsLayout.py) renders a setting whose order
+        # ends in '1' with a '.' (e.g. "10700.1") inline on its 'prereq'
+        # parent's own row instead of as a separate row - the panel mirrors
+        # that (see extractBumpChildren() in panel.js).
+        "prereq": item.get("prereq") or "",
     }
 
     if datatype in _BOOL_TYPES:
@@ -174,6 +179,27 @@ def _build_control(item: dict) -> Optional[dict]:
     return None
 
 
+def _is_vr() -> bool:
+    """MSFS's 'E:IS IN VR' environment variable (see SimConnectManager.py's
+    IsInVr SimVar) - 1 when the sim is in VR mode, 0 otherwise. Used to pick
+    between the two persisted panel-zoom settings (msfs_panel_zoom /
+    msfs_panel_zoom_vr) so VR and flat-screen can each keep their own
+    preferred zoom level. """
+    tm = getattr(G, "telem_manager", None)
+    if tm is None:
+        return False
+    try:
+        is_in_vr = tm.getTelemValue("IsInVr")
+    except Exception:
+        return False
+    if is_in_vr is None:
+        return False
+    try:
+        return bool(int(float(is_in_vr)))
+    except (TypeError, ValueError):
+        return str(is_in_vr).strip().lower() in ("1", "true")
+
+
 def _current_state() -> dict:
     sm = _settings_mgr
     return {
@@ -215,6 +241,36 @@ def root():
 @app.get("/api/status")
 def get_status():
     return _current_state()
+
+
+@app.get("/api/panel-zoom")
+def get_panel_zoom():
+    vr = _is_vr()
+    key = "msfs_panel_zoom_vr" if vr else "msfs_panel_zoom"
+    zoom = G.system_settings.get(key, 100)
+    try:
+        zoom = int(zoom)
+    except (TypeError, ValueError):
+        zoom = 100
+    return {"zoom": zoom, "vr": vr}
+
+
+@app.post("/api/panel-zoom")
+def set_panel_zoom():
+    data = request.json
+    if not data or "zoom" not in data:
+        response.status = 400
+        return {"detail": "Request body must include 'zoom'"}
+    try:
+        zoom = int(data["zoom"])
+    except (TypeError, ValueError):
+        response.status = 400
+        return {"detail": "'zoom' must be an integer"}
+
+    vr = _is_vr()
+    key = "msfs_panel_zoom_vr" if vr else "msfs_panel_zoom"
+    G.system_settings.setValue(key, zoom)
+    return {"ok": True, "vr": vr}
 
 
 @app.get("/api/settings")

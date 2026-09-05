@@ -16,8 +16,8 @@
   "content_type": "",
   "title": "VPforce TelemFFB Settings",
   "manufacturer": "VPforce",
-  "creator": "VPforce",
-  "package_version": "1.0.0",
+  "creator": "smitty",
+  "package_version": "0.2.0",
   "minimum_game_version": "1.8.3",
   "release_notes": {
     "neutral": {

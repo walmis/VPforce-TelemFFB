@@ -3,47 +3,47 @@
     {
       "path": "html_ui/icons/toolbar/icon_toolbar_vpforce_telemffb_settings.svg",
       "size": 1291,
-      "date": 134325791627803424
+      "date": 134326034032708384
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/panel.css",
-      "size": 6199,
-      "date": 134325839784925264
+      "size": 6251,
+      "date": 134331103209119200
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/panel.html",
       "size": 847,
-      "date": 134325833086746800
+      "date": 134326034032753488
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/panel.js",
-      "size": 12872,
-      "date": 134325833288892208
+      "size": 17771,
+      "date": 134331103138350448
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/vpforcelogo.svg",
       "size": 7685,
-      "date": 134325826750002000
+      "date": 134326034032753488
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/VpforceSettings.css",
       "size": 1294,
-      "date": 134325825591472544
+      "date": 134326034032733424
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/VpforceSettings.html",
       "size": 1850,
-      "date": 134325825652756448
+      "date": 134326034032733424
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/VpforceSettings.js",
       "size": 1978,
-      "date": 134325745605915808
+      "date": 134326034032773488
     },
     {
       "path": "InGamePanels/vpforce-telemffb-panel.spb",
       "size": 724,
-      "date": 134325809930000000
+      "date": 134326034028349120
     }
   ]
 }

@@ -123,6 +123,53 @@ function orderValue(v) {
     return isNaN(n) ? Number.MAX_SAFE_INTEGER : n;
 }
 
+// Desktop's SettingsLayout.py renders a setting whose 'order' ends in '1'
+// with a '.' (e.g. "10700.1") inline on its 'prereq' parent's own row,
+// sharing the parent's label, instead of as its own row - a very common
+// "[Enable X] --- [X strength]" one-line pattern. Mirror that here: pull
+// those items out of the flat list and key them by parent name, so
+// renderRow can render both controls together.
+function isBumpOrder(order) {
+    return typeof order === "string" && order.length > 0 &&
+        order[order.length - 1] === "1" && order.indexOf(".") !== -1;
+}
+
+// A ".2"+ decimal (as opposed to ".0"/bare-integer top-level, or ".1" bump
+// children merged into their parent's row above) is an ordinary nested
+// child in desktop's hierarchy - indent it one character width so it still
+// reads as subordinate to whatever precedes it, without going as far as
+// desktop's full per-depth indent.
+function decimalDigit(order) {
+    const dot = (order || "").indexOf(".");
+    if (dot === -1) return -1;
+    const n = parseInt(order.slice(dot + 1), 10);
+    return isNaN(n) ? -1 : n;
+}
+
+function isIndentedChild(order) {
+    return decimalDigit(order) >= 2;
+}
+
+function extractBumpChildren(settings) {
+    const byName = new Map();
+    for (const item of settings) byName.set(item.name, item);
+
+    const bumpChildren = new Map(); // parent name -> child item
+    const mainItems = [];
+    for (const item of settings) {
+        const isBump = isBumpOrder(item.order) && item.prereq && byName.has(item.prereq);
+        // Only the first bump child claims a given parent row - a second one
+        // (shouldn't happen in practice, but don't silently drop settings if
+        // it does) just renders as its own ordinary row instead.
+        if (isBump && !bumpChildren.has(item.prereq)) {
+            bumpChildren.set(item.prereq, item);
+        } else {
+            mainItems.push(item);
+        }
+    }
+    return { mainItems, bumpChildren };
+}
+
 function renderSettings(settings) {
     const root = document.getElementById("settingsList");
 
@@ -140,8 +187,10 @@ function renderSettings(settings) {
         const active = document.activeElement;
         const activeName = active && active.dataset ? active.dataset.name : null;
 
+        const { mainItems, bumpChildren } = extractBumpChildren(settings);
+
         const groups = new Map();
-        for (const item of settings) {
+        for (const item of mainItems) {
             const key = groupKey(item);
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key).push(item);
@@ -165,8 +214,12 @@ function renderSettings(settings) {
             groupEl.appendChild(title);
 
             for (const item of items) {
-                if (item.name === activeName) continue; // skip re-render of the row being edited
-                groupEl.appendChild(renderRow(item));
+                const bumpChild = bumpChildren.get(item.name) || null;
+                // skip re-render of a row being actively edited, whether that's
+                // the row's own control or its inline bump-child control
+                if (item.name === activeName) continue;
+                if (bumpChild && bumpChild.name === activeName) continue;
+                groupEl.appendChild(renderRow(item, bumpChild));
             }
 
             frag.appendChild(groupEl);
@@ -178,9 +231,11 @@ function renderSettings(settings) {
     }
 }
 
-function renderRow(item) {
+function renderRow(item, bumpChild) {
     const row = document.createElement("div");
-    row.className = item.control === "choice" ? "row row--choice" : "row";
+    let cls = item.control === "choice" ? "row row--choice" : "row";
+    if (isIndentedChild(item.order)) cls += " row--indent";
+    row.className = cls;
 
     const label = document.createElement("div");
     label.className = "rowLabel";
@@ -199,8 +254,36 @@ function renderRow(item) {
         control.appendChild(renderRange(item, row));
     }
 
+    if (bumpChild) {
+        const bumpEl = renderBumpControl(bumpChild, row);
+        if (bumpEl) control.appendChild(bumpEl);
+    }
+
     row.appendChild(control);
     return row;
+}
+
+function renderBumpControl(item, row) {
+    if (item.control === "bool") return renderBool(item, row);
+    if (item.control === "choice") return renderChoice(item, row);
+    if (item.control === "range") return renderRange(item, row);
+    return null;
+}
+
+function refreshSettingsNow() {
+    // A write can change which settings the server even returns (a bump
+    // child appearing/disappearing with its toggle, or any other prereq
+    // relationship) - don't wait for the next SETTINGS_POLL_MS tick to
+    // show that, which could be up to 3s of visibly stale state.
+    apiGet("/api/settings").then(
+        (data) => {
+            state.settings = data.settings || [];
+            renderSettings(state.settings);
+        },
+        (err) => {
+            log("immediate settings refresh failed:", err && err.message);
+        }
+    );
 }
 
 function markUpdating(row, promise) {
@@ -208,6 +291,7 @@ function markUpdating(row, promise) {
     promise.then(
         () => {
             row.classList.remove("updating");
+            refreshSettingsNow();
         },
         (err) => {
             row.classList.remove("updating");
@@ -229,6 +313,12 @@ function renderBool(item, row) {
     btn.addEventListener("click", () => {
         const newVal = !btn.classList.contains("on");
         btn.classList.toggle("on", newVal);
+        // A clicked <button> keeps DOM focus, and renderSettings() skips
+        // rebuilding whatever row is focused (so an in-progress edit isn't
+        // clobbered) - a toggle click is instantaneous, not an in-progress
+        // edit, so blur it immediately or its own row would be excluded
+        // from the refreshSettingsNow() this triggers.
+        btn.blur();
         markUpdating(row, apiPost(item.name, newVal, item.unit));
     });
 
@@ -248,6 +338,7 @@ function renderChoice(item, row) {
         pill.addEventListener("click", () => {
             wrap.querySelectorAll(".pill").forEach((p) => p.classList.remove("selected"));
             pill.classList.add("selected");
+            pill.blur();
             markUpdating(row, apiPost(item.name, opt.value, item.unit));
         });
         wrap.appendChild(pill);
@@ -346,11 +437,22 @@ function formatRangeValue(v, display, unit) {
     return v.toFixed(2) + (unit || "");
 }
 
+function postPanelZoom(zoom) {
+    return fetch(API_BASE + "/api/panel-zoom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zoom: zoom }),
+    }).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+    });
+}
+
 function initScaleControl() {
     const label = document.getElementById("scaleLabel");
-    let index = 0; // SCALE_STEPS[0] === 100%
+    let index = 0; // SCALE_STEPS[0] === 100%, until the persisted value loads
 
-    function apply() {
+    function apply(persist) {
         const pct = SCALE_STEPS[index];
         label.textContent = pct + "%";
         // 'zoom' (not transform: scale) so layout/scroll extent actually
@@ -358,20 +460,39 @@ function initScaleControl() {
         // to avoid clipping or dead scroll space. Applied to the whole page
         // (not just #settingsList) so the header scales along with it.
         document.body.style.zoom = pct / 100;
+        if (persist) {
+            // Server picks msfs_panel_zoom vs msfs_panel_zoom_vr based on the
+            // current CameraState - the client doesn't need to know which.
+            postPanelZoom(pct).then(null, (err) => log("panel-zoom save failed:", err && err.message));
+        }
     }
 
     document.getElementById("scaleDown").addEventListener("click", () => {
         if (index > 0) {
             index -= 1;
-            apply();
+            apply(true);
         }
     });
     document.getElementById("scaleUp").addEventListener("click", () => {
         if (index < SCALE_STEPS.length - 1) {
             index += 1;
-            apply();
+            apply(true);
         }
     });
+
+    // Load the persisted zoom once at startup and apply it without
+    // immediately re-saving the same value back.
+    apiGet("/api/panel-zoom").then(
+        (data) => {
+            const idx = SCALE_STEPS.indexOf(data.zoom);
+            index = idx >= 0 ? idx : 0;
+            apply(false);
+        },
+        (err) => {
+            log("panel-zoom load failed:", err && err.message);
+            apply(false);
+        }
+    );
 }
 
 window.addEventListener("error", (e) => {

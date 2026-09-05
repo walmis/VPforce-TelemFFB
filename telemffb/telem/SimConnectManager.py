@@ -343,6 +343,7 @@ class SimConnectManager(threading.Thread):
         SimVar("TAS", "AIRSPEED TRUE", "meter/second"),
         SimVar("IAS", "AIRSPEED INDICATED", "meter/second"),
         SimVar('CameraState', "CAMERA STATE", "Enum"),
+        SimVar('IsInVr', "IS IN VR", "Bool"),
         SimVar("GroundSpeed", "GROUND VELOCITY", "meter/second"),
         SimVar("AirDensity", "AMBIENT DENSITY", "kilograms per cubic meter"),
         SimVar("AoA", "INCIDENCE ALPHA", "degrees"),
