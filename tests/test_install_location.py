@@ -59,24 +59,65 @@ class TestSharedFolders:
 
 
 class TestTempFolder:
-    def test_temp_and_subfolders_refused(self):
-        tmp = tempfile.gettempdir()
-        assert unsafe_install_location_reason(tmp, FAKE_LOCATIONS) is not None
+    """Where temp is comes from the stub, not from the machine: the real
+    one moves with the user account and says nothing about the rule."""
+
+    TMP = r"C:\Users\synthetic\AppData\Local\Temp"
+
+    @pytest.fixture(autouse=True)
+    def temp_dir(self, monkeypatch):
+        monkeypatch.setattr(tempfile, 'gettempdir', lambda: self.TMP)
+
+    def test_temp_itself_is_refused(self):
+        assert unsafe_install_location_reason(self.TMP, FAKE_LOCATIONS) is not None
+
+    def test_a_folder_under_temp_is_refused_and_blames_the_zip(self):
         reason = unsafe_install_location_reason(
-            os.path.join(tmp, "Temp1_TelemFFB.zip"), FAKE_LOCATIONS)
+            os.path.join(self.TMP, "Temp1_TelemFFB.zip"), FAKE_LOCATIONS)
         assert reason is not None and "zip" in reason
 
+    def test_a_folder_merely_named_like_temp_is_accepted(self):
+        """Prefix matching has to respect the separator, or C:\\...\\Temporary
+        would be swept up with C:\\...\\Temp."""
+        assert unsafe_install_location_reason(
+            self.TMP + "orary", FAKE_LOCATIONS) is None
 
-class TestRealLocationResolution:
-    def test_real_lookup_flags_actual_desktop(self):
-        """No injected locations: the registry-resolved shell folders must
-        identify this machine's real Desktop (OneDrive-redirected or not)."""
-        import winreg
-        with winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders") as key:
-            desktop = winreg.QueryValueEx(key, "Desktop")[0]
-        assert unsafe_install_location_reason(desktop) == "your Desktop"
 
-    def test_real_lookup_accepts_this_repo(self):
-        assert unsafe_install_location_reason(os.path.dirname(__file__)) is None
+class TestResolvedLocationsAreUsed:
+    """With nothing injected, the guard falls back to the shell folders it
+    resolves for itself.
+
+    The resolver is stubbed rather than allowed to read the registry: a
+    test that consults the machine it runs on asserts something different
+    on every machine, and a build agent has no Desktop worth naming.  What
+    is worth pinning is that the fallback is consulted at all, and that
+    resolution is what it consults.
+    """
+
+    RESOLVED = {
+        "your Desktop": r"C:\Users\synthetic\OneDrive\Desktop",
+        "your Documents folder": r"C:\Users\synthetic\Documents",
+    }
+
+    @pytest.fixture
+    def resolved(self, monkeypatch):
+        import telemffb.utils as utils
+        monkeypatch.setattr(utils, '_shared_shell_locations',
+                            lambda: dict(self.RESOLVED))
+
+    def test_a_resolved_folder_is_flagged_without_being_passed_in(self, resolved):
+        assert (unsafe_install_location_reason(
+            r"C:\Users\synthetic\OneDrive\Desktop") == "your Desktop")
+
+    def test_redirection_is_honored_rather_than_assumed(self, resolved):
+        """The Desktop is wherever resolution says - under OneDrive here.
+        The path it would have had without redirection means nothing."""
+        assert unsafe_install_location_reason(
+            r"C:\Users\synthetic\Desktop") is None
+
+    def test_a_subfolder_of_a_resolved_location_is_fine(self, resolved):
+        assert unsafe_install_location_reason(
+            r"C:\Users\synthetic\OneDrive\Desktop\TelemFFB") is None
+
+    def test_an_unrelated_folder_is_accepted(self, resolved):
+        assert unsafe_install_location_reason(r"C:\Apps\TelemFFB") is None

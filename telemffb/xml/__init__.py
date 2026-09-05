@@ -73,9 +73,12 @@ class XmlConfigManager:
         defaults_path: Path to default settings XML file
     """
 
-    def __init__(self, device: str, userconfig_path: str, defaults_path: str) -> None:
+    def __init__(self, device: str, userconfig_path: str, defaults_path: str,
+                 hidden=None) -> None:
         self._store = XmlStore(device, userconfig_path, defaults_path)
-        self._resolver = ConfigResolver(self._store)
+        # ``hidden``: optional application-policy predicate, forwarded to
+        # the resolver (see ConfigResolver.__init__).  Default permissive.
+        self._resolver = ConfigResolver(self._store, hidden=hidden)
         self._writer = ConfigWriter(self._store, self._resolver)
 
     @property

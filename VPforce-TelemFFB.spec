@@ -32,7 +32,10 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', '.'), ('simconnect/simconnect.dll', 'simconnect')],
-    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')] + _collect_msfs_panel_datas(),
+    # ffb_tap: data rather than a binary, because TelemFFB never loads it -
+    # it is copied into a game folder. A subdirectory keeps a file named
+    # dinput8.dll out of TelemFFB's own DLL search path.
+    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.'), ('dll/ffb_tap/*', 'ffb_tap')] + _collect_msfs_panel_datas(),
     hiddenimports=[
         'numpy._core._exceptions',
         'numpy._core.multiarray',

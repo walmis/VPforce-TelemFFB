@@ -107,6 +107,10 @@ class TelemManager(QObject, threading.Thread):
 
     first_frame_received = pyqtSignal(str)
     sim_exited = pyqtSignal(str)   # emitted when a sim exit detected
+    #: per-aircraft device swap, handled on the main thread (the device's
+    #: read timer must live there); the payload is the devpath to acquire,
+    #: or '' for the stored primary
+    deviceSwapRequested = pyqtSignal(str)
 
     currentAircraft: Optional['AircraftBase'] = None
     currentAircraftName: Optional[str] = None
@@ -139,10 +143,21 @@ class TelemManager(QObject, threading.Thread):
         self._first_frame_from_sim = False
         self._sim_exit_signaled = False   # True after notify_sim_exited fires; prevents re-entrancy until reset_sim_connected() clears it
         self._process_check_deadline: Optional[float] = None  # perf_counter() timestamp of the next scheduled process check; None when inactive
+        self._device_swap_attempt = None  # (aircraft, devpath) already requested - one attempt per aircraft
 
 
     def set_paused(self, pause_state: bool = False):
         self.pause_state = pause_state
+
+    def frame_hold(self):
+        """The lock guarding frame processing.
+
+        Pausing only gates NEW frames; one already being processed (or
+        buffered) keeps driving effects.  A device teardown pauses, then
+        acquires this for the duration, so no frame ever writes to a
+        half-switched device - the per-aircraft swap made that race a
+        near-certainty, since the request originates mid-frame."""
+        return self._cond
 
     def reset_sim_connected(self):
         """Called by SimListenerManager.allStarted when all sim listeners have been
@@ -458,6 +473,7 @@ class TelemManager(QObject, threading.Thread):
         params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
         Aircraft_Class = self._resolve_aircraft_class(aircraft_info, cls_name, params)
 
+        self._handle_device_selection(aircraft_name, params)
         self._handle_vpconf_setup(params)
         self._handle_command_runner(params)
         self._handle_configurator_overrides(params)
@@ -474,6 +490,52 @@ class TelemManager(QObject, threading.Thread):
         self._setup_xpplugin_overrides(aircraft_name, data_source)
         # self._update_settings_ui()
         self.aircraftUpdated.emit()
+
+    def _handle_device_selection(self, aircraft_name, params):
+        """Acquire the device this aircraft asks for (per-aircraft swap).
+
+        The ``joystick_device`` aircraft setting stores the devpath of one
+        of the joystick role's configured devices; absent or empty means
+        the user's primary.  The swap is EPHEMERAL - the stored settings
+        are never touched, so a restart, or the next aircraft without a
+        preference, comes back up on the primary.  Only the joystick
+        instance acts: the setting addresses the one role that can hold
+        alternate devices.
+
+        The switch itself runs on the main thread (the device's read
+        timer must live there), so this emits and finishes the current
+        pass on the old device; the switch forces an aircraft reload
+        whose second pass finds the right device already in place.  One
+        request per aircraft: a swap that fails (device unplugged) falls
+        back to the primary on the main-thread side and is not retried
+        until another aircraft loads.
+        """
+        if G.device_type != 'joystick':
+            return
+        primary = str(G.system_settings.get('devpath_joystick', '') or '')
+        value = str(params.get('joystick_device', '') or '')
+        wanted = primary if value in ('', 'primary') else value
+        if wanted != primary:
+            configured = {primary} | {
+                str(G.system_settings.get(f'devpath_joystick_{slot}', '') or '')
+                for slot in (2, 3)}
+            if wanted not in configured:
+                logging.warning(
+                    f"'{aircraft_name}' asks for a device that is no "
+                    f"longer configured ({wanted}) - staying on the "
+                    "primary device")
+                wanted = primary
+        current = str(getattr(G, 'device_devpath', '') or '')
+        if wanted == current and getattr(G, 'device_connection_status', False):
+            return
+        request = (aircraft_name, wanted)
+        if self._device_swap_attempt == request:
+            return
+        self._device_swap_attempt = request
+        which = 'primary device' if wanted == primary else wanted
+        logging.info(f"'{aircraft_name}' asks for {which} - requesting a "
+                     "device swap")
+        self.deviceSwapRequested.emit('' if wanted == primary else wanted)
 
     def _stamp_trim_cal_availability(self, data_source, cls_name):
         """Evaluate ONCE per aircraft load whether elevator trim-curve
@@ -517,8 +579,19 @@ class TelemManager(QObject, threading.Thread):
 
         return Aircraft_Class
 
+    @staticmethod
+    def _device_has_gains() -> bool:
+        """VPConf profiles and Configurator gain overrides only apply to
+        devices with Configurator gain sliders (VPforce hardware)."""
+        caps = getattr(HapticEffect.device, 'caps', None)
+        return caps is None or caps.has_gains
+
     def _handle_vpconf_setup(self, params):
         """Handle VPConf profile setup for the aircraft."""
+        if not self._device_has_gains():
+            if "vpconf" in params:
+                logging.info("vpconf profile configured but this device has no Configurator gains; skipping")
+            return
         if "vpconf" in params:
             if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
                 upload_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
@@ -548,6 +621,10 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_configurator_overrides(self, params):
         """Handle configurator gain overrides for the aircraft."""
+        if not self._device_has_gains():
+            if params.get('configurator_override_enabled', False):
+                logging.info("configurator overrides enabled but this device has no Configurator gains; skipping")
+            return
         if params.get('configurator_override_enabled', False):
             state = params.get('configurator_gains', 'none')
             if state != "none":
@@ -606,6 +683,11 @@ class TelemManager(QObject, threading.Thread):
             updated_params = self.get_changed_params(params)
             self.currentAircraft.apply_settings(updated_params)
 
+            # the user picked a different device for the LOADED aircraft:
+            # the swap must not wait for the next aircraft change
+            if 'joystick_device' in updated_params:
+                self._handle_device_selection(aircraft_name, params)
+
             self._handle_vpconf_setup(params)
             self._handle_command_runner(params)
             self._handle_configurator_overrides_update(params)
@@ -619,6 +701,8 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_configurator_overrides_update(self, params):
         """Handle configurator overrides during config updates."""
+        if not self._device_has_gains():
+            return
         if params.get('configurator_override_enabled', False):
             state = params.get('configurator_gains', 'none')
             if state != "none":
@@ -644,6 +728,21 @@ class TelemManager(QObject, threading.Thread):
     def _process_current_aircraft_telemetry(self, telem_data: BaseTelemetryData):
         """Process telemetry for the current aircraft."""
         if self.currentAircraft:
+            # A just-(re)opened device has no input snapshot until its
+            # first report arrives, and the aircraft mixins read input
+            # every frame assuming it is always there - hold frames for
+            # the moment that takes (a device switch mid-session is when
+            # this window actually gets hit).
+            device = HapticEffect.device
+            if device is not None:
+                try:
+                    if device.get_input() is None:
+                        logging.debug(
+                            "Telemetry frame skipped: no input report "
+                            "from the device yet")
+                        return
+                except Exception:
+                    pass
             try:
                 _tm = time.perf_counter()
                 self.currentAircraft._last_telem_data = self.currentAircraft._telem_data.copy()

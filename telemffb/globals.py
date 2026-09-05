@@ -65,6 +65,16 @@ dev_build_str: str = "DEV_BUILD"
 allow_multi_instance: bool = False
 """if true, will skip mutex lock checks and allow multiple instances to run simultaneously"""
 
+dinput_bridge_min_version: str = "0.9.5"
+"""Oldest DInput bridge build this TelemFFB accepts, as the bridge's own
+'x.y.z' version string ('' disables the check).
+
+Raised when TelemFFB starts depending on bridge behavior an older build
+does not have - and, being the version pairing that was actually tested
+together, it doubles as a light gate on redistributed builds.  A soft
+one: anyone running from source can edit this line, which is inherent to
+a GPL client and deliberately not fought here."""
+
 vpf_logo: str = ":/image/TelemFFB_Logo.png"
 
 release_notes_url: str = "https://docs.vpforce.eu/telemffb/latest/"
@@ -95,6 +105,15 @@ device_info : Optional['DeviceInfo'] = None
 
 device_devpath : Optional[str] = None
 """System path to device, e.g. /dev/hidraw0 or \\?\\hid#vid_ffff&pid_2055&mi_00#7&2b3b4c3f&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"""
+
+device_di_guid : Optional[str] = None
+"""DirectInput instance GUID when this instance drives a generic DI FFB
+device (stored as 'dinput:{GUID}' in the devpath_* setting). None = native
+VPforce device."""
+
+device_capabilities = None
+"""ffb_backend.DeviceCapabilities of the connected device; feature-bearing
+UI and effects gate on these flags rather than probing the backend."""
 
 device_usbpid : str # deprecated
 

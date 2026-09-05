@@ -44,7 +44,7 @@ VALID_DATATYPES = {
     "float", "d_float", "n_float", "negfloat", "pct_float", "anyfloat",
     "int", "d_int",
     "anylist", "text", "path", "button", "convert",
-    "configurator", "advspr", "advgs", "trimcal",
+    "configurator", "advspr", "advgs", "trimcal", "devicelist",
 }
 
 # Internal prereq markers used to hide UI elements (may have leading whitespace/underscores)
@@ -680,3 +680,20 @@ class TestXimpleEditorCorruption:
             "it to TestXimpleEditorCorruption.LEGITIMATE_S with a reason "
             "(see this test's docstring).\nOffenders:\n  " + "\n  ".join(offenders)
         )
+
+class TestNoDuplicateChildElements:
+    def test_no_block_repeats_a_child_tag(self, defaults_root):
+        """Each <defaults> child appears at most once.  A duplicated
+        child (field case: two <grouping> tags after a hand edit went
+        wrong) parses fine and even renders fine - findtext returns the
+        first - but corrupts the block for grid editors and for whichever
+        consumer reads the other copy."""
+        from collections import Counter
+        for elem in defaults_root.findall(".//defaults"):
+            if _is_placeholder_default(elem) or _is_dummy_setting(elem):
+                continue
+            counts = Counter(child.tag for child in elem)
+            dupes = {tag: n for tag, n in counts.items() if n > 1}
+            assert not dupes, (
+                f"'{elem.findtext('name')}' repeats child element(s): "
+                f"{dupes}")

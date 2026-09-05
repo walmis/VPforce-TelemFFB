@@ -20,11 +20,28 @@ from telemffb.xml.types import (
 from telemffb.xml.store import XmlStore
 
 
+#: Settings whose visibility is an application policy question rather
+#: than an XML one - see ConfigResolver's ``hidden`` parameter.
+POLICY_GATED = ('device_group', 'joystick_device')
+
+
 class ConfigResolver:
     """Read-only query interface over parsed XML config trees."""
 
-    def __init__(self, store: XmlStore) -> None:
+    def __init__(self, store: XmlStore, hidden=None) -> None:
+        """``hidden`` is an optional predicate, ``name -> bool``, asked
+        about the settings in POLICY_GATED: True drops the row from
+        every read, here and in the cascade below.
+
+        Injected rather than imported: whether a setting applies can
+        depend on application state this layer knows nothing about (the
+        per-aircraft device selection means nothing until a second
+        joystick is configured), and a parser that reached up for that
+        answer would invert the dependency and close an import cycle.
+        Default is permissive - nothing is hidden.
+        """
         self._store = store
+        self._hidden = hidden
 
     # ── Main entry point ──────────────────────────────────────
 
@@ -151,6 +168,13 @@ class ConfigResolver:
             name = name_elem.text
             displayname = displayname_elem.text
             datatype = datatype_elem.text
+
+            # A policy-gated setting the application says does not
+            # apply is dropped here, at the one read the form AND
+            # runtime resolution both go through.
+            if (name in POLICY_GATED and self._hidden is not None
+                    and self._hidden(name)):
+                continue
             exclusive_with = elem.findtext('exclusive_with', '')
             unit = elem.findtext('unit', '')
             value = elem.findtext('value', '')

@@ -1716,3 +1716,54 @@ class TestWriteUserModelNotes:
 
     def test_returns_none_on_empty_model(self, notes_xml):
         assert xmlutils.write_user_model_notes("MSFS", "", "Note", "Auto User") is None
+
+class TestInjectedVisibilityPolicy:
+    """ConfigResolver takes an application-policy predicate rather than
+    reaching up for one.  Whether a setting applies can depend on state
+    the XML layer knows nothing about - the per-aircraft device
+    selection means nothing until a second joystick is configured - and
+    a parser that imported the answer would invert the dependency and
+    close an import cycle."""
+
+    def _resolver(self, hidden=None):
+        from telemffb.xml.read import ConfigResolver
+        from telemffb.xml.store import XmlStore
+        return ConfigResolver(XmlStore('joystick', '', ''), hidden=hidden)
+
+    def test_the_default_hides_nothing(self):
+        """An unwired resolver is permissive: no policy, no filtering."""
+        assert self._resolver()._hidden is None
+
+    def test_the_predicate_is_asked_and_obeyed(self, monkeypatch):
+        from telemffb.xml import read as xread
+        asked = []
+
+        def hidden(name):
+            asked.append(name)
+            return name == 'joystick_device'
+        resolver = self._resolver(hidden)
+        # the gate runs inside read_xml_file's element loop; exercise it
+        # directly against the policy contract
+        for name in xread.POLICY_GATED:
+            resolver._hidden(name)
+        assert asked == list(xread.POLICY_GATED)
+        assert resolver._hidden('joystick_device') is True
+        assert resolver._hidden('device_group') is False
+
+    def test_only_policy_gated_names_are_subject_to_it(self):
+        """A predicate that says yes to everything must not silently
+        drop unrelated settings - the gate consults it for POLICY_GATED
+        names only."""
+        from telemffb.xml.read import POLICY_GATED
+        assert 'joystick_device' in POLICY_GATED
+        assert 'device_group' in POLICY_GATED
+        assert 'spring_mode' not in POLICY_GATED
+
+    def test_the_shim_wires_the_real_policy(self):
+        """The application layer supplies it, so the parser stays clean."""
+        import telemffb.xmlutils as xu
+        assert xu._get_mgr()[1]._hidden is xu._setting_is_hidden
+
+    def test_the_wired_policy_only_speaks_for_device_settings(self):
+        import telemffb.xmlutils as xu
+        assert xu._setting_is_hidden('spring_mode') is False

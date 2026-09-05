@@ -499,7 +499,7 @@ class SettingsLayout(QGridLayout):
 
         # print (f"{i} rows with {self.count()} widgets")
 
-    def reload_caller(self):
+    def reload_caller(self, reveal_top=False):
         # caller_frame = inspect.currentframe().f_back
         # caller_name = caller_frame.f_code.co_name
         # dbprint("blue", f"RELOAD_CALLER was called by {caller_name}")
@@ -508,15 +508,20 @@ class SettingsLayout(QGridLayout):
         if not self.trigger_form_reload:
             self.trigger_form_reload = True  # reset back to true for next iteration
         else:
-            self.reload_layout(None)
+            self.reload_layout(None, reveal_top=reveal_top)
 
-    def reload_layout(self, result=None):
+    def reload_layout(self, result=None, reveal_top=False):
         # stack = inspect.stack()
         # for frame_info in stack:
         #     dbprint("green", f"Function {frame_info.function} in {frame_info.filename} at line {frame_info.lineno}")
         # Remember where the user was looking so the rebuilt form lands back at the
         # same row, instead of drifting by the pixel height of whatever changed above.
-        scroll_anchor = self._capture_scroll_anchor()
+        # ``reveal_top`` is for a rebuild that ADDS a section at the top of
+        # the form (the Device section appearing when a second joystick
+        # device is configured): holding the reading position - right for
+        # every ordinary edit - would leave the new section silently
+        # off-screen above.
+        scroll_anchor = None if reveal_top else self._capture_scroll_anchor()
         self.clear_layout(show_empty_notice=False)
         # Clear unit tracking when reloading layout
         self.unit_previous_values = {}
@@ -527,9 +532,22 @@ class SettingsLayout(QGridLayout):
         if result:
             self.build_rows(result)
             # Restore once the event loop has applied the freshly built geometry.
-            QtCore.QTimer.singleShot(0, lambda: self._restore_scroll_anchor(scroll_anchor))
+            if reveal_top:
+                QtCore.QTimer.singleShot(0, self._scroll_to_top)
+            else:
+                QtCore.QTimer.singleShot(0, lambda: self._restore_scroll_anchor(scroll_anchor))
         else:
             self._build_empty_notice()
+
+    def _scroll_to_top(self):
+        """Put the form back at the top, so a section that just appeared
+        there is the first thing in view."""
+        try:
+            area = self._settings_scroll_area()
+            if area is not None:
+                area.verticalScrollBar().setValue(0)
+        except Exception:
+            logging.exception("scroll-to-top failed")
 
     def _settings_scroll_area(self):
         """The QScrollArea hosting this settings layout, or None when it is not
@@ -1162,7 +1180,8 @@ class SettingsLayout(QGridLayout):
                 dropbox.setObjectName(f"edb_{item['name']}")
 
                 label_dict_name = item['validvalues']
-                label_dict = getattr(G.settings_mgr, label_dict_name, None)
+                label_dict = G.settings_mgr.resolve_enum_list(
+                    label_dict_name, item['value'])
 
                 if not isinstance(label_dict, dict):
                     dropbox.addItem(f"Label dict '{label_dict_name}' not found or invalid")
@@ -1214,6 +1233,35 @@ class SettingsLayout(QGridLayout):
                 dropbox.blockSignals(False)
             self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
+
+        if item['datatype'] == 'devicelist':
+            # the joystick role's configured devices, by devpath - the
+            # per-aircraft device selection ('primary' = whatever is
+            # marked active in System Settings)
+            dropbox = NoWheelComboBox()
+            dropbox.setMinimumWidth(150)
+            dropbox.setObjectName(f"ddb_{item['name']}")
+            dropbox.blockSignals(True)
+            dropbox.addItem('Primary (default)', 'primary')
+            for dev_path, dev_label in utils.joystick_device_choices(
+                    G.system_settings):
+                dropbox.addItem(dev_label, dev_path)
+                if dev_label.endswith(' *'):
+                    dropbox.setItemData(
+                        dropbox.count() - 1,
+                        'Currently the primary device (System Settings)',
+                        QtCore.Qt.ItemDataRole.ToolTipRole)
+            current = str(item['value'] or 'primary')
+            index = dropbox.findData(current)
+            if index < 0:
+                # a stored reference to a device no longer configured:
+                # display the truth, keep the value deselectable
+                dropbox.addItem('(no longer configured)', current)
+                index = dropbox.count() - 1
+            dropbox.setCurrentIndex(index)
+            dropbox.currentIndexChanged.connect(self.dropbox_changed)
+            dropbox.blockSignals(False)
+            self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
 
         if item['datatype'] == 'path':
             self.vpconf_browse_button = QPushButton()
@@ -1650,13 +1698,18 @@ class SettingsLayout(QGridLayout):
             combo = sender
 
         object_name = combo.objectName()
-        setting_name = object_name.replace('edb_', '').replace('db_', '')  # handle both db_ and edb_
-
-        # If it's an enum dropbox, get the enum member name
-        if object_name.startswith("edb_"):
+        if object_name.startswith("ddb_"):
+            # device dropbox: the stored value is the itemData devpath
+            # ('primary' for the default entry), never the display label
+            setting_name = object_name[len("ddb_"):]
+            value = str(combo.itemData(combo.currentIndex()) or 'primary')
+        elif object_name.startswith("edb_"):
+            setting_name = object_name[len("edb_"):]
+            # an enum dropbox stores the enum member name
             enum_member = combo.itemData(combo.currentIndex())
             value = enum_member.name if enum_member else combo.currentText()
         else:
+            setting_name = object_name.replace('db_', '')
             value = combo.currentText()
 
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")

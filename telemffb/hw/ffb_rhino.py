@@ -43,6 +43,7 @@ for p in paths:
     except:
         pass
 
+import telemffb.hw.ffb_backend as ffb_backend
 import telemffb.hw.hid as hid
 from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
 
@@ -629,7 +630,7 @@ input_report_handlers = {
     HID_REPORT_ID_PID_STATE_REPORT: FFBReport_PIDStatus_Input
 }
 
-class FFBEffectHandle:
+class FFBEffectHandle(ffb_backend.BaseEffectHandle):
     def __init__(self, device, effect_id, effect_type) -> None:
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
@@ -815,10 +816,12 @@ class DeviceInfo:
         """Returns the device name set in the VPforce Configurator"""
         return self.product_string.replace("Rhino FFB ", "").strip()
 
-class FFBRhino(QObject):
-    buttonPressed = pyqtSignal(int)
-    buttonReleased = pyqtSignal(int)
-    deviceConnected = pyqtSignal(bool)
+class FFBRhino(ffb_backend.BaseFFBDevice):
+    # signals (buttonPressed/buttonReleased/deviceConnected) are defined on
+    # BaseFFBDevice; the native VPforce backend carries the full capability set
+    @property
+    def caps(self) -> ffb_backend.DeviceCapabilities:
+        return ffb_backend.VPFORCE_CAPABILITIES
 
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path : Optional[str] = None) -> None:
 
@@ -844,9 +847,10 @@ class FFBRhino(QObject):
         self._in_reports = {}
         self._effect_handles : List[FFBEffectHandle] = []
         self._dev = None
+        self._shutdown = False
 
-        QObject.__init__(self)
-        self.startTimer(1) # start Qt timer to read HID reports every 1ms
+        super().__init__()
+        self._timer_id = self.startTimer(1) # start Qt timer to read HID reports every 1ms
 
         self.reconnect()
 
@@ -857,6 +861,27 @@ class FFBRhino(QObject):
 
         self._dev = hid.Device(path=self.info.path)
         self._dev.nonblocking = True
+
+    def shutdown(self):
+        """Release the device deliberately (live device switch).
+
+        The read timer and the unplug-reconnect loop both exist to keep a
+        process-lifetime device alive at all costs; a deliberate close must
+        stop them, or a queued reconnect would silently re-open the old
+        hardware behind the new one.
+        """
+        self._shutdown = True
+        try:
+            self.killTimer(self._timer_id)
+        except Exception:
+            pass
+        if self._dev:
+            try:
+                self._dev.close()
+            except Exception:
+                pass
+            self._dev = None
+        logging.info(f"HID device released: {self.info.product_string}")
 
     @property
     def connected(self) -> bool:
@@ -955,6 +980,8 @@ class FFBRhino(QObject):
     # runs on mainThread
     @override
     def timerEvent(self, a0: QTimerEvent) -> None:
+        if self._shutdown:
+            return
         try:
             self.read_reports()
         except Exception:
@@ -964,6 +991,8 @@ class FFBRhino(QObject):
 
             logging.warn("Reconnecting HID device in 1s")
             def do_reconnect():
+                if self._shutdown:
+                    return   # deliberately released mid-retry
                 try:
                     self.reconnect()
                     logging.info("HID connected!")
@@ -1023,41 +1052,100 @@ class FFBRhino(QObject):
                 logging.info("Device FFB state was reset, telemFFB will recreate all effects")
                 for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
-                    effect.invalidate()
+                    if effect is not None:
+                        effect.invalidate()
 
             if report.effectPlaying == 0:
                 for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
-                    if effect.effect_id == report.effectBlockIndex:
+                    if effect is not None and effect.effect_id == report.effectBlockIndex:
                         effect._started = False
+
+    #: How long a denied firmware read keeps retrying, and how often.
+    #: Windows grants the vendor interface exclusively and does not say
+    #: who holds it.  A brief hold rides out on the retries (the recovery
+    #: log line reports how long); the one denial chased down in the
+    #: field was a persistent hold that outlived every process suspected
+    #: of it and cleared only with a reboot - holder never identified.
+    FIRMWARE_READ_RETRIES = 3
+    FIRMWARE_RETRY_DELAY_S = 0.1
+    #: After the retries are exhausted, how long further reads are skipped
+    #: outright.  A persistently held interface would otherwise cost every
+    #: caller the full retry ladder - two per device switch, on the main
+    #: thread, for a read that cannot succeed.
+    FIRMWARE_DENIAL_BACKOFF_S = 5.0
 
     def get_firmware_version(self, cached=True):
         if self.firmware_version and cached:
             return self.firmware_version
-        
-        try:
-            with usb1.USBContext() as context:
-                handle = context.openByVendorIDAndProductID(
-                    self.vid,
-                    self.pid,
-                    skip_on_error=True,
-                )
-                #if handle is None:
-                    # Device not present, or user is not allowed to access device.
-                ##request_type, request, value, index, length
 
-                self.firmware_version = handle.controlRead(USB_REQTYPE_DEVICE_TO_HOST|USB_REQTYPE_VENDOR, 
-                                        USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
-                return self.firmware_version
-        except Exception:
-            logging.exception("Unable to read Firmware Version")
-        
+        denied_until = getattr(self, '_firmware_denied_until', 0)
+        if time.perf_counter() < denied_until:
+            logging.debug("Firmware version read skipped: exclusive access "
+                          "was denied moments ago")
+            return None
+
+        denied_at = None
+        for attempt in range(1 + self.FIRMWARE_READ_RETRIES):
+            if attempt:
+                time.sleep(self.FIRMWARE_RETRY_DELAY_S)
+            try:
+                with usb1.USBContext() as context:
+                    handle = context.openByVendorIDAndProductID(
+                        self.vid,
+                        self.pid,
+                        skip_on_error=True,
+                    )
+                    self.firmware_version = handle.controlRead(
+                        USB_REQTYPE_DEVICE_TO_HOST | USB_REQTYPE_VENDOR,
+                        USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
+                    if denied_at is not None:
+                        held_ms = (time.perf_counter() - denied_at) * 1000
+                        logging.info(
+                            "Firmware version read succeeded on retry - the "
+                            f"device was held for under {held_ms:.0f} ms "
+                            f"(vid={self.vid:04X} pid={self.pid:04X})")
+                    return self.firmware_version
+            except usb1.USBErrorAccess:
+                # Windows grants the vendor interface exclusively and does
+                # not say who holds it.  Retried above; only a persistent
+                # hold is worth a warning.
+                if denied_at is None:
+                    denied_at = time.perf_counter()
+                continue
+            except Exception:
+                logging.exception("Unable to read Firmware Version")
+                return None
+
+        self._firmware_denied_until = (time.perf_counter()
+                                       + self.FIRMWARE_DENIAL_BACKOFF_S)
+        logging.warning(
+            "Firmware version read deferred: exclusive access to the "
+            f"device was denied for over "
+            f"{self.FIRMWARE_READ_RETRIES * self.FIRMWARE_RETRY_DELAY_S:.1f}s"
+            f" (vid={self.vid:04X} pid={self.pid:04X}).  Another program "
+            "may have the device open, or the USB stack may be in a stale "
+            "state - the latter has been seen in the field and cleared by "
+            "a reboot.  Harmless here: the device works normally and the "
+            "version is retried later.")
         return None
 
     def reset_effects(self):
         assert(self._dev)
         logging.info("FFB: Reset device effects")
         self._dev.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
+        # The reset wiped the device-side effect pool; every Python handle
+        # must forget its effect id or a running effect keeps writing to a
+        # slot that no longer exists - silently dead forces.  Field case:
+        # a mid-flight settings save restarts the sim listeners, SimConnect
+        # reconnects fast enough to skip the telemetry timeout, and its
+        # Open event resets the device under a still-flying aircraft.
+        # Invalidated handles lazily re-create on next use - the same
+        # self-heal the DirectInput backend's reset uses.
+        for ref in self._effect_handles:
+            handle = ref()
+            if handle is not None:
+                handle.invalidate()
         time.sleep(0.01)
 
     def create_effect(self, type) -> FFBEffectHandle:
@@ -1082,6 +1170,20 @@ class FFBRhino(QObject):
         if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
+    def pump_input(self):
+        """One non-blocking drain of pending HID reports, input intake
+        only (see BaseFFBDevice.pump_input).  Unlike read_reports, the
+        report handlers do NOT run: a device switch pumps this while it
+        holds the main thread, and button events must not fire
+        mid-teardown."""
+        if not self._dev:
+            return
+        while True:
+            tmp = self._dev.read(64)
+            if not tmp:
+                break
+            self._in_reports[tmp[0]] = tmp
+
     def read_reports(self):
         if not self._dev:
             return
@@ -1190,6 +1292,25 @@ class HapticEffect(Destroyable):
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
         cls.device = FFBRhino(vid, pid, serial, path)
         logging.info(f"Successfully opened HID '{cls.device.info.path.decode('utf-8')}'")
+
+        return cls.device
+
+    @classmethod
+    def open_dinput(cls, guid: str):
+        """Open a generic DirectInput FFB device (via the DInput bridge DLL)
+        and attach it for all HapticEffect instances.
+
+        Args:
+            guid: The DirectInput instance GUID string of the device.
+
+        Returns:
+            The opened `DInputFFBDevice` instance.
+        """
+        # local import: ffb_dinput imports the effect constants from this module
+        from telemffb.hw.ffb_dinput import DInputFFBDevice
+        logging.info(f"Open DirectInput FFB device {guid}")
+        cls.device = DInputFFBDevice(guid)
+        logging.info(f"Successfully opened '{cls.device.info.product_string}' ({cls.device.info.vidpid()})")
 
         return cls.device
 

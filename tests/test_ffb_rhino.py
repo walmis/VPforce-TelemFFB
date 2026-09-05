@@ -900,3 +900,201 @@ class TestFFBRhinoConnected:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+class TestResetEffectsInvalidatesHandles:
+    """A device reset wipes the device-side effect pool; the Python
+    handles must forget their effect ids or every running effect keeps
+    writing to a slot that no longer exists - silently dead forces.
+    Field case: a mid-flight settings save restarts the sim listeners,
+    SimConnect reconnects fast enough to skip the telemetry timeout, and
+    its Open event resets the device under a still-flying aircraft.
+    Invalidated handles lazily re-create on next use, the same self-heal
+    the DirectInput backend's reset performs."""
+
+    def _handle(self, device, effect_id):
+        import weakref
+        handle = FFBEffectHandle(device, effect_id, EFFECT_SINE)
+        device._effect_handles.append(
+            weakref.ref(handle,
+                        lambda ref: ref in device._effect_handles
+                        and device._effect_handles.remove(ref)))
+        return handle
+
+    def test_reset_invalidates_every_live_handle(self, mock_ffb_device):
+        first = self._handle(mock_ffb_device, 3)
+        second = self._handle(mock_ffb_device, 7)
+        mock_ffb_device.reset_effects()
+        assert not first                      # falsy = lazily re-created
+        assert not second
+        assert first.effect_id == 0
+
+    def test_an_invalidated_handle_destroys_as_a_noop(self, mock_ffb_device):
+        handle = self._handle(mock_ffb_device, 3)
+        mock_ffb_device.reset_effects()
+        writes_before = len(mock_ffb_device._dev._write_buffer)
+        handle.destroy()                      # stale id: nothing to free
+        assert len(mock_ffb_device._dev._write_buffer) == writes_before
+
+    def test_the_device_reset_op_still_goes_out(self, mock_ffb_device):
+        self._handle(mock_ffb_device, 3)
+        mock_ffb_device.reset_effects()
+        assert any(w[1] == CONTROL_RESET
+                   for w in mock_ffb_device._dev._write_buffer if len(w) >= 2)
+
+
+class TestFirmwareReadContention:
+    """LIBUSB_ERROR_ACCESS means exclusive access to the vendor
+    interface was refused - Windows does not say by whom, and the one
+    field case chased down was never attributed (cleared by a reboot).
+    It reads as a crash when logged with a full traceback; it is a quiet
+    warning, and the next uncached read retries (only a successful read
+    is cached)."""
+
+    def test_access_denied_returns_none_without_a_traceback(
+            self, mock_ffb_device, caplog):
+        import logging as _logging
+        import usb1
+        with patch('telemffb.hw.ffb_rhino.usb1.USBContext',
+                   side_effect=usb1.USBErrorAccess(-3)):
+            with patch('telemffb.hw.ffb_rhino.time.sleep'):
+                with caplog.at_level(_logging.WARNING):
+                    assert mock_ffb_device.get_firmware_version(
+                        cached=False) is None
+        assert any('exclusive access to the device was denied' in r.message
+                   for r in caplog.records)
+        assert not any(r.exc_info for r in caplog.records)
+
+    def test_a_failed_read_is_not_cached(self, mock_ffb_device):
+        import usb1
+        with patch('telemffb.hw.ffb_rhino.usb1.USBContext',
+                   side_effect=usb1.USBErrorAccess(-3)):
+            with patch('telemffb.hw.ffb_rhino.time.sleep'):
+                mock_ffb_device.get_firmware_version(cached=False)
+        assert mock_ffb_device.firmware_version in (None, "")
+
+    def test_a_brief_hold_is_ridden_out_by_the_retry(
+            self, mock_ffb_device, caplog):
+        """A millisecond-scale hold (another process's device-list poll)
+        heals silently - one INFO line reporting the hold time, no
+        warning."""
+        import logging as _logging
+        import usb1
+
+        good = MagicMock()
+        good.__enter__ = MagicMock(return_value=good)
+        good.__exit__ = MagicMock(return_value=False)
+        handle = MagicMock()
+        handle.controlRead.return_value = b'v1.0.18-5'
+        good.openByVendorIDAndProductID.return_value = handle
+
+        outcomes = [usb1.USBErrorAccess(-3), usb1.USBErrorAccess(-3), good]
+
+        def context_factory():
+            result = outcomes.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        with patch('telemffb.hw.ffb_rhino.usb1.USBContext',
+                   side_effect=context_factory):
+            with patch('telemffb.hw.ffb_rhino.time.sleep'):
+                with caplog.at_level(_logging.INFO):
+                    version = mock_ffb_device.get_firmware_version(
+                        cached=False)
+        assert version == 'v1.0.18-5'
+        assert any('succeeded on retry' in r.message for r in caplog.records)
+        assert not any(r.levelno >= _logging.WARNING for r in caplog.records)
+
+
+class TestPidStateReportDeadHandles:
+    """The device's reset-event report walks the effect-handle weakrefs;
+    a handle collected between report arrival and the walk left a None
+    dereference inside the HID read timer."""
+
+    def test_reset_event_survives_a_collected_handle(self, mock_ffb_device):
+        import weakref
+
+        class Dead:
+            pass
+        doomed = Dead()
+        mock_ffb_device._effect_handles.append(weakref.ref(doomed))
+        del doomed                                   # ref() now None
+        live = FFBEffectHandle(mock_ffb_device, 5, EFFECT_SINE)
+        mock_ffb_device._effect_handles.append(weakref.ref(live))
+
+        report = FFBReport_PIDStatus_Input(
+            reportId=HID_REPORT_ID_PID_STATE_REPORT)
+        report.deviceResetEvent = 1
+        mock_ffb_device._in_reports[HID_REPORT_ID_PID_STATE_REPORT] = \
+            bytes(report)
+        mock_ffb_device.on_hid_report_received(
+            HID_REPORT_ID_PID_STATE_REPORT)   # must not raise
+        assert not live                       # ...and still invalidates
+
+
+class TestFirmwareDenialBackoff:
+    """A persistently held interface must not cost every caller the
+    full retry ladder - two stalls per device switch on the main thread
+    for a read that cannot succeed.  After the retries are exhausted,
+    reads are skipped outright for a few seconds."""
+
+    def test_reads_are_skipped_during_the_backoff(self, mock_ffb_device):
+        import usb1
+        calls = []
+
+        def denied():
+            calls.append(1)
+            raise usb1.USBErrorAccess(-3)
+        with patch('telemffb.hw.ffb_rhino.usb1.USBContext',
+                   side_effect=denied):
+            with patch('telemffb.hw.ffb_rhino.time.sleep'):
+                assert mock_ffb_device.get_firmware_version(
+                    cached=False) is None
+                attempts_first = len(calls)
+                assert mock_ffb_device.get_firmware_version(
+                    cached=False) is None
+        assert attempts_first == 1 + FFBRhino.FIRMWARE_READ_RETRIES
+        assert len(calls) == attempts_first      # second call: no USB at all
+
+    def test_the_backoff_expires(self, mock_ffb_device):
+        import usb1
+        with patch('telemffb.hw.ffb_rhino.usb1.USBContext',
+                   side_effect=usb1.USBErrorAccess(-3)):
+            with patch('telemffb.hw.ffb_rhino.time.sleep'):
+                mock_ffb_device.get_firmware_version(cached=False)
+        mock_ffb_device._firmware_denied_until = 0   # backoff elapsed
+        good = MagicMock()
+        good.__enter__ = MagicMock(return_value=good)
+        good.__exit__ = MagicMock(return_value=False)
+        handle = MagicMock()
+        handle.controlRead.return_value = b'v1.0.18-3'
+        good.openByVendorIDAndProductID.return_value = handle
+        with patch('telemffb.hw.ffb_rhino.usb1.USBContext',
+                   return_value=good):
+            assert mock_ffb_device.get_firmware_version(
+                cached=False) == 'v1.0.18-3'
+
+
+class TestPumpInput:
+    """pump_input is the backend-contract way for a device switch to get
+    the first input report while it holds the main thread (the read
+    timer cannot fire).  Input intake ONLY: unlike read_reports, no
+    button/hat events - a swap must not fire button side effects
+    mid-teardown."""
+
+    def test_pump_populates_the_input_snapshot(self, mock_ffb_device):
+        report = FFBReport_Input(reportId=HID_REPORT_ID_INPUT)
+        mock_ffb_device._dev.add_input_report(bytes(report))
+        assert mock_ffb_device.get_input() is None
+        mock_ffb_device.pump_input()
+        assert mock_ffb_device.get_input() is not None
+
+    def test_pump_does_not_dispatch_button_events(self, mock_ffb_device):
+        report = FFBReport_Input(reportId=HID_REPORT_ID_INPUT)
+        report.Button0_31 = 0b101              # buttons held in the report
+        mock_ffb_device._dev.add_input_report(bytes(report))
+        mock_ffb_device.pump_input()
+        # intake only: the press was stored, never processed into events
+        assert mock_ffb_device._button_state == 0
+        assert mock_ffb_device.get_input().Button0_31 == 0b101

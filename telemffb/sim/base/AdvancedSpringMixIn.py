@@ -6,7 +6,7 @@ import telemffb.utils as utils
 import telemffb.globals as G
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
-from telemffb.hw.ffb_rhino import FFBReport_SetCondition
+from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.util.conversions import FFB_UNITS
@@ -106,6 +106,11 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
                 self.il2_ffb_spring(force=True)
             else:
                 self.effects['il2_ffb_spring'].stop()
+        caps = getattr(HapticEffect.device, 'caps', None)
+        if caps is not None and not caps.has_spring_adjuster:
+            self.flag_error('The Advanced/Custom Spring Override is not supported on this device.\n'
+                            'It requires the spring adjuster feature of VPforce hardware.')
+            return
         # Verify the device firmware meets the minimum version required to execute this effect
         # Flag error and abort if not met
         if self.__firmware_supported is None:

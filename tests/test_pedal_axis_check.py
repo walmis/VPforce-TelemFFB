@@ -5,6 +5,9 @@ so ANY nonzero Y on a pedals device means the pedal is mapped to Y -
 the check is deliberately instantaneous.  The error message carries the
 observed axis values, so a user's screenshot of the notification is the
 diagnostic when a report disputes the finding.
+
+That firmware contract is VPforce's, which is why the check applies to
+VPforce hardware only - see TestDirectInputIsExempt.
 """
 from telemffb.sim.base.PedalSpringOverrideMixIn import PedalSpringOverrideMixIn
 
@@ -90,3 +93,26 @@ class TestPedalAxisCheck:
         pedals.is_pedals = lambda: False
         pedals.feed((0.0, 0.9))
         assert pedals.errors == []
+
+
+class TestDirectInputIsExempt:
+    """A generic DirectInput device makes neither half of the contract:
+    its unused axes may idle with noise rather than a clean 0, and the
+    remedy the message names (VPConfigurator) does not exist for
+    third-party hardware - theirs is the FFB Axis pulldown.  A wrong
+    choice there is self-evident: the spring lands on an axis that does
+    not move."""
+
+    def test_a_directinput_pedal_is_never_checked(self, monkeypatch):
+        import telemffb.globals as G
+        monkeypatch.setattr(G, 'device_di_guid', '{GUID}', raising=False)
+        pedals = FakePedals()
+        pedals.feed((0.0, 0.25))
+        assert pedals.errors == []
+
+    def test_a_vpforce_pedal_still_is(self, monkeypatch):
+        import telemffb.globals as G
+        monkeypatch.setattr(G, 'device_di_guid', None, raising=False)
+        pedals = FakePedals()
+        pedals.feed((0.0, 0.25))
+        assert pedals.errors

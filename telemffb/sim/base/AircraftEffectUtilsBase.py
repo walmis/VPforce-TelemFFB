@@ -363,7 +363,11 @@ class AircraftEffectUtilsBase(object):
         input_data = device.get_input()
         if input_data is None:
             return 0.0, 0.0
-        return input_data.forceXY()
+        forces = input_data.forceXY()
+        if forces is None:
+            # no force output telemetry on this backend (generic DirectInput)
+            return 0.0, 0.0
+        return forces
 
     def _device_feeding(self) -> bool:
         """Whether the FFB device is connected and delivering HID input.
