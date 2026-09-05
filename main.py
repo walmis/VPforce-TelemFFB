@@ -921,8 +921,10 @@ def _init_excepthooks():
             return
         # Log the unhandled exception including the full traceback via the logging module
         logging.getLogger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
-        # Also write the formatted traceback to stdout for the in-app log window
-        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        # Also write the formatted traceback to stdout for the in-app log window.
+        # stackprinter adds source context + local variable values; falls back to
+        # the standard traceback if unavailable.
+        tb = utils.format_exception_stackprinter((exc_type, exc_value, exc_tb))
         orig_stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
         # Optionally exit the Qt application:
         # QtWidgets.QApplication.quit()
@@ -942,8 +944,9 @@ def _init_excepthooks():
             f"Uncaught exception in thread {thread.name}",
             exc_info=(exc_type, exc_value, exc_tb)
         )
-        # Also write to stdout for visibility in log window
-        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        # Also write to stdout for visibility in log window (stackprinter adds
+        # source context + local variable values; falls back to std traceback).
+        tb = utils.format_exception_stackprinter((exc_type, exc_value, exc_tb))
         orig_stdout.write(
             f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}] Exception in thread {thread.name}{AnsiColors.WHITE}\n{tb}{AnsiColors.END}"
         )

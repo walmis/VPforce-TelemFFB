@@ -770,6 +770,48 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
             pass
 
 
+def format_exception_stackprinter(exc_info):
+    """Format an exception with stackprinter for a debug-friendly traceback.
+
+    The output includes source-code context and the values of local variables
+    at each frame, which is far more useful for diagnosing field issues than
+    the stock ``traceback`` output.
+
+    ``exc_info`` may be a ``sys.exc_info()``-style 3-tuple
+    ``(type, value, tb)`` or a single exception instance.
+
+    This is always safe to call from logging / excepthook paths: if
+    ``stackprinter`` is not installed, or fails (e.g. source files are
+    unavailable in a frozen build), it falls back to the standard
+    :mod:`traceback` formatting. ``style='plaintext'`` keeps the output
+    ANSI-free, which the log pipeline (and the file handler) require.
+    """
+    # Normalize to a (type, value, tb) triple.
+    if isinstance(exc_info, BaseException):
+        etype, evalue, tb = type(exc_info), exc_info, exc_info.__traceback__
+    elif isinstance(exc_info, tuple) and len(exc_info) == 3:
+        etype, evalue, tb = exc_info
+    else:
+        return ""
+
+    try:
+        import stackprinter
+        return stackprinter.format(
+            (etype, evalue, tb),
+            style='plaintext',
+            show_vals='like_source',
+            truncate_vals=500,
+            source_lines=5,
+        )
+    except Exception:
+        # Never let a formatting failure break logging; fall back to the
+        # standard traceback.
+        try:
+            return "".join(traceback.format_exception(etype, evalue, tb))
+        except Exception:
+            return ""
+
+
 def create_support_bundle_data(userconfig_rootpath, exceptions=None, user_info=None):
     """Create support bundle as bytes (in memory) for API upload.
 

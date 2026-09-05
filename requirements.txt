@@ -8,6 +8,7 @@ pygetwindow
 numpy==2.3.0
 akima
 bottle
+stackprinter
 
 # Testing dependencies
 pytest>=7.0.0
