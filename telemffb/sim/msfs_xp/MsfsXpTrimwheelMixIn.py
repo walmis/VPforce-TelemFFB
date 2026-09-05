@@ -2,7 +2,6 @@ import time
 
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
 
 
@@ -28,7 +27,14 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         super().__init__()
         self.trimwheel_init = 0
         self.last_trimwheel_y = None
-        self.last_pos_y_pos = 0.0
+        # Prefixed, not `last_pos_y_pos`: this mixin shares an MRO with
+        # MsfsXpHeliControlsMixIn, which caches the scaled *cyclic* Y position
+        # under that name and replays it to AXIS_CYCLIC_LONGITUDINAL_SET
+        # unscaled.  That event takes an int, and the value here is a float by
+        # design (direct mode writes trim in radians), so one name for both
+        # meant a helicopter crashed the moment the cyclic spring initialized
+        # before anything had cached an int over it.
+        self._tw_last_pos_y = 0.0
         self.trim_active = False
         self._tw_limits_warned = False
         self._tw_hold_prev = False
@@ -80,16 +86,16 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         # the sim's trim axis.
         if not self.telemffb_controls_axes or self.local_disable_axis_control:
             return
-        
-        assert HapticEffect.device is not None, "Haptic device not initialized"
-        
+
+        if not self._device_feeding():  # device unplugged; nothing to send
+            return
+
         ap_active = 0
         if self._sim_is_msfs():
             ap_active = telem_data.APMaster or 0
         if self._sim_is_xplane():
             ap_active = telem_data.APServos or 0
 
-        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = self._get_device_axes()
         self._spring_handle.name = "trimwheel_ap_spring"
 
@@ -126,20 +132,20 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
             if self.last_trimwheel_y is None:
                 # Air start or new aircraft.  Use sim defined trim setpoint as init point
                 trimwheel_pos = telem_data.ElevTrimPct
-                self.cpO_y = round(4096 * trimwheel_pos)
+                self.cpO_y = utils.clamp(trimwheel_pos, -1, 1)
             else:
                 # In air, previously paused.  Use stored position to init point
-                self.cpO_y = round(4096 * self.last_trimwheel_y)
+                self.cpO_y = utils.clamp(self.last_trimwheel_y, -1, 1)
 
             self.spring_y.set_coefficient(1.0)
 
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             self._spring_handle.setCondition(self.spring_y)
             # self.damper.damper(coef_y=int(4096*self.trimwheel_dampening_gain)).start()
             self._spring_handle.start(override=True)
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
-            if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+            if self.cpO_y - 0.1 < phys_y < self.cpO_y + 0.1:
                 # dont start sending position until physical stick has centered
                 self.trimwheel_init = 1
                 logging.info("Trim Wheel Initialized")
@@ -157,7 +163,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
             spring_pos = trimwheel_pos
             if hold and self._tw_hold_pos is not None:
                 spring_pos = self._tw_hold_pos
-            self.cpO_y = round(utils.scale(spring_pos, (-1, 1), (-4096, 4096)))
+            self.cpO_y = utils.clamp(spring_pos, -1, 1)
             telem_data._tw_cpO_y = spring_pos
             self.spring_y.set_offset(spring_pos)
 
@@ -179,9 +185,6 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                 else:
                     y_var = "AXIS_ELEV_TRIM_SET"
                     y_range = 16384
-
-                input_data = HapticEffect.device.get_input()
-                # phys_x, phys_y = input_data.axisXY()
 
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
                 telem_data._tw_phys_y_pos = phys_y
@@ -220,8 +223,8 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                         pos_y_pos = pos_y_pos * 0.01745
                         self._simconnect.set_simdatum_to_msfs("ELEVATOR TRIM POSITION", pos_y_pos, units="radians")
                         # print("TRIM TRIM POSITION", pos_y_pos)
-                self.last_pos_y_pos = pos_y_pos
-                telem_data._tw_last = self.last_pos_y_pos
+                self._tw_last_pos_y = pos_y_pos
+                telem_data._tw_last = self._tw_last_pos_y
 
         else:
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)

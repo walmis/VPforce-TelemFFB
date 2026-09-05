@@ -205,7 +205,7 @@ class Aircraft(AircraftBase):
             return
 
         frequency = float(frequency) + freq_offset
-        amplitude = float(amplitude) * factor * 3
+        amplitude = utils.clamp(float(amplitude) * factor * 3, 0.0, 1.0)
 
         if frequency <= 0:
             self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "il2_eng_shk3", "il2_eng_shk4", "il2_jet_shk1", "il2_jet_shk2")
@@ -439,38 +439,10 @@ class Aircraft(AircraftBase):
 
         if self.override_spring_ft_enabled:
             input_data = self._get_device_report()
-            x, y = self._get_device_axes()
             current_buttons = input_data.getPressedButtons() if input_data is not None else []
-            # print(f"BUTTONS:>{current_buttons}<")
-            # decide what to do depending on which button is pressed
-            # if self.override_spring_trim_release and self.override_spring_trim_release in current_buttons:
-            #     # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
-            #     # as it is moved while spring force is enabled.
-            #     # return from method so default spring gains do not get applied at the end of the method
-            #     gain = int(self.override_spring_tr_damper * 4096)
-            #     self.spring_x.set_coefficient(gain)
-            #     self.spring_y.set_coefficient(gain)
-            #
-            #     self.override_spring_cp0_x = round(x * 4096)
-            #     self.spring_x.set_offset(self.override_spring_cp0_x)
-            #
-            #     self.override_spring_cp0_y = round(y * 4096)
-            #     self.spring_y.set_offset(self.override_spring_cp0_y)
-            #     spring.setCondition(self.spring_x)
-            #     spring.setCondition(self.spring_y)
-            #     spring.start(override=True)
-            #     return
-
-            # elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
-            #     # if trim reset button pressed, set offsets back to 0
-            #     # print("TRIM RESET")
-            #     self.spring_x.cpOffset = self.override_spring_cp0_x = 0
-            #     self.spring_y.cpOffset = self.override_spring_cp0_y = 0
-            #     spring.setCondition(self.spring_x)
-            #     spring.setCondition(self.spring_y)
 
             # calculate step size based on configured rate and delta time
-            trim_step_size = self.override_spring_trim_rate * dt
+            trim_step_size = self.override_spring_trim_rate * dt / conv.FFB_UNITS
 
             self.telem_data._ovrd_spr_step = trim_step_size
 
@@ -479,38 +451,33 @@ class Aircraft(AircraftBase):
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM DOWN")
-                if self.override_spring_cp0_y - trim_step_size < -4096:
-                    self.override_spring_cp0_y = -4096
-                else:
-                    self.override_spring_cp0_y -= trim_step_size
-                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+                self.override_spring_cp0_y = utils.clamp(
+                    self.override_spring_cp0_y - trim_step_size, -1.0, 1.0)
+                self.spring_y.set_offset(self.override_spring_cp0_y)
             elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM UP")
-                if self.override_spring_cp0_y + trim_step_size > 4096:
-                    self.override_spring_cp0_y = 4096
-                else:
-                    self.override_spring_cp0_y += trim_step_size
-                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+                self.override_spring_cp0_y = utils.clamp(
+                    self.override_spring_cp0_y + trim_step_size, -1.0, 1.0)
+                self.spring_y.set_offset(self.override_spring_cp0_y)
 
             if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM LEFT")
-                if self.override_spring_cp0_x - trim_step_size < -4096:
-                    self.override_spring_cp0_x = -4096
-                else:
-                    self.override_spring_cp0_x -= trim_step_size
-                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+                self.override_spring_cp0_x = utils.clamp(
+                    self.override_spring_cp0_x - trim_step_size, -1.0, 1.0)
+                self.spring_x.set_offset(self.override_spring_cp0_x)
             elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM RIGHT")
-                if self.override_spring_cp0_x + trim_step_size > 4096:
-                    self.override_spring_cp0_x = 4096
-                else:
-                    self.override_spring_cp0_x += trim_step_size
-                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+                self.override_spring_cp0_x = utils.clamp(
+                    self.override_spring_cp0_x + trim_step_size, -1.0, 1.0)
+                self.spring_x.set_offset(self.override_spring_cp0_x)
 
-        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
+        self.telem_data._ovrd_spr_trim_pos = [
+            self.override_spring_cp0_x,
+            self.override_spring_cp0_y,
+        ]
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_x.set_coefficient(self.override_spring_gain)

@@ -278,6 +278,47 @@ class TestMsfsXpFlightControlsDynamicPressure(BaseTelemetryEffectTestCase):
         # Assert
         assert abs(telem["Vne_kt"] - 150 * 1.94384) < 0.1
 
+    def test_vne_override_non_numeric_falls_back_to_sim_data(self):
+        """A non-numeric vne_override (e.g. the bare unit string "kt" produced
+        by an empty config value + <unit>kt</unit>) must NOT be used as a speed.
+
+        Regression for the per-frame TypeError in _calculate_vne_and_gains
+        (`vne * ms2kt` on a string) that killed all MSFS FFB after the
+        unit-normalization refactor moved the override check to the top of the
+        method and dropped the isinstance guard. A non-numeric override must
+        fall through to the sim-computed Vne (MSFS: DesignSpeed-derived).
+        """
+        # Arrange
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.vne_override = "kt"  # unparseable unit string, not a number
+
+        telem = (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))  # Vc, Vs0, Vs1
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 0)
+            .set("Incidence", [0, 0, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .ffb_type("joystick")
+            .build()
+        )
+
+        # Act — must not raise TypeError
+        instance.on_telemetry(telem)
+
+        # Assert: sim-computed Vne is numeric and > 0, and the override string
+        # did not leak into the computed fields.
+        assert isinstance(telem["Vne_ms_calc"], (int, float))
+        assert telem["Vne_ms_calc"] > 0
+        assert isinstance(telem["Vne_kt"], (int, float))
+        assert telem["Vne_kt"] > 0
+        assert telem["Qvc_gain"] > 0
+
 
 class TestMsfsXpFlightControlsCoefficients(BaseTelemetryEffectTestCase):
     """Test suite for control coefficient calculations."""
@@ -1229,7 +1270,7 @@ class TestAPFollowing(BaseTelemetryEffectTestCase):
         spring = self.mock_effects['dynamic_spring']
         x_offset, _ = spring.get_offsets()
         # AP following should use aileron deflection for x offset
-        expected_x = int(0.3 * 4096)
+        expected_x = round(0.3 * 4096)
         assert x_offset == expected_x, f"X offset should reflect AileronDeflPctLR[0], got {x_offset}"
 
     def test_ap_following_xplane_uses_roll_servo(self):
@@ -1260,7 +1301,7 @@ class TestAPFollowing(BaseTelemetryEffectTestCase):
 
         spring = self.mock_effects['dynamic_spring']
         x_offset, _ = spring.get_offsets()
-        expected_x = int(0.4 * 4096)
+        expected_x = round(0.4 * 4096)
         assert x_offset == expected_x, f"X offset should reflect APRollServo, got {x_offset}"
 
     def test_ap_following_inactive_uses_aileron_trim(self):
@@ -1287,7 +1328,7 @@ class TestAPFollowing(BaseTelemetryEffectTestCase):
 
         spring = self.mock_effects['dynamic_spring']
         x_offset, _ = spring.get_offsets()
-        expected_x = int(0.3 * 4096)
+        expected_x = round(0.3 * 4096)
         assert x_offset == expected_x, f"X offset should use AileronTrimPct when AP inactive, got {x_offset}"
 
 

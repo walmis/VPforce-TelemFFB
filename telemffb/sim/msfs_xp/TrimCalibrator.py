@@ -61,6 +61,7 @@ import time
 
 import telemffb.globals as G
 from telemffb.utils import PID, clamp, piecewise_linear
+from telemffb.util import conversions
 
 logger = logging.getLogger(__name__)
 
@@ -412,11 +413,10 @@ class TrimCalibrator:
 
     HOLD_SPRING_COEFF = 1.0      # firm centered spring to keep hands-off stick put
     TRIM_AXIS_RANGE = 16383      # AXIS_ELEV_TRIM_SET: -16383..16384
-    CPOFFSET_RANGE = 4096        # spring cpOffset units per full axis deflection
-    HOLD_WALK_RATE = 3000        # cpOffset units/s for repositioning the parked
-                                 # stick at handback — an instant center set under
-                                 # the firm spring snaps the stick hard enough to
-                                 # whack a hand resting near the controls
+    HOLD_WALK_RATE = 3000 / conversions.FFB_UNITS  # normalized units/s for
+                                 # repositioning the parked stick at handback — an
+                                 # instant center set under the firm spring snaps the
+                                 # stick hard enough to whack a nearby hand
     HOLD_WALK_GRACE_S = 2.0      # release proceeds at most this long after the
                                  # phase would otherwise end, walk done or not
 
@@ -2488,11 +2488,12 @@ class TrimCalibrator:
         tx, ty = targets
         nx = x + clamp(tx - x, -step, step)
         ny = y + clamp(ty - y, -step, step)
-        self._hold_offs = (int(round(nx)), int(round(ny)))
-        return abs(tx - nx) < 1.0 and abs(ty - ny) < 1.0
+        self._hold_offs = (nx, ny)
+        tolerance = 1 / conversions.FFB_UNITS
+        return abs(tx - nx) < tolerance and abs(ty - ny) < tolerance
 
     def _release_hold_targets(self, telem_data):
-        """Stick position (cpOffset units, both axes) at which the normal
+        """Normalized stick position (both axes) at which the normal
         flight-controls path's first frame delivers exactly what the engine
         is delivering now — release continuity. Mirrors the runtime's
         trim-following offset math (calibrated curve or legacy static gain)."""
@@ -2514,7 +2515,7 @@ class TrimCalibrator:
                 x = clamp(x + clamp(a * p_x, -1, 1) * (1 - v_x), -1, 1)
         except Exception as e:  # continuity is comfort; never break teardown
             logger.debug(f"release-continuity targets fell back to raw u: {e}")
-        return int(x * self.CPOFFSET_RANGE), int(y * self.CPOFFSET_RANGE)
+        return round(x, 6), round(y, 6)
 
     @staticmethod
     def _fit(samples):
@@ -2742,15 +2743,16 @@ class TrimCalibrator:
                 # engagement and a snap across the gap when they let go.
                 try:
                     px, py = self.ac._get_device_raw_axes()
-                    self._hold_offs = (int(clamp(px, -1, 1) * self.CPOFFSET_RANGE),
-                                       int(clamp(py, -1, 1) * self.CPOFFSET_RANGE))
+                    self._hold_offs = (clamp(px, -1, 1), clamp(py, -1, 1))
                 except Exception:
-                    self._hold_offs = (int(self.ac.spring_x.cpOffset),
-                                       int(self.ac.spring_y.cpOffset))
+                    self._hold_offs = (
+                        self.ac.spring_x.cpOffset / conversions.FFB_UNITS,
+                        self.ac.spring_y.cpOffset / conversions.FFB_UNITS,
+                    )
                 logger.info(f"Holding stick at spring offsets "
                             f"x={self._hold_offs[0]}, y={self._hold_offs[1]}")
-            self.ac.spring_x.cpOffset = self._hold_offs[0]
-            self.ac.spring_y.cpOffset = self._hold_offs[1]
+            self.ac.spring_x.set_offset(self._hold_offs[0])
+            self.ac.spring_y.set_offset(self._hold_offs[1])
             self.ac.spring_x.set_coefficient(self.HOLD_SPRING_COEFF)
             self.ac.spring_y.set_coefficient(self.HOLD_SPRING_COEFF)
             self.ac._spring_handle.name = "trim_cal_spring"

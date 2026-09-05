@@ -83,8 +83,8 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         self.cyclic_spring_init = 0
         self.collective_init = 0
         self.pedals_init = 0
-        self.cpO_x = 0
-        self.cpO_y = 0
+        self.cpO_x = 0.0
+        self.cpO_y = 0.0
 
     @override
     def on_timeout(self):
@@ -123,16 +123,13 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
     def check_hands_on(self, percent) -> dict:
         phys_x, phys_y = self._get_device_axes()
 
-        phys_x = round(phys_x * 4096)
-        phys_y = round(phys_y * 4096)
-
         ref_x = self.cpO_x
         ref_y = self.cpO_y
 
-        threshold = 4096 * percent
+        threshold = percent
 
-        deviation_x = abs(phys_x - ref_x) / 4096
-        deviation_y = abs(phys_y - ref_y) / 4096
+        deviation_x = abs(phys_x - ref_x)
+        deviation_y = abs(phys_y - ref_y)
 
         raw_deviation_x = phys_x - ref_x
         raw_deviation_y = phys_y - ref_y
@@ -202,10 +199,10 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         self.spring_x.set_coefficient(self.pedal_spring_coeff_x)
         if telem_data.get("SimOnGround", 1):
-            self.cpO_x = 0
+            self.cpO_x = 0.0
             self.last_pos_x_pos = 0
         else:
-            self.cpO_x = round(4096 * self.last_pedal_x)
+            self.cpO_x = self.last_pedal_x
 
         self.spring_x.set_coefficient(self.pedal_spring_gain, True)
         self.spring_x.set_offset(self.cpO_x)
@@ -214,7 +211,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
         # Gate output until hardware reaches the seeded center point to avoid control jumps.
-        if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
+        if self.cpO_x - 0.1 < phys_x < self.cpO_x + 0.1:
             # dont start sending position until physical pedals have centered
             self.pedals_init = 1
             logging.info("Pedals Initialized")
@@ -235,6 +232,38 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         self.spring_x.set_coefficient(0)
         self._spring_handle.setCondition(self.spring_x)
+
+    @override
+    def ac_update_pedal_force_trim(self, telem_data: BaseTelemetryData, ft_active=True):
+        """Update MSFS/X-Plane pedal force trim using normalized spring centers."""
+        if not self.is_pedals():
+            return None
+
+        phys_x, _ = self._get_device_axes()
+        force_trim_pressed = self.check_button_press(
+            self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
+        trim_reset_pressed = self.check_button_press(
+            self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
+
+        if force_trim_pressed or not ft_active:
+            if self.pedal_ft_damper_enabled:
+                self.spring_x.set_coefficient(self.pedal_ft_damper_force)
+            else:
+                self.spring_x.set_coefficient(0)
+
+            self.cpO_x = utils.clamp(phys_x, -1, 1)
+            self.spring_x.set_offset(self.cpO_x)
+            return True
+
+        if trim_reset_pressed or not self.pedal_trim_reset_complete:
+            self.spring_x.set_coefficient(4096)
+            self.cpO_x = self.step_value_over_time(
+                "center_x", self.cpO_x, 1000, 0.0, floatpoint=True)
+            self.spring_x.set_offset(self.cpO_x)
+            self.pedal_trim_reset_complete = self.cpO_x == 0.0
+            return True
+
+        return False
 
     def _send_pedal_outputs(self, telem_data: BaseTelemetryData, phys_x: float, x_scale: float, x_var: str, x_range: float):
         if self._use_firmware_axis_backend():
@@ -277,7 +306,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         }
 
         self.spring_y.set_coefficient(4096)
-        self.spring_y.cpOffset = 4096
+        self.spring_y.set_offset(1.0)
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.start()
 
@@ -285,7 +314,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         if 0.9 < phys_y < 1.0:
             self._engage_controls_lock_detents(
                 self.spring_y,
-                spring_offset=4096,
+                spring_offset=1.0,
                 detent_1=detent_1,
                 detent_2=detent_2,
             )
@@ -302,7 +331,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         if telem_data.get("SimOnGround", 1):
             # aircraft is on ground, so initialize collective to full down
-            self.cpO_y = 4096
+            self.cpO_y = 1.0
             if self._sim_is_msfs():
                 if y_range != 1:
                     self.last_pos_y_pos = -y_range * 1
@@ -310,18 +339,18 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                     self.last_pos_y_pos = 1
         elif self.last_collective_y is None:
             # Air start or new aircraft. Use current physical position as init point
-            self.cpO_y = round(4096 * phys_y)
+            self.cpO_y = utils.clamp(phys_y, -1, 1)
         else:
             # In air, previously paused. Use stored collective position to init point
-            self.cpO_y = round(4096 * self.last_collective_y)
+            self.cpO_y = utils.clamp(self.last_collective_y, -1, 1)
 
         self.spring_y.set_coefficient(4096)
-        self.spring_y.cpOffset = self.cpO_y
+        self.spring_y.set_offset(self.cpO_y)
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.start(override=True)
 
         # Gate output until hardware reaches the seeded center point to avoid control jumps.
-        if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+        if self.cpO_y - 0.1 < phys_y < self.cpO_y + 0.1:
             # dont start sending position until physical stick has centered
             self.collective_init = 1
             logging.info("Collective Initialized")
@@ -338,8 +367,8 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             return
 
         self._spring_handle.name = "collective_ap_spring"
-        self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
-        self.spring_y.cpOffset = self.cpO_y
+        self.cpO_y = utils.clamp(phys_y, -1, 1)
+        self.spring_y.set_offset(self.cpO_y)
         self.spring_y.set_coefficient(round(self.collective_spring_coeff_y / 2))
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.start(override=True)

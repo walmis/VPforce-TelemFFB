@@ -68,7 +68,26 @@ class TestHelicopterInitialization(BaseTelemetryEffectTestCase):
         assert instance.cpO_x == 0
         assert instance.cpO_y == 0
         assert instance.last_collective_y is None
-    
+
+    def test_cached_cyclic_positions_are_ints(self):
+        """The cyclic spring init replays these to AXIS_CYCLIC_*_SET, which is
+        a standard SimConnect event and takes an int.
+
+        MsfsXpTrimwheelMixIn shares this MRO and used to seed a float under
+        the same name (last_pos_y_pos), so a helicopter that initialized its
+        cyclic spring before anything had cached an int over it raised
+        "'float' object cannot be interpreted as an integer" - airborne only,
+        Y axis only, and cleared by a restart, which made it look random.
+        """
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli")
+
+        assert isinstance(instance.last_pos_x_pos, int), \
+            f"lateral cache is {type(instance.last_pos_x_pos).__name__}"
+        assert isinstance(instance.last_pos_y_pos, int), \
+            f"longitudinal cache is {type(instance.last_pos_y_pos).__name__}"
+        # the trimwheel keeps its own float - direct mode sends radians
+        assert isinstance(instance._tw_last_pos_y, float)
+
     def test_helicopter_subscribes_simvars_on_msfs(self):
         """Test that SimConnect variables are subscribed on MSFS."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True)
@@ -188,8 +207,8 @@ class TestHelicopterCollective(BaseTelemetryEffectTestCase):
         
         instance.msfs_update_collective(telem)
         
-        # Should set cpO_y to full down (4096)
-        assert instance.cpO_y == 4096
+        # Should set normalized cpO_y to full down (+1.0).
+        assert instance.cpO_y == 1.0
     
     def test_collective_initialization_in_air_no_previous(self):
         """Test collective initializes to current position when in air with no previous data."""
@@ -207,7 +226,7 @@ class TestHelicopterCollective(BaseTelemetryEffectTestCase):
         instance.msfs_update_collective(telem)
         
         # Should set cpO_y based on current physical position
-        expected_offset = round(4096 * 0.5)
+        expected_offset = 0.5
         assert instance.cpO_y == expected_offset
     
     def test_collective_initialization_with_previous_position(self):
@@ -224,7 +243,7 @@ class TestHelicopterCollective(BaseTelemetryEffectTestCase):
         instance.msfs_update_collective(telem)
         
         # Should use saved position
-        expected_offset = round(4096 * 0.3)
+        expected_offset = 0.3
         assert instance.cpO_y == expected_offset
     
     def test_collective_waits_for_physical_stick_centering(self):
@@ -430,7 +449,7 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         instance.msfs_update_pedals(telem)
         
         # Should use saved position
-        expected_offset = round(4096 * 0.4)
+        expected_offset = 0.4
         assert instance.cpO_x == expected_offset
     
     def test_pedals_waits_for_centering(self):
@@ -492,18 +511,22 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         instance.telemffb_controls_axes = True
         instance.pedals_init = 1
         instance.spring_mode = SpringModeEnum.FORCETRIM
+        instance.pedal_ft_release_button = 1
         
         telem = self._create_heli_telem()
         telem["FFBType"] = "pedals"
         telem["ForceTrimSW"] = True
         self.set_telemetry(instance, telem)
         
-        self.mock_device._input_data.set_axis(x=0.0)
+        self.mock_device._input_data.set_axis(x=0.25)
+        self.mock_device._input_data.press_button(1)
         
         instance.msfs_update_pedals(telem)
         
         # Verify spring was configured (check name)
         assert instance._spring_handle.name == "pedal_spring"
+        assert instance.cpO_x == pytest.approx(0.25)
+        assert instance.spring_x.cpOffset == round(0.25 * 4096)
     
     def test_pedals_custom_force_trim_switch(self):
         """Test pedals with custom force trim switch variable."""
@@ -570,8 +593,9 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         assert len(self.mock_simconnect.sent_events) == 0
         assert self.mock_effects["lock_1"].started
         assert self.mock_effects["lock_1"].detent_config is not None
-        assert self.mock_effects["lock_1"].detent_config["position_x"] == 1500
-        assert self.mock_effects["lock_2"].detent_config["position_x"] == -1500
+        # position_x is now a normalized -1..1 float (1500/4096); the device scales it back
+        assert self.mock_effects["lock_1"].detent_config["position_x"] == 1500 / 4096
+        assert self.mock_effects["lock_2"].detent_config["position_x"] == -1500 / 4096
 
     def test_pedals_controls_lock_started_effect_short_circuits_axis_updates(self):
         """Test pedal lock path exits early when lock effects are already active."""
@@ -688,8 +712,8 @@ class TestHelicopterCyclicControls(BaseTelemetryEffectTestCase):
         instance.force_trim_button = 1
         instance.force_trim_reset_button = 2
         instance.cyclic_spring_init = 1
-        instance.cpO_x = 2000
-        instance.cpO_y = 3000
+        instance.cpO_x = 2000 / 4096
+        instance.cpO_y = 3000 / 4096
         
         telem = self._create_heli_telem()
         self.set_telemetry(instance, telem)
@@ -702,8 +726,8 @@ class TestHelicopterCyclicControls(BaseTelemetryEffectTestCase):
         # Should start moving toward center
         assert instance.trim_reset_complete == 0
         # Offsets should be moving toward 0 (first call returns original value)
-        assert abs(instance.cpO_x) <= 2000
-        assert abs(instance.cpO_y) <= 3000
+        assert abs(instance.cpO_x) <= 2000 / 4096
+        assert abs(instance.cpO_y) <= 3000 / 4096
     
     def test_cyclic_sends_position_to_msfs(self):
         """Test cyclic sends position to MSFS."""
@@ -819,8 +843,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
 
         result = inst._initialize_cyclic_if_needed(telem)
 
-        assert inst.cpO_x == round(0.25 * 4096)
-        assert inst.cpO_y == round(-0.3 * 4096)
+        assert inst.cpO_x == 0.25
+        assert inst.cpO_y == -0.3
         # stick is at target → completes
         assert result is False
         assert inst.cyclic_spring_init == 1
@@ -867,8 +891,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
 
     def test_trim_reset_starts_animation(self):
         inst = self._make_instance()
-        inst.cpO_x = 2000
-        inst.cpO_y = 3000
+        inst.cpO_x = 2000 / 4096
+        inst.cpO_y = 3000 / 4096
         inst.cyclic_spring_gain = 4096
 
         inst._handle_cyclic_trim_reset()
@@ -935,10 +959,10 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
     def test_force_trim_pressed_absorbs_offsets(self):
         inst = self._make_instance()
         inst.cyclic_spring_init = 1
-        inst.cpO_x = 1000
-        inst.cpO_y = 2000
-        inst.cyclic_physical_trim_x_offs = 100
-        inst.cyclic_physical_trim_y_offs = 200
+        inst.cpO_x = 1000 / 4096
+        inst.cpO_y = 2000 / 4096
+        inst.cyclic_physical_trim_x_offs = 100 / 4096
+        inst.cyclic_physical_trim_y_offs = 200 / 4096
         inst.cyclic_virtual_trim_x_offs = 50.0
         inst.cyclic_virtual_trim_y_offs = 60.0
         telem = self._make_telem()
@@ -972,8 +996,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         assert result is False
         assert inst.cyclic_trim_release_active == 0
         assert inst.cyclic_center == [0.4, 0.5]
-        assert inst.cpO_x == round(0.4 * 4096)
-        assert inst.cpO_y == round(0.5 * 4096)
+        assert inst.cpO_x == 0.4
+        assert inst.cpO_y == 0.5
 
     def test_force_trim_idle_sets_initial_coefficient(self):
         inst = self._make_instance()
@@ -1004,8 +1028,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
 
         assert result is False
         assert inst.ft_was_inactive is True
-        assert inst.cpO_x == round(0.3 * 4096)
-        assert inst.cpO_y == round(-0.2 * 4096)
+        assert inst.cpO_x == 0.3
+        assert inst.cpO_y == -0.2
 
     def test_force_trim_non_forcetrim_mode_zeroes_spring(self):
         inst = self._make_instance()
@@ -1665,20 +1689,20 @@ class TestCheckHandsOn(BaseTelemetryEffectTestCase):
 
     def test_hands_on_returns_raw_deviations(self):
         instance = self._make_instance()
-        instance.cpO_x = 1000
-        instance.cpO_y = -500
+        instance.cpO_x = 1000 / 4096
+        instance.cpO_y = -500 / 4096
 
         self.mock_device._input_data.set_axis(x=0.5, y=0.0)
 
         result = instance.check_hands_on(0.01)
 
-        assert result["x_deviation_raw"] == round(0.5 * 4096) - 1000
-        assert result["y_deviation_raw"] == round(0.0 * 4096) - (-500)
+        assert result["x_deviation_raw"] == pytest.approx(0.5 - 1000 / 4096)
+        assert result["y_deviation_raw"] == pytest.approx(500 / 4096)
 
     def test_hands_on_with_offset_reference(self):
         instance = self._make_instance()
-        instance.cpO_x = 2000
-        instance.cpO_y = 2000
+        instance.cpO_x = 2000 / 4096
+        instance.cpO_y = 2000 / 4096
         self.mock_device._input_data.set_axis(x=0.5, y=0.5)
 
         result = instance.check_hands_on(0.1)

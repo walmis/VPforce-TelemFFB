@@ -12,7 +12,7 @@ from tests.framework.utils import (
     assert_friction_coefficient_in_range,
 )
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
+from telemffb.sim.msfs_xp.MsfsXpSteeringFrictionMixIn import MsfsXpSteeringFrictionMixIn
 
 
 class TestFrameworkBasics(BaseTelemetryEffectTestCase):
@@ -20,7 +20,7 @@ class TestFrameworkBasics(BaseTelemetryEffectTestCase):
     
     def test_can_create_test_instance(self):
         """Test that we can create a test instance of a mixin."""
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         
         assert instance is not None
         assert hasattr(instance, 'steering_friction')
@@ -28,7 +28,7 @@ class TestFrameworkBasics(BaseTelemetryEffectTestCase):
     
     def test_default_parameters(self):
         """Test that default parameters are set correctly."""
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         
         assert instance.steering_friction == 0
         assert instance.steering_friction_intensity == 0.8
@@ -38,7 +38,7 @@ class TestFrameworkBasics(BaseTelemetryEffectTestCase):
     def test_can_override_parameters(self):
         """Test that we can override parameters during creation."""
         instance = self.create_test_instance(
-            MfsfXpSteeringFrictionEffectMixIn,
+            MsfsXpSteeringFrictionMixIn,
             steering_friction=1,
             steering_friction_intensity=0.5
         )
@@ -191,7 +191,7 @@ class TestSimulatorMocking(BaseTelemetryEffectTestCase):
     
     def test_can_mock_msfs(self):
         """Test that we can mock MSFS simulator."""
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         
         assert instance._sim_is_msfs()
@@ -199,7 +199,7 @@ class TestSimulatorMocking(BaseTelemetryEffectTestCase):
     
     def test_can_mock_xplane(self):
         """Test that we can mock X-Plane simulator."""
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_xplane = True
         
         assert not instance._sim_is_msfs()
@@ -207,7 +207,7 @@ class TestSimulatorMocking(BaseTelemetryEffectTestCase):
     
     def test_ffb_type_checking(self):
         """Test FFB type checking methods."""
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         
         # Set as pedals
         instance._telem_data = BaseTelemetryData({"FFBType": "pedals"})
@@ -225,7 +225,7 @@ class TestDirectMethodCalls(BaseTelemetryEffectTestCase):
     
     def test_direct_method_call(self):
         """Test calling the effect update method directly."""
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True
@@ -253,7 +253,7 @@ class TestDirectMethodCalls(BaseTelemetryEffectTestCase):
     
     def test_effect_respects_speed(self):
         """Test that effect responds to speed changes."""
-        instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
+        instance = self.create_test_instance(MsfsXpSteeringFrictionMixIn)
         instance._test_sim_is_msfs = True
         instance.steering_friction = 1
         instance.enable_friction_ovd = True

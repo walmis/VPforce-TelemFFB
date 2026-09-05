@@ -101,7 +101,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
 
             main_mag = utils.clamp(
                 dynamic_rumble_intensity * (2.0 - beat_depth ** 2) ** 0.5, 0.0, 1.0)
-            twin_mag = dynamic_rumble_intensity * beat_depth
+            twin_mag = utils.clamp(dynamic_rumble_intensity * beat_depth, 0.0, 1.0)
 
             self.effects["prop_rpm0-1"].periodic(frequency, main_mag, 0).start()
             self.effects["prop_rpm0-2"].periodic(frequency + r1_modulation, twin_mag, 0).start()
@@ -208,7 +208,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
 
         if afterburner_pos and (self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation", r1_modulation)):
             # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
-            intensity = self.afterburner_effect_intensity * afterburner_pos
+            intensity = utils.clamp(self.afterburner_effect_intensity * afterburner_pos, 0, 1)
             self.effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=EFFECT_TRIANGLE ).start()
             # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
             self.effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=EFFECT_TRIANGLE ).start()

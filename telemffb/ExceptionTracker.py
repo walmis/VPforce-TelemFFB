@@ -17,7 +17,6 @@
 #
 
 import logging
-import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
@@ -76,7 +75,11 @@ class ExceptionLoggingHandler(logging.Handler):
         if record.levelno >= logging.ERROR:
             tb_text = ""
             if record.exc_info:
-                tb_text = "".join(traceback.format_exception(*record.exc_info))
+                # Use stackprinter for a debug-friendly traceback (source
+                # context + local variable values). Falls back to the standard
+                # traceback if stackprinter is unavailable or fails.
+                import telemffb.utils as _utils
+                tb_text = _utils.format_exception_stackprinter(record.exc_info)
             elif hasattr(record, 'exc_text') and record.exc_text:
                 tb_text = record.exc_text
             # Strip ANSI color codes using stransi before storing

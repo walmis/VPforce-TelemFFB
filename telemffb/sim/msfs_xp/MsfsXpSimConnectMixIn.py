@@ -99,6 +99,24 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         # nothing sent yet, so the plugin's echoed state is trusted at once.
         self.__xplane_override_sent_at = float("-inf")
 
+    def __del__(self):
+        # Close the lazily-created X-Plane UDP socket. An aircraft instance
+        # is dropped by TelemManager simply clearing its reference (sim exit,
+        # aircraft switch) or by the garbage collector (tests, interpreter
+        # shutdown) with no explicit close hook, so without this the socket
+        # is only released by finalization, which raises a ResourceWarning
+        # ("unclosed <socket>") that surfaces as a spurious failure in
+        # whichever test's window the GC happens to run.
+        sock = getattr(self, "_socket", None)
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                # __del__ can run during interpreter shutdown, when the socket
+                # module is already being torn down; never let cleanup raise.
+                pass
+            self._socket = None
+
     @property
     def joystick_trim_follow_curve_y(self) -> Optional[str]:
         return self._trim_curve_y_json
@@ -293,20 +311,6 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
 
     def _use_sim_axis_backend(self) -> bool:
         return self._axis_control_enabled() and not self._use_firmware_axis_backend()
-
-    def _device_feeding(self) -> bool:
-        """Whether the FFB device is connected and delivering HID input.
-
-        Axis overrides must never be claimed without a live device: the
-        plugin pins the virtual yoke/rudder to whatever we send, so a dead
-        instance would feed zeros/stale values and silence the user's real
-        controller. Re-checked every frame, so a hot-unplug releases the
-        override and a reconnect reclaims it.
-        """
-        device = HapticEffect.device
-        if device is None or not device.connected:
-            return False
-        return device.get_input() is not None
 
     def _send_firmware_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
         if not self._use_firmware_axis_backend():

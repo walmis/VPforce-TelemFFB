@@ -28,8 +28,8 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
     def __init__(self):
         super().__init__()
         self.pedal_trim_reset_complete: bool = False
-        self.cpO_x = 0
-        self.cpO_y = 0
+        self.cpO_x = 0.0
+        self.cpO_y = 0.0
 
     def ac_update_pedal_trim(self, telem_data: BaseTelemetryData):
         """Update the pedal trim effect based on telemetry data and user input.
@@ -63,11 +63,11 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         - Reads (phys_x, phys_y) from the device; phys_y is not used.
         - May modify:
           - self.spring_x.set_coefficient(...) (spring stiffness/force coefficient).
-          - self.spring_x.cpOffset (center-point offset for the spring).
-          - self.cpO_x (cached center-point offset, integer scaled).
+          - self.spring_x.set_offset(...) (center-point offset for the spring).
+          - self.cpO_x (cached normalized center-point offset).
           - self.pedal_trim_reset_complete (boolean indicating reset completion).
         - Calls self.check_button_press(...) to detect button events.
-        - Calls self.step_value_over_time("center_x", self.cpO_x, 1000, 0) to smoothly
+        - Calls self.step_value_over_time("center_x", self.cpO_x, 1000, 0.0) to smoothly
           step cpO_x toward zero during a reset.
         Behavior details
         ----------------
@@ -76,23 +76,24 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         - If the force-trim button is pressed (or ft_active is False):
           - If self.pedal_ft_damper_enabled, set spring coefficient to
             self.pedal_ft_damper_force; otherwise set coefficient to 0.
-          - Compute self.cpO_x = round(phys_x * 4096) and write it to
-            self.spring_x.cpOffset.
+          - Cache the normalized physical X position in self.cpO_x and apply it
+            through self.spring_x.set_offset().
           - Return True.
         - Else if the trim-reset button is pressed or a previous reset is still in
           progress (not self.pedal_trim_reset_complete):
           - Set spring coefficient to 4096 (maximum/default).
-          - Call self.step_value_over_time("center_x", self.cpO_x, 1000, 0) to update
+          - Call self.step_value_over_time("center_x", self.cpO_x, 1000, 0.0,
+            floatpoint=True) to update
             self.cpO_x toward 0, assign the result to self.cpO_x and
-            self.spring_x.cpOffset.
+            self.spring_x through set_offset().
           - Set self.pedal_trim_reset_complete to True when cpO_x reaches 0; otherwise
             set it to False.
           - Return True.
         - Otherwise return False.
         Notes
         -----
-        - The code uses a 4096 scaling for cpOffset; phys_x is expected to be in the
-          device's normalized range (consult device conventions for sign and range).
+        - Internal center math remains normalized; set_offset() converts once at
+          the device boundary.
         - This method directly mutates hardware-related objects and internal flags;
           call sites should be prepared for those side effects.
         """
@@ -109,17 +110,18 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             else:
                 self.spring_x.set_coefficient(0)
 
-            self.cpO_x = round(phys_x * 4096)
-            self.spring_x.cpOffset = self.cpO_x
+            self.cpO_x = float(utils.clamp(phys_x, -1.0, 1.0))
+            self.spring_x.set_offset(self.cpO_x)
             return True
 
         if trim_reset_pressed or not self.pedal_trim_reset_complete:
             self.spring_x.set_coefficient(4096)
-            self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 1000, 0)
+            self.cpO_x = self.step_value_over_time(
+                "center_x", self.cpO_x, 1000, 0.0, floatpoint=True)
 
-            self.spring_x.cpOffset = self.cpO_x
+            self.spring_x.set_offset(self.cpO_x)
 
-            if self.cpO_x == 0:
+            if self.cpO_x == 0.0:
                 self.pedal_trim_reset_complete = True
             else:
                 self.pedal_trim_reset_complete = False

@@ -100,12 +100,16 @@ class MockFFBDevice:
     def supports_axis_override(self):
         import telemffb.globals as G
         import re
-        if G.device_firmware_version is None:
+        ver_str = getattr(G, "device_firmware_version", None)
+        if ver_str is None:
             return False
         # v1.0.18b14 -> 101814, v1.0.18 -> 1018
         # Use numeric comparison to ensure beta versions (>1018) pass
-        ver = int(re.sub(r'\D', '', G.device_firmware_version))
-        return ver > 1018
+        # Non-numeric placeholders (e.g. "Unknown") yield no digits -> unsupported.
+        digits = re.sub(r'\D', '', str(ver_str))
+        if not digits:
+            return False
+        return int(digits) > 1018
 
     def send_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
         self.axis_override_commands.append(
@@ -426,13 +430,30 @@ class MockSpringCondition:
         self.negativeSaturation = 0
     
     def set_coefficient(self, coefficient, override=False):
-        """Set spring coefficient."""
+        """Set spring coefficient.
+
+        .. note::
+            Intentionally does **not** mimic the production FFBReport_SetCondition
+            type-sniffing contract (float in [-1..1] gets scaled by 4096
+            internally). This mock stores whatever value it is given, both
+            int device units and normalized floats pass through unchanged.
+            Tests that assert a specific device-unit value (e.g.,
+            ``assert x_offset == int(0.3 * 4096)``) verify the caller's
+            normalization convention, not the production scaling. Keep this
+            pass-through when adding assertions, and treat any test that
+            depends on the mock performing the 4096 scaling as a bug."""
         self.positiveCoefficient = coefficient
         self.negativeCoefficient = coefficient
-    
+
     def set_offset(self, offset):
-        """Set spring offset."""
-        self.cpOffset = int(offset * 4096) if abs(offset) <= 1 else int(offset)
+        """Set spring offset.
+
+        Mirrors the production FFBReport_SetCondition.set_offset contract:
+        a normalized float (|value| <= 1) is scaled by 4096 and rounded; a
+        device-unit int (|value| > 1) passes through unchanged. The magnitude
+        heuristic stands in for the production int-vs-float type sniff.
+        """
+        self.cpOffset = round(offset * 4096) if abs(offset) <= 1 else int(offset)
 
 
 class BaseTelemetryEffectTestCase:

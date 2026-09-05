@@ -698,6 +698,7 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
 
         :param magnitude: Magnitude [-1..1]
         :type magnitude: float
+        Note: float in [-1..1] is scaled by 4096 internally and clamped (see :class:`FFBReport_SetCondition`)
         :param direction: Direction in degrees [0..360]
         :type direction: float
         """
@@ -706,8 +707,15 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
             logging.warn("setConstantForce on an invalidated effect")
             return
 
-        assert(self.type == EFFECT_CONSTANT)
-        assert(magnitude >= -1.0 and magnitude <= 1.0)
+        if self.type != EFFECT_CONSTANT:
+            logging.warning("setConstantForce called on a non-constant effect (type=%s), ignoring", self.type)
+            return
+        if not -1.0 <= magnitude <= 1.0:
+            # Don't assert in the 60-120 Hz telemetry path; clamp and warn once
+            if not getattr(self, "_magnitude_clamp_warned", False):
+                logging.warning("setConstantForce magnitude %s out of [-1, 1], clamping", magnitude)
+                self._magnitude_clamp_warned = True
+            magnitude = clamp(magnitude, -1.0, 1.0)
 
         direction %= 360
         direction = round((direction*255/360))
@@ -759,8 +767,15 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
             self.ffb.write(data)
 
     def setPeriodic(self, freq, magnitude, direction, duration=0, **kwargs):
-        assert(self.type in PERIODIC_EFFECTS)
-        assert(magnitude >= 0 and magnitude <= 1.0)
+        if self.type not in PERIODIC_EFFECTS:
+            logging.warning("setPeriodic called on a non-periodic effect (type=%s), ignoring", self.type)
+            return self
+        if not 0 <= magnitude <= 1.0:
+            # Don't assert in the 60-120 Hz telemetry path; clamp and warn once
+            if not getattr(self, "_magnitude_clamp_warned", False):
+                logging.warning("setPeriodic magnitude %s out of [0, 1], clamping", magnitude)
+                self._magnitude_clamp_warned = True
+            magnitude = clamp(magnitude, 0, 1)
         direction %= 360
         direction = round(direction*255/360)
 
@@ -1318,6 +1333,13 @@ class HapticEffect(Destroyable):
             if self._h_effect and self._pending_envelope and not self._envelope_applied:
                 self._h_effect.setEnvelope(self._pending_envelope)
                 self._envelope_applied = True
+            # Log a one-shot allocation line.  Start/stop playback logging is
+            # DEBUG-only (it can fire every telemetry frame), so this is the
+            # single INFO-level anchor for an effect's device lifecycle; a
+            # re-allocation after destroy() logs again here.
+            if self._h_effect:
+                name = f" (\"{self.name}\")" if self.name else ""
+                logging.info(f"Effect created {self._h_effect.effect_id} ({self._h_effect.name}){name}")
 
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
         """Set condition parameters for condition-style effects.
@@ -1359,7 +1381,9 @@ class HapticEffect(Destroyable):
 
         Keyword Args:
             coef_x (int|float|None): Positive/negative coefficient for the X axis.
-                If a float is provided it is scaled internally where appropriate.
+                A float is a normalized -1..1 value (scaled by 4096 internally,
+                matching FFBReport_SetCondition.set_coefficient); an int is a
+                raw device-unit value (passthrough).
             coef_y (int|float|None): Positive/negative coefficient for the Y axis.
             sat_x (int|float|None): Positive/negative saturation for the X axis.
             sat_y (int|float|None): Positive/negative saturation for the Y axis.
@@ -1369,23 +1393,32 @@ class HapticEffect(Destroyable):
         """
         self.effect_type = effect_type
 
+        def _to_device_units(value):
+            # Same type-sniffing contract as FFBReport_SetCondition.set_coefficient:
+            # float = normalized -1..1 (scaled by 4096), int = raw device units.
+            if value is None:
+                return 0
+            if isinstance(value, float):
+                return int(round(clamp(value, -1.0, 1.0) * 4096))
+            return int(value)
+
         def set_conditions():
             assert self._h_effect is not None, "Effect must be created before setting condition"
 
             if coef_x is not None or sat_x is not None:
                 cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                                positiveCoefficient=int(coef_x or 0),
-                                                negativeCoefficient=int(coef_x or 0),
-                                                positiveSaturation=int(sat_x or 0),
-                                                negativeSaturation=int(sat_x or 0))
+                                                positiveCoefficient=_to_device_units(coef_x),
+                                                negativeCoefficient=_to_device_units(coef_x),
+                                                positiveSaturation=_to_device_units(sat_x),
+                                                negativeSaturation=_to_device_units(sat_x))
                 self._h_effect.setCondition(cond_x)
 
             if coef_y is not None or sat_y is not None:
                 cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                                positiveCoefficient=int(coef_y or 0),
-                                                negativeCoefficient=int(coef_y or 0),
-                                                positiveSaturation=int(sat_y or 0),
-                                                negativeSaturation=int(sat_y or 0))
+                                                positiveCoefficient=_to_device_units(coef_y),
+                                                negativeCoefficient=_to_device_units(coef_y),
+                                                positiveSaturation=_to_device_units(sat_y),
+                                                negativeSaturation=_to_device_units(sat_y))
                 self._h_effect.setCondition(cond_y)
 
         if not self._h_effect:
@@ -1490,31 +1523,36 @@ class HapticEffect(Destroyable):
         gate_pos_x, _y      | e->saturation.pos.x/y| Upper gate/bound position
         gate_neg_x, _y      | e->saturation.neg.x/y| Lower gate/bound position
         deadband_x, _y      | e->deadband.x, .y    | Deadband size on X/Y axis
-        
+
+        All parameters follow the same type-sniffing contract as
+        FFBReport_SetCondition.set_coefficient: a float is a normalized -1..1
+        value (clamped and scaled by 4096 internally); an int is a raw
+        device-unit value (passthrough, no clamp).
+
         Args:
-            position_x (int, optional): Center position of detent on X-axis (default: 0).
+            position_x (int|float, optional): Center position of detent on X-axis (default: 0).
                 Firmware: e->cp.x
-            position_y (int, optional): Center position of detent on Y-axis (default: 0).
+            position_y (int|float, optional): Center position of detent on Y-axis (default: 0).
                 Firmware: e->cp.y
-            peak_x (int, optional): Detent size/peak strength on X-axis.
+            peak_x (int|float, optional): Detent size/peak strength on X-axis.
                 Firmware: e->coef.pos.x (e.g., groove_detent_size = 2500)
-            peak_y (int, optional): Detent size/peak strength on Y-axis.
+            peak_y (int|float, optional): Detent size/peak strength on Y-axis.
                 Firmware: e->coef.pos.y (e.g., latch_detent_size = 1500)
-            range_x (int, optional): Detent range/width on X-axis.
+            range_x (int|float, optional): Detent range/width on X-axis.
                 Firmware: e->coef.neg.x (e.g., groove_detent_range = 3000)
-            range_y (int, optional): Detent range/width on Y-axis.
+            range_y (int|float, optional): Detent range/width on Y-axis.
                 Firmware: e->coef.neg.y (e.g., latch_detent_range = 2000)
-            gate_pos_x (int, optional): Upper gate/bound position on X-axis.
+            gate_pos_x (int|float, optional): Upper gate/bound position on X-axis.
                 Firmware: e->saturation.pos.x
-            gate_neg_x (int, optional): Lower gate/bound position on X-axis.
+            gate_neg_x (int|float, optional): Lower gate/bound position on X-axis.
                 Firmware: e->saturation.neg.x
-            gate_pos_y (int, optional): Upper gate/bound position on Y-axis.
+            gate_pos_y (int|float, optional): Upper gate/bound position on Y-axis.
                 Firmware: e->saturation.pos.y (e.g., -400 for shifter groove)
-            gate_neg_y (int, optional): Lower gate/bound position on Y-axis.
+            gate_neg_y (int|float, optional): Lower gate/bound position on Y-axis.
                 Firmware: e->saturation.neg.y (e.g., -10000 for shifter groove)
-            deadband_x (int, optional): Deadband size on X-axis (default: None).
+            deadband_x (int|float, optional): Deadband size on X-axis (default: None).
                 Firmware: e->deadband.x
-            deadband_y (int, optional): Deadband size on Y-axis (default: None).
+            deadband_y (int|float, optional): Deadband size on Y-axis (default: None).
                 Firmware: e->deadband.y
         
         Returns:
@@ -1552,6 +1590,17 @@ class HapticEffect(Destroyable):
         """
         self.effect_type = EFFECT_DETENT
 
+        def _to_device_units(value):
+            # Same type-sniffing contract as FFBReport_SetCondition.set_coefficient:
+            # float = normalized -1..1 (clamped, scaled by 4096); int = raw
+            # device units (passthrough, no clamp — callers may use out-of-range
+            # values such as the firmware's -10000 gate).
+            if value is None:
+                return 0
+            if isinstance(value, float):
+                return int(round(clamp(value, -1.0, 1.0) * 4096))
+            return int(value)
+
         def set_conditions():
             assert self._h_effect is not None, "Effect must be created before setting condition"
 
@@ -1559,12 +1608,12 @@ class HapticEffect(Destroyable):
             if peak_x is not None or range_x is not None or gate_pos_x is not None or gate_neg_x is not None or deadband_x is not None:
                 cond_x = FFBReport_SetCondition(
                     parameterBlockOffset=0,
-                    cpOffset=int(position_x),               # e->cp.x
-                    positiveCoefficient=int(peak_x or 0),   # e->coef.pos.x (detent size/peak)
-                    negativeCoefficient=int(range_x or 0),  # e->coef.neg.x (detent range/width)
-                    positiveSaturation=int(gate_pos_x or 0),  # e->saturation.pos.x
-                    negativeSaturation=int(gate_neg_x or 0),   # e->saturation.neg.x
-                    deadBand=int(deadband_x or 0)           # e->deadband.x
+                    cpOffset=_to_device_units(position_x),               # e->cp.x
+                    positiveCoefficient=_to_device_units(peak_x),   # e->coef.pos.x (detent size/peak)
+                    negativeCoefficient=_to_device_units(range_x),  # e->coef.neg.x (detent range/width)
+                    positiveSaturation=_to_device_units(gate_pos_x),  # e->saturation.pos.x
+                    negativeSaturation=_to_device_units(gate_neg_x),   # e->saturation.neg.x
+                    deadBand=_to_device_units(deadband_x)           # e->deadband.x
                 )
                 self._h_effect.setCondition(cond_x)
 
@@ -1572,12 +1621,12 @@ class HapticEffect(Destroyable):
             if peak_y is not None or range_y is not None or gate_pos_y is not None or gate_neg_y is not None or deadband_y is not None:
                 cond_y = FFBReport_SetCondition(
                     parameterBlockOffset=1,
-                    cpOffset=int(position_y),               # e->cp.y
-                    positiveCoefficient=int(peak_y or 0),   # e->coef.pos.y
-                    negativeCoefficient=int(range_y or 0),  # e->coef.neg.y
-                    positiveSaturation=int(gate_pos_y or 0),  # e->saturation.pos.y
-                    negativeSaturation=int(gate_neg_y or 0),   # e->saturation.neg.y
-                    deadBand=int(deadband_y or 0)           # e->deadband.y
+                    cpOffset=_to_device_units(position_y),               # e->cp.y
+                    positiveCoefficient=_to_device_units(peak_y),   # e->coef.pos.y
+                    negativeCoefficient=_to_device_units(range_y),  # e->coef.neg.y
+                    positiveSaturation=_to_device_units(gate_pos_y),  # e->saturation.pos.y
+                    negativeSaturation=_to_device_units(gate_neg_y),   # e->saturation.neg.y
+                    deadBand=_to_device_units(deadband_y)           # e->deadband.y
                 )
                 self._h_effect.setCondition(cond_y)
 
@@ -1645,8 +1694,10 @@ class HapticEffect(Destroyable):
         class. If the underlying effect is not yet allocated the creation is
         queued for lazy allocation.
 
+        The magnitude is scaled by 4096 internally (see setConstantForce).
+
         Args:
-            magnitude: Float in range [0.0, 1.0] representing effect strength.
+            magnitude: Float in range [-1.0, 1.0] representing effect strength.
             direction: Angle in degrees or a DirectionModulator subclass.
 
         Returns:
@@ -1767,7 +1818,7 @@ class HapticEffect(Destroyable):
                 caller_name = caller_frame.f_code.co_name
                 logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""
-            logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            logging.debug(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.start(**kw)
             self._stopped_time = 0
 
@@ -1789,7 +1840,7 @@ class HapticEffect(Destroyable):
                 caller_name = caller_frame.f_code.co_name
                 logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            logging.debug(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.stop()
             
             # Clear envelope if it was marked as one-time use

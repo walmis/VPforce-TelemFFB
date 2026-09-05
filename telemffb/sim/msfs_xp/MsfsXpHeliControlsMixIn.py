@@ -65,16 +65,16 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             self.last_pos_x_pos = 0
             self.last_pos_y_pos = 0
         else:
-            self.cpO_x = round(self.last_device_x * 4096)
-            self.cpO_y = round(self.last_device_y * 4096)
+            self.cpO_x = utils.clamp(self.last_device_x, -1, 1)
+            self.cpO_y = utils.clamp(self.last_device_y, -1, 1)
 
-        self.spring_x.cpOffset = self.cpO_x
-        self.spring_y.cpOffset = self.cpO_y
+        self.spring_x.set_offset(self.cpO_x)
+        self.spring_y.set_offset(self.cpO_y)
         self._spring_handle.setCondition(self.spring_x)
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.start()
-        if (self.cpO_x / 4096 - 0.15 < phys_x < self.cpO_x / 4096 + 0.15) and (
-            self.cpO_y / 4096 - 0.15 < phys_y < self.cpO_y / 4096 + 0.15
+        if (self.cpO_x - 0.15 < phys_x < self.cpO_x + 0.15) and (
+            self.cpO_y - 0.15 < phys_y < self.cpO_y + 0.15
         ):
             self.cyclic_spring_init = 1
             logging.info("Cyclic Spring Initialized")
@@ -92,8 +92,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             self._trim_reset_in_progress = True
             logging.info("Trim Reset Pressed")
 
-        self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 500, 0)
-        self.cpO_y = self.step_value_over_time("center_y", self.cpO_y, 500, 0)
+        self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 500, 0, floatpoint=True)
+        self.cpO_y = self.step_value_over_time("center_y", self.cpO_y, 500, 0, floatpoint=True)
 
         if self.cpO_x == 0 and self.cpO_y == 0:
             self.trim_reset_complete = 1
@@ -109,8 +109,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         self.spring_x.set_coefficient(self.cyclic_spring_gain)
         self.spring_y.set_coefficient(self.cyclic_spring_gain)
 
-        self.spring_x.set_offset(round(self.cpO_x))
-        self.spring_y.set_offset(round(self.cpO_y))
+        self.spring_x.set_offset(self.cpO_x)
+        self.spring_y.set_offset(self.cpO_y)
 
         if self._sim_is_msfs() and self.force_trim_send_reset:
             self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
@@ -154,8 +154,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             elif force_trim_pressed:
                 # Force trim button depressed: absorb trim offsets, soften spring, follow stick
                 if self.tr_state_change:
-                    total_x = int(self.cpO_x) + int(self.cyclic_physical_trim_x_offs)
-                    total_y = int(self.cpO_y) + int(self.cyclic_physical_trim_y_offs)
+                    total_x = self.cpO_x + self.cyclic_physical_trim_x_offs
+                    total_y = self.cpO_y + self.cyclic_physical_trim_y_offs
 
                     self.cpO_x = total_x
                     self.cpO_y = total_y
@@ -173,11 +173,11 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                 self.spring_x.set_coefficient(gain)
                 self.spring_y.set_coefficient(gain)
 
-                self.cpO_x = round(x * 4096)
-                self.cpO_y = round(y * 4096)
+                self.cpO_x = utils.clamp(x, -1, 1)
+                self.cpO_y = utils.clamp(y, -1, 1)
 
-                self.spring_x.cpOffset = self.cpO_x
-                self.spring_y.cpOffset = self.cpO_y
+                self.spring_x.set_offset(self.cpO_x)
+                self.spring_y.set_offset(self.cpO_y)
 
                 self.cyclic_center = [x, y]
                 self.cyclic_trim_release_active = 1
@@ -187,8 +187,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                 self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
                 self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
 
-                self.cpO_x = round(x * 4096)
-                self.cpO_y = round(y * 4096)
+                self.cpO_x = utils.clamp(x, -1, 1)
+                self.cpO_y = utils.clamp(y, -1, 1)
                 self.spring_x.set_offset(self.cpO_x)
                 self.spring_y.set_offset(self.cpO_y)
 
@@ -219,11 +219,11 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             self.spring_x.set_coefficient(gain)
             self.spring_y.set_coefficient(gain)
 
-            self.cpO_x = round(x * 4096)
-            self.cpO_y = round(y * 4096)
+            self.cpO_x = utils.clamp(x, -1, 1)
+            self.cpO_y = utils.clamp(y, -1, 1)
 
-            self.spring_x.cpOffset = self.cpO_x
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_x.set_offset(self.cpO_x)
+            self.spring_y.set_offset(self.cpO_y)
 
             self.cyclic_center = [x, y]
 
@@ -317,7 +317,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             telem_data.get("ForceTrimSW", True) if self.custom_ft_sw_var_enabled else True  # non-zero default: keep .get()
         )  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
-            assert HapticEffect.device is not None, "HapticEffect.device is None"
+            if not self._device_feeding():  # device unplugged; nothing to send
+                return
             x, y = self._get_device_raw_axes()
             telem_data.phys_x = x
             telem_data.phys_y = y
@@ -339,8 +340,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                 self.spring_x.set_coefficient(self.cyclic_spring_gain)
                 self.spring_y.set_coefficient(self.cyclic_spring_gain)
 
-            self.spring_x.set_offset(int(self.cpO_x) + self.cyclic_physical_trim_x_offs)
-            self.spring_y.set_offset(int(self.cpO_y) + self.cyclic_physical_trim_y_offs)
+            self.spring_x.set_offset(self.cpO_x + self.cyclic_physical_trim_x_offs)
+            self.spring_y.set_offset(self.cpO_y + self.cyclic_physical_trim_y_offs)
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
             if self.spring_mode_is(SpringModeEnum.FORCETRIM) and force_trim_active:
@@ -378,8 +379,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
         # print(f"x:{cyclic_x_trim}, y:{cyclic_y_trim}")
 
-        self.cyclic_physical_trim_x_offs = round(cyclic_x_trim * 4096)
-        self.cyclic_physical_trim_y_offs = round(cyclic_y_trim * 4096)
+        self.cyclic_physical_trim_x_offs = utils.clamp(cyclic_x_trim, -1, 1)
+        self.cyclic_physical_trim_y_offs = utils.clamp(cyclic_y_trim, -1, 1)
         self.cyclic_virtual_trim_x_offs = cyclic_x_trim - (cyclic_x_trim * self.joystick_trim_follow_gain_virtual_x)
         self.cyclic_virtual_trim_y_offs = cyclic_y_trim - (cyclic_y_trim * self.joystick_trim_follow_gain_virtual_y)
 
