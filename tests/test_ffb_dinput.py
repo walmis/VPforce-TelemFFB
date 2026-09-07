@@ -931,8 +931,12 @@ class TestAutocenterHandover:
 
 class TestAxisMapResolution:
     """resolve_axis_map: TelemFFB's logical conventions are fixed (pedals
-    X, collective Y, trim wheel X, joystick untouchable) and the map
-    points them at whatever axis the hardware renders force on."""
+    X, collective Y, trim wheel Y, joystick untouchable) and the map
+    points them at whatever axis the hardware renders force on.
+
+    The map governs the position read as much as the force: the bridge
+    reports an unmapped logical axis as zero, so a role whose input lives
+    on the unmapped side sees a device that never moves."""
 
     def _resolve(self, *a):
         from telemffb.hw.ffb_dinput import resolve_axis_map
@@ -955,6 +959,18 @@ class TestAxisMapResolution:
     def test_collective_on_a_single_axis_device(self):
         """Logical Y carries the force; logical X goes unmapped."""
         assert self._resolve('collective', 'auto', ['X']) == (None, 'X')
+
+    def test_trim_wheel_on_an_x_only_wheel(self):
+        """A racing wheel renders force on X alone.  The trim wheel role
+        reads and drives logical Y, so Y is what must land on the wheel's
+        axis - mapping X instead leaves the role reading a zero."""
+        assert self._resolve('trimwheel', 'auto', ['X']) == (None, 'X')
+
+    def test_trim_wheel_keeps_y_when_the_device_has_it(self):
+        assert self._resolve('trimwheel', 'auto', ['X', 'Y']) == ('X', 'Y')
+
+    def test_trim_wheel_explicit_choice_lands_on_y(self):
+        assert self._resolve('trimwheel', 'RZ', ['X', 'Y', 'RZ']) == ('X', 'RZ')
 
     def test_no_actuator_info_means_identity(self):
         """An old DirectLink reports nothing; behave exactly as before."""
@@ -1000,6 +1016,17 @@ class TestAxisMapApplication:
     def test_a_joystick_never_sends_one(self, monkeypatch):
         bridge = self._open(monkeypatch, 'joystick', ['RZ'])
         assert not hasattr(bridge, 'axis_map')
+
+    def test_an_x_only_wheel_as_trim_wheel_lands_on_logical_y(
+            self, monkeypatch):
+        """Logical Y -> device X, logical X unmapped: the wheel's position
+        arrives on the axis the trim wheel role reads."""
+        bridge = self._open(monkeypatch, 'trimwheel', ['X'])
+        assert bridge.axis_map == (-1, 0, False, False)
+
+    def test_trim_wheel_inversion_is_on_y(self, monkeypatch):
+        bridge = self._open(monkeypatch, 'trimwheel', ['X'], inverted=True)
+        assert bridge.axis_map == (-1, 0, False, True)
 
     def test_inversion_rides_the_map(self, monkeypatch):
         bridge = self._open(monkeypatch, 'pedals', ['RZ'], inverted=True)

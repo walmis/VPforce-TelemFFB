@@ -452,9 +452,11 @@ def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
     return status
 
 
-#: Which logical axis each role's effects address.  The joystick is
-#: deliberately absent: it stays native X/Y, unmapped, always.
-ROLE_LOGICAL_AXIS = {'pedals': 'X', 'collective': 'Y', 'trimwheel': 'X'}
+#: Which logical axis each role's effects address - and read position
+#: from: the trim wheel's spring, center offset and reported position
+#: are all Y (MsfsXpTrimwheelMixIn), as on the VPforce wheel.  The
+#: joystick is deliberately absent: it stays native X/Y, unmapped, always.
+ROLE_LOGICAL_AXIS = {'pedals': 'X', 'collective': 'Y', 'trimwheel': 'Y'}
 
 AXIS_SETTING_AUTO = 'auto'
 
@@ -1277,7 +1279,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         force on.
 
         TelemFFB's conventions are fixed - pedals effects address logical
-        X, collective Y, trim wheel X - but third-party hardware puts its
+        X, collective Y, trim wheel Y - but third-party hardware puts its
         force feedback wherever it likes (pedals on Rz, typically).  The
         resolved map is handed to DirectLink only when it DIFFERS from
         what the device is running - so an identity map is never sent

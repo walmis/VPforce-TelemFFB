@@ -190,7 +190,7 @@ class DeviceRow(QWidget):
         row.addWidget(self.ids_label)
 
         # roles whose effects address one logical axis (pedals X,
-        # collective Y, trim wheel X) can point it at whichever axis a
+        # collective Y, trim wheel Y) can point it at whichever axis a
         # DirectInput device actually renders force on.  Hidden until a
         # [DI] device is selected; the dialog fills it with the axes the
         # device reports.  The joystick never gets one - X/Y untouched.
