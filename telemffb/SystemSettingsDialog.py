@@ -61,6 +61,17 @@ def _as_bool(value):
     return bool(value)
 
 
+def _device_path(device) -> str:
+    """A selector entry's path as the settings store it."""
+    path = getattr(device, 'path', None)
+    if isinstance(path, (bytes, bytearray)):
+        try:
+            return path.decode()
+        except Exception:
+            return str(path)
+    return str(path or '')
+
+
 def _same_hardware(a, b):
     """Whether two selector entries are one physical device.
 
@@ -671,10 +682,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     if msg.clickedButton() == override_btn:
                         # clear other combobox selection (set to index 0 = None)
                         other.setCurrentIndex(0)
-                        # accept new selection
-                        changed_cb._prev_index = index
-                        self.toggle_device_launch_widgets()
-                        return
+                        # The new selection is then committed below exactly
+                        # like an unopposed one.  Returning here would leave
+                        # it on screen but unstaged: Save takes the pid keys
+                        # from the screen and the devpaths from the staged
+                        # writes, and the two would disagree.  A device can
+                        # hold only one slot, so no second conflict exists.
+                        break
                     else:
                         # revert selection on changed_cb
                         # block signals to avoid recursion
@@ -3052,7 +3066,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 if not changed and G.device_connection_status:
                     continue
                 if not after:
-                    continue   # nothing selected: nothing to (re)acquire
+                    # nothing to (re)acquire - said, because the next
+                    # start opens by pid alone and a silent gap here is
+                    # indistinguishable from an unchanged slot
+                    logging.info(f"Device selection for '{role}' cleared")
+                    continue
                 switch = getattr(G, 'switch_to_device', None)
                 if switch is None:
                     continue
@@ -3066,6 +3084,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                         role) is not False:
                     continue
                 if not after:
+                    logging.info(f"Device selection for '{role}' cleared")
                     continue
                 logging.info(
                     f"Device selection for '{role}' "
@@ -3143,11 +3162,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         role, which is not the same as this instance's own.
         """
         device = self.selected_device(role)
-        if device is not None:
+        devpath = str(self._stored_or_pending(f'devpath_{role}') or '')
+        if device is not None and _device_path(device) == devpath:
             return format(device.product_id, 'x')
-        # pending first: an import stages the pid of hardware that is not
-        # currently plugged in, and validation runs before anything is
-        # written
+        # The selector and the staged devpath disagree, or nothing is
+        # selected.  The devpath is what startup reads, so the pid follows
+        # it rather than the screen: a cleared slot has no pid, and an
+        # unplugged device (stored, or staged by an import) keeps the pid
+        # recorded with it.
+        if not devpath:
+            return ''
         return str(self._stored_or_pending(device_pid_key(role)) or '').strip()
 
     def _configured_roles(self):
