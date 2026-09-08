@@ -33,7 +33,7 @@ from telemffb.preview import (
     TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
     GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
     IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits, Jitter,
-    TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, REFERENCE_SPRING,
+    TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, REFERENCE_SPRING, Gusts, TURBULENCE, WIND,
     ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, PREVIEWS_BY_ROW, preview_for_row,
     FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
@@ -1407,10 +1407,139 @@ class TestConstantForceGuard(BaseTelemetryEffectTestCase):
         PreviewRunner(ac, spec, 'DCS', frame_rate=10.0).step()
         assert 'preview_spring' not in self.mock_effects
 
-    def test_the_three_constant_force_specs_are_flagged(self):
+    def test_the_constant_force_specs_are_flagged(self):
         flagged = {s.name for s in PREVIEW_SPECS.values() if s.constant_force}
         assert flagged == {'touchdown_effect_enabled', 'deceleration_effect_enable',
-                           'runway_rumble_enabled'}
+                           'runway_rumble_enabled', 'turbulence_effect_enable',
+                           'wind_effect_enabled'}
+
+
+class TestGusts:
+    def test_three_components_with_the_stated_rms_and_band(self):
+        import random, math
+        g = Gusts(rms=(2.0, 3.0, 1.0), steady=(0.0, 0.0, 60.0), band=(0.3, 2.0),
+                  rng=random.Random(4))
+        ac = SimpleNamespace(_preview_duration=20.0)
+        samples = [g(ac, i / 2000) for i in range(2000)]          # 20 s at 100 Hz
+        assert all(len(v) == 3 for v in samples)
+        for axis, (rms, base) in enumerate(((2.0, 0.0), (3.0, 0.0), (1.0, 60.0))):
+            vals = [v[axis] - base for v in samples]
+            measured = math.sqrt(sum(x * x for x in vals) / len(vals))
+            assert measured == pytest.approx(rms, rel=0.35)      # random phases: loose
+        for axis in g._state(ac):
+            assert all(0.3 <= f <= 2.0 for f, _, _ in axis)
+
+    def test_each_run_is_a_fresh_draw(self):
+        g = Gusts()
+        a, b = SimpleNamespace(_preview_duration=8.0), SimpleNamespace(_preview_duration=8.0)
+        assert g(a, 0.37) != g(b, 0.37)
+
+    def test_runner_stamps_the_duration(self):
+        ac = SimpleNamespace(_telem_data=BaseTelemetryData(), _last_telem_data=BaseTelemetryData(),
+                             _name='x', effects=None, record=lambda *a, **k: None, x_enabled=False)
+        spec = PreviewSpec(effect_id='x_enabled', method='record', kind='hold',
+                           fields={'*': {}}, duration=8.0)
+        PreviewRunner(ac, spec, 'DCS')
+        assert ac._preview_duration == 8.0
+
+
+class TestFrameArg(BaseTelemetryEffectTestCase):
+    def test_a_method_without_a_frame_argument_reads_the_bound_frame(self):
+        ac = FakeAircraft(self.mock_effects)
+        seen = []
+        ac.no_frame = lambda **kw: seen.append((ac._telem_data['v'], kw))
+        spec = PreviewSpec(effect_id='x_enabled', method='no_frame', kind='hold',
+                           fields={'*': {'v': 7}}, kwargs={'k': 1}, frame_arg=False,
+                           duration=0.2, tail=0.0)
+        PreviewRunner(ac, spec, 'DCS', frame_rate=10.0).step()
+        assert seen == [(7, {'k': 1})]
+
+
+def _advancing_clock(monkeypatch, step=1.0 / 30):
+    """The turbulence modulator and the wind filters normalise by wall-clock
+    dt; test frames are microseconds apart, which would make their filters
+    do nothing.  Advance perf_counter a frame per call."""
+    import time
+    start = time.perf_counter()
+    ticks = iter(range(1, 1_000_000))
+    monkeypatch.setattr(time, 'perf_counter', lambda: start + next(ticks) * step)
+
+
+class TestTurbulencePreview(BaseTelemetryEffectTestCase):
+    def _aircraft(self):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.turbulence_effect_enable = False
+        ac.turbulence_hpf_alpha = 0.95
+        ac.turbulence_smoothing_alpha = 0.3
+        ac.turbulence_sensitivity = 0.7
+        ac.turbulence_intensity = 0.3
+        return ac
+
+    @pytest.mark.parametrize("sim", ['MSFS', 'XPLANE'])
+    def test_joystick_feels_a_varying_push_capped_at_the_intensity(self, sim, monkeypatch):
+        _advancing_clock(monkeypatch)
+        ac = self._aircraft()
+        runner = PreviewRunner(ac, TURBULENCE, sim, frame_rate=30.0)
+        mags, dirs = [], set()
+        for _ in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('turbulence')
+            if fx is not None and fx.started:
+                mags.append(fx._magnitude)
+                dirs.add(fx._direction)
+        assert mags and max(mags) > 0.02                         # the gusts come through
+        assert max(mags) <= 0.3 + 1e-9                           # capped at the intensity
+        assert len(set(round(m, 3) for m in mags)) > 10          # and it varies
+        assert len(dirs) > 1                                     # pitch and roll mix
+        assert runner.step() is False and not self.mock_effects.dict
+
+    def test_pedals_feel_yaw(self, monkeypatch):
+        _advancing_clock(monkeypatch)
+        ac = self._aircraft()
+        runner = PreviewRunner(ac, TURBULENCE, 'MSFS', device_type='pedals', frame_rate=30.0)
+        dirs = set()
+        for _ in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('turbulence')
+            if fx is not None and fx.started:
+                dirs.add(fx._direction)
+        assert dirs and dirs <= {90, 270}
+
+    def test_only_msfs_and_xplane(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_dcs.Aircraft('preview'), TURBULENCE, 'DCS')
+
+
+class TestWindPreview(BaseTelemetryEffectTestCase):
+    @pytest.mark.parametrize("sim", ['DCS', 'BMS'])
+    def test_gusts_come_through_the_speed_high_pass(self, sim, monkeypatch):
+        import telemffb.utils as utils
+        _advancing_clock(monkeypatch)
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.wind_effect_enabled = False
+        ac.wind_effect_max_intensity = 0.5
+        ac.wind_effect_scaling = 1.0
+        runner = PreviewRunner(ac, WIND, sim, frame_rate=30.0)
+        mags = []
+        for _ in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('wnd')
+            if fx is not None and fx.started:
+                mags.append(fx._magnitude)
+                assert fx._direction is utils.RandomDirectionModulator
+        assert mags and max(mags) > 0.02
+        assert max(mags) <= 0.5 + 1e-9
+        assert runner.step() is False and not self.mock_effects.dict
+
+    def test_pedals_are_silent_and_msfs_not_offered(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.wind_effect_max_intensity = 0.5
+        runner = PreviewRunner(ac, WIND, 'DCS', device_type='pedals', frame_rate=10.0)
+        for _ in range(3):
+            runner.step()
+        assert 'wnd' not in self.mock_effects
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_msfs_xp.Aircraft('preview'), WIND, 'MSFS')
 
 
 class TestTouchdownPreview(BaseTelemetryEffectTestCase):

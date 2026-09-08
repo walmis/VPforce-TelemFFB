@@ -198,6 +198,15 @@ freeze its running average on a perfectly steady plateau (deceleration does; the
 wobbles the stimulus 2%), and an effect fed through a high-pass filter needs motion, not a
 level (runway rumble takes a `Jitter` on wheel compression).
 
+**Gust-driven effects** (turbulence on MSFS/X-Plane, wind on DCS/BMS) only ever see the
+frame-to-frame change in wind, so a synthesised gust field is an honest stimulus as long as
+its amplitude and frequency content are stated. `Gusts(rms, steady, band)` is a per-run
+superposition of sinusoids per axis; the tooltip should say what reference it represents
+("moderate turbulence, a few m/s of gusts"). These effects normalise their filters by the
+wall clock, so a test needs an advancing `time.perf_counter` (see `_advancing_clock`) or
+the filters do nothing between microsecond-apart frames. A method that reads the bound frame
+instead of taking one (`update_turbulence`) sets `frame_arg=False`.
+
 ## 5. Register it
 
 Add the spec to the tuple that builds `PREVIEW_SPECS`, and bump the count assertion beneath
