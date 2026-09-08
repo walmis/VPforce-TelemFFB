@@ -188,6 +188,7 @@ def test_enabled_button_toggles_the_main_windows_preview(qapp, tmp_path):
     b = r.buttons[name]
     assert b.isEnabled() and b.text() == '▶'
     assert 'Click again to stop' in b.toolTip()
+    assert PREVIEWS_BY_ROW[name].reference in b.toolTip()     # says what it represents
     b.click()
     assert r.mw.toggled == [(PREVIEWS_BY_ROW[name], b)]
 

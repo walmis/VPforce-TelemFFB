@@ -1388,16 +1388,16 @@ class MainWindow(QMainWindow):
             device_alive=HapticEffect.device_alive(),
             telemetry_paused=bool(getattr(manager, 'pause_state', False)) if manager else True)
 
-    def confirm_constant_force_preview(self):
+    def confirm_constant_force_preview(self, spec):
         """The heads-up before a constant-force preview: an unattended axis
-        can be driven to its stops.  Asked every time, on purpose."""
+        can be driven to its stops.  Asked every time, on purpose.  The
+        safety wording is fixed; only the spec's reference line varies."""
         answer = QMessageBox.warning(
             self, "Constant Force Preview",
             "Constant force effect previews may move the axis in unexpected ways.\n\n"
             "Please firmly grasp the controls before proceeding.\n\n"
-            "The preview plays the effect at the maximum force your settings allow. "
-            "In flight the force is scaled by the telemetry (G, deceleration, surface "
-            "loading) and is usually lower.",
+            f"This preview plays {spec.reference} at the maximum force your settings "
+            "allow. In flight the telemetry sets the level, and it is usually lower.",
             QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel)
         return answer == QMessageBox.StandardButton.Ok
@@ -1442,7 +1442,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Effect Preview",
                                     "Cannot preview now:\n- " + "\n- ".join(blockers))
             return False
-        if spec.constant_force and not self.confirm_constant_force_preview():
+        if spec.constant_force and not self.confirm_constant_force_preview(spec):
             return False
         sim, model, cls = resolve_preview_target(G.settings_mgr)
         try:

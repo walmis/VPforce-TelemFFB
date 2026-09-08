@@ -81,6 +81,10 @@ Field by field:
 - **`rows`** — the settings rows that get the `▶` button. Always the **intensity** slider(s)
   the user adjusts while listening — never the toggle, never a threshold. A row belongs to one
   spec only; a test enforces both, and that every row exists in `defaults.xml`.
+- **`reference`** — one sentence fragment saying what condition the preview represents
+  ("moderate turbulence: a few m/s of vertical and lateral gusts"). The row tooltip and the
+  constant-force popup slot it into a fixed template, so write it to follow "This preview
+  plays …". Required; a test checks every catalog spec has one.
 - **`method`** — a name, or `{'*': 'generic', 'MSFS': 'msfs_specific'}`.
 - **`sims`** — restrict when a sim has no field for it, overrides the method, or the effect
   logs "unknown sim" there. Default is all five.

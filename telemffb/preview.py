@@ -136,6 +136,12 @@ class PreviewSpec:
     # intensity slider(s) the user adjusts while listening, never the
     # enable toggle or a threshold.  A row belongs to at most one spec.
     rows: Tuple[str, ...] = ()
+    # One user-facing sentence fragment saying what condition the preview
+    # represents ("moderate turbulence: a few m/s of gusts").  The row
+    # tooltip and the constant-force popup slot it into a fixed template,
+    # so the safety wording stays uniform while the description is
+    # honest per effect.  Required for every catalog spec (a test).
+    reference: str = ''
     duration: float = 3.0
     # Seconds the LAST frame is repeated before cleanup.  A one-shot fired
     # on the final scripted frame (the gear clunk at 1.0) would otherwise
@@ -465,6 +471,7 @@ JET_IDLE_PCT = 60   # a typical turbine idle; the effect has no profile threshol
 
 JET_ENGINE_RUMBLE = PreviewSpec(
     effect_id='engine_jet_rumble_enabled',
+    reference='sweeps from 60% idle to full power, holding 4 s at each end',
     rows=('jet_engine_rumble_intensity',),
     method='ac_update_jet_engine_rumble',
     kind='ramp',
@@ -481,6 +488,7 @@ JET_ENGINE_RUMBLE = PreviewSpec(
 
 GEAR_MOTION = PreviewSpec(
     effect_id='gear_motion_effect_enabled',
+    reference='one gear cycle, up to down, with the clunk as it locks',
     rows=('gear_motion_intensity',),
     method='ac_update_landing_gear',
     kind='ramp',
@@ -496,6 +504,7 @@ _PROP_RPM_SWEEP = ('engine_rumble_lowrpm', 'engine_rumble_highrpm')
 
 PROP_ENGINE_RUMBLE = PreviewSpec(
     effect_id='engine_prop_rumble_enabled',
+    reference="sweeps the profile's Low to High RPM range, holding 4 s at each end",
     rows=('engine_rumble_lowrpm_intensity', 'engine_rumble_highrpm_intensity'),
     method='ac_update_piston_engine_rumble',
     kind='ramp',
@@ -519,6 +528,7 @@ PROP_ENGINE_RUMBLE = PreviewSpec(
 
 STALL_BUFFET = PreviewSpec(
     effect_id='aoa_buffeting_enabled',
+    reference="AoA rising from the profile's buffet onset to its stall, held at stall, then recovering",
     rows=('buffeting_intensity',),
     method='ac_update_buffeting',
     kind='ramp',
@@ -545,6 +555,7 @@ ROTOR_RPM_NOMINAL = 300   # a typical NR; no profile threshold exists for it
 
 ETL = PreviewSpec(
     effect_id='etl_effect_enable',
+    reference="one acceleration through the profile's ETL speed band",
     rows=('etl_effect_intensity',),
     method='ac_calc_etl_effect',
     kind='ramp',
@@ -575,6 +586,7 @@ HOLD_SECONDS = 5.0
 
 AFTERBURNER = PreviewSpec(
     effect_id='afterburner_effect_enabled',
+    reference='afterburner lit for 5 s',
     rows=('afterburner_effect_intensity',),
     method='ac_update_ab_effect',
     # The effect re-issues only when something CHANGED: the afterburner
@@ -591,6 +603,7 @@ AFTERBURNER = PreviewSpec(
 
 STICK_SHAKER = PreviewSpec(
     effect_id='enable_stick_shaker',
+    reference='5 s in the stall warning (above the shaker AoA)',
     rows=('stick_shaker_intensity',),
     # DCS / BMS shake above a profile AoA; MSFS shakes on the sim's stall
     # warning flag.  Different methods, different fields, one preview.
@@ -606,6 +619,7 @@ STICK_SHAKER = PreviewSpec(
 
 OVERSPEED_SHAKE = PreviewSpec(
     effect_id='overspeed_effect_enable',
+    reference='5 s of full overspeed shake, 15 m/s past the onset speed',
     rows=('overspeed_shake_intensity',),
     method='ac_calc_etl_effect',
     kind='hold',
@@ -625,6 +639,7 @@ _XP_VLE = 60.0   # m/s; X-Plane takes the gear buffet band from Vle (0.9 .. 1.17
 
 GEAR_BUFFET = PreviewSpec(
     effect_id='gear_buffet_effect_enabled',
+    reference="gear down at the top of the profile's buffet speed band for 5 s",
     rows=('gear_buffet_intensity',),
     method='ac_update_landing_gear',
     kind='hold',
@@ -642,6 +657,7 @@ GEAR_BUFFET = PreviewSpec(
 
 SPEEDBRAKE_BUFFET = PreviewSpec(
     effect_id='speedbrake_buffet_effect_enabled',
+    reference='speedbrake fully deployed at 100 m/s for 5 s',
     rows=('speedbrake_buffet_intensity',),
     method='ac_update_speed_brakes',
     kind='hold',
@@ -655,6 +671,7 @@ SPEEDBRAKE_BUFFET = PreviewSpec(
 
 SPOILER_BUFFET = PreviewSpec(
     effect_id='spoiler_buffet_effect_enabled',
+    reference="spoilers fully deployed at the profile's upper speed threshold for 5 s",
     rows=('spoiler_buffet_intensity',),
     method='ac_update_spoilers',
     kind='hold',
@@ -672,6 +689,7 @@ SPOILER_BUFFET = PreviewSpec(
 
 FLAPS_MOTION = PreviewSpec(
     effect_id='flaps_motion_effect_enabled',
+    reference='flaps travelling from up to full over 3 s',
     rows=('flaps_motion_intensity',),
     method='ac_update_flaps',
     kind='ramp',
@@ -680,6 +698,7 @@ FLAPS_MOTION = PreviewSpec(
 
 SPEEDBRAKE_MOTION = PreviewSpec(
     effect_id='speedbrake_motion_effect_enabled',
+    reference='speedbrake travelling from retracted to deployed over 3 s',
     rows=('speedbrake_motion_intensity',),
     method='ac_update_speed_brakes',
     kind='ramp',
@@ -689,6 +708,7 @@ SPEEDBRAKE_MOTION = PreviewSpec(
 
 SPOILER_MOTION = PreviewSpec(
     effect_id='spoiler_motion_effect_enabled',
+    reference='spoilers travelling from retracted to deployed over 3 s',
     rows=('spoiler_motion_intensity',),
     method='ac_update_spoilers',
     kind='ramp',
@@ -698,6 +718,7 @@ SPOILER_MOTION = PreviewSpec(
 
 CANOPY_MOTION = PreviewSpec(
     effect_id='canopy_motion_effect_enabled',
+    reference='canopy closing over 3 s, with the clunk as it seats',
     rows=('canopy_motion_intensity',),
     method='ac_update_canopy',
     kind='ramp',
@@ -708,6 +729,7 @@ CANOPY_MOTION = PreviewSpec(
 
 TAILHOOK_MOTION = PreviewSpec(
     effect_id='tailhook_motion_effect_enabled',
+    reference='hook extending over 3 s, with the clunk as it seats',
     rows=('tailhook_motion_intensity',),
     method='ac_update_tailhook_effect',
     kind='ramp',
@@ -717,6 +739,7 @@ TAILHOOK_MOTION = PreviewSpec(
 
 FUELBOOM_MOTION = PreviewSpec(
     effect_id='fuelboom_motion_effect_enabled',
+    reference='refuelling boom or door extending over 3 s, with the clunk',
     rows=('fuelboom_motion_intensity',),
     method='ac_update_fuelboom_effect',
     kind='ramp',
@@ -726,6 +749,7 @@ FUELBOOM_MOTION = PreviewSpec(
 
 WINGFOLD_MOTION = PreviewSpec(
     effect_id='wingfold_motion_effect_enabled',
+    reference='wings folding on the ground over 3 s, with the clunks',
     rows=('wingfold_motion_intensity',),
     method='ac_update_wingfold_effect',
     kind='ramp',
@@ -866,6 +890,7 @@ class Jitter:
 
 GUNFIRE = PreviewSpec(
     effect_id='gunfire_effect_enabled',
+    reference='a 2 s gun burst',
     rows=('gun_vibration_intensity',),
     method='ac_update_cm_weapons',
     kind='edge',
@@ -878,6 +903,7 @@ GUNFIRE = PreviewSpec(
 
 WEAPON_RELEASE = PreviewSpec(
     effect_id='weapon_release_effect_enabled',
+    reference='three weapon releases a second apart',
     rows=('weapon_release_intensity',),
     method='ac_update_cm_weapons',
     kind='edge',
@@ -890,6 +916,7 @@ WEAPON_RELEASE = PreviewSpec(
 
 COUNTERMEASURES = PreviewSpec(
     effect_id='countermeasure_effect_enabled',
+    reference='four flares half a second apart',
     rows=('cm_vibration_intensity',),
     method='ac_update_cm_weapons',
     kind='edge',
@@ -902,6 +929,7 @@ COUNTERMEASURES = PreviewSpec(
 
 DAMAGE = PreviewSpec(
     effect_id='damage_effect_enabled',
+    reference='an irregular stream of hits over 5 s, different every press',
     rows=('damage_effect_intensity',),
     method={'*': 'dcs_update_damage', 'IL2': 'il2_update_damage'},
     kind='edge',
@@ -924,6 +952,7 @@ _IL2_WEAPON_FORCE = {'il2_shake_master': True, 'il2_dynamic_gunfire_mode': False
 
 IL2_GUNFIRE = PreviewSpec(
     name='il2_gunfire',
+    reference='a 2 s gun burst (basic gunfire mode)',
     rows=('il2_weapon_release_intensity',),
     effect_id='il2_enable_weapons',
     method='ac_update_cm_weapons',
@@ -938,6 +967,7 @@ IL2_GUNFIRE = PreviewSpec(
 
 IL2_BOMB_RELEASE = PreviewSpec(
     name='il2_bombs',
+    reference='one bomb release',
     rows=('il2_bomb_release_intensity',),
     effect_id='il2_enable_weapons',
     method='ac_update_cm_weapons',
@@ -950,6 +980,7 @@ IL2_BOMB_RELEASE = PreviewSpec(
 
 IL2_ROCKET_RELEASE = PreviewSpec(
     name='il2_rockets',
+    reference='one rocket launch',
     rows=('il2_rocket_release_intensity',),
     effect_id='il2_enable_weapons',
     method='ac_update_cm_weapons',
@@ -968,6 +999,7 @@ IL2_ROCKET_RELEASE = PreviewSpec(
 
 TOUCHDOWN = PreviewSpec(
     effect_id='touchdown_effect_enabled',
+    reference="a firm landing at the profile's maximum G",
     rows=('touchdown_effect_max_force',),
     method='ac_update_touchdown_effect',
     kind='ramp',
@@ -997,6 +1029,7 @@ def _decel_g(ac, p):
 
 DECELERATION = PreviewSpec(
     effect_id='deceleration_effect_enable',
+    reference="a braking run on the ground building to the profile's maximum, held, then released",
     rows=('deceleration_max_force',),
     method='ac_update_decel_effect',
     kind='ramp',
@@ -1016,6 +1049,7 @@ DECELERATION = PreviewSpec(
 
 RUNWAY_RUMBLE = PreviewSpec(
     effect_id='runway_rumble_enabled',
+    reference='rolling on a rough surface for 4 s',
     rows=('runway_rumble_intensity',),
     method='ac_update_runway_rumble',
     kind='hold',
@@ -1032,6 +1066,7 @@ RUNWAY_RUMBLE = PreviewSpec(
 
 TURBULENCE = PreviewSpec(
     effect_id='turbulence_effect_enable',
+    reference='moderate turbulence: a few m/s of vertical and lateral gusts',
     rows=('turbulence_intensity',),
     method='update_turbulence',
     frame_arg=False,                     # reads RelWind off the bound frame
@@ -1051,6 +1086,7 @@ TURBULENCE = PreviewSpec(
 
 WIND = PreviewSpec(
     effect_id='wind_effect_enabled',
+    reference='gusting on a steady 8 m/s breeze',
     rows=('wind_effect_max_intensity',),
     method='ac_update_wind_effect',
     kind='hold',
