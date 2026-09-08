@@ -14,16 +14,17 @@ This guide is the checklist for writing that entry for an effect you have just b
 
 ## 1. Decide whether the effect is previewable
 
-The rule, agreed after some argument: **periodic effects only**.
+The rule: **periodic effects, plus the constant-force effects a user can judge on the bench**.
 
 A preview shows the *shape* of an effect only when that shape is a one-dimensional sweep, and
-it shows *intensity* only when the user can judge it with hands off, on the bench. Vibrations
-and motions qualify. These do not, and should not get a spec:
+it shows *intensity* only when the user can judge it with the controls in hand. Vibrations and
+motions qualify. Touchdown, deceleration and runway rumble qualify too, with the guards in
+[Constant-force effects](#constant-force-effects) below. These do not, and should not get a
+spec:
 
-- **Constant-force effects** — G-force, deceleration, touchdown, runway rumble, wind,
-  turbulence, elevator droop. What the user tunes is how the push interacts with the spring
-  at the deflection they hold under load; on the bench there is nothing to interact with, and
-  a preview would invite the wrong setting.
+- **G-force**. In its newer mode the magnitude depends on the deflection the pilot holds
+  under load; hands-off on the bench answers the wrong question. Elevator droop on MSFS /
+  X-Plane is inside the flight-controls calculation and not callable on its own.
 - **The spring family** — static/dynamic/custom/advanced spring modes, FBW spring, IL-2
   native spring. The curve *is* the feature.
 - **Closed loops with the sim** — trim following, the DCS stick trim workaround, trimwheel.
@@ -171,6 +172,31 @@ fields={'*': {'Damage': RandomHits(), ...}},                                # ir
 ```
 
 Hold the *other* triggers of a shared method constant so only the previewed effect fires.
+
+### Constant-force effects
+
+A constant force on an unattended axis can drive it to the stops, and the user tunes these
+forces against **no spring** by preference (a Rhino may still be holding its own centering
+spring; a DirectInput device is not). So a constant-force spec sets `constant_force=True`,
+which does two things:
+
+- the UI asks the user to take hold of the controls before every run (the message box in
+  `MainWindow.confirm_constant_force_preview`), and the row's tooltip says so;
+- the runner puts up a **5% reference spring** (`REFERENCE_SPRING`) in the preview's own
+  effect table for the run. It is not there to counter the force — only to take the odd
+  freewheel feel off DirectInput devices that misbehave at 0% spring.
+
+And the stimulus is always **ramped, never stepped**, so the force builds and releases:
+
+```python
+schedule=((1.5, 0.0, 1.0), (1.0, 1.0, 1.0), (1.5, 1.0, 0.0)),   # deceleration: a braking run
+schedule=((0.15, 0.0, 1.0), (0.1, 1.0, 1.0), (0.15, 1.0, 0.0)), # touchdown: a defined thump
+```
+
+Two traps specific to these: an effect that skips frames whose input has not changed will
+freeze its running average on a perfectly steady plateau (deceleration does; the spec
+wobbles the stimulus 2%), and an effect fed through a high-pass filter needs motion, not a
+level (runway rumble takes a `Jitter` on wheel compression).
 
 ## 5. Register it
 

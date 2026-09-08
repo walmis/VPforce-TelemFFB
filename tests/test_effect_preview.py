@@ -32,7 +32,8 @@ from telemffb.preview import (
     SPOILER_BUFFET, FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
     TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
     GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
-    IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits,
+    IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits, Jitter,
+    TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, REFERENCE_SPRING,
     ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, PREVIEWS_BY_ROW, preview_for_row,
     FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
@@ -1143,10 +1144,10 @@ class TestPreviewRows:
         missing = [r for r in PREVIEWS_BY_ROW if r not in setting_names]
         assert not missing
 
-    def test_rows_are_intensities_not_toggles_or_thresholds(self):
+    def test_rows_are_strengths_not_toggles_or_thresholds(self):
         toggles = {spec.effect_id for spec in PREVIEW_SPECS.values()}
         assert not (set(PREVIEWS_BY_ROW) & toggles)
-        assert all('intensity' in r for r in PREVIEWS_BY_ROW)
+        assert all('intensity' in r or 'force' in r for r in PREVIEWS_BY_ROW)
 
     def test_lookup(self):
         assert preview_for_row('engine_rumble_lowrpm_intensity') is PROP_ENGINE_RUMBLE
@@ -1362,6 +1363,153 @@ class TestDamageEdgePreview(EdgePreviewCase):
     def test_msfs_is_not_offered(self):
         with pytest.raises(ValueError):
             PreviewRunner(aircrafts_msfs_xp.Aircraft('preview'), DAMAGE, 'MSFS')
+
+
+class TestJitter:
+    def test_walks_within_bounds_and_changes(self):
+        import random
+        j = Jitter(center=0.5, amplitude=0.4, size=3, rng=random.Random(1))
+        ac = SimpleNamespace()
+        seen = [j(ac, i / 50) for i in range(50)]
+        assert all(len(v) == 3 for v in seen)
+        assert all(0.1 - 1e-9 <= x <= 0.9 + 1e-9 for v in seen for x in v)
+        assert any(a != b for a, b in zip(seen, seen[1:]))
+        assert seen[0] != seen[-1]
+
+    def test_scalar_form_and_per_aircraft_state(self):
+        j = Jitter(center=0.5, amplitude=0.5)
+        a, b = SimpleNamespace(), SimpleNamespace()
+        va = [j(a, 0) for _ in range(5)]
+        vb = [j(b, 0) for _ in range(5)]
+        assert all(isinstance(x, float) for x in va)
+        assert va != vb
+
+
+class TestConstantForceGuard(BaseTelemetryEffectTestCase):
+    def test_reference_spring_up_for_the_run_and_freed_after(self):
+        ac = FakeAircraft(self.mock_effects)
+        spec = PreviewSpec(effect_id='x_enabled', method='record', kind='hold',
+                           fields={'*': {}}, duration=0.3, tail=0.0, constant_force=True)
+        runner = PreviewRunner(ac, spec, 'DCS', frame_rate=10.0)
+        assert 'preview_spring' not in self.mock_effects        # nothing until the run starts
+        runner.step()
+        spring = self.mock_effects['preview_spring']
+        assert spring.started
+        assert spring.get_coefficients() == (REFERENCE_SPRING, REFERENCE_SPRING)
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+
+    def test_no_spring_for_a_periodic_preview(self):
+        ac = FakeAircraft(self.mock_effects)
+        spec = PreviewSpec(effect_id='x_enabled', method='record', kind='hold',
+                           fields={'*': {}}, duration=0.3, tail=0.0)
+        PreviewRunner(ac, spec, 'DCS', frame_rate=10.0).step()
+        assert 'preview_spring' not in self.mock_effects
+
+    def test_the_three_constant_force_specs_are_flagged(self):
+        flagged = {s.name for s in PREVIEW_SPECS.values() if s.constant_force}
+        assert flagged == {'touchdown_effect_enabled', 'deceleration_effect_enable',
+                           'runway_rumble_enabled'}
+
+
+class TestTouchdownPreview(BaseTelemetryEffectTestCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_a_bump_up_to_max_force_and_back(self, cls, sim):
+        ac = cls('preview')
+        ac.touchdown_effect_enabled = False
+        ac.touchdown_effect_max_force = 0.5
+        ac.touchdown_effect_max_gs = 3.0
+        runner = PreviewRunner(ac, TOUCHDOWN, sim, frame_rate=20.0)   # 8 frames + 6 tail
+        mags = []
+        for _ in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('touchdown')
+            mags.append(fx._magnitude if fx is not None else 0.0)
+        assert max(mags) == pytest.approx(0.5)                        # max G -> max force, at the peak hold
+        assert mags[0] < max(mags) and mags[-1] < max(mags)          # up and back down
+        assert self.mock_effects['touchdown']._direction == 180
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+
+    def test_pedals_are_silent(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.touchdown_effect_max_force = 0.5
+        runner = PreviewRunner(ac, TOUCHDOWN, 'DCS', device_type='pedals', frame_rate=20.0)
+        for _ in range(3):
+            runner.step()
+        assert 'touchdown' not in self.mock_effects
+
+
+class TestDecelerationPreview(BaseTelemetryEffectTestCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+        (aircrafts_il2.Aircraft, 'IL2'),
+    ])
+    def test_a_braking_run_builds_to_max_force(self, cls, sim):
+        ac = cls('preview')
+        ac.deceleration_effect_enable = False
+        ac.deceleration_max_force = 0.5
+        ac.decel_scale_factor = 1
+        ac.decel_airborne_disable = True
+        runner = PreviewRunner(ac, DECELERATION, sim, frame_rate=10.0)   # 40 frames + 3 tail
+        mags = []
+        for _ in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('decel')
+            mags.append(fx._magnitude if fx is not None and fx.started else 0.0)
+        # end of the hold (frame 24, t = 2.4 s): the 8-frame average has caught
+        # up (the stimulus wobbles 2% so the effect keeps processing frames)
+        assert mags[24] == pytest.approx(0.5, abs=0.03)
+        assert mags[5] < mags[24]                                     # building
+        assert mags[-1] < mags[24]                                    # releasing
+        assert self.mock_effects['decel']._direction == 180
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+
+
+class TestRunwayRumblePreview(BaseTelemetryEffectTestCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_jittering_wheels_come_through_the_high_pass(self, cls, sim):
+        import telemffb.utils as utils
+        ac = cls('preview')
+        ac.runway_rumble_enabled = False
+        ac.runway_rumble_intensity = 1.0
+        runner = PreviewRunner(ac, RUNWAY_RUMBLE, sim, frame_rate=10.0)
+        peak = 0.0
+        for _ in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('runway0')
+            if fx is not None and fx.started:
+                peak = max(peak, abs(fx._magnitude))
+                assert fx._direction is utils.RandomDirectionModulator
+        assert 0.0 < peak <= 0.5                                       # clamped by the effect
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+
+    def test_bms_takes_bump_telemetry(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.runway_rumble_intensity = 1.0
+        runner = PreviewRunner(ac, RUNWAY_RUMBLE, 'BMS', frame_rate=10.0)
+        for _ in range(3):
+            runner.step()
+        bump = self.mock_effects['runway_bump1']
+        assert bump.started and bump._periodic[0] == 15
+        assert 'runway0' not in self.mock_effects
+
+    def test_il2_is_not_offered(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_il2.Aircraft('preview'), RUNWAY_RUMBLE, 'IL2')
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):

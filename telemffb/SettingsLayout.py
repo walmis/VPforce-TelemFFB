@@ -796,8 +796,12 @@ class SettingsLayout(QGridLayout):
             running = getattr(mw, 'effect_preview_running', lambda s: False)(spec)
             if running:
                 button.setText("\u25a0")
-            button.setToolTip(f"Preview this effect on the device ({spec.duration:g} s). "
-                              "Click again to stop.")
+            tip = (f"Preview this effect on the device ({spec.duration:g} s) at the maximum "
+                   "your settings allow; in flight the telemetry scales it, usually lower. "
+                   "Click again to stop.")
+            if spec.constant_force:
+                tip += "\nConstant force: keep a firm hold on the controls."
+            button.setToolTip(tip)
             button.clicked.connect(
                 lambda checked=False, s=spec, b=button: mw.toggle_effect_preview(s, b))
         sl_layout.addWidget(button)

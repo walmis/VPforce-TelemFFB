@@ -42,8 +42,18 @@ say "the RPM where this profile's rumble peaks" rather than a number,
 and the preview tracks the user's tuning.
 
 What is deliberately NOT previewable: the spring family (the curve is the
-feature), anything closed-loop with the sim (trim following), and the
-force-trim button state machines.  Those are status-view territory.
+feature), anything closed-loop with the sim (trim following), the
+force-trim button state machines, and G-force (its magnitude depends on
+the deflection the pilot holds under load).  Those are status-view
+territory.
+
+Constant-force effects that are bench-judgeable (touchdown, deceleration,
+runway rumble) ARE previewed, with two guards: the spec is marked
+``constant_force``, which makes the UI confirm with the user that they
+have hold of the controls before the run (a constant force on an
+unattended axis can slam it to the stops), and the runner puts up a very
+weak reference spring for the run - not to counter the force, only to
+avoid the odd freewheel feel some DirectInput devices have at 0% spring.
 
 Safety: the preview aircraft carries its OWN effect dispenser (see
 ``build_aircraft``), so its construction and cleanup never touch a live
@@ -68,6 +78,11 @@ from telemffb.util.conversions import kt2ms
 SIMS = ("DCS", "MSFS", "XPLANE", "IL2", "BMS")
 KINDS = ("hold", "ramp", "edge")
 FRAME_RATE_HZ = 30.0
+# The spring a constant-force preview plays against: deliberately weak.
+# Not a stand-in for the aircraft's spring (the user tunes these forces
+# against no spring, by preference); just enough to take the freewheel
+# feel off DirectInput devices that behave oddly at 0%.
+REFERENCE_SPRING = 0.05
 
 # A field value in a spec is one of:
 #   - a constant (number, list, str) used as-is
@@ -150,6 +165,9 @@ class PreviewSpec:
     # and mode switches that would route it to a path a preview cannot
     # feed (IL-2's dynamic gunfire needs real gun telemetry).
     force_attrs: Dict[str, Any] = None
+    # A constant-force effect: the UI asks the user to take hold of the
+    # controls before the run, and the runner adds the reference spring.
+    constant_force: bool = False
     sims: Tuple[str, ...] = SIMS
 
     def __post_init__(self):
@@ -308,8 +326,10 @@ class PreviewRunner:
         """Play one frame.  Returns True while more frames remain."""
         if self.finished:
             return False
-        frame = self.build_frame(self.progress)
         ac = self.aircraft
+        if self.frame_index == 0 and self.spec.constant_force:
+            ac.effects['preview_spring'].spring(REFERENCE_SPRING, REFERENCE_SPRING).start()
+        frame = self.build_frame(self.progress)
         ac._last_telem_data = ac._telem_data.copy()
         ac._telem_data = frame
         try:
@@ -756,6 +776,42 @@ class RandomHits:
 _DAMAGE_HITS = RandomHits()
 
 
+class Jitter:
+    """A value (or list of values) that random-walks around ``center``
+    within ``amplitude``, redrawn per run.
+
+    For effects fed through a high-pass filter (runway rumble reads wheel
+    compression through one), a steady value is silence: only motion
+    gets through.  The walk lives on the throwaway aircraft, like
+    ``RandomHits``, so each press differs.
+    """
+
+    def __init__(self, center=0.5, amplitude=0.4, size=None, step=0.5,
+                 rng: Optional[random.Random] = None):
+        self.center = center
+        self.amplitude = amplitude
+        self.size = size
+        self.step = step
+        self.rng = rng
+
+    def _state(self, aircraft):
+        store = aircraft.__dict__.setdefault('_preview_jitter', {})
+        if id(self) not in store:
+            n = self.size or 1
+            store[id(self)] = {'rng': self.rng or random.Random(),
+                               'values': [self.center] * n}
+        return store[id(self)]
+
+    def __call__(self, aircraft, progress):
+        st = self._state(aircraft)
+        rng, values = st['rng'], st['values']
+        lo, hi = self.center - self.amplitude, self.center + self.amplitude
+        for i, v in enumerate(values):
+            v += rng.uniform(-self.step, self.step) * self.amplitude
+            values[i] = min(hi, max(lo, v))
+        return list(values) if self.size else values[0]
+
+
 GUNFIRE = PreviewSpec(
     effect_id='gunfire_effect_enabled',
     rows=('gun_vibration_intensity',),
@@ -852,6 +908,76 @@ IL2_ROCKET_RELEASE = PreviewSpec(
     sims=('IL2',),
 )
 
+# ---------------------------------------------------------------------------
+# Constant-force effects.  Ramped, never stepped, so the force builds and
+# releases instead of slamming; the UI confirms the user has hold of the
+# controls first.
+# ---------------------------------------------------------------------------
+
+TOUCHDOWN = PreviewSpec(
+    effect_id='touchdown_effect_enabled',
+    rows=('touchdown_effect_max_force',),
+    method='ac_update_touchdown_effect',
+    kind='ramp',
+    # a 0.3 s bump of vertical G up to the profile's max G (= max force)
+    # and back, on the ground.  DCS-family G carries the 1 g bias.
+    fields={'*': {'SimOnGround': 1},
+            'DCS': {'ACCs': lambda ac, p: [0.0, 1.0 + ac.touchdown_effect_max_gs * p, 0.0]},
+            'BMS': {'ACCs': lambda ac, p: [0.0, 1.0 + ac.touchdown_effect_max_gs * p, 0.0]},
+            'MSFS': {'AccBody': lambda ac, p: [0.0, ac.touchdown_effect_max_gs * p, 0.0]},
+            'XPLANE': {'AccBody': lambda ac, p: [0.0, ac.touchdown_effect_max_gs * p, 0.0]}},
+    schedule=((0.15, 0.0, 1.0), (0.1, 1.0, 1.0), (0.15, 1.0, 0.0)),   # a defined thump at the peak
+    tail=0.3,
+    constant_force=True,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+# The decel effect skips any frame whose G has not changed, and its
+# 8-frame average only advances on frames it processes - so a perfectly
+# steady plateau freezes the push short of full.  Real telemetry never
+# sits still; neither does this: a 2% wobble on the stimulus.
+_DECEL_WOBBLE = Jitter(center=1.0, amplitude=0.02)
+
+
+def _decel_g(ac, p):
+    return ac.deceleration_max_force * p * _DECEL_WOBBLE(ac, p)
+
+
+DECELERATION = PreviewSpec(
+    effect_id='deceleration_effect_enable',
+    rows=('deceleration_max_force',),
+    method='ac_update_decel_effect',
+    kind='ramp',
+    # a braking run on the ground: longitudinal G builds to the profile's
+    # max over 1.5 s, holds a second, releases over 1.5 s.  The effect
+    # smooths over 8 frames, so the push lags the stimulus slightly.
+    fields={'*': {'WeightOnWheels': [1.0, 1.0, 1.0], 'TAS': 30.0, 'speedbrakes_value': 0.0},
+            'DCS': {'ACCs': lambda ac, p: [-_decel_g(ac, p), 0.0, 0.0]},
+            'BMS': {'ACCs': lambda ac, p: [-_decel_g(ac, p), 0.0, 0.0]},
+            'IL2': {'ACCs': lambda ac, p: [-_decel_g(ac, p), 0.0, 0.0]},
+            'MSFS': {'AccBody': lambda ac, p: [0.0, 0.0, -_decel_g(ac, p)]},
+            'XPLANE': {'Gaxil': lambda ac, p: _decel_g(ac, p)}},
+    schedule=((1.5, 0.0, 1.0), (1.0, 1.0, 1.0), (1.5, 1.0, 0.0)),
+    tail=0.3,
+    constant_force=True,
+)
+
+RUNWAY_RUMBLE = PreviewSpec(
+    effect_id='runway_rumble_enabled',
+    rows=('runway_rumble_intensity',),
+    method='ac_update_runway_rumble',
+    kind='hold',
+    # wheel compression jittering around half travel: the effect
+    # high-passes it, so only the motion comes through, as random-
+    # direction bumps.  BMS has no compression and takes bump telemetry.
+    fields={'*': {'WeightOnWheels': Jitter(center=0.5, amplitude=0.4, size=3)},
+            'BMS': {'BumpIntensity': Jitter(center=0.5, amplitude=0.5)}},
+    duration=4.0,
+    constant_force=True,
+    # IL-2 overrides the method with its own native-telemetry rumble
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
     spec.name: spec for spec in (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
@@ -860,9 +986,10 @@ PREVIEW_SPECS: Dict[str, PreviewSpec] = {
         FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
         TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
         GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
-        IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE)
+        IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE,
+        TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE)
 }
-assert len(PREVIEW_SPECS) == 25, "a spec name collided"
+assert len(PREVIEW_SPECS) == 28, "a spec name collided"
 
 # settings row -> the one preview whose button it hosts
 PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}
