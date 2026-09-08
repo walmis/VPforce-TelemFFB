@@ -732,6 +732,19 @@ class MainWindow(QMainWindow):
 
         self.tab_widget = QTabWidget(self)
 
+        # Offline editing for the aircraft that is loaded right now.  The
+        # other two entry points (Profiles menu, the empty-settings notice)
+        # open the editor with nothing selected; this one lands on the
+        # live aircraft's sim / class / model / profile, which is what you
+        # want when you have just been flying it and want to tune or
+        # preview its effects.  Lives in the tab bar's spare corner, shown
+        # only while an aircraft is loaded and the editor is not open.
+        self.offline_editor_button = QPushButton('Offline/Preview Mode')
+        self.offline_editor_button.setObjectName('offline_editor_button')
+        self.offline_editor_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.offline_editor_button.setVisible(False)
+        self.offline_editor_button.clicked.connect(self.enter_offline_for_live_aircraft)
+        self.tab_widget.setCornerWidget(self.offline_editor_button, Qt.Corner.TopRightCorner)
 
         """ Add the tab widget to the main layout """
 
@@ -2072,9 +2085,11 @@ class MainWindow(QMainWindow):
             # same context still refreshes)
             self._profile_notes_shown = None
             self.refresh_profile_notes_button()
+            self.refresh_offline_editor_button()
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
+            self.refresh_offline_editor_button()      # hidden while the editor is open
             self.status_container.set_offline("None")
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
@@ -2114,7 +2129,7 @@ class MainWindow(QMainWindow):
             G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
     @pyqtSlot(str, str, str, str)
-    def load_single_offline_model(self, sim, cls, model, profile):
+    def load_single_offline_model(self, sim, cls, model, profile, from_profile_manager=True):
 
         self.toggle_offline_mode(True)
         for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
@@ -2148,11 +2163,16 @@ class MainWindow(QMainWindow):
         for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
             cb.blockSignals(False)
 
-        G.settings_mgr.offline_scope = 'MODEL'
+        if model:
+            G.settings_mgr.offline_scope = 'MODEL'
+        else:
+            # an aircraft with class-level settings only: edit those
+            G.settings_mgr.offline_scope = 'CLASS'
+            self.offline_scope_label.setText(f"Editing Class Defaults ({cls})")
 
         self.force_sim_aircraft()
         if G.master_instance:
-            self.back_to_profile_mgr_button.setVisible(True)
+            self.back_to_profile_mgr_button.setVisible(from_profile_manager)
             args = [sim, cls, model, profile]
             G.ipc_instance.send_broadcast_message(f"SHOW_OFFLINE_MODEL:{json.dumps(args)} ")
             self.resize_offline_combos()
@@ -2507,6 +2527,58 @@ class MainWindow(QMainWindow):
         self.populate_profile_combo(None) # populate combo with any new profiles
         self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         self.settings_layout.reload_caller()
+        self.refresh_offline_editor_button()
+
+    # ---- "Enter Offline Editor" for the live aircraft -----------------------
+
+    @staticmethod
+    def live_offline_target(settings_mgr, available_profiles=()):
+        """What the offline editor should open on for the loaded aircraft:
+        ``(sim, cls, model, profile)`` or ``None`` when nothing is loaded.
+
+        ``model`` is the matched pattern (what the editor's model list
+        holds), empty when the aircraft only has class-level settings - the
+        editor then opens at CLASS scope.  ``profile`` is the active one,
+        else the first available, else empty."""
+        sim = getattr(settings_mgr, 'current_sim', None)
+        if not sim or sim == 'nothing':
+            return None
+        cls = getattr(settings_mgr, 'current_class', '') or ''
+        model = getattr(settings_mgr, 'current_pattern', '') or ''
+        profile = getattr(settings_mgr, 'active_profile', None) or ''
+        if not profile and model:
+            profile = next((p for p in available_profiles if p != 'Built-In'), '')
+        return sim, cls, model, profile
+
+    def refresh_offline_editor_button(self):
+        """Show the corner button only while an aircraft is loaded and the
+        offline editor is not open; its tooltip names where it will land."""
+        btn = getattr(self, 'offline_editor_button', None)
+        if btn is None:
+            return
+        manager = getattr(G, 'telem_manager', None)
+        loaded = manager is not None and getattr(manager, 'currentAircraft', None) is not None
+        target = self.live_offline_target(G.settings_mgr) if loaded else None
+        if target is None or G.settings_mgr.offline_mode:
+            btn.setVisible(False)
+            return
+        sim, cls, model, profile = target
+        where = f"{sim} / {cls or '-'} / {model or '(class defaults)'}"
+        if profile:
+            where += f" / {profile}"
+        btn.setToolTip(f"Edit and preview effects for the loaded aircraft:\n{where}\n"
+                       "Telemetry pauses while you work; play buttons appear on the sliders.")
+        btn.setVisible(True)
+
+    def enter_offline_for_live_aircraft(self):
+        target = self.live_offline_target(G.settings_mgr)
+        if target is None:
+            return
+        sim, cls, model, profile = target
+        if not profile and model:
+            profiles = xmlutils.get_available_profiles(sim, cls, model)
+            profile = next((p for p in profiles if p != 'Built-In'), '')
+        self.load_single_offline_model(sim, cls, model, profile, from_profile_manager=False)
 
     def open_url(self, url):
 
@@ -2787,6 +2859,7 @@ class MainWindow(QMainWindow):
         self._profile_notes_shown = None
         self.settings_layout.clear_layout()
         self.telemetry_timed_out = False
+        self.refresh_offline_editor_button()      # nothing loaded to edit any more
 
     def on_update_telemetry(self, datadict: dict):
         if utils.millis() - self.last_telemetry_refresh < 50:
