@@ -26,7 +26,8 @@ from telemffb.sim import aircrafts_dcs, aircrafts_msfs_xp, aircrafts_il2
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.preview import (
     PreviewSpec, PreviewRunner, TimedPreview, preview_blockers, resolve_preview_target,
-    JET_ENGINE_RUMBLE, GEAR_MOTION, PROP_ENGINE_RUMBLE, PREVIEW_SPECS, FRAME_RATE_HZ)
+    JET_ENGINE_RUMBLE, JET_IDLE_PCT, GEAR_MOTION, PROP_ENGINE_RUMBLE, PREVIEW_SPECS,
+    FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
 from tests.framework.base import BaseTelemetryEffectTestCase
 
@@ -68,7 +69,9 @@ class TestBuildAircraft(BaseTelemetryEffectTestCase):
                                    instance_device='', active_profile=None):
             seen.update(sim=the_sim, name=aircraft_name,
                         modeltype=input_modeltype, device=instance_device)
-            return cls_name, '.*', list(settings)
+            # like the real resolver: a pre-known class stands unless the
+            # model names its own
+            return (cls_name or input_modeltype), '.*', list(settings)
 
         monkeypatch.setattr(xmlutils, 'read_single_model', fake_read_single_model)
         monkeypatch.setattr(xmlutils, 'get_active_profile_for_model',
@@ -98,6 +101,20 @@ class TestBuildAircraft(BaseTelemetryEffectTestCase):
         self._stub_model(monkeypatch, '', [])
         ac = tm.build_aircraft('MSFS', 'Some Addon')
         assert type(ac) is aircrafts_msfs_xp.Aircraft
+
+    def test_class_scope_builds_that_class_from_the_class_cascade(self, monkeypatch):
+        """No model, a known class: the resolver is told the class so the
+        class-level settings apply, and the instance is of that class."""
+        seen = self._stub_model(monkeypatch, '', [('jet_engine_rumble_intensity', '0.4', '')])
+        ac = tm.build_aircraft('DCS', 'Preview', cls_name='JetAircraft')
+        assert seen['modeltype'] == 'JetAircraft'
+        assert isinstance(ac, aircrafts_dcs.JetAircraft)
+        assert ac.jet_engine_rumble_intensity == pytest.approx(0.4)
+
+    def test_a_model_that_names_its_class_overrides_the_given_one(self, monkeypatch):
+        self._stub_model(monkeypatch, 'Helicopter', [])
+        ac = tm.build_aircraft('DCS', 'UH-1H', cls_name='JetAircraft')
+        assert isinstance(ac, aircrafts_dcs.Helicopter)
 
     def test_explicit_device_type_reaches_the_resolver(self, monkeypatch):
         seen = self._stub_model(monkeypatch, 'Aircraft', [])
@@ -357,20 +374,29 @@ class TestPreviewRunnerMechanics(BaseTelemetryEffectTestCase):
 
 
 class TestResolvePreviewTarget:
-    def test_settings_tab_selection_wins(self):
-        mgr = SimpleNamespace(current_sim='MSFS', current_aircraft_name='C172')
-        assert resolve_preview_target(mgr) == ('MSFS', 'C172')
+    def test_settings_tab_model_selection_wins(self):
+        mgr = SimpleNamespace(current_sim='MSFS', current_aircraft_name='C172',
+                              current_class='PropellerAircraft')
+        assert resolve_preview_target(mgr) == ('MSFS', 'C172', 'PropellerAircraft')
+
+    def test_class_scope_carries_the_class_with_no_model(self):
+        """Offline editor at CLASS scope: the user is tuning class
+        defaults, so the preview must resolve the class-level cascade."""
+        mgr = SimpleNamespace(current_sim='DCS', current_aircraft_name='',
+                              current_class='JetAircraft')
+        assert resolve_preview_target(mgr) == ('DCS', 'Preview', 'JetAircraft')
 
     def test_no_selection_falls_back_to_a_generic_dcs_aircraft(self):
-        mgr = SimpleNamespace(current_sim='nothing', current_aircraft_name='')
-        assert resolve_preview_target(mgr) == ('DCS', 'Preview')
+        mgr = SimpleNamespace(current_sim='nothing', current_aircraft_name='',
+                              current_class='')
+        assert resolve_preview_target(mgr) == ('DCS', 'Preview', '')
 
-    def test_sim_without_a_model_gets_the_default_model(self):
-        mgr = SimpleNamespace(current_sim='IL2', current_aircraft_name='')
-        assert resolve_preview_target(mgr) == ('IL2', 'Preview')
+    def test_sim_scope_has_no_class(self):
+        mgr = SimpleNamespace(current_sim='IL2', current_aircraft_name='', current_class='')
+        assert resolve_preview_target(mgr) == ('IL2', 'Preview', '')
 
     def test_survives_a_missing_manager(self):
-        assert resolve_preview_target(None) == ('DCS', 'Preview')
+        assert resolve_preview_target(None) == ('DCS', 'Preview', '')
 
 
 @pytest.fixture
@@ -446,8 +472,8 @@ class TestPreviewBlockers:
 # ---------------------------------------------------------------------------
 
 class TestJetEngineRumblePreview(BaseTelemetryEffectTestCase):
-    """'hold': one frame at 100% RPM plays the rumble at the configured
-    intensity, on every sim, reading the sim's own RPM field."""
+    """Sweep from idle to 100% with dwells: intensity scales with RPM and
+    the frequency climbs, on every sim, reading the sim's own RPM field."""
 
     def _aircraft(self, cls):
         ac = cls('preview')
@@ -456,24 +482,35 @@ class TestJetEngineRumblePreview(BaseTelemetryEffectTestCase):
         ac.engine_jet_rumble_enabled = False   # the preview must force it on
         return ac
 
-    @pytest.mark.parametrize("cls, sim", [
-        (aircrafts_dcs.Aircraft, 'DCS'),
-        (aircrafts_dcs.Aircraft, 'BMS'),
-        (aircrafts_msfs_xp.Aircraft, 'MSFS'),
-        (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
-        (aircrafts_il2.Aircraft, 'IL2'),
+    @pytest.mark.parametrize("cls, sim, field", [
+        (aircrafts_dcs.Aircraft, 'DCS', 'EngRPM'),
+        (aircrafts_dcs.Aircraft, 'BMS', 'EngRPM'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS', 'EngRPM'),
+        (aircrafts_msfs_xp.Aircraft, 'XPLANE', 'EngPCT'),
+        (aircrafts_il2.Aircraft, 'IL2', 'EngRPM'),
     ])
-    def test_plays_at_full_configured_intensity(self, cls, sim):
+    def test_sweeps_idle_to_full_power(self, cls, sim, field):
         ac = self._aircraft(cls)
-        runner = PreviewRunner(ac, JET_ENGINE_RUMBLE, sim)
+        runner = PreviewRunner(ac, JET_ENGINE_RUMBLE, sim, frame_rate=10.0)   # 140 frames
         runner.step()
         main = self.mock_effects['je_rumble_1_1']
         cross = self.mock_effects['je_rumble_2_1']
+        assert ac._telem_data[field] == JET_IDLE_PCT
         assert main.started and cross.started
-        assert main._periodic[1] == pytest.approx(0.3)       # intensity * 100/100
+        assert main._periodic[1] == pytest.approx(0.3 * JET_IDLE_PCT / 100)
         assert main._periodic[2] == 0 and cross._periodic[2] == 90
-        # 100% RPM sits the frequency at base + 10 (plus a slow modulation term)
+        # idle sits the frequency at base + 10 * 0.6 (plus a slow modulation term)
+        assert main._periodic[0] == pytest.approx(45 + 6, abs=3.5)
+        rpm_seen = [ac._telem_data[field]]
+        for _ in range(runner.frames_total - 2):       # up to the last audible frame
+            runner.step()
+            rpm_seen.append(ac._telem_data[field])
+        assert rpm_seen[:40] == [JET_IDLE_PCT] * 40                 # idle dwell
+        assert rpm_seen[100:] == [pytest.approx(100)] * 39          # full-power dwell
+        assert main._periodic[1] == pytest.approx(0.3)              # intensity * 100/100
         assert main._periodic[0] == pytest.approx(55, abs=3.5)
+        assert runner.step() is False
+        assert not self.mock_effects.dict
 
     def test_disabled_toggle_is_honoured_when_not_forced(self):
         ac = self._aircraft(aircrafts_dcs.Aircraft)

@@ -1400,15 +1400,15 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Effect Preview",
                                     "Cannot preview now:\n- " + "\n- ".join(blockers))
             return
-        sim, model = resolve_preview_target(G.settings_mgr)
+        sim, model, cls = resolve_preview_target(G.settings_mgr)
         try:
-            aircraft = build_aircraft(sim, model)
+            aircraft = build_aircraft(sim, model, cls_name=cls)
             runner = PreviewRunner(aircraft, spec, sim)
         except Exception as e:
             logging.exception(f"Effect preview {spec.effect_id} could not start")
             QMessageBox.warning(self, "Effect Preview", f"Could not start preview:\n{e}")
             return
-        logging.info(f"Effect preview: {spec.effect_id} on {sim} / {model} "
+        logging.info(f"Effect preview: {spec.effect_id} on {sim} / {cls or '-'} / {model} "
                      f"({type(aircraft).__name__}), {runner.steps_total} frames "
                      f"at {runner.frame_rate:g} Hz")
         self._effect_preview = TimedPreview(
