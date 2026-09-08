@@ -1379,6 +1379,49 @@ class MainWindow(QMainWindow):
         count = G.exception_tracker.get_count()
         self.exception_status_widget.set_count(count)
 
+    def start_effect_preview(self, spec):
+        """Debug menu: play one effect on the device with synthetic telemetry.
+
+        Builds a throwaway aircraft for the settings tab's current model
+        (sim defaults when nothing is selected) and drives the spec's
+        effect method from a timer.  Refused while a sim session is live,
+        since the preview would fight the loaded aircraft for the same
+        effect slots.
+        """
+        from telemffb.preview import (PreviewRunner, TimedPreview,
+                                      preview_blockers, resolve_preview_target)
+        from telemffb.telem.TelemManager import build_aircraft
+        self.stop_effect_preview()
+        manager = getattr(G, 'telem_manager', None)
+        blockers = preview_blockers(
+            current_aircraft=manager.currentAircraft if manager else None,
+            device_alive=HapticEffect.device_alive())
+        if blockers:
+            QMessageBox.information(self, "Effect Preview",
+                                    "Cannot preview now:\n- " + "\n- ".join(blockers))
+            return
+        sim, model = resolve_preview_target(G.settings_mgr)
+        try:
+            aircraft = build_aircraft(sim, model)
+            runner = PreviewRunner(aircraft, spec, sim)
+        except Exception as e:
+            logging.exception(f"Effect preview {spec.effect_id} could not start")
+            QMessageBox.warning(self, "Effect Preview", f"Could not start preview:\n{e}")
+            return
+        logging.info(f"Effect preview: {spec.effect_id} on {sim} / {model} "
+                     f"({type(aircraft).__name__}), {runner.steps_total} frames "
+                     f"at {runner.frame_rate:g} Hz")
+        self._effect_preview = TimedPreview(
+            runner, on_finished=lambda: logging.info(
+                f"Effect preview finished: {spec.effect_id}"))
+        self._effect_preview.start()
+
+    def stop_effect_preview(self):
+        preview = getattr(self, '_effect_preview', None)
+        if preview is not None and preview.running:
+            preview.stop()
+        self._effect_preview = None
+
     def add_debug_menu(self):
         # debug mode
         for action in self.menu.actions():
@@ -1430,6 +1473,20 @@ class MainWindow(QMainWindow):
         show_settingname_action.triggered.connect(do_toggle_settingsnames)
         show_settingname_action.setCheckable(True)
         debug_menu.addAction(show_settingname_action)
+
+        # Effect preview (hardware check for the preview runner): one
+        # entry per shipped spec, played on the device with synthetic
+        # telemetry and the settings tab's current model.
+        from telemffb.preview import PREVIEW_SPECS
+        preview_menu = debug_menu.addMenu("Preview Effect")
+        for effect_id, spec in PREVIEW_SPECS.items():
+            preview_action = QAction(f"{effect_id}  ({spec.kind}, {spec.duration:g}s)", self)
+            preview_action.triggered.connect(
+                lambda checked=False, s=spec: self.start_effect_preview(s))
+            preview_menu.addAction(preview_action)
+        stop_preview_action = QAction("Stop preview", self)
+        stop_preview_action.triggered.connect(self.stop_effect_preview)
+        preview_menu.addAction(stop_preview_action)
 
         configurator_settings_action = QAction('Configurator Gain Override', self)
         def do_open_configurator_dialog():
