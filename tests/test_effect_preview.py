@@ -34,7 +34,7 @@ from telemffb.preview import (
     GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
     IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits, Jitter,
     TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, REFERENCE_SPRING, Gusts, TURBULENCE, WIND,
-    ROTOR_RUMBLE, VRS, BLADE_SLAP,
+    ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP,
     ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, PREVIEWS_BY_ROW, preview_for_row,
     FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
@@ -374,6 +374,17 @@ class TestPreviewRunnerMechanics(BaseTelemetryEffectTestCase):
         ac, runner = self._runner(dict(kwargs={'blade_ct': 3}))
         runner.step()
         assert ac.kwargs_seen == {'blade_ct': 3}
+
+    def test_a_recipe_callable_gets_the_aircraft_and_the_frame(self):
+        seen = []
+        recipe = lambda ac, frame, **kw: seen.append((ac, frame['v'], kw))
+        ac, runner = self._runner(dict(method=recipe, kwargs={'k': 1}, fields={'*': {'v': 5}}))
+        runner.step()
+        assert seen == [(ac, 5, {'k': 1})]
+
+    def test_no_toggle_means_nothing_is_forced(self):
+        ac, _ = self._runner(dict(effect_id=None, name='x'))
+        assert ac.x_enabled is False
 
     def test_frame_carries_sim_device_and_name(self):
         ac, runner = self._runner(device_type='pedals')
@@ -1154,9 +1165,16 @@ class TestPreviewRows:
         assert not missing
 
     def test_rows_are_strengths_not_toggles_or_thresholds(self):
-        toggles = {spec.effect_id for spec in PREVIEW_SPECS.values()}
+        toggles = {spec.effect_id for spec in PREVIEW_SPECS.values() if spec.effect_id}
         assert not (set(PREVIEWS_BY_ROW) & toggles)
-        assert all('intensity' in r or 'force' in r for r in PREVIEWS_BY_ROW)
+        assert all(any(k in r for k in ('intensity', 'force', 'moment')) for r in PREVIEWS_BY_ROW)
+
+    def test_a_spec_without_a_toggle_needs_a_name(self):
+        with pytest.raises(ValueError):
+            PreviewSpec(effect_id=None, method='m', kind='hold', fields={'*': {}})
+        spec = PreviewSpec(effect_id=None, name='x', method='m', kind='hold', fields={'*': {}})
+        assert spec.name == 'x'
+        assert MSFS_ELEVATOR_DROOP.effect_id is None and MSFS_ELEVATOR_DROOP.name == 'elevator_droop_moment'
 
     def test_lookup(self):
         assert preview_for_row('engine_rumble_lowrpm_intensity') is PROP_ENGINE_RUMBLE
@@ -1420,7 +1438,8 @@ class TestConstantForceGuard(BaseTelemetryEffectTestCase):
         flagged = {s.name for s in PREVIEW_SPECS.values() if s.constant_force}
         assert flagged == {'touchdown_effect_enabled', 'deceleration_effect_enable',
                            'runway_rumble_enabled', 'turbulence_effect_enable',
-                           'wind_effect_enabled'}
+                           'wind_effect_enabled', 'elevator_droop_enabled',
+                           'elevator_droop_moment'}
 
 
 class TestGusts:
@@ -1754,6 +1773,68 @@ class TestBladeSlapPreview(HoldPreviewCase):
         runner = self._run_hold(ac, BLADE_SLAP, 'DCS')
         assert self.mock_effects['blade_slap_y']._periodic[1] == pytest.approx(0.3 * 0.6, abs=0.01)
         self._finish(runner)
+
+
+class TestElevatorDroopPreviews(BaseTelemetryEffectTestCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_il2.Aircraft, 'IL2'),
+    ])
+    def test_dcs_family_rollout_builds_to_the_full_force_and_holds(self, cls, sim):
+        ac = cls('preview')
+        ac.elevator_droop_enabled = False
+        ac.elevator_droop_force = 0.4
+        runner = PreviewRunner(ac, ELEVATOR_DROOP, sim, frame_rate=10.0)   # 50 frames
+        mags = []
+        for _ in range(runner.frames_total - 1):
+            runner.step()
+            fx = self.mock_effects.get('elev_droop')
+            mags.append(fx._magnitude if fx is not None and fx.started else 0.0)
+        assert ac._telem_data['TAS'] == pytest.approx(0.0)              # at rest
+        assert mags[0] == pytest.approx(0.0, abs=0.02)                  # nothing at 20 kt
+        assert all(a <= b + 1e-9 for a, b in zip(mags[:20], mags[1:21]))   # building on the rollout
+        assert mags[-1] == pytest.approx(0.4)                           # full at rest
+        assert mags[20:] == [pytest.approx(0.4)] * 29                   # the hold
+        fx = self.mock_effects['elev_droop']
+        assert fx._direction == 180 and fx._envelope == {'attackFromForce': 0, 'attackTime': 1000}
+        assert runner.step() is False and not self.mock_effects.dict
+
+    def test_dcs_family_pedals_are_silent(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.elevator_droop_force = 0.4
+        runner = PreviewRunner(ac, ELEVATOR_DROOP, 'DCS', device_type='pedals', frame_rate=10.0)
+        for _ in range(3):
+            runner.step()
+        assert 'elev_droop' not in self.mock_effects
+
+    @pytest.mark.parametrize("sim", ['MSFS', 'XPLANE'])
+    def test_msfs_moment_plays_through_the_production_applier(self, sim):
+        from telemffb.util.Vector import Vector2D
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.elevator_droop_moment = 0.25
+        ac.uncoordinated_turn_effect_enabled = False
+        runner = PreviewRunner(ac, MSFS_ELEVATOR_DROOP, sim, frame_rate=10.0)
+        runner.step()
+        fx = self.mock_effects['control_weight']
+        assert fx.started
+        # cf_pitch = -term at rest and 1 g = -moment; the applier's own polar form
+        mag, theta = Vector2D(-0.25, 0.0).to_polar()
+        assert fx._magnitude == pytest.approx(mag)
+        assert fx._magnitude == pytest.approx(0.25)
+        assert fx._envelope == {'attackFromForce': 0, 'attackTime': 1000}
+        assert ac.elevator_droop_term_for(1.0, 0.0) == pytest.approx(0.25)       # the production term
+        assert ac.elevator_droop_term_for(1.0, 1.0) == pytest.approx(0.125)      # washed out by q
+        runner.run(sleep=lambda s: None)
+        assert not self.mock_effects.dict
+
+    def test_msfs_moment_is_joystick_only_and_dcs_not_offered(self):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.elevator_droop_moment = 0.25
+        runner = PreviewRunner(ac, MSFS_ELEVATOR_DROOP, 'MSFS', device_type='pedals', frame_rate=10.0)
+        runner.step()
+        assert 'control_weight' not in self.mock_effects
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_dcs.Aircraft('preview'), MSFS_ELEVATOR_DROOP, 'DCS')
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):
