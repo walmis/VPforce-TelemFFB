@@ -13,3 +13,5 @@ dll/directlink.dlk
 /pyenv
 tools/scenarios/_scenario_backup/
 tools/scenarios/_active_scenario.txt
+userconfig_v2.xml
+userconfig.xml
