@@ -555,7 +555,8 @@ ROTOR_RPM_NOMINAL = 300   # a typical NR; no profile threshold exists for it
 
 ETL = PreviewSpec(
     effect_id='etl_effect_enable',
-    reference="one acceleration through the profile's ETL speed band",
+    reference=("one acceleration through the profile's ETL speed band; pitch follows "
+               f"Rotor Blade Count at a fixed {ROTOR_RPM_NOMINAL} rpm NR"),
     rows=('etl_effect_intensity',),
     method='ac_calc_etl_effect',
     kind='ramp',
@@ -619,7 +620,8 @@ STICK_SHAKER = PreviewSpec(
 
 OVERSPEED_SHAKE = PreviewSpec(
     effect_id='overspeed_effect_enable',
-    reference='5 s of full overspeed shake, 15 m/s past the onset speed',
+    reference=("5 s of full overspeed shake, 15 m/s past the onset speed; pitch follows "
+               f"Rotor Blade Count at a fixed {ROTOR_RPM_NOMINAL} rpm NR"),
     rows=('overspeed_shake_intensity',),
     method='ac_calc_etl_effect',
     kind='hold',
@@ -1020,7 +1022,7 @@ TOUCHDOWN = PreviewSpec(
 # 8-frame average only advances on frames it processes - so a perfectly
 # steady plateau freezes the push short of full.  Real telemetry never
 # sits still; neither does this: a 2% wobble on the stimulus.
-_DECEL_WOBBLE = Jitter(center=1.0, amplitude=0.02)
+_DECEL_WOBBLE = Jitter(center=1.0, amplitude=0.04, step=1.0)   # a few %: consecutive frames must differ at the effect's 3-decimal change resolution
 
 
 def _decel_g(ac, p):
@@ -1100,6 +1102,81 @@ WIND = PreviewSpec(
     sims=('DCS', 'BMS'),
 )
 
+# ---------------------------------------------------------------------------
+# The rest of the helicopter set (ETL and overspeed are above).
+# ---------------------------------------------------------------------------
+
+ROTOR_RUMBLE = PreviewSpec(
+    effect_id='engine_rotor_rumble_enabled',
+    rows=('heli_engine_rumble_intensity',),
+    reference=(f"rotor turning at a fixed {ROTOR_RPM_NOMINAL} rpm NR with the engine running; "
+               "pitch follows Rotor Blade Count"),
+    method='ac_update_heli_engine_rumble',
+    kind='hold',
+    # frequency = NR / 45 x blade count, so the blade count is passed the
+    # way the live loop passes it; a nonzero engine RPM is the other gate
+    fields={'*': {'RotorRPM': ROTOR_RPM_NOMINAL, 'EngRPM': 100},
+            'XPLANE': {'PropRPM': [ROTOR_RPM_NOMINAL], 'EngRPM': 100}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+
+def _vrs_descent(ac, p):
+    """Descent rate sweeping the profile's VRS onset -> max (negative = down)."""
+    return -(ac.vrs_vs_onset + (ac.vrs_vs_max - ac.vrs_vs_onset) * p)
+
+
+VRS = PreviewSpec(
+    effect_id='vrs_effect_enable',
+    rows=('vrs_effect_intensity',),
+    reference="a descent steepening from the profile's VRS onset to its maximum, then held",
+    method='ac_update_vrs_effect',
+    kind='ramp',
+    # intensity scales with descent rate across the onset -> max band, so
+    # sweep it and hold at the top; airspeed at zero keeps the effect's
+    # speed gate open on every sim (it is silent above the threshold)
+    fields={'*': {'VerticalSpeed': _vrs_descent, 'TAS': 0.0, 'WeightOnWheels': [0, 0, 0]}},
+    schedule=((3.0, 0.0, 1.0), (3.0, 1.0, 1.0)),
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'BMS'),
+)
+
+_BLADE_SLAP_DESCENT_DEG = 6.0   # the inferred signal's descent-angle peak
+
+
+def _blade_slap_sink(ac, p):
+    """Sink rate for the inferred signal's peak descent angle at the
+    profile's band-centre speed."""
+    ias = ac.blade_slap_band_center or 32.4
+    return -ias * math.tan(math.radians(_BLADE_SLAP_DESCENT_DEG))
+
+
+BLADE_SLAP = PreviewSpec(
+    effect_id='blade_slap_enable',
+    rows=('blade_slap_intensity',),
+    reference=("blade-vortex interaction at its worst, the band-centre speed on a shallow descent; "
+               f"rate and strength follow Rotor Blade Count at a fixed {ROTOR_RPM_NOMINAL} rpm NR"),
+    method='ac_update_blade_slap',
+    kind='hold',
+    # X-Plane may use the sim's native signal (fed at full), everything
+    # else infers it from speed, descent angle and G - the frame carries
+    # both so either path plays at full signal.  1 g: no manoeuvring term.
+    fields={'*': {'WeightOnWheels': [0, 0, 0],
+                  'IAS': lambda ac, p: ac.blade_slap_band_center or 32.4,
+                  'VerticalSpeed': _blade_slap_sink,
+                  'RotorRPM': ROTOR_RPM_NOMINAL},
+            'DCS': {'ACCs': [0.0, 1.0, 0.0]},
+            'MSFS': {'G': 1.0},
+            'XPLANE': {'G': 1.0, 'PropRPM': [ROTOR_RPM_NOMINAL], 'BladeSlap': 1.0}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE'),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
     spec.name: spec for spec in (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
@@ -1109,9 +1186,10 @@ PREVIEW_SPECS: Dict[str, PreviewSpec] = {
         TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
         GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
         IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE,
-        TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, TURBULENCE, WIND)
+        TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, TURBULENCE, WIND,
+        ROTOR_RUMBLE, VRS, BLADE_SLAP)
 }
-assert len(PREVIEW_SPECS) == 30, "a spec name collided"
+assert len(PREVIEW_SPECS) == 33, "a spec name collided"
 
 # settings row -> the one preview whose button it hosts
 PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}
