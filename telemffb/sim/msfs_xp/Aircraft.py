@@ -122,7 +122,7 @@ class Aircraft(
 
         stall = telem_data.StallWarning or 0
         if stall:
-            self.effects["stick_shaker"].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
+            self.effects["stick_shaker"].periodic(14, self.stick_shaker_intensity, 0, effect_type=EFFECT_SQUARE).start()
         else:
             self.effects["stick_shaker"].destroy()
 

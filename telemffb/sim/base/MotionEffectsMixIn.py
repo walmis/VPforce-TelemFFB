@@ -1,5 +1,5 @@
 import telemffb.utils as utils
-from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SAWTOOTHUP, EFFECT_SQUARE
+from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SAWTOOTHUP, EFFECT_SINE, EFFECT_SQUARE
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.util.conversions import kt2ms
 
@@ -109,7 +109,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if self.anything_has_changed("Flaps", flapspos, delta_ms=100) and self.flaps_motion_intensity > 0 and self.flaps_motion_effect_enabled:
             logging.debug(f"Flaps Pos: {flapspos}")
             direction = 90 if self.is_pedals() else 0
-            self.effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, direction, 3).start()
+            self.effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, direction, effect_type=EFFECT_SQUARE).start()
         else:
             self.effects["flapsmovement"].stop(destroy_after=5000)
 
@@ -206,7 +206,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if self.anything_has_changed("Canopy", canopypos, delta_ms=100) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
             logging.debug(f"Canopy Pos: {canopypos}")
             direction = 90 if self.is_pedals() else 0
-            self.effects["canopymovement"].periodic(120, self.canopy_motion_intensity, direction, 3).start()
+            self.effects["canopymovement"].periodic(120, self.canopy_motion_intensity, direction, effect_type=EFFECT_SQUARE).start()
         else:
             if canopypos == 0 and self.effects['canopymovement'].started:
                 self.effects['canopyclunk'].periodic(10, utils.clamp((self.canopy_motion_intensity * 2), 0, 1), 180, effect_type=EFFECT_SQUARE,duration=40).start()
@@ -254,8 +254,8 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
 
         if self.anything_has_changed("gear_value", gearpos, 50) and self.gear_motion_intensity > 0 and self.gear_motion_effect_enabled:
             logging.debug(f"Landing Gear Pos: {gearpos}")
-            self.effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
-            self.effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 90, 3, phase=120).start()
+            self.effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, effect_type=EFFECT_SQUARE).start()
+            self.effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 90, effect_type=EFFECT_SQUARE, phase=120).start()
             if (gearpos == 0 or gearpos == 1) and self.is_joystick():
                 dir = 0 if gearpos == 0 else 180
                 self.effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 3), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
@@ -264,8 +264,8 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
 
         if (airspd > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
             realtime_intensity = utils.scale_clamp(airspd, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
-            self.effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
-            self.effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
+            self.effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, effect_type=EFFECT_SINE).start()
+            self.effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, effect_type=EFFECT_SINE).start()
             logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
         else:
             self.effects.dispose("gearbuffet", "gearbuffet2")
@@ -298,7 +298,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
             logging.debug(f"Speedbrake Pos: {spdbrk}")
             direction = 90 if self.is_pedals() else 0
-            self.effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, direction, 3).start()
+            self.effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, direction, effect_type=EFFECT_SQUARE).start()
         else:
             self.effects.dispose("speedbrakemovement")
 
@@ -351,8 +351,8 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if self.spoiler_motion_intensity > 0 and self.spoiler_motion_intensity > 0 and self.spoiler_motion_effect_enabled:
             if self.anything_has_changed("Spoilers", spoiler, delta_ms=50):
                 logging.debug(f"Spoilers Pos: {spoiler}")
-                self.effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
-                self.effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, 4).start()
+                self.effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, effect_type=EFFECT_SINE).start()
+                self.effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, effect_type=EFFECT_SINE).start()
             else:
                 logging.debug("Destroying Spoiler Effects")
                 for effect in ["spoilermovement", "spoilermovement2"]:
@@ -361,10 +361,10 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if airspd > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
             realtime_intensity = self.spoiler_buffet_intensity * spoiler * tas_intensity
             logging.debug(f"PLAYING SPOILER RUMBLE | intensity: {realtime_intensity}, d-factor: {spoiler}, s-factor: {tas_intensity}")
-            self.effects["spoilerbuffet1-1"].periodic(15, realtime_intensity, 0, 4).start()
-            self.effects["spoilerbuffet1-2"].periodic(16, realtime_intensity, 0, 4).start()
-            self.effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, 4).start()
-            self.effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, 4).start()
+            self.effects["spoilerbuffet1-1"].periodic(15, realtime_intensity, 0, effect_type=EFFECT_SINE).start()
+            self.effects["spoilerbuffet1-2"].periodic(16, realtime_intensity, 0, effect_type=EFFECT_SINE).start()
+            self.effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, effect_type=EFFECT_SINE).start()
+            self.effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, effect_type=EFFECT_SINE).start()
         else:
             for effect in ["spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2"]:
                 self.effects[effect].stop(1000)
@@ -386,7 +386,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if self.anything_has_changed("tailhook_value", hook, delta_ms=200):
             logging.debug(f"Hook Pos: {hook}")
             direction = 90 if self.is_pedals() else 0
-            self.effects["hookmovement"].periodic(160, self.tailhook_motion_intensity, direction, EFFECT_SAWTOOTHUP).start()
+            self.effects["hookmovement"].periodic(160, self.tailhook_motion_intensity, direction, effect_type=EFFECT_SAWTOOTHUP).start()
         else:
             if (hook == 0 or hook ==1) and self.effects['hookmovement'].started:
                 dir = (1-hook) * 180
@@ -474,7 +474,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
                     config['frequency'],
                     intensity,
                     direction,
-                    effect_type,
+                    effect_type=effect_type,
                     phase=phase
                 ).start()
         else:
@@ -537,7 +537,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
 
         for i, effect_name in enumerate(config['effect_names']):
             direction = config['directions'][i] if i < len(config['directions']) else config['directions'][0]
-            self.effects[effect_name].periodic(frequency, realtime_intensity, direction, 4).start()
+            self.effects[effect_name].periodic(frequency, realtime_intensity, direction, effect_type=EFFECT_SINE).start()
 
         logging.debug(f"PLAYING {config['effect_name'].upper()} RUMBLE | intensity: {realtime_intensity}")
 

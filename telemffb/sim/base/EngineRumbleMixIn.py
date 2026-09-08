@@ -175,10 +175,10 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         intensity = utils.clamp(intensity, 0, 1)
         rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
         rt_freq2 = round(rt_freq + median_modulation, 4)
-        self.effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
-        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
-        self.effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
-        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
+        self.effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=effect_index).start()
+        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=effect_index).start()
+        self.effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=effect_index, phase=phase_offset).start()
+        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=effect_index, phase=phase_offset+30).start()
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
     def ac_update_ab_effect(self, telem_data: BaseTelemetryData):
@@ -212,7 +212,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
             self.effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=EFFECT_TRIANGLE ).start()
             # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
             self.effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=EFFECT_TRIANGLE ).start()
-            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
+            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, effect_type=4, phase=120,
             #                                   offset=60).start()
             # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
         elif afterburner_pos == 0:

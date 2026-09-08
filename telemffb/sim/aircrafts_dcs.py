@@ -422,8 +422,8 @@ class Aircraft(AircraftBase, DCSCommands):
 
         if shake:
             freq = self.stick_shaker_frequency
-            self.effects['stick_shaker1'].periodic(freq, self.stick_shaker_intensity, dir1, EFFECT_SAWTOOTHUP).start()
-            self.effects['stick_shaker2'].periodic(freq, self.stick_shaker_intensity, dir2, EFFECT_SAWTOOTHDOWN).start()
+            self.effects['stick_shaker1'].periodic(freq, self.stick_shaker_intensity, dir1, effect_type=EFFECT_SAWTOOTHUP).start()
+            self.effects['stick_shaker2'].periodic(freq, self.stick_shaker_intensity, dir2, effect_type=EFFECT_SAWTOOTHDOWN).start()
         else:
             self.effects['stick_shaker1'].destroy()
             self.effects['stick_shaker2'].destroy()

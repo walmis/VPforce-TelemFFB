@@ -1902,6 +1902,16 @@ class HapticEffect(Destroyable):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
+        elif args:
+            # *args exists only to feed a DirectionModulator's constructor.
+            # A waveform passed positionally as the fourth argument landed
+            # here and was silently discarded - nine effects rendered as
+            # sine for years while their code said square or sawtooth.
+            # Refuse it so the call site gets fixed instead.
+            raise TypeError(
+                "periodic(): extra positional arguments are only for a "
+                "DirectionModulator's constructor; pass the waveform as "
+                "effect_type=")
 
         if not self._h_effect:
             # Store the creation and setup function

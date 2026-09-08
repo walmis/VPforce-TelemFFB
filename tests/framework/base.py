@@ -164,8 +164,9 @@ class MockConditionEffect:
         self.start_count += 1
         return self
     
-    def stop(self):
-        """Stop the effect."""
+    def stop(self, *args, **kwargs):
+        """Stop the effect.  Accepts and ignores the production
+        ``destroy_after`` timeout the motion effects pass."""
         self.started = False
         if self._envelope_once:
             self._envelope = None
@@ -211,7 +212,15 @@ class MockConditionEffect:
         return self
 
     def periodic(self, frequency=0, magnitude=0, direction=0, *args, **kwargs):
-        """Set periodic effect parameters (rumble/vibration; chainable)."""
+        """Set periodic effect parameters (rumble/vibration; chainable).
+
+        Mirrors production's refusal of a positional waveform (only a
+        DirectionModulator class as ``direction`` may take extra
+        positional arguments), so a stray call site fails the suite
+        instead of silently rendering as sine."""
+        from telemffb.utils import DirectionModulator
+        if args and not (isinstance(direction, type) and issubclass(direction, DirectionModulator)):
+            raise TypeError("periodic(): pass the waveform as effect_type=")
         self._periodic = (frequency, magnitude, direction, kwargs)
         return self
     
