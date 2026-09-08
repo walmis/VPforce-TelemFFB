@@ -593,9 +593,73 @@ SPOILER_BUFFET = PreviewSpec(
     sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
 )
 
+# ---------------------------------------------------------------------------
+# Motion ramps: the surface travels its full range over 3 s, then the
+# default tail repeats the final position so the effect winds down the
+# way it does live - and so the clunk the endpoint fires has time to play.
+# ---------------------------------------------------------------------------
+
+FLAPS_MOTION = PreviewSpec(
+    effect_id='flaps_motion_effect_enabled',
+    method='ac_update_flaps',
+    kind='ramp',
+    fields={'*': {'Flaps': (0.0, 1.0)}},
+)
+
+SPEEDBRAKE_MOTION = PreviewSpec(
+    effect_id='speedbrake_motion_effect_enabled',
+    method='ac_update_speed_brakes',
+    kind='ramp',
+    fields={'*': {'SpeedbrakePos': (0.0, 1.0), 'IAS': 0.0}},   # IAS 0: no buffet
+    sims=('DCS', 'XPLANE', 'BMS'),
+)
+
+SPOILER_MOTION = PreviewSpec(
+    effect_id='spoiler_motion_effect_enabled',
+    method='ac_update_spoilers',
+    kind='ramp',
+    fields={'*': {'Spoilers': (0.0, 1.0), 'IAS': 0.0}},
+    sims=('DCS', 'XPLANE', 'BMS'),
+)
+
+CANOPY_MOTION = PreviewSpec(
+    effect_id='canopy_motion_effect_enabled',
+    method='ac_update_canopy',
+    kind='ramp',
+    # closing: the effect clunks when the canopy reaches 0
+    fields={'*': {'Canopy': (1.0, 0.0)}},
+    sims=('DCS', 'XPLANE'),
+)
+
+TAILHOOK_MOTION = PreviewSpec(
+    effect_id='tailhook_motion_effect_enabled',
+    method='ac_update_tailhook_effect',
+    kind='ramp',
+    fields={'*': {'TailHook': (0.0, 1.0)}},
+    sims=('DCS',),
+)
+
+FUELBOOM_MOTION = PreviewSpec(
+    effect_id='fuelboom_motion_effect_enabled',
+    method='ac_update_fuelboom_effect',
+    kind='ramp',
+    fields={'*': {'FuelBoom': (0.0, 1.0)}},
+    sims=('DCS',),
+)
+
+WINGFOLD_MOTION = PreviewSpec(
+    effect_id='wingfold_motion_effect_enabled',
+    method='ac_update_wingfold_effect',
+    kind='ramp',
+    fields={'*': {'WingFold': (0.0, 1.0), 'SimOnGround': 1}},   # ground-only effect
+    sims=('DCS',),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
     spec.effect_id: spec for spec in (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
         AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET,
-        SPEEDBRAKE_BUFFET, SPOILER_BUFFET)
+        SPEEDBRAKE_BUFFET, SPOILER_BUFFET,
+        FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
+        TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION)
 }

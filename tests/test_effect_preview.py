@@ -29,7 +29,9 @@ from telemffb.preview import (
     Attr, PreviewSpec, PreviewRunner, TimedPreview, preview_blockers, resolve_preview_target,
     JET_ENGINE_RUMBLE, JET_IDLE_PCT, GEAR_MOTION, PROP_ENGINE_RUMBLE, STALL_BUFFET, ETL,
     AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET, SPEEDBRAKE_BUFFET,
-    SPOILER_BUFFET, ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, FRAME_RATE_HZ)
+    SPOILER_BUFFET, FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
+    TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
+    ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
 from tests.framework.base import BaseTelemetryEffectTestCase
 
@@ -917,6 +919,131 @@ class TestSpeedbrakeAndSpoilerBuffetPreview(HoldPreviewCase):
         assert self.mock_effects['spoilerbuffet1-1']._periodic[1] == pytest.approx(0.15)
         assert self.mock_effects['spoilerbuffet2-1']._periodic[2] == 90
         self._finish(runner)
+
+
+class RampPreviewCase(BaseTelemetryEffectTestCase):
+    """Shared shape for the motion ramps: the motion slot plays while the
+    value moves, the tail lets the endpoint clunk (where the effect has
+    one) fire after the change-tracker's quiet period, and nothing is
+    left behind."""
+
+    def _ramp(self, ac, spec, sim):
+        runner = PreviewRunner(ac, spec, sim, frame_rate=10.0)   # 30 frames + 5 tail
+        assert runner.tail_frames == 5
+        for _ in range(runner.frames_total):
+            runner.step()
+        return runner
+
+    def _settle_and_finish(self, runner, quiet=False):
+        """Run the tail.  ``quiet`` waits out the change tracker's
+        delta_ms first, as the real tail's wall-clock would."""
+        if quiet:
+            import time
+            time.sleep(0.25)
+        runner.step()                      # first tail frame: motion ends, clunk (if any)
+        snapshot = {k: v._periodic for k, v in self.mock_effects.dict.items()
+                    if getattr(v, '_periodic', None)}
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+        return snapshot
+
+
+class TestMotionRampPreviews(RampPreviewCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+        (aircrafts_il2.Aircraft, 'IL2'),
+    ])
+    def test_flaps(self, cls, sim):
+        ac = cls('preview')
+        ac.flaps_motion_effect_enabled = False
+        ac.flaps_motion_intensity = 0.2
+        runner = self._ramp(ac, FLAPS_MOTION, sim)
+        motion = self.mock_effects['flapsmovement']
+        assert motion.started and motion._periodic[:3] == (180, 0.2, 0)
+        assert ac._telem_data['Flaps'] == pytest.approx(1.0)
+        self._settle_and_finish(runner)
+
+    @pytest.mark.parametrize("sim", ['DCS', 'XPLANE', 'BMS'])
+    def test_speedbrake_moves_without_buffet(self, sim):
+        cls = aircrafts_dcs.Aircraft if sim != 'XPLANE' else aircrafts_msfs_xp.Aircraft
+        ac = cls('preview')
+        ac.speedbrake_motion_effect_enabled = False
+        ac.speedbrake_motion_intensity = 0.2
+        ac.speedbrake_buffet_effect_enabled = True
+        runner = self._ramp(ac, SPEEDBRAKE_MOTION, sim)
+        assert self.mock_effects['speedbrakemovement']._periodic[:3] == (180, 0.2, 0)
+        assert 'speedbrakebuffet' not in self.mock_effects
+        self._settle_and_finish(runner)
+
+    @pytest.mark.parametrize("sim", ['DCS', 'XPLANE', 'BMS'])
+    def test_spoilers_move_without_buffet(self, sim):
+        cls = aircrafts_dcs.Aircraft if sim != 'XPLANE' else aircrafts_msfs_xp.Aircraft
+        ac = cls('preview')
+        ac.spoiler_motion_effect_enabled = False
+        ac.spoiler_motion_intensity = 0.2
+        ac.spoiler_buffet_effect_enabled = True
+        runner = self._ramp(ac, SPOILER_MOTION, sim)
+        assert self.mock_effects['spoilermovement']._periodic[:3] == (118, 0.2, 0)
+        assert self.mock_effects['spoilermovement2']._periodic[2] == 90
+        # the buffet branch touches its slots to stop them (create-on-access
+        # in the dispenser) but must not have started one at IAS 0
+        buffet = self.mock_effects.get('spoilerbuffet1-1')
+        assert buffet is None or not buffet.started
+        self._settle_and_finish(runner)
+
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_canopy_closes_and_clunks_shut(self, cls, sim):
+        ac = cls('preview')
+        ac.canopy_motion_effect_enabled = False
+        ac.canopy_motion_intensity = 0.2
+        runner = self._ramp(ac, CANOPY_MOTION, sim)
+        assert self.mock_effects['canopymovement']._periodic[:3] == (120, 0.2, 0)
+        assert ac._telem_data['Canopy'] == pytest.approx(0.0)       # closed
+        played = self._settle_and_finish(runner, quiet=True)
+        assert played['canopyclunk'][:3] == (10, 0.4, 180)          # 2x intensity, shut
+
+    def test_tailhook_extends_and_clunks(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.tailhook_motion_effect_enabled = False
+        ac.tailhook_motion_intensity = 0.2
+        runner = self._ramp(ac, TAILHOOK_MOTION, 'DCS')
+        assert self.mock_effects['hookmovement']._periodic[:3] == (160, 0.2, 0)
+        played = self._settle_and_finish(runner, quiet=True)
+        assert played['clunk'][:3] == (10, 0.4, 0)                  # (1 - hook) * 180 at hook 1
+
+    def test_fuel_boom_extends_and_clunks(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.fuelboom_motion_effect_enabled = False
+        ac.fuelboom_motion_intensity = 0.2
+        runner = self._ramp(ac, FUELBOOM_MOTION, 'DCS')
+        assert self.mock_effects['boommovement']._periodic[:3] == (150, 0.2, 0)
+        played = self._settle_and_finish(runner, quiet=True)
+        assert played['clunk'][:3] == (10, 0.4, 0)                  # extended: seats forward
+
+    def test_wing_fold_on_the_ground_with_two_clunks(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.wingfold_motion_effect_enabled = False
+        ac.wingfold_motion_intensity = 0.2
+        runner = self._ramp(ac, WINGFOLD_MOTION, 'DCS')
+        assert ac._telem_data['SimOnGround'] == 1
+        one = self.mock_effects['wingfoldmovement_1']._periodic
+        two = self.mock_effects['wingfoldmovement_2']._periodic
+        assert one[:3] == (100, 0.2, 45) and two[:3] == (100, 0.2, 225)
+        played = self._settle_and_finish(runner, quiet=True)
+        assert played['wingfoldclunk1'][2] == 90 and played['wingfoldclunk2'][2] == 270
+        assert played['wingfoldclunk1'][3]['duration'] == 100
+
+    def test_joystick_only_motions_are_silent_on_pedals(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.tailhook_motion_intensity = 0.2
+        runner = PreviewRunner(ac, TAILHOOK_MOTION, 'DCS', device_type='pedals', frame_rate=10.0)
+        for _ in range(3):
+            runner.step()
+        assert 'hookmovement' not in self.mock_effects
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):
