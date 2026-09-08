@@ -26,7 +26,7 @@ from telemffb.sim import aircrafts_dcs, aircrafts_msfs_xp, aircrafts_il2
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.preview import (
     PreviewSpec, PreviewRunner, TimedPreview, preview_blockers, resolve_preview_target,
-    JET_ENGINE_RUMBLE, GEAR_MOTION, PREVIEW_SPECS, FRAME_RATE_HZ)
+    JET_ENGINE_RUMBLE, GEAR_MOTION, PROP_ENGINE_RUMBLE, PREVIEW_SPECS, FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
 from tests.framework.base import BaseTelemetryEffectTestCase
 
@@ -164,6 +164,42 @@ class TestPreviewSpec:
         spec = self._spec('hold', {'*': {'v': (10, 20)}})
         assert spec.resolve_fields(None, 'DCS', 1.0)['v'] == 10
 
+    def test_pair_endpoints_may_name_aircraft_attributes(self):
+        """A sweep between the profile's own thresholds, no lambda needed."""
+        ac = SimpleNamespace(lo=600, hi=2600)
+        spec = self._spec('ramp', {'*': {'RPM': ('lo', 'hi'), 'mixed': (0, 'hi')}})
+        assert spec.resolve_fields(ac, 'DCS', 0.0) == {'RPM': 600, 'mixed': 0}
+        assert spec.resolve_fields(ac, 'DCS', 0.5) == {'RPM': 1600, 'mixed': 1300}
+        assert spec.resolve_fields(ac, 'DCS', 1.0) == {'RPM': 2600, 'mixed': 2600}
+
+    def test_dwell_holds_both_ends_and_sweeps_between(self):
+        spec = PreviewSpec(effect_id='x_enabled', method='m', kind='ramp',
+                           fields={'*': {'v': (0.0, 1.0)}}, duration=10.0, dwell=2.0)
+        sp = spec.stimulus_progress
+        assert sp(0.0) == 0.0 and sp(0.2) == 0.0            # leading dwell
+        assert sp(0.5) == pytest.approx(0.5)                # middle of the sweep
+        assert sp(0.35) == pytest.approx(0.25)
+        assert sp(0.8) == 1.0 and sp(1.0) == 1.0            # trailing dwell
+        assert spec.resolve_fields(None, 'DCS', 0.1) == {'v': 0.0}
+        assert spec.resolve_fields(None, 'DCS', 0.9) == {'v': 1.0}
+
+    def test_no_dwell_is_the_identity(self):
+        spec = self._spec('ramp', {'*': {'v': (0.0, 1.0)}})
+        assert spec.stimulus_progress(0.3) == 0.3
+
+    def test_dwell_shapes_callables_too(self):
+        spec = PreviewSpec(effect_id='x_enabled', method='m', kind='ramp',
+                           fields={'*': {'v': lambda a, p: p}}, duration=10.0, dwell=2.0)
+        assert spec.resolve_fields(None, 'DCS', 0.1) == {'v': 0.0}
+
+    def test_dwell_must_fit_inside_the_duration(self):
+        with pytest.raises(ValueError):
+            PreviewSpec(effect_id='x_enabled', method='m', kind='ramp',
+                        fields={'*': {}}, duration=4.0, dwell=2.0)
+        with pytest.raises(ValueError):
+            PreviewSpec(effect_id='x_enabled', method='m', kind='ramp',
+                        fields={'*': {}}, duration=4.0, dwell=-1.0)
+
     def test_callable_sees_aircraft_and_progress(self):
         ac = SimpleNamespace(peak_rpm=650)
         spec = self._spec('hold', {'*': {'RPM': lambda a, p: a.peak_rpm,
@@ -173,6 +209,7 @@ class TestPreviewSpec:
     def test_registry_is_keyed_by_effect_id(self):
         assert PREVIEW_SPECS['engine_jet_rumble_enabled'] is JET_ENGINE_RUMBLE
         assert PREVIEW_SPECS['gear_motion_effect_enabled'] is GEAR_MOTION
+        assert PREVIEW_SPECS['engine_prop_rumble_enabled'] is PROP_ENGINE_RUMBLE
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +487,67 @@ class TestJetEngineRumblePreview(BaseTelemetryEffectTestCase):
         runner.run(sleep=lambda s: None)
         assert runner.finished
         assert not self.mock_effects.dict
+
+
+class TestPropEngineRumblePreview(BaseTelemetryEffectTestCase):
+    """'ramp' as a sweep: RPM runs from the profile's Low RPM point to its
+    High RPM point, so the preview plays the taper (intensity falling,
+    frequency rising) rather than one level."""
+
+    LOW, HIGH = 650, 2800
+
+    def _aircraft(self, cls):
+        ac = cls('preview')
+        ac.engine_prop_rumble_enabled = False   # forced on by the preview
+        ac.engine_rumble_lowrpm = self.LOW
+        ac.engine_rumble_lowrpm_intensity = 0.06
+        ac.engine_rumble_highrpm = self.HIGH
+        ac.engine_rumble_highrpm_intensity = 0.03
+        return ac
+
+    @pytest.mark.parametrize("cls, sim, field", [
+        (aircrafts_dcs.Aircraft, 'DCS', 'ActualRPM'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS', 'PropRPM'),
+        (aircrafts_msfs_xp.Aircraft, 'XPLANE', 'PropRPM'),
+        (aircrafts_il2.Aircraft, 'IL2', 'RPM'),
+    ])
+    def test_sweeps_the_profiles_rpm_range_on_each_sims_field(self, cls, sim, field):
+        ac = self._aircraft(cls)
+        runner = PreviewRunner(ac, PROP_ENGINE_RUMBLE, sim, frame_rate=10.0)   # 140 frames
+        assert runner.frames_total == 140
+        rpm_seen = []
+        main = None
+        # Up to the penultimate frame: the final one is destroyed in the
+        # same step it plays (tail 0), so the last audible frame is the
+        # one to inspect - and with the dwell it is already at High RPM.
+        for _ in range(runner.frames_total - 1):
+            runner.step()
+            rpm_seen.append(ac._telem_data[field])
+            main = self.mock_effects['prop_rpm0-1']
+            if len(rpm_seen) == 1:
+                assert main.started
+                assert main._periodic[0] == pytest.approx(self.LOW / 60)
+                start_mag = main._periodic[1]
+                assert start_mag == pytest.approx(0.06)     # Low RPM intensity, full beat depth
+        # 4 s dwell at each end of a 14 s run at 10 Hz: 40 frames flat
+        # at Low RPM, 40 flat at High RPM, the sweep between.
+        assert rpm_seen[:40] == [pytest.approx(self.LOW)] * 40
+        assert rpm_seen[100:] == [pytest.approx(self.HIGH)] * 39
+        assert all(a < b for a, b in zip(rpm_seen[40:100], rpm_seen[41:101]))
+        assert main._periodic[0] == pytest.approx(self.HIGH / 60)
+        end_mag = main._periodic[1]
+        assert end_mag < start_mag                           # the taper
+        beat_depth = (self.LOW / self.HIGH) ** 2
+        assert end_mag == pytest.approx(
+            0.03 * (2.0 - beat_depth ** 2) ** 0.5, abs=1e-6)  # High RPM intensity, beat faded
+        assert self.mock_effects['prop_rpm1-1']._periodic[2] == 90
+        assert runner.step() is False
+        assert runner.finished and not self.mock_effects.dict
+
+    def test_bms_is_not_offered(self):
+        ac = self._aircraft(aircrafts_dcs.Aircraft)
+        with pytest.raises(ValueError):
+            PreviewRunner(ac, PROP_ENGINE_RUMBLE, 'BMS')
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):

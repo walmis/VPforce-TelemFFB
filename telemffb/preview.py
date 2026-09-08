@@ -66,10 +66,12 @@ FRAME_RATE_HZ = 30.0
 # A field value in a spec is one of:
 #   - a constant (number, list, str) used as-is
 #   - a 2-tuple (a, b): for 'ramp' interpolated a -> b by progress, for
-#     'edge' a before the midpoint and b after; for 'hold' a is used
-#   - a callable (aircraft, progress) -> value, for reference values that
-#     depend on the profile ("the RPM this rumble peaks at") or need a
-#     shape a tuple cannot express (a list that varies)
+#     'edge' a before the midpoint and b after; for 'hold' a is used.
+#     Either end may be the NAME of an aircraft attribute, resolved on
+#     the instance, so a sweep can run between the profile's own
+#     thresholds: ('engine_rumble_lowrpm', 'engine_rumble_highrpm')
+#   - a callable (aircraft, progress) -> value, for anything the above
+#     cannot express (a list that varies)
 FieldValue = Any
 
 
@@ -95,6 +97,13 @@ class PreviewSpec:
     # repeated final frame is also what the sim does when motion stops,
     # so change-driven effects wind down the way they do live.
     tail: float = 0.5
+    # Seconds held at EACH end of a sweep before / after the moving part.
+    # A sweep's ends are the two settings the user actually tunes (Low
+    # RPM intensity, High RPM intensity); a stimulus that keeps moving
+    # through them cannot be judged for "could I live with this".  The
+    # holds are long enough to judge, the sweep between shows the
+    # transition.  Zero for holds and edges.
+    dwell: float = 0.0
     sims: Tuple[str, ...] = SIMS
 
     def __post_init__(self):
@@ -103,16 +112,33 @@ class PreviewSpec:
         unknown = set(self.fields) - set(SIMS) - {'*'}
         if unknown:
             raise ValueError(f"{self.effect_id}: fields keyed by unknown sim(s) {sorted(unknown)}")
+        if self.dwell < 0 or (self.dwell and 2 * self.dwell >= self.duration):
+            raise ValueError(f"{self.effect_id}: dwell {self.dwell}s x2 must fit inside "
+                             f"the {self.duration}s duration")
 
     def supports(self, sim: str) -> bool:
         return sim in self.sims
 
+    def stimulus_progress(self, progress: float) -> float:
+        """Frame progress (0..1 over the whole run) -> stimulus progress:
+        flat at 0 through the leading dwell, linear through the middle,
+        flat at 1 through the trailing dwell."""
+        if not self.dwell:
+            return progress
+        d = self.dwell / self.duration
+        if progress <= d:
+            return 0.0
+        if progress >= 1.0 - d:
+            return 1.0
+        return (progress - d) / (1.0 - 2.0 * d)
+
     def resolve_fields(self, aircraft, sim: str, progress: float) -> Dict[str, Any]:
-        """The telemetry fields for one frame at ``progress`` (0..1)."""
+        """The telemetry fields for one frame at frame ``progress`` (0..1)."""
         if sim not in SIMS:
             raise ValueError(f"unknown sim {sim!r}")
         merged: Dict[str, FieldValue] = dict(self.fields.get('*', {}))
         merged.update(self.fields.get(sim, {}))
+        progress = self.stimulus_progress(progress)
         return {name: self._resolve(value, aircraft, progress)
                 for name, value in merged.items()}
 
@@ -120,12 +146,20 @@ class PreviewSpec:
         if callable(value):
             return value(aircraft, progress)
         if isinstance(value, tuple) and len(value) == 2:
-            a, b = value
+            a, b = (self._endpoint(v, aircraft) for v in value)
             if self.kind == 'ramp':
                 return a + (b - a) * progress
             if self.kind == 'edge':
                 return a if progress < 0.5 else b
             return a
+        return value
+
+    @staticmethod
+    def _endpoint(value, aircraft):
+        """A pair endpoint: a number as-is, a string as the named aircraft
+        attribute (a profile threshold)."""
+        if isinstance(value, str):
+            return getattr(aircraft, value)
         return value
 
 
@@ -324,6 +358,30 @@ GEAR_MOTION = PreviewSpec(
             'XPLANE': {'RetractableGear': 1, 'Gear': lambda ac, p: [p]}},
 )
 
+_PROP_RPM_SWEEP = ('engine_rumble_lowrpm', 'engine_rumble_highrpm')
+
+PROP_ENGINE_RUMBLE = PreviewSpec(
+    effect_id='engine_prop_rumble_enabled',
+    method='ac_update_piston_engine_rumble',
+    kind='ramp',
+    # The effect is a TAPER, not a level: intensity falls from the Low RPM
+    # setting to the High RPM setting while the frequency climbs with RPM,
+    # so no single point represents it.  Sweep the profile's own range and
+    # the whole taper is felt in one press - idle chunk, rising pitch,
+    # settling to the cruise hum - dwelling at each end long enough to
+    # judge the two intensities the user tunes.  Each sim names its RPM
+    # field differently.
+    fields={'DCS': {'ActualRPM': _PROP_RPM_SWEEP},
+            'MSFS': {'PropRPM': _PROP_RPM_SWEEP},
+            'XPLANE': {'PropRPM': _PROP_RPM_SWEEP},
+            'IL2': {'RPM': _PROP_RPM_SWEEP}},
+    duration=14.0,   # 4 s at Low RPM, 6 s sweep, 4 s at High RPM
+    dwell=4.0,
+    tail=0.0,
+    # BMS is not handled by the effect (it reads no BMS RPM field)
+    sims=('DCS', 'MSFS', 'XPLANE', 'IL2'),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
-    spec.effect_id: spec for spec in (JET_ENGINE_RUMBLE, GEAR_MOTION)
+    spec.effect_id: spec for spec in (PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION)
 }
