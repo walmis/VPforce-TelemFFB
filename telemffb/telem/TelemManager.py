@@ -114,7 +114,7 @@ def resolve_aircraft_config(the_sim, aircraft_name, input_modeltype='', device_t
     return params, cls_name, pattern, active_profile
 
 
-def build_aircraft(data_source, aircraft_name, device_type=None):
+def build_aircraft(data_source, aircraft_name, device_type=None, cls_name=''):
     """Construct and configure an aircraft instance with no telemetry.
 
     The same steps ``TelemManager`` takes when a new aircraft shows up in
@@ -125,8 +125,13 @@ def build_aircraft(data_source, aircraft_name, device_type=None):
     effect preview, which needs a configured aircraft to drive effect
     methods against with synthetic frames.
 
-    Class resolution is by the model's configured class only.  The
-    SimConnect fallback (``resolve_aircraft_class_from_sc``) needs the
+    ``cls_name`` is a pre-known class ("JetAircraft"): the offline editor
+    at CLASS scope has a class but no model, and the class-level cascade
+    (sim + class + user overrides of both) only applies when the resolver
+    is told the class.  A model that names its own class wins over it.
+
+    Otherwise class resolution is by the model's configured class only.
+    The SimConnect fallback (``resolve_aircraft_class_from_sc``) needs the
     aircraft category from a telemetry frame, which does not exist here;
     an MSFS model with no class configured comes back as the module's
     generic ``Aircraft``.
@@ -140,10 +145,10 @@ def build_aircraft(data_source, aircraft_name, device_type=None):
     module = aircraft_module_for_source(data_source)
     if module is None:
         raise ValueError(f"Unknown telemetry source {data_source!r}")
-    params, cls_name, _pattern, _profile = resolve_aircraft_config(
-        data_source, aircraft_name, device_type=device_type)
-    aircraft_class = getattr(module, cls_name, None) or module.Aircraft
-    logging.info(f"Building {aircraft_name} for preview: "
+    params, resolved_cls, _pattern, _profile = resolve_aircraft_config(
+        data_source, aircraft_name, cls_name or '', device_type)
+    aircraft_class = getattr(module, resolved_cls, None) or module.Aircraft
+    logging.info(f"Building {aircraft_name!r} (class {resolved_cls}) for preview: "
                  f"{aircraft_class.__module__}.{aircraft_class.__name__}")
     aircraft = aircraft_class(aircraft_name)
     aircraft.apply_settings(params)

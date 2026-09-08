@@ -253,19 +253,21 @@ class PreviewRunner:
 
 
 def resolve_preview_target(settings_mgr, default_sim: str = 'DCS',
-                           default_model: str = 'Preview') -> Tuple[str, str]:
-    """The (sim, model) a preview should build its aircraft for.
+                           default_model: str = 'Preview') -> Tuple[str, str, str]:
+    """The (sim, model, class) a preview should build its aircraft for.
 
-    The settings tab's current selection when it names a real sim (the
-    user is looking at a model, so they get that model's tuning);
-    otherwise a generic aircraft on ``default_sim``, whose sim-level
-    defaults are what a fresh install would feel.
+    The settings tab's current selection when it names a real sim: a
+    model when one is picked, else the class alone (the offline editor at
+    CLASS scope - the user is tuning class defaults and should feel
+    them), else the sim's own defaults.  With no real sim selected, a
+    generic aircraft on ``default_sim``.
     """
     sim = getattr(settings_mgr, 'current_sim', None)
     model = getattr(settings_mgr, 'current_aircraft_name', None)
+    cls = getattr(settings_mgr, 'current_class', None) or ''
     if sim not in SIMS:
-        return default_sim, default_model
-    return sim, (model or default_model)
+        return default_sim, default_model, ''
+    return sim, (model or default_model), cls
 
 
 class TimedPreview:
@@ -336,14 +338,21 @@ def preview_blockers(current_aircraft=None, device_alive: bool = True) -> List[s
 # here until it moves to defaults.xml.
 # ---------------------------------------------------------------------------
 
+JET_IDLE_PCT = 60   # a typical turbine idle; the effect has no profile threshold for it
+
 JET_ENGINE_RUMBLE = PreviewSpec(
     effect_id='engine_jet_rumble_enabled',
     method='ac_update_jet_engine_rumble',
-    kind='hold',
-    # 100% RPM is the full-scale point: intensity = jet_engine_rumble_intensity * rpm/100
-    fields={'*': {'EngRPM': 100},
-            'XPLANE': {'EngPCT': 100}},
-    tail=0.0,   # a hold has nothing to settle
+    kind='ramp',
+    # Intensity scales with rpm/100 and the frequency climbs 10 Hz over
+    # the range, so idle and full power are different feels: sweep from
+    # idle to 100% with a dwell at each.  0% is silence (the effect
+    # disposes), so the sweep starts at idle rather than the floor.
+    fields={'*': {'EngRPM': (JET_IDLE_PCT, 100)},
+            'XPLANE': {'EngPCT': (JET_IDLE_PCT, 100)}},
+    duration=14.0,   # 4 s at idle, 6 s sweep, 4 s at full power
+    dwell=4.0,
+    tail=0.0,
 )
 
 GEAR_MOTION = PreviewSpec(
