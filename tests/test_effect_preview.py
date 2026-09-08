@@ -28,7 +28,8 @@ from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.preview import (
     Attr, PreviewSpec, PreviewRunner, TimedPreview, preview_blockers, resolve_preview_target,
     JET_ENGINE_RUMBLE, JET_IDLE_PCT, GEAR_MOTION, PROP_ENGINE_RUMBLE, STALL_BUFFET, ETL,
-    ROTOR_RPM_NOMINAL, PREVIEW_SPECS, FRAME_RATE_HZ)
+    AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET, SPEEDBRAKE_BUFFET,
+    SPOILER_BUFFET, ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
 from tests.framework.base import BaseTelemetryEffectTestCase
 
@@ -251,6 +252,17 @@ class TestPreviewSpec:
         with pytest.raises(ValueError):                     # progress out of range
             PreviewSpec(effect_id='x_enabled', method='m', kind='ramp', fields={'*': {}},
                         schedule=((1.0, 0.0, 1.5),))
+
+    def test_method_may_be_keyed_by_sim(self):
+        spec = PreviewSpec(effect_id='x_enabled', kind='hold', fields={'*': {}},
+                           method={'*': 'generic', 'MSFS': 'msfs_specific'})
+        assert spec.method_for('DCS') == 'generic'
+        assert spec.method_for('MSFS') == 'msfs_specific'
+        only = PreviewSpec(effect_id='x_enabled', kind='hold', fields={'*': {}},
+                           method={'MSFS': 'msfs_specific'})
+        with pytest.raises(ValueError):
+            only.method_for('DCS')
+        assert self._spec('hold', {'*': {}}).method_for('IL2') == 'm'
 
     def test_kwargs_resolve_like_fields(self):
         ac = SimpleNamespace(blades=4)
@@ -743,6 +755,168 @@ class TestEtlPreview(BaseTelemetryEffectTestCase):
         ac._telem_data = frame
         ac.ac_calc_etl_effect(frame)
         assert self.mock_effects['etlY']._periodic[0] == pytest.approx(250 / 75 * 2)
+
+
+class HoldPreviewCase(BaseTelemetryEffectTestCase):
+    """Shared shape for the on/off holds: run two frames (an effect that
+    keys on change primes on the first), check the slot, run to the end,
+    check nothing is left."""
+
+    def _run_hold(self, ac, spec, sim, frames=2):
+        runner = PreviewRunner(ac, spec, sim, frame_rate=10.0)
+        assert runner.frames_total == HOLD_SECONDS * 10
+        for _ in range(frames):
+            assert runner.step() is True
+        return runner
+
+    def _finish(self, runner):
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+
+
+class TestAfterburnerPreview(HoldPreviewCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_lights_one_frame_in_at_the_configured_intensity(self, cls, sim, monkeypatch):
+        # The effect re-issues on change of its slow modulation term; live
+        # that ticks every frame, in a test the frames are microseconds
+        # apart, so stand in a modulation that advances per call.
+        import telemffb.utils as utils
+        ticks = iter(range(10_000))
+        monkeypatch.setattr(utils, 'sine_point_in_time',
+                            lambda *a, **k: next(ticks) * 0.01)
+        ac = cls('preview')
+        ac.afterburner_effect_enabled = False
+        ac.afterburner_effect_intensity = 0.3
+        runner = self._run_hold(ac, AFTERBURNER, sim, frames=1)
+        assert 'ab_rumble_1_1' not in self.mock_effects      # tracker primes on frame 0
+        runner.step()
+        assert ac._telem_data['Afterburner'] == 1
+        main = self.mock_effects['ab_rumble_1_1']
+        assert main.started
+        assert main._periodic[1] == pytest.approx(0.3)          # intensity * AB 1
+        assert main._periodic[0] == pytest.approx(20, abs=2.5)  # 20 Hz + modulation
+        assert self.mock_effects['ab_rumble_2_1']._periodic[2] == 45
+        self._finish(runner)
+
+
+class TestStickShakerPreview(HoldPreviewCase):
+    def test_dcs_and_bms_shake_above_the_profile_aoa(self):
+        for sim in ('DCS', 'BMS'):
+            self.setup_method()
+            ac = aircrafts_dcs.Aircraft('preview')
+            ac.enable_stick_shaker = False
+            ac.stick_shaker_aoa = 22.3
+            ac.stick_shaker_intensity = 0.5
+            ac.stick_shaker_frequency = 40
+            runner = self._run_hold(ac, STICK_SHAKER, sim)
+            assert runner.method_name == 'dcs_update_stick_shaker'
+            assert ac._telem_data['AoA'] == pytest.approx(27.3)
+            assert ac._telem_data['SimOnGround'] == 0
+            one = self.mock_effects['stick_shaker1']._periodic
+            two = self.mock_effects['stick_shaker2']._periodic
+            assert one[:3] == (40, 0.5, 0) and two[:3] == (40, 0.5, 180)
+            self._finish(runner)
+
+    def test_msfs_shakes_on_the_stall_warning_flag(self):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.enable_stick_shaker = False
+        ac.stick_shaker_intensity = 0.5
+        runner = self._run_hold(ac, STICK_SHAKER, 'MSFS')
+        assert runner.method_name == 'msfs_update_stick_shaker'
+        assert ac._telem_data['StallWarning'] == 1
+        assert self.mock_effects['stick_shaker']._periodic[:3] == (14, 0.5, 0)
+        self._finish(runner)
+
+    def test_xplane_is_not_offered(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_msfs_xp.Aircraft('preview'), STICK_SHAKER, 'XPLANE')
+
+
+class TestOverspeedPreview(HoldPreviewCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Helicopter, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_full_strength_past_the_onset_at_the_aircrafts_frequency(self, cls, sim):
+        ac = cls('preview')
+        ac.overspeed_effect_enable = False
+        ac.overspeed_shake_intensity = 0.2
+        ac.overspeed_shake_start = 70.0
+        ac.etl_effect_enable = True
+        ac.rotor_blade_count = 4
+        runner = self._run_hold(ac, OVERSPEED_SHAKE, sim)
+        assert ac._telem_data['TAS'] == pytest.approx(85.0)
+        y = self.mock_effects['overspeedY']._periodic
+        assert y[0] == pytest.approx(ROTOR_RPM_NOMINAL / 75 * 4 * 0.75)   # 12 Hz
+        assert y[1] == pytest.approx(0.2)                                # full: 15 m/s past onset
+        assert self.mock_effects['overspeedX']._periodic[2] == 90
+        assert 'etlY' not in self.mock_effects                           # clear of the band
+        self._finish(runner)
+
+
+class TestGearBuffetPreview(HoldPreviewCase):
+    def _aircraft(self, cls):
+        ac = cls('preview')
+        ac.gear_buffet_effect_enabled = False
+        ac.gear_buffet_intensity = 0.15
+        ac.gear_buffet_freq = 10
+        ac.gear_buffet_speed_low = 100
+        ac.gear_buffet_speed_high = 150
+        ac.gear_motion_effect_enabled = True    # must not fire on a steady value
+        return ac
+
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_gear_down_at_the_top_of_the_band_is_full_intensity(self, cls, sim):
+        ac = self._aircraft(cls)
+        runner = self._run_hold(ac, GEAR_BUFFET, sim)
+        buffet = self.mock_effects['gearbuffet']._periodic
+        assert buffet[0] == 10
+        assert buffet[1] == pytest.approx(0.15)
+        assert self.mock_effects['gearbuffet2']._periodic[2] == 90
+        assert 'gearmovement' not in self.mock_effects
+        self._finish(runner)
+
+
+class TestSpeedbrakeAndSpoilerBuffetPreview(HoldPreviewCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_speedbrake_fully_deployed_is_full_intensity(self, cls, sim):
+        ac = cls('preview')
+        ac.speedbrake_buffet_effect_enabled = False
+        ac.speedbrake_buffet_intensity = 0.15
+        ac.speedbrake_motion_effect_enabled = True
+        runner = self._run_hold(ac, SPEEDBRAKE_BUFFET, sim)
+        buffet = self.mock_effects['speedbrakebuffet']._periodic
+        assert buffet[1] == pytest.approx(0.15)
+        assert 'speedbrakemovement' not in self.mock_effects
+        self._finish(runner)
+
+    def test_speedbrake_is_not_offered_on_msfs(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_msfs_xp.Aircraft('preview'), SPEEDBRAKE_BUFFET, 'MSFS')
+
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_spoilers_fully_deployed_at_the_top_speed_is_full_intensity(self, cls, sim):
+        ac = cls('preview')
+        ac.spoiler_buffet_effect_enabled = False
+        ac.spoiler_buffet_intensity = 0.15
+        runner = self._run_hold(ac, SPOILER_BUFFET, sim)
+        assert ac._telem_data['IAS'] == pytest.approx(ac.spoiler_spd_thresh_hi)
+        assert self.mock_effects['spoilerbuffet1-1']._periodic[1] == pytest.approx(0.15)
+        assert self.mock_effects['spoilerbuffet2-1']._periodic[2] == 90
+        self._finish(runner)
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):
