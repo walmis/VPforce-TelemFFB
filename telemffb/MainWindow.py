@@ -1379,27 +1379,55 @@ class MainWindow(QMainWindow):
         count = G.exception_tracker.get_count()
         self.exception_status_widget.set_count(count)
 
-    def start_effect_preview(self, spec):
-        """Debug menu: play one effect on the device with synthetic telemetry.
+    def effect_preview_blockers(self):
+        """Why an effect preview cannot run right now (empty: it can)."""
+        from telemffb.preview import preview_blockers
+        manager = getattr(G, 'telem_manager', None)
+        return preview_blockers(
+            current_aircraft=manager.currentAircraft if manager else None,
+            device_alive=HapticEffect.device_alive(),
+            telemetry_paused=bool(getattr(manager, 'pause_state', False)) if manager else True)
+
+    def effect_preview_running(self, spec):
+        preview = getattr(self, '_effect_preview', None)
+        return bool(preview is not None and preview.running and preview.runner.spec is spec)
+
+    def toggle_effect_preview(self, spec, button=None):
+        """Settings-row play button: start this preview, or stop it if it
+        is the one playing.  The button reads as a stop while it plays and
+        reverts when the run ends, however it ends."""
+        if self.effect_preview_running(spec):
+            self.stop_effect_preview()
+            return
+
+        def restore():
+            if button is not None:
+                try:
+                    button.setText("▶")
+                except RuntimeError:
+                    pass   # the row was rebuilt while the preview played
+
+        if self.start_effect_preview(spec, on_finished=restore) and button is not None:
+            button.setText("■")
+
+    def start_effect_preview(self, spec, on_finished=None):
+        """Play one effect on the device with synthetic telemetry.
 
         Builds a throwaway aircraft for the settings tab's current model
-        (sim defaults when nothing is selected) and drives the spec's
-        effect method from a timer.  Refused while a sim session is live,
-        since the preview would fight the loaded aircraft for the same
-        effect slots.
+        (sim defaults when nothing is selected), with its own effect
+        table so a loaded aircraft is untouched, and drives the spec's
+        effect method from a timer.  Refused only while telemetry is
+        actively streaming or the device is gone.  Returns True when the
+        preview started.
         """
-        from telemffb.preview import (PreviewRunner, TimedPreview,
-                                      preview_blockers, resolve_preview_target)
+        from telemffb.preview import PreviewRunner, TimedPreview, resolve_preview_target
         from telemffb.telem.TelemManager import build_aircraft
         self.stop_effect_preview()
-        manager = getattr(G, 'telem_manager', None)
-        blockers = preview_blockers(
-            current_aircraft=manager.currentAircraft if manager else None,
-            device_alive=HapticEffect.device_alive())
+        blockers = self.effect_preview_blockers()
         if blockers:
             QMessageBox.information(self, "Effect Preview",
                                     "Cannot preview now:\n- " + "\n- ".join(blockers))
-            return
+            return False
         sim, model, cls = resolve_preview_target(G.settings_mgr)
         try:
             aircraft = build_aircraft(sim, model, cls_name=cls)
@@ -1407,14 +1435,22 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logging.exception(f"Effect preview {spec.name} could not start")
             QMessageBox.warning(self, "Effect Preview", f"Could not start preview:\n{e}")
-            return
+            return False
         logging.info(f"Effect preview: {spec.name} on {sim} / {cls or '-'} / {model} "
                      f"({type(aircraft).__name__}), {runner.steps_total} frames "
                      f"at {runner.frame_rate:g} Hz")
-        self._effect_preview = TimedPreview(
-            runner, on_finished=lambda: logging.info(
-                f"Effect preview finished: {spec.name}"))
+        from telemffb.SettingsLayout import mark_preview_sliders
+        mark_preview_sliders(self, spec, True)     # the live-effect green, while it plays
+
+        def finished():
+            logging.info(f"Effect preview finished: {spec.name}")
+            mark_preview_sliders(self, spec, False)
+            if on_finished is not None:
+                on_finished()
+
+        self._effect_preview = TimedPreview(runner, on_finished=finished)
         self._effect_preview.start()
+        return True
 
     def stop_effect_preview(self):
         preview = getattr(self, '_effect_preview', None)
