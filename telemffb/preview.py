@@ -58,6 +58,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import telemffb.globals as G
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.util.conversions import kt2ms
 
 SIMS = ("DCS", "MSFS", "XPLANE", "IL2", "BMS")
 KINDS = ("hold", "ramp", "edge")
@@ -70,9 +71,22 @@ FRAME_RATE_HZ = 30.0
 #     Either end may be the NAME of an aircraft attribute, resolved on
 #     the instance, so a sweep can run between the profile's own
 #     thresholds: ('engine_rumble_lowrpm', 'engine_rumble_highrpm')
+#   - Attr('name'): the named aircraft attribute, resolved on the instance
 #   - a callable (aircraft, progress) -> value, for anything the above
 #     cannot express (a list that varies)
 FieldValue = Any
+
+
+@dataclass(frozen=True)
+class Attr:
+    """A reference to an aircraft attribute, resolved per frame."""
+    name: str
+
+
+# A schedule segment: (seconds, stimulus progress at the start, at the end).
+# Stimulus progress 0..1 is what the fields interpolate over; a segment
+# with equal ends is a hold, one from 0 to 1 a sweep.
+Segment = Tuple[float, float, float]
 
 
 @dataclass(frozen=True)
@@ -104,6 +118,17 @@ class PreviewSpec:
     # holds are long enough to judge, the sweep between shows the
     # transition.  Zero for holds and edges.
     dwell: float = 0.0
+    # The general form of dwell: a sequence of (seconds, from, to) segments
+    # the stimulus progress follows in order.  Lets a sweep hold at its
+    # PEAK rather than its ends when the ends are silent by definition
+    # (stall buffet at onset, ETL outside the band).  Overrides duration
+    # (which becomes the segments' sum) and excludes dwell.
+    schedule: Optional[Tuple[Segment, ...]] = None
+    # Extra keyword arguments for the effect method, resolved per frame
+    # like fields.  Some effects take state the live loop passes in
+    # (ac_calc_etl_effect's blade count) and fall back to a hard-coded
+    # guess without it.
+    kwargs: Dict[str, FieldValue] = None
     sims: Tuple[str, ...] = SIMS
 
     def __post_init__(self):
@@ -112,25 +137,48 @@ class PreviewSpec:
         unknown = set(self.fields) - set(SIMS) - {'*'}
         if unknown:
             raise ValueError(f"{self.effect_id}: fields keyed by unknown sim(s) {sorted(unknown)}")
+        if self.kwargs is None:
+            object.__setattr__(self, 'kwargs', {})
+        if self.schedule is not None:
+            if self.dwell:
+                raise ValueError(f"{self.effect_id}: give a dwell or a schedule, not both")
+            for seconds, a, b in self.schedule:
+                if seconds <= 0 or not (0.0 <= a <= 1.0 and 0.0 <= b <= 1.0):
+                    raise ValueError(f"{self.effect_id}: bad schedule segment {(seconds, a, b)}")
+            object.__setattr__(self, 'duration', float(sum(seg[0] for seg in self.schedule)))
+            return
         if self.dwell < 0 or (self.dwell and 2 * self.dwell >= self.duration):
             raise ValueError(f"{self.effect_id}: dwell {self.dwell}s x2 must fit inside "
                              f"the {self.duration}s duration")
+        if self.dwell:
+            segments = ((self.dwell, 0.0, 0.0),
+                        (self.duration - 2 * self.dwell, 0.0, 1.0),
+                        (self.dwell, 1.0, 1.0))
+        else:
+            segments = ((self.duration, 0.0, 1.0),)
+        object.__setattr__(self, 'schedule', segments)
 
     def supports(self, sim: str) -> bool:
         return sim in self.sims
 
     def stimulus_progress(self, progress: float) -> float:
-        """Frame progress (0..1 over the whole run) -> stimulus progress:
-        flat at 0 through the leading dwell, linear through the middle,
-        flat at 1 through the trailing dwell."""
-        if not self.dwell:
-            return progress
-        d = self.dwell / self.duration
-        if progress <= d:
-            return 0.0
-        if progress >= 1.0 - d:
-            return 1.0
-        return (progress - d) / (1.0 - 2.0 * d)
+        """Frame progress (0..1 over the whole run) -> stimulus progress,
+        following the schedule: for a plain sweep the identity, for a
+        dwell flat at 0, linear, flat at 1."""
+        t = progress * self.duration
+        elapsed = 0.0
+        for seconds, a, b in self.schedule:
+            # a boundary instant belongs to the segment that STARTS there,
+            # so the first frame after a hold is the sweep's own start
+            if t < elapsed + seconds:
+                return a + (b - a) * (t - elapsed) / seconds
+            elapsed += seconds
+        return self.schedule[-1][2]
+
+    def resolve_kwargs(self, aircraft, progress: float) -> Dict[str, Any]:
+        progress = self.stimulus_progress(progress)
+        return {name: self._resolve(value, aircraft, progress)
+                for name, value in self.kwargs.items()}
 
     def resolve_fields(self, aircraft, sim: str, progress: float) -> Dict[str, Any]:
         """The telemetry fields for one frame at frame ``progress`` (0..1)."""
@@ -143,6 +191,8 @@ class PreviewSpec:
                 for name, value in merged.items()}
 
     def _resolve(self, value: FieldValue, aircraft, progress: float):
+        if isinstance(value, Attr):
+            return getattr(aircraft, value.name)
         if callable(value):
             return value(aircraft, progress)
         if isinstance(value, tuple) and len(value) == 2:
@@ -158,6 +208,8 @@ class PreviewSpec:
     def _endpoint(value, aircraft):
         """A pair endpoint: a number as-is, a string as the named aircraft
         attribute (a profile threshold)."""
+        if isinstance(value, Attr):
+            return getattr(aircraft, value.name)
         if isinstance(value, str):
             return getattr(aircraft, value)
         return value
@@ -225,7 +277,7 @@ class PreviewRunner:
         ac._last_telem_data = ac._telem_data.copy()
         ac._telem_data = frame
         try:
-            getattr(ac, self.spec.method)(frame)
+            getattr(ac, self.spec.method)(frame, **self.spec.resolve_kwargs(ac, self.progress))
         except Exception:
             logging.exception(f"Preview {self.spec.effect_id}: effect method raised; stopping")
             self.finish()
@@ -391,6 +443,54 @@ PROP_ENGINE_RUMBLE = PreviewSpec(
     sims=('DCS', 'MSFS', 'XPLANE', 'IL2'),
 )
 
+STALL_BUFFET = PreviewSpec(
+    effect_id='aoa_buffeting_enabled',
+    method='ac_update_buffeting',
+    kind='ramp',
+    # AoA sweeps the profile's onset -> stall band, then holds at stall:
+    # onset is zero magnitude by definition, so a dwell there would be 4 s
+    # of silence.  No StallAoA / WarnAlpha / DesignSpeed in the frame, so
+    # the effect takes its fallback path on every sim: the profile's own
+    # thresholds for the band and the legacy airflow scale, which is 1.0
+    # at 75 kt.  On MSFS / X-Plane the live band comes from the sim, so
+    # the preview demonstrates intensity and renderer, not the band.
+    fields={'*': {'AoA': ('buffet_aoa', 'stall_aoa'),
+                  'TAS': 75 * kt2ms,
+                  'WeightOnWheels': [0, 0, 0],
+                  'Flaps': 0}},
+    # 3 s onset sweep, 4 s at stall, 1 s recovery back to onset so the
+    # end is a fade rather than a cut
+    schedule=((3.0, 0.0, 1.0), (4.0, 1.0, 1.0), (1.0, 1.0, 0.0)),
+    tail=0.0,
+    # IL-2 overrides the method with its telemetry-native buffet
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+ROTOR_RPM_NOMINAL = 300   # a typical NR; no profile threshold exists for it
+
+ETL = PreviewSpec(
+    effect_id='etl_effect_enable',
+    method='ac_calc_etl_effect',
+    kind='ramp',
+    # ETL is a transient: a few seconds of shake as the aircraft
+    # accelerates or decelerates through the band.  A hold at the peak
+    # felt wrong on the bench (it never sits there in flight), so the
+    # preview is the event itself - one acceleration through the band at
+    # the pace it happens.
+    # The blade count is passed the way the live loop passes it; without
+    # it the effect hard-codes 2 blades at 250 RPM and the frequency is
+    # wrong for the aircraft.
+    fields={'*': {'TAS': ('etl_start_speed', 'etl_stop_speed'),
+                  'WeightOnWheels': [0, 0, 0],
+                  'RotorRPM': ROTOR_RPM_NOMINAL},
+            'XPLANE': {'PropRPM': [ROTOR_RPM_NOMINAL]}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=5.0,    # a single pass up through the band
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
-    spec.effect_id: spec for spec in (PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION)
+    spec.effect_id: spec for spec in (
+        PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL)
 }
