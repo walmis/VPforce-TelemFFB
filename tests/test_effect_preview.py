@@ -31,6 +31,8 @@ from telemffb.preview import (
     AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET, SPEEDBRAKE_BUFFET,
     SPOILER_BUFFET, FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
     TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
+    GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
+    IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits,
     ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
 from tests.framework.base import BaseTelemetryEffectTestCase
@@ -279,10 +281,17 @@ class TestPreviewSpec:
                                          'Gear': lambda a, p: [p]}})
         assert spec.resolve_fields(ac, 'DCS', 0.25) == {'RPM': 650, 'Gear': [0.25]}
 
-    def test_registry_is_keyed_by_effect_id(self):
+    def test_registry_is_keyed_by_name_which_defaults_to_the_toggle(self):
         assert PREVIEW_SPECS['engine_jet_rumble_enabled'] is JET_ENGINE_RUMBLE
         assert PREVIEW_SPECS['gear_motion_effect_enabled'] is GEAR_MOTION
         assert PREVIEW_SPECS['engine_prop_rumble_enabled'] is PROP_ENGINE_RUMBLE
+        assert JET_ENGINE_RUMBLE.name == JET_ENGINE_RUMBLE.effect_id
+        # one toggle, three tuned effects, three previews
+        assert PREVIEW_SPECS['il2_gunfire'] is IL2_GUNFIRE
+        assert PREVIEW_SPECS['il2_bombs'] is IL2_BOMB_RELEASE
+        assert PREVIEW_SPECS['il2_rockets'] is IL2_ROCKET_RELEASE
+        assert {s.effect_id for s in (IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE)} \
+            == {'il2_enable_weapons'}
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +399,12 @@ class TestPreviewRunnerMechanics(BaseTelemetryEffectTestCase):
         assert ac.x_enabled is True
         ac2, _ = self._runner(force_enable=False)
         assert ac2.x_enabled is False
+
+    def test_force_attrs_ride_along_with_the_toggle(self):
+        ac, _ = self._runner(dict(force_attrs={'master': True, 'mode': 'basic'}))
+        assert ac.master is True and ac.mode == 'basic'
+        ac2, _ = self._runner(dict(force_attrs={'master': True}), force_enable=False)
+        assert not hasattr(ac2, 'master')
 
     def test_finish_frees_effects_once_and_step_is_inert_after(self):
         ac, runner = self._runner(frame_rate=2.0)          # 2 frames
@@ -1044,6 +1059,214 @@ class TestMotionRampPreviews(RampPreviewCase):
         for _ in range(3):
             runner.step()
         assert 'hookmovement' not in self.mock_effects
+
+
+class TestStepsHelper:
+    def test_changes_count_times_evenly(self):
+        f = steps(3, start=4, step=-1)
+        seen = [f(None, i / 99) for i in range(100)]
+        assert seen[0] == 4 and seen[-1] == 1
+        changes = [i for i in range(1, 100) if seen[i] != seen[i - 1]]
+        assert len(changes) == 3
+        assert changes == [33, 66, 99]                # thirds of the run
+
+
+class EdgePreviewCase(BaseTelemetryEffectTestCase):
+    """Run an edge spec frame by frame, recording every frame on which
+    a slot was (re)started, so a test can count events and their
+    spacing.  Frames are instantaneous here, so the change tracker's
+    quiet-period stops never fire mid-run; only start counts are
+    meaningful."""
+
+    def _events(self, ac, spec, sim, slot, rate=10.0):
+        runner = PreviewRunner(ac, spec, sim, frame_rate=rate)
+        fired, last_count, params = [], 0, None
+        for i in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get(slot)
+            if fx is not None and fx.start_count > last_count:
+                fired.append(i)
+                last_count = fx.start_count
+                params = fx._periodic
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+        return fired, params
+
+
+class TestWeaponEdgePreviews(EdgePreviewCase):
+    def _aircraft(self, sim):
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.gunfire_effect_enabled = False
+        ac.weapon_release_effect_enabled = False
+        ac.countermeasure_effect_enabled = False
+        ac.gun_vibration_intensity = 0.3
+        ac.weapon_release_intensity = 0.25
+        ac.cm_vibration_intensity = 0.2
+        ac.weapon_effect_direction = 45
+        return ac
+
+    @pytest.mark.parametrize("sim", ['DCS', 'BMS'])
+    def test_gunfire_is_a_continuous_burst(self, sim):
+        fired, params = self._events(self._aircraft(sim), GUNFIRE, sim, 'gunfire')
+        # 20 frames; the first primes the tracker, every later one fires
+        assert fired == list(range(1, 20))
+        freq, mag, direction, kw = params
+        assert (freq, mag, direction) == (10, 0.3, 45)
+        assert kw == {'effect_type': 6, 'duration': 80}      # sawtooth up
+        assert 'payload_rel' not in self.mock_effects or \
+            self.mock_effects.get('payload_rel') is None
+
+    @pytest.mark.parametrize("sim", ['DCS', 'BMS'])
+    def test_weapon_release_fires_three_times_a_second_apart(self, sim):
+        fired, params = self._events(self._aircraft(sim), WEAPON_RELEASE, sim, 'payload_rel')
+        assert fired == [10, 20, 29]                          # thirds of 30 frames
+        assert params[:3] == (10, 0.25, 45)
+        assert params[3] == {'effect_type': 3, 'duration': 80}   # square
+
+    @pytest.mark.parametrize("sim", ['DCS', 'BMS'])
+    def test_countermeasures_fire_four_times(self, sim):
+        fired, params = self._events(self._aircraft(sim), COUNTERMEASURES, sim, 'cm')
+        assert fired == [5, 10, 15, 19]                       # quarters of 20 frames
+        assert params[:3] == (50, 0.2, 45)
+        assert params[3] == {'duration': 80}
+
+    def test_only_the_previewed_weapon_effect_plays(self):
+        ac = self._aircraft('DCS')
+        ac.gunfire_effect_enabled = True                      # user has it on
+        self._events(ac, WEAPON_RELEASE, 'DCS', 'payload_rel')
+        # a steady Gun value never fires the gunfire slot
+        fx = self.mock_effects.get('gunfire')
+        assert fx is None or fx.start_count == 0
+
+
+class TestIl2WeaponPreviews(EdgePreviewCase):
+    """The basic IL-2 weapon path, one preview per tuned effect, with the
+    shake master forced on and the dynamic gunfire mode (which needs
+    real gun telemetry) switched off for the throwaway."""
+
+    def _aircraft(self):
+        ac = aircrafts_il2.Aircraft('preview')
+        ac.il2_shake_master = 0
+        ac.il2_enable_weapons = 0
+        ac.il2_dynamic_gunfire_mode = True             # must be switched off for the preview
+        ac.il2_weapon_release_intensity = 0.3
+        ac.il2_bomb_release_intensity = 0.25
+        ac.il2_rocket_release_intensity = 0.2
+        return ac
+
+    def test_gunfire_is_one_held_burst(self):
+        ac = self._aircraft()
+        fired, params = self._events(ac, IL2_GUNFIRE, 'IL2', 'il2_gunfire')
+        assert ac.il2_shake_master is True and ac.il2_dynamic_gunfire_mode is False
+        assert fired == [1]                                          # primes, fires, holds
+        assert params == (10, 0.3, 0, {'effect_type': 3})           # 600 rpm square
+        for slot in ('il2_bombs', 'il2_rockets'):
+            fx = self.mock_effects.get(slot)
+            assert fx is None or fx.start_count == 0
+
+    def test_bomb_drops_once_at_the_midpoint(self):
+        fired, params = self._events(self._aircraft(), IL2_BOMB_RELEASE, 'IL2', 'il2_bombs')
+        assert fired == [5]                                          # 10 frames, edge at 0.5
+        assert params == (10, 0.25, 0, {'effect_type': 6, 'duration': 80})
+
+    def test_rocket_fires_once_at_the_midpoint(self):
+        fired, params = self._events(self._aircraft(), IL2_ROCKET_RELEASE, 'IL2', 'il2_rockets')
+        assert fired == [5]
+        assert params == (50, 0.2, 0, {'effect_type': 3, 'duration': 80})
+
+    def test_only_il2(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_dcs.Aircraft('preview'), IL2_GUNFIRE, 'DCS')
+
+
+class TestRandomHits:
+    def _ac(self):
+        return SimpleNamespace()
+
+    def test_schedule_is_drawn_once_per_aircraft_and_counts_up(self):
+        import random
+        hits = RandomHits(hits=(3, 3), cluster_chance=0.0, rng=random.Random(7))
+        ac = self._ac()
+        times = hits.schedule(ac)
+        assert len(times) == 3 and list(times) == sorted(times)
+        assert all(0.05 <= t <= 0.95 for t in times)
+        assert hits.schedule(ac) is times                    # cached on the throwaway
+        assert hits(ac, 0.0) == 0
+        assert hits(ac, times[1]) == 2
+        assert hits(ac, 1.0) == 3
+
+    def test_each_aircraft_gets_its_own_draw(self):
+        hits = RandomHits(hits=(6, 6), cluster_chance=0.0)   # system entropy
+        a, b = hits.schedule(self._ac()), hits.schedule(self._ac())
+        assert a != b
+
+    def test_clusters_trail_a_hit_closely(self):
+        import random
+        hits = RandomHits(hits=(2, 2), cluster_chance=1.0, cluster_span=0.03,
+                          rng=random.Random(3))
+        times = hits.schedule(self._ac())
+        assert 4 <= len(times) <= 6                          # 2 lone + 1-2 trailing each
+        gaps = [b - a for a, b in zip(times, times[1:])]
+        assert min(gaps) <= 0.03                              # at least one tight pair
+
+
+class TestDamageEdgePreview(EdgePreviewCase):
+    def _seeded(self, monkeypatch, seed):
+        import random
+        import telemffb.preview as preview
+        monkeypatch.setattr(preview._DAMAGE_HITS, 'rng', random.Random(seed))
+
+    def test_dcs_hits_land_at_irregular_moments_within_the_intensity_band(self, monkeypatch):
+        self._seeded(monkeypatch, 11)
+        ac = aircrafts_dcs.Aircraft('preview')
+        ac.damage_effect_enabled = False
+        ac.damage_effect_intensity = 0.4
+        fired, params = self._events(ac, DAMAGE, 'DCS', 'damage', rate=30.0)   # 150 frames
+        assert 4 <= len(fired) <= 24
+        gaps = {b - a for a, b in zip(fired, fired[1:])}
+        assert len(gaps) >= 2                                 # not a metronome
+        assert 0 < fired[0] and fired[-1] < 149              # inside the run, before the tail
+        freq, mag, direction, kw = params
+        assert freq == 10 and 0 <= direction <= 359
+        assert 0.2 <= mag <= 0.6                              # 0.5x .. 1.5x intensity
+        assert kw['duration'] == 30 and kw['effect_type'] in (3, 4, 5)
+
+    def test_every_press_is_a_fresh_draw(self):
+        seen = []
+        for _ in range(2):
+            self.setup_method()
+            ac = aircrafts_dcs.Aircraft('preview')
+            ac.damage_effect_intensity = 0.4
+            fired, _ = self._events(ac, DAMAGE, 'DCS', 'damage', rate=30.0)
+            seen.append(fired)
+        assert seen[0] != seen[1]
+
+    def test_il2_plays_hit_and_damage_slots_on_one_schedule(self, monkeypatch):
+        self._seeded(monkeypatch, 5)
+        ac = aircrafts_il2.Aircraft('preview')
+        ac.damage_effect_enabled = False
+        ac.damage_effect_intensity = 0.4
+        runner = PreviewRunner(ac, DAMAGE, 'IL2', frame_rate=30.0)
+        damage_fired, hit_fired = [], []
+        counts = {'damage': 0, 'hit': 0}
+        for i in range(runner.frames_total):
+            runner.step()
+            for slot, out in (('damage', damage_fired), ('hit', hit_fired)):
+                fx = self.mock_effects.get(slot)
+                if fx is not None and fx.start_count > counts[slot]:
+                    counts[slot] = fx.start_count
+                    out.append(i)
+        assert damage_fired and damage_fired == hit_fired    # same schedule, both slots
+        params = self.mock_effects['damage']._periodic
+        assert params[:2] == (10, 0.4) and params[3] == {'effect_type': 3, 'duration': 30}
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+
+    def test_msfs_is_not_offered(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_msfs_xp.Aircraft('preview'), DAMAGE, 'MSFS')
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):

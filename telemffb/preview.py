@@ -52,6 +52,7 @@ gate.  The runner is clock-agnostic (``step`` per frame) so the app can
 drive it from a timer and tests from a loop.
 """
 import logging
+import random
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -106,6 +107,11 @@ class PreviewSpec:
     method: Any
     kind: str
     fields: Dict[str, Dict[str, FieldValue]]
+    # Registry key and menu label.  Defaults to the toggle, which is the
+    # right identity for almost every effect; an effect whose ONE toggle
+    # covers several separately-tuned effects (IL-2's weapons: gun, bomb,
+    # rocket, three intensities) gets one spec per adjustment.
+    name: str = ''
     duration: float = 3.0
     # Seconds the LAST frame is repeated before cleanup.  A one-shot fired
     # on the final scripted frame (the gear clunk at 1.0) would otherwise
@@ -131,6 +137,11 @@ class PreviewSpec:
     # (ac_calc_etl_effect's blade count) and fall back to a hard-coded
     # guess without it.
     kwargs: Dict[str, FieldValue] = None
+    # Attributes set on the throwaway aircraft alongside the forced-on
+    # toggle: parent gates the effect sits behind (IL-2's shake master)
+    # and mode switches that would route it to a path a preview cannot
+    # feed (IL-2's dynamic gunfire needs real gun telemetry).
+    force_attrs: Dict[str, Any] = None
     sims: Tuple[str, ...] = SIMS
 
     def __post_init__(self):
@@ -139,8 +150,12 @@ class PreviewSpec:
         unknown = set(self.fields) - set(SIMS) - {'*'}
         if unknown:
             raise ValueError(f"{self.effect_id}: fields keyed by unknown sim(s) {sorted(unknown)}")
+        if not self.name:
+            object.__setattr__(self, 'name', self.effect_id)
         if self.kwargs is None:
             object.__setattr__(self, 'kwargs', {})
+        if self.force_attrs is None:
+            object.__setattr__(self, 'force_attrs', {})
         if self.schedule is not None:
             if self.dwell:
                 raise ValueError(f"{self.effect_id}: give a dwell or a schedule, not both")
@@ -259,6 +274,8 @@ class PreviewRunner:
             # the method dispose its slots and return.  The instance is a
             # throwaway, so nothing to restore.
             setattr(aircraft, spec.effect_id, True)
+            for name, value in spec.force_attrs.items():
+                setattr(aircraft, name, value)
 
     @property
     def period(self) -> float:
@@ -655,11 +672,158 @@ WINGFOLD_MOTION = PreviewSpec(
     sims=('DCS',),
 )
 
+# ---------------------------------------------------------------------------
+# Edges: one-shots that fire on a telemetry CHANGE.  A single step would
+# give one event, so these feed a train of changes - a value that steps N
+# times over the run fires N times, evenly spaced; a value that changes
+# every frame (gunfire) fires continuously.  The tail lets the last shot
+# play out before cleanup.
+# ---------------------------------------------------------------------------
+
+def steps(count: int, start: float = 0.0, step: float = 1.0):
+    """A field that changes ``count`` times over the run: ``start`` on the
+    first frame, then one step per 1/count of progress.  The first value
+    primes the change tracker; each later step is one event."""
+    return lambda ac, p: start + step * int(p * count)
+
+class RandomHits:
+    """A counter that steps at random moments over the run.
+
+    For effects like damage, where the real thing is an irregular stream
+    of single hits and short clusters, an even train reads as a metronome.
+    Each run draws its own schedule: ``hits`` lone events spread over the
+    run, each with ``cluster_chance`` of trailing one or two more within
+    ``cluster_span`` of the run, then the counter is the number of hits at
+    or before the current progress.  The schedule lives on the throwaway
+    aircraft, so every press is a fresh draw and two fields sharing one
+    instance (IL-2's Hits and Damage) step together.
+    """
+
+    def __init__(self, hits=(4, 8), cluster_chance=0.4, cluster_span=0.03,
+                 rng: Optional[random.Random] = None):
+        self.hits = hits
+        self.cluster_chance = cluster_chance
+        self.cluster_span = cluster_span
+        self.rng = rng
+
+    def schedule(self, aircraft):
+        store = aircraft.__dict__.setdefault('_preview_random_hits', {})
+        if id(self) not in store:
+            rng = self.rng or random.Random()
+            times = []
+            for _ in range(rng.randint(*self.hits)):
+                t = rng.uniform(0.05, 0.95)
+                times.append(t)
+                if rng.random() < self.cluster_chance:
+                    for _ in range(rng.randint(1, 2)):
+                        times.append(min(0.98, t + rng.uniform(0.3, 1.0) * self.cluster_span))
+            store[id(self)] = tuple(sorted(times))
+        return store[id(self)]
+
+    def __call__(self, aircraft, progress):
+        return sum(1 for t in self.schedule(aircraft) if t <= progress)
+
+
+_DAMAGE_HITS = RandomHits()
+
+
+GUNFIRE = PreviewSpec(
+    effect_id='gunfire_effect_enabled',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # the gun signal changes every frame while firing; a 2 s burst
+    fields={'*': {'Gun': lambda ac, p: p,
+                  'PayloadInfo': 4, 'Flares': 10, 'Chaff': 10}},
+    duration=2.0,
+    sims=('DCS', 'BMS'),
+)
+
+WEAPON_RELEASE = PreviewSpec(
+    effect_id='weapon_release_effect_enabled',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # three releases a second apart: the payload count steps down
+    fields={'*': {'PayloadInfo': steps(3, start=4, step=-1),
+                  'Gun': 0, 'Flares': 10, 'Chaff': 10}},
+    duration=3.0,
+    sims=('DCS', 'BMS'),
+)
+
+COUNTERMEASURES = PreviewSpec(
+    effect_id='countermeasure_effect_enabled',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # four flares half a second apart
+    fields={'*': {'Flares': steps(4, start=10, step=-1),
+                  'Chaff': 10, 'Gun': 0, 'PayloadInfo': 4}},
+    duration=2.0,
+    sims=('DCS', 'BMS'),
+)
+
+DAMAGE = PreviewSpec(
+    effect_id='damage_effect_enabled',
+    method={'*': 'dcs_update_damage', 'IL2': 'il2_update_damage'},
+    kind='edge',
+    # An irregular stream of hits over 5 s - lone rounds and short
+    # clusters at random moments, redrawn every press.  DCS randomises
+    # direction, amplitude (0.5-1.5x) and waveform per hit; IL-2 plays a
+    # hit and a damage slot, both stepping on the same schedule.
+    fields={'*': {'Damage': _DAMAGE_HITS},
+            'IL2': {'Damage': _DAMAGE_HITS, 'Hits': _DAMAGE_HITS}},
+    duration=5.0,
+    sims=('DCS', 'BMS', 'IL2'),
+)
+
+# IL-2's three basic weapon effects share one toggle but have three
+# intensities, so three previews.  The dynamic gunfire mode computes its
+# pattern from the aircraft's real gun telemetry and is not previewable;
+# the throwaway is switched to the basic path, and the shake master the
+# effects sit behind is forced on.
+_IL2_WEAPON_FORCE = {'il2_shake_master': True, 'il2_dynamic_gunfire_mode': False}
+
+IL2_GUNFIRE = PreviewSpec(
+    name='il2_gunfire',
+    effect_id='il2_enable_weapons',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # the gun counter changes every frame for a 2 s burst; the tail holds
+    # it so the effect winds down as it does live
+    fields={'IL2': {'Gun': lambda ac, p: p, 'Bombs': 2, 'Rockets': 4}},
+    duration=2.0,
+    force_attrs=_IL2_WEAPON_FORCE,
+    sims=('IL2',),
+)
+
+IL2_BOMB_RELEASE = PreviewSpec(
+    name='il2_bombs',
+    effect_id='il2_enable_weapons',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    fields={'IL2': {'Bombs': (2, 1), 'Gun': 0, 'Rockets': 4}},   # one drop at the midpoint
+    duration=1.0,
+    force_attrs=_IL2_WEAPON_FORCE,
+    sims=('IL2',),
+)
+
+IL2_ROCKET_RELEASE = PreviewSpec(
+    name='il2_rockets',
+    effect_id='il2_enable_weapons',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    fields={'IL2': {'Rockets': (4, 3), 'Gun': 0, 'Bombs': 2}},
+    duration=1.0,
+    force_attrs=_IL2_WEAPON_FORCE,
+    sims=('IL2',),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
-    spec.effect_id: spec for spec in (
+    spec.name: spec for spec in (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
         AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET,
         SPEEDBRAKE_BUFFET, SPOILER_BUFFET,
         FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
-        TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION)
+        TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
+        GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
+        IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE)
 }
+assert len(PREVIEW_SPECS) == 25, "a spec name collided"

@@ -1405,15 +1405,15 @@ class MainWindow(QMainWindow):
             aircraft = build_aircraft(sim, model, cls_name=cls)
             runner = PreviewRunner(aircraft, spec, sim)
         except Exception as e:
-            logging.exception(f"Effect preview {spec.effect_id} could not start")
+            logging.exception(f"Effect preview {spec.name} could not start")
             QMessageBox.warning(self, "Effect Preview", f"Could not start preview:\n{e}")
             return
-        logging.info(f"Effect preview: {spec.effect_id} on {sim} / {cls or '-'} / {model} "
+        logging.info(f"Effect preview: {spec.name} on {sim} / {cls or '-'} / {model} "
                      f"({type(aircraft).__name__}), {runner.steps_total} frames "
                      f"at {runner.frame_rate:g} Hz")
         self._effect_preview = TimedPreview(
             runner, on_finished=lambda: logging.info(
-                f"Effect preview finished: {spec.effect_id}"))
+                f"Effect preview finished: {spec.name}"))
         self._effect_preview.start()
 
     def stop_effect_preview(self):
@@ -1479,8 +1479,8 @@ class MainWindow(QMainWindow):
         # telemetry and the settings tab's current model.
         from telemffb.preview import PREVIEW_SPECS
         preview_menu = debug_menu.addMenu("Preview Effect")
-        for effect_id, spec in PREVIEW_SPECS.items():
-            preview_action = QAction(f"{effect_id}  ({spec.kind}, {spec.duration:g}s)", self)
+        for name, spec in PREVIEW_SPECS.items():
+            preview_action = QAction(f"{name}  ({spec.kind}, {spec.duration:g}s)", self)
             preview_action.triggered.connect(
                 lambda checked=False, s=spec: self.start_effect_preview(s))
             preview_menu.addAction(preview_action)
