@@ -796,8 +796,11 @@ class SettingsLayout(QGridLayout):
             running = getattr(mw, 'effect_preview_running', lambda s: False)(spec)
             if running:
                 button.setText("\u25a0")
-            tip = (f"Preview this effect on the device ({spec.duration:g} s) at the maximum "
-                   "your settings allow; in flight the telemetry scales it, usually lower. "
+            # one clause per line: a Qt tooltip only wraps where told to,
+            # and a single long line runs the width of the screen
+            tip = (f"Preview: {spec.reference} ({spec.duration:g} s).\n"
+                   "Plays at the maximum your settings allow;\n"
+                   "in flight the telemetry sets the level, usually lower.\n"
                    "Click again to stop.")
             if spec.constant_force:
                 tip += "\nConstant force: keep a firm hold on the controls."
