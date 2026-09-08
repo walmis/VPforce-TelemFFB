@@ -95,13 +95,15 @@ class PreviewSpec:
 
     ``effect_id`` is the effect's enable toggle in defaults.xml; it names
     the preview and is the attribute forced on for the run.  ``method`` is
-    the aircraft method called once per frame.  ``fields`` is keyed by sim
-    name with ``'*'`` for every sim; a sim's entries are merged over the
-    ``'*'`` entries, which is how one spec names ``EngRPM`` for most sims
-    and ``EngPCT`` for X-Plane.
+    the aircraft method called once per frame - a name, or a dict keyed
+    by sim with ``'*'`` as the default, for an effect that lives in a
+    different method per sim (the stick shaker).  ``fields`` is keyed by
+    sim name with ``'*'`` for every sim; a sim's entries are merged over
+    the ``'*'`` entries, which is how one spec names ``EngRPM`` for most
+    sims and ``EngPCT`` for X-Plane.
     """
     effect_id: str
-    method: str
+    method: Any
     kind: str
     fields: Dict[str, Dict[str, FieldValue]]
     duration: float = 3.0
@@ -160,6 +162,14 @@ class PreviewSpec:
 
     def supports(self, sim: str) -> bool:
         return sim in self.sims
+
+    def method_for(self, sim: str) -> str:
+        if isinstance(self.method, dict):
+            name = self.method.get(sim, self.method.get('*'))
+            if name is None:
+                raise ValueError(f"{self.effect_id}: no method for {sim}")
+            return name
+        return self.method
 
     def stimulus_progress(self, progress: float) -> float:
         """Frame progress (0..1 over the whole run) -> stimulus progress,
@@ -231,8 +241,9 @@ class PreviewRunner:
                  force_enable: bool = True):
         if not spec.supports(sim):
             raise ValueError(f"{spec.effect_id} is not previewable on {sim}")
-        if not hasattr(aircraft, spec.method):
-            raise ValueError(f"{type(aircraft).__name__} has no {spec.method}")
+        self.method_name = spec.method_for(sim)
+        if not hasattr(aircraft, self.method_name):
+            raise ValueError(f"{type(aircraft).__name__} has no {self.method_name}")
         self.aircraft = aircraft
         self.spec = spec
         self.sim = sim
@@ -277,7 +288,7 @@ class PreviewRunner:
         ac._last_telem_data = ac._telem_data.copy()
         ac._telem_data = frame
         try:
-            getattr(ac, self.spec.method)(frame, **self.spec.resolve_kwargs(ac, self.progress))
+            getattr(ac, self.method_name)(frame, **self.spec.resolve_kwargs(ac, self.progress))
         except Exception:
             logging.exception(f"Preview {self.spec.effect_id}: effect method raised; stopping")
             self.finish()
@@ -490,7 +501,101 @@ ETL = PreviewSpec(
     sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
 )
 
+# ---------------------------------------------------------------------------
+# Holds: on/off effects with one intensity.  Five seconds at the full-scale
+# point, no tail (a hold has nothing to settle).
+# ---------------------------------------------------------------------------
+
+HOLD_SECONDS = 5.0
+
+AFTERBURNER = PreviewSpec(
+    effect_id='afterburner_effect_enabled',
+    method='ac_update_ab_effect',
+    # The effect re-issues only when something CHANGED: the afterburner
+    # value or its own slow modulation term.  With the burner lit from
+    # the first frame the change tracker primes on that frame and the
+    # modulation ticks on the next, so it lights one frame in - the same
+    # way it does live.
+    kind='hold',
+    fields={'*': {'Afterburner': 1}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+STICK_SHAKER = PreviewSpec(
+    effect_id='enable_stick_shaker',
+    # DCS / BMS shake above a profile AoA; MSFS shakes on the sim's stall
+    # warning flag.  Different methods, different fields, one preview.
+    method={'*': 'dcs_update_stick_shaker', 'MSFS': 'msfs_update_stick_shaker'},
+    kind='hold',
+    fields={'DCS': {'AoA': lambda ac, p: ac.stick_shaker_aoa + 5.0, 'SimOnGround': 0},
+            'BMS': {'AoA': lambda ac, p: ac.stick_shaker_aoa + 5.0, 'SimOnGround': 0},
+            'MSFS': {'StallWarning': 1}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'BMS', 'MSFS'),
+)
+
+OVERSPEED_SHAKE = PreviewSpec(
+    effect_id='overspeed_effect_enable',
+    method='ac_calc_etl_effect',
+    kind='hold',
+    # The overspeed branch of the ETL method: full strength 15 m/s past
+    # the onset speed (its own scaling), well clear of the ETL band.
+    fields={'*': {'TAS': lambda ac, p: ac.overspeed_shake_start + 15.0,
+                  'WeightOnWheels': [0, 0, 0],
+                  'RotorRPM': ROTOR_RPM_NOMINAL},
+            'XPLANE': {'PropRPM': [ROTOR_RPM_NOMINAL]}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+_XP_VLE = 60.0   # m/s; X-Plane takes the gear buffet band from Vle (0.9 .. 1.17 x)
+
+GEAR_BUFFET = PreviewSpec(
+    effect_id='gear_buffet_effect_enabled',
+    method='ac_update_landing_gear',
+    kind='hold',
+    # Gear down at the top of the profile's buffet speed band = full
+    # intensity.  X-Plane derives the band from the aircraft's Vle, so
+    # the frame supplies one and the speed to match.
+    fields={'*': {'gear_value': 1.0, 'IAS': Attr('gear_buffet_speed_high')},
+            'MSFS': {'RetractableGear': 1, 'Gear': [1.0]},
+            'XPLANE': {'RetractableGear': 1, 'Gear': [1.0],
+                       'Vle': _XP_VLE, 'IAS': 0.9 * _XP_VLE * 1.3}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+SPEEDBRAKE_BUFFET = PreviewSpec(
+    effect_id='speedbrake_buffet_effect_enabled',
+    method='ac_update_speed_brakes',
+    kind='hold',
+    # Fully deployed at 100 m/s: the shared buffet helper scales speed
+    # over a fixed 0..100 m/s range, so that is its full-scale point.
+    fields={'*': {'SpeedbrakePos': 1.0, 'IAS': 100.0}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'XPLANE', 'BMS'),
+)
+
+SPOILER_BUFFET = PreviewSpec(
+    effect_id='spoiler_buffet_effect_enabled',
+    method='ac_update_spoilers',
+    kind='hold',
+    fields={'*': {'Spoilers': 1.0, 'IAS': Attr('spoiler_spd_thresh_hi')}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
     spec.effect_id: spec for spec in (
-        PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL)
+        PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
+        AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET,
+        SPEEDBRAKE_BUFFET, SPOILER_BUFFET)
 }
