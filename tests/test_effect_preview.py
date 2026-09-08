@@ -14,6 +14,7 @@ the real aircraft classes: jet rumble is a 'hold', gear motion is a
 'ramp' whose whole point is that the effect only plays while the value
 keeps changing.
 """
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -25,9 +26,9 @@ import telemffb.xmlutils as xmlutils
 from telemffb.sim import aircrafts_dcs, aircrafts_msfs_xp, aircrafts_il2
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.preview import (
-    PreviewSpec, PreviewRunner, TimedPreview, preview_blockers, resolve_preview_target,
-    JET_ENGINE_RUMBLE, JET_IDLE_PCT, GEAR_MOTION, PROP_ENGINE_RUMBLE, PREVIEW_SPECS,
-    FRAME_RATE_HZ)
+    Attr, PreviewSpec, PreviewRunner, TimedPreview, preview_blockers, resolve_preview_target,
+    JET_ENGINE_RUMBLE, JET_IDLE_PCT, GEAR_MOTION, PROP_ENGINE_RUMBLE, STALL_BUFFET, ETL,
+    ROTOR_RPM_NOMINAL, PREVIEW_SPECS, FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
 from tests.framework.base import BaseTelemetryEffectTestCase
 
@@ -217,6 +218,47 @@ class TestPreviewSpec:
             PreviewSpec(effect_id='x_enabled', method='m', kind='ramp',
                         fields={'*': {}}, duration=4.0, dwell=-1.0)
 
+    def test_attr_resolves_on_the_instance_in_fields_and_pairs(self):
+        ac = SimpleNamespace(blades=4, lo=1, hi=3)
+        spec = self._spec('ramp', {'*': {'n': Attr('blades'), 'v': (Attr('lo'), 'hi')}})
+        assert spec.resolve_fields(ac, 'DCS', 0.5) == {'n': 4, 'v': 2}
+
+    def test_schedule_holds_and_sweeps_in_order_and_sets_the_duration(self):
+        spec = PreviewSpec(effect_id='x_enabled', method='m', kind='ramp',
+                           fields={'*': {'v': (0.0, 1.0)}}, duration=99.0,
+                           schedule=((4.0, 0.5, 0.5), (6.0, 0.0, 1.0)))
+        assert spec.duration == 10.0                         # segments' sum, not 99
+        sp = spec.stimulus_progress
+        assert sp(0.0) == 0.5 and sp(0.2) == 0.5             # hold at the peak
+        assert sp(0.4) == pytest.approx(0.0)                 # sweep starts
+        assert sp(0.7) == pytest.approx(0.5)
+        assert sp(1.0) == pytest.approx(1.0)
+
+    def test_dwell_is_sugar_for_a_three_segment_schedule(self):
+        spec = PreviewSpec(effect_id='x_enabled', method='m', kind='ramp',
+                           fields={'*': {}}, duration=14.0, dwell=4.0)
+        assert spec.schedule == ((4.0, 0.0, 0.0), (6.0, 0.0, 1.0), (4.0, 1.0, 1.0))
+        plain = self._spec('ramp', {'*': {}})
+        assert plain.schedule == ((plain.duration, 0.0, 1.0),)
+
+    def test_schedule_validation(self):
+        with pytest.raises(ValueError):                     # not both
+            PreviewSpec(effect_id='x_enabled', method='m', kind='ramp', fields={'*': {}},
+                        duration=10.0, dwell=2.0, schedule=((10.0, 0.0, 1.0),))
+        with pytest.raises(ValueError):                     # zero-length segment
+            PreviewSpec(effect_id='x_enabled', method='m', kind='ramp', fields={'*': {}},
+                        schedule=((0.0, 0.0, 1.0),))
+        with pytest.raises(ValueError):                     # progress out of range
+            PreviewSpec(effect_id='x_enabled', method='m', kind='ramp', fields={'*': {}},
+                        schedule=((1.0, 0.0, 1.5),))
+
+    def test_kwargs_resolve_like_fields(self):
+        ac = SimpleNamespace(blades=4)
+        spec = PreviewSpec(effect_id='x_enabled', method='m', kind='ramp', fields={'*': {}},
+                           kwargs={'blade_ct': Attr('blades'), 'p': lambda a, p: p})
+        assert spec.resolve_kwargs(ac, 0.25) == {'blade_ct': 4, 'p': 0.25}
+        assert self._spec('hold', {'*': {}}).kwargs == {}
+
     def test_callable_sees_aircraft_and_progress(self):
         ac = SimpleNamespace(peak_rpm=650)
         spec = self._spec('hold', {'*': {'RPM': lambda a, p: a.peak_rpm,
@@ -249,8 +291,9 @@ class FakeAircraft:
     def effects(self):
         return self._effects
 
-    def record(self, frame):
+    def record(self, frame, **kwargs):
         self.calls.append(frame)
+        self.kwargs_seen = kwargs
 
     def boom(self, frame):
         raise RuntimeError("effect blew up")
@@ -300,6 +343,11 @@ class TestPreviewRunnerMechanics(BaseTelemetryEffectTestCase):
                 break
         assert seen == pytest.approx([0.0, 0.25, 0.5, 0.75, 1.0])
         assert [f['v'] for f in ac.calls] == pytest.approx([0.0, 0.25, 0.5, 0.75, 1.0])
+
+    def test_kwargs_reach_the_effect_method(self):
+        ac, runner = self._runner(dict(kwargs={'blade_ct': 3}))
+        runner.step()
+        assert ac.kwargs_seen == {'blade_ct': 3}
 
     def test_frame_carries_sim_device_and_name(self):
         ac, runner = self._runner(device_type='pedals')
@@ -585,6 +633,116 @@ class TestPropEngineRumblePreview(BaseTelemetryEffectTestCase):
         ac = self._aircraft(aircrafts_dcs.Aircraft)
         with pytest.raises(ValueError):
             PreviewRunner(ac, PROP_ENGINE_RUMBLE, 'BMS')
+
+
+class TestStallBuffetPreview(BaseTelemetryEffectTestCase):
+    """AoA sweeps onset -> stall then holds at stall.  With no sim-side
+    thresholds in the frame the effect uses the profile's own band and
+    the legacy airflow scale (1.0 at 75 kt), so magnitude runs 0 -> the
+    configured intensity."""
+
+    def _aircraft(self, cls):
+        ac = cls('preview')
+        ac.aoa_buffeting_enabled = False     # forced on by the preview
+        ac.buffeting_intensity = 0.2
+        ac.buffet_aoa = 10.0
+        ac.stall_aoa = 15.0
+        ac.aoa_buffet_freq = 13
+        ac.stall_buffet_style = "Classic"
+        return ac
+
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Aircraft, 'DCS'),
+        (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'),
+        (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_sweeps_the_band_then_holds_at_stall(self, cls, sim):
+        ac = self._aircraft(cls)
+        runner = PreviewRunner(ac, STALL_BUFFET, sim, frame_rate=10.0)   # 80 frames
+        assert runner.frames_total == 80
+        mags = []
+        for _ in range(runner.frames_total - 1):           # up to the last audible frame
+            runner.step()
+            fx = self.mock_effects['buffeting']
+            mags.append(fx._periodic[1])
+            if len(mags) == 1:
+                assert fx.started
+                assert ac._telem_data['AoA'] == pytest.approx(10.0)      # onset
+                assert ac._telem_data.get('StallAoA') is None          # fallback band
+                assert fx._periodic[0] == 13
+        assert mags[0] == pytest.approx(0.0)                           # silent at onset
+        # 3 s onset sweep, 4 s hold, 1 s recovery at 10 Hz over 8 s:
+        # frame 30 (t = 30/79 * 8 = 3.04 s) is the first held frame and
+        # frame 70 (t = 7.09 s) the first of the fade
+        assert all(a <= b + 1e-9 for a, b in zip(mags[:30], mags[1:31]))   # rising
+        assert mags[30:70] == [pytest.approx(0.2)] * 40                # the hold at stall
+        assert all(a > b for a, b in zip(mags[70:], mags[71:]))        # fading
+        assert mags[-1] < 0.05                                         # nearly gone
+        assert ac._telem_data['AoA'] < 11.0                            # back near onset
+        assert runner.step() is False
+        assert not self.mock_effects.dict
+
+    def test_il2_is_not_offered(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(self._aircraft(aircrafts_il2.Aircraft), STALL_BUFFET, 'IL2')
+
+
+class TestEtlPreview(BaseTelemetryEffectTestCase):
+    """The event itself: one acceleration through the band, Gaussian
+    peak at mid-band.  The blade count reaches the effect the way the
+    live loop passes it, so the frequency is the aircraft's rather than
+    the hard-coded fallback."""
+
+    def _aircraft(self, cls):
+        ac = cls('preview')
+        ac.etl_effect_enable = False         # forced on by the preview
+        ac.etl_effect_intensity = 0.2
+        ac.etl_start_speed = 6.0
+        ac.etl_stop_speed = 22.0
+        ac.overspeed_shake_start = 70.0
+        ac.rotor_blade_count = 4
+        return ac
+
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Helicopter, 'DCS'),
+        (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'),
+        (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_one_pass_through_the_band_at_the_aircrafts_frequency(self, cls, sim):
+        ac = self._aircraft(cls)
+        runner = PreviewRunner(ac, ETL, sim, frame_rate=10.0)   # 50 frames
+        assert runner.frames_total == 50
+        mags, tas_seen = [], []
+        for _ in range(runner.frames_total - 1):
+            runner.step()
+            tas_seen.append(ac._telem_data['TAS'])
+            mags.append(self.mock_effects['etlY']._periodic[1])
+        y = self.mock_effects['etlY']._periodic
+        x = self.mock_effects['etlX']._periodic
+        expected_freq = ROTOR_RPM_NOMINAL / 75 * 4          # 16 Hz: blade count got through
+        assert y[0] == pytest.approx(expected_freq) and y[2] == 0
+        assert x[0] == pytest.approx(expected_freq + 4) and x[2] == 90
+        edge = 0.2 * math.exp(-0.5 * (0.5 / 0.35) ** 2)
+        assert tas_seen[0] == pytest.approx(6.0)             # etl_start
+        assert mags[0] == pytest.approx(edge, rel=1e-3)      # Gaussian tail at the edge
+        assert all(a < b for a, b in zip(tas_seen, tas_seen[1:]))   # accelerating through
+        assert tas_seen[-1] == pytest.approx(22.0, rel=2e-2)   # last audible frame, 48/49 of the way
+        assert max(mags) == pytest.approx(0.2, rel=1e-2)     # peak = intensity, mid-band
+        assert mags[24] > mags[0] and mags[24] > mags[-1]
+        assert 'overspeedX' not in self.mock_effects
+        assert runner.step() is False
+        assert not self.mock_effects.dict
+
+    def test_without_the_blade_count_the_effect_would_guess(self):
+        """Documents why the spec passes blade_ct: the bare call falls
+        back to 2 blades at 250 RPM regardless of telemetry."""
+        ac = self._aircraft(aircrafts_dcs.Helicopter)
+        frame = PreviewRunner(ac, ETL, 'DCS').build_frame(0.0)
+        ac._telem_data = frame
+        ac.ac_calc_etl_effect(frame)
+        assert self.mock_effects['etlY']._periodic[0] == pytest.approx(250 / 75 * 2)
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):
