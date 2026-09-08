@@ -134,11 +134,16 @@ def test_no_buttons_or_pads_outside_offline_mode(qapp, tmp_path):
 def test_rows_without_a_preview_get_a_matching_pad(qapp, tmp_path):
     """Every slider row is the same length: a button or a same-size pad."""
     from telemffb.SettingsLayout import PREVIEW_BUTTON_SIZE
-    r = _render(qapp, tmp_path, offline=True)
+    # a propeller model: its form mixes preview rows (rumble, buffet...)
+    # with plain sliders (expo, droop moment) - the F-16's visible sliders
+    # all happen to host previews now
+    r = _render(qapp, tmp_path, offline=True, sim='MSFS', model='Cessna 172')
     if not r.buttons or not r.pads:
         pytest.skip("need both kinds of row rendered for this model")
     assert not (set(r.buttons) & set(r.pads))
-    assert set(r.buttons) | set(r.pads) >= set(r.sliders)     # every slider row has one
+    every_slider = {w.objectName().split('_', 1)[1]
+                    for w in r.content.findChildren(QtWidgets.QSlider)}
+    assert set(r.buttons) | set(r.pads) >= every_slider          # every slider row has one
     for b in r.buttons.values():
         assert (b.width(), b.height()) == (PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
     for pad in r.pads.values():
