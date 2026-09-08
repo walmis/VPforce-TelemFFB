@@ -1234,6 +1234,143 @@ MSFS_ELEVATOR_DROOP = PreviewSpec(
     sims=('MSFS', 'XPLANE'),
 )
 
+# ---------------------------------------------------------------------------
+# The stragglers found by walking every toggle in defaults.xml.
+# ---------------------------------------------------------------------------
+
+NOSEWHEEL_SHIMMY = PreviewSpec(
+    effect_id='nosewheel_shimmy',
+    rows=('nosewheel_shimmy_intensity',),
+    reference="full brakes at twice the shimmy onset speed, rolling on the ground",
+    method='msfs_update_nosewheel_shimmy',
+    kind='hold',
+    # pedals only (the effect's own gate); frequency runs 8 -> 16 Hz from
+    # the onset speed to three times it, so twice the onset sits mid-band
+    fields={'MSFS': {'IsTaildragger': 0, 'SimOnGround': 1, 'WeightOnWheels': [1.0, 1.0, 1.0],
+                     'GroundSpeed': lambda ac, p: ac.nosewheel_shimmy_min_speed * 2.0,
+                     'Brakes': [1.0, 1.0]}},     # a list: a pair would be read as a ramp
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('MSFS',),
+)
+
+
+def _critical_aoa(ac, p):
+    return ac.critical_aoa_start + (ac.critical_aoa_max - ac.critical_aoa_start) * p
+
+
+AOA_REDUCTION = PreviewSpec(
+    effect_id='aoa_reduction_effect_enabled',
+    rows=('aoa_reduction_max_force',),
+    reference="AoA rising from the profile's critical onset to its maximum over 3 s, "
+              "then held 3 s: the push forward",
+    method='ac_update_aoa_reduction_force_effect',
+    kind='ramp',
+    # airborne with airspeed; the effect averages AoA over 8 frames and
+    # keeps averaging on a steady input, so a plain hold reaches full
+    fields={'*': {'AoA': _critical_aoa, 'TAS': 50.0, 'WeightOnWheels': [0, 0, 0]}},
+    schedule=((3.0, 0.0, 1.0), (3.0, 1.0, 1.0)),
+    tail=0.0,
+    constant_force=True,
+    # the toggle is offered on DCS and BMS too, but only the MSFS / X-Plane
+    # aircraft class carries the implementation (AoAEffectsMixIn)
+    sims=('MSFS', 'XPLANE'),
+)
+
+LATERAL_G_REFERENCE = 0.3   # g of sideslip the preview holds
+
+
+def _msfs_lateral_force(ac, frame, **kwargs):
+    """Recipe: the lateral (uncoordinated-turn) push through the same
+    constant-force applier the live loop uses, with no droop or G term."""
+    if not ac.is_joystick():
+        return
+    ac._apply_joystick_constant_forces(frame, 0.0, 0.0)
+
+
+LATERAL_FORCE = PreviewSpec(
+    effect_id='uncoordinated_turn_effect_enabled',
+    rows=('lateral_force_gain',),
+    reference=f"{LATERAL_G_REFERENCE:g} g of sideslip, held: the roll push at the profile's lateral gain",
+    method=_msfs_lateral_force,
+    kind='hold',
+    fields={'*': {'AccBody': [LATERAL_G_REFERENCE, 1.0, 0.0]}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    constant_force=True,
+    sims=('MSFS', 'XPLANE'),
+)
+
+# IL-2's native-telemetry effects: the sim computes the shake and TelemFFB
+# scales it by a factor, so the reference is a stated sim value.  All sit
+# behind the shake master, forced on for the throwaway as the weapons are.
+_IL2_SHAKE_FORCE = {'il2_shake_master': True}
+IL2_BUFFET_HZ = 12.0
+IL2_ENGINE_SHAKE_HZ = 20.0
+IL2_ENGINE_SHAKE_AMPLITUDE = 1.0 / 3.0   # the effect scales amplitude x factor x 3
+
+IL2_BUFFET = PreviewSpec(
+    effect_id='il2_enable_buffet',
+    rows=('il2_buffeting_factor',),
+    reference=f"the sim's stall buffet at full amplitude and {IL2_BUFFET_HZ:g} Hz, scaled by the profile's factor",
+    method='ac_update_buffeting',
+    kind='hold',
+    fields={'IL2': {'BuffetFrequency': IL2_BUFFET_HZ, 'BuffetAmplitude': 1.0}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
+IL2_PROP_ENGINE_SHAKE = PreviewSpec(
+    effect_id='il2_prop_eng_shake_enabled',
+    rows=('il2_prop_eng_shake_factor',),
+    reference=f"the sim's propeller engine shake at {IL2_ENGINE_SHAKE_HZ:g} Hz, at the amplitude that "
+              "maps to full, scaled by the profile's factor",
+    method='il2_update_engine_shake',
+    kind='hold',
+    # the effect branches on the frame's aircraft class, not the profile's
+    fields={'IL2': {'AircraftClass': 'PropellerAircraft',
+                    'EngineShakeFrequency': IL2_ENGINE_SHAKE_HZ,
+                    'EngineShakeAmplitude': IL2_ENGINE_SHAKE_AMPLITUDE}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
+IL2_JET_ENGINE_SHAKE = PreviewSpec(
+    effect_id='il2_jet_eng_shake_enabled',
+    rows=('il2_jet_eng_shake_factor',),
+    reference=f"the sim's jet engine shake at {IL2_ENGINE_SHAKE_HZ:g} Hz (the effect adds its 30 Hz "
+              "offset), at the amplitude that maps to full, scaled by the profile's factor",
+    method='il2_update_engine_shake',
+    kind='hold',
+    fields={'IL2': {'AircraftClass': 'JetAircraft',
+                    'EngineShakeFrequency': IL2_ENGINE_SHAKE_HZ,
+                    'EngineShakeAmplitude': IL2_ENGINE_SHAKE_AMPLITUDE}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
+IL2_RUNWAY_RUMBLE = PreviewSpec(
+    effect_id='il2_enable_runway_rumble',
+    rows=('il2_runway_rumble_intensity',),
+    reference='rolling on a rough surface for 4 s',
+    method='ac_update_runway_rumble',
+    kind='hold',
+    # the IL-2 wrapper gates on rolling, near the ground, gear down, then
+    # translates its own toggle and intensity onto the base effect
+    fields={'IL2': {'TAS': 15.0, 'AGL': 1.0, 'GearPos': [1.0, 1.0, 1.0],
+                    'WeightOnWheels': Jitter(center=0.5, amplitude=0.4, size=3)}},
+    duration=4.0,
+    constant_force=True,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
     spec.name: spec for spec in (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
@@ -1244,9 +1381,11 @@ PREVIEW_SPECS: Dict[str, PreviewSpec] = {
         GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
         IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE,
         TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, TURBULENCE, WIND,
-        ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP)
+        ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP,
+        NOSEWHEEL_SHIMMY, AOA_REDUCTION, LATERAL_FORCE,
+        IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE)
 }
-assert len(PREVIEW_SPECS) == 35, "a spec name collided"
+assert len(PREVIEW_SPECS) == 42, "a spec name collided"
 
 # settings row -> the one preview whose button it hosts
 PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}
