@@ -48,7 +48,7 @@ the deflection the pilot holds under load).  Those are status-view
 territory.
 
 Constant-force effects that are bench-judgeable (touchdown, deceleration,
-runway rumble) ARE previewed, with two guards: the spec is marked
+runway rumble, turbulence, wind) ARE previewed, with two guards: the spec is marked
 ``constant_force``, which makes the UI confirm with the user that they
 have hold of the controls before the run (a constant force on an
 unattended axis can slam it to the stops), and the runner puts up a very
@@ -66,6 +66,7 @@ two threads, and a preview mid-flight is meaningless anyway):
 from a loop.
 """
 import logging
+import math
 import random
 import time
 from dataclasses import dataclass
@@ -168,6 +169,10 @@ class PreviewSpec:
     # A constant-force effect: the UI asks the user to take hold of the
     # controls before the run, and the runner adds the reference spring.
     constant_force: bool = False
+    # Whether the method takes the frame as its argument.  A few read the
+    # bound frame off the aircraft instead (update_turbulence); the runner
+    # binds it either way.
+    frame_arg: bool = True
     sims: Tuple[str, ...] = SIMS
 
     def __post_init__(self):
@@ -295,6 +300,9 @@ class PreviewRunner:
         self.steps_total = self.frames_total + self.tail_frames
         self.frame_index = 0
         self.finished = False
+        # stimuli that run on seconds rather than progress (Gusts) read
+        # the run length off the throwaway
+        aircraft._preview_duration = spec.duration
         if force_enable:
             # The user asked to feel it; a disabled toggle would only make
             # the method dispose its slots and return.  The instance is a
@@ -333,7 +341,11 @@ class PreviewRunner:
         ac._last_telem_data = ac._telem_data.copy()
         ac._telem_data = frame
         try:
-            getattr(ac, self.method_name)(frame, **self.spec.resolve_kwargs(ac, self.progress))
+            kwargs = self.spec.resolve_kwargs(ac, self.progress)
+            if self.spec.frame_arg:
+                getattr(ac, self.method_name)(frame, **kwargs)
+            else:
+                getattr(ac, self.method_name)(**kwargs)
         except Exception:
             logging.exception(f"Preview {self.spec.effect_id}: effect method raised; stopping")
             self.finish()
@@ -776,6 +788,46 @@ class RandomHits:
 _DAMAGE_HITS = RandomHits()
 
 
+class Gusts:
+    """A three-component wind vector carrying a band-limited gust field,
+    redrawn per run.
+
+    The turbulence and wind effects never see the weather, only the
+    frame-to-frame CHANGE in wind through a high-pass, so what matters is
+    gust amplitude and frequency content - both of which can be stated.
+    Each axis is a sum of ``components`` sinusoids at random frequencies
+    inside ``band`` (Hz) and random phases, sized so the axis's gust
+    r.m.s. is ``rms[axis]``, on top of ``steady``.  Time comes from the
+    run's progress and the duration the runner stamps on the aircraft.
+    """
+
+    def __init__(self, rms=(2.0, 3.0, 1.0), steady=(0.0, 0.0, 0.0),
+                 band=(0.3, 2.0), components=5, rng: Optional[random.Random] = None):
+        self.rms = rms
+        self.steady = steady
+        self.band = band
+        self.components = components
+        self.rng = rng
+
+    def _state(self, aircraft):
+        store = aircraft.__dict__.setdefault('_preview_gusts', {})
+        if id(self) not in store:
+            rng = self.rng or random.Random()
+            lo, hi = self.band
+            # n equal sinusoids of amplitude a have r.m.s. a * sqrt(n / 2)
+            store[id(self)] = [
+                [(rng.uniform(lo, hi), rng.uniform(0, 2 * math.pi),
+                  r * math.sqrt(2.0 / self.components))
+                 for _ in range(self.components)]
+                for r in self.rms]
+        return store[id(self)]
+
+    def __call__(self, aircraft, progress):
+        t = progress * getattr(aircraft, '_preview_duration', 1.0)
+        return [base + sum(a * math.sin(2 * math.pi * f * t + ph) for f, ph, a in axis)
+                for base, axis in zip(self.steady, self._state(aircraft))]
+
+
 class Jitter:
     """A value (or list of values) that random-walks around ``center``
     within ``amplitude``, redrawn per run.
@@ -978,6 +1030,40 @@ RUNWAY_RUMBLE = PreviewSpec(
     sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
 )
 
+TURBULENCE = PreviewSpec(
+    effect_id='turbulence_effect_enable',
+    rows=('turbulence_intensity',),
+    method='update_turbulence',
+    frame_arg=False,                     # reads RelWind off the bound frame
+    kind='hold',
+    # "moderate turbulence": a few m/s of gusts, vertical dominant, in the
+    # 0.3 - 2 Hz band, over a steady 60 m/s airflow.  The effect's four
+    # knobs (high-pass, smoothing, sensitivity, intensity) all shape the
+    # response to this one reference field.  Joystick gets pitch and
+    # roll, pedals yaw, from the effect's own branches.
+    fields={'*': {'RelWind': Gusts(rms=(2.0, 3.0, 1.0), steady=(0.0, 0.0, 60.0),
+                                   band=(0.3, 2.0))}},
+    duration=8.0,
+    tail=0.0,
+    constant_force=True,
+    sims=('MSFS', 'XPLANE'),
+)
+
+WIND = PreviewSpec(
+    effect_id='wind_effect_enabled',
+    rows=('wind_effect_max_intensity',),
+    method='ac_update_wind_effect',
+    kind='hold',
+    # the effect high-passes the wind SPEED at 3 Hz, so the gusts here sit
+    # higher in frequency than turbulence's, on a steady 8 m/s breeze
+    fields={'*': {'Wind': Gusts(rms=(3.0, 3.0, 1.0), steady=(8.0, 0.0, 0.0),
+                                band=(1.0, 5.0))}},
+    duration=8.0,
+    tail=0.0,
+    constant_force=True,
+    sims=('DCS', 'BMS'),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
     spec.name: spec for spec in (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
@@ -987,9 +1073,9 @@ PREVIEW_SPECS: Dict[str, PreviewSpec] = {
         TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
         GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
         IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE,
-        TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE)
+        TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, TURBULENCE, WIND)
 }
-assert len(PREVIEW_SPECS) == 28, "a spec name collided"
+assert len(PREVIEW_SPECS) == 30, "a spec name collided"
 
 # settings row -> the one preview whose button it hosts
 PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}
