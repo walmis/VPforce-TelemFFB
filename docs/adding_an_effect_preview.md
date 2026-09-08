@@ -211,6 +211,26 @@ wall clock, so a test needs an advancing `time.perf_counter` (see `_advancing_cl
 the filters do nothing between microsecond-apart frames. A method that reads the bound frame
 instead of taking one (`update_turbulence`) sets `frame_arg=False`.
 
+### Previews for a child instance's device
+
+Nothing to do per spec, but worth knowing. The master's settings form hosts the play button
+for every device's rows (the config scope switches between joystick, pedals, collective),
+while the effect must play on the instance that owns the device. When the scope is not the
+master's own device, `MainWindow.toggle_effect_preview` sends `PREVIEW:<device>:<name>` to
+the children over IPC; the owner runs the same `start_effect_preview` on its own device (no
+confirmation there — the master already asked, and the child's window is hidden) and reports
+`PREVIEW DONE:<device>:<name>` back, at which point the master resets the button and slider
+cues. A fallback timer on the master covers a child that never answers. The child resolves
+the same sim / class / model because offline-editing state is already mirrored to children.
+
+The second button on a row, `»`, plays the effect on every running device that offers it at
+once — the way turbulence's yaw is felt against its pitch and roll in flight. Which devices
+"offer it" is looked up, not guessed: `defaults.xml` flags each setting per device, and the
+form resolves the current model for all three devices once per rebuild
+(`SettingsLayout._preview_devices_for`). The button appears only where two or more running
+devices have the row, and its tooltip names them, so a device that stays silent is never
+mistaken for a broken one. Nothing per spec is needed for it.
+
 ## 5. Register it
 
 Add the spec to the tuple that builds `PREVIEW_SPECS`, and bump the count assertion beneath

@@ -41,6 +41,7 @@ class FakeMainWindow(QtWidgets.QWidget):
         super().__init__()
         self.blockers = []
         self.running_spec = None
+        self.running_devices = ['joystick']
         self.toggled = []
 
     def effect_preview_blockers(self):
@@ -49,12 +50,15 @@ class FakeMainWindow(QtWidgets.QWidget):
     def effect_preview_running(self, spec):
         return spec is self.running_spec
 
-    def toggle_effect_preview(self, spec, button=None):
-        self.toggled.append((spec, button))
+    def effect_preview_running_devices(self):
+        return list(self.running_devices)
+
+    def toggle_effect_preview(self, spec, button=None, devices=None):
+        self.toggled.append((spec, button, devices))
 
 
 def _render(qapp, tmp_path, *, offline, blockers=(), running=None,
-            sim='DCS', model='F-16C_50'):
+            sim='DCS', model='F-16C_50', running_devices=('joystick',)):
     try:
         import telemffb.globals as G
         uc = tmp_path / "userconfig.xml"
@@ -90,6 +94,7 @@ def _render(qapp, tmp_path, *, offline, blockers=(), running=None,
         mw = FakeMainWindow()
         mw.blockers = list(blockers)
         mw.running_spec = running
+        mw.running_devices = list(running_devices)
         mwl = QtWidgets.QVBoxLayout(mw)
         area = NoKeyScrollArea()
         area.setWidgetResizable(True)
@@ -118,12 +123,16 @@ def _render(qapp, tmp_path, *, offline, blockers=(), running=None,
         pytest.skip(f"could not build real SettingsLayout offscreen: {e}")
     buttons = {b.objectName()[3:]: b for b in content.findChildren(QtWidgets.QPushButton)
                if b.objectName().startswith('pv_')}
+    all_buttons = {b.objectName()[6:]: b for b in content.findChildren(QtWidgets.QPushButton)
+                   if b.objectName().startswith('pvall_')}
     pads = {w.objectName()[6:]: w for w in content.findChildren(QtWidgets.QWidget)
             if w.objectName().startswith('pvpad_')}
+    all_pads = {w.objectName()[9:]: w for w in content.findChildren(QtWidgets.QWidget)
+                if w.objectName().startswith('pvpadall_')}
     sliders = {w.objectName()[4:]: w for w in content.findChildren(QtWidgets.QSlider)
                if w.objectName().startswith('sld_')}
-    return types.SimpleNamespace(mw=mw, buttons=buttons, pads=pads, sliders=sliders,
-                                 sl=sl, content=content)
+    return types.SimpleNamespace(mw=mw, buttons=buttons, all_buttons=all_buttons, pads=pads,
+                                 all_pads=all_pads, sliders=sliders, sl=sl, content=content)
 
 
 def test_no_buttons_or_pads_outside_offline_mode(qapp, tmp_path):
@@ -144,6 +153,8 @@ def test_rows_without_a_preview_get_a_matching_pad(qapp, tmp_path):
     every_slider = {w.objectName().split('_', 1)[1]
                     for w in r.content.findChildren(QtWidgets.QSlider)}
     assert set(r.buttons) | set(r.pads) >= every_slider          # every slider row has one
+    # and the second slot too: a play-all button or its pad, on every row
+    assert set(r.all_buttons) | set(r.all_pads) >= every_slider
     for b in r.buttons.values():
         assert (b.width(), b.height()) == (PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
     for pad in r.pads.values():
@@ -190,7 +201,33 @@ def test_enabled_button_toggles_the_main_windows_preview(qapp, tmp_path):
     assert 'Click again to stop' in b.toolTip()
     assert PREVIEWS_BY_ROW[name].reference in b.toolTip()     # says what it represents
     b.click()
-    assert r.mw.toggled == [(PREVIEWS_BY_ROW[name], b)]
+    assert r.mw.toggled == [(PREVIEWS_BY_ROW[name], b, None)]
+
+
+def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp_path):
+    """stall buffet intensity is offered on every device, touchdown on the
+    joystick only: with joystick and pedals running the first gets a
+    play-all naming both, the second gets a pad in that slot."""
+    from telemffb.preview import PREVIEWS_BY_ROW
+    r = _render(qapp, tmp_path, offline=True, sim='MSFS', model='Cessna 172',
+                running_devices=('joystick', 'pedals'))
+    buffet, touch = 'buffeting_intensity', 'touchdown_effect_max_force'
+    if buffet not in r.buttons or touch not in r.buttons:
+        pytest.skip("buffet and touchdown rows not both rendered for this model")
+    assert buffet in r.all_buttons and buffet not in r.all_pads
+    assert touch in r.all_pads and touch not in r.all_buttons
+    b = r.all_buttons[buffet]
+    assert b.text() == '▶▶'
+    assert b.toolTip().startswith("Play on joystick and pedals together.")
+    b.click()
+    assert r.mw.toggled == [(PREVIEWS_BY_ROW[buffet], b, ('joystick', 'pedals'))]
+
+
+def test_no_play_all_with_a_single_running_device(qapp, tmp_path):
+    r = _render(qapp, tmp_path, offline=True, sim='MSFS', model='Cessna 172',
+                running_devices=('joystick',))
+    assert r.all_buttons == {}
+    assert set(r.all_pads) >= set(r.buttons)                  # every preview row padded instead
 
 
 def test_blocked_button_is_disabled_with_the_reason(qapp, tmp_path):

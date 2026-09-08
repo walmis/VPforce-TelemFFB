@@ -464,6 +464,7 @@ class SettingsLayout(QGridLayout):
 
 
     def build_rows(self, datalist):
+        self._preview_rows_by_device = None      # recomputed per rebuild (see _preview_devices_for)
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
         self.convert_to_springmode(sorted_data)
@@ -758,56 +759,118 @@ class SettingsLayout(QGridLayout):
             xmlutils.write_sim_to_xml(csim,value,setting, unit)
             xmlutils.erase_models_from_xml(csim,model,setting)
 
+    def _preview_devices_for(self, setting_name):
+        """The running devices whose settings offer ``setting_name`` for the
+        current sim / class / model - this instance's own device first.
+
+        defaults.xml flags every setting per device and the resolver takes
+        a device, so "which devices does this effect play on" is looked up,
+        never guessed: the play-all button is offered only where two or
+        more of these are running, and its tooltip names them, so a device
+        that stays silent is never mistaken for a broken one.  Resolved
+        once per rebuild for all three devices, then cached.
+        """
+        mw = self.mainwindow
+        running = list(getattr(mw, 'effect_preview_running_devices', lambda: [G.device_type])())
+        if len(running) < 2:
+            return running[:1] if setting_name else []
+        if getattr(self, '_preview_rows_by_device', None) is None:
+            sm = G.settings_mgr
+            by_device = {}
+            for dev in ('joystick', 'pedals', 'collective'):
+                try:
+                    _, _, rows = xmlutils.read_single_model(
+                        sm.current_sim, sm.current_aircraft_name, sm.current_class, dev)
+                    by_device[dev] = {r['name'] for r in rows}
+                except Exception:
+                    logging.exception(f"preview: could not resolve {dev} settings")
+                    by_device[dev] = set()
+            self._preview_rows_by_device = by_device
+        return [d for d in running if setting_name in self._preview_rows_by_device.get(d, ())]
+
     def _add_preview_button(self, sl_layout, item):
-        """Append a play button to a slider row's -/+ pair when the row
-        hosts an effect preview.
+        """Append the preview controls to a slider row's -/+ pair.
 
         Offline editing only: that is where the user tunes without a sim
         streaming, and the preview runs on the device alongside whatever
-        a paused session left there (it has its own effect table).  The
-        button is the availability cue - rows without a preview get
-        nothing.  A blocked preview (device gone, telemetry streaming)
-        shows the button disabled with the reason as its tooltip.  While
-        this row's preview plays the button reads as a stop.
+        a paused session left there (it has its own effect table).  Two
+        slots, always filled so every slider in the form is the same
+        length: ``\u25b6`` plays on the device the form is scoped to, and
+        ``\u25b6\u25b6`` plays on every running device that offers the
+        effect, when that is more than one.  Rows without a preview get same-size pads.
+        A blocked preview (device gone, telemetry streaming) shows its
+        button disabled with the reason as its tooltip; while this row's
+        preview plays its button reads as a stop.
         """
         if not G.settings_mgr.offline_mode:
             return
         from telemffb.preview import preview_for_row
+        # the two preview slots sit tight together, apart from the row's
+        # own -/slider/+ spacing
+        slots = QHBoxLayout()
+        slots.setSpacing(2)
+        slots.setContentsMargins(0, 0, 0, 0)
+        sl_layout.addLayout(slots)
         spec = preview_for_row(item['name'])
         if spec is None or not spec.supports(G.settings_mgr.current_sim):
-            # Same footprint as the button so every slider in the form is
-            # the same length whether or not its row has a preview.
-            pad = QtWidgets.QWidget()
-            pad.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
-            pad.setObjectName(f"pvpad_{item['name']}")
-            sl_layout.addWidget(pad)
+            for tag in ('pvpad', 'pvpadall'):
+                self._add_preview_pad(slots, tag, item['name'])
             return
         mw = self.mainwindow
-        button = QPushButton("\u25b6")
-        button.setProperty('buttonType', 'p_m_button')
-        button.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
-        button.setObjectName(f"pv_{item['name']}")
-        button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         blockers = list(getattr(mw, 'effect_preview_blockers', lambda: [])())
-        if blockers:
-            button.setDisabled(True)
-            button.setToolTip("Preview unavailable: " + "; ".join(blockers))
+        running = getattr(mw, 'effect_preview_running', lambda s: False)(spec)
+
+        def make(text, object_prefix, tip, on_click, small=False):
+            button = QPushButton(text)
+            button.setProperty('buttonType', 'p_m_button')
+            button.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
+            button.setObjectName(f"{object_prefix}_{item['name']}")
+            button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            if small:
+                # two play glyphs side by side need a smaller face to fit
+                # the 20 px button; they centre the way the single one does
+                f = button.font()
+                f.setPointSizeF(max(6.0, f.pointSizeF() * 0.7))
+                button.setFont(f)
+            if blockers:
+                button.setDisabled(True)
+                button.setToolTip("Preview unavailable: " + "; ".join(blockers))
+            else:
+                if running:
+                    button.setText("\u25a0")
+                button.setToolTip(tip)
+                button.clicked.connect(on_click)
+            slots.addWidget(button)
+            return button
+
+        # one clause per line: a Qt tooltip only wraps where told to,
+        # and a single long line runs the width of the screen
+        tip = (f"Preview: {spec.reference} ({spec.duration:g} s).\n"
+               "Plays at the maximum your settings allow;\n"
+               "in flight the telemetry sets the level, usually lower.\n"
+               "Click again to stop.")
+        if spec.constant_force:
+            tip += "\nConstant force: keep a firm hold on the controls."
+        play = make("\u25b6", 'pv', tip,
+                    lambda checked=False, s=spec: mw.toggle_effect_preview(s, play))
+
+        devices = self._preview_devices_for(item['name'])
+        if len(devices) >= 2:
+            names = ", ".join(devices[:-1]) + " and " + devices[-1]
+            all_tip = f"Play on {names} together.\n" + tip
+            play_all = make("\u25b6\u25b6", 'pvall', all_tip,
+                            lambda checked=False, s=spec, d=tuple(devices):
+                            mw.toggle_effect_preview(s, play_all, devices=d),
+                            small=True)
         else:
-            running = getattr(mw, 'effect_preview_running', lambda s: False)(spec)
-            if running:
-                button.setText("\u25a0")
-            # one clause per line: a Qt tooltip only wraps where told to,
-            # and a single long line runs the width of the screen
-            tip = (f"Preview: {spec.reference} ({spec.duration:g} s).\n"
-                   "Plays at the maximum your settings allow;\n"
-                   "in flight the telemetry sets the level, usually lower.\n"
-                   "Click again to stop.")
-            if spec.constant_force:
-                tip += "\nConstant force: keep a firm hold on the controls."
-            button.setToolTip(tip)
-            button.clicked.connect(
-                lambda checked=False, s=spec, b=button: mw.toggle_effect_preview(s, b))
-        sl_layout.addWidget(button)
+            self._add_preview_pad(slots, 'pvpadall', item['name'])
+
+    def _add_preview_pad(self, sl_layout, tag, name):
+        """Same footprint as a preview button, so rows line up."""
+        pad = QtWidgets.QWidget()
+        pad.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
+        pad.setObjectName(f"{tag}_{name}")
+        sl_layout.addWidget(pad)
 
     def generate_settings_row(self, item, i,  rowdisabled=False ):
         self.setRowMinimumHeight(i, 25)
