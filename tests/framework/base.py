@@ -154,11 +154,12 @@ class MockConditionEffect:
         self.effect_id += 1
 
     
-    def start(self, override=False):
+    def start(self, override=False, **kwargs):
         """Start the effect.
-        
+
         Args:
             override: Whether to override existing effects (ignored in mock)
+            **kwargs: the production ``force=`` the weapon effects pass (ignored)
         """
         self.started = True
         self.start_count += 1
