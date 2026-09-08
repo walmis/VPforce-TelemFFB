@@ -288,10 +288,17 @@ class Aircraft(AircraftBase):
         if not self.il2_shake_master: return
         if not self.il2_enable_runway_rumble: return
 
+        # This wrapper translates IL-2's own settings onto the shared base
+        # effect's inputs.  The base method re-checks the DCS-family toggle
+        # (runway_rumble_enabled), which IL-2 profiles never carry, so the
+        # toggle has to be translated along with the intensity - without
+        # it the base disposed every frame and IL-2 rumble never played.
         if telem_data.TAS > 1.0 and telem_data.AGL < 10.0 and utils.average(telem_data.GearPos) == 1:
+            self.runway_rumble_enabled = True          # the IL-2 toggle passed above
             self.runway_rumble_intensity = self.il2_runway_rumble_intensity
             super().ac_update_runway_rumble(telem_data)
         else:
+            self.runway_rumble_enabled = False
             self.runway_rumble_intensity = 0
             self.effects.dispose("runway0", "runway1")
 
