@@ -41,6 +41,21 @@ import styles
 from . import globals as G
 from . import xmlutils
 
+PREVIEW_BUTTON_SIZE = 20          # matches the -/+ step buttons
+PREVIEW_ACTIVE_HANDLE = "#17c411"  # the green the live loop paints active effects
+
+
+def mark_preview_sliders(root, spec, active):
+    """Paint the slider handle(s) of a preview's rows the live-effect green
+    while it plays, and back to the default when it ends - the same cue the
+    telemetry loop gives an active effect, so a preview reads the same way.
+    ``root`` is any widget above the settings form (the main window)."""
+    for row in spec.rows:
+        for prefix in ('sld_', 'dsld_', 'dfsld_'):
+            for slider in root.findChildren(NoWheelSlider, f"{prefix}{row}"):
+                slider.setHandleColor(PREVIEW_ACTIVE_HANDLE if active else vpf_purple)
+
+
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
@@ -743,6 +758,50 @@ class SettingsLayout(QGridLayout):
             xmlutils.write_sim_to_xml(csim,value,setting, unit)
             xmlutils.erase_models_from_xml(csim,model,setting)
 
+    def _add_preview_button(self, sl_layout, item):
+        """Append a play button to a slider row's -/+ pair when the row
+        hosts an effect preview.
+
+        Offline editing only: that is where the user tunes without a sim
+        streaming, and the preview runs on the device alongside whatever
+        a paused session left there (it has its own effect table).  The
+        button is the availability cue - rows without a preview get
+        nothing.  A blocked preview (device gone, telemetry streaming)
+        shows the button disabled with the reason as its tooltip.  While
+        this row's preview plays the button reads as a stop.
+        """
+        if not G.settings_mgr.offline_mode:
+            return
+        from telemffb.preview import preview_for_row
+        spec = preview_for_row(item['name'])
+        if spec is None or not spec.supports(G.settings_mgr.current_sim):
+            # Same footprint as the button so every slider in the form is
+            # the same length whether or not its row has a preview.
+            pad = QtWidgets.QWidget()
+            pad.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
+            pad.setObjectName(f"pvpad_{item['name']}")
+            sl_layout.addWidget(pad)
+            return
+        mw = self.mainwindow
+        button = QPushButton("\u25b6")
+        button.setProperty('buttonType', 'p_m_button')
+        button.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
+        button.setObjectName(f"pv_{item['name']}")
+        button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        blockers = list(getattr(mw, 'effect_preview_blockers', lambda: [])())
+        if blockers:
+            button.setDisabled(True)
+            button.setToolTip("Preview unavailable: " + "; ".join(blockers))
+        else:
+            running = getattr(mw, 'effect_preview_running', lambda s: False)(spec)
+            if running:
+                button.setText("\u25a0")
+            button.setToolTip(f"Preview this effect on the device ({spec.duration:g} s). "
+                              "Click again to stop.")
+            button.clicked.connect(
+                lambda checked=False, s=spec, b=button: mw.toggle_effect_preview(s, b))
+        sl_layout.addWidget(button)
+
     def generate_settings_row(self, item, i,  rowdisabled=False ):
         self.setRowMinimumHeight(i, 25)
         entry_colspan = 2
@@ -983,6 +1042,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignmentFlag.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1014,6 +1074,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt);
             sl_layout.addWidget(dfs);
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1050,6 +1111,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(n_slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignmentFlag.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1078,6 +1140,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(df_slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1108,6 +1171,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1136,6 +1200,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(d_slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)

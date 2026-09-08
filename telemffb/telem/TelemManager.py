@@ -114,7 +114,8 @@ def resolve_aircraft_config(the_sim, aircraft_name, input_modeltype='', device_t
     return params, cls_name, pattern, active_profile
 
 
-def build_aircraft(data_source, aircraft_name, device_type=None, cls_name=''):
+def build_aircraft(data_source, aircraft_name, device_type=None, cls_name='',
+                   private_effects=True):
     """Construct and configure an aircraft instance with no telemetry.
 
     The same steps ``TelemManager`` takes when a new aircraft shows up in
@@ -136,9 +137,14 @@ def build_aircraft(data_source, aircraft_name, device_type=None, cls_name=''):
     an MSFS model with no class configured comes back as the module's
     generic ``Aircraft``.
 
-    NOTE: ``AircraftBase.__init__`` clears the shared effect dispenser
-    (``G.effects``), so this must only be called when no live aircraft
-    owns effects on the device.
+    ``private_effects`` (the default) gives the instance its own effect
+    dispenser.  ``AircraftBase.__init__`` clears the dispenser it sees
+    and the preview's cleanup destroys everything in it, so on the
+    shared ``G.effects`` a build would wipe a live aircraft's effects -
+    the springs a paused sim session keeps up, for one.  With a private
+    table the live aircraft is untouched, so a preview can run with a
+    sim loaded in the background (telemetry paused, as offline editing
+    leaves it).
 
     Raises ``ValueError`` for an unknown ``data_source``.
     """
@@ -150,7 +156,14 @@ def build_aircraft(data_source, aircraft_name, device_type=None, cls_name=''):
     aircraft_class = getattr(module, resolved_cls, None) or module.Aircraft
     logging.info(f"Building {aircraft_name!r} (class {resolved_cls}) for preview: "
                  f"{aircraft_class.__module__}.{aircraft_class.__name__}")
-    aircraft = aircraft_class(aircraft_name)
+    if private_effects:
+        # The dispenser has to be in place BEFORE __init__ runs, since
+        # __init__ clears whatever ``self.effects`` resolves to.
+        aircraft = aircraft_class.__new__(aircraft_class)
+        aircraft._effects = utils.Dispenser(HapticEffect)
+        aircraft.__init__(aircraft_name)
+    else:
+        aircraft = aircraft_class(aircraft_name)
     aircraft.apply_settings(params)
     return aircraft
 
