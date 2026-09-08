@@ -35,6 +35,9 @@ from telemffb.preview import (
     IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits, Jitter,
     TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, REFERENCE_SPRING, Gusts, TURBULENCE, WIND,
     ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP,
+    NOSEWHEEL_SHIMMY, AOA_REDUCTION, LATERAL_FORCE, LATERAL_G_REFERENCE,
+    IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE,
+    IL2_BUFFET_HZ, IL2_ENGINE_SHAKE_HZ,
     ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, PREVIEWS_BY_ROW, preview_for_row,
     FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
@@ -1167,7 +1170,8 @@ class TestPreviewRows:
     def test_rows_are_strengths_not_toggles_or_thresholds(self):
         toggles = {spec.effect_id for spec in PREVIEW_SPECS.values() if spec.effect_id}
         assert not (set(PREVIEWS_BY_ROW) & toggles)
-        assert all(any(k in r for k in ('intensity', 'force', 'moment')) for r in PREVIEWS_BY_ROW)
+        assert all(any(k in r for k in ('intensity', 'force', 'moment', 'gain', 'factor'))
+                   for r in PREVIEWS_BY_ROW)
 
     def test_a_spec_without_a_toggle_needs_a_name(self):
         with pytest.raises(ValueError):
@@ -1439,7 +1443,8 @@ class TestConstantForceGuard(BaseTelemetryEffectTestCase):
         assert flagged == {'touchdown_effect_enabled', 'deceleration_effect_enable',
                            'runway_rumble_enabled', 'turbulence_effect_enable',
                            'wind_effect_enabled', 'elevator_droop_enabled',
-                           'elevator_droop_moment'}
+                           'elevator_droop_moment', 'aoa_reduction_effect_enabled',
+                           'uncoordinated_turn_effect_enabled', 'il2_enable_runway_rumble'}
 
 
 class TestGusts:
@@ -1835,6 +1840,155 @@ class TestElevatorDroopPreviews(BaseTelemetryEffectTestCase):
         assert 'control_weight' not in self.mock_effects
         with pytest.raises(ValueError):
             PreviewRunner(aircrafts_dcs.Aircraft('preview'), MSFS_ELEVATOR_DROOP, 'DCS')
+
+
+class TestNosewheelShimmyPreview(HoldPreviewCase):
+    def test_pedals_shimmy_mid_band_at_full_brakes(self):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.nosewheel_shimmy = False
+        ac.nosewheel_shimmy_intensity = 0.3
+        ac.nosewheel_shimmy_min_speed = 7
+        ac.nosewheel_shimmy_min_brakes = 0.6
+        runner = PreviewRunner(ac, NOSEWHEEL_SHIMMY, 'MSFS', device_type='pedals', frame_rate=10.0)
+        for _ in range(2):
+            runner.step()
+        shimmy = self.mock_effects['nw_shimmy']._periodic
+        assert shimmy[0] == 12                                   # mid-band: 8 -> 16 Hz
+        assert shimmy[1] == pytest.approx(0.3)                   # full brakes: full intensity
+        assert shimmy[2] == 90
+        self._finish(runner)
+
+    def test_joystick_is_silent_and_xplane_not_offered(self):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.nosewheel_shimmy_intensity = 0.3
+        runner = PreviewRunner(ac, NOSEWHEEL_SHIMMY, 'MSFS', frame_rate=10.0)
+        runner.step()
+        assert 'nw_shimmy' not in self.mock_effects
+        with pytest.raises(ValueError):
+            PreviewRunner(ac, NOSEWHEEL_SHIMMY, 'XPLANE')
+
+
+class TestAoaReductionPreview(BaseTelemetryEffectTestCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_push_builds_to_the_max_force_and_holds(self, cls, sim):
+        ac = cls('preview')
+        ac.aoa_reduction_effect_enabled = False
+        ac.aoa_reduction_max_force = 0.5
+        ac.critical_aoa_start = 22.0
+        ac.critical_aoa_max = 25.0
+        runner = PreviewRunner(ac, AOA_REDUCTION, sim, frame_rate=10.0)   # 60 frames
+        mags = []
+        for _ in range(runner.frames_total - 1):
+            runner.step()
+            fx = self.mock_effects.get('crit_aoa')
+            mags.append(fx._magnitude if fx is not None and fx.started else 0.0)
+        assert ac._telem_data['AoA'] == pytest.approx(25.0)
+        assert mags[0] == pytest.approx(0.0, abs=0.01)                   # at onset: nothing
+        assert all(a <= b + 1e-9 for a, b in zip(mags[:30], mags[1:31]))   # building
+        assert mags[-1] == pytest.approx(0.5, abs=0.01)                  # 8-frame average caught up
+        assert self.mock_effects['crit_aoa']._direction == 180          # push forward
+        assert runner.step() is False and not self.mock_effects.dict
+
+    def test_pedals_are_silent_and_dcs_not_offered(self):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.aoa_reduction_max_force = 0.5
+        runner = PreviewRunner(ac, AOA_REDUCTION, 'MSFS', device_type='pedals', frame_rate=10.0)
+        for _ in range(3):
+            runner.step()
+        assert 'crit_aoa' not in self.mock_effects
+        # the DCS aircraft class has the settings but not the effect method
+        assert not hasattr(aircrafts_dcs.Aircraft, 'ac_update_aoa_reduction_force_effect')
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_dcs.Aircraft('preview'), AOA_REDUCTION, 'DCS')
+
+
+class TestLateralForcePreview(HoldPreviewCase):
+    @pytest.mark.parametrize("sim", ['MSFS', 'XPLANE'])
+    def test_sideslip_pushes_in_roll_at_the_gain(self, sim):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        ac.uncoordinated_turn_effect_enabled = False
+        ac.lateral_force_gain = 0.2
+        runner = self._run_hold(ac, LATERAL_FORCE, sim, frames=1)
+        fx = self.mock_effects['control_weight']
+        assert fx.started
+        assert fx._magnitude == pytest.approx(LATERAL_G_REFERENCE * 0.2)   # 0.3 g x gain
+        self._finish(runner)
+
+    def test_pedals_are_silent(self):
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        runner = PreviewRunner(ac, LATERAL_FORCE, 'MSFS', device_type='pedals', frame_rate=10.0)
+        runner.step()
+        assert 'control_weight' not in self.mock_effects
+
+
+class TestIl2NativePreviews(HoldPreviewCase):
+    def _aircraft(self):
+        ac = aircrafts_il2.Aircraft('preview')
+        ac.il2_shake_master = 0
+        return ac
+
+    def test_buffet_at_full_amplitude_scaled_by_the_factor(self):
+        ac = self._aircraft()
+        ac.il2_enable_buffet = 0
+        ac.il2_buffeting_factor = 0.5
+        runner = self._run_hold(ac, IL2_BUFFET, 'IL2', frames=1)
+        assert ac.il2_shake_master is True
+        one = self.mock_effects['il2_buffet']._periodic
+        two = self.mock_effects['il2_buffet2']._periodic
+        assert one[:3] == (IL2_BUFFET_HZ, 0.5, 0)
+        assert two[0] == pytest.approx(IL2_BUFFET_HZ * 1.5) and two[1] == pytest.approx(0.7)
+        self._finish(runner)
+
+    def test_prop_engine_shake_maps_the_amplitude_to_the_factor(self):
+        ac = self._aircraft()
+        ac.il2_prop_eng_shake_enabled = 0
+        ac.il2_prop_eng_shake_factor = 0.8
+        runner = self._run_hold(ac, IL2_PROP_ENGINE_SHAKE, 'IL2', frames=1)
+        base = self.mock_effects['il2_eng_shk1']._periodic
+        assert base[0] == pytest.approx(IL2_ENGINE_SHAKE_HZ, abs=0.5)
+        assert base[1] == pytest.approx(0.8)                         # 1/3 x factor x 3
+        assert self.mock_effects['il2_eng_shk3']._periodic[0] == pytest.approx(IL2_ENGINE_SHAKE_HZ * 2, abs=0.5)
+        assert 'il2_jet_shk1' not in self.mock_effects
+        self._finish(runner)
+
+    def test_jet_engine_shake_carries_its_offset(self):
+        ac = self._aircraft()
+        ac.il2_jet_eng_shake_enabled = 0
+        ac.il2_jet_eng_shake_factor = 1.0
+        runner = self._run_hold(ac, IL2_JET_ENGINE_SHAKE, 'IL2', frames=1)
+        jet = self.mock_effects['il2_jet_shk1']._periodic
+        assert jet[0] == pytest.approx(IL2_ENGINE_SHAKE_HZ + 30, abs=3.5)   # +- its 3 Hz modulation
+        assert jet[1] == pytest.approx(1.0)
+        assert 'il2_eng_shk1' not in self.mock_effects
+        self._finish(runner)
+
+    def test_runway_rumble_rolls_through_the_wrapper(self):
+        import telemffb.utils as utils
+        ac = self._aircraft()
+        ac.il2_enable_runway_rumble = 0
+        ac.il2_runway_rumble_intensity = 1.0
+        ac.runway_rumble_enabled = False              # what an IL-2 profile leaves it at
+        runner = PreviewRunner(ac, IL2_RUNWAY_RUMBLE, 'IL2', frame_rate=10.0)
+        peak = 0.0
+        for _ in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('runway0')
+            if fx is not None and fx.started:
+                peak = max(peak, abs(fx._magnitude))
+                assert fx._direction is utils.RandomDirectionModulator
+        assert ac.runway_rumble_enabled is True       # translated by the wrapper, not forced here
+        assert ac.runway_rumble_intensity == 1.0      # handed down by the wrapper
+        assert 0.0 < peak <= 0.5
+        while runner.step():
+            pass
+        assert not self.mock_effects.dict
+
+    def test_only_il2(self):
+        for spec in (IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE):
+            with pytest.raises(ValueError):
+                PreviewRunner(aircrafts_dcs.Aircraft('preview'), spec, 'DCS')
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):
