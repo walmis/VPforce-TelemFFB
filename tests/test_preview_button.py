@@ -200,6 +200,7 @@ def test_enabled_button_toggles_the_main_windows_preview(qapp, tmp_path):
     assert b.isEnabled() and b.text() == '▶'
     assert 'Click again to stop' in b.toolTip()
     assert PREVIEWS_BY_ROW[name].reference in b.toolTip()     # says what it represents
+    assert b.toolTip().startswith("<p")                       # rich text: Qt word-wraps it
     b.click()
     assert r.mw.toggled == [(PREVIEWS_BY_ROW[name], b, None)]
 
@@ -218,7 +219,8 @@ def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp
     assert touch in r.all_pads and touch not in r.all_buttons
     b = r.all_buttons[buffet]
     assert b.text() == '▶▶'
-    assert b.toolTip().startswith("Play on joystick and pedals together.")
+    assert "Play on joystick and pedals together." in b.toolTip()
+    assert b.toolTip().startswith("<p")                       # rich text: Qt word-wraps it
     b.click()
     assert r.mw.toggled == [(PREVIEWS_BY_ROW[buffet], b, ('joystick', 'pedals'))]
 

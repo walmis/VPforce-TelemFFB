@@ -48,7 +48,7 @@ the deflection the pilot holds under load).  Those are status-view
 territory.
 
 Constant-force effects that are bench-judgeable (touchdown, deceleration,
-runway rumble, turbulence, wind) ARE previewed, with two guards: the spec is marked
+runway rumble, turbulence, wind, elevator droop) ARE previewed, with two guards: the spec is marked
 ``constant_force``, which makes the UI confirm with the user that they
 have hold of the controls before the run (a constant force on an
 unattended axis can slam it to the stops), and the runner puts up a very
@@ -115,15 +115,20 @@ class PreviewSpec:
     """How to preview one effect.
 
     ``effect_id`` is the effect's enable toggle in defaults.xml; it names
-    the preview and is the attribute forced on for the run.  ``method`` is
-    the aircraft method called once per frame - a name, or a dict keyed
-    by sim with ``'*'`` as the default, for an effect that lives in a
-    different method per sim (the stick shaker).  ``fields`` is keyed by
-    sim name with ``'*'`` for every sim; a sim's entries are merged over
-    the ``'*'`` entries, which is how one spec names ``EngRPM`` for most
-    sims and ``EngPCT`` for X-Plane.
+    the preview and is the attribute forced on for the run.  ``None`` for
+    an effect with no toggle (MSFS elevator droop: the moment at zero is
+    "off"); such a spec must set ``name``.  ``method`` is what is called
+    once per frame - an aircraft method name, a dict of names keyed by
+    sim with ``'*'`` as the default (the stick shaker lives in a different
+    method per sim), or a recipe ``callable(aircraft, frame, **kwargs)``
+    for an effect that is one step inside a longer routine and has to be
+    played by sequencing the production pieces (MSFS droop: the term,
+    then the applier).  ``fields`` is keyed by sim name with ``'*'`` for
+    every sim; a sim's entries are merged over the ``'*'`` entries, which
+    is how one spec names ``EngRPM`` for most sims and ``EngPCT`` for
+    X-Plane.
     """
-    effect_id: str
+    effect_id: Optional[str]
     method: Any
     kind: str
     fields: Dict[str, Dict[str, FieldValue]]
@@ -188,6 +193,8 @@ class PreviewSpec:
         if unknown:
             raise ValueError(f"{self.effect_id}: fields keyed by unknown sim(s) {sorted(unknown)}")
         if not self.name:
+            if not self.effect_id:
+                raise ValueError("a spec with no effect_id must set name")
             object.__setattr__(self, 'name', self.effect_id)
         if self.kwargs is None:
             object.__setattr__(self, 'kwargs', {})
@@ -215,11 +222,12 @@ class PreviewSpec:
     def supports(self, sim: str) -> bool:
         return sim in self.sims
 
-    def method_for(self, sim: str) -> str:
+    def method_for(self, sim: str):
+        """The method name, or the recipe callable, for ``sim``."""
         if isinstance(self.method, dict):
             name = self.method.get(sim, self.method.get('*'))
             if name is None:
-                raise ValueError(f"{self.effect_id}: no method for {sim}")
+                raise ValueError(f"{self.name}: no method for {sim}")
             return name
         return self.method
 
@@ -294,7 +302,7 @@ class PreviewRunner:
         if not spec.supports(sim):
             raise ValueError(f"{spec.effect_id} is not previewable on {sim}")
         self.method_name = spec.method_for(sim)
-        if not hasattr(aircraft, self.method_name):
+        if not callable(self.method_name) and not hasattr(aircraft, self.method_name):
             raise ValueError(f"{type(aircraft).__name__} has no {self.method_name}")
         self.aircraft = aircraft
         self.spec = spec
@@ -313,7 +321,8 @@ class PreviewRunner:
             # The user asked to feel it; a disabled toggle would only make
             # the method dispose its slots and return.  The instance is a
             # throwaway, so nothing to restore.
-            setattr(aircraft, spec.effect_id, True)
+            if spec.effect_id:
+                setattr(aircraft, spec.effect_id, True)
             for name, value in spec.force_attrs.items():
                 setattr(aircraft, name, value)
 
@@ -348,12 +357,14 @@ class PreviewRunner:
         ac._telem_data = frame
         try:
             kwargs = self.spec.resolve_kwargs(ac, self.progress)
-            if self.spec.frame_arg:
+            if callable(self.method_name):
+                self.method_name(ac, frame, **kwargs)
+            elif self.spec.frame_arg:
                 getattr(ac, self.method_name)(frame, **kwargs)
             else:
                 getattr(ac, self.method_name)(**kwargs)
         except Exception:
-            logging.exception(f"Preview {self.spec.effect_id}: effect method raised; stopping")
+            logging.exception(f"Preview {self.spec.name}: effect method raised; stopping")
             self.finish()
             return False
         self.frame_index += 1
@@ -370,7 +381,7 @@ class PreviewRunner:
         try:
             self.aircraft.effects.clear()
         except Exception:
-            logging.exception(f"Preview {self.spec.effect_id}: cleanup failed")
+            logging.exception(f"Preview {self.spec.name}: cleanup failed")
 
     def run(self, sleep: Callable[[float], None] = time.sleep) -> None:
         """Blocking playback at ``frame_rate`` - for scripts and bench checks."""
@@ -528,7 +539,7 @@ PROP_ENGINE_RUMBLE = PreviewSpec(
 
 STALL_BUFFET = PreviewSpec(
     effect_id='aoa_buffeting_enabled',
-    reference="AoA rising from the profile's buffet onset to its stall, held at stall, then recovering",
+    reference="AoA rising from the profile's buffet onset to its stall over 3 s, 4 s held at stall, 1 s recovering",
     rows=('buffeting_intensity',),
     method='ac_update_buffeting',
     kind='ramp',
@@ -1031,7 +1042,7 @@ def _decel_g(ac, p):
 
 DECELERATION = PreviewSpec(
     effect_id='deceleration_effect_enable',
-    reference="a braking run on the ground building to the profile's maximum, held, then released",
+    reference="a braking run on the ground: 1.5 s building to the profile's maximum, held 1 s, released over 1.5 s",
     rows=('deceleration_max_force',),
     method='ac_update_decel_effect',
     kind='ramp',
@@ -1132,7 +1143,7 @@ def _vrs_descent(ac, p):
 VRS = PreviewSpec(
     effect_id='vrs_effect_enable',
     rows=('vrs_effect_intensity',),
-    reference="a descent steepening from the profile's VRS onset to its maximum, then held",
+    reference="a descent steepening from the profile's VRS onset to its maximum over 3 s, then held 3 s",
     method='ac_update_vrs_effect',
     kind='ramp',
     # intensity scales with descent rate across the onset -> max band, so
@@ -1177,6 +1188,52 @@ BLADE_SLAP = PreviewSpec(
     sims=('DCS', 'MSFS', 'XPLANE'),
 )
 
+# ---------------------------------------------------------------------------
+# Elevator droop.  Two implementations: the DCS-family one is a standalone
+# method on true airspeed; the MSFS / X-Plane one is a single term inside
+# the flight-controls chain, played here by sequencing the production
+# term and the production applier.
+# ---------------------------------------------------------------------------
+
+ELEVATOR_DROOP = PreviewSpec(
+    effect_id='elevator_droop_enabled',
+    rows=('elevator_droop_force',),
+    reference='rolling out from 20 kt to a stop over 2 s, then 3 s standing still at the full droop force',
+    method='ac_override_elevator_droop',
+    kind='ramp',
+    # the force scales from nothing at 20 kt to full at rest
+    fields={'*': {'TAS': (20 * kt2ms, 0.0)}},
+    schedule=((2.0, 0.0, 1.0), (3.0, 1.0, 1.0)),
+    tail=0.0,
+    constant_force=True,
+    sims=('DCS', 'IL2', 'BMS'),
+)
+
+
+def _msfs_elevator_droop(ac, frame, **kwargs):
+    """Recipe: the droop term at rest (no dynamic pressure) at 1 g, through
+    the same constant-force applier the live loop uses.  Joystick only,
+    as the live loop only calls the applier for the joystick."""
+    if not ac.is_joystick():
+        return
+    term = ac.elevator_droop_term_for(g_force=frame.G or 1.0, _elev_dyn_pressure=0.0)
+    ac._apply_joystick_constant_forces(frame, term, 0.0)
+
+
+MSFS_ELEVATOR_DROOP = PreviewSpec(
+    effect_id=None,                      # no toggle: the moment at zero is "off"
+    name='elevator_droop_moment',
+    rows=('elevator_droop_moment',),
+    reference='stationary with the engine off, at 1 g: the full elevator moment',
+    method=_msfs_elevator_droop,
+    kind='hold',
+    fields={'*': {'G': 1.0, 'AccBody': [0.0, 1.0, 0.0]}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    constant_force=True,
+    sims=('MSFS', 'XPLANE'),
+)
+
 PREVIEW_SPECS: Dict[str, PreviewSpec] = {
     spec.name: spec for spec in (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
@@ -1187,9 +1244,9 @@ PREVIEW_SPECS: Dict[str, PreviewSpec] = {
         GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
         IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE,
         TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, TURBULENCE, WIND,
-        ROTOR_RUMBLE, VRS, BLADE_SLAP)
+        ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP)
 }
-assert len(PREVIEW_SPECS) == 33, "a spec name collided"
+assert len(PREVIEW_SPECS) == 35, "a spec name collided"
 
 # settings row -> the one preview whose button it hosts
 PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}

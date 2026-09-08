@@ -17,6 +17,7 @@
 #
 
 
+import html
 import inspect
 import json
 import logging
@@ -43,6 +44,13 @@ from . import xmlutils
 
 PREVIEW_BUTTON_SIZE = 20          # matches the -/+ step buttons
 PREVIEW_ACTIVE_HANDLE = "#17c411"  # the green the live loop paints active effects
+
+
+def preview_tooltip_html(paragraphs):
+    """A tooltip that wraps: Qt only word-wraps RICH text tooltips, so the
+    paragraphs go out as HTML.  Callers escape their own dynamic text;
+    the template keeps a small gap between paragraphs."""
+    return "".join(f"<p style='margin:0 0 4px 0'>{p}</p>" for p in paragraphs)
 
 
 def mark_preview_sliders(root, spec, active):
@@ -843,21 +851,25 @@ class SettingsLayout(QGridLayout):
             slots.addWidget(button)
             return button
 
-        # one clause per line: a Qt tooltip only wraps where told to,
-        # and a single long line runs the width of the screen
-        tip = (f"Preview: {spec.reference} ({spec.duration:g} s).\n"
-               "Plays at the maximum your settings allow;\n"
-               "in flight the telemetry sets the level, usually lower.\n"
-               "Click again to stop.")
+        # Rich text: Qt word-wraps a rich-text tooltip to a sensible width,
+        # a plain one only breaks where told to and a reference line runs
+        # the width of the screen.  One short paragraph per idea.
+        paragraphs = [
+            f"<b>Preview:</b> {html.escape(spec.reference, quote=False)} ({spec.duration:g} s).",
+            "Plays at the maximum your settings allow; in flight the telemetry "
+            "sets the level, usually lower.",
+        ]
         if spec.constant_force:
-            tip += "\nConstant force: keep a firm hold on the controls."
+            paragraphs.append("<b>Constant force:</b> keep a firm hold on the controls.")
+        paragraphs.append("Click again to stop.")
+        tip = preview_tooltip_html(paragraphs)
         play = make("\u25b6", 'pv', tip,
                     lambda checked=False, s=spec: mw.toggle_effect_preview(s, play))
 
         devices = self._preview_devices_for(item['name'])
         if len(devices) >= 2:
             names = ", ".join(devices[:-1]) + " and " + devices[-1]
-            all_tip = f"Play on {names} together.\n" + tip
+            all_tip = preview_tooltip_html([f"<b>Play on {names} together.</b>"] + paragraphs)
             play_all = make("\u25b6\u25b6", 'pvall', all_tip,
                             lambda checked=False, s=spec, d=tuple(devices):
                             mw.toggle_effect_preview(s, play_all, devices=d),

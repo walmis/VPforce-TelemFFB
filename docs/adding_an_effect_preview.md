@@ -89,7 +89,15 @@ Field by field:
   Count"), and any telemetry the preview holds at a fixed value that the profile has no
   setting for ("at a fixed 300 rpm NR"). The user is tuning one slider; the line tells them
   what else shaped what they felt.
-- **`method`** — a name, or `{'*': 'generic', 'MSFS': 'msfs_specific'}`.
+- **`method`** — a name, or `{'*': 'generic', 'MSFS': 'msfs_specific'}`, or a **recipe**
+  `callable(aircraft, frame, **kwargs)` for an effect that is one step inside a longer routine
+  and can only be played by sequencing the production pieces. The MSFS elevator droop is the
+  example: its term is one line inside the flight-controls chain, lifted into
+  `elevator_droop_term_for()` so the recipe calls that and then the production applier. A
+  recipe must never re-implement the effect's arithmetic; if the piece you need isn't callable
+  on its own, extract it first (a pure refactor) rather than copying it.
+- **`effect_id=None`** — for an effect with no enable toggle (the MSFS droop moment at zero is
+  "off"); set `name` explicitly, and nothing is forced on for the run.
 - **`sims`** — restrict when a sim has no field for it, overrides the method, or the effect
   logs "unknown sim" there. Default is all five.
 - **`fields`** — `{'*': {...}, 'XPLANE': {...}}`; a sim's entries merge over `'*'`.
