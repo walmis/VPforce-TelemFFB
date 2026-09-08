@@ -1140,6 +1140,14 @@ class TestPreviewRows:
     def test_every_spec_has_at_least_one_row(self):
         assert all(spec.rows for spec in PREVIEW_SPECS.values())
 
+    def test_every_spec_states_its_reference_condition(self):
+        """The tooltip and the constant-force popup slot this into a fixed
+        template; an empty one would regress to vague text."""
+        missing = [name for name, spec in PREVIEW_SPECS.items() if not spec.reference.strip()]
+        assert not missing
+        # a fragment, not a sentence: it is embedded mid-sentence
+        assert all(not spec.reference.endswith('.') for spec in PREVIEW_SPECS.values())
+
     def test_every_row_is_a_setting_in_defaults_xml(self, setting_names):
         missing = [r for r in PREVIEWS_BY_ROW if r not in setting_names]
         assert not missing
