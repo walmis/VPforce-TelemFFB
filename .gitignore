@@ -11,3 +11,5 @@ __pycache__
 dll/directlink.dlk
 *.lock
 /pyenv
+userconfig_v2.xml
+userconfig.xml
