@@ -485,6 +485,17 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
 
                     for i, clunk_name in enumerate(clunk_effects):
                         direction = config.get('clunk_directions', [180, 0])[i % 2]
+                        if config['telem_key'] in ['TailHook', 'FuelBoom']:
+                            # extending (1) seats forward, retracting (0) aft
+                            direction = (1 - value) * 180
+                        duration = config.get('clunk_duration', 40)
+                        self.effects[clunk_name].periodic(
+                            10,
+                            clunk_intensity,
+                            direction,
+                            effect_type=EFFECT_SQUARE,
+                            duration=duration
+                        ).start()
 
             self.effects.dispose(*config['effect_names'])
 
