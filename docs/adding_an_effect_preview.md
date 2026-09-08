@@ -84,7 +84,11 @@ Field by field:
 - **`reference`** — one sentence fragment saying what condition the preview represents
   ("moderate turbulence: a few m/s of vertical and lateral gusts"). The row tooltip and the
   constant-force popup slot it into a fixed template, so write it to follow "This preview
-  plays …". Required; a test checks every catalog spec has one.
+  plays …". Required; a test checks every catalog spec has one. Two things belong in it when
+  they apply, briefly: a *separate* setting the result depends on ("pitch follows Rotor Blade
+  Count"), and any telemetry the preview holds at a fixed value that the profile has no
+  setting for ("at a fixed 300 rpm NR"). The user is tuning one slider; the line tells them
+  what else shaped what they felt.
 - **`method`** — a name, or `{'*': 'generic', 'MSFS': 'msfs_specific'}`.
 - **`sims`** — restrict when a sim has no field for it, overrides the method, or the effect
   logs "unknown sim" there. Default is all five.

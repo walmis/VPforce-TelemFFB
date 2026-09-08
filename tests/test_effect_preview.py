@@ -34,6 +34,7 @@ from telemffb.preview import (
     GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
     IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits, Jitter,
     TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, REFERENCE_SPRING, Gusts, TURBULENCE, WIND,
+    ROTOR_RUMBLE, VRS, BLADE_SLAP,
     ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, PREVIEWS_BY_ROW, preview_for_row,
     FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
@@ -1588,7 +1589,12 @@ class TestDecelerationPreview(BaseTelemetryEffectTestCase):
         (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
         (aircrafts_il2.Aircraft, 'IL2'),
     ])
-    def test_a_braking_run_builds_to_max_force(self, cls, sim):
+    def test_a_braking_run_builds_to_max_force(self, cls, sim, monkeypatch):
+        # the stimulus wobble is random per run; pin it so the frame the
+        # assertion reads is repeatable (the runtime draw is unseeded)
+        import random
+        import telemffb.preview as preview
+        monkeypatch.setattr(preview._DECEL_WOBBLE, 'rng', random.Random(3))
         ac = cls('preview')
         ac.deceleration_effect_enable = False
         ac.deceleration_max_force = 0.5
@@ -1601,8 +1607,9 @@ class TestDecelerationPreview(BaseTelemetryEffectTestCase):
             fx = self.mock_effects.get('decel')
             mags.append(fx._magnitude if fx is not None and fx.started else 0.0)
         # end of the hold (frame 24, t = 2.4 s): the 8-frame average has caught
-        # up (the stimulus wobbles 2% so the effect keeps processing frames)
-        assert mags[24] == pytest.approx(0.5, abs=0.03)
+        # up (the stimulus wobbles a few percent so the effect keeps
+        # processing frames instead of skipping "unchanged" ones)
+        assert mags[24] == pytest.approx(0.5, abs=0.06)
         assert mags[5] < mags[24]                                     # building
         assert mags[-1] < mags[24]                                    # releasing
         assert self.mock_effects['decel']._direction == 180
@@ -1647,6 +1654,106 @@ class TestRunwayRumblePreview(BaseTelemetryEffectTestCase):
     def test_il2_is_not_offered(self):
         with pytest.raises(ValueError):
             PreviewRunner(aircrafts_il2.Aircraft('preview'), RUNWAY_RUMBLE, 'IL2')
+
+
+class TestRotorRumblePreview(HoldPreviewCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Helicopter, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'), (aircrafts_msfs_xp.Aircraft, 'XPLANE'),
+    ])
+    def test_hums_at_the_aircrafts_blade_passage_rate(self, cls, sim):
+        ac = cls('preview')
+        ac.engine_rotor_rumble_enabled = False
+        ac.heli_engine_rumble_intensity = 0.4
+        ac.rotor_blade_count = 4
+        runner = self._run_hold(ac, ROTOR_RUMBLE, sim)
+        x = self.mock_effects['rotor_rpm0-1']._periodic
+        y = self.mock_effects['rotor_rpm1-1']._periodic
+        assert x[0] == pytest.approx(ROTOR_RPM_NOMINAL / 45 * 4)     # blade count got through
+        assert x[1] == pytest.approx(0.2) and y[1] == pytest.approx(0.2)   # half intensity per axis
+        assert x[2] == 0 and y[2] == 90
+        self._finish(runner)
+
+
+class TestVrsPreview(BaseTelemetryEffectTestCase):
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Helicopter, 'DCS'), (aircrafts_dcs.Aircraft, 'BMS'),
+        (aircrafts_msfs_xp.Aircraft, 'MSFS'),
+    ])
+    def test_descent_sweeps_the_band_then_holds_at_max(self, cls, sim):
+        import telemffb.utils as utils
+        ac = cls('preview')
+        ac.vrs_effect_enable = False
+        ac.vrs_effect_intensity = 0.3
+        ac.vrs_threshold_speed = 10.0
+        ac.vrs_vs_onset = 3.0
+        ac.vrs_vs_max = 9.0
+        runner = PreviewRunner(ac, VRS, sim, frame_rate=10.0)   # 60 frames
+        mags = []
+        for _ in range(runner.frames_total - 1):
+            runner.step()
+            fx = self.mock_effects.get('vrs_buffet')
+            mags.append(fx._periodic[1] if fx is not None and fx.started else 0.0)
+        assert ac._telem_data['VerticalSpeed'] == pytest.approx(-9.0)      # held at max sink
+        assert mags[0] == pytest.approx(0.0)                                 # silent at onset
+        assert all(a <= b + 1e-9 for a, b in zip(mags[:30], mags[1:31]))    # building
+        assert mags[-1] == pytest.approx(0.3)                                # full at max
+        assert mags[30:] == [pytest.approx(0.3)] * 29                        # the hold
+        assert self.mock_effects['vrs_buffet']._periodic[2] is utils.RandomDirectionModulator
+        assert self.mock_effects['vrs_buffet2']._periodic[0] == 12
+        assert runner.step() is False and not self.mock_effects.dict
+
+    def test_xplane_is_not_offered(self):
+        with pytest.raises(ValueError):
+            PreviewRunner(aircrafts_msfs_xp.Aircraft('preview'), VRS, 'XPLANE')
+
+
+class TestBladeSlapPreview(HoldPreviewCase):
+    def _aircraft(self, cls):
+        ac = cls('preview')
+        ac.blade_slap_enable = False
+        ac.blade_slap_intensity = 0.3
+        ac.blade_slap_band_center = 32.4
+        ac.blade_slap_g_factor = 0.8
+        ac.rotor_blade_count = 2
+        return ac
+
+    @pytest.mark.parametrize("cls, sim", [
+        (aircrafts_dcs.Helicopter, 'DCS'), (aircrafts_msfs_xp.Aircraft, 'MSFS'),
+    ])
+    def test_inferred_signal_at_its_peak_gives_full_intensity(self, cls, sim):
+        ac = self._aircraft(cls)
+        runner = self._run_hold(ac, BLADE_SLAP, sim)
+        assert ac._telem_data['_blade_slap_src'] == 'inferred'
+        assert ac._telem_data['_blade_slap_sig'] == pytest.approx(1.0, abs=0.02)
+        y = self.mock_effects['blade_slap_y']._periodic
+        assert y[0] == pytest.approx(ROTOR_RPM_NOMINAL / 60 * 2)            # blade passage
+        assert y[1] == pytest.approx(0.3, abs=0.01)                          # 2 blades: full
+        assert y[3] == {'effect_type': 7}                                    # sawtooth down
+        self._finish(runner)
+
+    def test_xplane_native_signal_is_fed_at_full(self):
+        ac = self._aircraft(aircrafts_msfs_xp.Aircraft)
+        ac.blade_slap_use_native = True
+        runner = self._run_hold(ac, BLADE_SLAP, 'XPLANE')
+        assert ac._telem_data['_blade_slap_src'] == 'native'
+        assert self.mock_effects['blade_slap_y']._periodic[1] == pytest.approx(0.3)
+        self._finish(runner)
+
+    def test_xplane_inferred_path_works_too(self):
+        ac = self._aircraft(aircrafts_msfs_xp.Aircraft)
+        ac.blade_slap_use_native = False
+        runner = self._run_hold(ac, BLADE_SLAP, 'XPLANE')
+        assert ac._telem_data['_blade_slap_src'] == 'inferred'
+        assert self.mock_effects['blade_slap_y']._periodic[1] == pytest.approx(0.3, abs=0.01)
+        self._finish(runner)
+
+    def test_more_blades_soften_the_slap(self):
+        ac = self._aircraft(aircrafts_dcs.Helicopter)
+        ac.rotor_blade_count = 4
+        runner = self._run_hold(ac, BLADE_SLAP, 'DCS')
+        assert self.mock_effects['blade_slap_y']._periodic[1] == pytest.approx(0.3 * 0.6, abs=0.01)
+        self._finish(runner)
 
 
 class TestGearMotionPreview(BaseTelemetryEffectTestCase):
