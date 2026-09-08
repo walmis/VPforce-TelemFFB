@@ -45,11 +45,15 @@ What is deliberately NOT previewable: the spring family (the curve is the
 feature), anything closed-loop with the sim (trim following), and the
 force-trim button state machines.  Those are status-view territory.
 
-Safety: ``AircraftBase.__init__`` clears the SHARED effect dispenser and
-the preview plays into the same device slots a live aircraft would, so a
-preview must never overlap a sim session - ``preview_blockers`` is the
-gate.  The runner is clock-agnostic (``step`` per frame) so the app can
-drive it from a timer and tests from a loop.
+Safety: the preview aircraft carries its OWN effect dispenser (see
+``build_aircraft``), so its construction and cleanup never touch a live
+aircraft's effects, and a preview can run while a sim session sits
+paused in the background - which offline editing is.  What it must not
+overlap is telemetry actively streaming (two writers on the device from
+two threads, and a preview mid-flight is meaningless anyway):
+``preview_blockers`` is that gate.  The runner is clock-agnostic
+(``step`` per frame) so the app can drive it from a timer and tests
+from a loop.
 """
 import logging
 import random
@@ -112,6 +116,10 @@ class PreviewSpec:
     # covers several separately-tuned effects (IL-2's weapons: gun, bomb,
     # rocket, three intensities) gets one spec per adjustment.
     name: str = ''
+    # The settings rows that host this preview's play button: the
+    # intensity slider(s) the user adjusts while listening, never the
+    # enable toggle or a threshold.  A row belongs to at most one spec.
+    rows: Tuple[str, ...] = ()
     duration: float = 3.0
     # Seconds the LAST frame is repeated before cleanup.  A one-shot fired
     # on the final scripted frame (the gear clunk at 1.0) would otherwise
@@ -397,17 +405,20 @@ class TimedPreview:
             self.on_finished()
 
 
-def preview_blockers(current_aircraft=None, device_alive: bool = True) -> List[str]:
+def preview_blockers(current_aircraft=None, device_alive: bool = True,
+                     telemetry_paused: bool = False) -> List[str]:
     """Reasons a preview must not run now; empty means go.
 
-    A live aircraft owns effect slots on the device and its constructor
-    would be re-run by ``build_aircraft`` (clearing them); a dead device
-    has nowhere to play.  Pure so it is testable; the caller passes
-    ``G.telem_manager.currentAircraft`` and ``HapticEffect.device_alive()``.
+    A loaded aircraft is fine while telemetry is paused (offline editing
+    pauses it): the preview aircraft has its own effect table, so the
+    two never touch.  Streaming telemetry is not: two threads would be
+    writing the device.  A dead device has nowhere to play.  Pure so it
+    is testable; the caller passes ``G.telem_manager.currentAircraft``,
+    ``HapticEffect.device_alive()`` and the manager's pause state.
     """
     reasons = []
-    if current_aircraft is not None:
-        reasons.append("a sim session is active - previews run only with no aircraft loaded")
+    if current_aircraft is not None and not telemetry_paused:
+        reasons.append("telemetry is streaming - pause it (offline editing) or stop the sim")
     if not device_alive:
         reasons.append("no FFB device connected")
     return reasons
@@ -422,6 +433,7 @@ JET_IDLE_PCT = 60   # a typical turbine idle; the effect has no profile threshol
 
 JET_ENGINE_RUMBLE = PreviewSpec(
     effect_id='engine_jet_rumble_enabled',
+    rows=('jet_engine_rumble_intensity',),
     method='ac_update_jet_engine_rumble',
     kind='ramp',
     # Intensity scales with rpm/100 and the frequency climbs 10 Hz over
@@ -437,6 +449,7 @@ JET_ENGINE_RUMBLE = PreviewSpec(
 
 GEAR_MOTION = PreviewSpec(
     effect_id='gear_motion_effect_enabled',
+    rows=('gear_motion_intensity',),
     method='ac_update_landing_gear',
     kind='ramp',
     # gear_value swept up -> down keeps the motion effect alive (it plays
@@ -451,6 +464,7 @@ _PROP_RPM_SWEEP = ('engine_rumble_lowrpm', 'engine_rumble_highrpm')
 
 PROP_ENGINE_RUMBLE = PreviewSpec(
     effect_id='engine_prop_rumble_enabled',
+    rows=('engine_rumble_lowrpm_intensity', 'engine_rumble_highrpm_intensity'),
     method='ac_update_piston_engine_rumble',
     kind='ramp',
     # The effect is a TAPER, not a level: intensity falls from the Low RPM
@@ -473,6 +487,7 @@ PROP_ENGINE_RUMBLE = PreviewSpec(
 
 STALL_BUFFET = PreviewSpec(
     effect_id='aoa_buffeting_enabled',
+    rows=('buffeting_intensity',),
     method='ac_update_buffeting',
     kind='ramp',
     # AoA sweeps the profile's onset -> stall band, then holds at stall:
@@ -498,6 +513,7 @@ ROTOR_RPM_NOMINAL = 300   # a typical NR; no profile threshold exists for it
 
 ETL = PreviewSpec(
     effect_id='etl_effect_enable',
+    rows=('etl_effect_intensity',),
     method='ac_calc_etl_effect',
     kind='ramp',
     # ETL is a transient: a few seconds of shake as the aircraft
@@ -527,6 +543,7 @@ HOLD_SECONDS = 5.0
 
 AFTERBURNER = PreviewSpec(
     effect_id='afterburner_effect_enabled',
+    rows=('afterburner_effect_intensity',),
     method='ac_update_ab_effect',
     # The effect re-issues only when something CHANGED: the afterburner
     # value or its own slow modulation term.  With the burner lit from
@@ -542,6 +559,7 @@ AFTERBURNER = PreviewSpec(
 
 STICK_SHAKER = PreviewSpec(
     effect_id='enable_stick_shaker',
+    rows=('stick_shaker_intensity',),
     # DCS / BMS shake above a profile AoA; MSFS shakes on the sim's stall
     # warning flag.  Different methods, different fields, one preview.
     method={'*': 'dcs_update_stick_shaker', 'MSFS': 'msfs_update_stick_shaker'},
@@ -556,6 +574,7 @@ STICK_SHAKER = PreviewSpec(
 
 OVERSPEED_SHAKE = PreviewSpec(
     effect_id='overspeed_effect_enable',
+    rows=('overspeed_shake_intensity',),
     method='ac_calc_etl_effect',
     kind='hold',
     # The overspeed branch of the ETL method: full strength 15 m/s past
@@ -574,6 +593,7 @@ _XP_VLE = 60.0   # m/s; X-Plane takes the gear buffet band from Vle (0.9 .. 1.17
 
 GEAR_BUFFET = PreviewSpec(
     effect_id='gear_buffet_effect_enabled',
+    rows=('gear_buffet_intensity',),
     method='ac_update_landing_gear',
     kind='hold',
     # Gear down at the top of the profile's buffet speed band = full
@@ -590,6 +610,7 @@ GEAR_BUFFET = PreviewSpec(
 
 SPEEDBRAKE_BUFFET = PreviewSpec(
     effect_id='speedbrake_buffet_effect_enabled',
+    rows=('speedbrake_buffet_intensity',),
     method='ac_update_speed_brakes',
     kind='hold',
     # Fully deployed at 100 m/s: the shared buffet helper scales speed
@@ -602,6 +623,7 @@ SPEEDBRAKE_BUFFET = PreviewSpec(
 
 SPOILER_BUFFET = PreviewSpec(
     effect_id='spoiler_buffet_effect_enabled',
+    rows=('spoiler_buffet_intensity',),
     method='ac_update_spoilers',
     kind='hold',
     fields={'*': {'Spoilers': 1.0, 'IAS': Attr('spoiler_spd_thresh_hi')}},
@@ -618,6 +640,7 @@ SPOILER_BUFFET = PreviewSpec(
 
 FLAPS_MOTION = PreviewSpec(
     effect_id='flaps_motion_effect_enabled',
+    rows=('flaps_motion_intensity',),
     method='ac_update_flaps',
     kind='ramp',
     fields={'*': {'Flaps': (0.0, 1.0)}},
@@ -625,6 +648,7 @@ FLAPS_MOTION = PreviewSpec(
 
 SPEEDBRAKE_MOTION = PreviewSpec(
     effect_id='speedbrake_motion_effect_enabled',
+    rows=('speedbrake_motion_intensity',),
     method='ac_update_speed_brakes',
     kind='ramp',
     fields={'*': {'SpeedbrakePos': (0.0, 1.0), 'IAS': 0.0}},   # IAS 0: no buffet
@@ -633,6 +657,7 @@ SPEEDBRAKE_MOTION = PreviewSpec(
 
 SPOILER_MOTION = PreviewSpec(
     effect_id='spoiler_motion_effect_enabled',
+    rows=('spoiler_motion_intensity',),
     method='ac_update_spoilers',
     kind='ramp',
     fields={'*': {'Spoilers': (0.0, 1.0), 'IAS': 0.0}},
@@ -641,6 +666,7 @@ SPOILER_MOTION = PreviewSpec(
 
 CANOPY_MOTION = PreviewSpec(
     effect_id='canopy_motion_effect_enabled',
+    rows=('canopy_motion_intensity',),
     method='ac_update_canopy',
     kind='ramp',
     # closing: the effect clunks when the canopy reaches 0
@@ -650,6 +676,7 @@ CANOPY_MOTION = PreviewSpec(
 
 TAILHOOK_MOTION = PreviewSpec(
     effect_id='tailhook_motion_effect_enabled',
+    rows=('tailhook_motion_intensity',),
     method='ac_update_tailhook_effect',
     kind='ramp',
     fields={'*': {'TailHook': (0.0, 1.0)}},
@@ -658,6 +685,7 @@ TAILHOOK_MOTION = PreviewSpec(
 
 FUELBOOM_MOTION = PreviewSpec(
     effect_id='fuelboom_motion_effect_enabled',
+    rows=('fuelboom_motion_intensity',),
     method='ac_update_fuelboom_effect',
     kind='ramp',
     fields={'*': {'FuelBoom': (0.0, 1.0)}},
@@ -666,6 +694,7 @@ FUELBOOM_MOTION = PreviewSpec(
 
 WINGFOLD_MOTION = PreviewSpec(
     effect_id='wingfold_motion_effect_enabled',
+    rows=('wingfold_motion_intensity',),
     method='ac_update_wingfold_effect',
     kind='ramp',
     fields={'*': {'WingFold': (0.0, 1.0), 'SimOnGround': 1}},   # ground-only effect
@@ -729,6 +758,7 @@ _DAMAGE_HITS = RandomHits()
 
 GUNFIRE = PreviewSpec(
     effect_id='gunfire_effect_enabled',
+    rows=('gun_vibration_intensity',),
     method='ac_update_cm_weapons',
     kind='edge',
     # the gun signal changes every frame while firing; a 2 s burst
@@ -740,6 +770,7 @@ GUNFIRE = PreviewSpec(
 
 WEAPON_RELEASE = PreviewSpec(
     effect_id='weapon_release_effect_enabled',
+    rows=('weapon_release_intensity',),
     method='ac_update_cm_weapons',
     kind='edge',
     # three releases a second apart: the payload count steps down
@@ -751,6 +782,7 @@ WEAPON_RELEASE = PreviewSpec(
 
 COUNTERMEASURES = PreviewSpec(
     effect_id='countermeasure_effect_enabled',
+    rows=('cm_vibration_intensity',),
     method='ac_update_cm_weapons',
     kind='edge',
     # four flares half a second apart
@@ -762,6 +794,7 @@ COUNTERMEASURES = PreviewSpec(
 
 DAMAGE = PreviewSpec(
     effect_id='damage_effect_enabled',
+    rows=('damage_effect_intensity',),
     method={'*': 'dcs_update_damage', 'IL2': 'il2_update_damage'},
     kind='edge',
     # An irregular stream of hits over 5 s - lone rounds and short
@@ -783,6 +816,7 @@ _IL2_WEAPON_FORCE = {'il2_shake_master': True, 'il2_dynamic_gunfire_mode': False
 
 IL2_GUNFIRE = PreviewSpec(
     name='il2_gunfire',
+    rows=('il2_weapon_release_intensity',),
     effect_id='il2_enable_weapons',
     method='ac_update_cm_weapons',
     kind='edge',
@@ -796,6 +830,7 @@ IL2_GUNFIRE = PreviewSpec(
 
 IL2_BOMB_RELEASE = PreviewSpec(
     name='il2_bombs',
+    rows=('il2_bomb_release_intensity',),
     effect_id='il2_enable_weapons',
     method='ac_update_cm_weapons',
     kind='edge',
@@ -807,6 +842,7 @@ IL2_BOMB_RELEASE = PreviewSpec(
 
 IL2_ROCKET_RELEASE = PreviewSpec(
     name='il2_rockets',
+    rows=('il2_rocket_release_intensity',),
     effect_id='il2_enable_weapons',
     method='ac_update_cm_weapons',
     kind='edge',
@@ -827,3 +863,15 @@ PREVIEW_SPECS: Dict[str, PreviewSpec] = {
         IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE)
 }
 assert len(PREVIEW_SPECS) == 25, "a spec name collided"
+
+# settings row -> the one preview whose button it hosts
+PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}
+for _spec in PREVIEW_SPECS.values():
+    for _row in _spec.rows:
+        assert _row not in PREVIEWS_BY_ROW, f"row {_row} claimed by two previews"
+        PREVIEWS_BY_ROW[_row] = _spec
+
+
+def preview_for_row(setting_name: str) -> Optional[PreviewSpec]:
+    """The preview a settings row hosts a play button for, if any."""
+    return PREVIEWS_BY_ROW.get(setting_name)

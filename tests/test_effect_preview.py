@@ -33,9 +33,10 @@ from telemffb.preview import (
     TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
     GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
     IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits,
-    ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, FRAME_RATE_HZ)
+    ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, PREVIEWS_BY_ROW, preview_for_row,
+    FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
-from tests.framework.base import BaseTelemetryEffectTestCase
+from tests.framework.base import BaseTelemetryEffectTestCase, MockEffectDispenser
 
 pytestmark = [
     pytest.mark.unit,
@@ -532,9 +533,15 @@ class TestPreviewBlockers:
     def test_clear_when_idle_with_a_device(self):
         assert preview_blockers(current_aircraft=None, device_alive=True) == []
 
-    def test_live_aircraft_blocks(self):
+    def test_streaming_aircraft_blocks(self):
         reasons = preview_blockers(current_aircraft=object(), device_alive=True)
-        assert len(reasons) == 1 and 'sim session' in reasons[0]
+        assert len(reasons) == 1 and 'streaming' in reasons[0]
+
+    def test_loaded_aircraft_with_telemetry_paused_is_fine(self):
+        """Offline editing with a sim in the background: the preview has
+        its own effect table, so nothing to protect."""
+        assert preview_blockers(current_aircraft=object(), device_alive=True,
+                                telemetry_paused=True) == []
 
     def test_dead_device_blocks(self):
         reasons = preview_blockers(current_aircraft=None, device_alive=False)
@@ -542,6 +549,64 @@ class TestPreviewBlockers:
 
     def test_both_reported(self):
         assert len(preview_blockers(current_aircraft=object(), device_alive=False)) == 2
+
+
+class TestPrivateEffects(BaseTelemetryEffectTestCase):
+    """The preview aircraft's own effect table: construction and cleanup
+    never touch the shared one a live aircraft uses."""
+
+    def test_effects_property_defaults_to_the_shared_dispenser(self):
+        ac = aircrafts_dcs.Aircraft('live')
+        assert ac.effects is self.mock_effects
+
+    def test_an_instance_may_carry_its_own(self):
+        ac = aircrafts_dcs.Aircraft('live')
+        own = MockEffectDispenser()
+        ac._effects = own
+        assert ac.effects is own
+        ac.effects['x'].start()
+        assert 'x' in own and 'x' not in self.mock_effects
+
+    def test_build_aircraft_leaves_a_live_aircrafts_effects_alone(self, monkeypatch):
+        import telemffb.utils as utils
+        live_spring = self.mock_effects['spring']          # a paused session's spring
+        live_spring.start()
+        monkeypatch.setattr(xmlutils, 'read_single_model',
+                            lambda *a, **k: ('Aircraft', '.*', []))
+        monkeypatch.setattr(xmlutils, 'get_active_profile_for_model', lambda *a: None)
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        ac = tm.build_aircraft('DCS', 'Preview')
+        assert isinstance(ac.effects, utils.Dispenser)
+        assert ac.effects is not self.mock_effects
+        # construction set up the aircraft's own spring handle in ITS table
+        assert set(ac.effects.dict) == {'spring'}
+        assert ac.effects.dict['spring'] is not live_spring
+        assert self.mock_effects['spring'] is live_spring   # __init__ did not clear the shared one
+        assert live_spring.started
+
+    def test_a_preview_run_frees_only_its_own_effects(self):
+        live_spring = self.mock_effects['spring']
+        live_spring.start()
+        # the private table must be in place BEFORE __init__ (which clears
+        # whatever it sees) - the order build_aircraft uses
+        ac = aircrafts_dcs.Aircraft.__new__(aircrafts_dcs.Aircraft)
+        ac._effects = MockEffectDispenser()
+        ac.__init__('preview')
+        assert self.mock_effects['spring'] is live_spring   # construction left it alone
+        ac.jet_engine_rumble_intensity = 0.3
+        runner = PreviewRunner(ac, JET_ENGINE_RUMBLE, 'DCS', frame_rate=10.0)
+        runner.step()
+        assert 'je_rumble_1_1' in ac.effects and 'je_rumble_1_1' not in self.mock_effects
+        runner.run(sleep=lambda s: None)
+        assert not ac.effects.dict
+        assert self.mock_effects['spring'] is live_spring and live_spring.started
+
+    def test_shared_path_still_clears_on_construction(self):
+        """The live behaviour is unchanged: a new aircraft on the shared
+        table starts from an empty one."""
+        self.mock_effects['stale'].start()
+        aircrafts_dcs.Aircraft('next')
+        assert 'stale' not in self.mock_effects
 
 
 # ---------------------------------------------------------------------------
@@ -1059,6 +1124,36 @@ class TestMotionRampPreviews(RampPreviewCase):
         for _ in range(3):
             runner.step()
         assert 'hookmovement' not in self.mock_effects
+
+
+class TestPreviewRows:
+    """Every preview names the intensity row(s) that host its play
+    button; every such row is a real setting; no row hosts two."""
+
+    @pytest.fixture(scope='class')
+    def setting_names(self):
+        import xml.etree.ElementTree as ET
+        root = ET.parse('defaults.xml').getroot()
+        return {(d.findtext('name') or '').strip() for d in root.iter('defaults')}
+
+    def test_every_spec_has_at_least_one_row(self):
+        assert all(spec.rows for spec in PREVIEW_SPECS.values())
+
+    def test_every_row_is_a_setting_in_defaults_xml(self, setting_names):
+        missing = [r for r in PREVIEWS_BY_ROW if r not in setting_names]
+        assert not missing
+
+    def test_rows_are_intensities_not_toggles_or_thresholds(self):
+        toggles = {spec.effect_id for spec in PREVIEW_SPECS.values()}
+        assert not (set(PREVIEWS_BY_ROW) & toggles)
+        assert all('intensity' in r for r in PREVIEWS_BY_ROW)
+
+    def test_lookup(self):
+        assert preview_for_row('engine_rumble_lowrpm_intensity') is PROP_ENGINE_RUMBLE
+        assert preview_for_row('engine_rumble_highrpm_intensity') is PROP_ENGINE_RUMBLE
+        assert preview_for_row('il2_bomb_release_intensity') is IL2_BOMB_RELEASE
+        assert preview_for_row('engine_prop_rumble_enabled') is None
+        assert preview_for_row('no_such_setting') is None
 
 
 class TestStepsHelper:
