@@ -618,7 +618,7 @@ class TestPrivateEffects(BaseTelemetryEffectTestCase):
         assert self.mock_effects['spring'] is live_spring and live_spring.started
 
     def test_shared_path_still_clears_on_construction(self):
-        """The live behaviour is unchanged: a new aircraft on the shared
+        """The live behavior is unchanged: a new aircraft on the shared
         table starts from an empty one."""
         self.mock_effects['stale'].start()
         aircrafts_dcs.Aircraft('next')
@@ -1489,7 +1489,7 @@ class TestFrameArg(BaseTelemetryEffectTestCase):
 
 
 def _advancing_clock(monkeypatch, step=1.0 / 30):
-    """The turbulence modulator and the wind filters normalise by wall-clock
+    """The turbulence modulator and the wind filters normalize by wall-clock
     dt; test frames are microseconds apart, which would make their filters
     do nothing.  Advance perf_counter a frame per call."""
     import time
