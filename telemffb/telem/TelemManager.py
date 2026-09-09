@@ -198,6 +198,7 @@ class TelemManager(QObject, threading.Thread):
                 logging.info(f"Sim exit: freed {freed} effect(s) from the device")
             self.currentAircraft = None
         self.currentAircraftName = None
+        self.currentDataSource = None
         self.sim_exited.emit(src)
 
     def set_simconnect(self, sc : SimConnectManager):
@@ -207,7 +208,27 @@ class TelemManager(QObject, threading.Thread):
     def simconnect(self) -> Optional[SimConnectManager]:
         return self._simconnect
 
+    def refresh_aircraft_profile(self) -> Optional[str]:
+        """Re-resolve the loaded aircraft's class, pattern and active profile
+        from the userconfig right now, on the caller's thread.
+
+        The telemetry loop only re-resolves them when a frame notices the
+        config file changed. After the new-aircraft wizard writes the type
+        row and profile mapping, that frame may be a long way off (sim
+        paused, sitting in a menu), and a setting changed before it arrives
+        would be written against the stale ``None`` profile.
+
+        Returns the resolved profile, or None when no aircraft is loaded.
+        """
+        name = self.currentAircraftName
+        data_source = getattr(self, 'currentDataSource', None)
+        if not name or not data_source:
+            return None
+        self.get_aircraft_config(name, data_source)
+        return G.settings_mgr.active_profile
+
     def get_aircraft_config(self, aircraft_name, data_source) -> Tuple[dict, str]:
+        self.currentDataSource = data_source
         params = {}
         cls_name = "UNKNOWN"
         input_modeltype = ''

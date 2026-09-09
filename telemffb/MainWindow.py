@@ -2841,6 +2841,14 @@ class MainWindow(QMainWindow):
     def new_ac_wizard_finished(self):
         self.new_craft_button.setVisible(False)
         self._new_craft_anim.stop()
+        # The wizard just wrote the type row and the profile mapping. The
+        # telemetry loop only re-resolves the active profile when a frame
+        # notices the config change; a setting changed before that frame
+        # (sim paused, in a menu) would be written against the stale None
+        # profile, as a row that belongs to no profile. Re-resolve now, so
+        # the form we reload below already edits the new profile.
+        if not G.settings_mgr.offline_mode and G.telem_manager is not None:
+            G.telem_manager.refresh_aircraft_profile()
         self.settings_layout.reload_layout(None)
 
     def _update_trim_cal_prompt(self):

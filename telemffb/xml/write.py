@@ -43,6 +43,18 @@ class ConfigWriter:
 
         is_profile = profile_name is not None and profile_name.lower() != 'none'
 
+        if not is_profile:
+            # No profile named. Never persist a row without a <profile>: it
+            # belongs to no profile, nothing reads it back, and the importer
+            # trips over it. The live path hands us None when the aircraft's
+            # profile was resolved before the new-aircraft wizard created
+            # it, so resolve it ourselves from what is on disk now; a model
+            # with nothing to resolve forks to Auto User like Built-In does.
+            cls = self._resolver.get_class_for_sim_model(sim, model)
+            profile_name = (self._resolver.get_active_profile_for_model(sim, cls or '', model)
+                            or 'Built-In')
+            is_profile = True
+
         if is_profile and profile_name is not None and profile_name.lower() == 'built-in':
             cls = self._resolver.get_class_for_sim_model(sim, model)
             root = self._store.user_root

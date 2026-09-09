@@ -979,6 +979,45 @@ class TestWriteModelsToXml:
             './/models[sim="MSFS"][model="RedirectTest.*"][name="type"][profile="Auto User"]')
         assert found is not None
 
+    def test_no_profile_resolves_the_models_active_profile(self, xml_tmpdir):
+        """The live path passes the settings manager's active profile, which
+        is still None for an aircraft whose profile was resolved before the
+        new-aircraft wizard created it. The writer must never persist a row
+        with no <profile>: it resolves the profile from the mapping the
+        wizard wrote instead."""
+        xmlutils.add_new_model("MSFS", "Helicopter", "Hoist.*", profile_name="User Default")
+        xmlutils.update_active_profile_entry("MSFS", "Helicopter", "Hoist.*", "User Default")
+        xmlutils.write_models_to_xml("MSFS", "Hoist.*", "1", "force_trim_button",
+                                     profile_name=None)
+        xmlutils.update_roots()
+        rows = xmlutils.auto_user_root.findall(
+            './/models[model="Hoist.*"][name="force_trim_button"]')
+        assert [r.findtext("profile") for r in rows] == ["User Default"]
+
+    def test_no_profile_and_nothing_to_resolve_forks_auto_user(self, xml_tmpdir):
+        """A model nothing knows about yet gets the same treatment as a
+        write to a Built-In profile: an Auto User profile is created and
+        made active, and the setting lands in it."""
+        xmlutils.write_models_to_xml("MSFS", "Fresh.*", "1", "spring_mode")
+        xmlutils.update_roots()
+        row = xmlutils.auto_user_root.find('.//models[model="Fresh.*"][name="spring_mode"]')
+        assert row is not None and row.findtext("profile") == "Auto User"
+        assert xmlutils.auto_user_root.find(
+            './/models[model="Fresh.*"][name="profile"][profile="Auto User"]') is not None
+        assert xmlutils.get_active_profile_for_model("MSFS", "", "Fresh.*") == "Auto User"
+
+    def test_never_writes_a_models_row_without_a_profile(self, xml_tmpdir):
+        for profile in (None, "none", "None"):
+            xmlutils.write_models_to_xml("MSFS", f"Plane{profile}.*", "1", "spring_mode",
+                                         profile_name=profile)
+        xmlutils.update_roots()
+        # (the fixture userconfig ships one legacy profile-less Cessna row of
+        # its own; only the rows this test wrote are under scrutiny)
+        written = [r for r in xmlutils.auto_user_root.findall("models")
+                   if (r.findtext("model") or "").startswith("Plane")]
+        assert len(written) >= 3
+        assert all(r.findtext("profile") == "Auto User" for r in written)
+
 
 # ─────────────────────────────────────────────────────────────
 # erase functions
