@@ -33,7 +33,8 @@ License: GPL-3.0
 """
 
 from simconnect import *
-from ctypes import byref, cast, sizeof
+from ctypes import byref, cast, sizeof, c_double, c_void_p, create_string_buffer
+import itertools
 from telemffb.utils import dbprint
 from telemffb.util.TransformExpr import TransformExpr
 import time
@@ -307,6 +308,13 @@ class SimVarArray:
 
 
 
+def is_input_event(var) -> bool:
+    """Whether a variable reference names one of the aircraft's input
+    events (a "B:" variable), which SimConnect addresses by hash rather
+    than through a data definition."""
+    return isinstance(var, str) and var[:2].upper() == "B:"
+
+
 EV_PAUSED = 65499 # id for paused event
 EV_STARTED = 65498 # id for started event
 EV_STOPPED = 65497  # id for stopped event
@@ -456,6 +464,24 @@ class SimConnectManager(threading.Thread):
         self.sv_dict = {}
         self.connected_version = None
         self._connect_attempts = 0
+        # Input events ("B:" variables).  The sim addresses them by a
+        # per-aircraft hash, so the wanted SimVars are held apart from the
+        # data definition and resolved against an enumeration that is
+        # redone for every aircraft.
+        self._input_events = {}          # name without "B:" -> InputEvent, current aircraft
+        self._b_vars = []                # SimVars whose var is a B: name
+        self._b_hash_to_var = {}         # subscribed hash -> SimVar
+        self._b_values = {}              # SimVar.name -> latest value, merged into every frame
+        self._b_pending_writes = {}      # name without "B:" -> value, waiting for a hash
+        self._b_unresolved_logged = set()
+        self._b_enum_req = None          # request id of the enumeration in flight
+        self._b_enum_found = {}          # descriptors gathered from a chunked enumeration
+        self._b_enum_retry_at = None     # time to ask again after an empty answer
+        self._b_enum_sent_at = 0.0
+        self._b_enum_retries = 0
+        self._b_get_reqs = {}            # request id -> SimVar, initial value reads
+        self._b_req_iter = itertools.count(self.req_id + 0x10000)
+        self._last_title = None
         self._sent_datums = {}           # packet id -> SimVar, the last subscription's definition calls
 
 
@@ -594,27 +620,28 @@ class SimConnectManager(threading.Thread):
         self.sv_dict.clear()
         self._sent_datums.clear()
 
+        flat = []
+        for sv in sim_vars:
+            flat.extend(sv.vars if isinstance(sv, SimVarArray) else [sv])
+
+        # The datum id i must stay the index into subscribed_vars: the
+        # frame parser looks tagged values up by it.
         i = 0
-        for sv in (sim_vars):
-            if isinstance(sv, SimVarArray):
-                for sv in sv.vars:
-                    res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
-                    logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
-                    self._note_sent_datum(sv)
+        input_event_vars = []
+        for sv in flat:
+            self.current_var_tracker.append(sv.var)
+            self.sv_dict[sv.name] = sv.var
+            if is_input_event(sv.var):
+                input_event_vars.append(sv)
+                continue
+            res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
+            logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
+            self._note_sent_datum(sv)
 
-                    self.subscribed_vars.append(sv)
-                    self.current_var_tracker.append(sv.var)
-                    self.sv_dict[sv.name] = sv.var
-                    i+=1
-            else:
-                res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
-                logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
-                self._note_sent_datum(sv)
+            self.subscribed_vars.append(sv)
+            i += 1
 
-                self.subscribed_vars.append(sv)
-                self.current_var_tracker.append(sv.var)
-                self.sv_dict[sv.name] = sv.var
-                i+=1
+        self._sync_input_events(input_event_vars)
 
         self.sc.RequestDataOnSimObject(
             self.req_id,  # request identifier for response packets
@@ -668,6 +695,9 @@ class SimConnectManager(threading.Thread):
         """
         while self._simdatums_to_send:
             simvar, value, units = self._simdatums_to_send.pop(0)
+            if is_input_event(simvar):
+                self._set_input_event(simvar, value)
+                continue
             try:
                 self.sc.set_simdatum(simvar, value, units=units)
             except Exception as e:
@@ -687,7 +717,9 @@ class SimConnectManager(threading.Thread):
         while self._events_to_send:
             event, data = self._events_to_send.pop(0)
             logging.debug(f"event {event}   data {data}")
-            if event.startswith('L:'):
+            if is_input_event(event):
+                self._set_input_event(event, data)
+            elif event.startswith('L:'):
                 self.set_simdatum_to_msfs(event, data, units="number")
             else:
                 try:
@@ -718,6 +750,313 @@ class SimConnectManager(threading.Thread):
         except ValueError:
             return str(code)
 
+    # --- input events ("B:" variables) -------------------------------------
+    # Names are only meaningful through the current aircraft's enumeration,
+    # so every subscription and write goes through the hash table that
+    # enumeration fills, and the table is thrown away when the aircraft
+    # changes or the connection reopens.
+
+    def _reset_input_events(self):
+        """Forget every hash: after (re)connecting nothing is subscribed
+        and the table may belong to another session."""
+        self._input_events = {}
+        self._b_hash_to_var = {}
+        self._b_values = {}
+        self._b_get_reqs = {}
+        self._b_enum_req = None
+        self._b_enum_found = {}
+        self._b_enum_retry_at = None
+        self._b_enum_retries = 0
+        self._b_unresolved_logged = set()
+        self._last_title = None
+        if self._b_vars or self._b_pending_writes:
+            self._request_input_event_enumeration()
+
+    def _note_aircraft_title(self, title):
+        """A new aircraft carries new hashes: drop the old subscriptions
+        and enumerate again when anything is wanted."""
+        if title == self._last_title:
+            return
+        first = self._last_title is None
+        self._last_title = title
+        if not (self._b_vars or self._b_pending_writes):
+            return
+        self._b_enum_retries = 0
+        if first:
+            # Frames only flow with an aircraft loaded, so a table already
+            # in hand belongs to this one; an empty table means the
+            # enumeration ran from the menu and must be asked again.
+            if not self._input_events:
+                self._request_input_event_enumeration()
+            return
+        self._drop_input_event_subscriptions()
+        self._input_events = {}
+        self._b_unresolved_logged = set()
+        self._request_input_event_enumeration()
+
+    def _drop_input_event_subscriptions(self):
+        for h in list(self._b_hash_to_var):
+            try:
+                self.sc.UnsubscribeInputEvent(h)
+            except Exception as e:
+                logging.debug(f"UnsubscribeInputEvent({h}) failed: {e}")
+        self._b_hash_to_var = {}
+        self._b_get_reqs = {}
+
+    def _sync_input_events(self, wanted):
+        """Make the subscribed set match the wanted SimVars."""
+        self._b_vars = list(wanted)
+        wanted_names = {sv.var[2:] for sv in self._b_vars}
+        for name in [n for n, v in self._b_values.items()
+                     if n not in {sv.name for sv in self._b_vars}]:
+            self._b_values.pop(name, None)
+        for h, sv in list(self._b_hash_to_var.items()):
+            if sv.var[2:] not in wanted_names:
+                try:
+                    self.sc.UnsubscribeInputEvent(h)
+                except Exception as e:
+                    logging.debug(f"UnsubscribeInputEvent({h}) failed: {e}")
+                self._b_hash_to_var.pop(h)
+        if not self._b_vars:
+            return
+        if self._input_events:
+            self._resolve_input_events()
+        else:
+            self._request_input_event_enumeration()
+
+    def _request_input_event_enumeration(self):
+        if self.sc is None or self._b_enum_req is not None:
+            return
+        self._b_enum_req = next(self._b_req_iter)
+        self._b_enum_found = {}
+        self._b_enum_retry_at = None
+        self._b_enum_sent_at = time.time()
+        try:
+            self.sc.EnumerateInputEvents(self._b_enum_req)
+        except Exception as e:
+            logging.warning(f"EnumerateInputEvents failed: {e}")
+            self._b_enum_req = None
+
+    #: An enumeration a sim without the API never answers; past this it
+    #: is given up so an aircraft change can ask again.
+    _B_ENUM_TIMEOUT_S = 5.0
+
+    def _tick_input_events(self):
+        now = time.time()
+        if self._b_enum_req is not None and now - self._b_enum_sent_at > self._B_ENUM_TIMEOUT_S:
+            self._b_enum_req = None
+            self._b_enum_found = {}
+            if self._b_enum_retries < 3:
+                self._b_enum_retries += 1
+                self._b_enum_retry_at = now + 2.0
+            else:
+                logging.warning("SimConnect: input event enumeration unanswered; "
+                                "B: variables need MSFS 2020 SU12 or later")
+        if self._b_enum_retry_at is not None and now >= self._b_enum_retry_at:
+            self._b_enum_retry_at = None
+            self._request_input_event_enumeration()
+
+    def _on_input_events_enumerated(self, recv):
+        if recv.dwRequestID != self._b_enum_req:
+            return
+        for d in recv.descriptors():
+            name = d.Name.decode("utf-8", errors="replace")
+            self._b_enum_found[name] = InputEvent(name, d.Hash, d.eType)
+        if recv.dwEntryNumber + 1 < recv.dwOutOf:
+            return
+        self._b_enum_req = None
+        self._input_events = self._b_enum_found
+        self._b_enum_found = {}
+        if not self._input_events and self._b_enum_retries < 3:
+            # An aircraft still loading answers with an empty list; ask
+            # again a little later rather than declare every name missing.
+            self._b_enum_retries += 1
+            self._b_enum_retry_at = time.time() + 2.0
+            return
+        logging.info(f"SimConnect: {len(self._input_events)} input events on this aircraft")
+        self._resolve_input_events()
+        self._flush_input_event_writes()
+
+    def _resolve_input_events(self):
+        for sv in self._b_vars:
+            name = sv.var[2:]
+            ev = self._input_events.get(name)
+            if ev is None:
+                self._warn_unresolved(name)
+                continue
+            if ev.hash in self._b_hash_to_var:
+                continue
+            try:
+                self.sc.SubscribeInputEvent(ev.hash)
+            except Exception as e:
+                logging.warning(f"SubscribeInputEvent({sv.var}) failed: {e}")
+                continue
+            self._b_hash_to_var[ev.hash] = sv
+            # subscriptions report changes only; fetch where it stands now
+            req = next(self._b_req_iter)
+            self._b_get_reqs[req] = sv
+            try:
+                self.sc.GetInputEvent(req, ev.hash)
+            except Exception as e:
+                logging.debug(f"GetInputEvent({sv.var}) failed: {e}")
+                self._b_get_reqs.pop(req, None)
+
+    def _warn_unresolved(self, name):
+        if name in self._b_unresolved_logged:
+            return
+        self._b_unresolved_logged.add(name)
+        logging.warning(f"SimConnect: input event B:{name} is not defined on this aircraft")
+
+    def _store_input_event_value(self, sv, value):
+        if isinstance(value, float):
+            try:
+                value = sv._calculate(value)
+            except Exception as e:
+                # A bad transform must not take the reader thread down;
+                # the raw value is still worth more than none.
+                if not getattr(sv, "_transform_warned", False):
+                    sv._transform_warned = True
+                    logging.warning(f"{sv}: transform {sv.scale!r} failed ({e}); using the raw value")
+        self._b_values[sv.name] = value
+
+    def _set_input_event(self, var, value):
+        """Write a B: variable; a value for a name the table does not hold
+        yet waits for the enumeration and is sent when it lands."""
+        name = var[2:]
+        ev = self._input_events.get(name)
+        if ev is None:
+            self._b_pending_writes[name] = value
+            if self._input_events:
+                self._warn_unresolved(name)
+            else:
+                self._request_input_event_enumeration()
+            return
+        try:
+            if ev.type == INPUT_EVENT_TYPE_STRING or isinstance(value, str):
+                buf = create_string_buffer(str(value).encode("utf-8"))
+                self.sc.SetInputEvent(ev.hash, sizeof(buf), cast(buf, c_void_p))
+            else:
+                d = c_double(float(value))
+                self.sc.SetInputEvent(ev.hash, sizeof(d), cast(byref(d), c_void_p))
+        except Exception as e:
+            logging.error(f"Error setting input event {var} value {value}: {e}")
+
+    def _flush_input_event_writes(self):
+        pending, self._b_pending_writes = self._b_pending_writes, {}
+        for name, value in pending.items():
+            if name in self._input_events:
+                self._set_input_event("B:" + name, value)
+            else:
+                self._warn_unresolved(name)
+
+    def _handle_recv(self, recv) -> bool:
+        """Act on one dispatched message; False once the sim said Quit."""
+        #print(f"got {recv.__class__.__name__}")
+        if isinstance(recv, RECV_EXCEPTION):
+            logging.warning(f"SimConnect exception [magenta]{self._exception_name(recv.dwException)}[/magenta], sendID {recv.dwSendID}, index {recv.dwIndex}{self._exception_detail(recv)}")
+        elif isinstance(recv, RECV_QUIT):
+            logging.info("Quit received")
+            self.emit_event("Quit")
+            return False
+        elif isinstance(recv, RECV_OPEN):
+            msfs_vers = recv.szApplicationName.decode('utf-8')
+            if msfs_vers == 'SunRise':
+                self.connected_version = "MSFS2024"
+            elif msfs_vers == "KittyHawk":
+                self.connected_version = "MSFS2020"
+            else:
+                self.connected_version = msfs_vers
+            self.emit_event("Open")
+            self._reset_input_events()
+
+        elif isinstance(recv, RECV_EVENT):
+            if recv.uEventID == EV_PAUSED:
+                logging.debug(f"EVENT PAUSED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
+                self._sim_paused = recv.dwData
+                self.emit_event("Paused", recv.dwData)
+            elif recv.uEventID == EV_STARTED:
+                logging.debug(f"EVENT STARTED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
+                self._sim_started = 1
+                self.emit_event("SimStart")
+                self._stop_state = False # clear stop state, this will cause a reload of current aircraft in telemFFB
+            elif recv.uEventID == EV_STOPPED:
+                logging.debug(f"EVENT STOPPED, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
+                self._sim_started = 0
+                self.emit_event("SimStop")
+            elif recv.uEventID == EV_SIMSTATE:
+                logging.debug(f"EVENT SIMSTATE, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
+                self._sim_state = recv.dwData
+                self.emit_event("SimState", recv.dwData)
+
+        elif isinstance(recv, RECV_SIMOBJECT_DATA):
+            logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
+            #print(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
+            if recv.dwRequestID == self.req_id and recv.dwDefineID == self.def_id:
+                #print(f"Matched request 0x{req_id:X}")
+                data = {}
+                data["SimPaused"] = self._sim_paused
+                # data["FlightStarted"] = self._sim_state
+                offset = RECV_SIMOBJECT_DATA.dwData.offset
+                for _ in range(recv.dwDefineCount):
+                    idx = cast(byref(recv, offset), POINTER(DWORD))[0]
+                    offset += sizeof(DWORD)
+                    # DATATYPE_FLOAT64 => c_double
+                    try:
+                        var : SimVar = self.subscribed_vars[idx]
+                        c_type = var.c_type
+                        if var.datatype == DATATYPE_STRING128: #fixme: other string types
+                            val = str(cast(byref(recv, offset), POINTER(c_type))[0].value, "utf-8")
+                        else:
+                            val = cast(byref(recv, offset), POINTER(c_type))[0]
+                        offset += sizeof(c_type)
+                        val = var._calculate(val)
+
+                        if var.parent: # var is part of array
+                            var.parent.values[var.index-var.parent.min] = val
+                            data[var.parent.name] = var.parent.values
+                        else:
+                            data[var.name] = val
+                    except:
+                        # dbprint("red", "**DEBUG*** Exception parsing SC FRAME")
+                        continue
+
+                self._note_aircraft_title(data.get("N"))
+                data.update(self._b_values)
+
+                avatar = data.get("_IS AVATAR", False) # in 2024, see if user is controlling avatar
+                rtc = data.get("_IS IN RTC", False) # check if 2024 sim is running realtime cinematic (cut scene)
+
+                in_menus = data.get('CameraState', 0) not in (2,3,4,5)  # Check the camera state value - workaround for FS2024 telemetry at wrong times https://forums.flightsimulator.com/t/at-the-finish-of-beta-loading-if-start-is-not-click-open-upon-reaching-yosemite-during-2nd-run-of-opening-graphics-telemetry-is-sent-to-motion-platform-causiing-violent-shaking-and-movement/702082/2?u=number4815901
+
+                if self._sim_paused or data.get("Parked", 0) or data.get("Slew", 0) or avatar or rtc or in_menus:
+                    data["STOP"] = 1
+                    data['_num_simvars'] = len(data)
+                    data['msfs_vers'] = self.connected_version
+                    if not self._stop_state:
+                        self.emit_event("STOP")
+                        self.emit_packet(data) # emit last packet
+                        self._stop_state = True
+                else:
+                # print(f"!#$!#$!#$!#$ EMITTING PACKET LEN: {len(data)}")
+                    self._stop_state = False
+                    self.emit_packet(data)
+            else:
+                # dbprint("green", f"**DEBUG*** got dispatch for OLD request: {recv.dwRequestID} defID: {recv.dwDefineID} | currrent defID: {self.def_id}")
+                pass
+        elif isinstance(recv, RECV_ENUMERATE_INPUT_EVENTS):
+            self._on_input_events_enumerated(recv)
+        elif isinstance(recv, RECV_SUBSCRIBE_INPUT_EVENT):
+            sv = self._b_hash_to_var.get(recv.Hash)
+            if sv is not None:
+                self._store_input_event_value(sv, recv.value)
+        elif isinstance(recv, RECV_GET_INPUT_EVENT):
+            sv = self._b_get_reqs.pop(recv.dwRequestID, None)
+            if sv is not None:
+                self._store_input_event_value(sv, recv.value)
+        else:
+            logging.warning(f"Received unknown simconnect message: {recv}")
+        return True
+
     def _read_telem(self) -> bool:
         """
         Main telemetry reading loop for processing SimConnect messages.
@@ -745,6 +1084,7 @@ class SimConnectManager(threading.Thread):
         while not self._quit:
             self.tx_events_to_msfs()  # tx any pending sim events that are queued
             self.tx_simdatums_to_msfs()  # tx any pending simdatum sets that are queued
+            self._tick_input_events()
 
             try:
                 #print('Trying')
@@ -760,96 +1100,8 @@ class SimConnectManager(threading.Thread):
                 continue
 
             recv = ReceiverInstance.cast_recv(pRecv)
-            #print(f"got {recv.__class__.__name__}")
-            if isinstance(recv, RECV_EXCEPTION):
-                logging.warning(f"SimConnect exception [magenta]{self._exception_name(recv.dwException)}[/magenta], sendID {recv.dwSendID}, index {recv.dwIndex}{self._exception_detail(recv)}")
-            elif isinstance(recv, RECV_QUIT):
-                logging.info("Quit received")
-                self.emit_event("Quit")
+            if self._handle_recv(recv) is False:
                 break
-            elif isinstance(recv, RECV_OPEN):
-                msfs_vers = recv.szApplicationName.decode('utf-8')
-                if msfs_vers == 'SunRise':
-                    self.connected_version = "MSFS2024"
-                elif msfs_vers == "KittyHawk":
-                    self.connected_version = "MSFS2020"
-                else:
-                    self.connected_version = msfs_vers
-                self.emit_event("Open")
-
-            elif isinstance(recv, RECV_EVENT):
-                if recv.uEventID == EV_PAUSED:
-                    logging.debug(f"EVENT PAUSED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
-                    self._sim_paused = recv.dwData
-                    self.emit_event("Paused", recv.dwData)
-                elif recv.uEventID == EV_STARTED:
-                    logging.debug(f"EVENT STARTED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
-                    self._sim_started = 1
-                    self.emit_event("SimStart")
-                    self._stop_state = False # clear stop state, this will cause a reload of current aircraft in telemFFB
-                elif recv.uEventID == EV_STOPPED:
-                    logging.debug(f"EVENT STOPPED, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
-                    self._sim_started = 0
-                    self.emit_event("SimStop")
-                elif recv.uEventID == EV_SIMSTATE:
-                    logging.debug(f"EVENT SIMSTATE, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
-                    self._sim_state = recv.dwData
-                    self.emit_event("SimState", recv.dwData)
-
-            elif isinstance(recv, RECV_SIMOBJECT_DATA):
-                logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
-                #print(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
-                if recv.dwRequestID == self.req_id and recv.dwDefineID == self.def_id:
-                    #print(f"Matched request 0x{req_id:X}")
-                    data = {}
-                    data["SimPaused"] = self._sim_paused
-                    # data["FlightStarted"] = self._sim_state
-                    offset = RECV_SIMOBJECT_DATA.dwData.offset
-                    for _ in range(recv.dwDefineCount):
-                        idx = cast(byref(recv, offset), POINTER(DWORD))[0]
-                        offset += sizeof(DWORD)
-                        # DATATYPE_FLOAT64 => c_double
-                        try:
-                            var : SimVar = self.subscribed_vars[idx]
-                            c_type = var.c_type
-                            if var.datatype == DATATYPE_STRING128: #fixme: other string types
-                                val = str(cast(byref(recv, offset), POINTER(c_type))[0].value, "utf-8")
-                            else:
-                                val = cast(byref(recv, offset), POINTER(c_type))[0]
-                            offset += sizeof(c_type)
-                            val = var._calculate(val)
-
-                            if var.parent: # var is part of array
-                                var.parent.values[var.index-var.parent.min] = val
-                                data[var.parent.name] = var.parent.values
-                            else:
-                                data[var.name] = val
-                        except:
-                            # dbprint("red", "**DEBUG*** Exception parsing SC FRAME")
-                            continue
-
-                    avatar = data.get("_IS AVATAR", False) # in 2024, see if user is controlling avatar
-                    rtc = data.get("_IS IN RTC", False) # check if 2024 sim is running realtime cinematic (cut scene)
-
-                    in_menus = data.get('CameraState', 0) not in (2,3,4,5)  # Check the camera state value - workaround for FS2024 telemetry at wrong times https://forums.flightsimulator.com/t/at-the-finish-of-beta-loading-if-start-is-not-click-open-upon-reaching-yosemite-during-2nd-run-of-opening-graphics-telemetry-is-sent-to-motion-platform-causiing-violent-shaking-and-movement/702082/2?u=number4815901
-
-                    if self._sim_paused or data.get("Parked", 0) or data.get("Slew", 0) or avatar or rtc or in_menus:
-                        data["STOP"] = 1
-                        data['_num_simvars'] = len(data)
-                        data['msfs_vers'] = self.connected_version
-                        if not self._stop_state:
-                            self.emit_event("STOP")
-                            self.emit_packet(data) # emit last packet
-                            self._stop_state = True
-                    else:
-                    # print(f"!#$!#$!#$!#$ EMITTING PACKET LEN: {len(data)}")
-                        self._stop_state = False
-                        self.emit_packet(data)
-                else:
-                    # dbprint("green", f"**DEBUG*** got dispatch for OLD request: {recv.dwRequestID} defID: {recv.dwDefineID} | currrent defID: {self.def_id}")
-                    pass
-            else:
-                logging.warning(f"Received unknown simconnect message: {recv}")
 
     def emit_packet(self, data):
         """

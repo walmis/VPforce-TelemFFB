@@ -133,7 +133,7 @@ Each `<models>` block is an aircraft-specific default override stored in `defaul
 ## Section: `<sc_overrides>`
 
 SimConnect variable override entries. Each block maps a setting name + aircraft pattern to a
-specific SimConnect variable or L:var, allowing per-aircraft telemetry source customization.
+specific SimConnect variable, L:var, or B: input event, allowing per-aircraft telemetry source customization.
 
 ### Child Elements
 
@@ -141,7 +141,7 @@ specific SimConnect variable or L:var, allowing per-aircraft telemetry source cu
 |---------|-------------|
 | `name` | The setting identifier this override applies to. |
 | `model` | Python regex pattern matching the aircraft name. |
-| `var` | The SimConnect variable name or L:var (`L:VarName`) to use as the data source. |
+| `var` | The SimConnect variable name, L:var (`L:VarName`), or input event (`B:VarName`, MSFS 2020 SU12 and later) to use as the data source. Input events are looked up on the loaded aircraft; a name the aircraft does not define is logged once and left unset. Their value is the event's own (a switch often reads 0 or 100), `sc_unit` is ignored for them, and `scale` still applies. |
 | `sc_unit` | SimConnect unit string (e.g., `"percent"`, `"feet per second"`). |
 | `scale` | Numeric scale factor applied to the raw SimConnect value. |
 
