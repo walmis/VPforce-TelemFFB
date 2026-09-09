@@ -24,7 +24,7 @@ short scripted sequence of telemetry frames, then releases everything it
 created.
 
 Why an effect method and not ``on_telemetry``: a sparse synthetic frame
-through the whole loop misfires neighbours - a frame carrying only
+through the whole loop misfires neighbors - a frame carrying only
 ``TAS = 0`` plays full elevator droop.  Calling the one method is the
 isolation, and it costs nothing: every effect already takes a frame and
 reads a handful of fields.
@@ -702,7 +702,7 @@ SPOILER_BUFFET = PreviewSpec(
 
 FLAPS_MOTION = PreviewSpec(
     effect_id='flaps_motion_effect_enabled',
-    reference='flaps travelling from up to full over 3 s',
+    reference='flaps traveling from up to full over 3 s',
     rows=('flaps_motion_intensity',),
     method='ac_update_flaps',
     kind='ramp',
@@ -711,7 +711,7 @@ FLAPS_MOTION = PreviewSpec(
 
 SPEEDBRAKE_MOTION = PreviewSpec(
     effect_id='speedbrake_motion_effect_enabled',
-    reference='speedbrake travelling from retracted to deployed over 3 s',
+    reference='speedbrake traveling from retracted to deployed over 3 s',
     rows=('speedbrake_motion_intensity',),
     method='ac_update_speed_brakes',
     kind='ramp',
@@ -721,7 +721,7 @@ SPEEDBRAKE_MOTION = PreviewSpec(
 
 SPOILER_MOTION = PreviewSpec(
     effect_id='spoiler_motion_effect_enabled',
-    reference='spoilers travelling from retracted to deployed over 3 s',
+    reference='spoilers traveling from retracted to deployed over 3 s',
     rows=('spoiler_motion_intensity',),
     method='ac_update_spoilers',
     kind='ramp',
@@ -752,7 +752,7 @@ TAILHOOK_MOTION = PreviewSpec(
 
 FUELBOOM_MOTION = PreviewSpec(
     effect_id='fuelboom_motion_effect_enabled',
-    reference='refuelling boom or door extending over 3 s, with the clunk',
+    reference='refueling boom or door extending over 3 s, with the clunk',
     rows=('fuelboom_motion_intensity',),
     method='ac_update_fuelboom_effect',
     kind='ramp',
@@ -947,7 +947,7 @@ DAMAGE = PreviewSpec(
     method={'*': 'dcs_update_damage', 'IL2': 'il2_update_damage'},
     kind='edge',
     # An irregular stream of hits over 5 s - lone rounds and short
-    # clusters at random moments, redrawn every press.  DCS randomises
+    # clusters at random moments, redrawn every press.  DCS randomizes
     # direction, amplitude (0.5-1.5x) and waveform per hit; IL-2 plays a
     # hit and a damage slot, both stepping on the same schedule.
     fields={'*': {'Damage': _DAMAGE_HITS},
@@ -1160,7 +1160,7 @@ _BLADE_SLAP_DESCENT_DEG = 6.0   # the inferred signal's descent-angle peak
 
 def _blade_slap_sink(ac, p):
     """Sink rate for the inferred signal's peak descent angle at the
-    profile's band-centre speed."""
+    profile's band-center speed."""
     ias = ac.blade_slap_band_center or 32.4
     return -ias * math.tan(math.radians(_BLADE_SLAP_DESCENT_DEG))
 
@@ -1168,7 +1168,7 @@ def _blade_slap_sink(ac, p):
 BLADE_SLAP = PreviewSpec(
     effect_id='blade_slap_enable',
     rows=('blade_slap_intensity',),
-    reference=("blade-vortex interaction at its worst, the band-centre speed on a shallow descent; "
+    reference=("blade-vortex interaction at its worst, the band-center speed on a shallow descent; "
                f"rate and strength follow Rotor Blade Count at a fixed {ROTOR_RPM_NOMINAL} rpm NR"),
     method='ac_update_blade_slap',
     kind='hold',

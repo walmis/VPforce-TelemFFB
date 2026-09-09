@@ -30,7 +30,7 @@ spec:
 - **Closed loops with the sim** — trim following, the DCS stick trim workaround, trimwheel.
   Open-loop replay is meaningless.
 - **Button state machines** — force trim, hardware force trim, controls lock.
-- **Effects computed from real aircraft data** the preview cannot synthesise — IL-2's dynamic
+- **Effects computed from real aircraft data** the preview cannot synthesize — IL-2's dynamic
   gunfire mode, for one. Preview the basic path and switch the mode off for the run.
 
 If the effect is a periodic and its intensity is one number (or a taper between two), it is
@@ -40,7 +40,7 @@ previewable.
 
 A preview calls the effect's own method once per frame with a synthetic `BaseTelemetryData`
 frame. It never goes through `on_telemetry` — a sparse frame through the whole loop misfires
-neighbours (a frame carrying only `TAS = 0` plays full elevator droop). So the spec has to
+neighbors (a frame carrying only `TAS = 0` plays full elevator droop). So the spec has to
 know exactly what the one method reads and what it needs to fire. Open the method and note:
 
 | Look for | Why it matters |
@@ -215,10 +215,10 @@ wobbles the stimulus 2%), and an effect fed through a high-pass filter needs mot
 level (runway rumble takes a `Jitter` on wheel compression).
 
 **Gust-driven effects** (turbulence on MSFS/X-Plane, wind on DCS/BMS) only ever see the
-frame-to-frame change in wind, so a synthesised gust field is an honest stimulus as long as
+frame-to-frame change in wind, so a synthesized gust field is an honest stimulus as long as
 its amplitude and frequency content are stated. `Gusts(rms, steady, band)` is a per-run
 superposition of sinusoids per axis; the tooltip should say what reference it represents
-("moderate turbulence, a few m/s of gusts"). These effects normalise their filters by the
+("moderate turbulence, a few m/s of gusts"). These effects normalize their filters by the
 wall clock, so a test needs an advancing `time.perf_counter` (see `_advancing_clock`) or
 the filters do nothing between microsecond-apart frames. A method that reads the bound frame
 instead of taking one (`update_turbulence`) sets `frame_arg=False`.

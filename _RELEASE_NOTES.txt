@@ -20,6 +20,15 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - An optional integration that lets TelemFFB drive any device exposing force feedback through DirectInput
   - Usable in any role
   - Enabled in System Settings > Integrations; DirectLink is a separate free download. VPforce-only features (Configurator, firmware effects, force telemetry) degrade cleanly
+- **NEW: Effect previews - feel an effect at your configured strength without flying**
+  - Accessible via Offline Editor only - use the new Offline/Preview mode button to quickly enter offline mode for an actively loaded aircraft.
+  - A play button (>) next to each effect's intensity slider in the offline editor plays that effect on the device from synthesized telemetry. Tune most effects in isolation, without needing to replicate flying conditions where they occur.
+  - A play-all button (>>) appears when more than one running device carries the setting and plays the effect on all of them (joystick, pedals, collective) together
+  - 42 effects are covered across all sims.  Each preview is built so the strengths you tune are the ones you feel: prop rumble sweeps idle to redline and dwells at each end, stall buffet builds to a full stall and holds, motion effects run the full travel and land the end clunk, weapon and countermeasure effects fire a short burst
+  - Hover the mouse over the play button for a description of the preview conditions, reference speeds, RPM, rotor blade count, and how long each phase lasts
+  - Constant-force effects (touchdown, deceleration, runway rumble, elevator droop, turbulence / wind, lateral force, AoA reduction) can move the axes unexpectedly, so they confirm you are ready for them to run with a dialog.
+  - Previews use their own effect table, so they can run while a sim sits paused in the background with an aircraft loaded; only live streaming telemetry or a missing device blocks them
+- **NEW: "Offline/Preview Mode" button** in the corner of the Settings tab opens the offline editor on the aircraft currently loaded in the sim, so its effects can be previewed and tuned without leaving the flight
 ## UI
 - **NEW: Device configuration UI re-work**
   - Device cards with pull-down selection of detected devices
@@ -31,10 +40,13 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - The USB Product ID column is gone; the device selector is the source. A slot with no device assigned can no longer be made the master or given launch options
 - **NEW: Backup and restore system settings**, from a new File menu on the System Settings dialog
 
+
 ## General fixes
 - Fix: exiting TelemFFB could take up to ten seconds before its processes actually closed, and a restart in that window was refused as "already running"
 - Fix: effects are now properly freed when the sim exits and when TelemFFB exits preventing scenarios that may result in hung effects on the device
 - Fix: resetting the device's effects no longer strands the effects that were running on it
+- Fix: the gear, flaps, speedbrake, canopy, tailhook, fuel boom and wing fold motion effects and the stick shakers had all been rendering as a plain sine wave - their intended square and sawtooth waveforms were silently dropped on the way to the device.  They now play as designed.  This changes the feel of those effects; retune their intensity if they come across harsher than before
+- Fix: the fuel boom and wing fold end-of-travel clunks never played
 
 ## MSFS / X-Plane
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
@@ -48,6 +60,9 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - View and change the current aircraft's TelemFFB settings from a toolbar window inside MSFS - toggles, choice pills, and sliders sized for VR laser-pointer/controller use, so you don't have to leave the cockpit or pull up the desktop app
   - System Settings > MSFS now detects your installed MSFS 2020/2024 copies (Microsoft Store or Steam) and installs or updates the panel into the right Community folder with one click, showing the installed version alongside what's available
   - Backed by a local HTTP server that only runs while MSFS is the active sim; can be turned off in System Settings > MSFS > Options if you don't use the panel
+
+## IL-2
+- Fix: the runway rumble effect never played - its enable toggle was not being honored.  It now runs when enabled, so expect a rumble on the ground if you have it switched on
 
 ---
 

@@ -836,7 +836,7 @@ class SettingsLayout(QGridLayout):
             button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             if small:
                 # two play glyphs side by side need a smaller face to fit
-                # the 20 px button; they centre the way the single one does
+                # the 20 px button; they center the way the single one does
                 f = button.font()
                 f.setPointSizeF(max(6.0, f.pointSizeF() * 0.7))
                 button.setFont(f)
