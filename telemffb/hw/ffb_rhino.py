@@ -998,27 +998,6 @@ class FFBRhino(ffb_backend.BaseFFBDevice):
             self._dev = None
         logging.info(f"HID device released: {self.info.product_string}")
 
-    def shutdown(self):
-        """Release the device deliberately (live device switch).
-
-        The read timer and the unplug-reconnect loop both exist to keep a
-        process-lifetime device alive at all costs; a deliberate close must
-        stop them, or a queued reconnect would silently re-open the old
-        hardware behind the new one.
-        """
-        self._shutdown = True
-        try:
-            self.killTimer(self._timer_id)
-        except Exception:
-            pass
-        if self._dev:
-            try:
-                self._dev.close()
-            except Exception:
-                pass
-            self._dev = None
-        logging.info(f"HID device released: {self.info.product_string}")
-
     @property
     def connected(self) -> bool:
         """Whether the HID handle is currently open.
