@@ -83,19 +83,24 @@ def _lua_num(v) -> Optional[str]:
     return repr(f)
 
 
-class DcsSettingsChannel(threading.Thread):
+class DcsSettingsChannel:
     """Receives SET/SHOW commands from the DCS overlay and pushes settings
     snapshots back to it.
 
-    The thread only does UDP I/O and parsing; every XML read/write and
+    Deliberately not a ``threading.Thread`` subclass: a ``Thread`` object can
+    only ever be started once, but this channel outlives many DCS sessions
+    (stop on sim exit, start again on the next first frame). Instead it owns
+    a fresh one-shot worker ``Thread`` per ``start()``.
+
+    The worker only does UDP I/O and parsing; every XML read/write and
     snapshot build is marshalled to the main thread (the ``xmlutils`` facade
     and ``SettingsManager`` are main-thread-only in practice).
     """
 
     def __init__(self) -> None:
-        super().__init__(daemon=True, name="TelemFFB-DcsSettings")
         self._run = False
         self._settings_mgr = None
+        self._thread: Optional[threading.Thread] = None
         self._socket: Optional[socket.socket] = None
         self._port = 0  # OS-chosen port of the listener, announced to the DLL
         self._lock = threading.Lock()
@@ -109,8 +114,17 @@ class DcsSettingsChannel(threading.Thread):
         """
         with self._lock:
             self._settings_mgr = settings_mgr
-            if self._run and self._socket is not None:
+            if self._run and self._socket is not None and self._thread is not None and self._thread.is_alive():
                 return True
+
+            # A previous worker may still be winding down (slow join, or the
+            # socket it was using hasn't been reclaimed yet); make sure it is
+            # gone before spawning a replacement so exactly one reader runs.
+            # Bounded at 0.5s - far more than the 100ms socket timeout the
+            # worker needs to notice a closed socket, so a truly stuck thread
+            # can't delay a restart by more than that.
+            if self._thread is not None and self._thread.is_alive():
+                self._thread.join(timeout=0.5)
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
@@ -121,11 +135,19 @@ class DcsSettingsChannel(threading.Thread):
                 sock.close()
                 return False
 
-            sock.settimeout(0.5)
+            # 100ms so a worker blocked in recvfrom notices a closed socket
+            # (OSError) or the run flag quickly, minimizing stop() latency.
+            # This only bounds *waiting* for data - recvfrom returns datagrams
+            # already in the buffer, so SET/SHOW messages are never delayed by
+            # it; the cost is just an extra spurious timeout every 100ms of
+            # idle, which is negligible.
+            sock.settimeout(0.1)
             self._socket = sock
             self._port = sock.getsockname()[1]
             self._run = True
-            super().start()
+            t = threading.Thread(target=self.run, daemon=True, name="TelemFFB-DcsSettings")
+            self._thread = t
+            t.start()
             logging.info(f"DCS settings channel listening on 127.0.0.1:{self._port}")
             return True
 
@@ -139,8 +161,12 @@ class DcsSettingsChannel(threading.Thread):
                 except OSError:
                     pass
                 self._socket = None
-        if self.is_alive():
-            self.join(timeout=2)
+            t = self._thread
+        if t is not None and t.is_alive():
+            # The worker's 100ms socket timeout means the join above normally
+            # returns in well under 100ms; the 0.5s cap only guards the race
+            # where the thread hasn't reached its first recvfrom yet.
+            t.join(timeout=0.5)
         logging.info("DCS settings channel stopped")
 
     def is_running(self) -> bool:
@@ -150,8 +176,11 @@ class DcsSettingsChannel(threading.Thread):
 
     def run(self) -> None:
         while self._run:
+            sock = self._socket
+            if sock is None:
+                break  # stop() raced with thread startup
             try:
-                data, _addr = self._socket.recvfrom(4096)
+                data, _addr = sock.recvfrom(4096)
             except socket.timeout:
                 continue
             except OSError:
