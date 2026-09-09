@@ -152,6 +152,10 @@ class SimVar:
         """
         self.name = name
         self.var = var
+        # The overrides editor stores an empty transform as the text
+        # 'None'; either spelling means no scaling, not an expression.
+        if isinstance(scale, str) and scale.strip().lower() in ('', 'none'):
+            scale = None
         self.scale = scale
         self.mutator = mutator
         self.sc_unit = sc_unit
@@ -452,6 +456,7 @@ class SimConnectManager(threading.Thread):
         self.sv_dict = {}
         self.connected_version = None
         self._connect_attempts = 0
+        self._sent_datums = {}           # packet id -> SimVar, the last subscription's definition calls
 
 
 
@@ -587,6 +592,7 @@ class SimConnectManager(threading.Thread):
         self.subscribed_vars.clear()
         self.current_var_tracker.clear()
         self.sv_dict.clear()
+        self._sent_datums.clear()
 
         i = 0
         for sv in (sim_vars):
@@ -594,6 +600,7 @@ class SimConnectManager(threading.Thread):
                 for sv in sv.vars:
                     res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
                     logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
+                    self._note_sent_datum(sv)
 
                     self.subscribed_vars.append(sv)
                     self.current_var_tracker.append(sv.var)
@@ -602,6 +609,7 @@ class SimConnectManager(threading.Thread):
             else:
                 res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
                 logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
+                self._note_sent_datum(sv)
 
                 self.subscribed_vars.append(sv)
                 self.current_var_tracker.append(sv.var)
@@ -689,6 +697,27 @@ class SimConnectManager(threading.Thread):
                     logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
                     # self.telem_data['error'] = 1
 
+    def _note_sent_datum(self, sv):
+        """Remember which datum the last packet carried, so a rejected
+        name can be reported by name rather than by packet id."""
+        try:
+            pid = DWORD()
+            self.sc.GetLastSentPacketID(byref(pid))
+            self._sent_datums[pid.value] = sv
+        except Exception:
+            pass
+
+    def _exception_detail(self, recv) -> str:
+        sv = self._sent_datums.get(recv.dwSendID)
+        return f" (datum {sv})" if sv is not None else ""
+
+    @staticmethod
+    def _exception_name(code) -> str:
+        try:
+            return SimConnectException(code).name
+        except ValueError:
+            return str(code)
+
     def _read_telem(self) -> bool:
         """
         Main telemetry reading loop for processing SimConnect messages.
@@ -733,7 +762,7 @@ class SimConnectManager(threading.Thread):
             recv = ReceiverInstance.cast_recv(pRecv)
             #print(f"got {recv.__class__.__name__}")
             if isinstance(recv, RECV_EXCEPTION):
-                logging.warning(f"SimConnect exception [magenta]{SimConnectException(recv.dwException).name}[/magenta], sendID {recv.dwSendID}, index {recv.dwIndex}")
+                logging.warning(f"SimConnect exception [magenta]{self._exception_name(recv.dwException)}[/magenta], sendID {recv.dwSendID}, index {recv.dwIndex}{self._exception_detail(recv)}")
             elif isinstance(recv, RECV_QUIT):
                 logging.info("Quit received")
                 self.emit_event("Quit")

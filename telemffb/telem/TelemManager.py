@@ -698,12 +698,24 @@ class TelemManager(QObject, threading.Thread):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
             d1 = xmlutils.read_sc_overrides(aircraft_name)
             for sv in d1:
-                scale = sv['scale'] if sv['scale'] is not None or sv['scale'] == '' else 1.0
+                scale = self._xplane_conversion(sv['scale'], sv['name'])
                 sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={scale}"
-                # if sv['scale'] is None or sv['scale'] == '':
-                #     print(f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion=>{scale}<")
-                # sendstr = f"SUBSCRIBE:dataref=sim/flightmodel/position/latitude,type=float,tag=LLLatitude,precision=6,conversion=0.51444"
                 self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+
+    @staticmethod
+    def _xplane_conversion(scale, name) -> float:
+        """The conversion factor the X-Plane plugin can take: a plain
+        number.  The plugin parses the field with no fallback, so an
+        empty transform (stored as '' or the text 'None') and an
+        expression it cannot evaluate both go out as 1.0."""
+        if scale is None or (isinstance(scale, str) and scale.strip().lower() in ('', 'none')):
+            return 1.0
+        try:
+            return float(scale)
+        except (TypeError, ValueError):
+            logging.warning(f"X-Plane override {name!r}: transform {scale!r} is not a number; "
+                            "the plugin applies numeric factors only, sending 1.0")
+            return 1.0
 
     # def _update_settings_ui(self):
     #     """Update settings UI if visible."""
