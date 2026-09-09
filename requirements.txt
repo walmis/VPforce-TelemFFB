@@ -1,7 +1,10 @@
 pyqt6==6.9.1
 configobj
 psutil
-pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.zip
+# pysimconnect is vendored under simconnect/ (the fork's modules beside the DLL and
+# the scvars catalog) and takes precedence over an installed copy.  Kept for reference
+# until the vendored copy is settled.
+# pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.zip
 stransi
 libusb1
 pygetwindow
