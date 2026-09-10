@@ -1086,17 +1086,18 @@ class SimConnectManager(threading.Thread):
             self.tx_simdatums_to_msfs()  # tx any pending simdatum sets that are queued
             self._tick_input_events()
 
+            # Before fetching: a resubscribe checked after GetNextDispatch
+            # discarded whatever message that call had just returned.
+            if self.resubscribe:
+                self._subscribe()
+                self.resubscribe = False
+
             try:
                 #print('Trying')
                 self.sc.GetNextDispatch(byref(pRecv), byref(nSize))
             except OSError as e:
                 #print(e)
                 time.sleep(0.001)
-                continue
-
-            if self.resubscribe:
-                self._subscribe()
-                self.resubscribe = False
                 continue
 
             recv = ReceiverInstance.cast_recv(pRecv)
