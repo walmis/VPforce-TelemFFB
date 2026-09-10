@@ -68,6 +68,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit, QProgress
 
 import resources
 import telemffb.globals as G
+from telemffb import match_history
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
@@ -1232,6 +1233,7 @@ def _handle_corrupted_config():
 
         os.remove(G.userconfig_path)
         utils.create_empty_userxml_file(G.userconfig_path)
+        match_history.reset()
 
         logging.info(f"User config Reset:  Backup file created: {backup_file}")
         G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,

@@ -280,7 +280,8 @@ def read_models(the_sim: str, the_class: str = '') -> list[str]:
 
 
 def read_models_data(which_root: str, sim: str, full_model_name: str, alldevices: bool = False,
-                     instance_device: str = '', user: bool = False, profile: Optional[str] = None) -> tuple[list[ModelDataRow], str]:
+                     instance_device: str = '', user: bool = False, profile: Optional[str] = None,
+                     identity: Optional[str] = None) -> tuple[list[ModelDataRow], str]:
     """Extract model-specific config entries by regex matching.
 
     Args:
@@ -296,19 +297,24 @@ def read_models_data(which_root: str, sim: str, full_model_name: str, alldevices
         Tuple of (setting list, matched pattern)
     """
     return _resolver().read_models_data(which_root, sim, full_model_name,
-                                        alldevices, instance_device, user, profile)
+                                        alldevices, instance_device, user, profile, identity)
 
 
-def read_sc_overrides(aircraft_name: str) -> list[ScOverrideRow]:
-    """Get merged SimConnect/dataref overrides for an aircraft.
+def read_sc_overrides(aircraft_name: str, identity: Optional[str] = None,
+                      sim: Optional[str] = None) -> list[ScOverrideRow]:
+    """The SimConnect/dataref overrides of the pattern that names an
+    aircraft: shipped ones replaced by the user's by name, nothing from any
+    other pattern.  Pass ``identity`` when the pattern is already known.
 
     Args:
         aircraft_name: Aircraft identifier
+        identity: The pattern whose overrides apply, if known
+        sim: The sim to resolve the identity under; the current one by default
 
     Returns:
         List of override dicts (``name``, ``var``, ``sc_unit``, ``scale``, ``source``)
     """
-    return _resolver().read_sc_overrides(aircraft_name)
+    return _resolver().read_sc_overrides(aircraft_name, identity, sim)
 
 
 def read_default_class_data(the_sim: str, the_class: str, instance_device: str = '') -> tuple[list[ClassDataRow], Optional[list[str]]]:
@@ -446,7 +452,8 @@ def write_sim_to_xml(the_sim: str, the_value: str, setting_name: str, unit: str 
     _writer().write_sim_to_xml(the_sim, the_value, setting_name, unit, the_device)
 
 
-def write_sc_override_to_xml(the_model: str, the_var: str, setting_name: str, sc_unit: str = '', scale: str = '') -> None:
+def write_sc_override_to_xml(the_model: str, the_var: str, setting_name: str, sc_unit: str = '',
+                             scale: str = '', sim: Optional[str] = None) -> None:
     """Write or update a SimConnect/dataref variable override in userconfig.
 
     Args:
@@ -455,8 +462,9 @@ def write_sc_override_to_xml(the_model: str, the_var: str, setting_name: str, sc
         setting_name: Internal setting name being overridden
         sc_unit: Unit string
         scale: Numeric scaling factor
+        sim: The sim the override belongs to; None writes a row for any sim
     """
-    _writer().write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit, scale)
+    _writer().write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit, scale, sim)
 
 
 # ── Erase functions ────────────────────────────────────────────────
@@ -533,14 +541,15 @@ def erase_sim_from_xml(the_sim: str, setting_name: str, the_device: str = '') ->
     _writer().erase_sim_from_xml(the_sim, setting_name, the_device)
 
 
-def erase_sc_override_from_xml(the_model: str, setting_name: str) -> None:
+def erase_sc_override_from_xml(the_model: str, setting_name: str, sim: Optional[str] = None) -> None:
     """Remove a SimConnect/dataref override from userconfig.
 
     Args:
         the_model: Model pattern
         setting_name: Setting name whose override to remove
+        sim: Only the rows for this sim (and rows naming none); None removes all
     """
-    _writer().erase_sc_override_from_xml(the_model, setting_name)
+    _writer().erase_sc_override_from_xml(the_model, setting_name, sim)
 
 
 # ── Profile management ─────────────────────────────────────────────
@@ -555,6 +564,62 @@ def update_active_profile_entry(sim: str, cls: str, model: str, new_profile: str
         new_profile: Profile name to activate
     """
     _writer().update_active_profile_entry(sim, cls, model, new_profile)
+
+
+def setting_display_names(names) -> dict:
+    """Setting name -> the label the UI shows for it."""
+    return _resolver().display_names(names)
+
+
+def is_user_pattern(sim: str, pattern: str) -> bool:
+    """Whether the user config, rather than defaults.xml, defines this
+    pattern as an aircraft type."""
+    return _resolver().is_user_pattern(sim, pattern)
+
+
+def collision(sim: str, full_name: str) -> Optional[dict]:
+    """A type pattern of the user's and a shipped one both matching this
+    aircraft: {'user', 'curated', 'winner', 'same_claim'}, or None."""
+    return _resolver().collision(sim, full_name)
+
+
+def merge_preview(sim: str, full_name: str, user_pattern: str, curated_pattern: str) -> dict:
+    """What the aircraft flies with now and would after a merge, entry by
+    entry with sources, plus what else moves; see the resolver."""
+    return _resolver().merge_preview(sim, full_name, user_pattern, curated_pattern)
+
+
+def curated_rows_for_fingerprint(sim: str, pattern: str) -> list:
+    """The shipped pattern's settings and overrides as plain tuples, for
+    match_history.fingerprint(). Notes are left out.
+
+    Args:
+        sim: Simulator name
+        pattern: The shipped model pattern
+
+    Returns:
+        A list of string tuples, in no particular order
+    """
+    return _resolver().curated_rows_for_fingerprint(sim, pattern)
+
+
+def user_rows_by_profile(sim: str, pattern: str) -> list:
+    """(profile, setting, value, device) for every settings row the user
+    holds under a pattern: what a merge carries across."""
+    return _resolver().user_rows_by_profile(sim, pattern)
+
+
+def discard_user_pattern(sim: str, pattern: str) -> int:
+    """Delete one of the user's patterns outright - rows, mapping and
+    overrides - so whatever else matches the aircraft applies instead."""
+    return _writer().discard_user_pattern(sim, pattern)
+
+
+def merge_user_pattern(sim: str, old_pattern: str, new_pattern: str, keep: bool = False) -> dict:
+    """Merge one of the user's patterns into a built-in: every profile,
+    override and note under it becomes a User Profile of the built-in, and
+    the old pattern is removed unless ``keep``.  Returns what moved."""
+    return _writer().merge_user_pattern(sim, old_pattern, new_pattern, keep)
 
 
 def clone_profile_entry(sim: str, cls: str, src_model: str, src_profile: str, dst_profile: str) -> None:

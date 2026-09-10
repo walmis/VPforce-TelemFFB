@@ -729,6 +729,10 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
         if os.path.exists(legacy_userconfig_path):
             support_zip.write(userconfig_path, "userconfig.xml")
 
+        history_path = os.path.join(userconfig_rootpath, "match_history.json")
+        if os.path.exists(history_path):
+            support_zip.write(history_path, "match_history.json")
+
         # Add log files
         log_folder = os.path.join(userconfig_rootpath, "log")
         if os.path.exists(log_folder):

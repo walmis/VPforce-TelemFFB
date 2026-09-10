@@ -11,3 +11,5 @@ __pycache__
 dll/directlink.dlk
 *.lock
 /pyenv
+tools/scenarios/_scenario_backup/
+tools/scenarios/_active_scenario.txt

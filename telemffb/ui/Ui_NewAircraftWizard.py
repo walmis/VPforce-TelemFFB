@@ -185,6 +185,7 @@ class Ui_NewAircraftWizard(object):
         font = QtGui.QFont()
         font.setFamily("Cascadia Mono")
         self.label_7.setFont(font)
+        self.label_7.setWordWrap(True)
         self.label_7.setObjectName("label_7")
         self.gridLayout_6.addWidget(self.label_7, 1, 0, 1, 2)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout()
@@ -343,7 +344,7 @@ class Ui_NewAircraftWizard(object):
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">TelemFFB uses regex to match aircraft names. For example:</p>\n"
 "<p style=\" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:700;\">    Name.*        - </span>matches anything starting with \'<span style=\" font-style:italic;\">Name\'</span></p>\n"
 "<p style=\" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:700;\">    ^Name$        - </span>matches <span style=\" font-weight:700;\">only</span> the exact <span style=\" font-style:italic;\">\'Name\'</span></p>\n"
-"<p style=\" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:700;\">    (The )?Name.*    - </span>matches <span style=\" font-style:italic;\">\'Name\'</span> or \'<span style=\" font-weight:700; font-style:italic;\">The</span> Name\'</p></body></html>"))
+"<p style=\" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:700;\">    (The )?Name.*    - </span>matches <span style=\" font-style:italic;\">\'Name\'</span> or \'<span style=\" font-weight:700; font-style:italic;\">The</span> Name\'</p><p style=\" margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">When more than one match string fits an aircraft, the <span style=\" font-weight:700;\">most specific</span> one is used: a name pinned at both ends (^Name$) beats a pattern, and a longer pattern beats a shorter one.</p></body></html>"))
         self.lbl_manualname.setText(_translate("NewAircraftWizard", "Enter the full aircraft name as it will be received by TelemFFB"))
         self.lbl_manual_edit.setText(_translate("NewAircraftWizard", "Full Name:"))
         self.label_11.setText(_translate("NewAircraftWizard", "Select or enter a match string.  The string must be globally unique for the given sim/class"))

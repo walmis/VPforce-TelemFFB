@@ -2,12 +2,15 @@
 
 Every method mutates the user XML tree and persists to disk.
 """
+import copy
+import datetime
 import logging
 import re
 import xml.etree.ElementTree as ET
 from typing import Optional, TYPE_CHECKING
 
 import telemffb.globals as G
+import telemffb.xml.match as xmatch
 
 if TYPE_CHECKING:
     from telemffb.xml.read import ConfigResolver
@@ -185,12 +188,23 @@ class ConfigWriter:
         name: str,
         sc_unit: str = '',
         scale: str = '',
+        sim: Optional[str] = None,
     ) -> None:
+        """Write or update one override.  With ``sim`` the row belongs to
+        that sim only; a row of the same pattern and name that names no
+        sim (written before rows carried one) is the one updated, and it
+        is stamped as it is touched, so a config migrates one edit at a
+        time.  A row stamped for another sim is left alone and a new row
+        is written beside it."""
         root = self._store.user_root
         if root is None:
             return
-        xpath = f'.//sc_overrides[model="{model}"][name="{name}"]'
-        elem = root.find(xpath)
+        elem = None
+        for candidate in root.findall(f'.//sc_overrides[model="{model}"][name="{name}"]'):
+            row_sim = candidate.findtext('sim') or ''
+            if not sim or row_sim in ('', sim):
+                elem = candidate
+                break
         if elem is not None:
             for child in elem:
                 if child.tag == 'var':
@@ -201,13 +215,19 @@ class ConfigWriter:
                     child.text = str(scale)
                 elif child.tag == 'source':
                     child.text = 'user'
+            if sim:
+                stamp = elem.find('sim')
+                if stamp is None:
+                    stamp = ET.SubElement(elem, 'sim')
+                stamp.text = sim
             self._store.write_userconfig()
             return
 
-        new_elem = ET_element('sc_overrides', [
-            ('name', name), ('model', model), ('var', var),
-            ('sc_unit', sc_unit), ('scale', str(scale)), ('source', 'user')])
-        root.append(new_elem)
+        children = [('name', name), ('model', model), ('var', var),
+                    ('sc_unit', sc_unit), ('scale', str(scale)), ('source', 'user')]
+        if sim:
+            children.append(('sim', sim))
+        root.append(ET_element('sc_overrides', children))
         self._store.write_userconfig()
 
     # ── Erase operations ──────────────────────────────────────
@@ -282,13 +302,15 @@ class ConfigWriter:
             root.remove(elem)
         self._store.write_userconfig()
 
-    def erase_sc_override_from_xml(self, model: str, name: str) -> None:
+    def erase_sc_override_from_xml(self, model: str, name: str, sim: Optional[str] = None) -> None:
+        """Remove an override: with ``sim``, the rows for that sim and the
+        rows that name none; without, every row of that pattern and name."""
         root = self._store.user_root
         if root is None:
             return
-        xpath = f'sc_overrides[model="{model}"][name="{name}"]'
-        for elem in root.findall(xpath):
-            root.remove(elem)
+        for elem in root.findall(f'sc_overrides[model="{model}"][name="{name}"]'):
+            if not sim or (elem.findtext('sim') or '') in ('', sim):
+                root.remove(elem)
         self._store.write_userconfig()
 
     def erase_aircraft_profiles(self, sim: str, cls: str, model: str) -> None:
@@ -306,6 +328,205 @@ class ConfigWriter:
         for elem in list(root.findall(f'.//models[sim="{sim}"][model="{model}"][profile="{profile}"]')):
             root.remove(elem)
         self._store.write_userconfig()
+
+    def discard_user_pattern(self, sim: str, model: str) -> int:
+        """Remove every trace of one of the user's patterns: its settings and
+        type rows, its profile mapping and its SimConnect overrides, so the
+        aircraft falls back to whatever else matches.  Returns the number of
+        elements removed."""
+        root = self._store.user_root
+        if root is None or not model:
+            return 0
+        gone = 0
+        for xpath in (f'.//models[model="{model}"][sim="{sim}"]',
+                      f'.//profileMappings[model="{model}"][sim="{sim}"]',
+                      f'.//sc_overrides[model="{model}"]'):
+            for elem in list(root.findall(xpath)):
+                root.remove(elem)
+                gone += 1
+        if gone:
+            self._store.write_userconfig()
+        return gone
+
+    def _merge_onto_same_string(self, sim: str, pattern: str) -> dict:
+        """Merge a user entry into a built-in that carries the same string.
+
+        Nothing moves: every row is already under that string, and both
+        trees resolve as one identity with the user's on top.  What makes
+        theirs a competing aircraft of its own is the type row, and what
+        makes no sense under a built-in is a ``User Default`` profile.  So
+        the type row goes, its notes fold into the base, and the base is
+        renamed ``Auto User`` - the profile a slider move would have made
+        here - leaving an ordinary User Profile on a built-in.  The values
+        the aircraft flies with do not change."""
+        root = self._store.user_root
+        rows = root.findall(f'models[sim="{sim}"][model="{pattern}"]')
+        type_rows = [e for e in rows if e.findtext('name') == 'type']
+        base = [e for e in rows if e.findtext('name') != 'type'
+                and (e.findtext('profile') or 'User Default') == 'User Default']
+        if not type_rows and not base:
+            return {}
+
+        taken = {e.findtext('profile') or 'User Default' for e in rows} - {'User Default'}
+        label = xmatch.required_literal(pattern)[0].strip(' -_.:') or pattern
+        new = 'Auto User'
+        if new in taken:
+            stem, n = new, 2
+            new = f"{stem} ({label})"
+            while new in taken:
+                new, n = f"{stem} ({label} {n})", n + 1
+
+        notes_carried = ''
+        for e in type_rows:
+            notes_carried = e.findtext('notes') or notes_carried
+            root.remove(e)
+
+        moved = 0
+        registered = None
+        for e in base:
+            prof = e.find('profile')
+            if prof is None:
+                prof = ET.SubElement(e, 'profile')
+            prof.text = new
+            if e.findtext('name') == 'profile':
+                registered = e
+            else:
+                moved += 1
+
+        cls = self._resolver.get_class_for_sim_model(sim, pattern) or ''
+        if registered is None:
+            self.write_models_to_xml(sim, pattern, cls, 'profile',
+                                     device=self._store.device, profile_name=new)
+            registered = root.find(
+                f'models[sim="{sim}"][model="{pattern}"][name="profile"][profile="{new}"]')
+        stamp = f"Merged into the built-in {pattern} on {datetime.date.today().isoformat()}."
+        if registered is not None:
+            notes = registered.find('notes')
+            if notes is None:
+                notes = ET.SubElement(registered, 'notes')
+            carried = [t for t in (notes_carried, notes.text or '') if t and t.strip()]
+            notes.text = "\n\n".join(carried + [stamp])
+
+        was_active = None
+        for pm in root.findall(f'profileMappings[sim="{sim}"][model="{pattern}"]'):
+            was_active = pm.findtext('active_profile') or was_active
+        active = new if was_active in (None, '', 'User Default') else was_active
+        self._store.write_userconfig()
+        self.update_active_profile_entry(sim, cls, pattern, active)
+        logging.info(f"Merged {pattern} into the built-in of the same string: "
+                     f"User Default became {new!r}, active {active!r}, {moved} row(s)")
+        return {'profiles': {'User Default': new}, 'active': active,
+                'rows': moved, 'overrides': 0}
+
+    def merge_user_pattern(self, sim: str, old_pattern: str, new_pattern: str,
+                           keep: bool = False) -> dict:
+        """Merge one of the user's own aircraft profiles into a built-in:
+        everything under ``old_pattern`` becomes User Profiles of
+        ``new_pattern``, and the aircraft flies with the moved active one.
+        The old pattern is removed unless ``keep``: a broad pattern may be
+        the only thing naming some other aircraft, so a merge from one of
+        those copies and leaves it standing.  Nothing the user set is lost.
+
+        Every profile travels, not only the active one.  ``User Default``,
+        the base of an aircraft the user added, means nothing under a
+        built-in and becomes ``Auto User``, the profile a slider move would
+        have made there; the rest keep their names.  A name the built-in
+        already carries stays as it is and the incoming profile is suffixed
+        with where it came from.  Overrides travel too, replacing a same-named
+        one.  Each moved profile's notes record the pattern it came from, and
+        the notes on the old type row go with the base.  The active choice
+        carries over.
+
+        When the two patterns are the identical string there is nothing to
+        move - both trees already resolve as one identity, the user's rows
+        on top - so the merge does the rest in place; see
+        ``_merge_onto_same_string``.
+
+        Returns ``{'profiles': {old name: new name}, 'active': str,
+        'rows': int, 'overrides': int}``, or ``{}`` with nothing to move."""
+        root = self._store.user_root
+        if root is None or not old_pattern or not new_pattern:
+            return {}
+        if old_pattern == new_pattern:
+            return self._merge_onto_same_string(sim, old_pattern)
+        source = root.findall(f'models[sim="{sim}"][model="{old_pattern}"]')
+        if not source:
+            return {}
+
+        taken = {e.findtext('profile') or ''
+                 for e in root.findall(f'models[sim="{sim}"][model="{new_pattern}"]')}
+        label = xmatch.required_literal(old_pattern)[0].strip(' -_.:') or old_pattern
+        names: dict[str, str] = {}
+        for e in source:
+            old = e.findtext('profile') or 'User Default'    # a row with no profile is the base's
+            if old in names:
+                continue
+            new = 'Auto User' if old == 'User Default' else old
+            if new in taken:
+                stem, n = new, 2
+                new = f"{stem} ({label})"
+                while new in taken:
+                    new, n = f"{stem} ({label} {n})", n + 1
+            names[old] = new
+            taken.add(new)
+
+        cls = self._resolver.get_class_for_sim_model(sim, new_pattern) or ''
+        base_notes, rows, registered = '', 0, {}
+        for e in source:
+            name = e.findtext('name', '')
+            if name == 'type':
+                base_notes = e.findtext('notes') or ''
+                continue
+            moved = copy.deepcopy(e)
+            moved.find('model').text = new_pattern
+            prof = moved.find('profile')
+            if prof is None:
+                prof = ET.SubElement(moved, 'profile')
+            prof.text = names[e.findtext('profile') or 'User Default']
+            root.append(moved)
+            if name == 'profile':
+                registered[prof.text] = moved
+            else:
+                rows += 1
+
+        stamp = f"{'Copied' if keep else 'Migrated'} from {old_pattern} on {datetime.date.today().isoformat()}."
+        for old, new in names.items():
+            row = registered.get(new)
+            if row is None:
+                self.write_models_to_xml(sim, new_pattern, cls, 'profile',
+                                         device=self._store.device, profile_name=new)
+                row = root.find(f'models[sim="{sim}"][model="{new_pattern}"][name="profile"][profile="{new}"]')
+                if row is None:
+                    continue
+            notes = row.find('notes')
+            if notes is None:
+                notes = ET.SubElement(row, 'notes')
+            carried = [t for t in (base_notes if old == 'User Default' else '', notes.text or '')
+                       if t and t.strip()]
+            notes.text = "\n\n".join(carried + [stamp])
+
+        overrides = 0
+        for ov in root.findall(f'sc_overrides[model="{old_pattern}"]'):
+            for dup in list(root.findall(f'sc_overrides[model="{new_pattern}"][name="{ov.findtext("name", "")}"]')):
+                root.remove(dup)
+            moved = copy.deepcopy(ov)
+            moved.find('model').text = new_pattern
+            root.append(moved)
+            overrides += 1
+
+        was_active = None
+        for pm in root.findall(f'profileMappings[sim="{sim}"][model="{old_pattern}"]'):
+            was_active = pm.findtext('active_profile') or was_active
+        active = names.get(was_active or 'User Default') or names.get('User Default') or next(iter(names.values()))
+
+        if keep:
+            self._store.write_userconfig()
+        else:
+            self.discard_user_pattern(sim, old_pattern)
+        self.update_active_profile_entry(sim, cls, new_pattern, active)
+        logging.info(f"{'Copied' if keep else 'Moved'} {old_pattern} onto {new_pattern}: profiles {names}, "
+                     f"{rows} row(s), {overrides} override(s), active {active!r}")
+        return {'profiles': names, 'active': active, 'rows': rows, 'overrides': overrides}
 
     def erase_entire_model_from_xml(self, sim: str, model: str) -> None:
         root = self._store.user_root
@@ -374,23 +595,24 @@ class ConfigWriter:
         old_profile: str,
         new_profile: str,
     ) -> None:
-        # Clone models data
+        # Clone models data: the source pattern's own rows, by exact pattern
         model_data, _ = self._resolver.read_models_data('defaults', sim, old_pattern,
-                                                         user=False, profile=None)
+                                                         user=False, profile=None, identity=old_pattern)
         for m in model_data:
             self.write_models_to_xml(sim, new_pattern, m['value'], m['name'],
                                      m.get('unit', ''), m.get('device', ''), new_profile)
 
         user_data, _ = self._resolver.read_models_data('user', sim, old_pattern,
-                                                       user=True, profile=old_profile)
+                                                       user=True, profile=old_profile, identity=old_pattern)
         for m in user_data:
             self.write_models_to_xml(sim, new_pattern, m['value'], m['name'],
                                      m.get('unit', ''), m.get('device', ''), new_profile)
 
         # Clone SC overrides
-        for ov in self._resolver.read_sc_overrides(old_pattern):
+        for ov in self._resolver.read_sc_overrides(old_pattern, identity=old_pattern):
             self.write_sc_override_to_xml(new_pattern, ov['var'], ov['name'],
-                                          ov.get('sc_unit', ''), ov.get('scale', ''))
+                                          ov.get('sc_unit', ''), ov.get('scale', ''),
+                                          sim=ov.get('sim') or None)
 
     def add_new_model(
         self,

@@ -128,6 +128,125 @@ Each `<models>` block is an aircraft-specific default override stored in `defaul
 > **Note:** Aircraft name matching uses `re.match()`, which anchors at the start of the string.
 > Use `.*` at the beginning of patterns intended to match anywhere in the name.
 
+### Which pattern wins
+
+When several patterns match the same aircraft, the most specific one names it and its settings
+apply last:
+
+1. an exact pin beats a pattern: `^Name$` can match nothing but that name;
+2. then the longer run of literal text the pattern pins down, so `737-600.*` beats `737.*`;
+3. then the pattern that pins that text down at the start, so `C-17.*` beats `.*C-17.*` — both
+   require the same four characters, but only one requires them first;
+4. otherwise `defaults.xml` beats the user file, so a newly shipped profile is noticed rather
+   than shadowed by an equal one of the user's; within a file the earlier entry wins.
+
+Specificity is measured on what a pattern *requires*. Matching is anchored at the start only, so
+a leading `^` adds nothing, and bare `Name` takes that name and anything after it, exactly as
+`Name.*` does; the two rank alike, and only the trailing `$` makes a pin exact. A leading `.*` or
+optional group is skipped rather than counted, since neither constrains anything on its own. The
+wizard offers `^Name$` first for that reason, and not the bare name, which reads as exact and is
+not. Note that ranking makes the negative-lookahead form
+unnecessary: `R66 Turbine.*` already beats `R66.*`, so `R66(?! Turbine).*` need only be `R66.*`.
+
+Only the winner's settings apply. A broader pattern that also matches contributes nothing, so a
+profile owns its values and does not follow the pattern it was forked from; a setting the winner
+leaves unset comes from the class and sim defaults. SimConnect overrides follow the same rule:
+the naming pattern's shipped overrides, the user's under that pattern replacing them by name,
+and nothing from any other pattern. When an aircraft has no type row at all, the most specific pattern
+that sets anything for it stands in. The log line `Pattern Match:` names the winner, and notes
+the pattern the old first-match rule would have chosen whenever the two differ; a warning names
+the two patterns whenever one of the user's collides with a shipped one, once per aircraft.
+
+TelemFFB remembers which pattern named each aircraft, and how the user answered when one of their
+own patterns collided with a shipped one (`match_history.json` beside the user config, written by
+the master instance; a config reset clears it).
+
+There is exactly one situation the main window raises with the user: a type pattern of their own
+and a shipped one both match the loaded aircraft. That happens when a curated profile ships for an
+aircraft the user had already covered. Nothing else is asked about: two patterns of the user's own
+only overlap by deliberate action, and settings rows under a pattern with no type row anywhere are
+not given a home.
+
+Whichever of the two is more specific names the aircraft, the shipped one on a tie. Either way the
+prompt reads *Multiple matching profiles detected*, and the dialog behind it says which profile
+matched and why, lists everything the user holds under theirs, and offers to merge it into the
+built-in: every profile under their pattern becomes a User Profile of the built-in (`User Default`,
+the base of an aircraft the user added, becomes `Auto User`, the profile a slider move would have
+made; the rest keep their names, suffixed with where they came from only if the built-in already
+has one by that name), overrides travel with them, each moved profile's notes record where it came
+from, and the aircraft flies with the moved active profile. When their pattern claims exactly what
+the built-in claims (`AH-6J` against `AH-6J.*`) it is dead weight after the merge and is removed.
+When it is broader it may be the only thing naming some other aircraft, so it is copied and left
+standing. The identical string is the one case where nothing travels: the rows already sit under that
+string and both trees resolve as one identity, so the merge drops the type row that made theirs an
+aircraft of its own, renames `User Default` to `Auto User`, and leaves an ordinary User Profile on the
+built-in. The aircraft flies with exactly what it flew with before; what changes is that the two
+entries stop competing.
+
+*Not now* is always offered, and leaves the prompt up to return on the next load. A permanent no is
+offered only where the user's own rows still reach the aircraft, because that is the only case where
+leaving things alone preserves anything:
+
+| Which names the aircraft | Their rows now | Permanent no |
+| --- | --- | --- |
+| Theirs, being more specific | apply | *Keep mine* |
+| The identical string, the built-in winning the tie | apply, on top of the built-in's | *Don't ask again* |
+| The built-in, claiming exactly what theirs claims | reach nothing anywhere | none |
+| The built-in, being more specific | reach nothing on this aircraft | none |
+
+The last two rows are offered only the merge and *Not now*. A permanent no there would hide the fact
+that their settings do nothing and, on an equal claim, leave the rows orphaned for good, which is the
+problem the prompt exists to surface. The prompt stays up until they merge.
+
+An answer is remembered per pattern pair, so it holds for every aircraft both match, and a later
+defaults.xml that ships a different pattern asks afresh. A decline also covers the built-in only as
+it stood when the answer was given: the record keeps a fingerprint of the shipped profile's settings
+and overrides, and when a later defaults.xml changes either, the pair reads as open and is offered
+again. A shipped profile can therefore gain something the user would want without their old no
+burying it forever. Rewording the shipped notes is not a change in what the profile does and does not
+re-ask. A merge is never re-offered: the user is already on the built-in, so whatever it becomes
+reaches them the ordinary way.
+
+A decline can be taken back. *Profiles > Reset Dismissed Profile Prompts* forgets every collision
+answered with *Keep mine* or *Don't ask again*, so each one is raised again, at once for the loaded
+aircraft and on the next load for the rest. The configuration itself is untouched. A merge is not
+taken back: it changed the configuration, the profiles it carried across stay where they went, and
+for a copy its record is the only thing that keeps the still-standing source pattern from being
+offered a second copy. Which pattern named each aircraft is kept too, since that is a record of what
+happened rather than a choice. The item is greyed out when nothing has been declined, and appears on
+the master instance only, which is the one that raises the offer and writes the record. A config reset
+clears the whole file, answers and matches alike.
+
+The dialog shows the consequence of each answer rather than an inventory, and it shows it the way a
+merge actually works: two inputs and a result. For every setting either pattern holds, and every
+SimConnect override, one column carries what the built-in sets, the next what the user's profile
+sets, and the last what the aircraft would fly with afterward. Each column is headed with the match
+and profile it stands for, and the heading says which side is in force today, so none of it is left
+to be inferred from the values. Entries the merge changes are emphasized, a count summarizes what it
+applies of theirs, leaves alone, and adds from the built-in, and the built-in's own notes appear
+alongside when the shipped type row carries any.
+
+A row where the two columns hold different values is a conflict. There the user's value stands, which
+is what a User Profile means everywhere else in TelemFFB, and the row is marked rather than dimmed so
+the choice is visible. It matters most for a SimConnect override, where the built-in's entry is not a
+matter of taste but the variable a feature reads, and a user value left standing over it would leave
+the shipped profile looking broken. Values are compared by meaning, not spelling, so `0.5` and `0.50`
+are the same entry and so are `10kt` and `5.1444m/s`; a value the user rounded by hand is a real
+difference and is marked, small as it may be, since the row shows both and they can judge it.
+
+The split button beside the Matched Model row opens the New Aircraft Wizard for the loaded
+aircraft, so an aircraft that rode a broader profile gets one of its own. The wizard then offers
+a choice: inherit, which copies the matched profile's settings and overrides into the new
+pattern (the clone list picks which profile), or create a new model, which starts with nothing
+but its class, for an aircraft that matched the wrong profile. A profile made this way is not
+offered a copy: the wizard already asked.
+
+The wizard's suggested match strings run from the whole aircraft title down to its first word.
+It preselects the second one rather than the first, because a title usually ends in the livery,
+the variant or the registration, and matching on the whole title would pin the profile to one
+paint job. It falls back to the whole title when dropping a word would leave the manufacturer
+alone, or would leave a pattern that loses to the one the aircraft is being forked off.
+
 ---
 
 ## Section: `<sc_overrides>`
@@ -144,6 +263,7 @@ specific SimConnect variable, L:var, or B: input event, allowing per-aircraft te
 | `var` | The SimConnect variable name, L:var (`L:VarName`), or input event (`B:VarName`, MSFS 2020 SU12 and later) to use as the data source. Input events are looked up on the loaded aircraft; a name the aircraft does not define is logged once and left unset. Their value is the event's own (a switch often reads 0 or 100), `sc_unit` is ignored for them, and `scale` still applies. |
 | `sc_unit` | SimConnect unit string (e.g., `"percent"`, `"feet per second"`). |
 | `scale` | Numeric scale factor applied to the raw SimConnect value. |
+| `sim` | Optional. The simulator the override belongs to (`MSFS` or `XPLANE`). A row without one belongs to any sim, which is how every row written before this element existed behaves; the overrides editor stamps the current sim on each row it writes or edits, so a user config migrates one edit at a time. Shipped rows all carry one, so an aircraft name that exists in both sims (`King Air C90.*` does) cannot pick up the other sim's variables. |
 
 ---
 
