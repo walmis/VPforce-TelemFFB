@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSi
 from . import globals as G
 from . import utils
 from . import xmlutils
+from .xml import match as xmatch
 from .ui.Ui_NewAircraftWizard import Ui_NewAircraftWizard
 
 class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
@@ -81,7 +82,8 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     class_list: list=None
     sim_list: list=None
 
-    def __init__(self, parent=None, manual=False, auto_sim=None, auto_name=None, auto_cls=None):
+    def __init__(self, parent=None, manual=False, auto_sim=None, auto_name=None, auto_cls=None,
+                 clone_from=None):
         """
             Initialize the wizard.
 
@@ -91,6 +93,9 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                 auto_sim (str): Simulation name (used when manual=False)
                 auto_name (str): Aircraft name (used when manual=False)
                 auto_cls (str): Aircraft class (optional, used when manual=False)
+                clone_from (tuple): (pattern, profile) to preselect as the clone
+                    source, for splitting a loaded aircraft off the profile it
+                    currently matches
             """
         if not manual and (auto_sim is None or auto_name is None):
             raise ValueError("Parameter 'auto_sim' and auto_name are required when 'manual' is False")
@@ -102,6 +107,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         self.auto_sim = auto_sim
         self.auto_cls = auto_cls
         self.auto_name = auto_name
+        self.clone_from = tuple(clone_from) if clone_from else None
         self.setupUi(self)
         self.retranslateUi(self)
 
@@ -166,7 +172,60 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             if self.auto_name is not None and self.auto_name != '':
                 self.tb_manual_full_name.setText(self.auto_name)
                 self.tb_manual_full_name.setDisabled(True)
+            self._preselect_clone_source()
+            if self.clone_from:
+                self._add_fork_choice()
             self.stackedWidget.setCurrentIndex(1) # Skip the sim page since it is auto discovered
+
+    def _add_fork_choice(self):
+        """Opened from the split button, the wizard is forking the loaded
+        aircraft off the profile it matches: either it inherits that
+        profile's settings (the clone list, preselected) or it starts as a
+        new model with nothing but its class."""
+        from PyQt6 import QtCore
+        from PyQt6.QtWidgets import QHBoxLayout, QLabel, QRadioButton
+        self.rb_fork_inherit = QRadioButton("Inherit settings from the current match / profile")
+        self.rb_fork_new = QRadioButton("Create a new model with no inherited settings")
+        self.bg_fork = QButtonGroup(self)
+        self.bg_fork.addButton(self.rb_fork_inherit)
+        self.bg_fork.addButton(self.rb_fork_new)
+        row = QHBoxLayout()
+        row.addWidget(self.rb_fork_inherit)
+        row.addWidget(self.rb_fork_new)
+        row.addStretch(1)
+        at = self.verticalLayout_2.indexOf(self.gridLayout_4)
+        self.verticalLayout_2.insertLayout(at, row)
+        note = QLabel(f"This aircraft currently uses <b>{self.clone_from[0]}</b>. Only match "
+                      f"strings more specific than that are offered, since a broader one would "
+                      f"not take the aircraft off it.")
+        note.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #a0a0a0;" if G.useDarkMode else "color: #5a5a5a;")
+        self.verticalLayout_2.insertWidget(at, note)
+        self.rb_fork_inherit.setChecked(True)
+        # a class that must be cloned from a curated profile cannot start empty
+        self.rb_fork_new.setEnabled(not self.mandatory_clone)
+        self.bg_fork.buttonToggled.connect(self._fork_choice_changed)
+
+    def _fork_choice_changed(self, *_):
+        inherit = self.rb_fork_inherit.isChecked()
+        self.cb_clone.setEnabled(inherit)
+        if inherit:
+            self._preselect_clone_source()
+        else:
+            self.cb_clone.setCurrentIndex(0)
+        self.validate_ac_page_entries()
+
+    def _preselect_clone_source(self):
+        """Select the clone source the caller asked for, when the class page
+        has populated the combo with it."""
+        if not self.clone_from:
+            return
+        for i in range(self.cb_clone.count()):
+            data = self.cb_clone.itemData(i)
+            if data and tuple(data) == self.clone_from:
+                self.cb_clone.setCurrentIndex(i)
+                return
 
     def manage_pages(self, page_index):
         """
@@ -399,6 +458,11 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             tt = "Match string will not match with full name"
             is_match = False
 
+        if is_match and not self._out_ranks_the_source(match_str, full_name):
+            is_match = False
+            tt = (f"'{match_str}' is no more specific than '{self.clone_from[0]}', which this "
+                  f"aircraft already uses, so it would never take over the match")
+
         # Set background color
         color = "rgba(0, 128, 0, 0.2)" if is_match else "rgba(255, 0, 0, 0.2)"
         self.tb_manual_match_string.setToolTip(tt) if not is_match else self.tb_manual_match_string.setToolTip('')
@@ -446,24 +510,62 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         return profiles
 
 
+    #: Suggestions below this many words are the manufacturer alone
+    #: ("Sopwith.*" for the Camel and the Dolphin both), too broad to
+    #: preselect.
+    _MIN_SUGGESTED_WORDS = 2
+
     def generate_regex_patterns(self, input_str):
         """
             Generates a list of suggested regex patterns based on the aircraft name.
-            Adds these patterns to the suggestion combo box.
+            Adds these patterns to the suggestion combo box, and preselects one.
             """
         words = input_str.split()
-        patterns = []
-
-        for i in range(len(words), 0, -1):
-            pattern = ' '.join(words[:i])
-            pattern += ".*"
-            patterns.append(pattern)
+        patterns = [' '.join(words[:i]) + ".*" for i in range(len(words), 0, -1)]
+        patterns = [p for p in patterns if self._out_ranks_the_source(p, input_str)]
+        # Most specific first.  The anchored form is the only one that will
+        # not also take a title with a livery name appended.  The bare name
+        # would, exactly as Name.* does, so it is not offered: it reads as an
+        # exact match and is not one.
+        exact = [p for p in (f"^{input_str}$",) if self._out_ranks_the_source(p, input_str)]
+        options = exact + patterns
         self.cb_suggested.clear()
-        for match_string in patterns:
+        for match_string in options:
             self.cb_suggested.addItem(match_string)
-        exact_match = f"^{input_str}$"
-        self.cb_suggested.addItem(exact_match)
-        return patterns
+        # The default stays the prefix that drops the livery word, wherever
+        # it now sits in the list.
+        self.cb_suggested.setCurrentIndex(
+            len(exact) + self._default_suggestion(patterns, input_str) if patterns else 0)
+        return options
+
+    def _out_ranks_the_source(self, pattern, full_name):
+        """Whether a pattern would actually take the aircraft off the one it
+        is being forked from.  An equal or broader pattern loses the match,
+        so the new profile would never name the aircraft and the split
+        button would look like it had done nothing."""
+        if not self.clone_from:
+            return True
+        return (xmatch.specificity(pattern, full_name)
+                > xmatch.specificity(self.clone_from[0], full_name))
+
+    def _default_suggestion(self, patterns, full_name):
+        """Which suggestion starts selected.  Not the first: it is the whole
+        title, and the last word of a title is usually the livery, the
+        variant or the registration, so it would pin the profile to one
+        paint job.  The next one down drops that word - unless doing so
+        leaves the manufacturer alone, or leaves a pattern that would lose
+        to the one this aircraft is being forked off, in which case the
+        more specific suggestion stands."""
+        current = self.clone_from[0] if self.clone_from else ''
+        for i, pattern in enumerate(patterns):
+            if i == 0:
+                continue                      # the whole title, livery and all
+            if len(pattern.split()) < self._MIN_SUGGESTED_WORDS:
+                break
+            if current and xmatch.specificity(pattern, full_name) <= xmatch.specificity(current, full_name):
+                break                         # a fork this broad would never win
+            return i
+        return 0
 
     def clear_match_toggles(self):
         self.bg_matchString.setExclusive(False)

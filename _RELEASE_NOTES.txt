@@ -20,6 +20,23 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - An optional integration that lets TelemFFB drive any device exposing force feedback through DirectInput
   - Usable in any role
   - Enabled in System Settings > Integrations; DirectLink is a separate free download. VPforce-only features (Configurator, firmware effects, force telemetry) degrade cleanly
+- **NEW: The most specific matching profile now names your aircraft**
+  - Previously the first profile that matched in file order won.  A broad match string could take an aircraft that a more specific one was written for, and which one you got depended on where each entry happened to sit in the file
+  - Now the most specific match wins. When two match equally the built-in profile wins, so a curated profile that ships for an aircraft you already had covered gets noticed instead of being quietly shadowed
+  - Settings come from the profile that matched, and no longer blend together from every match string that happens to fit the aircraft's name.  What the settings page shows is what the aircraft is flying with.  SimConnect and dataref overrides follow the same rule
+  - The New Aircraft Wizard no longer suggests a bare name as a match string, since a bare name and that name followed by anything are the same match.  Its match strings are ordered by how specific they are
+- **NEW: TelemFFB tells you when one of your own profiles and a built-in both match**
+  - The main window shows "Multiple matching profiles detected".  This happens when a curated profile ships for an aircraft you had already made a profile for
+  - The dialog names which profile matched and why, then shows every setting and override either one holds, what the aircraft flies with now, and what it would fly with after merging.  The built-in's own notes are shown alongside, so you can see what it was written to do
+  - Merging turns everything you have into user profiles of the built-in.  Your other profiles come across under their own names, your notes travel with them and record where they came from, and the aircraft keeps flying with the profile it was on.  Nothing you have set is lost
+  - If your match string is broader than the built-in's it stays in place afterward, since it may be the only thing naming your other aircraft.  If it claimed exactly what the built-in claims it is removed, because it has nothing left to name
+  - You can keep your own profile when it is the one naming the aircraft, and TelemFFB remembers that answer.  It asks again only if the built-in profile changes in a later release, so a curated profile that gains something important is not buried by an old answer.  Profiles > Reset Dismissed Profile Prompts makes it ask again about every aircraft you answered that way, as each one loads
+- **NEW: Split button - give the loaded aircraft a profile of its own**
+  - A new button sits beside the Matched Model row.  It forks the aircraft you are flying off whatever profile claimed it and onto a more specific match string of its own
+  - Until now the New Aircraft Wizard only appeared when nothing matched at all.  An aircraft that rode in on a broader profile had no way to be separated from it without hand-editing the config
+  - The wizard opens already filled in for the loaded aircraft, suggesting match strings built from its name so you can decide how much of the name to keep.  Leaving part of it off keeps a family of liveries or variants together on one profile
+  - Then it asks what the new profile should start from.  Inherit copies the settings and overrides of the profile that matched, which is what you want when the aircraft is close to its neighbors and needs a few changes.  New model starts with nothing but its class, for an aircraft that was matched by the wrong profile in the first place
+  - The button is available only once a profile actually names the aircraft.  With no match there is nothing to fork, and the wizard fires on its own
 ## UI
 - **NEW: Device configuration UI re-work**
   - Device cards with pull-down selection of detected devices

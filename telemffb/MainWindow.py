@@ -45,6 +45,8 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QDialog, QStatusBar, QSplitter)
 
 import telemffb.globals as G
+from telemffb import match_history
+from telemffb.ProfileOfferDialog import ProfileOfferDialog
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.app_events import events as app_events
@@ -259,6 +261,18 @@ class MainWindow(QMainWindow):
             self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
             self.profiles_menu.addAction(self.offline_config_action)
 
+            self.profiles_menu.setToolTipsVisible(True)
+            self.forget_offers_action = QAction('Reset Dismissed Profile Prompts', self)
+            self.forget_offers_action.setToolTip(
+                "TelemFFB will ask again about each aircraft you answered with 'Keep mine' "
+                "or 'Don't ask again', the next time the aircraft loads.")
+            self.forget_offers_action.triggered.connect(self.forget_profile_offers)
+            self.profiles_menu.addAction(self.forget_offers_action)
+            # Nothing dismissed means nothing to bring back; checked as the menu
+            # opens rather than tracked, since prompts are answered elsewhere.
+            self.profiles_menu.aboutToShow.connect(
+                lambda: self.forget_offers_action.setEnabled(match_history.has_declines()))
+
 
         """ Create the "Utilities" menu """
 
@@ -447,6 +461,7 @@ class MainWindow(QMainWindow):
 
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
         self.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
+        self.status_container.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
         self.status_container.sim_status_label.set_waiting()
 
         def on_sims_changed(sim: SimTelemListener):
@@ -545,6 +560,33 @@ class MainWindow(QMainWindow):
         self._trim_prompt_anim.setLoopCount(-1)
         self._trim_prompt_anim.valueChanged.connect(self._style_trim_cal_prompt)
         self._style_trim_cal_prompt(0.0)
+        # Profile-changed offer: the pattern naming the loaded aircraft is
+        # not the one recorded at its last load (a more specific curated
+        # profile shipped, or the user made one), so the user's
+        # rows under the old pattern no longer edit this aircraft. Copy
+        # them across on request; either link clears the offer.
+        self.profile_change_button = QLabel()
+        self.profile_change_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self.profile_change_button.linkActivated.connect(self._on_profile_change_link)
+        # Teal, and static where its two neighbours breathe: red is the
+        # new-aircraft prompt, mustard the trim one and the Paused badge,
+        # blue the device selection, purple the brand.  This is an offer,
+        # not something wrong, so it should not pulse for attention.
+        self.profile_change_button.setStyleSheet("""QLabel {
+                            background-color: rgb(0, 121, 107);
+                            border: 3px solid white;
+                            border-radius: 17px;
+                            color: white;
+                            padding: 8px 18px;
+                        }
+                        QLabel:hover {
+                            background-color: #26a69a;
+                        }""")
+        self.profile_change_button.hide()
+        new_craft_layout.addWidget(self.profile_change_button,
+                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
+        new_craft_layout.addSpacing(7)
+
         new_craft_layout.addWidget(self.trim_cal_prompt_button,
                                    alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
 
@@ -1509,6 +1551,7 @@ class MainWindow(QMainWindow):
 
             os.remove(G.userconfig_path)
             utils.create_empty_userxml_file(G.userconfig_path)
+            match_history.reset()
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
         else:
@@ -2048,9 +2091,10 @@ class MainWindow(QMainWindow):
         self.refresh_profile_notes_button()
 
 
-    def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
+    def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None, clone_from=None):
         # utils.debug_caller_args("red")
-        wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls)
+        wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls,
+                                   clone_from=clone_from)
         wizard.accepted.connect(self.new_ac_wizard_finished)
         if wizard.exec():
             try:
@@ -2246,11 +2290,95 @@ class MainWindow(QMainWindow):
         self.populate_profile_combo(None) # populate combo with any new profiles
         self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         self.settings_layout.reload_caller()
+        self._update_profile_change_prompt()
+
+    def _update_profile_change_prompt(self):
+        change = getattr(G.settings_mgr, 'profile_change', None)
+        if not change or not G.master_instance:
+            self.profile_change_button.hide()
+            return
+        # One line, like the trim prompt beside it: the detail and the choice
+        # need more room than a pill has, so they live in the dialog it opens.
+        self.profile_change_button.setText(
+            "<a href='#open' style='color:white; text-decoration:none;'>"
+            "<span style='font-weight:500;'>Multiple matching profiles detected — </span>"
+            "<b>Click Here</b><span style='font-weight:500;'> to resolve</span></a>")
+        if not self.profile_change_button.isVisible():
+            self.profile_change_button.show()
+            # Only worth a toast when the window cannot be seen, and it says
+            # what is true: nothing has been decided and nothing is asked for.
+            if self.isHidden() or self.isMinimized():
+                self.pop_tray_notification(
+                    "Multiple matching profiles",
+                    f"{change['aircraft']}: your {change['user']} and the built-in "
+                    f"{change['curated']} both match.\nOpen TelemFFB to resolve.",
+                    15)
+
+    def _on_profile_change_link(self, href):
+        change = getattr(G.settings_mgr, 'profile_change', None)
+        if not change:
+            self.profile_change_button.hide()
+            return
+        choice = self._ask_profile_change(change)
+        if choice == ProfileOfferDialog.LATER:
+            return                      # the prompt stays put, and returns next load
+        G.settings_mgr.profile_change = None
+        self.profile_change_button.hide()
+        sim, user, curated = change['sim'], change['user'], change['curated']
+        shipped = change.get('shipped', '')
+        try:
+            if choice == ProfileOfferDialog.MERGE:
+                xmlutils.merge_user_pattern(sim, user, curated, keep=bool(change.get('keep')))
+                match_history.resolve(sim, user, curated, match_history.MERGED, shipped)
+                if G.telem_manager is not None:
+                    G.telem_manager.currentAircraftName = None    # re-resolve from scratch
+            elif choice == ProfileOfferDialog.DECLINE:
+                match_history.resolve(sim, user, curated, match_history.DECLINED, shipped)
+            else:
+                return
+        except Exception:
+            logging.exception("Acting on the profile offer failed")
+            return
+        if not G.settings_mgr.offline_mode and G.telem_manager is not None:
+            G.telem_manager.refresh_aircraft_profile()
+        self.settings_layout.reload_layout(None)
+
+    def _ask_profile_change(self, change):
+        """Show the offer; returns one of the ProfileOfferDialog choices."""
+        preview = xmlutils.merge_preview(change['sim'], change['aircraft'],
+                                         change['user'], change['curated'])
+        labels = xmlutils.setting_display_names([e['name'] for e in preview['entries']])
+        dialog = ProfileOfferDialog(change, preview, labels, self)
+        dialog.exec()
+        return dialog.choice
 
     def open_url(self, url):
 
         # Open the URL
         QDesktopServices.openUrl(QUrl(url))
+
+    def forget_profile_offers(self):
+        """Give back every matching-profile offer the user answered for good,
+        so each one is raised again.  Their configuration is untouched: the
+        only thing forgotten is what they answered."""
+        ans = QMessageBox.question(
+            self, "Reset dismissed profile prompts?",
+            "TelemFFB will ask again about each aircraft you answered with 'Keep mine' "
+            "or 'Don't ask again'. The prompt returns as that aircraft loads, starting "
+            "with the one you have loaded now.\n\n"
+            "Nothing in your configuration changes, and merges you already made stay as "
+            "they are.",
+            QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes,
+            QMessageBox.StandardButton.Yes)
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        match_history.forget_declines()
+        logging.info("Declined profile offers forgotten at the user's request")
+        # The loaded aircraft may be one of them, so bring its prompt back now
+        # rather than on whichever frame next resolves it.
+        if not G.settings_mgr.offline_mode and G.telem_manager is not None:
+            G.telem_manager.recheck_profile_offer()
+        self._update_profile_change_prompt()
 
     def reset_all_effects(self):
         result = QMessageBox.warning(self, "Are you sure?", "*** Only use this if you have effects which are 'stuck' ***\n\n  Proceeding will result in the destruction"
@@ -2764,12 +2892,25 @@ class MainWindow(QMainWindow):
         self.status_container.cur_pattern_label.setText(pattern)
         self.status_container.active_profile_label.setText(profile)
         # The resolved pattern, not the label: with nothing matched the label
-        # reads "Using defaults", which has no profiles to pick between.
-        self.status_container.set_profile_state(
-            bool(craft) and bool(G.settings_mgr.current_pattern) and G.master_instance
-            and G.settings_mgr.current_sim not in ('', 'nothing')
-            and not G.settings_mgr.offline_mode)
+        # reads "Using defaults", which is neither something to fork off nor
+        # something with profiles to pick between.
+        named = (bool(craft) and bool(G.settings_mgr.current_pattern) and G.master_instance
+                 and G.settings_mgr.current_sim not in ('', 'nothing')
+                 and not G.settings_mgr.offline_mode)
+        self.status_container.set_split_state(named)
+        self.status_container.set_profile_state(named)
         self.refresh_profile_notes_button()
+
+    def split_loaded_aircraft_profile(self):
+        """The wizard, prefilled for the loaded aircraft and cloning from the
+        profile it matches now, so a livery or variant that rode a broader
+        pattern gets a profile of its own."""
+        sm = G.settings_mgr
+        if not sm.current_aircraft_name or not sm.current_pattern:
+            return
+        self.show_new_aircraft_wizard(
+            manual=False, sim=sm.current_sim, name=sm.current_aircraft_name,
+            cls=sm.current_class, clone_from=(sm.current_pattern, sm.active_profile or 'Built-In'))
 
     def refresh_telem_override_pill(self, force=False):
         """Update the telemetry-override pill in the status area for the
@@ -2788,7 +2929,7 @@ class MainWindow(QMainWindow):
         text, tip = '', ''
         if sim in ('MSFS', 'XPLANE') and aircraft:
             try:
-                overrides = xmlutils.read_sc_overrides(aircraft)
+                overrides = xmlutils.read_sc_overrides(aircraft, sim=sim)
             except Exception:
                 logging.exception('Failed to read sc_overrides for status pill')
                 overrides = []
@@ -2859,6 +3000,12 @@ class MainWindow(QMainWindow):
         # the form we reload below already edits the new profile.
         if not G.settings_mgr.offline_mode and G.telem_manager is not None:
             G.telem_manager.refresh_aircraft_profile()
+        # A profile the user just made on purpose is not a surprise, and
+        # the wizard already offered the clone; the refresh above recorded
+        # the new match, so neither the next reload nor the next start
+        # offers again.
+        G.settings_mgr.profile_change = None
+        self.profile_change_button.hide()
         self.settings_layout.reload_layout(None)
 
     def _update_trim_cal_prompt(self):
