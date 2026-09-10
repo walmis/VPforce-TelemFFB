@@ -22,6 +22,7 @@
         <file>image/file-download.svg</file>
         <file>image/file-upload.svg</file>
         <file>image/profile-notes.svg</file>
+        <file>image/split-profile.svg</file>
         <file>image/up-up.png</file>
         <file>image/down-down_grey.png</file>
         <file>image/up-up_grey.png</file>
@@ -61,8 +62,8 @@
     </qresource>
 </RCC>
 <!-- To regenerate resources.py after adding a file above, run: -->
-<!--     makeresources.bat          (or: py makeresources.py)   -->
-<!-- and check it with: makeresources.bat --check               -->
+<!-- makeresources.bat (or: py makeresources.py)   -->
+<!-- and check it with: makeresources.bat  -->
 <!-- Do not run pyside6-rcc by hand.  Its output imports PySide6 and the -->
 <!-- compiler cannot be told otherwise; makeresources.py rewrites that one -->
 <!-- line to PyQt6, and stops with an error if it ever cannot find it. -->
