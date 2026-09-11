@@ -117,3 +117,109 @@ class TestWizardFinishedHook:
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=False), raising=False)
         hook(win)
         assert calls == ['reload']
+
+
+class TestNotesButtonState:
+    """A note is written against the pattern that names the aircraft, so with
+    nothing matched the dialog would open, fail to save and log an error."""
+
+    def _enabled(self, monkeypatch, pattern, aircraft="C172SP Classic Cargo", sim="MSFS"):
+        from telemffb.MainWindow import MainWindow
+        calls = []
+        win = SimpleNamespace(
+            refresh_telem_override_pill=lambda: None,
+            status_container=SimpleNamespace(
+                set_notes_state=lambda enabled, has_notes: calls.append(enabled)))
+        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
+            current_sim=sim, current_aircraft_name=aircraft,
+            current_pattern=pattern, active_profile="Built-In"), raising=False)
+        for name in ('read_default_model_notes', 'read_user_default_model_notes',
+                     'read_user_model_notes'):
+            monkeypatch.setattr(xmlutils, name, lambda *a, **k: '')
+        MainWindow.refresh_profile_notes_button(win)
+        return calls[0]
+
+    def test_disabled_when_nothing_matched(self, monkeypatch):
+        assert self._enabled(monkeypatch, "") is False
+
+    def test_enabled_when_a_pattern_names_the_aircraft(self, monkeypatch):
+        assert self._enabled(monkeypatch, "C172SP.*") is True
+
+    def test_disabled_with_no_aircraft_or_no_sim(self, monkeypatch):
+        assert self._enabled(monkeypatch, "C172SP.*", aircraft="") is False
+        assert self._enabled(monkeypatch, "C172SP.*", sim="nothing") is False
+
+
+@pytest.fixture
+def qt_app():
+    from PyQt6 import QtWidgets
+    return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+
+class TestProfileComboState:
+    """Profiles belong to the pattern that names the aircraft, so with nothing
+    matched there are none to pick between and none to add to."""
+
+    def _combo(self, monkeypatch, pattern, items):
+        from PyQt6.QtWidgets import QComboBox
+        from telemffb.MainWindow import MainWindow
+        combo = QComboBox()
+        win = SimpleNamespace(status_container=SimpleNamespace(
+            cb_selectProfileCombo=combo, set_profile_state=combo.setEnabled))
+        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
+            current_sim="MSFS", current_class="PropellerAircraft",
+            current_pattern=pattern), raising=False)
+        MainWindow.populate_profile_combo(win, items)
+        return combo
+
+    def test_disabled_when_nothing_matched(self, qt_app, monkeypatch):
+        assert self._combo(monkeypatch, "", []).isEnabled() is False
+
+    def test_enabled_when_a_pattern_names_the_aircraft(self, qt_app, monkeypatch):
+        combo = self._combo(monkeypatch, "C172SP.*", ["Built-In", "Auto User"])
+        assert combo.isEnabled() is True
+        assert [combo.itemText(i) for i in range(combo.count())] == \
+            ["Select...", "Built-In", "Auto User", "Add New..."]
+
+    def test_the_aircraft_refresh_applies_the_same_rule(self, monkeypatch):
+        from telemffb.MainWindow import MainWindow
+        calls = []
+        win = SimpleNamespace(
+            status_container=SimpleNamespace(
+                cur_craft_label=MagicMock(), cur_pattern_label=MagicMock(),
+                active_profile_label=MagicMock(),
+                set_profile_state=lambda v: calls.append(v)),
+            refresh_profile_notes_button=lambda: None)
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        for pattern, want in (("", False), ("C172SP.*", True)):
+            monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
+                current_aircraft_name="C172SP Classic Cargo", current_pattern=pattern,
+                active_profile="Built-In", current_sim="MSFS", offline_mode=False), raising=False)
+            # the label reads "Using defaults" with nothing matched: not a pattern
+            MainWindow.update_craft_text_block(win, craft="C172SP Classic Cargo",
+                                               pattern=pattern or "Using defaults", profile="Built-In")
+            assert calls[-1] is want
+
+
+class TestSimStatusLeavesTheProfileComboAlone:
+    """The sim-status transitions run on every telemetry frame.  They used to
+    switch the combo back on each time, undoing the gate within a second of
+    it being applied."""
+
+    def _widget(self, monkeypatch):
+        from telemffb.custom_widgets import AppStatusWidget
+        monkeypatch.setattr(G, 'useDarkMode', False, raising=False)
+        w = AppStatusWidget(master_instance=True)
+        w.set_profile_state(False)
+        return w
+
+    def test_running_and_paused_frames_do_not_reenable_it(self, qt_app, monkeypatch):
+        w = self._widget(monkeypatch)
+        for transition in (w.set_paused, w.set_running, w.set_waiting, w.set_error):
+            transition("MSFS")
+            assert w.cb_selectProfileCombo.isEnabled() is False
+
+    def test_a_named_aircraft_enables_it(self, qt_app, monkeypatch):
+        w = self._widget(monkeypatch)
+        w.set_profile_state(True)
+        assert w.cb_selectProfileCombo.isEnabled() is True

@@ -2410,8 +2410,9 @@ class MainWindow(QMainWindow):
         """
         SELECT_LABEL = 'Select...'
         ADD_NEW_LABEL = "Add New..."
-        if not self.status_container.cb_selectProfileCombo.isEnabled():
-            self.status_container.cb_selectProfileCombo.setEnabled(True)
+        # Profiles belong to the pattern that names the aircraft, so with
+        # nothing matched there are none to pick between and none to add to.
+        self.status_container.set_profile_state(bool(G.settings_mgr.current_pattern))
         if new_items is None:
             new_items = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
@@ -2762,6 +2763,12 @@ class MainWindow(QMainWindow):
         self.status_container.cur_craft_label.setText(craft)
         self.status_container.cur_pattern_label.setText(pattern)
         self.status_container.active_profile_label.setText(profile)
+        # The resolved pattern, not the label: with nothing matched the label
+        # reads "Using defaults", which has no profiles to pick between.
+        self.status_container.set_profile_state(
+            bool(craft) and bool(G.settings_mgr.current_pattern) and G.master_instance
+            and G.settings_mgr.current_sim not in ('', 'nothing')
+            and not G.settings_mgr.offline_mode)
         self.refresh_profile_notes_button()
 
     def refresh_telem_override_pill(self, force=False):
@@ -2814,7 +2821,10 @@ class MainWindow(QMainWindow):
         if ctx == getattr(self, '_profile_notes_shown', None):
             return
         self._profile_notes_shown = ctx
-        enabled = bool(aircraft) and sim not in ('', 'nothing')
+        # A note is written against the pattern that names the aircraft, so
+        # with nothing matched there is nothing to attach one to: the dialog
+        # would open, fail to save and log an error.
+        enabled = bool(aircraft) and bool(pattern) and sim not in ('', 'nothing')
         has_notes = False
         if enabled:
             target = profile if profile and str(profile).lower() not in ('none', 'built-in', 'default') else 'Auto User'

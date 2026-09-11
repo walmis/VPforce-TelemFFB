@@ -452,27 +452,23 @@ class AppStatusWidget(QWidget):
     def set_running(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Running')
-        self.cb_selectProfileCombo.setDisabled(False)
         self.message_stack.setCurrentIndex(0)
         self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(0,200,0))
 
     def set_paused(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Paused')
-        self.cb_selectProfileCombo.setDisabled(False)
         self.message_stack.setCurrentIndex(0)
         self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(255,200,0))
 
     def set_error(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Error')
-        self.cb_selectProfileCombo.setDisabled(False)
         self.pulse_label(self.sim_status_label.status_label, pulses=20000, color=QColor(200,0,0))
 
     def set_waiting(self, source):
         if self.offline: return
         self.sim_status_label.set_waiting()
-        self.cb_selectProfileCombo.setDisabled(False)
 
     def set_offline(self, source):
         self.offline = True
@@ -531,6 +527,13 @@ class AppStatusWidget(QWidget):
         self.set_notes_state(False)
         self.set_telem_overrides('', '')
         self.set_waiting(src)
+
+    def set_profile_state(self, enabled):
+        """Whether a profile can be picked: only once a pattern names the
+        aircraft, since profiles belong to the pattern.  Owned here, not by
+        the sim-status transitions, which run every frame and used to switch
+        the combo back on regardless."""
+        self.cb_selectProfileCombo.setEnabled(bool(enabled))
 
     def set_notes_state(self, enabled, has_notes=False):
         """Enable/disable the profile-notes button. When notes exist (curated
