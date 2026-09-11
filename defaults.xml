@@ -6151,20 +6151,20 @@
 	</sc_overrides>
 	<sc_overrides>
 		<name>EngRPM</name>
-		<model>FlyInside - B206.*</model>
+		<model>FlyInside - B206</model>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>RotorRPM</name>
-		<model>FlyInside - B206.*</model>
+		<model>FlyInside - B206</model>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.95</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>HydSys</name>
-		<model>FlyInside - B206.*</model>
+		<model>FlyInside - B206</model>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
@@ -6191,21 +6191,21 @@
 	</sc_overrides>
 	<sc_overrides>
 		<name>FI_VibX</name>
-		<model>FlyInside - B206.*</model>
+		<model>FlyInside - B206</model>
 		<var>L:Aircraft.Vibrations.X</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>FI_VibY</name>
-		<model>FlyInside - B206.*</model>
+		<model>FlyInside - B206</model>
 		<var>L:Aircraft.Vibrations.Y</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>FI_VibZ</name>
-		<model>FlyInside - B206.*</model>
+		<model>FlyInside - B206</model>
 		<var>L:Aircraft.Vibrations.Z</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
