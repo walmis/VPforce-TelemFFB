@@ -202,6 +202,10 @@ QMenu::item:selected {
     color: palette(text);
 }
 
+QMenu::item:disabled {
+    color: #7f7f7f;
+}
+
 QCheckBox:disabled {
   color: rgb(155, 155, 155);  /* lighter grey for better visibility */
 }
