@@ -6133,12 +6133,14 @@
 <sc_overrides>
 		<name>EngRPM</name>
 		<model>FlyInside B206.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>RotorRPM</name>
 		<model>FlyInside B206.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.95</scale>
@@ -6146,18 +6148,21 @@
 	<sc_overrides>
 		<name>HydSys</name>
 		<model>FlyInside B206.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>EngRPM</name>
 		<model>FlyInside - B206</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>RotorRPM</name>
 		<model>FlyInside - B206</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.95</scale>
@@ -6165,12 +6170,14 @@
 	<sc_overrides>
 		<name>HydSys</name>
 		<model>FlyInside - B206</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>FI_VibX</name>
 		<model>FlyInside B206.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.X</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6178,6 +6185,7 @@
 	<sc_overrides>
 		<name>FI_VibY</name>
 		<model>FlyInside B206.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.Y</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6185,6 +6193,7 @@
 	<sc_overrides>
 		<name>FI_VibZ</name>
 		<model>FlyInside B206.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.Z</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6192,6 +6201,7 @@
 	<sc_overrides>
 		<name>FI_VibX</name>
 		<model>FlyInside - B206</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.X</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6199,6 +6209,7 @@
 	<sc_overrides>
 		<name>FI_VibY</name>
 		<model>FlyInside - B206</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.Y</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6206,6 +6217,7 @@
 	<sc_overrides>
 		<name>FI_VibZ</name>
 		<model>FlyInside - B206</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.Z</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6213,6 +6225,7 @@
 	<sc_overrides>
 		<name>FI_VibX</name>
 		<model>FlyInside B47.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.X</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6220,6 +6233,7 @@
 	<sc_overrides>
 		<name>FI_VibY</name>
 		<model>FlyInside B47.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.Y</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6227,6 +6241,7 @@
 	<sc_overrides>
 		<name>FI_VibZ</name>
 		<model>FlyInside B47.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Vibrations.Z</var>
 		<sc_unit>number</sc_unit>
 		<scale>5000</scale>
@@ -6234,12 +6249,14 @@
 	<sc_overrides>
 		<name>EngRPM</name>
 		<model>FlyInside B47.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>RotorRPM</name>
 		<model>FlyInside B47.*</model>
+		<sim>MSFS</sim>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.6</scale>
@@ -6247,18 +6264,21 @@
 	<sc_overrides>
 		<name>APMaster</name>
 		<model>A2A Piper PA-24.*</model>
+		<sim>MSFS</sim>
 		<var>L:ApDisableAileron</var>
 		<sc_unit>Enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>PropRPM</name>
 		<model>A2A Piper PA-24.*</model>
+		<sim>MSFS</sim>
 		<var>L:Eng1_PropRPM</var>
 		<sc_unit>number</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>PropThrust</name>
 		<model>A2A Piper PA-24.*</model>
+		<sim>MSFS</sim>
 		<var>L:Eng1_ForceZ</var>
 		<sc_unit>number</sc_unit>
 		<scale>4.45</scale>
@@ -6266,6 +6286,7 @@
 	<sc_overrides>
 		<name>AccBody:0</name>
 		<model>A2A Piper PA-24.*</model>
+		<sim>MSFS</sim>
 		<var>L:FM_BodyAccelerationX</var>
 		<sc_unit>number</sc_unit>
 		<scale>0.102</scale>
@@ -6273,6 +6294,7 @@
 	<sc_overrides>
 		<name>AccBody:1</name>
 		<model>A2A Piper PA-24.*</model>
+		<sim>MSFS</sim>
 		<var>L:FM_BodyAccelerationY</var>
 		<sc_unit>number</sc_unit>
 		<scale>0.102</scale>
@@ -6280,6 +6302,7 @@
 	<sc_overrides>
 		<name>AccBody:2</name>
 		<model>A2A Piper PA-24.*</model>
+		<sim>MSFS</sim>
 		<var>L:FM_BodyAccelerationZ</var>
 		<sc_unit>number</sc_unit>
 		<scale>0.102</scale>
@@ -6287,240 +6310,280 @@
 	<sc_overrides>
 		<name>hpgSEMAx</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAy</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAyaw</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_YAW</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgAfcsMaster</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:H145_SDK_AFCS_MASTER</var>
 		<sc_unit>number</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgTrimRelease</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgCollectiveRelease</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgCollectiveAfcsMode</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:H145_SDK_AFCS_MODE_COLLECTIVE</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:FFB_HANDS_ON_CYCLIC</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgFeetOnPedals</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:FFB_FEET_ON_PEDALS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgFollowupTrimMode</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:H145_PERSIST_ATT_FOLLOWUP_MODE_V2</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgVRSDatum</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_VRS2_DATUM</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgVRSIsInVRS</name>
 		<model>Airbus H145.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAx</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAy</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAyaw</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_YAW</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgAfcsMaster</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:H160_SDK_AFCS_MASTER</var>
 		<sc_unit>number</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgTrimRelease</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgCollectiveRelease</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgCollectiveAfcsMode</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:H160_SDK_AFCS_MODE_COLLECTIVE</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:FFB_HANDS_ON_CYCLIC</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgFeetOnPedals</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:FFB_FEET_ON_PEDALS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgFollowupTrimMode</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:H160_PERSIST_ATT_FOLLOWUP_MODE_V2</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgVRSDatum</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_VRS2_DATUM</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgVRSIsInVRS</name>
 		<model>Airbus H160.*</model>
+		<sim>MSFS</sim>
 		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>SEMAx</name>
 		<model>Simfocus B407.*</model>
+		<sim>MSFS</sim>
 		<var>L:FFB_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>SEMAy</name>
 		<model>Simfocus B407.*</model>
+		<sim>MSFS</sim>
 		<var>L:FFB_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>ForceTrimSW</name>
 		<model>UH-1H.*</model>
+		<sim>MSFS</sim>
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 		<sc_overrides>
 		<name>ForceTrimSW</name>
 		<model>205-A1B.*</model>
+		<sim>MSFS</sim>
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 		<sc_overrides>
 			<name>HydSwitch</name>
 			<model>R66(?! Turbine).*</model>
+			<sim>MSFS</sim>
 			<var>L:CSR66_Hyd_Switch</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500CyclicFriction</name>
 			<model>H500C.*</model>
+			<sim>MSFS</sim>
 			<var>L:cyclic_friction</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500CollectiveFriction</name>
 			<model>H500C.*</model>
+			<sim>MSFS</sim>
 			<var>L:collective_friction</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500TRDamaged</name>
 			<model>H500C.*</model>
+			<sim>MSFS</sim>
 			<var>L:TR_damaged</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500PedalLock</name>
 			<model>H500C.*</model>
+			<sim>MSFS</sim>
 			<var>L:pedal_lock</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500CyclicFriction</name>
 			<model>OH6A.*</model>
+			<sim>MSFS</sim>
 			<var>L:cyclic_friction</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500CollectiveFriction</name>
 			<model>OH6A.*</model>
+			<sim>MSFS</sim>
 			<var>L:collective_friction</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500TRDamaged</name>
 			<model>OH6A.*</model>
+			<sim>MSFS</sim>
 			<var>L:TR_damaged</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500PedalLock</name>
 			<model>OH6A.*</model>
+			<sim>MSFS</sim>
 			<var>L:pedal_lock</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_trim_thresh_hi</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_threshold_high</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6528,6 +6591,7 @@
 		<sc_overrides>
 			<name>AW109_rud_trim_thresh_lo</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_threshold_low</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6535,6 +6599,7 @@
 		<sc_overrides>
 			<name>AW109_rud_trim_zero</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_zero</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6542,6 +6607,7 @@
 		<sc_overrides>
 			<name>AW109_rud_trim_coarse</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_auto_coord_coarse</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6549,6 +6615,7 @@
 		<sc_overrides>
 			<name>AW109_rud_trim_fine</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_auto_coord_fine</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6556,6 +6623,7 @@
 		<sc_overrides>
 			<name>AW109_rud_sim_trim_left</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>sim/flight_controls/rudder_trim_left</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6563,6 +6631,7 @@
 		<sc_overrides>
 			<name>AW109_rud_sim_trim_right</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>sim/flight_controls/rudder_trim_right</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6570,6 +6639,7 @@
 		<sc_overrides>
 			<name>AW109_aileron_trim_req</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/aileron_trim_req</var>
 			<sc_unit>float</sc_unit>
 			<scale>100</scale>
@@ -6577,6 +6647,7 @@
 		<sc_overrides>
 			<name>AW109_elevator_trim_req</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/elevator_trim_req</var>
 			<sc_unit>float</sc_unit>
 			<scale>100</scale>
@@ -6584,6 +6655,7 @@
 		<sc_overrides>
 			<name>AW109_rudder_trim_req</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_req</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6591,6 +6663,7 @@
 		<sc_overrides>
 			<name>AW109_hdg_on</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/cockpit/capsule/apms/hdg_on</var>
 			<sc_unit>int</sc_unit>
 			<scale>1.0</scale>
@@ -6598,6 +6671,7 @@
 		<sc_overrides>
 			<name>AW109_cyc_force_trim_release_pressed</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/autopilot/cyc_force_trim_release_pressed</var>
 			<sc_unit>int</sc_unit>
 			<scale>1.0</scale>
@@ -6605,6 +6679,7 @@
 		<sc_overrides>
 			<name>AW109_ped_force_trim_release_pressed</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/autopilot/ped_force_trim_release_pressed</var>
 			<sc_unit>int</sc_unit>
 			<scale>1.0</scale>
@@ -6612,6 +6687,7 @@
 		<sc_overrides>
 			<name>AW109_col_force_trim_release_pressed</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/autopilot/col_force_trim_release_pressed</var>
 			<sc_unit>int</sc_unit>
 			<scale>1.0</scale>
@@ -6619,6 +6695,7 @@
 		<sc_overrides>
 			<name>AW109_rudder_trim_rate</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/servo/rudder_trim_rate</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6626,6 +6703,7 @@
 		<sc_overrides>
 			<name>AW109_aileron_trim_rate</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/servo/aileron_trim_rate</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6633,6 +6711,7 @@
 		<sc_overrides>
 			<name>AW109_elevator_trim_rate</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/servo/elevator_trim_rate</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6640,6 +6719,7 @@
 		<sc_overrides>
 			<name>AW109_collective_trim_rate</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>000/joy_collective_rate</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6647,6 +6727,7 @@
 		<sc_overrides>
 			<name>AW109_collective_mode</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/autopilot/vvi_engaged</var>
 			<sc_unit>int</sc_unit>
 			<scale>1.0</scale>
@@ -6654,6 +6735,7 @@
 		<sc_overrides>
 			<name>AW109_collective_ratio</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>000/joy_collective_ratio</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6661,6 +6743,7 @@
 		<sc_overrides>
 			<name>AW109_collective_input_ratio</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>000/joy_collective_input_ratio</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6668,6 +6751,7 @@
 		<sc_overrides>
 			<name>AW109_target_pitch</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/servo/pitch_ratio_target</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6675,6 +6759,7 @@
 		<sc_overrides>
 			<name>AW109_target_roll</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/servo/roll_ratio_target</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6682,6 +6767,7 @@
 		<sc_overrides>
 			<name>AW109_target_yaw</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/servo/rudder_ratio_target</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6689,6 +6775,7 @@
 		<sc_overrides>
 			<name>AW109_yaw_damper</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_yaw_damper</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
@@ -6696,6 +6783,7 @@
 		<sc_overrides>
 			<name>AW109_target_collective</name>
 			<model>AW109SP</model>
+			<sim>XPLANE</sim>
 			<var>aw109/servo/collective_ratio_target</var>
 			<sc_unit>float</sc_unit>
 			<scale>1</scale>
