@@ -15237,7 +15237,7 @@
 	</models>
 	<models>
 		<name>runway_rumble_intensity</name>
-		<model>MB-399.*</model>
+		<model>MB-339.*</model>
 		<value>2.0</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
@@ -15299,13 +15299,6 @@
 		<value>0.12</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
-	</models>
-	<models>
-		<name>hydraulic_loss_threshold</name>
-		<model>Mi-24P</model>
-		<value>0.7</value>
-		<sim>DCS</sim>
-		<device>any</device>
 	</models>
 	<models>
 		<name>hydraulic_loss_threshold</name>
@@ -15791,29 +15784,6 @@
 		<sim>DCS</sim>
 		<device>joystick</device>
 		</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>Shrike.*</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>aircraft_vne_speed</name>
-		<model>Spitfire Mk.*</model>
-		<value>390</value>
-		<unit>kt</unit>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>aircraft_vs_speed</name>
-		<model>Spitfire Mk.*</model>
-		<value>70</value>
-		<unit>kt</unit>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>SpitfireLFMkIX</model>
@@ -17085,13 +17055,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
-		<model>.*C-17.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
 		<name>etl_effect_intensity</name>
 		<model>205-A1B.*</model>
 		<value>0.25</value>
@@ -18157,13 +18120,6 @@
 	<models>
 		<name>etl_effect_intensity</name>
 		<model>Bell 429.*</model>
-		<value>0.15</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>Bell 429.*</model>
 		<value>0.2</value>
 		<sim>MSFS</sim>
 		<device>any</device>
@@ -19102,13 +19058,6 @@
 		<value>0.65</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>CGS Hawk Arrow II.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
