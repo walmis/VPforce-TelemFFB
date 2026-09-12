@@ -91,12 +91,14 @@ class TapSim:
     #: least one of them is present.
     exe_relpaths: Tuple[str, ...]
     #: The setting holding a path the user already configured, if any.
+    #: Also what tells the UI this sim can be pointed at a folder by hand:
+    #: a sim without one can only ever be found automatically.
     settings_key: Optional[str] = None
-    #: Name of the module-level function returning candidate roots from
-    #: the registry.  A name rather than the function itself: holding the
-    #: object would bind it at import, so the lookup could not be
-    #: substituted - by a test, or by anything else.
-    registry_lookup: Optional[str] = None
+    #: Where to look for this sim, as (function name, provenance), tried in
+    #: order after the configured path.  Names rather than the functions
+    #: themselves: holding the object would bind it at import, so a lookup
+    #: could not be substituted - by a test, or by anything else.
+    lookups: Tuple[Tuple[str, str], ...] = ()
     #: Some installs nest the game below the directory the user points at.
     normalize_root: Optional[Callable[[str], str]] = None
     #: Roles this sim renders force feedback to.  A plain table, meant to be
@@ -129,6 +131,22 @@ class TapSim:
 
     def renders_to(self, role: str) -> bool:
         return role in self.ffb_roles
+
+    @property
+    def root_contents(self) -> Tuple[str, ...]:
+        """The top-level folders a game root holds, in signature order.
+
+        What to name when telling someone which folder to pick.  The
+        executable is the wrong thing to name: it sits one or two levels
+        below the root, so naming it sends the user into bin\\ - which is
+        not what the wrapper is installed from, and not a root we accept.
+        """
+        seen = []
+        for rel in self.exe_relpaths:
+            top = rel.split("/")[0]
+            if top not in seen:
+                seen.append(top)
+        return tuple(seen)
 
 
 @dataclass
@@ -163,6 +181,12 @@ class SimStatus:
     #: drifted from the hardware.  Populated by all_status, which knows what
     #: is configured; sim_status on its own leaves it empty.
     stale_rules: List["Rule"] = field(default_factory=list)
+    #: A path the user set by hand that does not hold this sim.  Resolution
+    #: falls through it either way, so that a setting left behind by a move
+    #: cannot strand a sim that is findable elsewhere - but silently
+    #: ignoring what someone just typed reads as the setting having worked,
+    #: and the whole reason to type one is that detection got it wrong.
+    rejected_configured: Optional[str] = None
 
     @property
     def found(self) -> bool:
@@ -210,6 +234,81 @@ def dcs_registry_roots() -> List[str]:
         (r"Software\Eagle Dynamics\DCS World OpenBeta",
          r"Software\Eagle Dynamics\DCS World"),
         "Path")
+
+
+#: How dcs.log opens every session.  The path is quoted and absolute, and
+#: the line appears within the first handful of records.
+_DCS_COMMAND_LINE = re.compile(r'Command line:\s*"([^"]+)"')
+
+#: Executable directories to climb out of to reach the game root.
+_DCS_BIN_DIRS = ("bin", "bin-mt")
+
+
+def dcs_log_roots() -> List[str]:
+    """Install roots taken from the command line DCS logs at startup.
+
+    The registry path is written at install time and is never corrected
+    when the folder is moved by hand, so an install that has been
+    relocated is invisible to every other lookup - a standalone install
+    is not in a Steam library either.  The log is written by the running
+    game, so it names where the executable actually was, and it survives
+    the move because it lives in Saved Games.
+
+    Every write directory is read, newest log first: ``--write-dir``
+    gives a module or a mission its own folder, and any of them may hold
+    the most recent session.  Ordering only decides which root is
+    offered first; each is still checked for the executable.
+    """
+    import telemffb.winpaths as winpaths
+    try:
+        saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
+    except Exception:
+        logging.exception("DirectInput tap: Saved Games folder is unavailable")
+        return []
+
+    logs = []
+    try:
+        for entry in os.scandir(saved_games):
+            if not entry.is_dir() or not entry.name.upper().startswith("DCS"):
+                continue
+            for name in ("dcs.log", "dcs.log.old"):
+                path = os.path.join(entry.path, "Logs", name)
+                try:
+                    logs.append((os.path.getmtime(path), path))
+                except OSError:
+                    continue
+    except OSError:
+        return []
+
+    roots = []
+    for _, path in sorted(logs, reverse=True):
+        root = _root_from_dcs_log(path)
+        if root and root not in roots:
+            roots.append(root)
+    return roots
+
+
+def _root_from_dcs_log(path: str) -> Optional[str]:
+    """The game root the logged executable sits under, or None.
+
+    Only the head of the file is read: the command line is written
+    before anything else, and a session log runs to tens of megabytes.
+    """
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for _ in range(400):
+                line = handle.readline()
+                if not line:
+                    break
+                match = _DCS_COMMAND_LINE.search(line)
+                if match:
+                    directory = os.path.dirname(os.path.normpath(match.group(1)))
+                    if os.path.basename(directory).lower() in _DCS_BIN_DIRS:
+                        return os.path.dirname(directory)
+                    return None
+    except OSError:
+        return None
+    return None
 
 
 def bms_registry_roots() -> List[str]:
@@ -299,7 +398,9 @@ SIMS: Tuple[TapSim, ...] = (
         # managing the device, and guessing which executable the user
         # launches would silently do nothing when guessed wrong.
         exe_relpaths=("bin/DCS.exe", "bin-mt/DCS.exe"),
-        registry_lookup="dcs_registry_roots",
+        settings_key="pathDCS",
+        lookups=(("dcs_registry_roots", "registry"),
+                 ("dcs_log_roots", "DCS log")),
     ),
     TapSim(
         key="IL2",
@@ -330,7 +431,8 @@ SIMS: Tuple[TapSim, ...] = (
         name="Falcon BMS",
         # x64 only: arm64 ships alongside but is not what the launcher runs.
         exe_relpaths=("Bin/x64/Falcon BMS.exe",),
-        registry_lookup="bms_registry_roots",
+        settings_key="pathBMS",
+        lookups=(("bms_registry_roots", "registry"),),
     ),
 )
 
@@ -358,12 +460,12 @@ def candidate_roots(sim: TapSim, configured: Optional[str] = None
     candidates: List[Tuple[str, str]] = []
     if configured:
         candidates.append((configured, "configured in TelemFFB"))
-    if sim.registry_lookup:
+    for name, provenance in sim.lookups:
         try:
-            lookup = globals()[sim.registry_lookup]
-            candidates += [(root, "registry") for root in lookup()]
+            candidates += [(root, provenance) for root in globals()[name]()]
         except Exception:
-            logging.exception(f"DirectInput tap: registry lookup failed for {sim.name}")
+            logging.exception(
+                f"DirectInput tap: {provenance} lookup failed for {sim.name}")
     candidates += [(path, "Steam library") for path in steam_common_dirs()]
     return candidates
 
@@ -371,10 +473,25 @@ def candidate_roots(sim: TapSim, configured: Optional[str] = None
 def resolve_root(sim: TapSim, configured: Optional[str] = None
                  ) -> Tuple[Optional[str], str]:
     """The first candidate that actually contains this sim."""
+    tried = []
+    scanned = 0
     for path, provenance in candidate_roots(sim, configured):
         root = sim.normalize_root(path) if sim.normalize_root else path
         if matches_signature(sim, root):
             return root, provenance
+        # Every installed Steam app is a candidate; listing them all would
+        # bury the two or three paths that were actually claims about
+        # this sim.
+        if provenance == "Steam library":
+            scanned += 1
+        else:
+            tried.append(f"{root} ({provenance})")
+    # A sim that is installed but not found is a support question, and the
+    # answer is which paths were rejected: a registry path left behind by a
+    # move reads as an ordinary miss until it is seen next to the real one.
+    logging.info(f"DirectInput tap: {sim.name} not found.  Tried: "
+                 + ("; ".join(tried) if tried else "no recorded path")
+                 + f"; {scanned} Steam app folder(s) scanned")
     return None, "not found"
 
 
@@ -1161,6 +1278,10 @@ def sim_status(sim: TapSim, configured: Optional[str] = None) -> SimStatus:
     """Where this sim is, and what is installed in it."""
     root, provenance = resolve_root(sim, configured)
     status = SimStatus(sim=sim, root=root, provenance=provenance)
+    if configured and not matches_signature(
+            sim, sim.normalize_root(configured) if sim.normalize_root
+            else configured):
+        status.rejected_configured = configured
     if root:
         status.targets = [
             _target_status(directory) for directory in target_dirs(sim, root)]

@@ -235,6 +235,7 @@ class World:
         monkeypatch.setattr(tap_install, 'steam_common_dirs', lambda: [])
         monkeypatch.setattr(tap_install, 'dcs_registry_roots', lambda: [self.root])
         monkeypatch.setattr(tap_install, 'bms_registry_roots', lambda: [])
+        monkeypatch.setattr(tap_install, 'dcs_log_roots', lambda: [])
         bundled = tmp_path / "bundled.dll"
         bundled.write_bytes(OUR_DLL)
         monkeypatch.setattr(tap_install, 'bundled_wrapper', lambda: str(bundled))

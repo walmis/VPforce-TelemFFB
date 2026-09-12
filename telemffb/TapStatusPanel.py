@@ -302,11 +302,32 @@ class TapStatusPanel(QtWidgets.QWidget):
             header.layout().addWidget(button)
         body.addWidget(header)
 
-        if not status.found:
+        # The backstop for a path that is wrong by the time it is read
+        # rather than when it was set: the game moved again afterwards, or
+        # the setting came from somewhere the dialog never checked.  What
+        # to choose instead is said where a path is entered, which is the
+        # moment it can be acted on.
+        if status.rejected_configured:
             body.addWidget(self._row(
-                self._label("Install not found. Set the path in this tab, or "
-                            "install the sim, and reopen this dialog.", "dim"),
+                self._label(
+                    f"The path set above does not hold {status.sim.name}, "
+                    f"and is being ignored.",
+                    "attention", status.rejected_configured),
                 indent=INDENT))
+
+        if not status.found:
+            if not status.rejected_configured:
+                # Only offer the field to sims that have one; the others
+                # can only ever be found automatically, and telling their
+                # users to set a path sends them looking for a control
+                # that is not there.
+                where = ("Set the path above, or install the sim"
+                         if status.sim.settings_key
+                         else "Install the sim")
+                body.addWidget(self._row(
+                    self._label(f"Install not found.  {where}, and reopen "
+                                "this dialog.", "dim"),
+                    indent=INDENT))
             self._outer.insertWidget(0, self._body)
             return
 

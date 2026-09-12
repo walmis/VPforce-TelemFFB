@@ -36,7 +36,7 @@ from . import utils
 from .app_events import events as app_events
 from .ui.Ui_SystemDialog import Ui_SystemDialog
 from .TapStatusPanel import TapStatusPanel
-from .tap_install import SIMS_BY_KEY, sim_status
+from .tap_install import SIMS_BY_KEY, matches_signature, sim_status
 from .InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
@@ -221,6 +221,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # before ANY wiring: state-derivation slots that read it fire as
         # early as load_settings' master-radio click.
         self._pending_devpaths = {}
+        # The install path each sim path field is known to hold a good
+        # value for.  A typed path is only re-checked when it differs from
+        # this, so a field the user merely tabbed through asks nothing, and
+        # a refused one has somewhere to be put back to.
+        self._accepted_paths = {}
+        self._validating_path = False
         # while an import is populating the form, panels created on the fly
         # read the imported values instead of the store
         self._import_source = None
@@ -267,6 +273,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableMsfsApiServer.setToolTip('If enabled, the master instance starts a local HTTP server while MSFS is the active sim, letting the VPforce Settings in-sim toolbar panel view and edit the current aircraft\'s settings')
         self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
         # self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
+        tap_path_tip = ('Only needed if TelemFFB cannot find the install itself.  '
+                        'Leave empty to detect it automatically; set it to the '
+                        'folder holding the game executable when detection fails, '
+                        'for instance after the install was moved by hand.')
+        self.pathDCS.setToolTip(tap_path_tip)
+        self.lab_pathDCS.setToolTip(tap_path_tip)
+        self.pathDCS.setPlaceholderText('Detected automatically')
+        self.pathBMS.setToolTip(tap_path_tip)
+        self.lab_pathBMS.setToolTip(tap_path_tip)
+        self.pathBMS.setPlaceholderText('Detected automatically')
         self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
         self.lab_pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
         self.pathIL2_K.setToolTip('The root path where IL-2 Korea is installed')
@@ -386,6 +402,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseXPLANE.clicked.connect(self.select_xplane_directory)
         self.browseIL2.clicked.connect(self.select_il2_directory)
         self.browseIL2_K.clicked.connect(self.select_il2_directory)
+        self.browseDCS.clicked.connect(self.select_dcs_directory)
+        self.browseBMS.clicked.connect(self.select_bms_directory)
+        # a typed path is checked and takes effect as soon as the field is
+        # left, so the panel below it answers for the path on screen and
+        # not the last one saved
+        self.pathDCS.editingFinished.connect(
+            lambda: self._on_sim_path_edited('DCS'))
+        self.pathBMS.editingFinished.connect(
+            lambda: self._on_sim_path_edited('BMS'))
         self.buttonBox.accepted.connect(self.save_settings)
         self._build_settings_menu()
         self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
@@ -394,6 +419,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.validateIL2.clicked.connect(self.toggle_il2_path)
         self.validateIL2_K.clicked.connect(self.toggle_il2_path)
+        # the tap needs the same path, so opting into it is also a reason
+        # to let the field be edited
+        for _name in ('enableTap_IL2', 'enableTap_IL2_K'):
+            _box = getattr(self, _name, None)
+            if _box is not None:
+                _box.stateChanged.connect(
+                    lambda _state: self.refresh_il2_path_fields())
 
         self.il2_fwd_model = QStandardItemModel(0, 5, self)
         self.il2_fwd_model.setHorizontalHeaderLabels(["IP", "Port", "Telem", "Motion", "FFB"])
@@ -1436,6 +1468,20 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         'BMS': ('enableTap_BMS', 'tapStatusHost_BMS'),
     }
 
+    #: Sims whose install path is asked for inside the tap section, and the
+    #: widgets that make up that row.  Only the sims the tap alone needs a
+    #: path for: IL-2's fields serve telemetry as well and belong with the
+    #: rest of its setup, where they stay visible whatever the tap is doing.
+    TAP_PATH_WIDGETS = {
+        'DCS': ('lab_pathDCS', 'pathDCS', 'browseDCS'),
+        'BMS': ('lab_pathBMS', 'pathBMS', 'browseBMS'),
+    }
+
+    def _tap_path_row(self, sim_key):
+        widgets = [getattr(self, name, None)
+                   for name in self.TAP_PATH_WIDGETS.get(sim_key, ())]
+        return [w for w in widgets if w is not None]
+
     def _build_tap_panels(self):
         """A status panel per sim, under its opt-in toggle.
 
@@ -1498,7 +1544,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 lambda state, p=panel: p.setVisible(bool(state)))
             box.stateChanged.connect(
                 lambda state, k=key: self._on_tap_opt_in(bool(state), k))
+            # the path row is part of the tap section, so it comes and goes
+            # with the panel it feeds
+            box.stateChanged.connect(
+                lambda state, k=key: [w.setVisible(bool(state))
+                                      for w in self._tap_path_row(k)])
             panel.setVisible(box.isChecked())
+            for widget in self._tap_path_row(key):
+                widget.setVisible(box.isChecked())
+        # The tap switches are restored here, after the IL-2 widgets were
+        # last enabled, so their effect on IL-2's shared path fields is
+        # applied once the restored state is known.
+        self.refresh_il2_path_fields()
 
     def tap_settings(self):
         """Settings with the dialog's unsaved sim switches over the top.
@@ -1598,12 +1655,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         sim = SIMS_BY_KEY[sim_key]
         configured = None
-        field = {'IL2': getattr(self, 'pathIL2', None),
-                 'IL2_K': getattr(self, 'pathIL2_K', None)}.get(sim_key)
-        if field is not None:
-            configured = field.text().strip() or None
-        if configured is None and sim.settings_key:
-            configured = G.system_settings.get(sim.settings_key, '') or None
+        if sim.settings_key:
+            # Each path setting is also the name of the field that edits it,
+            # so a sim that can be pointed at a folder by hand is read from
+            # the dialog first and the saved settings second.
+            field = getattr(self, sim.settings_key, None)
+            if field is not None:
+                configured = field.text().strip() or None
+            if configured is None:
+                configured = G.system_settings.get(sim.settings_key, '') or None
 
         status = sim_status(sim, configured)
         # sim_status knows nothing about what is configured, so the drift
@@ -1867,20 +1927,40 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.lab_IL2_S.setEnabled(il2_enabled)
         self.lab_IL2_K.setEnabled(il2_enabled)
 
-        self.browseIL2.setEnabled(self.validateIL2.isChecked())
-        self.pathIL2.setEnabled(self.validateIL2.isChecked())
-        self.browseIL2_K.setEnabled(self.validateIL2_K.isChecked())
-        self.pathIL2_K.setEnabled(self.validateIL2_K.isChecked())
+        self.refresh_il2_path_fields()
 
+    #: IL-2's path fields, as (auto-setup toggle, tap toggle, label, field,
+    #: browse).  One field per title serves both telemetry setup and the
+    #: tap, which is why IL-2 gets no path row of its own in the tap
+    #: section the way DCS and BMS do.
+    IL2_PATH_FIELDS = (
+        ('validateIL2', 'enableTap_IL2', 'lab_pathIL2', 'pathIL2', 'browseIL2'),
+        ('validateIL2_K', 'enableTap_IL2_K', 'lab_pathIL2_2', 'pathIL2_K',
+         'browseIL2_K'),
+    )
+
+    def refresh_il2_path_fields(self):
+        """Let a path be edited when anything needs it.
+
+        The field used to follow the auto telemetry setup toggle alone.
+        The tap reads the same setting to find the game - IL-2 records
+        nothing in the registry, so that path and a Steam scan are all it
+        has - and a user who sets telemetry up by hand was left with the
+        one control that could point the tap at the game greyed out.
+        """
+        sim_on = self.enableIL2.isChecked()
+        for auto_name, tap_name, label_name, field_name, browse_name in self.IL2_PATH_FIELDS:
+            auto = getattr(self, auto_name, None)
+            tap = getattr(self, tap_name, None)
+            wanted = ((auto is not None and auto.isChecked())
+                      or (tap is not None and tap.isChecked()))
+            for name in (label_name, field_name, browse_name):
+                widget = getattr(self, name, None)
+                if widget is not None:
+                    widget.setEnabled(sim_on and wanted)
 
     def toggle_il2_path(self):
-        auto_config = self.validateIL2.isChecked() if self.sender() == self.validateIL2 else self.validateIL2_K.isChecked()
-        if self.sender() == self.validateIL2:
-            self.browseIL2.setEnabled(auto_config)
-            self.pathIL2.setEnabled(auto_config)
-        else:
-            self.browseIL2_K.setEnabled(auto_config)
-            self.pathIL2_K.setEnabled(auto_config)
+        self.refresh_il2_path_fields()
 
     def toggle_bms_widgets(self):
         bms_enabled = self.enableBMS.isChecked()
@@ -1900,13 +1980,97 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.pathXPLANE.setText(directory)
 
     def select_il2_directory(self):
-        # Open a directory dialog and set the result in the pathIL2 QLineEdit
-        directory = QFileDialog.getExistingDirectory(self, "Select IL-2 Install Path", "")
-        if directory:
-            if self.sender() == self.browseIL2:
-                self.pathIL2.setText(directory)
-            elif self.sender() == self.browseIL2_K:
-                self.pathIL2_K.setText(directory)
+        """Browse for an IL-2 title's folder, keeping it only if it is one.
+
+        The same startup.cfg test Save has always made, asked here instead
+        of several steps later: the path serves telemetry setup and the
+        tap alike, and neither can do anything with a folder that is not
+        the game.
+        """
+        if self.sender() == self.browseIL2:
+            field_name, title = 'pathIL2', "IL-2 Sturmovik Great Battles"
+        else:
+            field_name, title = 'pathIL2_K', "IL-2 Korea"
+        field = getattr(self, field_name)
+        directory = QFileDialog.getExistingDirectory(
+            self, f"Select {title} Install Path", field.text())
+        if not directory:
+            return
+        directory = os.path.normpath(directory)
+        if not self._il2_path_holds_the_game(field_name, directory):
+            QMessageBox.warning(
+                self, "Not the game folder",
+                f"{directory}\n\nUnable to locate {title} at this path."
+                f"\n\nChoose the game's main folder where "
+                f"{self.IL2_STARTUP_CFG[field_name][1]} exists.")
+            return
+        field.setText(directory)
+        self.refresh_tap_panels()
+
+    def select_dcs_directory(self):
+        self._pick_sim_path('DCS', "Select DCS World Install Path")
+
+    def select_bms_directory(self):
+        self._pick_sim_path('BMS', "Select Falcon BMS Install Path")
+
+    def _pick_sim_path(self, sim_key, caption):
+        """Browse for a sim's install folder, keeping it only if it is one.
+
+        A folder that does not hold the game is refused rather than
+        stored: the path exists to override detection, so accepting one
+        that cannot be used would look like it had taken effect.
+        """
+        field = getattr(self, SIMS_BY_KEY[sim_key].settings_key)
+        directory = QFileDialog.getExistingDirectory(self, caption, field.text())
+        if not directory:
+            return
+        directory = os.path.normpath(directory)
+        if not self._sim_path_accepted(sim_key, directory):
+            return
+        field.setText(directory)
+        self._accepted_paths[sim_key] = directory
+        self.refresh_tap_panels()
+
+    def _sim_path_accepted(self, sim_key, directory) -> bool:
+        """Whether the folder is this sim, saying what to pick if not."""
+        sim = SIMS_BY_KEY[sim_key]
+        root = sim.normalize_root(directory) if sim.normalize_root else directory
+        if matches_signature(sim, root):
+            return True
+        # One sim names two folders and the rest name one, so the verb
+        # cannot be fixed in the sentence.
+        holds = sim.root_contents
+        QMessageBox.warning(
+            self, "Not the game folder",
+            f"{directory}\n\nUnable to locate {sim.name} at this path."
+            f"\n\nChoose the game's main folder where "
+            f"{' and '.join(holds)} {'exist' if len(holds) > 1 else 'exists'}.")
+        return False
+
+    def _on_sim_path_edited(self, sim_key):
+        """A typed path, checked when the field is left.
+
+        Only when it has actually changed: a stale path from an install
+        that moved after it was set is already flagged on the panel, and
+        re-asking every time focus passes through would be nagging.  An
+        empty field is how detection is handed back the job.
+        """
+        if self._validating_path:
+            return
+        field = getattr(self, SIMS_BY_KEY[sim_key].settings_key)
+        typed = field.text().strip()
+        if typed == self._accepted_paths.get(sim_key, ''):
+            return
+        if typed and not self._sim_path_accepted(sim_key, typed):
+            self._validating_path = True
+            try:
+                field.setText(self._accepted_paths.get(sim_key, ''))
+            finally:
+                self._validating_path = False
+            return
+        self._accepted_paths[sim_key] = os.path.normpath(typed) if typed else ''
+        field.setText(self._accepted_paths[sim_key])
+        self.refresh_tap_panels()
 
     def toggle_launchmode_cbs(self):
         """
@@ -1940,23 +2104,42 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_startToTray.setChecked(False)
         logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
 
+    #: What proves a path is one of the IL-2 titles: where startup.cfg sits
+    #: under it, and how to name that in a prompt.  Great Battles keeps it
+    #: directly below the path.  Korea's standalone release nests the game
+    #: under <root>\game\data while the Steam release (IL2Series) uses
+    #: <root>\data, and il2_korea_game_root accepts either.
+    IL2_STARTUP_CFG = {
+        'pathIL2': (lambda path: os.path.join(path, "data", "startup.cfg"),
+                    "'\\data\\startup.cfg'"),
+        'pathIL2_K': (lambda path: os.path.join(
+                          utils.il2_korea_game_root(path), "data", "startup.cfg"),
+                      "startup.cfg under '\\game\\data' (standalone) "
+                      "or '\\data' (Steam)"),
+    }
+
+    def _il2_path_holds_the_game(self, field_name, path) -> bool:
+        """The test Save has always made, asked of any path.
+
+        Named separately so that picking a folder and saving ask the same
+        question: a path refused at Save is one the user chose several
+        steps earlier, with nothing since to say it was wrong.
+        """
+        locate, _ = self.IL2_STARTUP_CFG[field_name]
+        return bool(path) and os.path.exists(locate(path))
+
     def validate_il2_path(self):
-        if self.validateIL2.isChecked():
-            file_path = os.path.join(self.pathIL2.text(), "data\\startup.cfg")
-            if not os.path.exists(file_path):
-                QMessageBox.warning(self, "Config Error",
-                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n\\data\\startup.cfg not found at path")
-                return False
-        if self.validateIL2_K.isChecked():
-            # Standalone nests the game under <root>\game\data; the Steam
-            # release (IL2Series) uses <root>\data — accept either layout.
-            game_root = utils.il2_korea_game_root(self.pathIL2_K.text())
-            file_path = os.path.join(game_root, "data", "startup.cfg")
-            if not os.path.exists(file_path):
-                QMessageBox.warning(self, "Config Error",
-                                    "IL2 Auto Telemetry is enabled but the path is invalid\n\n"
-                                    "startup.cfg not found under '\\game\\data' (standalone) "
-                                    "or '\\data' (Steam) at the configured path")
+        for field_name, toggle in (('pathIL2', self.validateIL2),
+                                   ('pathIL2_K', self.validateIL2_K)):
+            if not toggle.isChecked():
+                continue
+            if not self._il2_path_holds_the_game(
+                    field_name, getattr(self, field_name).text()):
+                QMessageBox.warning(
+                    self, "Config Error",
+                    "IL2 Auto Telemetry is enabled but the path is invalid"
+                    f"\n\n{self.IL2_STARTUP_CFG[field_name][1]} not found "
+                    "at the configured path")
                 return False
         return True
 
@@ -2121,6 +2304,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         global_settings_dict = {
             "enableDCS": self.enableDCS.isChecked(),
+            "pathDCS": self.pathDCS.text().strip(),
             "validateDCS": self.validateDCS.isChecked(),
             "enableMSFS": self.enableMSFS.isChecked(),
             "enableMsfsApiServer": self.enableMsfsApiServer.isChecked(),
@@ -2137,6 +2321,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "il2_fwd_enable": self.il2_fwd_enable.isChecked(),
             "il2_fwd_destinations": json.dumps(self.get_il2_fwd_destinations()),
             'enableBMS': self.enableBMS.isChecked(),
+            'pathBMS': self.pathBMS.text().strip(),
             # per-sim DirectInput Tap opt-in, built in code rather than the .ui
             **{SIMS_BY_KEY[k].tap_enable_key: b.isChecked()
                for k, b in self.tap_enable_boxes.items()},
@@ -2928,6 +3113,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_closeToTray.setChecked(settings_dict.get('closeToTray', False))
 
         self.enableDCS.setChecked(settings_dict.get('enableDCS', False))
+        self.pathDCS.setText(settings_dict.get('pathDCS', ''))
+        self._accepted_paths['DCS'] = self.pathDCS.text().strip()
         self.toggle_dcs_widgets()
 
         self.validateDCS.setChecked(settings_dict.get('validateDCS', True))
@@ -2961,6 +3148,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
 
         self.enableBMS.setChecked(settings_dict.get('enableBMS', False))
+        self.pathBMS.setText(settings_dict.get('pathBMS', ''))
+        self._accepted_paths['BMS'] = self.pathBMS.text().strip()
         for key, box in self.tap_enable_boxes.items():
             box.setChecked(_as_bool(settings_dict.get(
                 SIMS_BY_KEY[key].tap_enable_key, False)))

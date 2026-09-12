@@ -85,6 +85,7 @@ def nothing_from_this_machine(monkeypatch, tmp_path):
     monkeypatch.setattr(tap_install, "steam_common_dirs", lambda: [])
     monkeypatch.setattr(tap_install, "dcs_registry_roots", lambda: [])
     monkeypatch.setattr(tap_install, "bms_registry_roots", lambda: [])
+    monkeypatch.setattr(tap_install, "dcs_log_roots", lambda: [])
     bundled = tmp_path / "bundled" / "dinput8.dll"
     bundled.parent.mkdir()
     bundled.write_bytes(OUR_DLL)

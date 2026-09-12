@@ -1215,14 +1215,17 @@ class SystemSettings(QSettings):
     startToTray: bool
     closeToTray: bool
     enableDCS: bool
+    pathDCS: str
     enableMSFS: bool
     enableXPLANE: bool
     validateXPLANE: bool
     pathXPLANE: str
     validateIL2: bool
     pathIL2: str
+    pathIL2_K: str
     portIL2: int
     enableBMS: bool
+    pathBMS: str
     enableDirectInput: bool
     masterInstance: int
     autolaunchMaster: bool
@@ -1263,6 +1266,10 @@ class SystemSettings(QSettings):
         'startToTray': False,
         'closeToTray': False,
         'enableDCS': False,
+        # Empty means "find it": every sim path here overrides discovery
+        # rather than seeding it, so a default would be a wrong answer on
+        # any machine that installed somewhere else.
+        'pathDCS': '',
         'enableMSFS': False,
         'enableXPLANE': False,
         'validateXPLANE': False,
@@ -1272,10 +1279,12 @@ class SystemSettings(QSettings):
         'focus_pauseIL2': True,
         'validateDCS': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
+        'pathIL2_K': '',
         'portIL2': 34385,
         'il2_fwd_enable': False,
         'il2_fwd_destinations': '[]',
         'enableBMS': False,
+        'pathBMS': '',
         # opt-in per sim: the tap is a thing most VPforce owners never
         # need, and defaulting it on would imply otherwise
         'enableTapDCS': False,

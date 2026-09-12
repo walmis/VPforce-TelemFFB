@@ -48,6 +48,7 @@ def no_machine_lookups(monkeypatch):
     monkeypatch.setattr(tap_install, 'steam_common_dirs', lambda: [])
     monkeypatch.setattr(tap_install, 'dcs_registry_roots', lambda: [])
     monkeypatch.setattr(tap_install, 'bms_registry_roots', lambda: [])
+    monkeypatch.setattr(tap_install, 'dcs_log_roots', lambda: [])
 
 
 class TestSignatureMatching:

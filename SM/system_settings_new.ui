@@ -588,7 +588,7 @@
            <string>DCS</string>
           </attribute>
           <layout class="QGridLayout" name="gridLayout_12">
-           <item row="9" column="0">
+           <item row="10" column="0">
             <spacer name="verticalSpacer_5">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -693,6 +693,39 @@
              </property>
             </widget>
            </item>
+           <item row="8" column="0" colspan="2">
+            <layout class="QHBoxLayout" name="horizontalLayout_pathDCS">
+             <item>
+              <widget class="QLabel" name="lab_pathDCS">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>98</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>DCS Install Path:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="pathDCS" />
+             </item>
+             <item>
+              <widget class="QToolButton" name="browseDCS">
+               <property name="text">
+                <string>...</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
            <item row="5" column="0" colspan="2">
             <widget class="Line" name="tapLine_tab_DCS">
              <property name="orientation">
@@ -723,7 +756,7 @@
              </property>
             </widget>
            </item>
-           <item row="8" column="0" colspan="2">
+           <item row="9" column="0" colspan="2">
             <widget class="QWidget" name="tapStatusHost_DCS" />
            </item>
           </layout>
@@ -1689,7 +1722,7 @@
              </property>
             </spacer>
            </item>
-           <item row="8" column="0">
+           <item row="9" column="0">
             <spacer name="verticalSpacer_8">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1701,6 +1734,39 @@
               </size>
              </property>
             </spacer>
+           </item>
+           <item row="7" column="0" colspan="2">
+            <layout class="QHBoxLayout" name="horizontalLayout_pathBMS">
+             <item>
+              <widget class="QLabel" name="lab_pathBMS">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>98</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>BMS Install Path:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="pathBMS" />
+             </item>
+             <item>
+              <widget class="QToolButton" name="browseBMS">
+               <property name="text">
+                <string>...</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </item>
            <item row="4" column="0" colspan="2">
             <widget class="Line" name="tapLine_tab_BMS">
@@ -1732,7 +1798,7 @@
              </property>
             </widget>
            </item>
-           <item row="7" column="0" colspan="2">
+           <item row="8" column="0" colspan="2">
             <widget class="QWidget" name="tapStatusHost_BMS" />
            </item>
           </layout>
@@ -1765,6 +1831,10 @@
   <tabstop>focus_pauseIL2</tabstop>
   <tabstop>portIL2</tabstop>
   <tabstop>validateIL2</tabstop>
+  <tabstop>pathDCS</tabstop>
+  <tabstop>browseDCS</tabstop>
+  <tabstop>pathBMS</tabstop>
+  <tabstop>browseBMS</tabstop>
   <tabstop>pathIL2</tabstop>
   <tabstop>browseIL2</tabstop>
   <tabstop>validateIL2_K</tabstop>
