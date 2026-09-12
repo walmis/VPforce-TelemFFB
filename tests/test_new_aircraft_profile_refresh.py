@@ -89,6 +89,7 @@ class TestWizardFinishedHook:
         win = SimpleNamespace(
             new_craft_button=MagicMock(),
             _new_craft_anim=MagicMock(),
+            profile_change_button=MagicMock(),
             settings_layout=SimpleNamespace(
                 reload_layout=lambda *_: calls.append('reload')))
         return MainWindow.new_ac_wizard_finished, win, calls
@@ -117,6 +118,106 @@ class TestWizardFinishedHook:
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=False), raising=False)
         hook(win)
         assert calls == ['reload']
+
+
+class TestSuggestedMatchDefault:
+    """Which suggestion the wizard starts on. The whole title ends in the
+    livery, the variant or the registration, so preselecting it would pin a
+    profile to one paint job."""
+
+    def _pick(self, name, clone_from=None):
+        from telemffb.NewAircraftWizard import NewAircraftWizard
+        words = name.split()
+        patterns = [' '.join(words[:i]) + ".*" for i in range(len(words), 0, -1)]
+        wiz = SimpleNamespace(clone_from=clone_from,
+                              _MIN_SUGGESTED_WORDS=NewAircraftWizard._MIN_SUGGESTED_WORDS)
+        return patterns[NewAircraftWizard._default_suggestion(wiz, patterns, name)]
+
+    def test_the_last_word_of_a_long_title_is_dropped(self):
+        assert self._pick("Black Square A36 Bonanza Professional N924SV") ==             "Black Square A36 Bonanza Professional.*"
+        assert self._pick("Taylorcraft BC-12D: Bush") == "Taylorcraft BC-12D:.*"
+        assert self._pick("Scheibe SF-25 Falke") == "Scheibe SF-25.*"
+
+    def test_a_two_word_title_keeps_both_words(self):
+        # dropping one would leave the manufacturer, shared by unrelated aircraft
+        assert self._pick("Sopwith Camel") == "Sopwith Camel.*"
+        assert self._pick("Cessna Skyhawk") == "Cessna Skyhawk.*"
+
+    def test_a_one_word_title_has_only_one_suggestion(self):
+        assert self._pick("MXS-R") == "MXS-R.*"
+
+    def test_a_fork_never_suggests_a_pattern_that_would_lose(self):
+        # forking off 737.*: dropping a word still beats it
+        assert self._pick("737-600 PAX TC", clone_from=("737.*", "Auto User")) == "737-600 PAX.*"
+        # forking off a pattern the shorter suggestion cannot beat
+        assert self._pick("Black Square Baron 58P Professional N513LW",
+                          clone_from=("Black Square Baron 58P Professional.*", "Auto User")) ==             "Black Square Baron 58P Professional N513LW.*"
+
+
+class TestForkSuggestions:
+    """A fork has to out-rank the pattern it forks off, or the new profile
+    never names the aircraft and the button looks like it did nothing."""
+
+    def _wizard(self, clone_from):
+        from telemffb.NewAircraftWizard import NewAircraftWizard
+        return SimpleNamespace(
+            clone_from=clone_from,
+            _out_ranks_the_source=lambda p, n: NewAircraftWizard._out_ranks_the_source(
+                SimpleNamespace(clone_from=clone_from), p, n))
+
+    def _offered(self, name, clone_from):
+        w = self._wizard(clone_from)
+        words = name.split()
+        pats = [' '.join(words[:i]) + ".*" for i in range(len(words), 0, -1)]
+        return [p for p in pats if w._out_ranks_the_source(p, name)]
+
+    def test_equal_or_broader_suggestions_are_not_offered(self):
+        offered = self._offered("C172SP Classic Cargo", ("C172SP Classic.*", "Auto User"))
+        assert offered == ["C172SP Classic Cargo.*"]
+        assert "C172SP Classic.*" not in offered and "C172SP.*" not in offered
+
+    def test_a_broader_source_leaves_more_on_offer(self):
+        assert self._offered("C172SP Classic Cargo", ("C172SP.*", "Built-In")) ==             ["C172SP Classic Cargo.*", "C172SP Classic.*"]
+
+    def test_nothing_is_filtered_for_a_brand_new_aircraft(self):
+        assert len(self._offered("C172SP Classic Cargo", None)) == 3
+
+
+class TestSplitButtonState:
+    """The split button forks the loaded aircraft off the pattern that names
+    it, so with nothing matched there is nothing for it to do."""
+
+    def _enabled(self, monkeypatch, current_pattern, label_text,
+                 master=True, sim="MSFS", offline=False):
+        from telemffb.MainWindow import MainWindow
+        calls = []
+        win = SimpleNamespace(
+            status_container=SimpleNamespace(
+                cur_craft_label=MagicMock(), cur_pattern_label=MagicMock(),
+                active_profile_label=MagicMock(),
+                set_split_state=lambda v: calls.append(v),
+                set_profile_state=lambda v: calls.append(v)),
+            refresh_profile_notes_button=lambda: None)
+        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
+            current_aircraft_name="C172SP Classic Cargo", current_pattern=current_pattern,
+            active_profile="Built-In", current_sim=sim, offline_mode=offline), raising=False)
+        monkeypatch.setattr(G, 'master_instance', master, raising=False)
+        MainWindow.update_craft_text_block(win, craft="C172SP Classic Cargo",
+                                           pattern=label_text, profile="Built-In")
+        assert calls[0] == calls[1]      # the split button and the profile combo agree
+        return calls[0]
+
+    def test_disabled_when_nothing_matched(self, monkeypatch):
+        # the label reads "Using defaults" there, which is not a pattern to fork
+        assert self._enabled(monkeypatch, "", "Using defaults") is False
+
+    def test_enabled_when_a_pattern_names_the_aircraft(self, monkeypatch):
+        assert self._enabled(monkeypatch, "C172SP.*", "C172SP.*") is True
+
+    def test_disabled_offline_on_a_child_or_with_no_sim(self, monkeypatch):
+        assert self._enabled(monkeypatch, "C172SP.*", "C172SP.*", offline=True) is False
+        assert self._enabled(monkeypatch, "C172SP.*", "C172SP.*", master=False) is False
+        assert self._enabled(monkeypatch, "C172SP.*", "C172SP.*", sim="nothing") is False
 
 
 class TestNotesButtonState:
@@ -178,27 +279,7 @@ class TestProfileComboState:
     def test_enabled_when_a_pattern_names_the_aircraft(self, qt_app, monkeypatch):
         combo = self._combo(monkeypatch, "C172SP.*", ["Built-In", "Auto User"])
         assert combo.isEnabled() is True
-        assert [combo.itemText(i) for i in range(combo.count())] == \
-            ["Select...", "Built-In", "Auto User", "Add New..."]
-
-    def test_the_aircraft_refresh_applies_the_same_rule(self, monkeypatch):
-        from telemffb.MainWindow import MainWindow
-        calls = []
-        win = SimpleNamespace(
-            status_container=SimpleNamespace(
-                cur_craft_label=MagicMock(), cur_pattern_label=MagicMock(),
-                active_profile_label=MagicMock(),
-                set_profile_state=lambda v: calls.append(v)),
-            refresh_profile_notes_button=lambda: None)
-        monkeypatch.setattr(G, 'master_instance', True, raising=False)
-        for pattern, want in (("", False), ("C172SP.*", True)):
-            monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
-                current_aircraft_name="C172SP Classic Cargo", current_pattern=pattern,
-                active_profile="Built-In", current_sim="MSFS", offline_mode=False), raising=False)
-            # the label reads "Using defaults" with nothing matched: not a pattern
-            MainWindow.update_craft_text_block(win, craft="C172SP Classic Cargo",
-                                               pattern=pattern or "Using defaults", profile="Built-In")
-            assert calls[-1] is want
+        assert [combo.itemText(i) for i in range(combo.count())] ==             ["Select...", "Built-In", "Auto User", "Add New..."]
 
 
 class TestSimStatusLeavesTheProfileComboAlone:

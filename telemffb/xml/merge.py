@@ -54,6 +54,32 @@ def update_data_with_models(
     return updated
 
 
+def merged_profile_names(sources, taken, label: str, same_string: bool = False) -> dict:
+    """What each profile under a user pattern is called once it sits on the
+    built-in.
+
+    ``User Default`` is the base of an aircraft the user added and means
+    nothing under a built-in, so it becomes ``Auto User``, the profile a
+    slider move would have made there; every other name is kept.  A name the
+    built-in already carries is left alone and the incoming one is suffixed
+    with ``label``, where it came from.  ``same_string`` is the case where
+    both patterns are one string: the rows are already there, so only the
+    base is renamed and the other names cannot collide with themselves.
+    """
+    out: dict = {}
+    taken = set(taken) - ({'User Default'} if same_string else set())
+    for old in (['User Default'] if same_string else list(sources)):
+        new = 'Auto User' if old == 'User Default' else old
+        if new in taken:
+            stem, n = new, 2
+            new = f"{stem} ({label})"
+            while new in taken:
+                new, n = f"{stem} ({label} {n})", n + 1
+        out[old] = new
+        taken.add(new)
+    return out
+
+
 def update_sc_overrides_with_user(
     defaults_ovr: list[ScOverrideRow],
     user_ovr: list[ScOverrideRow],
@@ -68,6 +94,7 @@ def update_sc_overrides_with_user(
                 existing['sc_unit'] = user_model['sc_unit']
                 existing['scale'] = user_model['scale']
                 existing['source'] = 'user'
+                existing['sim'] = user_model.get('sim', '')
                 found = True
                 break
         if not found:
@@ -77,6 +104,7 @@ def update_sc_overrides_with_user(
                 'sc_unit': user_model['sc_unit'],
                 'scale': user_model['scale'],
                 'source': 'user',
+                'sim': user_model.get('sim', ''),
             })
     return updated
 

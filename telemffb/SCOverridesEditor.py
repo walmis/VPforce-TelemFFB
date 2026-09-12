@@ -127,7 +127,8 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.lb_InfoLabel.setText('')
             self.fill_cb_name()
 
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
+            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                                                        sim=G.settings_mgr.current_sim)
 
 
             if not any(self.overrides) :
@@ -282,12 +283,17 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             return
 
         if name and var and sc_unit:
+            # The editor always knows the sim: the connected one, or the one
+            # picked in the offline editor.  Stamping it keeps an MSFS row
+            # from reaching an X-Plane aircraft of the same name, or the
+            # reverse, once one is shipped for both.
             xmlutils.write_sc_override_to_xml(
                 G.settings_mgr.current_pattern,
                 var,
                 name,
                 sc_unit,
                 scale_text.strip() if scale is not None else None,
+                sim=G.settings_mgr.current_sim,
             )
 
             self.cb_name.setCurrentText('')
@@ -297,7 +303,8 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.tb_scale.setStyleSheet("")
             self.tb_scale.setToolTip("")
 
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
+            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                                                        sim=G.settings_mgr.current_sim)
             self.fill_table()
 
     def delete_button_clicked(self):
@@ -307,6 +314,8 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             # print(f"\nerase row: {self.current_name}    pattern: {G.settings_mgr.current_pattern}  name: {name}")
             self.tableWidget.blockSignals(True)
             self.pb_delete.setEnabled(False)
-            xmlutils.erase_sc_override_from_xml(G.settings_mgr.current_pattern,name)
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
+            xmlutils.erase_sc_override_from_xml(G.settings_mgr.current_pattern, name,
+                                                sim=G.settings_mgr.current_sim)
+            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                                                        sim=G.settings_mgr.current_sim)
             self.fill_table()

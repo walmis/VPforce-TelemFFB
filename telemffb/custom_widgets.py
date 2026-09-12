@@ -153,10 +153,10 @@ class DetachedTabWindow(QtWidgets.QMainWindow):
         super().closeEvent(e)
 
 def svg_icon(svg_name, color="#d0d0d0", disabled_color="#707070", size=20):
-    """Build a QIcon from a ``currentColor`` SVG, rendered at explicit
-    colors — standalone SVG rendering resolves currentColor to black, which
-    is invisible on the dark theme. One source file yields the normal and
-    disabled variants, crisp at 2x for scaled displays.
+    """Build a QIcon from a ``currentColor`` SVG (fill or stroke), rendered
+    at explicit colors — standalone SVG rendering resolves currentColor to
+    black, which is invisible on the dark theme. One source file yields the
+    normal and disabled variants, crisp at 2x for scaled displays.
 
     Loads from the compiled Qt resource (":/image/<name>") when present so
     frozen builds work once the SVG is added to the resource file, falling
@@ -185,7 +185,8 @@ def svg_icon(svg_name, color="#d0d0d0", disabled_color="#707070", size=20):
     icon = QIcon()
     for col, mode in ((color, QIcon.Mode.Normal),
                       (disabled_color, QIcon.Mode.Disabled)):
-        svg = data.replace(b'fill="currentColor"', f'fill="{col}"'.encode())
+        svg = (data.replace(b'fill="currentColor"', f'fill="{col}"'.encode())
+                   .replace(b'stroke="currentColor"', f'stroke="{col}"'.encode()))
         renderer = QSvgRenderer(svg)
         pm = QPixmap(round(size * ratio), round(size * ratio))
         pm.setDevicePixelRatio(ratio)
@@ -225,6 +226,7 @@ class AppStatusWidget(QWidget):
     request_flag_error = pyqtSignal(str)
     request_clear_error = pyqtSignal()
     profile_notes_clicked = pyqtSignal()
+    split_profile_clicked = pyqtSignal()
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -381,7 +383,28 @@ class AppStatusWidget(QWidget):
         row += 1
 
         grid.addWidget(make_item_label("Matched Model"), row, 0, alignment=label_align)
-        grid.addWidget(self.cur_pattern_label, row, 1, alignment=value_align)
+        pattern_row_layout = QHBoxLayout()
+        pattern_row_layout.setContentsMargins(0, 0, 0, 0)
+        pattern_row_layout.setSpacing(6)
+        pattern_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        # Split the loaded aircraft off the profile it currently matches:
+        # opens the wizard prefilled for it, cloning from that profile.
+        # Framed like the profile-notes button below it, so it reads as one.
+        self.btn_split_profile = QtWidgets.QToolButton()
+        self.btn_split_profile.setIcon(svg_icon('split-profile.svg',
+                                                color='#d0d0d0' if G.useDarkMode else '#505050'))
+        self.btn_split_profile.setIconSize(QSize(20, 20))
+        self.btn_split_profile.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_split_profile.setToolTip('Fork this model match to a new, more specific pattern.\n'
+                                          'starting from the one it matches now')
+        self.btn_split_profile.setEnabled(False)
+        self.btn_split_profile.clicked.connect(self.split_profile_clicked.emit)
+        pattern_row_layout.addWidget(self.cur_pattern_label)
+        pattern_row_layout.addWidget(self.btn_split_profile)
+        pattern_row_layout.addStretch(1)
+        pattern_row_widget = QWidget()
+        pattern_row_widget.setLayout(pattern_row_layout)
+        grid.addWidget(pattern_row_widget, row, 1, alignment=value_align)
         row += 1
 
         self.cb_selectProfileCombo = QComboBox()
@@ -527,6 +550,9 @@ class AppStatusWidget(QWidget):
         self.set_notes_state(False)
         self.set_telem_overrides('', '')
         self.set_waiting(src)
+
+    def set_split_state(self, enabled):
+        self.btn_split_profile.setEnabled(bool(enabled))
 
     def set_profile_state(self, enabled):
         """Whether a profile can be picked: only once a pattern names the
