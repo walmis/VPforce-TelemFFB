@@ -1,0 +1,1400 @@
+#
+# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
+# Copyright (c) 2023 Valmantas Palikša.
+# Copyright (c) 2023 Micah Frisby
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+"""Effect preview: play one effect on the device with synthetic telemetry.
+
+Answers "what does this effect feel like at the strength I have set"
+without a sim running.  A preview drives ONE effect method on a fully
+configured aircraft instance (see ``TelemManager.build_aircraft``) with a
+short scripted sequence of telemetry frames, then releases everything it
+created.
+
+Why an effect method and not ``on_telemetry``: a sparse synthetic frame
+through the whole loop misfires neighbors - a frame carrying only
+``TAS = 0`` plays full elevator droop.  Calling the one method is the
+isolation, and it costs nothing: every effect already takes a frame and
+reads a handful of fields.
+
+Why a sequence and not a frame: about a third of the effects fire on
+CHANGE (``anything_has_changed``) or run through a high-pass filter, so a
+constant frame produces silence.  Three stimulus kinds cover the catalog:
+
+    hold   the same frame for the duration (rumble, buffet, shaker)
+    ramp   a field swept start -> end over the duration (gear, flaps)
+    edge   a field stepped before -> after at the midpoint (release, hit)
+
+Reference values are resolved against the live instance, so a spec can
+say "the RPM where this profile's rumble peaks" rather than a number,
+and the preview tracks the user's tuning.
+
+What is deliberately NOT previewable: the spring family (the curve is the
+feature), anything closed-loop with the sim (trim following), the
+force-trim button state machines, and G-force (its magnitude depends on
+the deflection the pilot holds under load).  Those are status-view
+territory.
+
+Constant-force effects that are bench-judgeable (touchdown, deceleration,
+runway rumble, turbulence, wind, elevator droop) ARE previewed, with two guards: the spec is marked
+``constant_force``, which makes the UI confirm with the user that they
+have hold of the controls before the run (a constant force on an
+unattended axis can slam it to the stops), and the runner puts up a very
+weak reference spring for the run - not to counter the force, only to
+avoid the odd freewheel feel some DirectInput devices have at 0% spring.
+
+Safety: the preview aircraft carries its OWN effect dispenser (see
+``build_aircraft``), so its construction and cleanup never touch a live
+aircraft's effects, and a preview can run while a sim session sits
+paused in the background - which offline editing is.  What it must not
+overlap is telemetry actively streaming (two writers on the device from
+two threads, and a preview mid-flight is meaningless anyway):
+``preview_blockers`` is that gate.  The runner is clock-agnostic
+(``step`` per frame) so the app can drive it from a timer and tests
+from a loop.
+"""
+import logging
+import math
+import random
+import time
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import telemffb.globals as G
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.util.conversions import kt2ms
+
+SIMS = ("DCS", "MSFS", "XPLANE", "IL2", "BMS")
+KINDS = ("hold", "ramp", "edge")
+FRAME_RATE_HZ = 30.0
+# The spring a constant-force preview plays against: deliberately weak.
+# Not a stand-in for the aircraft's spring (the user tunes these forces
+# against no spring, by preference); just enough to take the freewheel
+# feel off DirectInput devices that behave oddly at 0%.
+REFERENCE_SPRING = 0.05
+
+# A field value in a spec is one of:
+#   - a constant (number, list, str) used as-is
+#   - a 2-tuple (a, b): for 'ramp' interpolated a -> b by progress, for
+#     'edge' a before the midpoint and b after; for 'hold' a is used.
+#     Either end may be the NAME of an aircraft attribute, resolved on
+#     the instance, so a sweep can run between the profile's own
+#     thresholds: ('engine_rumble_lowrpm', 'engine_rumble_highrpm')
+#   - Attr('name'): the named aircraft attribute, resolved on the instance
+#   - a callable (aircraft, progress) -> value, for anything the above
+#     cannot express (a list that varies)
+FieldValue = Any
+
+
+@dataclass(frozen=True)
+class Attr:
+    """A reference to an aircraft attribute, resolved per frame."""
+    name: str
+
+
+# A schedule segment: (seconds, stimulus progress at the start, at the end).
+# Stimulus progress 0..1 is what the fields interpolate over; a segment
+# with equal ends is a hold, one from 0 to 1 a sweep.
+Segment = Tuple[float, float, float]
+
+
+@dataclass(frozen=True)
+class PreviewSpec:
+    """How to preview one effect.
+
+    ``effect_id`` is the effect's enable toggle in defaults.xml; it names
+    the preview and is the attribute forced on for the run.  ``None`` for
+    an effect with no toggle (MSFS elevator droop: the moment at zero is
+    "off"); such a spec must set ``name``.  ``method`` is what is called
+    once per frame - an aircraft method name, a dict of names keyed by
+    sim with ``'*'`` as the default (the stick shaker lives in a different
+    method per sim), or a recipe ``callable(aircraft, frame, **kwargs)``
+    for an effect that is one step inside a longer routine and has to be
+    played by sequencing the production pieces (MSFS droop: the term,
+    then the applier).  ``fields`` is keyed by sim name with ``'*'`` for
+    every sim; a sim's entries are merged over the ``'*'`` entries, which
+    is how one spec names ``EngRPM`` for most sims and ``EngPCT`` for
+    X-Plane.
+    """
+    effect_id: Optional[str]
+    method: Any
+    kind: str
+    fields: Dict[str, Dict[str, FieldValue]]
+    # Registry key and menu label.  Defaults to the toggle, which is the
+    # right identity for almost every effect; an effect whose ONE toggle
+    # covers several separately-tuned effects (IL-2's weapons: gun, bomb,
+    # rocket, three intensities) gets one spec per adjustment.
+    name: str = ''
+    # The settings rows that host this preview's play button: the
+    # intensity slider(s) the user adjusts while listening, never the
+    # enable toggle or a threshold.  A row belongs to at most one spec.
+    rows: Tuple[str, ...] = ()
+    # One user-facing sentence fragment saying what condition the preview
+    # represents ("moderate turbulence: a few m/s of gusts").  The row
+    # tooltip and the constant-force popup slot it into a fixed template,
+    # so the safety wording stays uniform while the description is
+    # honest per effect.  Required for every catalog spec (a test).
+    reference: str = ''
+    duration: float = 3.0
+    # Seconds the LAST frame is repeated before cleanup.  A one-shot fired
+    # on the final scripted frame (the gear clunk at 1.0) would otherwise
+    # be destroyed in the same step it was created and never felt; a
+    # repeated final frame is also what the sim does when motion stops,
+    # so change-driven effects wind down the way they do live.
+    tail: float = 0.5
+    # Seconds held at EACH end of a sweep before / after the moving part.
+    # A sweep's ends are the two settings the user actually tunes (Low
+    # RPM intensity, High RPM intensity); a stimulus that keeps moving
+    # through them cannot be judged for "could I live with this".  The
+    # holds are long enough to judge, the sweep between shows the
+    # transition.  Zero for holds and edges.
+    dwell: float = 0.0
+    # The general form of dwell: a sequence of (seconds, from, to) segments
+    # the stimulus progress follows in order.  Lets a sweep hold at its
+    # PEAK rather than its ends when the ends are silent by definition
+    # (stall buffet at onset, ETL outside the band).  Overrides duration
+    # (which becomes the segments' sum) and excludes dwell.
+    schedule: Optional[Tuple[Segment, ...]] = None
+    # Extra keyword arguments for the effect method, resolved per frame
+    # like fields.  Some effects take state the live loop passes in
+    # (ac_calc_etl_effect's blade count) and fall back to a hard-coded
+    # guess without it.
+    kwargs: Dict[str, FieldValue] = None
+    # Attributes set on the throwaway aircraft alongside the forced-on
+    # toggle: parent gates the effect sits behind (IL-2's shake master)
+    # and mode switches that would route it to a path a preview cannot
+    # feed (IL-2's dynamic gunfire needs real gun telemetry).
+    force_attrs: Dict[str, Any] = None
+    # A constant-force effect: the UI asks the user to take hold of the
+    # controls before the run, and the runner adds the reference spring.
+    constant_force: bool = False
+    # Whether the method takes the frame as its argument.  A few read the
+    # bound frame off the aircraft instead (update_turbulence); the runner
+    # binds it either way.
+    frame_arg: bool = True
+    sims: Tuple[str, ...] = SIMS
+
+    def __post_init__(self):
+        if self.kind not in KINDS:
+            raise ValueError(f"{self.effect_id}: unknown preview kind {self.kind!r}")
+        unknown = set(self.fields) - set(SIMS) - {'*'}
+        if unknown:
+            raise ValueError(f"{self.effect_id}: fields keyed by unknown sim(s) {sorted(unknown)}")
+        if not self.name:
+            if not self.effect_id:
+                raise ValueError("a spec with no effect_id must set name")
+            object.__setattr__(self, 'name', self.effect_id)
+        if self.kwargs is None:
+            object.__setattr__(self, 'kwargs', {})
+        if self.force_attrs is None:
+            object.__setattr__(self, 'force_attrs', {})
+        if self.schedule is not None:
+            if self.dwell:
+                raise ValueError(f"{self.effect_id}: give a dwell or a schedule, not both")
+            for seconds, a, b in self.schedule:
+                if seconds <= 0 or not (0.0 <= a <= 1.0 and 0.0 <= b <= 1.0):
+                    raise ValueError(f"{self.effect_id}: bad schedule segment {(seconds, a, b)}")
+            object.__setattr__(self, 'duration', float(sum(seg[0] for seg in self.schedule)))
+            return
+        if self.dwell < 0 or (self.dwell and 2 * self.dwell >= self.duration):
+            raise ValueError(f"{self.effect_id}: dwell {self.dwell}s x2 must fit inside "
+                             f"the {self.duration}s duration")
+        if self.dwell:
+            segments = ((self.dwell, 0.0, 0.0),
+                        (self.duration - 2 * self.dwell, 0.0, 1.0),
+                        (self.dwell, 1.0, 1.0))
+        else:
+            segments = ((self.duration, 0.0, 1.0),)
+        object.__setattr__(self, 'schedule', segments)
+
+    def supports(self, sim: str) -> bool:
+        return sim in self.sims
+
+    def method_for(self, sim: str):
+        """The method name, or the recipe callable, for ``sim``."""
+        if isinstance(self.method, dict):
+            name = self.method.get(sim, self.method.get('*'))
+            if name is None:
+                raise ValueError(f"{self.name}: no method for {sim}")
+            return name
+        return self.method
+
+    def stimulus_progress(self, progress: float) -> float:
+        """Frame progress (0..1 over the whole run) -> stimulus progress,
+        following the schedule: for a plain sweep the identity, for a
+        dwell flat at 0, linear, flat at 1."""
+        t = progress * self.duration
+        elapsed = 0.0
+        for seconds, a, b in self.schedule:
+            # a boundary instant belongs to the segment that STARTS there,
+            # so the first frame after a hold is the sweep's own start
+            if t < elapsed + seconds:
+                return a + (b - a) * (t - elapsed) / seconds
+            elapsed += seconds
+        return self.schedule[-1][2]
+
+    def resolve_kwargs(self, aircraft, progress: float) -> Dict[str, Any]:
+        progress = self.stimulus_progress(progress)
+        return {name: self._resolve(value, aircraft, progress)
+                for name, value in self.kwargs.items()}
+
+    def resolve_fields(self, aircraft, sim: str, progress: float) -> Dict[str, Any]:
+        """The telemetry fields for one frame at frame ``progress`` (0..1)."""
+        if sim not in SIMS:
+            raise ValueError(f"unknown sim {sim!r}")
+        merged: Dict[str, FieldValue] = dict(self.fields.get('*', {}))
+        merged.update(self.fields.get(sim, {}))
+        progress = self.stimulus_progress(progress)
+        return {name: self._resolve(value, aircraft, progress)
+                for name, value in merged.items()}
+
+    def _resolve(self, value: FieldValue, aircraft, progress: float):
+        if isinstance(value, Attr):
+            return getattr(aircraft, value.name)
+        if callable(value):
+            return value(aircraft, progress)
+        if isinstance(value, tuple) and len(value) == 2:
+            a, b = (self._endpoint(v, aircraft) for v in value)
+            if self.kind == 'ramp':
+                return a + (b - a) * progress
+            if self.kind == 'edge':
+                return a if progress < 0.5 else b
+            return a
+        return value
+
+    @staticmethod
+    def _endpoint(value, aircraft):
+        """A pair endpoint: a number as-is, a string as the named aircraft
+        attribute (a profile threshold)."""
+        if isinstance(value, Attr):
+            return getattr(aircraft, value.name)
+        if isinstance(value, str):
+            return getattr(aircraft, value)
+        return value
+
+
+class PreviewRunner:
+    """Drive one ``PreviewSpec`` against an aircraft, one frame per ``step``.
+
+    Mirrors what ``TelemManager`` does per frame - rotate ``_telem_data``
+    into ``_last_telem_data``, bind the new frame, call into the aircraft -
+    so change detection and per-frame state inside the effect behave as
+    they do live.  ``finish`` releases every effect the run created and is
+    idempotent; ``step`` calls it after the last frame.
+    """
+
+    def __init__(self, aircraft, spec: PreviewSpec, sim: str,
+                 device_type: Optional[str] = None,
+                 frame_rate: float = FRAME_RATE_HZ,
+                 force_enable: bool = True):
+        if not spec.supports(sim):
+            raise ValueError(f"{spec.effect_id} is not previewable on {sim}")
+        self.method_name = spec.method_for(sim)
+        if not callable(self.method_name) and not hasattr(aircraft, self.method_name):
+            raise ValueError(f"{type(aircraft).__name__} has no {self.method_name}")
+        self.aircraft = aircraft
+        self.spec = spec
+        self.sim = sim
+        self.device_type = device_type or G.device_type
+        self.frame_rate = frame_rate
+        self.frames_total = max(2, round(spec.duration * frame_rate))   # scripted frames
+        self.tail_frames = max(0, round(spec.tail * frame_rate))          # last frame repeated
+        self.steps_total = self.frames_total + self.tail_frames
+        self.frame_index = 0
+        self.finished = False
+        # stimuli that run on seconds rather than progress (Gusts) read
+        # the run length off the throwaway
+        aircraft._preview_duration = spec.duration
+        if force_enable:
+            # The user asked to feel it; a disabled toggle would only make
+            # the method dispose its slots and return.  The instance is a
+            # throwaway, so nothing to restore.
+            if spec.effect_id:
+                setattr(aircraft, spec.effect_id, True)
+            for name, value in spec.force_attrs.items():
+                setattr(aircraft, name, value)
+
+    @property
+    def period(self) -> float:
+        return 1.0 / self.frame_rate
+
+    @property
+    def progress(self) -> float:
+        """0.0 on the first frame, 1.0 on the last scripted frame and
+        throughout the tail."""
+        return min(1.0, self.frame_index / (self.frames_total - 1))
+
+    def build_frame(self, progress: float) -> BaseTelemetryData:
+        frame = BaseTelemetryData()
+        frame['src'] = self.sim
+        frame['N'] = getattr(self.aircraft, '_name', 'preview')
+        frame['FFBType'] = self.device_type
+        for name, value in self.spec.resolve_fields(self.aircraft, self.sim, progress).items():
+            frame[name] = value
+        return frame
+
+    def step(self) -> bool:
+        """Play one frame.  Returns True while more frames remain."""
+        if self.finished:
+            return False
+        ac = self.aircraft
+        if self.frame_index == 0 and self.spec.constant_force:
+            ac.effects['preview_spring'].spring(REFERENCE_SPRING, REFERENCE_SPRING).start()
+        frame = self.build_frame(self.progress)
+        ac._last_telem_data = ac._telem_data.copy()
+        ac._telem_data = frame
+        try:
+            kwargs = self.spec.resolve_kwargs(ac, self.progress)
+            if callable(self.method_name):
+                self.method_name(ac, frame, **kwargs)
+            elif self.spec.frame_arg:
+                getattr(ac, self.method_name)(frame, **kwargs)
+            else:
+                getattr(ac, self.method_name)(**kwargs)
+        except Exception:
+            logging.exception(f"Preview {self.spec.name}: effect method raised; stopping")
+            self.finish()
+            return False
+        self.frame_index += 1
+        if self.frame_index >= self.steps_total:
+            self.finish()
+        return not self.finished
+
+    def finish(self) -> None:
+        if self.finished:
+            return
+        self.finished = True
+        # Destroy, not stop: nothing outlives a preview.  Dispenser.clear
+        # frees every effect block the run allocated on the device.
+        try:
+            self.aircraft.effects.clear()
+        except Exception:
+            logging.exception(f"Preview {self.spec.name}: cleanup failed")
+
+    def run(self, sleep: Callable[[float], None] = time.sleep) -> None:
+        """Blocking playback at ``frame_rate`` - for scripts and bench checks."""
+        while self.step():
+            sleep(self.period)
+
+
+def resolve_preview_target(settings_mgr, default_sim: str = 'DCS',
+                           default_model: str = 'Preview') -> Tuple[str, str, str]:
+    """The (sim, model, class) a preview should build its aircraft for.
+
+    The settings tab's current selection when it names a real sim: a
+    model when one is picked, else the class alone (the offline editor at
+    CLASS scope - the user is tuning class defaults and should feel
+    them), else the sim's own defaults.  With no real sim selected, a
+    generic aircraft on ``default_sim``.
+    """
+    sim = getattr(settings_mgr, 'current_sim', None)
+    model = getattr(settings_mgr, 'current_aircraft_name', None)
+    cls = getattr(settings_mgr, 'current_class', None) or ''
+    if sim not in SIMS:
+        return default_sim, default_model, ''
+    return sim, (model or default_model), cls
+
+
+class TimedPreview:
+    """Drive a ``PreviewRunner`` from the Qt event loop at its frame rate.
+
+    The runner is clock-agnostic; this is the app-side clock.  ``stop``
+    ends a run early and still frees the effects.  ``on_finished`` fires
+    exactly once, whether the run completed or was stopped.
+    """
+
+    def __init__(self, runner: PreviewRunner, on_finished: Optional[Callable[[], None]] = None):
+        from PyQt6.QtCore import QTimer, Qt
+        self.runner = runner
+        self.on_finished = on_finished
+        self._notified = False
+        self._timer = QTimer()
+        self._timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self._timer.setInterval(max(1, round(1000.0 / runner.frame_rate)))
+        self._timer.timeout.connect(self._tick)
+
+    @property
+    def interval_ms(self) -> int:
+        return self._timer.interval()
+
+    @property
+    def running(self) -> bool:
+        return self._timer.isActive()
+
+    def start(self) -> None:
+        self._timer.start()
+
+    def stop(self) -> None:
+        self._timer.stop()
+        self.runner.finish()
+        self._notify()
+
+    def _tick(self) -> None:
+        if not self.runner.step():
+            self._timer.stop()
+            self._notify()
+
+    def _notify(self) -> None:
+        if self._notified:
+            return
+        self._notified = True
+        if self.on_finished is not None:
+            self.on_finished()
+
+
+def preview_blockers(current_aircraft=None, device_alive: bool = True,
+                     telemetry_paused: bool = False) -> List[str]:
+    """Reasons a preview must not run now; empty means go.
+
+    A loaded aircraft is fine while telemetry is paused (offline editing
+    pauses it): the preview aircraft has its own effect table, so the
+    two never touch.  Streaming telemetry is not: two threads would be
+    writing the device.  A dead device has nowhere to play.  Pure so it
+    is testable; the caller passes ``G.telem_manager.currentAircraft``,
+    ``HapticEffect.device_alive()`` and the manager's pause state.
+    """
+    reasons = []
+    if current_aircraft is not None and not telemetry_paused:
+        reasons.append("telemetry is streaming - pause it (offline editing) or stop the sim")
+    if not device_alive:
+        reasons.append("no FFB device connected")
+    return reasons
+
+
+# ---------------------------------------------------------------------------
+# Specs.  Two to prove the two stimulus kinds end to end; the catalog grows
+# here until it moves to defaults.xml.
+# ---------------------------------------------------------------------------
+
+JET_IDLE_PCT = 60   # a typical turbine idle; the effect has no profile threshold for it
+
+JET_ENGINE_RUMBLE = PreviewSpec(
+    effect_id='engine_jet_rumble_enabled',
+    reference='sweeps from 60% idle to full power, holding 4 s at each end',
+    rows=('jet_engine_rumble_intensity',),
+    method='ac_update_jet_engine_rumble',
+    kind='ramp',
+    # Intensity scales with rpm/100 and the frequency climbs 10 Hz over
+    # the range, so idle and full power are different feels: sweep from
+    # idle to 100% with a dwell at each.  0% is silence (the effect
+    # disposes), so the sweep starts at idle rather than the floor.
+    fields={'*': {'EngRPM': (JET_IDLE_PCT, 100)},
+            'XPLANE': {'EngPCT': (JET_IDLE_PCT, 100)}},
+    duration=14.0,   # 4 s at idle, 6 s sweep, 4 s at full power
+    dwell=4.0,
+    tail=0.0,
+)
+
+GEAR_MOTION = PreviewSpec(
+    effect_id='gear_motion_effect_enabled',
+    reference='one gear cycle, up to down, with the clunk as it locks',
+    rows=('gear_motion_intensity',),
+    method='ac_update_landing_gear',
+    kind='ramp',
+    # gear_value swept up -> down keeps the motion effect alive (it plays
+    # while the value keeps changing) and lands exactly on 1.0, where the
+    # clunk fires.  IAS = 0 keeps the gear-down buffet out of the picture.
+    fields={'*': {'gear_value': (0.0, 1.0), 'IAS': 0.0},
+            'MSFS': {'RetractableGear': 1, 'Gear': lambda ac, p: [p]},
+            'XPLANE': {'RetractableGear': 1, 'Gear': lambda ac, p: [p]}},
+)
+
+_PROP_RPM_SWEEP = ('engine_rumble_lowrpm', 'engine_rumble_highrpm')
+
+PROP_ENGINE_RUMBLE = PreviewSpec(
+    effect_id='engine_prop_rumble_enabled',
+    reference="sweeps the profile's Low to High RPM range, holding 4 s at each end",
+    rows=('engine_rumble_lowrpm_intensity', 'engine_rumble_highrpm_intensity'),
+    method='ac_update_piston_engine_rumble',
+    kind='ramp',
+    # The effect is a TAPER, not a level: intensity falls from the Low RPM
+    # setting to the High RPM setting while the frequency climbs with RPM,
+    # so no single point represents it.  Sweep the profile's own range and
+    # the whole taper is felt in one press - idle chunk, rising pitch,
+    # settling to the cruise hum - dwelling at each end long enough to
+    # judge the two intensities the user tunes.  Each sim names its RPM
+    # field differently.
+    fields={'DCS': {'ActualRPM': _PROP_RPM_SWEEP},
+            'MSFS': {'PropRPM': _PROP_RPM_SWEEP},
+            'XPLANE': {'PropRPM': _PROP_RPM_SWEEP},
+            'IL2': {'RPM': _PROP_RPM_SWEEP}},
+    duration=14.0,   # 4 s at Low RPM, 6 s sweep, 4 s at High RPM
+    dwell=4.0,
+    tail=0.0,
+    # BMS is not handled by the effect (it reads no BMS RPM field)
+    sims=('DCS', 'MSFS', 'XPLANE', 'IL2'),
+)
+
+STALL_BUFFET = PreviewSpec(
+    effect_id='aoa_buffeting_enabled',
+    reference="AoA rising from the profile's buffet onset to its stall over 3 s, 4 s held at stall, 1 s recovering",
+    rows=('buffeting_intensity',),
+    method='ac_update_buffeting',
+    kind='ramp',
+    # AoA sweeps the profile's onset -> stall band, then holds at stall:
+    # onset is zero magnitude by definition, so a dwell there would be 4 s
+    # of silence.  No StallAoA / WarnAlpha / DesignSpeed in the frame, so
+    # the effect takes its fallback path on every sim: the profile's own
+    # thresholds for the band and the legacy airflow scale, which is 1.0
+    # at 75 kt.  On MSFS / X-Plane the live band comes from the sim, so
+    # the preview demonstrates intensity and renderer, not the band.
+    fields={'*': {'AoA': ('buffet_aoa', 'stall_aoa'),
+                  'TAS': 75 * kt2ms,
+                  'WeightOnWheels': [0, 0, 0],
+                  'Flaps': 0}},
+    # 3 s onset sweep, 4 s at stall, 1 s recovery back to onset so the
+    # end is a fade rather than a cut
+    schedule=((3.0, 0.0, 1.0), (4.0, 1.0, 1.0), (1.0, 1.0, 0.0)),
+    tail=0.0,
+    # IL-2 overrides the method with its telemetry-native buffet
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+ROTOR_RPM_NOMINAL = 300   # a typical NR; no profile threshold exists for it
+
+ETL = PreviewSpec(
+    effect_id='etl_effect_enable',
+    reference=("one acceleration through the profile's ETL speed band; pitch follows "
+               f"Rotor Blade Count at a fixed {ROTOR_RPM_NOMINAL} rpm NR"),
+    rows=('etl_effect_intensity',),
+    method='ac_calc_etl_effect',
+    kind='ramp',
+    # ETL is a transient: a few seconds of shake as the aircraft
+    # accelerates or decelerates through the band.  A hold at the peak
+    # felt wrong on the bench (it never sits there in flight), so the
+    # preview is the event itself - one acceleration through the band at
+    # the pace it happens.
+    # The blade count is passed the way the live loop passes it; without
+    # it the effect hard-codes 2 blades at 250 RPM and the frequency is
+    # wrong for the aircraft.
+    fields={'*': {'TAS': ('etl_start_speed', 'etl_stop_speed'),
+                  'WeightOnWheels': [0, 0, 0],
+                  'RotorRPM': ROTOR_RPM_NOMINAL},
+            'XPLANE': {'PropRPM': [ROTOR_RPM_NOMINAL]}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=5.0,    # a single pass up through the band
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+# ---------------------------------------------------------------------------
+# Holds: on/off effects with one intensity.  Five seconds at the full-scale
+# point, no tail (a hold has nothing to settle).
+# ---------------------------------------------------------------------------
+
+HOLD_SECONDS = 5.0
+
+AFTERBURNER = PreviewSpec(
+    effect_id='afterburner_effect_enabled',
+    reference='afterburner lit for 5 s',
+    rows=('afterburner_effect_intensity',),
+    method='ac_update_ab_effect',
+    # The effect re-issues only when something CHANGED: the afterburner
+    # value or its own slow modulation term.  With the burner lit from
+    # the first frame the change tracker primes on that frame and the
+    # modulation ticks on the next, so it lights one frame in - the same
+    # way it does live.
+    kind='hold',
+    fields={'*': {'Afterburner': 1}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+STICK_SHAKER = PreviewSpec(
+    effect_id='enable_stick_shaker',
+    reference='5 s in the stall warning (above the shaker AoA)',
+    rows=('stick_shaker_intensity',),
+    # DCS / BMS shake above a profile AoA; MSFS shakes on the sim's stall
+    # warning flag.  Different methods, different fields, one preview.
+    method={'*': 'dcs_update_stick_shaker', 'MSFS': 'msfs_update_stick_shaker'},
+    kind='hold',
+    fields={'DCS': {'AoA': lambda ac, p: ac.stick_shaker_aoa + 5.0, 'SimOnGround': 0},
+            'BMS': {'AoA': lambda ac, p: ac.stick_shaker_aoa + 5.0, 'SimOnGround': 0},
+            'MSFS': {'StallWarning': 1}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'BMS', 'MSFS'),
+)
+
+OVERSPEED_SHAKE = PreviewSpec(
+    effect_id='overspeed_effect_enable',
+    reference=("5 s of full overspeed shake, 15 m/s past the onset speed; pitch follows "
+               f"Rotor Blade Count at a fixed {ROTOR_RPM_NOMINAL} rpm NR"),
+    rows=('overspeed_shake_intensity',),
+    method='ac_calc_etl_effect',
+    kind='hold',
+    # The overspeed branch of the ETL method: full strength 15 m/s past
+    # the onset speed (its own scaling), well clear of the ETL band.
+    fields={'*': {'TAS': lambda ac, p: ac.overspeed_shake_start + 15.0,
+                  'WeightOnWheels': [0, 0, 0],
+                  'RotorRPM': ROTOR_RPM_NOMINAL},
+            'XPLANE': {'PropRPM': [ROTOR_RPM_NOMINAL]}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+_XP_VLE = 60.0   # m/s; X-Plane takes the gear buffet band from Vle (0.9 .. 1.17 x)
+
+GEAR_BUFFET = PreviewSpec(
+    effect_id='gear_buffet_effect_enabled',
+    reference="gear down at the top of the profile's buffet speed band for 5 s",
+    rows=('gear_buffet_intensity',),
+    method='ac_update_landing_gear',
+    kind='hold',
+    # Gear down at the top of the profile's buffet speed band = full
+    # intensity.  X-Plane derives the band from the aircraft's Vle, so
+    # the frame supplies one and the speed to match.
+    fields={'*': {'gear_value': 1.0, 'IAS': Attr('gear_buffet_speed_high')},
+            'MSFS': {'RetractableGear': 1, 'Gear': [1.0]},
+            'XPLANE': {'RetractableGear': 1, 'Gear': [1.0],
+                       'Vle': _XP_VLE, 'IAS': 0.9 * _XP_VLE * 1.3}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+SPEEDBRAKE_BUFFET = PreviewSpec(
+    effect_id='speedbrake_buffet_effect_enabled',
+    reference='speedbrake fully deployed at 100 m/s for 5 s',
+    rows=('speedbrake_buffet_intensity',),
+    method='ac_update_speed_brakes',
+    kind='hold',
+    # Fully deployed at 100 m/s: the shared buffet helper scales speed
+    # over a fixed 0..100 m/s range, so that is its full-scale point.
+    fields={'*': {'SpeedbrakePos': 1.0, 'IAS': 100.0}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'XPLANE', 'BMS'),
+)
+
+SPOILER_BUFFET = PreviewSpec(
+    effect_id='spoiler_buffet_effect_enabled',
+    reference="spoilers fully deployed at the profile's upper speed threshold for 5 s",
+    rows=('spoiler_buffet_intensity',),
+    method='ac_update_spoilers',
+    kind='hold',
+    fields={'*': {'Spoilers': 1.0, 'IAS': Attr('spoiler_spd_thresh_hi')}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+# ---------------------------------------------------------------------------
+# Motion ramps: the surface travels its full range over 3 s, then the
+# default tail repeats the final position so the effect winds down the
+# way it does live - and so the clunk the endpoint fires has time to play.
+# ---------------------------------------------------------------------------
+
+FLAPS_MOTION = PreviewSpec(
+    effect_id='flaps_motion_effect_enabled',
+    reference='flaps traveling from up to full over 3 s',
+    rows=('flaps_motion_intensity',),
+    method='ac_update_flaps',
+    kind='ramp',
+    fields={'*': {'Flaps': (0.0, 1.0)}},
+)
+
+SPEEDBRAKE_MOTION = PreviewSpec(
+    effect_id='speedbrake_motion_effect_enabled',
+    reference='speedbrake traveling from retracted to deployed over 3 s',
+    rows=('speedbrake_motion_intensity',),
+    method='ac_update_speed_brakes',
+    kind='ramp',
+    fields={'*': {'SpeedbrakePos': (0.0, 1.0), 'IAS': 0.0}},   # IAS 0: no buffet
+    sims=('DCS', 'XPLANE', 'BMS'),
+)
+
+SPOILER_MOTION = PreviewSpec(
+    effect_id='spoiler_motion_effect_enabled',
+    reference='spoilers traveling from retracted to deployed over 3 s',
+    rows=('spoiler_motion_intensity',),
+    method='ac_update_spoilers',
+    kind='ramp',
+    fields={'*': {'Spoilers': (0.0, 1.0), 'IAS': 0.0}},
+    sims=('DCS', 'XPLANE', 'BMS'),
+)
+
+CANOPY_MOTION = PreviewSpec(
+    effect_id='canopy_motion_effect_enabled',
+    reference='canopy closing over 3 s, with the clunk as it seats',
+    rows=('canopy_motion_intensity',),
+    method='ac_update_canopy',
+    kind='ramp',
+    # closing: the effect clunks when the canopy reaches 0
+    fields={'*': {'Canopy': (1.0, 0.0)}},
+    sims=('DCS', 'XPLANE'),
+)
+
+TAILHOOK_MOTION = PreviewSpec(
+    effect_id='tailhook_motion_effect_enabled',
+    reference='hook extending over 3 s, with the clunk as it seats',
+    rows=('tailhook_motion_intensity',),
+    method='ac_update_tailhook_effect',
+    kind='ramp',
+    fields={'*': {'TailHook': (0.0, 1.0)}},
+    sims=('DCS',),
+)
+
+FUELBOOM_MOTION = PreviewSpec(
+    effect_id='fuelboom_motion_effect_enabled',
+    reference='refueling boom or door extending over 3 s, with the clunk',
+    rows=('fuelboom_motion_intensity',),
+    method='ac_update_fuelboom_effect',
+    kind='ramp',
+    fields={'*': {'FuelBoom': (0.0, 1.0)}},
+    sims=('DCS',),
+)
+
+WINGFOLD_MOTION = PreviewSpec(
+    effect_id='wingfold_motion_effect_enabled',
+    reference='wings folding on the ground over 3 s, with the clunks',
+    rows=('wingfold_motion_intensity',),
+    method='ac_update_wingfold_effect',
+    kind='ramp',
+    fields={'*': {'WingFold': (0.0, 1.0), 'SimOnGround': 1}},   # ground-only effect
+    sims=('DCS',),
+)
+
+# ---------------------------------------------------------------------------
+# Edges: one-shots that fire on a telemetry CHANGE.  A single step would
+# give one event, so these feed a train of changes - a value that steps N
+# times over the run fires N times, evenly spaced; a value that changes
+# every frame (gunfire) fires continuously.  The tail lets the last shot
+# play out before cleanup.
+# ---------------------------------------------------------------------------
+
+def steps(count: int, start: float = 0.0, step: float = 1.0):
+    """A field that changes ``count`` times over the run: ``start`` on the
+    first frame, then one step per 1/count of progress.  The first value
+    primes the change tracker; each later step is one event."""
+    return lambda ac, p: start + step * int(p * count)
+
+class RandomHits:
+    """A counter that steps at random moments over the run.
+
+    For effects like damage, where the real thing is an irregular stream
+    of single hits and short clusters, an even train reads as a metronome.
+    Each run draws its own schedule: ``hits`` lone events spread over the
+    run, each with ``cluster_chance`` of trailing one or two more within
+    ``cluster_span`` of the run, then the counter is the number of hits at
+    or before the current progress.  The schedule lives on the throwaway
+    aircraft, so every press is a fresh draw and two fields sharing one
+    instance (IL-2's Hits and Damage) step together.
+    """
+
+    def __init__(self, hits=(4, 8), cluster_chance=0.4, cluster_span=0.03,
+                 rng: Optional[random.Random] = None):
+        self.hits = hits
+        self.cluster_chance = cluster_chance
+        self.cluster_span = cluster_span
+        self.rng = rng
+
+    def schedule(self, aircraft):
+        store = aircraft.__dict__.setdefault('_preview_random_hits', {})
+        if id(self) not in store:
+            rng = self.rng or random.Random()
+            times = []
+            for _ in range(rng.randint(*self.hits)):
+                t = rng.uniform(0.05, 0.95)
+                times.append(t)
+                if rng.random() < self.cluster_chance:
+                    for _ in range(rng.randint(1, 2)):
+                        times.append(min(0.98, t + rng.uniform(0.3, 1.0) * self.cluster_span))
+            store[id(self)] = tuple(sorted(times))
+        return store[id(self)]
+
+    def __call__(self, aircraft, progress):
+        return sum(1 for t in self.schedule(aircraft) if t <= progress)
+
+
+_DAMAGE_HITS = RandomHits()
+
+
+class Gusts:
+    """A three-component wind vector carrying a band-limited gust field,
+    redrawn per run.
+
+    The turbulence and wind effects never see the weather, only the
+    frame-to-frame CHANGE in wind through a high-pass, so what matters is
+    gust amplitude and frequency content - both of which can be stated.
+    Each axis is a sum of ``components`` sinusoids at random frequencies
+    inside ``band`` (Hz) and random phases, sized so the axis's gust
+    r.m.s. is ``rms[axis]``, on top of ``steady``.  Time comes from the
+    run's progress and the duration the runner stamps on the aircraft.
+    """
+
+    def __init__(self, rms=(2.0, 3.0, 1.0), steady=(0.0, 0.0, 0.0),
+                 band=(0.3, 2.0), components=5, rng: Optional[random.Random] = None):
+        self.rms = rms
+        self.steady = steady
+        self.band = band
+        self.components = components
+        self.rng = rng
+
+    def _state(self, aircraft):
+        store = aircraft.__dict__.setdefault('_preview_gusts', {})
+        if id(self) not in store:
+            rng = self.rng or random.Random()
+            lo, hi = self.band
+            # n equal sinusoids of amplitude a have r.m.s. a * sqrt(n / 2)
+            store[id(self)] = [
+                [(rng.uniform(lo, hi), rng.uniform(0, 2 * math.pi),
+                  r * math.sqrt(2.0 / self.components))
+                 for _ in range(self.components)]
+                for r in self.rms]
+        return store[id(self)]
+
+    def __call__(self, aircraft, progress):
+        t = progress * getattr(aircraft, '_preview_duration', 1.0)
+        return [base + sum(a * math.sin(2 * math.pi * f * t + ph) for f, ph, a in axis)
+                for base, axis in zip(self.steady, self._state(aircraft))]
+
+
+class Jitter:
+    """A value (or list of values) that random-walks around ``center``
+    within ``amplitude``, redrawn per run.
+
+    For effects fed through a high-pass filter (runway rumble reads wheel
+    compression through one), a steady value is silence: only motion
+    gets through.  The walk lives on the throwaway aircraft, like
+    ``RandomHits``, so each press differs.
+    """
+
+    def __init__(self, center=0.5, amplitude=0.4, size=None, step=0.5,
+                 rng: Optional[random.Random] = None):
+        self.center = center
+        self.amplitude = amplitude
+        self.size = size
+        self.step = step
+        self.rng = rng
+
+    def _state(self, aircraft):
+        store = aircraft.__dict__.setdefault('_preview_jitter', {})
+        if id(self) not in store:
+            n = self.size or 1
+            store[id(self)] = {'rng': self.rng or random.Random(),
+                               'values': [self.center] * n}
+        return store[id(self)]
+
+    def __call__(self, aircraft, progress):
+        st = self._state(aircraft)
+        rng, values = st['rng'], st['values']
+        lo, hi = self.center - self.amplitude, self.center + self.amplitude
+        for i, v in enumerate(values):
+            v += rng.uniform(-self.step, self.step) * self.amplitude
+            values[i] = min(hi, max(lo, v))
+        return list(values) if self.size else values[0]
+
+
+GUNFIRE = PreviewSpec(
+    effect_id='gunfire_effect_enabled',
+    reference='a 2 s gun burst',
+    rows=('gun_vibration_intensity',),
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # the gun signal changes every frame while firing; a 2 s burst
+    fields={'*': {'Gun': lambda ac, p: p,
+                  'PayloadInfo': 4, 'Flares': 10, 'Chaff': 10}},
+    duration=2.0,
+    sims=('DCS', 'BMS'),
+)
+
+WEAPON_RELEASE = PreviewSpec(
+    effect_id='weapon_release_effect_enabled',
+    reference='three weapon releases a second apart',
+    rows=('weapon_release_intensity',),
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # three releases a second apart: the payload count steps down
+    fields={'*': {'PayloadInfo': steps(3, start=4, step=-1),
+                  'Gun': 0, 'Flares': 10, 'Chaff': 10}},
+    duration=3.0,
+    sims=('DCS', 'BMS'),
+)
+
+COUNTERMEASURES = PreviewSpec(
+    effect_id='countermeasure_effect_enabled',
+    reference='four flares half a second apart',
+    rows=('cm_vibration_intensity',),
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # four flares half a second apart
+    fields={'*': {'Flares': steps(4, start=10, step=-1),
+                  'Chaff': 10, 'Gun': 0, 'PayloadInfo': 4}},
+    duration=2.0,
+    sims=('DCS', 'BMS'),
+)
+
+DAMAGE = PreviewSpec(
+    effect_id='damage_effect_enabled',
+    reference='an irregular stream of hits over 5 s, different every press',
+    rows=('damage_effect_intensity',),
+    method={'*': 'dcs_update_damage', 'IL2': 'il2_update_damage'},
+    kind='edge',
+    # An irregular stream of hits over 5 s - lone rounds and short
+    # clusters at random moments, redrawn every press.  DCS randomizes
+    # direction, amplitude (0.5-1.5x) and waveform per hit; IL-2 plays a
+    # hit and a damage slot, both stepping on the same schedule.
+    fields={'*': {'Damage': _DAMAGE_HITS},
+            'IL2': {'Damage': _DAMAGE_HITS, 'Hits': _DAMAGE_HITS}},
+    duration=5.0,
+    sims=('DCS', 'BMS', 'IL2'),
+)
+
+# IL-2's three basic weapon effects share one toggle but have three
+# intensities, so three previews.  The dynamic gunfire mode computes its
+# pattern from the aircraft's real gun telemetry and is not previewable;
+# the throwaway is switched to the basic path, and the shake master the
+# effects sit behind is forced on.
+_IL2_WEAPON_FORCE = {'il2_shake_master': True, 'il2_dynamic_gunfire_mode': False}
+
+IL2_GUNFIRE = PreviewSpec(
+    name='il2_gunfire',
+    reference='a 2 s gun burst (basic gunfire mode)',
+    rows=('il2_weapon_release_intensity',),
+    effect_id='il2_enable_weapons',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    # the gun counter changes every frame for a 2 s burst; the tail holds
+    # it so the effect winds down as it does live
+    fields={'IL2': {'Gun': lambda ac, p: p, 'Bombs': 2, 'Rockets': 4}},
+    duration=2.0,
+    force_attrs=_IL2_WEAPON_FORCE,
+    sims=('IL2',),
+)
+
+IL2_BOMB_RELEASE = PreviewSpec(
+    name='il2_bombs',
+    reference='one bomb release',
+    rows=('il2_bomb_release_intensity',),
+    effect_id='il2_enable_weapons',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    fields={'IL2': {'Bombs': (2, 1), 'Gun': 0, 'Rockets': 4}},   # one drop at the midpoint
+    duration=1.0,
+    force_attrs=_IL2_WEAPON_FORCE,
+    sims=('IL2',),
+)
+
+IL2_ROCKET_RELEASE = PreviewSpec(
+    name='il2_rockets',
+    reference='one rocket launch',
+    rows=('il2_rocket_release_intensity',),
+    effect_id='il2_enable_weapons',
+    method='ac_update_cm_weapons',
+    kind='edge',
+    fields={'IL2': {'Rockets': (4, 3), 'Gun': 0, 'Bombs': 2}},
+    duration=1.0,
+    force_attrs=_IL2_WEAPON_FORCE,
+    sims=('IL2',),
+)
+
+# ---------------------------------------------------------------------------
+# Constant-force effects.  Ramped, never stepped, so the force builds and
+# releases instead of slamming; the UI confirms the user has hold of the
+# controls first.
+# ---------------------------------------------------------------------------
+
+TOUCHDOWN = PreviewSpec(
+    effect_id='touchdown_effect_enabled',
+    reference="a firm landing at the profile's maximum G",
+    rows=('touchdown_effect_max_force',),
+    method='ac_update_touchdown_effect',
+    kind='ramp',
+    # a 0.3 s bump of vertical G up to the profile's max G (= max force)
+    # and back, on the ground.  DCS-family G carries the 1 g bias.
+    fields={'*': {'SimOnGround': 1},
+            'DCS': {'ACCs': lambda ac, p: [0.0, 1.0 + ac.touchdown_effect_max_gs * p, 0.0]},
+            'BMS': {'ACCs': lambda ac, p: [0.0, 1.0 + ac.touchdown_effect_max_gs * p, 0.0]},
+            'MSFS': {'AccBody': lambda ac, p: [0.0, ac.touchdown_effect_max_gs * p, 0.0]},
+            'XPLANE': {'AccBody': lambda ac, p: [0.0, ac.touchdown_effect_max_gs * p, 0.0]}},
+    schedule=((0.15, 0.0, 1.0), (0.1, 1.0, 1.0), (0.15, 1.0, 0.0)),   # a defined thump at the peak
+    tail=0.3,
+    constant_force=True,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+# The decel effect skips any frame whose G has not changed, and its
+# 8-frame average only advances on frames it processes - so a perfectly
+# steady plateau freezes the push short of full.  Real telemetry never
+# sits still; neither does this: a 2% wobble on the stimulus.
+_DECEL_WOBBLE = Jitter(center=1.0, amplitude=0.04, step=1.0)   # a few %: consecutive frames must differ at the effect's 3-decimal change resolution
+
+
+def _decel_g(ac, p):
+    return ac.deceleration_max_force * p * _DECEL_WOBBLE(ac, p)
+
+
+DECELERATION = PreviewSpec(
+    effect_id='deceleration_effect_enable',
+    reference="a braking run on the ground: 1.5 s building to the profile's maximum, held 1 s, released over 1.5 s",
+    rows=('deceleration_max_force',),
+    method='ac_update_decel_effect',
+    kind='ramp',
+    # a braking run on the ground: longitudinal G builds to the profile's
+    # max over 1.5 s, holds a second, releases over 1.5 s.  The effect
+    # smooths over 8 frames, so the push lags the stimulus slightly.
+    fields={'*': {'WeightOnWheels': [1.0, 1.0, 1.0], 'TAS': 30.0, 'speedbrakes_value': 0.0},
+            'DCS': {'ACCs': lambda ac, p: [-_decel_g(ac, p), 0.0, 0.0]},
+            'BMS': {'ACCs': lambda ac, p: [-_decel_g(ac, p), 0.0, 0.0]},
+            'IL2': {'ACCs': lambda ac, p: [-_decel_g(ac, p), 0.0, 0.0]},
+            'MSFS': {'AccBody': lambda ac, p: [0.0, 0.0, -_decel_g(ac, p)]},
+            'XPLANE': {'Gaxil': lambda ac, p: _decel_g(ac, p)}},
+    schedule=((1.5, 0.0, 1.0), (1.0, 1.0, 1.0), (1.5, 1.0, 0.0)),
+    tail=0.3,
+    constant_force=True,
+)
+
+RUNWAY_RUMBLE = PreviewSpec(
+    effect_id='runway_rumble_enabled',
+    reference='rolling on a rough surface for 4 s',
+    rows=('runway_rumble_intensity',),
+    method='ac_update_runway_rumble',
+    kind='hold',
+    # wheel compression jittering around half travel: the effect
+    # high-passes it, so only the motion comes through, as random-
+    # direction bumps.  BMS has no compression and takes bump telemetry.
+    fields={'*': {'WeightOnWheels': Jitter(center=0.5, amplitude=0.4, size=3)},
+            'BMS': {'BumpIntensity': Jitter(center=0.5, amplitude=0.5)}},
+    duration=4.0,
+    constant_force=True,
+    # IL-2 overrides the method with its own native-telemetry rumble
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+TURBULENCE = PreviewSpec(
+    effect_id='turbulence_effect_enable',
+    reference='moderate turbulence: a few m/s of vertical and lateral gusts',
+    rows=('turbulence_intensity',),
+    method='update_turbulence',
+    frame_arg=False,                     # reads RelWind off the bound frame
+    kind='hold',
+    # "moderate turbulence": a few m/s of gusts, vertical dominant, in the
+    # 0.3 - 2 Hz band, over a steady 60 m/s airflow.  The effect's four
+    # knobs (high-pass, smoothing, sensitivity, intensity) all shape the
+    # response to this one reference field.  Joystick gets pitch and
+    # roll, pedals yaw, from the effect's own branches.
+    fields={'*': {'RelWind': Gusts(rms=(2.0, 3.0, 1.0), steady=(0.0, 0.0, 60.0),
+                                   band=(0.3, 2.0))}},
+    duration=8.0,
+    tail=0.0,
+    constant_force=True,
+    sims=('MSFS', 'XPLANE'),
+)
+
+WIND = PreviewSpec(
+    effect_id='wind_effect_enabled',
+    reference='gusting on a steady 8 m/s breeze',
+    rows=('wind_effect_max_intensity',),
+    method='ac_update_wind_effect',
+    kind='hold',
+    # the effect high-passes the wind SPEED at 3 Hz, so the gusts here sit
+    # higher in frequency than turbulence's, on a steady 8 m/s breeze
+    fields={'*': {'Wind': Gusts(rms=(3.0, 3.0, 1.0), steady=(8.0, 0.0, 0.0),
+                                band=(1.0, 5.0))}},
+    duration=8.0,
+    tail=0.0,
+    constant_force=True,
+    sims=('DCS', 'BMS'),
+)
+
+# ---------------------------------------------------------------------------
+# The rest of the helicopter set (ETL and overspeed are above).
+# ---------------------------------------------------------------------------
+
+ROTOR_RUMBLE = PreviewSpec(
+    effect_id='engine_rotor_rumble_enabled',
+    rows=('heli_engine_rumble_intensity',),
+    reference=(f"rotor turning at a fixed {ROTOR_RPM_NOMINAL} rpm NR with the engine running; "
+               "pitch follows Rotor Blade Count"),
+    method='ac_update_heli_engine_rumble',
+    kind='hold',
+    # frequency = NR / 45 x blade count, so the blade count is passed the
+    # way the live loop passes it; a nonzero engine RPM is the other gate
+    fields={'*': {'RotorRPM': ROTOR_RPM_NOMINAL, 'EngRPM': 100},
+            'XPLANE': {'PropRPM': [ROTOR_RPM_NOMINAL], 'EngRPM': 100}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
+)
+
+
+def _vrs_descent(ac, p):
+    """Descent rate sweeping the profile's VRS onset -> max (negative = down)."""
+    return -(ac.vrs_vs_onset + (ac.vrs_vs_max - ac.vrs_vs_onset) * p)
+
+
+VRS = PreviewSpec(
+    effect_id='vrs_effect_enable',
+    rows=('vrs_effect_intensity',),
+    reference="a descent steepening from the profile's VRS onset to its maximum over 3 s, then held 3 s",
+    method='ac_update_vrs_effect',
+    kind='ramp',
+    # intensity scales with descent rate across the onset -> max band, so
+    # sweep it and hold at the top; airspeed at zero keeps the effect's
+    # speed gate open on every sim (it is silent above the threshold)
+    fields={'*': {'VerticalSpeed': _vrs_descent, 'TAS': 0.0, 'WeightOnWheels': [0, 0, 0]}},
+    schedule=((3.0, 0.0, 1.0), (3.0, 1.0, 1.0)),
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'BMS'),
+)
+
+_BLADE_SLAP_DESCENT_DEG = 6.0   # the inferred signal's descent-angle peak
+
+
+def _blade_slap_sink(ac, p):
+    """Sink rate for the inferred signal's peak descent angle at the
+    profile's band-center speed."""
+    ias = ac.blade_slap_band_center or 32.4
+    return -ias * math.tan(math.radians(_BLADE_SLAP_DESCENT_DEG))
+
+
+BLADE_SLAP = PreviewSpec(
+    effect_id='blade_slap_enable',
+    rows=('blade_slap_intensity',),
+    reference=("blade-vortex interaction at its worst, the band-center speed on a shallow descent; "
+               f"rate and strength follow Rotor Blade Count at a fixed {ROTOR_RPM_NOMINAL} rpm NR"),
+    method='ac_update_blade_slap',
+    kind='hold',
+    # X-Plane may use the sim's native signal (fed at full), everything
+    # else infers it from speed, descent angle and G - the frame carries
+    # both so either path plays at full signal.  1 g: no manoeuvring term.
+    fields={'*': {'WeightOnWheels': [0, 0, 0],
+                  'IAS': lambda ac, p: ac.blade_slap_band_center or 32.4,
+                  'VerticalSpeed': _blade_slap_sink,
+                  'RotorRPM': ROTOR_RPM_NOMINAL},
+            'DCS': {'ACCs': [0.0, 1.0, 0.0]},
+            'MSFS': {'G': 1.0},
+            'XPLANE': {'G': 1.0, 'PropRPM': [ROTOR_RPM_NOMINAL], 'BladeSlap': 1.0}},
+    kwargs={'blade_ct': Attr('rotor_blade_count')},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('DCS', 'MSFS', 'XPLANE'),
+)
+
+# ---------------------------------------------------------------------------
+# Elevator droop.  Two implementations: the DCS-family one is a standalone
+# method on true airspeed; the MSFS / X-Plane one is a single term inside
+# the flight-controls chain, played here by sequencing the production
+# term and the production applier.
+# ---------------------------------------------------------------------------
+
+ELEVATOR_DROOP = PreviewSpec(
+    effect_id='elevator_droop_enabled',
+    rows=('elevator_droop_force',),
+    reference='rolling out from 20 kt to a stop over 2 s, then 3 s standing still at the full droop force',
+    method='ac_override_elevator_droop',
+    kind='ramp',
+    # the force scales from nothing at 20 kt to full at rest
+    fields={'*': {'TAS': (20 * kt2ms, 0.0)}},
+    schedule=((2.0, 0.0, 1.0), (3.0, 1.0, 1.0)),
+    tail=0.0,
+    constant_force=True,
+    sims=('DCS', 'IL2', 'BMS'),
+)
+
+
+def _msfs_elevator_droop(ac, frame, **kwargs):
+    """Recipe: the droop term at rest (no dynamic pressure) at 1 g, through
+    the same constant-force applier the live loop uses.  Joystick only,
+    as the live loop only calls the applier for the joystick."""
+    if not ac.is_joystick():
+        return
+    term = ac.elevator_droop_term_for(g_force=frame.G or 1.0, _elev_dyn_pressure=0.0)
+    ac._apply_joystick_constant_forces(frame, term, 0.0)
+
+
+MSFS_ELEVATOR_DROOP = PreviewSpec(
+    effect_id=None,                      # no toggle: the moment at zero is "off"
+    name='elevator_droop_moment',
+    rows=('elevator_droop_moment',),
+    reference='stationary with the engine off, at 1 g: the full elevator moment',
+    method=_msfs_elevator_droop,
+    kind='hold',
+    fields={'*': {'G': 1.0, 'AccBody': [0.0, 1.0, 0.0]}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    constant_force=True,
+    sims=('MSFS', 'XPLANE'),
+)
+
+# ---------------------------------------------------------------------------
+# The stragglers found by walking every toggle in defaults.xml.
+# ---------------------------------------------------------------------------
+
+NOSEWHEEL_SHIMMY = PreviewSpec(
+    effect_id='nosewheel_shimmy',
+    rows=('nosewheel_shimmy_intensity',),
+    reference="full brakes at twice the shimmy onset speed, rolling on the ground",
+    method='msfs_update_nosewheel_shimmy',
+    kind='hold',
+    # pedals only (the effect's own gate); frequency runs 8 -> 16 Hz from
+    # the onset speed to three times it, so twice the onset sits mid-band
+    fields={'MSFS': {'IsTaildragger': 0, 'SimOnGround': 1, 'WeightOnWheels': [1.0, 1.0, 1.0],
+                     'GroundSpeed': lambda ac, p: ac.nosewheel_shimmy_min_speed * 2.0,
+                     'Brakes': [1.0, 1.0]}},     # a list: a pair would be read as a ramp
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    sims=('MSFS',),
+)
+
+
+def _critical_aoa(ac, p):
+    return ac.critical_aoa_start + (ac.critical_aoa_max - ac.critical_aoa_start) * p
+
+
+AOA_REDUCTION = PreviewSpec(
+    effect_id='aoa_reduction_effect_enabled',
+    rows=('aoa_reduction_max_force',),
+    reference="AoA rising from the profile's critical onset to its maximum over 3 s, "
+              "then held 3 s: the push forward",
+    method='ac_update_aoa_reduction_force_effect',
+    kind='ramp',
+    # airborne with airspeed; the effect averages AoA over 8 frames and
+    # keeps averaging on a steady input, so a plain hold reaches full
+    fields={'*': {'AoA': _critical_aoa, 'TAS': 50.0, 'WeightOnWheels': [0, 0, 0]}},
+    schedule=((3.0, 0.0, 1.0), (3.0, 1.0, 1.0)),
+    tail=0.0,
+    constant_force=True,
+    # the toggle is offered on DCS and BMS too, but only the MSFS / X-Plane
+    # aircraft class carries the implementation (AoAEffectsMixIn)
+    sims=('MSFS', 'XPLANE'),
+)
+
+LATERAL_G_REFERENCE = 0.3   # g of sideslip the preview holds
+
+
+def _msfs_lateral_force(ac, frame, **kwargs):
+    """Recipe: the lateral (uncoordinated-turn) push through the same
+    constant-force applier the live loop uses, with no droop or G term."""
+    if not ac.is_joystick():
+        return
+    ac._apply_joystick_constant_forces(frame, 0.0, 0.0)
+
+
+LATERAL_FORCE = PreviewSpec(
+    effect_id='uncoordinated_turn_effect_enabled',
+    rows=('lateral_force_gain',),
+    reference=f"{LATERAL_G_REFERENCE:g} g of sideslip, held: the roll push at the profile's lateral gain",
+    method=_msfs_lateral_force,
+    kind='hold',
+    fields={'*': {'AccBody': [LATERAL_G_REFERENCE, 1.0, 0.0]}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    constant_force=True,
+    sims=('MSFS', 'XPLANE'),
+)
+
+# IL-2's native-telemetry effects: the sim computes the shake and TelemFFB
+# scales it by a factor, so the reference is a stated sim value.  All sit
+# behind the shake master, forced on for the throwaway as the weapons are.
+_IL2_SHAKE_FORCE = {'il2_shake_master': True}
+IL2_BUFFET_HZ = 12.0
+IL2_ENGINE_SHAKE_HZ = 20.0
+IL2_ENGINE_SHAKE_AMPLITUDE = 1.0 / 3.0   # the effect scales amplitude x factor x 3
+
+IL2_BUFFET = PreviewSpec(
+    effect_id='il2_enable_buffet',
+    rows=('il2_buffeting_factor',),
+    reference=f"the sim's stall buffet at full amplitude and {IL2_BUFFET_HZ:g} Hz, scaled by the profile's factor",
+    method='ac_update_buffeting',
+    kind='hold',
+    fields={'IL2': {'BuffetFrequency': IL2_BUFFET_HZ, 'BuffetAmplitude': 1.0}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
+IL2_PROP_ENGINE_SHAKE = PreviewSpec(
+    effect_id='il2_prop_eng_shake_enabled',
+    rows=('il2_prop_eng_shake_factor',),
+    reference=f"the sim's propeller engine shake at {IL2_ENGINE_SHAKE_HZ:g} Hz, at the amplitude that "
+              "maps to full, scaled by the profile's factor",
+    method='il2_update_engine_shake',
+    kind='hold',
+    # the effect branches on the frame's aircraft class, not the profile's
+    fields={'IL2': {'AircraftClass': 'PropellerAircraft',
+                    'EngineShakeFrequency': IL2_ENGINE_SHAKE_HZ,
+                    'EngineShakeAmplitude': IL2_ENGINE_SHAKE_AMPLITUDE}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
+IL2_JET_ENGINE_SHAKE = PreviewSpec(
+    effect_id='il2_jet_eng_shake_enabled',
+    rows=('il2_jet_eng_shake_factor',),
+    reference=f"the sim's jet engine shake at {IL2_ENGINE_SHAKE_HZ:g} Hz (the effect adds its 30 Hz "
+              "offset), at the amplitude that maps to full, scaled by the profile's factor",
+    method='il2_update_engine_shake',
+    kind='hold',
+    fields={'IL2': {'AircraftClass': 'JetAircraft',
+                    'EngineShakeFrequency': IL2_ENGINE_SHAKE_HZ,
+                    'EngineShakeAmplitude': IL2_ENGINE_SHAKE_AMPLITUDE}},
+    duration=HOLD_SECONDS,
+    tail=0.0,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
+IL2_RUNWAY_RUMBLE = PreviewSpec(
+    effect_id='il2_enable_runway_rumble',
+    rows=('il2_runway_rumble_intensity',),
+    reference='rolling on a rough surface for 4 s',
+    method='ac_update_runway_rumble',
+    kind='hold',
+    # the IL-2 wrapper gates on rolling, near the ground, gear down, then
+    # translates its own toggle and intensity onto the base effect
+    fields={'IL2': {'TAS': 15.0, 'AGL': 1.0, 'GearPos': [1.0, 1.0, 1.0],
+                    'WeightOnWheels': Jitter(center=0.5, amplitude=0.4, size=3)}},
+    duration=4.0,
+    constant_force=True,
+    force_attrs=_IL2_SHAKE_FORCE,
+    sims=('IL2',),
+)
+
+PREVIEW_SPECS: Dict[str, PreviewSpec] = {
+    spec.name: spec for spec in (
+        PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
+        AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET,
+        SPEEDBRAKE_BUFFET, SPOILER_BUFFET,
+        FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
+        TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
+        GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
+        IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE,
+        TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, TURBULENCE, WIND,
+        ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP,
+        NOSEWHEEL_SHIMMY, AOA_REDUCTION, LATERAL_FORCE,
+        IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE)
+}
+assert len(PREVIEW_SPECS) == 42, "a spec name collided"
+
+# settings row -> the one preview whose button it hosts
+PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}
+for _spec in PREVIEW_SPECS.values():
+    for _row in _spec.rows:
+        assert _row not in PREVIEWS_BY_ROW, f"row {_row} claimed by two previews"
+        PREVIEWS_BY_ROW[_row] = _spec
+
+
+def preview_for_row(setting_name: str) -> Optional[PreviewSpec]:
+    """The preview a settings row hosts a play button for, if any."""
+    return PREVIEWS_BY_ROW.get(setting_name)

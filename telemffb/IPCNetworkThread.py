@@ -54,6 +54,14 @@ class IPCNetworkThread(QObject, threading.Thread):
     set_offline_profile_signal = pyqtSignal(str)
     show_offline_model_signal = pyqtSignal(str, str, str, str)
     reload_caller_signal = pyqtSignal()
+    # Effect preview on a child's device: the master's settings form hosts
+    # the button for every device, but the effect must play on the
+    # instance that owns the device.  child <- master: run / stop a named
+    # preview; master <- child: it finished (so the master can reset the
+    # button and slider cues).
+    preview_signal = pyqtSignal(str)
+    preview_stop_signal = pyqtSignal()
+    preview_done_signal = pyqtSignal(str, str)
 
     def __init__(self, host="127.0.0.1", dstport=0, keepalive_sec=1, missed_keepalive=3):
         QObject.__init__(self)
@@ -363,6 +371,16 @@ class IPCNetworkThread(QObject, threading.Thread):
             payload = msg.removeprefix("SHOW_OFFLINE_MODEL:")
             args = json.loads(payload)
             self.show_offline_model_signal.emit(*args)
+        elif msg.startswith("PREVIEW:"):
+            _, dev, name = msg.split(":", 2)
+            if dev == G.device_type:
+                self.preview_signal.emit(name)
+        elif msg.startswith("PREVIEW STOP:"):
+            if msg.removeprefix("PREVIEW STOP:") == G.device_type:
+                self.preview_stop_signal.emit()
+        elif msg.startswith("PREVIEW DONE:"):
+            _, dev, name = msg.split(":", 2)
+            self.preview_done_signal.emit(dev, name)
         else:
             logging.info(f"GOT GENERIC MESSAGE: {msg}")
 
@@ -384,6 +402,19 @@ class IPCNetworkThread(QObject, threading.Thread):
 
     def notify_close_children(self):
         self.send_broadcast_message("MASTER INSTANCE QUIT")
+
+    # --- effect preview on a child's device (see the preview_* signals) ---
+
+    def send_preview(self, device, name):
+        """master -> the child owning ``device``: run the named preview."""
+        self.send_broadcast_message(f"PREVIEW:{device}:{name}")
+
+    def send_preview_stop(self, device):
+        self.send_broadcast_message(f"PREVIEW STOP:{device}")
+
+    def send_preview_done(self, name):
+        """child -> master: this instance's preview finished."""
+        self.send_message(f"PREVIEW DONE:{G.device_type}:{name}")
 
     def send_message(self, message):
         if not self._dstport:

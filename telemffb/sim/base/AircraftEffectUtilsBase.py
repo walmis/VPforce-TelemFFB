@@ -25,8 +25,17 @@ class AircraftEffectUtilsBase(object):
 
     @property
     def effects(self) -> utils.Dispenser:
-        # Return global effects dispenser from globals to avoid circular imports
-        return G.effects
+        """This aircraft's effect dispenser.
+
+        The shared global one (``G.effects``) for a live aircraft - read
+        from globals to avoid circular imports.  An instance may carry
+        its own in ``_effects``: the effect preview builds a throwaway
+        aircraft that must never touch the live aircraft's effects (its
+        constructor clears the dispenser; its cleanup destroys every
+        effect in it), so it gets a private table and the live one is
+        untouched even with a sim session in the background.
+        """
+        return self.__dict__.get('_effects') or G.effects
 
     @property
     def telem_data(self) -> BaseTelemetryData:

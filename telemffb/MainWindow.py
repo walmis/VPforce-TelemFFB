@@ -732,6 +732,19 @@ class MainWindow(QMainWindow):
 
         self.tab_widget = QTabWidget(self)
 
+        # Offline editing for the aircraft that is loaded right now.  The
+        # other two entry points (Profiles menu, the empty-settings notice)
+        # open the editor with nothing selected; this one lands on the
+        # live aircraft's sim / class / model / profile, which is what you
+        # want when you have just been flying it and want to tune or
+        # preview its effects.  Lives in the tab bar's spare corner, shown
+        # only while an aircraft is loaded and the editor is not open.
+        self.offline_editor_button = QPushButton('Offline/Preview Mode')
+        self.offline_editor_button.setObjectName('offline_editor_button')
+        self.offline_editor_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.offline_editor_button.setVisible(False)
+        self.offline_editor_button.clicked.connect(self.enter_offline_for_live_aircraft)
+        self.tab_widget.setCornerWidget(self.offline_editor_button, Qt.Corner.TopRightCorner)
 
         """ Add the tab widget to the main layout """
 
@@ -1379,6 +1392,253 @@ class MainWindow(QMainWindow):
         count = G.exception_tracker.get_count()
         self.exception_status_widget.set_count(count)
 
+    # ---- effect preview ---------------------------------------------------
+    #
+    # The settings form on the master hosts the play button for EVERY
+    # device's rows (the config scope switches between them), but an effect
+    # has to play on the instance that owns the device.  So a preview is
+    # local when the scope is this instance's own device, and otherwise
+    # goes to the owning child over IPC: the master keeps the popup, the
+    # button state and the slider cues, the child does the playing and
+    # reports when it is done (with a timer here as the fallback).
+
+    def effect_preview_scope(self):
+        """The device whose rows the settings form is showing."""
+        if G.master_instance:
+            return getattr(G, 'current_device_config_scope', None) or G.device_type
+        return G.device_type
+
+    def effect_preview_is_remote(self):
+        return self.effect_preview_scope() != G.device_type
+
+    def effect_preview_blockers(self):
+        """Why an effect preview cannot run right now (empty: it can)."""
+        from telemffb.preview import preview_blockers
+        if self.effect_preview_is_remote():
+            scope = self.effect_preview_scope()
+            ipc = getattr(G, 'ipc_instance', None)
+            if scope not in (getattr(G, 'launched_instances', None) or {}):
+                return [f"no {scope} instance is running"]
+            connected = ipc.child_device_connected(scope) if ipc else None
+            if connected is None:
+                return [f"the {scope} instance has not reported its device yet"]
+            if not connected:
+                return [f"no {scope} device connected"]
+            return []
+        manager = getattr(G, 'telem_manager', None)
+        return preview_blockers(
+            current_aircraft=manager.currentAircraft if manager else None,
+            device_alive=HapticEffect.device_alive(),
+            telemetry_paused=bool(getattr(manager, 'pause_state', False)) if manager else True)
+
+    def confirm_constant_force_preview(self, spec):
+        """The heads-up before a constant-force preview: an unattended axis
+        can be driven to its stops.  Asked every time, on purpose.  The
+        safety wording is fixed; only the spec's reference line varies."""
+        answer = QMessageBox.warning(
+            self, "Constant Force Preview",
+            "Constant force effect previews may move the axis in unexpected ways.\n\n"
+            "Please firmly grasp the controls before proceeding.\n\n"
+            f"This preview plays {spec.reference} at the maximum force your settings "
+            "allow. In flight the telemetry sets the level, and it is usually lower.",
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel)
+        return answer == QMessageBox.StandardButton.Ok
+
+    def effect_preview_running_devices(self):
+        """This instance's device plus every launched child whose device
+        has reported connected - the candidates for a play-all."""
+        devices = [G.device_type]
+        if G.master_instance:
+            ipc = getattr(G, 'ipc_instance', None)
+            for dev in (getattr(G, 'launched_instances', None) or {}):
+                if dev != G.device_type and ipc and ipc.child_device_connected(dev):
+                    devices.append(dev)
+        return devices
+
+    def effect_preview_running(self, spec):
+        group = getattr(self, '_group_preview', None)
+        if group is not None:
+            return group['spec'] is spec
+        preview = getattr(self, '_effect_preview', None)
+        return bool(preview is not None and preview.running and preview.runner.spec is spec)
+
+    def toggle_effect_preview(self, spec, button=None, devices=None):
+        """Settings-row play buttons: start this preview on ``devices``
+        (default: the device the form is scoped to), or stop it if it is
+        the one playing.  The button reads as a stop while it plays and
+        reverts when the run ends, however it ends.  A set that is only
+        this instance's own device plays locally; anything else goes
+        through the group path, which drives the children over IPC."""
+        if self.effect_preview_running(spec):
+            if getattr(self, '_group_preview', None) is not None:
+                self._stop_group_preview()
+            else:
+                self.stop_effect_preview()
+            return
+
+        # the button reverts to whatever it showed (play, or play-all),
+        # not to a fixed glyph
+        original_text = button.text() if button is not None else None
+
+        def restore():
+            if button is not None:
+                try:
+                    button.setText(original_text)
+                except RuntimeError:
+                    pass   # the row was rebuilt while the preview played
+
+        devices = list(devices) if devices else [self.effect_preview_scope()]
+        if devices == [G.device_type]:
+            started = self.start_effect_preview(spec, on_finished=restore)
+        else:
+            started = self._start_group_preview(spec, devices, on_finished=restore)
+        if started and button is not None:
+            button.setText("■")
+
+    def _start_group_preview(self, spec, devices, on_finished=None):
+        """Play ``spec`` on a set of devices at once: this instance's own
+        device locally (if in the set) and each child over IPC.  The
+        master keeps the confirmation, the slider cues and a fallback
+        timer in case a child never reports back; the run is over when
+        every device has finished."""
+        from telemffb.SettingsLayout import mark_preview_sliders
+        self._stop_group_preview()
+        self.stop_effect_preview()
+        blockers = self.effect_preview_blockers() if len(devices) == 1 else []
+        if blockers:
+            QMessageBox.information(self, "Effect Preview",
+                                    "Cannot preview now:\n- " + "\n- ".join(blockers))
+            return False
+        if spec.constant_force and not self.confirm_constant_force_preview(spec):
+            return False
+        children = [d for d in devices if d != G.device_type]
+        local = G.device_type in devices
+        logging.info(f"Effect preview: {spec.name} on {', '.join(devices)}")
+        mark_preview_sliders(self, spec, True)
+        fallback = QTimer(self)
+        fallback.setSingleShot(True)
+        fallback.setInterval(int((spec.duration + spec.tail + 2.0) * 1000))
+        fallback.timeout.connect(lambda: self._finish_group_preview(reason="no reply from a child"))
+        self._group_preview = {'spec': spec, 'pending': set(children) | ({G.device_type} if local else set()),
+                               'children': children, 'on_finished': on_finished, 'timer': fallback}
+        for dev in children:
+            G.ipc_instance.send_preview(dev, spec.name)
+        if local:
+            started = self.start_effect_preview(
+                spec, confirm=False, on_finished=lambda: self._group_device_done(G.device_type))
+            if not started:
+                self._group_device_done(G.device_type)
+        fallback.start()
+        return True
+
+    def _group_device_done(self, device):
+        group = getattr(self, '_group_preview', None)
+        if group is None:
+            return
+        group['pending'].discard(device)
+        if not group['pending']:
+            self._finish_group_preview(reason="all devices done")
+
+    def _stop_group_preview(self):
+        group = getattr(self, '_group_preview', None)
+        if group is None:
+            return
+        for dev in group['children']:
+            G.ipc_instance.send_preview_stop(dev)
+        self._finish_group_preview(reason="stopped")
+        self.stop_effect_preview()
+
+    def _finish_group_preview(self, reason=""):
+        from telemffb.SettingsLayout import mark_preview_sliders
+        group = getattr(self, '_group_preview', None)
+        if group is None:
+            return
+        self._group_preview = None
+        group['timer'].stop()
+        mark_preview_sliders(self, group['spec'], False)
+        logging.info(f"Effect preview finished: {group['spec'].name} ({reason})")
+        if group['on_finished'] is not None:
+            group['on_finished']()
+
+    def on_child_preview_done(self, device, name):
+        """IPC: the child owning ``device`` finished the named preview."""
+        group = getattr(self, '_group_preview', None)
+        if group is not None and group['spec'].name == name:
+            self._group_device_done(device)
+
+    def start_child_preview(self, name):
+        """IPC: the master asked this instance to play a named preview on
+        its device.  No confirmation here - the master already asked, and
+        this window is hidden - and the master is told when it ends."""
+        from telemffb.preview import PREVIEW_SPECS
+        spec = PREVIEW_SPECS.get(name)
+        if spec is None:
+            logging.warning(f"Effect preview {name!r} requested by the master is unknown here")
+            G.ipc_instance.send_preview_done(name)
+            return
+        started = self.start_effect_preview(
+            spec, on_finished=lambda: G.ipc_instance.send_preview_done(name), confirm=False)
+        if not started:
+            G.ipc_instance.send_preview_done(name)
+
+    def start_effect_preview(self, spec, on_finished=None, confirm=True):
+        """Play one effect on the device with synthetic telemetry.
+
+        Builds a throwaway aircraft for the settings tab's current model
+        (sim defaults when nothing is selected), with its own effect
+        table so a loaded aircraft is untouched, and drives the spec's
+        effect method from a timer.  Refused only while telemetry is
+        actively streaming or the device is gone.  Returns True when the
+        preview started.
+        """
+        from telemffb.preview import PreviewRunner, TimedPreview, resolve_preview_target
+        from telemffb.telem.TelemManager import build_aircraft
+        self.stop_effect_preview()
+        blockers = self.effect_preview_blockers()
+        if blockers:
+            if confirm:
+                QMessageBox.information(self, "Effect Preview",
+                                        "Cannot preview now:\n- " + "\n- ".join(blockers))
+            else:
+                logging.warning(f"Effect preview {spec.name} refused: " + "; ".join(blockers))
+            return False
+        if confirm and spec.constant_force and not self.confirm_constant_force_preview(spec):
+            return False
+        sim, model, cls = resolve_preview_target(G.settings_mgr)
+        try:
+            aircraft = build_aircraft(sim, model, cls_name=cls)
+            runner = PreviewRunner(aircraft, spec, sim)
+        except Exception as e:
+            logging.exception(f"Effect preview {spec.name} could not start")
+            if confirm:
+                QMessageBox.warning(self, "Effect Preview", f"Could not start preview:\n{e}")
+            return False
+        logging.info(f"Effect preview: {spec.name} on {sim} / {cls or '-'} / {model} "
+                     f"({type(aircraft).__name__}), {runner.steps_total} frames "
+                     f"at {runner.frame_rate:g} Hz")
+        from telemffb.SettingsLayout import mark_preview_sliders
+        mark_preview_sliders(self, spec, True)     # the live-effect green, while it plays
+
+        def finished():
+            logging.info(f"Effect preview finished: {spec.name}")
+            mark_preview_sliders(self, spec, False)
+            if on_finished is not None:
+                on_finished()
+
+        self._effect_preview = TimedPreview(runner, on_finished=finished)
+        self._effect_preview.start()
+        return True
+
+    def stop_effect_preview(self):
+        """Stop this instance's own preview (the local runner).  A group
+        run's children are stopped by _stop_group_preview; a child told to
+        stop over IPC lands here and its finished callback reports back."""
+        preview = getattr(self, '_effect_preview', None)
+        if preview is not None and preview.running:
+            preview.stop()
+        self._effect_preview = None
+
     def add_debug_menu(self):
         # debug mode
         for action in self.menu.actions():
@@ -1430,6 +1690,20 @@ class MainWindow(QMainWindow):
         show_settingname_action.triggered.connect(do_toggle_settingsnames)
         show_settingname_action.setCheckable(True)
         debug_menu.addAction(show_settingname_action)
+
+        # Effect preview (hardware check for the preview runner): one
+        # entry per shipped spec, played on the device with synthetic
+        # telemetry and the settings tab's current model.
+        from telemffb.preview import PREVIEW_SPECS
+        preview_menu = debug_menu.addMenu("Preview Effect")
+        for name, spec in PREVIEW_SPECS.items():
+            preview_action = QAction(f"{name}  ({spec.kind}, {spec.duration:g}s)", self)
+            preview_action.triggered.connect(
+                lambda checked=False, s=spec: self.start_effect_preview(s))
+            preview_menu.addAction(preview_action)
+        stop_preview_action = QAction("Stop preview", self)
+        stop_preview_action.triggered.connect(self.stop_effect_preview)
+        preview_menu.addAction(stop_preview_action)
 
         configurator_settings_action = QAction('Configurator Gain Override', self)
         def do_open_configurator_dialog():
@@ -1811,9 +2085,11 @@ class MainWindow(QMainWindow):
             # same context still refreshes)
             self._profile_notes_shown = None
             self.refresh_profile_notes_button()
+            self.refresh_offline_editor_button()
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
+            self.refresh_offline_editor_button()      # hidden while the editor is open
             self.status_container.set_offline("None")
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
@@ -1853,7 +2129,7 @@ class MainWindow(QMainWindow):
             G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
     @pyqtSlot(str, str, str, str)
-    def load_single_offline_model(self, sim, cls, model, profile):
+    def load_single_offline_model(self, sim, cls, model, profile, from_profile_manager=True):
 
         self.toggle_offline_mode(True)
         for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
@@ -1887,11 +2163,16 @@ class MainWindow(QMainWindow):
         for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
             cb.blockSignals(False)
 
-        G.settings_mgr.offline_scope = 'MODEL'
+        if model:
+            G.settings_mgr.offline_scope = 'MODEL'
+        else:
+            # an aircraft with class-level settings only: edit those
+            G.settings_mgr.offline_scope = 'CLASS'
+            self.offline_scope_label.setText(f"Editing Class Defaults ({cls})")
 
         self.force_sim_aircraft()
         if G.master_instance:
-            self.back_to_profile_mgr_button.setVisible(True)
+            self.back_to_profile_mgr_button.setVisible(from_profile_manager)
             args = [sim, cls, model, profile]
             G.ipc_instance.send_broadcast_message(f"SHOW_OFFLINE_MODEL:{json.dumps(args)} ")
             self.resize_offline_combos()
@@ -2246,6 +2527,58 @@ class MainWindow(QMainWindow):
         self.populate_profile_combo(None) # populate combo with any new profiles
         self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         self.settings_layout.reload_caller()
+        self.refresh_offline_editor_button()
+
+    # ---- "Enter Offline Editor" for the live aircraft -----------------------
+
+    @staticmethod
+    def live_offline_target(settings_mgr, available_profiles=()):
+        """What the offline editor should open on for the loaded aircraft:
+        ``(sim, cls, model, profile)`` or ``None`` when nothing is loaded.
+
+        ``model`` is the matched pattern (what the editor's model list
+        holds), empty when the aircraft only has class-level settings - the
+        editor then opens at CLASS scope.  ``profile`` is the active one,
+        else the first available, else empty."""
+        sim = getattr(settings_mgr, 'current_sim', None)
+        if not sim or sim == 'nothing':
+            return None
+        cls = getattr(settings_mgr, 'current_class', '') or ''
+        model = getattr(settings_mgr, 'current_pattern', '') or ''
+        profile = getattr(settings_mgr, 'active_profile', None) or ''
+        if not profile and model:
+            profile = next((p for p in available_profiles if p != 'Built-In'), '')
+        return sim, cls, model, profile
+
+    def refresh_offline_editor_button(self):
+        """Show the corner button only while an aircraft is loaded and the
+        offline editor is not open; its tooltip names where it will land."""
+        btn = getattr(self, 'offline_editor_button', None)
+        if btn is None:
+            return
+        manager = getattr(G, 'telem_manager', None)
+        loaded = manager is not None and getattr(manager, 'currentAircraft', None) is not None
+        target = self.live_offline_target(G.settings_mgr) if loaded else None
+        if target is None or G.settings_mgr.offline_mode:
+            btn.setVisible(False)
+            return
+        sim, cls, model, profile = target
+        where = f"{sim} / {cls or '-'} / {model or '(class defaults)'}"
+        if profile:
+            where += f" / {profile}"
+        btn.setToolTip(f"Edit and preview effects for the loaded aircraft:\n{where}\n"
+                       "Telemetry pauses while you work; play buttons appear on the sliders.")
+        btn.setVisible(True)
+
+    def enter_offline_for_live_aircraft(self):
+        target = self.live_offline_target(G.settings_mgr)
+        if target is None:
+            return
+        sim, cls, model, profile = target
+        if not profile and model:
+            profiles = xmlutils.get_available_profiles(sim, cls, model)
+            profile = next((p for p in profiles if p != 'Built-In'), '')
+        self.load_single_offline_model(sim, cls, model, profile, from_profile_manager=False)
 
     def open_url(self, url):
 
@@ -2526,6 +2859,7 @@ class MainWindow(QMainWindow):
         self._profile_notes_shown = None
         self.settings_layout.clear_layout()
         self.telemetry_timed_out = False
+        self.refresh_offline_editor_button()      # nothing loaded to edit any more
 
     def on_update_telemetry(self, datadict: dict):
         if utils.millis() - self.last_telemetry_refresh < 50:
