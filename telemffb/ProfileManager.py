@@ -26,12 +26,13 @@ from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot, QRegularExp
 from PyQt6.QtGui import QAction, QIcon, QRegularExpressionValidator, QFont, QBrush, QPalette
 from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, QStyle, QMenu, QFileDialog, QTreeWidget, \
     QInputDialog, QTableWidgetItem, QComboBox, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QHBoxLayout, QPushButton, \
-    QRadioButton, QButtonGroup, QApplication, QListWidget, QListWidgetItem, QTableWidget, QAbstractItemView
+    QRadioButton, QButtonGroup, QApplication, QListWidget, QListWidgetItem, QTableWidget, QAbstractItemView, QTextEdit
 
 import telemffb.globals as G
 from telemffb import utils
 from telemffb.ui.Ui_ProfileManagerDialog import Ui_ProfileManagerDialog
 from telemffb.ProfileImportDialog import ProfileImportDialog
+from telemffb.ProfileSharing import LocalProfileShareService, SharedProfileItem, SharedProfileMetadata
 from telemffb.NewAircraftWizard import NewAircraftWizard
 from telemffb.utils import dbprint
 import xml.etree.ElementTree as ET
@@ -96,6 +97,12 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.pb_Activate.clicked.connect(self.on_activate_clicked)
         self.pb_Edit.clicked.connect(self.on_edit_clicked)
         self.pb_Rename.clicked.connect(self.on_rename_clicked)
+        self.share_service = LocalProfileShareService()
+        self.pb_Share = QPushButton("Share...")
+        self.pb_Share.setToolTip("Create a shareable XML profile file with metadata")
+        self.pb_Share.setEnabled(False)
+        self.pb_Share.clicked.connect(self.share_selected_profiles)
+        self.verticalLayout.insertWidget(self.verticalLayout.indexOf(self.pb_Import), self.pb_Share)
 
         self.pb_newAircraft.clicked.connect(self.on_new_wizard_clicked)
 
@@ -265,6 +272,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         self.pb_Delete.setEnabled(False)
         self.pb_Export.setEnabled(False)
+        self.pb_Share.setEnabled(False)
         self.pb_Clone.setEnabled(False)
         self.pb_Rename.setEnabled(False)
         self.pb_Edit.setEnabled(False)
@@ -386,6 +394,10 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             export_action.triggered.connect(self.export_selected_profile)
             menu.addAction(export_action)
 
+            share_action = QAction("Share selection to file", self)
+            share_action.triggered.connect(self.share_selected_profiles)
+            menu.addAction(share_action)
+
             delete_action = QAction("Delete selected profile(s)", self)
             delete_action.triggered.connect(self.on_delete_clicked)
             menu.addAction(delete_action)
@@ -427,8 +439,10 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 self.pb_Activate.setEnabled(False)
                 if any(self.get_metadata(item, "type") == "user" for item in selected_item):
                     self.pb_Export.setEnabled(True)
+                    self.pb_Share.setEnabled(True)
                 else:
                     self.pb_Export.setEnabled(False)
+                    self.pb_Share.setEnabled(False)
             else:
                 # only one item is selected
                 item = selected_item[0]
@@ -449,15 +463,18 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 if self.get_metadata(selected_item[0], "type") == "user":
                     self.pb_Delete.setEnabled(True)
                     self.pb_Export.setEnabled(True)
+                    self.pb_Share.setEnabled(True)
                     self.pb_Edit.setEnabled(True)
                 else:
                     self.pb_Delete.setEnabled(False)
                     self.pb_Export.setEnabled(False)
+                    self.pb_Share.setEnabled(False)
                     self.pb_Edit.setEnabled(False)
         else:
             # all items unsulected
             self.pb_Delete.setEnabled(False)
             self.pb_Export.setEnabled(False)
+            self.pb_Share.setEnabled(False)
             self.pb_Edit.setEnabled(False)
             self.pb_Rename.setEnabled(False)
             self.pb_Clone.setEnabled(False)
@@ -735,7 +752,8 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             export_class,
             devices,
             output_path,
-            get_metadata
+            get_metadata,
+            share_metadata=None
     ):
         root = ET.Element("TelemFFB_v2")
         seen = set()
@@ -794,6 +812,21 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                     if key not in seen:
                         root.append(el)
                         seen.add(key)
+
+        if share_metadata is not None:
+            omitted_vpconf_refs = self.share_service.find_omitted_vpconf_refs(root)
+            share_metadata = SharedProfileMetadata(
+                title=share_metadata.title,
+                author=share_metadata.author,
+                notes=share_metadata.notes,
+                telemffb_version=share_metadata.telemffb_version,
+                exported_at=share_metadata.exported_at,
+                schema_version=share_metadata.schema_version,
+                items=share_metadata.items,
+                devices=share_metadata.devices,
+                omitted_vpconf_refs=omitted_vpconf_refs,
+            )
+            self.share_service.add_metadata(root, share_metadata)
 
         tree = ET.ElementTree(root)
         tree = xmlutils.consolidate_sort_and_write_userconfig(tree, ret=True)
@@ -879,6 +912,53 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             QMessageBox.information(self, "Export Complete",
                                     f"{len(filtered_items)} profiles exported to:\n{output_dir}")
 
+    def share_selected_profiles(self):
+        """
+        Export selected user profiles as a metadata-bearing XML share file.
+        """
+        xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
+
+        selected_items = self.treeWidget.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "No Selection", "Please select one or more profiles to share.")
+            return
+
+        dialog = ShareProfileDialog(selected_items, self.get_metadata, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        filtered_items, export_sim, export_class, _, selected_devices, metadata = dialog.get_data()
+        if not filtered_items:
+            QMessageBox.warning(self, "No Shareable Profiles",
+                                "All selected profiles are default and cannot be shared.")
+            return
+
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Shared Profile",
+            "telemffb_profile_share.xml",
+            "XML Files (*.xml)"
+        )
+        if not save_path:
+            return
+
+        try:
+            self.export_combined_profile_xml(
+                profiles=filtered_items,
+                export_sim=export_sim,
+                export_class=export_class,
+                devices=selected_devices,
+                output_path=save_path,
+                get_metadata=self.get_metadata,
+                share_metadata=metadata
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Share Export Failed", f"An error occurred while exporting:\n{e}")
+            return
+
+        QMessageBox.information(self, "Share File Created",
+                                f"{len(filtered_items)} profiles exported to:\n{save_path}")
+
 
 
     def export_profile_to_xml(self, path: str, sim: str, cls: str, model: str, profile: str) -> bool:
@@ -936,11 +1016,29 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         if not filename:
             return
 
-        tree = ET.parse(filename)
-        root = tree.getroot()
-        if root.tag != 'TelemFFB_v2':
-            QMessageBox.critical(self, "Invalid File", f"Importation is only supported for files generated by TelemFFB v2 versions")
+        try:
+            tree = ET.parse(filename)
+        except ET.ParseError as e:
+            QMessageBox.critical(self, "Invalid File", f"The selected XML file could not be parsed:\n{e}")
             return
+
+        root = tree.getroot()
+        validation_errors = self.share_service.validate_import_root(root)
+        if validation_errors:
+            QMessageBox.critical(
+                self,
+                "Invalid File",
+                "The selected XML file is not a valid TelemFFB profile import:\n\n"
+                + "\n".join(validation_errors[:10])
+            )
+            return
+
+        shared_metadata = self.share_service.parse_metadata(root)
+        if shared_metadata is not None:
+            preview = SharedProfilePreviewDialog(shared_metadata, self)
+            if preview.exec() != QDialog.DialogCode.Accepted:
+                return
+
         imported_sim_defaults = tree.getroot().findall('simSettings')
         imported_class_defaults = tree.getroot().findall('classSettings')
         imported_sc_overrides = tree.getroot().findall('sc_overrides')
@@ -1666,6 +1764,133 @@ class ExportOptionsDialog(QDialog):
             selected_devices = [G.device_type]
 
         return self.valid_items, export_sim, export_class, export_mode, selected_devices
+
+
+class ShareProfileDialog(ExportOptionsDialog):
+    def __init__(self, selected_items, get_metadata, parent=None):
+        super().__init__(selected_items, get_metadata, parent)
+        self.setWindowTitle("Share Profile")
+        self.radio_single_file.setText("Single Shareable XML File")
+        self.radio_multiple_files.hide()
+
+        self.title_edit = QLineEdit(self._default_title())
+        self.author_edit = QLineEdit()
+        self.notes_edit = QTextEdit()
+        self.notes_edit.setMaximumHeight(90)
+        self.notes_edit.setPlaceholderText("Optional notes for people importing this profile")
+
+        layout = self.layout()
+        insert_at = max(layout.count() - 1, 0)
+        layout.insertWidget(insert_at, QLabel("Share Metadata:"))
+        layout.insertWidget(insert_at + 1, QLabel("Title:"))
+        layout.insertWidget(insert_at + 2, self.title_edit)
+        layout.insertWidget(insert_at + 3, QLabel("Author:"))
+        layout.insertWidget(insert_at + 4, self.author_edit)
+        layout.insertWidget(insert_at + 5, QLabel("Notes:"))
+        layout.insertWidget(insert_at + 6, self.notes_edit)
+
+        self.title_edit.textChanged.connect(self._validate_title)
+        self._validate_title(self.title_edit.text())
+
+    def get_data(self):
+        valid_items, export_sim, export_class, export_mode, selected_devices = super().get_data()
+        metadata = SharedProfileMetadata(
+            title=self.title_edit.text().strip(),
+            author=self.author_edit.text().strip(),
+            notes=self.notes_edit.toPlainText().strip(),
+            telemffb_version=utils.get_version(),
+            items=self._metadata_items(valid_items),
+            devices=sorted(set(selected_devices + ["any"])),
+        )
+        return valid_items, export_sim, export_class, export_mode, selected_devices, metadata
+
+    def _default_title(self) -> str:
+        if not self.valid_items:
+            return "TelemFFB Profile Share"
+
+        item = self.valid_items[0]
+        aircraft = item.text(ProfileManagerDialog.COL_AIRCRAFT)
+        profile = self.get_metadata(item, "profile_name") or "Profile"
+        if len(self.valid_items) == 1:
+            return f"{aircraft} - {profile}"
+        return f"{aircraft} and {len(self.valid_items) - 1} more profiles"
+
+    def _metadata_items(self, valid_items) -> list[SharedProfileItem]:
+        return [
+            SharedProfileItem(
+                sim=self.get_metadata(item, "sim_name") or "",
+                cls=self.get_metadata(item, "cls_name") or "",
+                model=item.text(ProfileManagerDialog.COL_AIRCRAFT),
+                profile=self.get_metadata(item, "profile_name") or "",
+            )
+            for item in valid_items
+        ]
+
+    def _validate_title(self, title: str):
+        self.ok_button.setEnabled(bool(title.strip()) and bool(self.valid_items))
+
+
+class SharedProfilePreviewDialog(QDialog):
+    def __init__(self, metadata: SharedProfileMetadata, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Shared Profile Preview")
+        self.setMinimumWidth(520)
+
+        layout = QVBoxLayout(self)
+        title_label = QLabel(metadata.title or "Shared TelemFFB profile")
+        title_label.setTextFormat(Qt.TextFormat.PlainText)
+        title_font = title_label.font()
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        layout.addWidget(title_label)
+
+        details = [
+            f"Author: {metadata.author or 'Not specified'}",
+            f"TelemFFB version: {metadata.telemffb_version or 'Unknown'}",
+            f"Exported: {metadata.exported_at or 'Unknown'}",
+            f"Devices: {', '.join(metadata.devices) if metadata.devices else 'Not specified'}",
+        ]
+        details_label = QLabel("\n".join(details))
+        details_label.setTextFormat(Qt.TextFormat.PlainText)
+        layout.addWidget(details_label)
+
+        if metadata.items:
+            items_text = "\n".join(
+                f"{item.sim} / {item.cls} / {item.model} / {item.profile}"
+                for item in metadata.items
+            )
+            items_box = QTextEdit(items_text)
+            items_box.setReadOnly(True)
+            items_box.setMaximumHeight(100)
+            layout.addWidget(QLabel("Included profiles:"))
+            layout.addWidget(items_box)
+
+        if metadata.notes:
+            notes_box = QTextEdit(metadata.notes)
+            notes_box.setReadOnly(True)
+            notes_box.setMaximumHeight(90)
+            layout.addWidget(QLabel("Notes:"))
+            layout.addWidget(notes_box)
+
+        if metadata.omitted_vpconf_refs:
+            warning = QLabel(
+                "This share references VPforce Configurator .vpconf files that are not included:\n"
+                + "\n".join(metadata.omitted_vpconf_refs)
+            )
+            warning.setTextFormat(Qt.TextFormat.PlainText)
+            warning.setWordWrap(True)
+            layout.addWidget(warning)
+
+        button_layout = QHBoxLayout()
+        import_button = QPushButton("Continue Import")
+        cancel_button = QPushButton("Cancel")
+        button_layout.addStretch(1)
+        button_layout.addWidget(import_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+
+        import_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
 
 
 class TreePopulationWorker(QObject):
