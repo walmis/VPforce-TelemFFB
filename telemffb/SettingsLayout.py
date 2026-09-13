@@ -742,7 +742,7 @@ class SettingsLayout(QGridLayout):
             notice.setText(text)
         self.addWidget(notice, 0, 1, 1, 6)
         if not G.settings_mgr.offline_mode and G.master_instance and self.mainwindow is not None:
-            btn = QPushButton('Open Offline Editor')
+            btn = QPushButton(r'Offline Editor/Effect Preview')
             btn.clicked.connect(lambda checked=False: self.mainwindow.toggle_offline_mode(True))
             self.addWidget(btn, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
