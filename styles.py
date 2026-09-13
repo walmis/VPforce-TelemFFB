@@ -101,12 +101,24 @@ QPushButton[buttonType="p_m_button"]:hover {
     border-radius: 4px;
 }    
                                                                    
-QPushButton[buttonType="p_m_button"]:pressed {                          
+QPushButton[buttonType="p_m_button"]:pressed {
     background-color: #666;  /* Optional: Change background on press */
     border: 1px solid #ab37c8;
     min-width: 20px;
-    border-radius: 4px; 
-}     
+    border-radius: 4px;
+}
+
+/* Borderless glyph buttons stay borderless when disabled (a preview holding
+   the row, a setting whose toggle is off): the generic disabled gradient box
+   above is for framed buttons.  Just dim the glyph. */
+QPushButton[buttonType="p_m_button"]:disabled:!pressed,
+QPushButton[buttonType="erase_button"]:disabled:!pressed {
+    color: #808080;
+    background-color: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+}
 
 QToolButton[buttonType="expand_button"] {                                                          
     font-size: 16px;  /* Adjust the font size */                       
@@ -345,11 +357,23 @@ QPushButton[buttonType="p_m_button"]:hover {
     border-radius: 4px;
 }                      
                                                  
-QPushButton[buttonType="p_m_button"]:pressed {                          
-    background-color: #666;  /* Optional: Change background on press */ 
+QPushButton[buttonType="p_m_button"]:pressed {
+    background-color: #666;  /* Optional: Change background on press */
     min-width: 20px;
     border-radius: 4px;
-}                                                                       
+}
+
+/* Borderless glyph buttons stay borderless when disabled (a preview holding
+   the row, a setting whose toggle is off): the generic disabled gradient box
+   above is for framed buttons.  Just dim the glyph. */
+QPushButton[buttonType="p_m_button"]:disabled:!pressed,
+QPushButton[buttonType="erase_button"]:disabled:!pressed {
+    color: #a0a0a0;
+    background-color: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+}
 
 QToolButton[buttonType="expand_button"] {                                                          
     font-size: 16px;  /* Adjust the font size */                       

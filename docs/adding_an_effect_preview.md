@@ -79,8 +79,12 @@ Field by field:
   toggle covers several separately tuned effects (IL-2's gun / bomb / rocket are three specs
   sharing `il2_enable_weapons`).
 - **`rows`** — the settings rows that get the `▶` button. Always the **intensity** slider(s)
-  the user adjusts while listening — never the toggle, never a threshold. A row belongs to one
-  spec only; a test enforces both, and that every row exists in `defaults.xml`.
+  the user adjusts between runs — never the toggle, never a threshold. A row belongs to one
+  spec only; a test enforces both, and that every row exists in `defaults.xml`. While the
+  preview plays, every row listed here is held (slider, steppers, value entry and erase
+  disabled, handle green, the starting button a stop): the runner read its settings once at
+  the start, so an edit mid-run would not be heard. `SettingsLayout.lock_preview_rows` does
+  this by object name and `build_rows` replays it, so a form rebuild mid-run comes back held.
 - **`reference`** — one sentence fragment saying what condition the preview represents
   ("moderate turbulence: a few m/s of vertical and lateral gusts"). The row tooltip and the
   constant-force popup slot it into a fixed template, so write it to follow "This preview

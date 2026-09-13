@@ -7,7 +7,10 @@ scroll-anchor e2e test does, and checks the button's placement rules:
 * only on rows a preview names (the button is the availability cue)
 * disabled with the reason as tooltip when the main window reports a
   blocker; enabled and wired to the main window's toggle when not
-* reads as a stop while its own preview plays
+* reads as a stop while its own preview plays, and the row is held
+  (slider, steppers, value entry, erase locked) until the run ends -
+  redrawn from the main window's state on every build, so a form rebuild
+  mid-run (an erase, an expander) comes back the same
 
 Self-skips if Qt has no platform or the layout cannot be built.
 """
@@ -41,11 +44,17 @@ class FakeMainWindow(QtWidgets.QWidget):
         super().__init__()
         self.blockers = []
         self.running_spec = None
+        self.running_slot = 'pv'
         self.running_devices = ['joystick']
         self.toggled = []
 
     def effect_preview_blockers(self):
         return list(self.blockers)
+
+    def effect_preview_running_spec(self):
+        if self.running_spec is None:
+            return None, None
+        return self.running_spec, self.running_slot
 
     def effect_preview_running(self, spec):
         return spec is self.running_spec
@@ -53,11 +62,11 @@ class FakeMainWindow(QtWidgets.QWidget):
     def effect_preview_running_devices(self):
         return list(self.running_devices)
 
-    def toggle_effect_preview(self, spec, button=None, devices=None):
-        self.toggled.append((spec, button, devices))
+    def toggle_effect_preview(self, spec, devices=None):
+        self.toggled.append((spec, devices))
 
 
-def _render(qapp, tmp_path, *, offline, blockers=(), running=None,
+def _render(qapp, tmp_path, *, offline, blockers=(), running=None, running_slot='pv',
             sim='DCS', model='F-16C_50', running_devices=('joystick',)):
     try:
         import telemffb.globals as G
@@ -94,6 +103,7 @@ def _render(qapp, tmp_path, *, offline, blockers=(), running=None,
         mw = FakeMainWindow()
         mw.blockers = list(blockers)
         mw.running_spec = running
+        mw.running_slot = running_slot
         mw.running_devices = list(running_devices)
         mwl = QtWidgets.QVBoxLayout(mw)
         area = NoKeyScrollArea()
@@ -131,8 +141,22 @@ def _render(qapp, tmp_path, *, offline, blockers=(), running=None,
                 if w.objectName().startswith('pvpadall_')}
     sliders = {w.objectName()[4:]: w for w in content.findChildren(QtWidgets.QSlider)
                if w.objectName().startswith('sld_')}
+
+    def row_widgets(name):
+        """The editable widgets of one slider row, by role."""
+        found = {}
+        for role, cls, prefix in (('slider', QtWidgets.QSlider, 'sld_'),
+                                  ('minus', QtWidgets.QPushButton, 'sldm_'),
+                                  ('plus', QtWidgets.QPushButton, 'sldp_'),
+                                  ('erase', QtWidgets.QPushButton, 'eb_'),
+                                  ('entry', QtWidgets.QLineEdit, 'vle_')):
+            w = content.findChild(cls, f"{prefix}{name}")
+            if w is not None:
+                found[role] = w
+        return found
     return types.SimpleNamespace(mw=mw, buttons=buttons, all_buttons=all_buttons, pads=pads,
-                                 all_pads=all_pads, sliders=sliders, sl=sl, content=content)
+                                 all_pads=all_pads, sliders=sliders, sl=sl, content=content,
+                                 row_widgets=row_widgets)
 
 
 def test_no_buttons_or_pads_outside_offline_mode(qapp, tmp_path):
@@ -164,18 +188,72 @@ def test_rows_without_a_preview_get_a_matching_pad(qapp, tmp_path):
 def test_playing_preview_paints_its_rows_handles_green(qapp, tmp_path):
     from telemffb.custom_widgets import vpf_purple
     from telemffb.preview import JET_ENGINE_RUMBLE, AFTERBURNER
-    from telemffb.SettingsLayout import mark_preview_sliders, PREVIEW_ACTIVE_HANDLE
+    from telemffb.SettingsLayout import lock_preview_rows, PREVIEW_ACTIVE_HANDLE
     r = _render(qapp, tmp_path, offline=True)
     jet, ab = 'jet_engine_rumble_intensity', 'afterburner_effect_intensity'
     if jet not in r.sliders or ab not in r.sliders:
         pytest.skip("jet rumble and afterburner intensity rows not both rendered for this model")
-    mark_preview_sliders(r.content, JET_ENGINE_RUMBLE, True)
+    lock_preview_rows(r.content, JET_ENGINE_RUMBLE, True)
     assert r.sliders[jet].handle_color == PREVIEW_ACTIVE_HANDLE
     assert r.sliders[ab].handle_color == vpf_purple             # only its own rows
-    mark_preview_sliders(r.content, JET_ENGINE_RUMBLE, False)
+    lock_preview_rows(r.content, JET_ENGINE_RUMBLE, False)
     assert r.sliders[jet].handle_color == vpf_purple
-    mark_preview_sliders(r.content, AFTERBURNER, True)
+    lock_preview_rows(r.content, AFTERBURNER, True)
     assert r.sliders[ab].handle_color == PREVIEW_ACTIVE_HANDLE
+
+
+def test_playing_rows_are_held_and_released(qapp, tmp_path):
+    """A preview reads its settings once, at the start: while it plays the
+    row cannot be edited - slider, -/+ steppers, value entry and the erase
+    button (present but hidden on a clean row) are all disabled - and the
+    lock lets go of every one of them when the run ends."""
+    from telemffb.preview import JET_ENGINE_RUMBLE, AFTERBURNER
+    from telemffb.SettingsLayout import lock_preview_rows
+    r = _render(qapp, tmp_path, offline=True)
+    jet, ab = 'jet_engine_rumble_intensity', 'afterburner_effect_intensity'
+    row, other = r.row_widgets(jet), r.row_widgets(ab)
+    if set(row) < {'slider', 'minus', 'plus', 'erase'} or 'slider' not in other:
+        pytest.skip("jet rumble row not fully rendered for this model")
+    assert all(w.isEnabled() for w in row.values())
+    lock_preview_rows(r.content, JET_ENGINE_RUMBLE, True, slot='pv')
+    assert not any(w.isEnabled() for w in row.values())
+    assert other['slider'].isEnabled()                          # only its own rows
+    assert not row['erase'].isVisible()                         # the hold does not reveal it
+    lock_preview_rows(r.content, JET_ENGINE_RUMBLE, False)
+    assert all(w.isEnabled() for w in row.values())
+
+
+def test_release_leaves_a_row_disabled_for_its_own_reasons_alone(qapp, tmp_path):
+    """A row disabled before the run (its toggle off, say) is not
+    re-enabled by the release: the lock only lets go of what it took."""
+    from telemffb.preview import JET_ENGINE_RUMBLE
+    from telemffb.SettingsLayout import lock_preview_rows
+    r = _render(qapp, tmp_path, offline=True)
+    row = r.row_widgets('jet_engine_rumble_intensity')
+    if 'slider' not in row or 'plus' not in row:
+        pytest.skip("row not rendered for this model")
+    row['slider'].setEnabled(False)
+    lock_preview_rows(r.content, JET_ENGINE_RUMBLE, True)
+    lock_preview_rows(r.content, JET_ENGINE_RUMBLE, False)
+    assert not row['slider'].isEnabled()
+    assert row['plus'].isEnabled()
+
+
+def test_a_rebuild_mid_run_comes_back_held(qapp, tmp_path):
+    """The form is rebuilt from scratch on an erase or an expander click;
+    a fresh build while a preview plays draws its rows held and its
+    button a stop, from the main window's state alone."""
+    from telemffb.preview import PREVIEWS_BY_ROW
+    from telemffb.SettingsLayout import PREVIEW_ACTIVE_HANDLE
+    name = 'jet_engine_rumble_intensity'
+    r = _render(qapp, tmp_path, offline=True, running=PREVIEWS_BY_ROW[name])
+    row = r.row_widgets(name)
+    if name not in r.buttons or 'slider' not in row:
+        pytest.skip("row not rendered for this model")
+    assert r.buttons[name].text() == '■'
+    assert r.sliders[name].handle_color == PREVIEW_ACTIVE_HANDLE
+    assert not any(w.isEnabled() for w in row.values())
+    assert r.buttons[name].isEnabled()                          # the stop still works
 
 
 def test_buttons_only_on_rows_that_host_a_preview(qapp, tmp_path):
@@ -202,7 +280,7 @@ def test_enabled_button_toggles_the_main_windows_preview(qapp, tmp_path):
     assert PREVIEWS_BY_ROW[name].reference in b.toolTip()     # says what it represents
     assert b.toolTip().startswith("<p")                       # rich text: Qt word-wraps it
     b.click()
-    assert r.mw.toggled == [(PREVIEWS_BY_ROW[name], b, None)]
+    assert r.mw.toggled == [(PREVIEWS_BY_ROW[name], None)]
 
 
 def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp_path):
@@ -222,7 +300,20 @@ def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp
     assert "Play on joystick and pedals together." in b.toolTip()
     assert b.toolTip().startswith("<p")                       # rich text: Qt word-wraps it
     b.click()
-    assert r.mw.toggled == [(PREVIEWS_BY_ROW[buffet], b, ('joystick', 'pedals'))]
+    assert r.mw.toggled == [(PREVIEWS_BY_ROW[buffet], ('joystick', 'pedals'))]
+
+
+def test_the_stop_glyph_goes_on_the_button_that_started_it(qapp, tmp_path):
+    from telemffb.preview import PREVIEWS_BY_ROW
+    buffet = 'buffeting_intensity'
+    for slot, stop, plain in (('pv', 'buttons', 'all_buttons'), ('pvall', 'all_buttons', 'buttons')):
+        r = _render(qapp, tmp_path, offline=True, sim='MSFS', model='Cessna 172',
+                    running=PREVIEWS_BY_ROW[buffet], running_slot=slot,
+                    running_devices=('joystick', 'pedals'))
+        if buffet not in r.buttons or buffet not in r.all_buttons:
+            pytest.skip("buffet row with a play-all not rendered for this model")
+        assert getattr(r, stop)[buffet].text() == '■'
+        assert getattr(r, plain)[buffet].text() in ('▶', '▶▶')
 
 
 def test_no_play_all_with_a_single_running_device(qapp, tmp_path):
