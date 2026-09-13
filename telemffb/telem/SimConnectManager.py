@@ -42,6 +42,7 @@ import threading
 import logging
 import os
 import telemffb.globals as G
+from telemffb.util.AxisJitter import AxisJitterMonitor, record_axis_command
 from enum import IntEnum
 
 surface_types = {
@@ -374,6 +375,7 @@ class SimConnectManager(threading.Thread):
         SimVar("ElevTrimMin", "ELEVATOR TRIM MIN", "degrees"),  #2024 only (down)
         SimVar("AileronDefl", "AILERON AVERAGE DEFLECTION", "degrees"),
         SimVarArray("AileronDeflPctLR", "AILERON <> DEFLECTION PCT", keywords=("LEFT", "RIGHT"), unit="Percent Over 100"),
+        SimVar("AileronPos", "AILERON POSITION", "Percent Over 100"),
         SimVar("AileronTrim", "AILERON TRIM", "degrees"),
         SimVar("AileronTrimPct", "AILERON TRIM PCT", "Percent Over 100"),
         SimVarArray("PropThrust", "PROP THRUST", "kilograms", min=1, max=4, scale=10),#scaled to newtons
@@ -383,6 +385,17 @@ class SimConnectManager(threading.Thread):
         SimVar("APMaster", "AUTOPILOT MASTER", "Bool"),
         SimVar("RudderDefl", "RUDDER DEFLECTION", "degrees"),
         SimVar("RudderDeflPct", "RUDDER DEFLECTION PCT", "Percent Over 100"),
+        SimVar("RudderPos", "RUDDER POSITION", "Percent Over 100"),
+        SimVar("CollectivePos", "COLLECTIVE POSITION", "Percent Over 100"),
+        SimVar("TailRotorPos", "TAIL ROTOR PEDAL POSITION", "Percent Over 100"),
+        # Named for the variables they are, not the control they happen
+        # to be read for: a rotorcraft reports its CYCLIC on these, since
+        # AILERON/ELEVATOR POSITION sit flat at zero on several of them.
+        # The LINEAR variant is a different variable from the plain one -
+        # the plain carries the simulator's non-linear response curve,
+        # which would stand as a permanent residual against a command.
+        SimVar("YokeXLinearPos", "YOKE X POSITION LINEAR", "Percent Over 100"),
+        SimVar("YokeYPos", "YOKE Y POSITION", "Percent Over 100"),
         SimVar("RudderTrimPct", "RUDDER TRIM PCT", "Percent Over 100"),
         SimVar("Pitch", "PLANE PITCH DEGREES", "degrees"),
         SimVar("Roll", "PLANE BANK DEGREES", "degrees"),
@@ -684,6 +697,9 @@ class SimConnectManager(threading.Thread):
             data (int): The event data/value (default: 0)
         """
         if event == "DO_NOT_SEND": return
+        # every axis TelemFFB drives passes through here, whatever effect
+        # path raised it, so the contention probe is fed from this one place
+        record_axis_command(event, data)
         self._events_to_send.append((event, data))
 
     def tx_simdatums_to_msfs(self):
@@ -818,6 +834,14 @@ class SimConnectManager(threading.Thread):
                     logging.debug(f"UnsubscribeInputEvent({h}) failed: {e}")
                 self._b_hash_to_var.pop(h)
         if not self._b_vars:
+            # Nothing needs a B: variable, so nothing would normally ask the
+            # aircraft what it has.  Ask anyway while axis capture is on:
+            # listing them is the only way to find a reported position for a
+            # control the simulator describes nowhere else, the helicopter
+            # cyclic being the one that needs it.
+            if self._input_events or not AxisJitterMonitor.capture_enabled():
+                return
+            self._request_input_event_enumeration()
             return
         if self._input_events:
             self._resolve_input_events()
@@ -831,6 +855,8 @@ class SimConnectManager(threading.Thread):
         self._b_enum_found = {}
         self._b_enum_retry_at = None
         self._b_enum_sent_at = time.time()
+        logging.info("SimConnect: asking the aircraft for its input events "
+                     "(attempt %d)", self._b_enum_retries + 1)
         try:
             self.sc.EnumerateInputEvents(self._b_enum_req)
         except Exception as e:
@@ -872,10 +898,49 @@ class SimConnectManager(threading.Thread):
             # again a little later rather than declare every name missing.
             self._b_enum_retries += 1
             self._b_enum_retry_at = time.time() + 2.0
+            logging.info("SimConnect: the aircraft listed no input events; "
+                         "asking again shortly")
             return
         logging.info(f"SimConnect: {len(self._input_events)} input events on this aircraft")
+        self._log_flight_control_input_events()
         self._resolve_input_events()
         self._flush_input_event_writes()
+
+    #: What to call out of an aircraft's input events, for an axis whose
+    #: reported position cannot be found among the simulator's own
+    #: variables.
+    #:
+    #: The helicopter cyclic was that case and no longer is - it reports
+    #: on YOKE X POSITION LINEAR and YOKE Y POSITION, while AILERON and
+    #: ELEVATOR POSITION sit flat at zero on several rotorcraft.  What
+    #: remains uncovered is an aircraft whose external flight model
+    #: populates nothing at all; the FlyInside B206 registers no usable
+    #: variable of its own either, so this is a hunting aid rather than
+    #: a solution.
+    _FLIGHT_CONTROL_EVENT_HINTS = ('CYCLIC', 'COLLECTIVE', 'PEDAL', 'ROTOR',
+                                   'STICK', 'YOKE')
+
+    def _log_flight_control_input_events(self):
+        """Name the input events that might report a control's position.
+
+        The full list runs to hundreds of names and belongs at debug; the
+        few that look like flight controls are worth a normal line, because
+        finding one is the only route to covering an axis the simulator
+        reports nowhere else.
+        """
+        try:
+            names = sorted(self._input_events)
+            if not names:
+                return
+            logging.debug("SimConnect: input events: %s", ", ".join(names))
+            hits = [n for n in names
+                    if any(h in n.upper()
+                           for h in self._FLIGHT_CONTROL_EVENT_HINTS)]
+            if hits:
+                logging.info("SimConnect: flight-control input events: %s",
+                             ", ".join(hits))
+        except Exception:
+            logging.debug("Could not list input events", exc_info=True)
 
     def _resolve_input_events(self):
         for sv in self._b_vars:

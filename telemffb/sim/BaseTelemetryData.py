@@ -664,9 +664,18 @@ class BaseTelemetryData:
     MSFS: AILERON <> DEFLECTION PCT (L, R) SimVars — percent.  
     """
 
+    AileronPos: Optional[float]
+    """Aileron INPUT position (control-side, not the surface).
+    MSFS: AILERON POSITION SimVar — -1.0 to +1.0, 0 at neutral.
+    The roll-axis counterpart of ElevPos, and the readback a second
+    writer on the axis shows up in: a binding left mapped in the sim
+    contends with the axis TelemFFB sends, which appears here as
+    frame-rate alternation rather than as a steady offset.
+    """
+
     AileronTrim: Optional[float]
-    """Aileron trim angle.  
-    MSFS: AILERON TRIM SimVar — degrees.  
+    """Aileron trim angle.
+    MSFS: AILERON TRIM SimVar — degrees.
     """
 
     AileronTrimPct: Optional[float]
@@ -686,9 +695,30 @@ class BaseTelemetryData:
     MSFS: RUDDER DEFLECTION PCT SimVar — percent (-1.0 to 1.0).  
     """
 
+    RudderPos: Optional[float]
+    """Rudder INPUT position (control-side, not the surface).
+    MSFS: RUDDER POSITION SimVar — -1.0 to +1.0, 0 at neutral.
+    The yaw-axis counterpart of ElevPos, carrying the same contention
+    signature when a rudder binding is left mapped in the sim.
+    """
+
+    CollectivePos: Optional[float]
+    """Helicopter collective INPUT position (control-side).
+    MSFS: COLLECTIVE POSITION SimVar - 0.0 fully up to 1.0 fully depressed,
+    unlike the other control axes, which run -1.0 to +1.0.  The contention
+    probe rescales it before comparing against a commanded value.
+    """
+
+    TailRotorPos: Optional[float]
+    """Helicopter tail-rotor pedal INPUT position (control-side).
+    MSFS: TAIL ROTOR PEDAL POSITION SimVar - Percent Over 100.  Whether it
+    runs -1..1 like the rudder or 0..1 like the collective is unconfirmed,
+    so the contention probe measures this axis without judging it.
+    """
+
     RudderTrimPct: Optional[float]
-    """Rudder trim as percentage.  
-    MSFS: RUDDER TRIM PCT SimVar — percent.  
+    """Rudder trim as percentage.
+    MSFS: RUDDER TRIM PCT SimVar — percent.
     """
 
     # -- Controls lock --
