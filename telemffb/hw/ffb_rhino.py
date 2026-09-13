@@ -1579,8 +1579,9 @@ class HapticEffect(Destroyable):
         if self._h_effect:
             self._h_effect.setCondition(cond)
         else:
-            # Queue the condition for application once effect is created
-            self._pending_conditions[cond.effectBlockIndex] = lambda: self._h_effect.setCondition(cond)
+            # Queued per axis: the block index is 0 until the device assigns
+            # one, so it cannot tell the axes apart.
+            self._pending_conditions[cond.parameterBlockOffset] = lambda: self._h_effect.setCondition(cond)
 
         return self
 

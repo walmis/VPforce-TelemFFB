@@ -758,6 +758,28 @@ class TestHapticEffect:
         # Start should apply pending conditions
         effect.start()
         assert len(effect._pending_conditions) == 0
+
+    def test_set_condition_lazy_keeps_both_axes(self, haptic_device):
+        """Conditions queued before creation must reach the device for each
+        axis.  The block index is 0 for every condition until the device
+        assigns one, so it cannot tell the axes apart; the axis can.  A
+        later condition for the same axis still replaces the earlier one."""
+        effect = HapticEffect()
+        effect.spring()
+        effect.setCondition(FFBReport_SetCondition(
+            parameterBlockOffset=0, positiveCoefficient=1000, negativeCoefficient=1000))
+        effect.setCondition(FFBReport_SetCondition(
+            parameterBlockOffset=1, positiveCoefficient=2000, negativeCoefficient=2000))
+        effect.setCondition(FFBReport_SetCondition(
+            parameterBlockOffset=0, positiveCoefficient=1500, negativeCoefficient=1500))
+
+        with patch.object(FFBEffectHandle, 'setCondition', autospec=True) as sent:
+            effect.start()
+
+        applied = {c.args[1].parameterBlockOffset: c.args[1].positiveCoefficient
+                   for c in sent.call_args_list}
+        assert applied == {0: 1500, 1: 2000}
+        assert len(sent.call_args_list) == 2
     
     def test_set_condition_immediate(self, haptic_device):
         """Test setCondition on already created effect."""
