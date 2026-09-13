@@ -970,6 +970,99 @@ class BaseTelemetryData:
     Set by helicopter MixIns — axis-specific authority values.  
     """
 
+    # -- Standardized helicopter FFB LVAR API (MSFS) --
+    #
+    #    Spec: https://github.com/CK-AT/DIY-FFB/blob/ck_dev/Standards/MSFS_Helicopter_FFB_API.md
+    #    Consumed by telemffb/sim/msfs_xp/FFBApiMixIn.py.  Subscribed automatically
+    #    for every MSFS helicopter (not via sc_overrides) so discovery works on
+    #    aircraft with no config entry.  All are meaningful only while that control's
+    #    L:FFB_<CONTROL>_ENABLED is 1, except the two discovery fields.
+
+    ffbApiVersion: Optional[float]
+    """FFB LVAR API revision implemented by the aircraft.
+    MSFS: L:FFB_API_VERSION — number.
+    Discovery variable: read once per aircraft load, never per frame.
+    0 or absent = not implemented; the rig stays in legacy mode and writes no
+    L:FFB_* variable at all.
+    Default when absent: None until subscribed, then 0.
+    """
+
+    ffbFeatures: Optional[float]
+    """Aircraft capability bitfield.
+    MSFS: L:FFB_FEATURES — number, decoded as (round(v) >> bit) & 1.
+    Bit 0 = cyclic has trim, 1 = collective has trim, 2 = pedals has trim;
+    bits 3+ reserved and must be ignored rather than treated as an error.
+    Discovery variable: read once per aircraft load.
+    Default when absent: 0 — meaning no control is trimmed, so no trim spring is
+    applied anywhere.
+    """
+
+    ffbTrimCyclicPitch: Optional[float]
+    """Cyclic pitch trim actuator position.
+    MSFS: L:FFB_CYCLIC_PITCH_TRIM — number, −1..+1, positive = nose-up.
+    Drives the cyclic spring center (Y).  Independent of the zeroed
+    ROTOR LONGITUDINAL TRIM PCT; while TR is active it follows the control input,
+    so it has no discontinuities.  Consumed raw — the rig applies no smoothing.
+    """
+
+    ffbTrimCyclicRoll: Optional[float]
+    """Cyclic roll trim actuator position.
+    MSFS: L:FFB_CYCLIC_ROLL_TRIM — number, −1..+1, positive = roll right.
+    Drives the cyclic spring center (X).
+    """
+
+    ffbTrimCollective: Optional[float]
+    """Collective trim actuator position.
+    MSFS: L:FFB_COLLECTIVE_TRIM — number, −1..+1, positive = collective up.
+    Note TelemFFB's device Y axis is inverted relative to this (+1 = full down);
+    the conversion lives in FFBApiMixIn._ffb_api_to_device_sign.
+    """
+
+    ffbTrimPedals: Optional[float]
+    """Pedal trim actuator position.
+    MSFS: L:FFB_PEDALS_TRIM — number, −1..+1, positive = right pedal (yaw right).
+    """
+
+    ffbHydLossCyclicPitch: Optional[float]
+    """Hydraulic assist loss on the cyclic pitch axis.
+    MSFS: L:FFB_CYCLIC_PITCH_HYD_ASSIST_LOSS — number, 0..1.
+    0 = full boost, 1 = unassisted/locked.  Note this is the inverse of TelemFFB's
+    HydSys / hydraulic_factor, which are system *health*; FFBApiMixIn converts.
+    Default when absent: 0 (full boost) — correct for a non-hydraulic aircraft.
+    """
+
+    ffbHydLossCyclicRoll: Optional[float]
+    """Hydraulic assist loss on the cyclic roll axis.
+    MSFS: L:FFB_CYCLIC_ROLL_HYD_ASSIST_LOSS — number, 0..1.  Default absent: 0.
+    """
+
+    ffbHydLossCollective: Optional[float]
+    """Hydraulic assist loss on the collective axis.
+    MSFS: L:FFB_COLLECTIVE_HYD_ASSIST_LOSS — number, 0..1.  Default absent: 0.
+    """
+
+    ffbHydLossPedals: Optional[float]
+    """Hydraulic assist loss on the pedal axis.
+    MSFS: L:FFB_PEDALS_HYD_ASSIST_LOSS — number, 0..1.  Default absent: 0.
+    """
+
+    ffbTrOnCyclic: Optional[Union[bool, int]]
+    """Cyclic trim actuators unclutched (TR pressed / TRIM FEEL CYCL = OFF).
+    MSFS: L:FFB_CYCLIC_TR_ON — bool.  Covers both cyclic axes.
+    While set, the rig softens the spring and lets the stick reposition freely.
+    Ignored when the cyclic trim feature bit is clear — nothing to unclutch.
+    """
+
+    ffbTrOnCollective: Optional[Union[bool, int]]
+    """Collective trim actuator unclutched (C-SYNC / COLLECTIVE TRIM FEEL = OFF).
+    MSFS: L:FFB_COLLECTIVE_TR_ON — bool.
+    """
+
+    ffbTrOnPedals: Optional[Union[bool, int]]
+    """Pedal trim actuator unclutched.
+    MSFS: L:FFB_PEDALS_TR_ON — bool.
+    """
+
     # -- HPG Helicopters (vendor-specific) --
 
     hpgAfcsMaster: Optional[float]

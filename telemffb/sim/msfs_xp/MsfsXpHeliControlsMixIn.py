@@ -1,6 +1,7 @@
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.sim.msfs_xp.FFBApiMixIn import FFBApiMixIn, FFB_API_CYCLIC
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
 from telemffb.utils import clamp
 from typing import override
@@ -8,7 +9,7 @@ import logging
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
-class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
+class MsfsXpHeliControlsMixIn(FFBApiMixIn, MsfsXpFlightControlsMixIn):
     """Mixin for MSFS and X-Plane specific helicopter flight controls handling."""
 
     # user parameters
@@ -350,6 +351,16 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
     def _update_cyclic_trim(self, telem_data: BaseTelemetryData):
         if not self.is_joystick():
             return
+        if self._ffb_api_active(FFB_API_CYCLIC):
+            # The aircraft owns trim and has zeroed ROTOR *_TRIM PCT, so the
+            # generic CyclicTrimX/Y follow would be integrating dead state.
+            # Trim reaches the stick through the spring center instead, and the
+            # sent axis must stay raw so it is never applied twice.
+            self.cyclic_physical_trim_x_offs = 0
+            self.cyclic_physical_trim_y_offs = 0
+            self.cyclic_virtual_trim_x_offs = 0
+            self.cyclic_virtual_trim_y_offs = 0
+            return
         if not self.trim_following:
             return
 
@@ -386,4 +397,10 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
-        self.msfs_update_heli_controls(telem_data)
+        # Cyclic dispatch site.  Guarding here rather than inside each vendor
+        # class routes around every msfs_update_heli_controls override at once
+        # (HPG / SAS / XAW109 each drive trim from their own AFCS state).
+        if self._ffb_api_active(FFB_API_CYCLIC):
+            self._ffb_api_update_cyclic(telem_data)
+        else:
+            self.msfs_update_heli_controls(telem_data)

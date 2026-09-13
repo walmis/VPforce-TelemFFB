@@ -17,6 +17,7 @@
 #
 
 from typing import override
+from telemffb.sim.msfs_xp.FFBApiMixIn import FFB_API_COLLECTIVE, FFB_API_PEDALS
 from telemffb.sim.msfs_xp.MsfsXpHeliControlsMixIn import MsfsXpHeliControlsMixIn
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
@@ -88,6 +89,9 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
     @override
     def on_timeout(self):
+        # Release the aircraft before the rest of the teardown: the aircraft
+        # restores its own trim/feel when ENABLED clears (spec 3.2).
+        self.ffb_api_on_timeout()
         super().on_timeout()
         self.cyclic_spring_init = 0
         self.collective_init = 0
@@ -100,11 +104,25 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             return
         telem_data.AircraftClass = "Helicopter"  # inject aircraft class into telemetry
 
+        # Discovery, ENABLED lifecycle and hydraulic injection run before the
+        # effect mixins so injected HydSys is in place when they read it.
+        self.ffb_api_on_telemetry(telem_data)
+
         super().on_telemetry(telem_data)
 
-        self.msfs_update_collective(telem_data)
-        # # self._update_cyclic_trim(telem_data)
-        self.msfs_update_pedals(telem_data)
+        # Collective and pedal dispatch sites - see MsfsXpHeliControlsMixIn
+        # .on_telemetry for the cyclic equivalent.  Each control decides
+        # independently, so an FFB cyclic with a normal collective needs no
+        # special case.
+        if self._ffb_api_active(FFB_API_COLLECTIVE):
+            self._ffb_api_update_collective(telem_data)
+        else:
+            self.msfs_update_collective(telem_data)
+
+        if self._ffb_api_active(FFB_API_PEDALS):
+            self._ffb_api_update_pedals(telem_data)
+        else:
+            self.msfs_update_pedals(telem_data)
 
     @override
     def msfs_update_trimwheel(self, *args, **kwargs):
@@ -117,6 +135,10 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         if 'ForceTrimSW' not in self._simconnect.sv_dict.keys():
             self._simconnect.add_simvar(name='ForceTrimSW', var="L:TelemFFBHeliFT", sc_unit="enum")
             self._simconnect._resubscribe()
+
+        # Subscribed for every MSFS helicopter, not via sc_overrides: discovery
+        # has to work on aircraft with no config entry of their own.
+        self.subscribe_ffb_api_simvars()
 
     def check_hands_on(self, percent) -> dict:
         phys_x, phys_y = self._get_device_axes()

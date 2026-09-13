@@ -1039,6 +1039,133 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
+		<datatype>bool</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1234</order>
+		<name>ffb_api_enable</name>
+		<displayname>Enable Standard FFB API</displayname>
+		<value>true</value>
+		<info>Use the standardized helicopter FFB LVAR API when the loaded aircraft publishes it (L:FFB_API_VERSION &gt;= 1).&lt;br&gt;&lt;br&gt;When the aircraft does not implement the API this setting has no effect and TelemFFB behaves exactly as before.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<collective>true</collective>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<datatype>float</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1236</order>
+		<name>ffb_api_tr_spring_gain</name>
+		<displayname>FFB API Trim Release Damper</displayname>
+		<value>0</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Spring gain while the aircraft reports its trim actuator unclutched (L:FFB_&lt;CONTROL&gt;_TR_ON).&lt;br&gt;&lt;br&gt;Acts as a dampening force while the control is free to reposition.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<collective>true</collective>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>float</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1237</order>
+		<name>ffb_api_fly_through_deadzone</name>
+		<displayname>FFB API Fly Through Deadzone</displayname>
+		<value>0.1</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Deviation from the published trim position required to report a fly-through condition to the aircraft.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<collective>true</collective>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>float</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1238</order>
+		<name>ffb_api_fly_through_release_deadzone</name>
+		<displayname>FFB API Fly Through Release Deadzone</displayname>
+		<value>0.05</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Deviation below which an active fly-through condition is cleared.&lt;br&gt;&lt;br&gt;Smaller than the trigger deadzone, giving hysteresis so a control resting near the threshold does not chatter.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<collective>true</collective>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>bool</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1239</order>
+		<name>ffb_api_individual_fly_through</name>
+		<displayname>FFB API Per-Axis Fly Through</displayname>
+		<value>true</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Detect fly-through separately for cyclic pitch and roll.&lt;br&gt;&lt;br&gt;Disable on hardware that cannot cleanly separate the two axes - detection is then per control and mirrored onto both axis variables.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<datatype>bool</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1241</order>
+		<name>ffb_api_invert_cyclic_pitch</name>
+		<displayname>FFB API Invert Cyclic Pitch Trim</displayname>
+		<value>false</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Invert the sign of the published cyclic pitch trim position.&lt;br&gt;&lt;br&gt;The API convention is positive = nose-up; use this if the spring centre moves the wrong way.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<datatype>bool</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1242</order>
+		<name>ffb_api_invert_cyclic_roll</name>
+		<displayname>FFB API Invert Cyclic Roll Trim</displayname>
+		<value>false</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Invert the sign of the published cyclic roll trim position.&lt;br&gt;&lt;br&gt;The API convention is positive = roll right.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<datatype>bool</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1243</order>
+		<name>ffb_api_invert_collective</name>
+		<displayname>FFB API Invert Collective Trim</displayname>
+		<value>true</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Invert the sign of the published collective trim position.&lt;br&gt;&lt;br&gt;Enabled by default: the API convention is positive = collective up, while TelemFFB's device axis reads +1 at full down.</info>
+		<MSFS>true</MSFS>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<datatype>bool</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1244</order>
+		<name>ffb_api_invert_pedals</name>
+		<displayname>FFB API Invert Pedal Trim</displayname>
+		<value>false</value>
+		<prereq>ffb_api_enable</prereq>
+		<info>Invert the sign of the published pedal trim position.&lt;br&gt;&lt;br&gt;The API convention is positive = right pedal (yaw right).</info>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
 		<effecttype>spring</effecttype>
 		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
