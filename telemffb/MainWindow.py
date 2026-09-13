@@ -256,7 +256,7 @@ class MainWindow(QMainWindow):
             self.profile_manager_action.triggered.connect(self.show_profile_manager)
             self.profiles_menu.addAction(self.profile_manager_action)
 
-            self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
+            self.offline_config_action = QAction(r'Offline Editor/Effect Preview', self)
             self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
             self.profiles_menu.addAction(self.offline_config_action)
 
