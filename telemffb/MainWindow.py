@@ -1502,18 +1502,30 @@ class MainWindow(QMainWindow):
                     devices.append(dev)
         return devices
 
-    def effect_preview_running(self, spec):
+    def effect_preview_running_spec(self):
+        """(spec, slot) of the preview playing now, else (None, None).
+        ``slot`` is the settings-row button that started it - 'pv' play,
+        'pvall' play-all - or None from the debug menu.  The settings form
+        asks this when it rebuilds, to redraw the playing row as held."""
+        slot = getattr(self, '_effect_preview_slot', None)
         group = getattr(self, '_group_preview', None)
         if group is not None:
-            return group['spec'] is spec
+            return group['spec'], slot
         preview = getattr(self, '_effect_preview', None)
-        return bool(preview is not None and preview.running and preview.runner.spec is spec)
+        if preview is not None and preview.running:
+            return preview.runner.spec, slot
+        return None, None
 
-    def toggle_effect_preview(self, spec, button=None, devices=None):
+    def effect_preview_running(self, spec):
+        return self.effect_preview_running_spec()[0] is spec
+
+    def toggle_effect_preview(self, spec, devices=None):
         """Settings-row play buttons: start this preview on ``devices``
         (default: the device the form is scoped to), or stop it if it is
-        the one playing.  The button reads as a stop while it plays and
-        reverts when the run ends, however it ends.  A set that is only
+        the one playing.  While it plays the row is held - slider, value
+        and erase locked, the starting button a stop - and released when
+        the run ends, however it ends; the settings form finds the row by
+        name, so a rebuild in between does not matter.  A set that is only
         this instance's own device plays locally; anything else goes
         through the group path, which drives the children over IPC."""
         if self.effect_preview_running(spec):
@@ -1522,33 +1534,26 @@ class MainWindow(QMainWindow):
             else:
                 self.stop_effect_preview()
             return
-
-        # the button reverts to whatever it showed (play, or play-all),
-        # not to a fixed glyph
-        original_text = button.text() if button is not None else None
-
-        def restore():
-            if button is not None:
-                try:
-                    button.setText(original_text)
-                except RuntimeError:
-                    pass   # the row was rebuilt while the preview played
-
+        slot = 'pvall' if devices else 'pv'
         devices = list(devices) if devices else [self.effect_preview_scope()]
         if devices == [G.device_type]:
-            started = self.start_effect_preview(spec, on_finished=restore)
+            self.start_effect_preview(spec, slot=slot)
         else:
-            started = self._start_group_preview(spec, devices, on_finished=restore)
-        if started and button is not None:
-            button.setText("■")
+            self._start_group_preview(spec, devices, slot=slot)
 
-    def _start_group_preview(self, spec, devices, on_finished=None):
+    def _hold_preview_rows(self, spec, held, slot=None):
+        """The settings form's cue for a playing preview, on this window's
+        form: rows held (or released) and the starting button a stop."""
+        from telemffb.SettingsLayout import lock_preview_rows
+        self._effect_preview_slot = slot if held else None
+        lock_preview_rows(self, spec, held, slot=slot)
+
+    def _start_group_preview(self, spec, devices, on_finished=None, slot=None):
         """Play ``spec`` on a set of devices at once: this instance's own
         device locally (if in the set) and each child over IPC.  The
-        master keeps the confirmation, the slider cues and a fallback
+        master keeps the confirmation, the row cues and a fallback
         timer in case a child never reports back; the run is over when
         every device has finished."""
-        from telemffb.SettingsLayout import mark_preview_sliders
         self._stop_group_preview()
         self.stop_effect_preview()
         blockers = self.effect_preview_blockers() if len(devices) == 1 else []
@@ -1561,18 +1566,19 @@ class MainWindow(QMainWindow):
         children = [d for d in devices if d != G.device_type]
         local = G.device_type in devices
         logging.info(f"Effect preview: {spec.name} on {', '.join(devices)}")
-        mark_preview_sliders(self, spec, True)
         fallback = QTimer(self)
         fallback.setSingleShot(True)
         fallback.setInterval(int((spec.duration + spec.tail + 2.0) * 1000))
         fallback.timeout.connect(lambda: self._finish_group_preview(reason="no reply from a child"))
         self._group_preview = {'spec': spec, 'pending': set(children) | ({G.device_type} if local else set()),
                                'children': children, 'on_finished': on_finished, 'timer': fallback}
+        self._hold_preview_rows(spec, True, slot=slot)
         for dev in children:
             G.ipc_instance.send_preview(dev, spec.name)
         if local:
             started = self.start_effect_preview(
-                spec, confirm=False, on_finished=lambda: self._group_device_done(G.device_type))
+                spec, confirm=False, cues=False,
+                on_finished=lambda: self._group_device_done(G.device_type))
             if not started:
                 self._group_device_done(G.device_type)
         fallback.start()
@@ -1596,13 +1602,12 @@ class MainWindow(QMainWindow):
         self.stop_effect_preview()
 
     def _finish_group_preview(self, reason=""):
-        from telemffb.SettingsLayout import mark_preview_sliders
         group = getattr(self, '_group_preview', None)
         if group is None:
             return
         self._group_preview = None
         group['timer'].stop()
-        mark_preview_sliders(self, group['spec'], False)
+        self._hold_preview_rows(group['spec'], False)
         logging.info(f"Effect preview finished: {group['spec'].name} ({reason})")
         if group['on_finished'] is not None:
             group['on_finished']()
@@ -1628,7 +1633,7 @@ class MainWindow(QMainWindow):
         if not started:
             G.ipc_instance.send_preview_done(name)
 
-    def start_effect_preview(self, spec, on_finished=None, confirm=True):
+    def start_effect_preview(self, spec, on_finished=None, confirm=True, slot=None, cues=True):
         """Play one effect on the device with synthetic telemetry.
 
         Builds a throwaway aircraft for the settings tab's current model
@@ -1636,7 +1641,9 @@ class MainWindow(QMainWindow):
         table so a loaded aircraft is untouched, and drives the spec's
         effect method from a timer.  Refused only while telemetry is
         actively streaming or the device is gone.  Returns True when the
-        preview started.
+        preview started.  ``cues`` is the settings-row hold for the run
+        (off when a group run manages the cue for all its devices);
+        ``slot`` names the button that started it, see toggle.
         """
         from telemffb.preview import PreviewRunner, TimedPreview, resolve_preview_target
         from telemffb.telem.TelemManager import build_aircraft
@@ -1663,12 +1670,13 @@ class MainWindow(QMainWindow):
         logging.info(f"Effect preview: {spec.name} on {sim} / {cls or '-'} / {model} "
                      f"({type(aircraft).__name__}), {runner.steps_total} frames "
                      f"at {runner.frame_rate:g} Hz")
-        from telemffb.SettingsLayout import mark_preview_sliders
-        mark_preview_sliders(self, spec, True)     # the live-effect green, while it plays
+        if cues:
+            self._hold_preview_rows(spec, True, slot=slot)
 
         def finished():
             logging.info(f"Effect preview finished: {spec.name}")
-            mark_preview_sliders(self, spec, False)
+            if cues:
+                self._hold_preview_rows(spec, False)
             if on_finished is not None:
                 on_finished()
 

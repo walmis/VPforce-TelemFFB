@@ -43,6 +43,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - A play-all button (>>) appears when more than one running device carries the setting and plays the effect on all of them (joystick, pedals, collective) together
   - 42 effects are covered across all sims.  Each preview is built so the strengths you tune are the ones you feel: prop rumble sweeps idle to redline and dwells at each end, stall buffet builds to a full stall and holds, motion effects run the full travel and land the end clunk, weapon and countermeasure effects fire a short burst
   - Hover the mouse over the play button for a description of the preview conditions, reference speeds, RPM, rotor blade count, and how long each phase lasts
+  - The telemetry required to preview the effect is synthesized based on the settings when the effect is started.  Adjusting the effects during playback is not supported.
   - Constant-force effects (touchdown, deceleration, runway rumble, elevator droop, turbulence / wind, lateral force, AoA reduction) can move the axes unexpectedly, so they confirm you are ready for them to run with a dialog.
   - Previews use their own effect table, so they can run while a sim sits paused in the background with an aircraft loaded; only live streaming telemetry or a missing device blocks them
 - **NEW: "Offline/Preview Mode" button** in the corner of the Settings tab opens the offline editor on the aircraft currently loaded in the sim, so its effects can be previewed and tuned without leaving the flight
