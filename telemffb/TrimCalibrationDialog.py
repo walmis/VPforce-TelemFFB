@@ -35,7 +35,7 @@ from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
     QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QProgressBar, QMessageBox, QFrame, QCheckBox, QSizePolicy,
-    QComboBox, QToolButton, QMenu, QFileDialog, QSpinBox,
+    QComboBox, QToolButton, QMenu, QFileDialog, QSpinBox, QScrollArea,
 )
 
 import telemffb.globals as G
@@ -128,6 +128,13 @@ class TrimCalibrationDialog(QDialog):
         # instead of clobbering it with the generic waiting message.
         self._sim_paused_seen = False
 
+        # Parented single-shot (never QTimer.singleShot with a bound method:
+        # a fire after deleteLater is a fatal Qt-slot exception) deferring
+        # the help-pane re-derive out of resizeEvent.
+        self._repane_timer = QtCore.QTimer(self)
+        self._repane_timer.setSingleShot(True)
+        self._repane_timer.timeout.connect(self._repane)
+
         self._build_ui()
         self._refresh_idle()
 
@@ -158,17 +165,18 @@ class TrimCalibrationDialog(QDialog):
         # window to manage) and a side drawer (width changes re-wrap every
         # height-for-width label — the exact fragility _fit_to_content
         # exists to contain).
-        self.btn_instructions = QToolButton()
-        self.btn_instructions.setCheckable(True)
         # Clickability must be visible: link-blue bold text, hand cursor and
         # a hover highlight — a plain bold label reads as a heading, not a
-        # control (field feedback).
-        self.btn_instructions.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_instructions.setStyleSheet(
+        # control (field feedback). Shared with the Result disclosure.
+        disclosure_style = (
             "QToolButton { border: none; font-weight: bold; color: #2a7fd4;"
             " padding: 2px 4px; }"
             "QToolButton:hover { background-color: rgba(42, 127, 212, 38);"
             " border-radius: 4px; }")
+        self.btn_instructions = QToolButton()
+        self.btn_instructions.setCheckable(True)
+        self.btn_instructions.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_instructions.setStyleSheet(disclosure_style)
         self.btn_instructions.setToolButtonStyle(
             Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.btn_instructions.clicked.connect(self._on_instructions_toggled)
@@ -208,7 +216,24 @@ class TrimCalibrationDialog(QDialog):
             "</ol>"
         )
         self.lbl_instructions.setWordWrap(True)
-        root.addWidget(self.lbl_instructions)
+        # Top-aligned: when the pane is taller than a re-wrapped text (user
+        # widened the window) the text must hug the disclosure button, not
+        # float vertically centered.
+        self.lbl_instructions.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        # The help pane is the dialog's one ELASTIC element: it lives in a
+        # scroll area whose height _fit_to_content sets explicitly - full
+        # content height when the window fits the screen, shrunk (scrollbar
+        # appears) when it would not. Everything else keeps its natural
+        # height, so on a low-resolution monitor the live status, buttons
+        # and result stay reachable instead of the window growing off-screen.
+        self.scroll_instructions = QScrollArea()
+        self.scroll_instructions.setWidget(self.lbl_instructions)
+        self.scroll_instructions.setWidgetResizable(True)
+        self.scroll_instructions.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_instructions.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        root.addWidget(self.scroll_instructions)
         expanded = not bool(G.system_settings.get(
             "TrimCalInstructionsCollapsed", False))
         self.btn_instructions.setChecked(expanded)
@@ -522,7 +547,22 @@ class TrimCalibrationDialog(QDialog):
         root.addWidget(self.banner)
 
         # ---- result ----
-        result_box = QGroupBox("Result")
+        # Collapsible with the same disclosure language as the instructions,
+        # so a cramped screen can trade the result area for the help text
+        # and back. NOT persisted, unlike the instructions: the result frame
+        # is the dialog's payload, so every open starts expanded, and
+        # _show_result force-expands it - a fresh curve and its Save
+        # decision must never land in a hidden pane.
+        self.btn_result = QToolButton()
+        self.btn_result.setCheckable(True)
+        self.btn_result.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_result.setStyleSheet(disclosure_style)
+        self.btn_result.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.btn_result.clicked.connect(self._apply_result_state)
+        root.addWidget(self.btn_result)
+
+        self.result_box = result_box = QGroupBox()
         rlay = QVBoxLayout(result_box)
         # Which aircraft this dialog (and any result on it) belongs to —
         # live telemetry name, or the matched settings pattern when the sim
@@ -670,6 +710,8 @@ class TrimCalibrationDialog(QDialog):
         rlay.addWidget(self.lbl_linearity)
         rlay.addWidget(self.lbl_note)
         root.addWidget(result_box)
+        self.btn_result.setChecked(True)
+        self._apply_result_state(True)
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
@@ -1450,9 +1492,48 @@ class TrimCalibrationDialog(QDialog):
             ac.joystick_trim_follow_stick_position = text
         self.position_mode_changed.emit(text)
 
+    def _instructions_natural_height(self):
+        """Unscrolled height of the help text at the pane's current width."""
+        w = self.scroll_instructions.viewport().width()
+        if w <= 0:
+            # Pre-show the viewport has no real geometry yet; the deferred
+            # _refit pass re-measures once it does.
+            w = max(self.width() - 24, 100)
+        return self.lbl_instructions.heightForWidth(w)
+
+    def _instructions_min_height(self):
+        # Below a few visible lines a scrolled help pane stops being
+        # readable; past this floor the window grows off-screen instead
+        # (the pre-fix behavior).
+        return 4 * self.lbl_instructions.fontMetrics().lineSpacing()
+
+    def _layout_height(self):
+        lay = self.layout()
+        lay.activate()
+        if lay.hasHeightForWidth():
+            return lay.totalHeightForWidth(self.width())
+        return self.sizeHint().height()
+
+    def _size_instructions_pane(self, budget_h):
+        """Set the help pane's height for a window height budget: natural
+        (unscrolled) when the whole layout fits within ``budget_h``, shrunk
+        (its scrollbar appears) to absorb the overflow when it does not,
+        floored at a few readable lines. Returns the layout height the
+        window then needs at the current width."""
+        natural = self._instructions_natural_height()
+        self.scroll_instructions.setFixedHeight(natural)
+        needed = self._layout_height()
+        if needed > budget_h:
+            give = min(needed - budget_h,
+                       max(natural - self._instructions_min_height(), 0))
+            if give > 0:
+                self.scroll_instructions.setFixedHeight(natural - give)
+                needed = self._layout_height()
+        return needed
+
     def _fit_to_content(self, allow_shrink=False):
         """Grow (never shrink, unless asked) the window so the content cannot
-        overlap.
+        overlap, keeping it on the screen.
 
         Word-wrapped labels make the layout height-for-width: a plain
         sizeHint() under-reports the needed height until a later layout pass,
@@ -1460,18 +1541,40 @@ class TrimCalibrationDialog(QDialog):
         the window is moved. Force a layout pass and measure with the
         height-for-width machinery at the current width instead.
 
+        The help pane is the one elastic element (_size_instructions_pane):
+        when the full-content window would not fit the screen the overflow
+        is taken out of the pane. The window is never clamped below what
+        the remaining fixed-height content needs - squeezing the layout
+        under its minimum is what causes widget overlap - so with the pane
+        at its floor (or collapsed) the window can still exceed a very
+        small screen, matching the pre-clamp behavior.
+
         ``allow_shrink`` is for deliberate content removal (collapsing the
-        instructions) — the one case where handing space back beats leaving
-        a gap.
+        instructions) - the one case where handing space back beats leaving
+        a gap. A window already taller than the screen may always shrink
+        to content: no user chose that height on purpose, and honoring it
+        is exactly how the dialog used to walk off the bottom edge.
         """
-        lay = self.layout()
-        lay.activate()
-        if lay.hasHeightForWidth():
-            needed = lay.totalHeightForWidth(self.width())
+        avail = self.screen().availableGeometry()
+        overhead = self.frameGeometry().height() - self.height()
+        if overhead <= 0:
+            overhead = 40   # frame not realized yet (pre-show): estimate
+        max_h = avail.height() - overhead
+
+        if self.btn_instructions.isChecked():
+            needed = self._size_instructions_pane(max_h)
         else:
-            needed = self.sizeHint().height()
-        if self.height() < needed or (allow_shrink and self.height() > needed):
+            needed = self._layout_height()
+
+        shrink_ok = allow_shrink or self.height() > max_h
+        if self.height() < needed or (shrink_ok and self.height() > needed):
             self.resize(self.width(), needed)
+
+        # Growth can push the bottom edge off a window the user parked low;
+        # slide it up (title bar stays reachable via the avail.top() floor).
+        over = self.frameGeometry().bottom() - avail.bottom()
+        if over > 0:
+            self.move(self.x(), max(avail.top(), self.y() - over))
 
     def _refit(self, allow_shrink=False):
         """Fit now and once more on the next event-loop tick: the deferred
@@ -1487,7 +1590,7 @@ class TrimCalibrationDialog(QDialog):
             f"{G.device_type}/TrimCalInstructionsCollapsed", not checked)
 
     def _apply_instructions_state(self, expanded):
-        self.lbl_instructions.setVisible(expanded)
+        self.scroll_instructions.setVisible(expanded)
         self.btn_instructions.setArrowType(
             Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
         self.btn_instructions.setText(
@@ -1495,6 +1598,17 @@ class TrimCalibrationDialog(QDialog):
             else "How to use  (click to expand)")
         self.btn_instructions.setToolTip(
             "Hide the instructions" if expanded else "Show the instructions")
+        self._refit(allow_shrink=not expanded)
+
+    def _apply_result_state(self, expanded):
+        self.result_box.setVisible(expanded)
+        self.btn_result.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+        self.btn_result.setText(
+            "Result  (click to hide)" if expanded
+            else "Result  (click to show)")
+        self.btn_result.setToolTip(
+            "Hide the result area" if expanded else "Show the result area")
         self._refit(allow_shrink=not expanded)
 
     def _update_live_values(self, data, ias_ref=None):
@@ -1799,6 +1913,11 @@ class TrimCalibrationDialog(QDialog):
     # ---- result / state display ---------------------------------------------
 
     def _show_result(self, result):
+        # A fresh result must be seen: force the pane open even if the user
+        # collapsed it earlier in the session.
+        if not self.btn_result.isChecked():
+            self.btn_result.setChecked(True)
+            self._apply_result_state(True)
         self._result_shown = True
         self._last_result = result
         # Ghost the stored family behind the fresh result for context (and
@@ -1993,6 +2112,24 @@ class TrimCalibrationDialog(QDialog):
                 self._set_ready(False, "Waiting for telemetry — is the sim running?")
 
     # ---- lifecycle ----------------------------------------------------------
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # A width change re-wraps the help text, changing its natural
+        # height while the pane's set height stays frozen - re-derive it.
+        # Deferred (resizing layout from inside resizeEvent invites a
+        # feedback loop) and width-only, so _fit_to_content's own resizes
+        # (height-only) and the user's height drags never re-enter here.
+        if (self.btn_instructions.isChecked()
+                and event.oldSize().width() != event.size().width()):
+            self._repane_timer.start(0)
+
+    def _repane(self):
+        # Fit the pane to the CURRENT window height: the user may have just
+        # chosen it with the mouse, so unlike _fit_to_content the window is
+        # not resized.
+        if self.btn_instructions.isChecked():
+            self._size_instructions_pane(self.height())
 
     def showEvent(self, event):
         super().showEvent(event)
