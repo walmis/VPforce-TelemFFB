@@ -443,6 +443,19 @@ class RECV_EVENT(RECV):
     ]
 
 
+class RECV_EVENT_EX1(RECV):
+    UNKNOWN_GROUP = 0xFFFFFFFF
+    _fields_ = [
+        ("uGroupID", DWORD),
+        ("uEventID", DWORD),
+        ("dwData0", DWORD),   # uEventID-dependent context
+        ("dwData1", DWORD),
+        ("dwData2", DWORD),
+        ("dwData3", DWORD),
+        ("dwData4", DWORD),
+    ]
+
+
 class RECV_EVENT_FILENAME(RECV_EVENT):
     _fields_ = [
         ("szFileName", c_char * MAX_PATH),   # uEventID-dependent context
@@ -731,6 +744,43 @@ class INPUT_EVENT_DESCRIPTOR(Struct1):
     ]
 
 
+# SIMCONNECT_VERSION_BASE_TYPE
+class VERSION_BASE_TYPE(Struct1):
+    _fields_ = [
+        ("Major", WORD),
+        ("Minor", WORD),
+        ("Revision", WORD),
+        ("Build", WORD),
+    ]
+
+
+# SIMCONNECT_CONTROLLER_ITEM
+class CONTROLLER_ITEM(Struct1):
+    _fields_ = [
+        ("DeviceName", c_char * 256),
+        ("DeviceId", DWORD),   # the n in a joystick:n:Axis input definition
+        ("ProductId", DWORD),
+        ("CompositeID", DWORD),
+        ("HardwareVersion", VERSION_BASE_TYPE),
+    ]
+
+
+# SIMCONNECT_RECV_CONTROLLERS_LIST (a SIMCONNECT_RECV_LIST_TEMPLATE)
+class RECV_CONTROLLERS_LIST(RECV):
+    _fields_ = [
+        ("dwRequestID", DWORD),
+        ("dwArraySize", DWORD),
+        ("dwEntryNumber", DWORD),
+        ("dwOutOf", DWORD),
+        ("rgData", CONTROLLER_ITEM * 1),   # dwArraySize items begin here
+    ]
+
+    def controllers(self):
+        """The controller items carried by this send (dwArraySize)."""
+        return cast(byref(self, RECV_CONTROLLERS_LIST.rgData.offset),
+                    POINTER(CONTROLLER_ITEM * self.dwArraySize))[0]
+
+
 # SIMCONNECT_RECV_ENUMERATE_INPUT_EVENTS (a SIMCONNECT_RECV_LIST_TEMPLATE)
 class RECV_ENUMERATE_INPUT_EVENTS(RECV):
     _fields_ = [
@@ -929,7 +979,9 @@ def _decls(dll):
         c_char_p,  # const char * szInputDefinition
         CLIENT_EVENT_ID,  # SIMCONNECT_CLIENT_EVENT_ID DownEventID
         DWORD,  # DWORD DownValue = 0
-        CLIENT_EVENT_ID,  # SIMCONNECT_CLIENT_EVENT_ID UpEventID = (SIMCONNECT_CLIENT_EVENT_ID
+        CLIENT_EVENT_ID,  # SIMCONNECT_CLIENT_EVENT_ID UpEventID = (SIMCONNECT_CLIENT_EVENT_ID)SIMCONNECT_UNUSED
+        DWORD,  # DWORD UpValue = 0
+        c_bool,  # BOOL bMaskable = FALSE
     ]
     _['MapInputEventToClientEvent'] = f
     f = dll.SimConnect_SetInputGroupPriority
@@ -1495,4 +1547,53 @@ def _decls(dll):
         c_uint64,  # UINT64 Hash
     ]
     _['EnumerateInputEventParams'] = f
+
+    # Guarded: these are absent from SimConnect.dll builds older than
+    # MSFS 2020, and an AttributeError here would fail the whole import.
+    try:
+        f = dll.SimConnect_EnumerateControllers
+        f.restype = HRESULT
+        f.argtypes = [
+            HANDLE,  # HANDLE hSimConnect
+        ]
+        _['EnumerateControllers'] = f
+    except AttributeError:
+        pass
+
+    try:
+        f = dll.SimConnect_MapInputEventToClientEvent_EX1
+        f.restype = HRESULT
+        f.argtypes = [
+            HANDLE,  # HANDLE hSimConnect
+            INPUT_GROUP_ID,  # SIMCONNECT_INPUT_GROUP_ID GroupID
+            c_char_p,  # const char * szInputDefinition
+            CLIENT_EVENT_ID,  # SIMCONNECT_CLIENT_EVENT_ID DownEventID
+            DWORD,  # DWORD DownValue = 0
+            CLIENT_EVENT_ID,  # SIMCONNECT_CLIENT_EVENT_ID UpEventID = UNUSED
+            DWORD,  # DWORD UpValue = 0
+            c_bool,  # BOOL bMaskable = FALSE
+        ]
+        _['MapInputEventToClientEvent_EX1'] = f
+    except AttributeError:
+        pass
+
+    try:
+        f = dll.SimConnect_TransmitClientEvent_EX1
+        f.restype = HRESULT
+        f.argtypes = [
+            HANDLE,  # HANDLE hSimConnect
+            OBJECT_ID,  # SIMCONNECT_OBJECT_ID ObjectID
+            CLIENT_EVENT_ID,  # SIMCONNECT_CLIENT_EVENT_ID EventID
+            NOTIFICATION_GROUP_ID,  # SIMCONNECT_NOTIFICATION_GROUP_ID GroupID
+            EVENT_FLAG,  # SIMCONNECT_EVENT_FLAG Flags
+            DWORD,  # DWORD dwData0
+            DWORD,  # DWORD dwData1 = 0
+            DWORD,  # DWORD dwData2 = 0
+            DWORD,  # DWORD dwData3 = 0
+            DWORD,  # DWORD dwData4 = 0
+        ]
+        _['TransmitClientEvent_EX1'] = f
+    except AttributeError:
+        pass
+
     return _
