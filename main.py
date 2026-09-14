@@ -1307,9 +1307,9 @@ def _setup_ipc_and_connections():
     G.ipc_instance.set_offline_profile_signal.connect(G.main_window.offline_profile.setCurrentText)
     G.ipc_instance.show_offline_model_signal.connect(G.main_window.load_single_offline_model)
     # effect preview on a child's device: children run it, the master is told
-    G.ipc_instance.preview_signal.connect(G.main_window.start_child_preview)
-    G.ipc_instance.preview_stop_signal.connect(G.main_window.stop_effect_preview)
-    G.ipc_instance.preview_done_signal.connect(G.main_window.on_child_preview_done)
+    G.ipc_instance.preview_signal.connect(G.main_window.preview.start_child)
+    G.ipc_instance.preview_stop_signal.connect(G.main_window.preview.stop)
+    G.ipc_instance.preview_done_signal.connect(G.main_window.preview.on_child_done)
     G.ipc_instance.start()
 
 

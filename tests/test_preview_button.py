@@ -37,33 +37,40 @@ def _pump(app, n=10):
         app.processEvents()
 
 
+class FakePreviewController:
+    """What the layout asks of the window's preview controller."""
+
+    def __init__(self):
+        self.blocked = []
+        self.spec = None
+        self.slot = 'pv'
+        self.devices = ['joystick']
+        self.toggled = []
+
+    def blockers(self):
+        return list(self.blocked)
+
+    def running_spec(self):
+        if self.spec is None:
+            return None, None
+        return self.spec, self.slot
+
+    def running(self, spec):
+        return spec is self.spec
+
+    def running_devices(self):
+        return list(self.devices)
+
+    def toggle(self, spec, devices=None):
+        self.toggled.append((spec, devices))
+
+
 class FakeMainWindow(QtWidgets.QWidget):
-    """What the layout asks of the main window for the button."""
+    """A window that hosts a preview controller, which is all the layout needs."""
 
     def __init__(self):
         super().__init__()
-        self.blockers = []
-        self.running_spec = None
-        self.running_slot = 'pv'
-        self.running_devices = ['joystick']
-        self.toggled = []
-
-    def effect_preview_blockers(self):
-        return list(self.blockers)
-
-    def effect_preview_running_spec(self):
-        if self.running_spec is None:
-            return None, None
-        return self.running_spec, self.running_slot
-
-    def effect_preview_running(self, spec):
-        return spec is self.running_spec
-
-    def effect_preview_running_devices(self):
-        return list(self.running_devices)
-
-    def toggle_effect_preview(self, spec, devices=None):
-        self.toggled.append((spec, devices))
+        self.preview = FakePreviewController()
 
 
 def _render(qapp, tmp_path, *, offline, blockers=(), running=None, running_slot='pv',
@@ -101,10 +108,10 @@ def _render(qapp, tmp_path, *, offline, blockers=(), running=None, running_slot=
         G.settings_mgr.current_class = cls
         G.settings_mgr.current_pattern = pat
         mw = FakeMainWindow()
-        mw.blockers = list(blockers)
-        mw.running_spec = running
-        mw.running_slot = running_slot
-        mw.running_devices = list(running_devices)
+        mw.preview.blocked = list(blockers)
+        mw.preview.spec = running
+        mw.preview.slot = running_slot
+        mw.preview.devices = list(running_devices)
         mwl = QtWidgets.QVBoxLayout(mw)
         area = NoKeyScrollArea()
         area.setWidgetResizable(True)
@@ -280,7 +287,7 @@ def test_enabled_button_toggles_the_main_windows_preview(qapp, tmp_path):
     assert PREVIEWS_BY_ROW[name].reference in b.toolTip()     # says what it represents
     assert b.toolTip().startswith("<p")                       # rich text: Qt word-wraps it
     b.click()
-    assert r.mw.toggled == [(PREVIEWS_BY_ROW[name], None)]
+    assert r.mw.preview.toggled == [(PREVIEWS_BY_ROW[name], None)]
 
 
 def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp_path):
@@ -300,7 +307,7 @@ def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp
     assert "Play on joystick and pedals together." in b.toolTip()
     assert b.toolTip().startswith("<p")                       # rich text: Qt word-wraps it
     b.click()
-    assert r.mw.toggled == [(PREVIEWS_BY_ROW[buffet], ('joystick', 'pedals'))]
+    assert r.mw.preview.toggled == [(PREVIEWS_BY_ROW[buffet], ('joystick', 'pedals'))]
 
 
 def test_the_stop_glyph_goes_on_the_button_that_started_it(qapp, tmp_path):

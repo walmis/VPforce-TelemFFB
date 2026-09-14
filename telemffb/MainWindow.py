@@ -59,6 +59,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.SettingsLayout import SettingsLayout
+from telemffb.preview_controller import EffectPreviewController
 # from telemffb.UserModelDialog import UserModelDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
 from telemffb.telem.SimTelemListener import SimTelemListener
@@ -94,6 +95,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.preview = EffectPreviewController(self)   # effect previews, see preview_controller
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_notifications = {}
         self.new_craft_notification_sent = False
@@ -1438,261 +1440,6 @@ class MainWindow(QMainWindow):
         count = G.exception_tracker.get_count()
         self.exception_status_widget.set_count(count)
 
-    # ---- effect preview ---------------------------------------------------
-    #
-    # The settings form on the master hosts the play button for EVERY
-    # device's rows (the config scope switches between them), but an effect
-    # has to play on the instance that owns the device.  So a preview is
-    # local when the scope is this instance's own device, and otherwise
-    # goes to the owning child over IPC: the master keeps the popup, the
-    # button state and the slider cues, the child does the playing and
-    # reports when it is done (with a timer here as the fallback).
-
-    def effect_preview_scope(self):
-        """The device whose rows the settings form is showing."""
-        if G.master_instance:
-            return getattr(G, 'current_device_config_scope', None) or G.device_type
-        return G.device_type
-
-    def effect_preview_is_remote(self):
-        return self.effect_preview_scope() != G.device_type
-
-    def effect_preview_blockers(self):
-        """Why an effect preview cannot run right now (empty: it can)."""
-        from telemffb.preview import preview_blockers
-        if self.effect_preview_is_remote():
-            scope = self.effect_preview_scope()
-            ipc = getattr(G, 'ipc_instance', None)
-            if scope not in (getattr(G, 'launched_instances', None) or {}):
-                return [f"no {scope} instance is running"]
-            connected = ipc.child_device_connected(scope) if ipc else None
-            if connected is None:
-                return [f"the {scope} instance has not reported its device yet"]
-            if not connected:
-                return [f"no {scope} device connected"]
-            return []
-        manager = getattr(G, 'telem_manager', None)
-        return preview_blockers(
-            current_aircraft=manager.currentAircraft if manager else None,
-            device_alive=HapticEffect.device_alive(),
-            telemetry_paused=bool(getattr(manager, 'pause_state', False)) if manager else True)
-
-    def confirm_constant_force_preview(self, spec):
-        """The heads-up before a constant-force preview: an unattended axis
-        can be driven to its stops.  Asked every time, on purpose.  The
-        safety wording is fixed; only the spec's reference line varies."""
-        answer = QMessageBox.warning(
-            self, "Constant Force Preview",
-            "Constant force effect previews may move the axis in unexpected ways.\n\n"
-            "Please firmly grasp the controls before proceeding.\n\n"
-            f"This preview plays {spec.reference} at the maximum force your settings "
-            "allow. In flight the telemetry sets the level, and it is usually lower.",
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel)
-        return answer == QMessageBox.StandardButton.Ok
-
-    def effect_preview_running_devices(self):
-        """This instance's device plus every launched child whose device
-        has reported connected - the candidates for a play-all."""
-        devices = [G.device_type]
-        if G.master_instance:
-            ipc = getattr(G, 'ipc_instance', None)
-            for dev in (getattr(G, 'launched_instances', None) or {}):
-                if dev != G.device_type and ipc and ipc.child_device_connected(dev):
-                    devices.append(dev)
-        return devices
-
-    def effect_preview_running_spec(self):
-        """(spec, slot) of the preview playing now, else (None, None).
-        ``slot`` is the settings-row button that started it - 'pv' play,
-        'pvall' play-all - or None from the debug menu.  The settings form
-        asks this when it rebuilds, to redraw the playing row as held."""
-        slot = getattr(self, '_effect_preview_slot', None)
-        group = getattr(self, '_group_preview', None)
-        if group is not None:
-            return group['spec'], slot
-        preview = getattr(self, '_effect_preview', None)
-        if preview is not None and preview.running:
-            return preview.runner.spec, slot
-        return None, None
-
-    def effect_preview_running(self, spec):
-        return self.effect_preview_running_spec()[0] is spec
-
-    def toggle_effect_preview(self, spec, devices=None):
-        """Settings-row play buttons: start this preview on ``devices``
-        (default: the device the form is scoped to), or stop it if it is
-        the one playing.  While it plays the row is held - slider, value
-        and erase locked, the starting button a stop - and released when
-        the run ends, however it ends; the settings form finds the row by
-        name, so a rebuild in between does not matter.  A set that is only
-        this instance's own device plays locally; anything else goes
-        through the group path, which drives the children over IPC."""
-        if self.effect_preview_running(spec):
-            if getattr(self, '_group_preview', None) is not None:
-                self._stop_group_preview()
-            else:
-                self.stop_effect_preview()
-            return
-        slot = 'pvall' if devices else 'pv'
-        devices = list(devices) if devices else [self.effect_preview_scope()]
-        if devices == [G.device_type]:
-            self.start_effect_preview(spec, slot=slot)
-        else:
-            self._start_group_preview(spec, devices, slot=slot)
-
-    def _hold_preview_rows(self, spec, held, slot=None):
-        """The settings form's cue for a playing preview, on this window's
-        form: rows held (or released) and the starting button a stop."""
-        from telemffb.SettingsLayout import lock_preview_rows
-        self._effect_preview_slot = slot if held else None
-        lock_preview_rows(self, spec, held, slot=slot)
-
-    def _start_group_preview(self, spec, devices, on_finished=None, slot=None):
-        """Play ``spec`` on a set of devices at once: this instance's own
-        device locally (if in the set) and each child over IPC.  The
-        master keeps the confirmation, the row cues and a fallback
-        timer in case a child never reports back; the run is over when
-        every device has finished."""
-        self._stop_group_preview()
-        self.stop_effect_preview()
-        blockers = self.effect_preview_blockers() if len(devices) == 1 else []
-        if blockers:
-            QMessageBox.information(self, "Effect Preview",
-                                    "Cannot preview now:\n- " + "\n- ".join(blockers))
-            return False
-        if spec.constant_force and not self.confirm_constant_force_preview(spec):
-            return False
-        children = [d for d in devices if d != G.device_type]
-        local = G.device_type in devices
-        logging.info(f"Effect preview: {spec.name} on {', '.join(devices)}")
-        fallback = QTimer(self)
-        fallback.setSingleShot(True)
-        fallback.setInterval(int((spec.duration + spec.tail + 2.0) * 1000))
-        fallback.timeout.connect(lambda: self._finish_group_preview(reason="no reply from a child"))
-        self._group_preview = {'spec': spec, 'pending': set(children) | ({G.device_type} if local else set()),
-                               'children': children, 'on_finished': on_finished, 'timer': fallback}
-        self._hold_preview_rows(spec, True, slot=slot)
-        for dev in children:
-            G.ipc_instance.send_preview(dev, spec.name)
-        if local:
-            started = self.start_effect_preview(
-                spec, confirm=False, cues=False,
-                on_finished=lambda: self._group_device_done(G.device_type))
-            if not started:
-                self._group_device_done(G.device_type)
-        fallback.start()
-        return True
-
-    def _group_device_done(self, device):
-        group = getattr(self, '_group_preview', None)
-        if group is None:
-            return
-        group['pending'].discard(device)
-        if not group['pending']:
-            self._finish_group_preview(reason="all devices done")
-
-    def _stop_group_preview(self):
-        group = getattr(self, '_group_preview', None)
-        if group is None:
-            return
-        for dev in group['children']:
-            G.ipc_instance.send_preview_stop(dev)
-        self._finish_group_preview(reason="stopped")
-        self.stop_effect_preview()
-
-    def _finish_group_preview(self, reason=""):
-        group = getattr(self, '_group_preview', None)
-        if group is None:
-            return
-        self._group_preview = None
-        group['timer'].stop()
-        self._hold_preview_rows(group['spec'], False)
-        logging.info(f"Effect preview finished: {group['spec'].name} ({reason})")
-        if group['on_finished'] is not None:
-            group['on_finished']()
-
-    def on_child_preview_done(self, device, name):
-        """IPC: the child owning ``device`` finished the named preview."""
-        group = getattr(self, '_group_preview', None)
-        if group is not None and group['spec'].name == name:
-            self._group_device_done(device)
-
-    def start_child_preview(self, name):
-        """IPC: the master asked this instance to play a named preview on
-        its device.  No confirmation here - the master already asked, and
-        this window is hidden - and the master is told when it ends."""
-        from telemffb.preview import PREVIEW_SPECS
-        spec = PREVIEW_SPECS.get(name)
-        if spec is None:
-            logging.warning(f"Effect preview {name!r} requested by the master is unknown here")
-            G.ipc_instance.send_preview_done(name)
-            return
-        started = self.start_effect_preview(
-            spec, on_finished=lambda: G.ipc_instance.send_preview_done(name), confirm=False)
-        if not started:
-            G.ipc_instance.send_preview_done(name)
-
-    def start_effect_preview(self, spec, on_finished=None, confirm=True, slot=None, cues=True):
-        """Play one effect on the device with synthetic telemetry.
-
-        Builds a throwaway aircraft for the settings tab's current model
-        (sim defaults when nothing is selected), with its own effect
-        table so a loaded aircraft is untouched, and drives the spec's
-        effect method from a timer.  Refused only while telemetry is
-        actively streaming or the device is gone.  Returns True when the
-        preview started.  ``cues`` is the settings-row hold for the run
-        (off when a group run manages the cue for all its devices);
-        ``slot`` names the button that started it, see toggle.
-        """
-        from telemffb.preview import PreviewRunner, TimedPreview, resolve_preview_target
-        from telemffb.telem.TelemManager import build_aircraft
-        self.stop_effect_preview()
-        blockers = self.effect_preview_blockers()
-        if blockers:
-            if confirm:
-                QMessageBox.information(self, "Effect Preview",
-                                        "Cannot preview now:\n- " + "\n- ".join(blockers))
-            else:
-                logging.warning(f"Effect preview {spec.name} refused: " + "; ".join(blockers))
-            return False
-        if confirm and spec.constant_force and not self.confirm_constant_force_preview(spec):
-            return False
-        sim, model, cls = resolve_preview_target(G.settings_mgr)
-        try:
-            aircraft = build_aircraft(sim, model, cls_name=cls)
-            runner = PreviewRunner(aircraft, spec, sim)
-        except Exception as e:
-            logging.exception(f"Effect preview {spec.name} could not start")
-            if confirm:
-                QMessageBox.warning(self, "Effect Preview", f"Could not start preview:\n{e}")
-            return False
-        logging.info(f"Effect preview: {spec.name} on {sim} / {cls or '-'} / {model} "
-                     f"({type(aircraft).__name__}), {runner.steps_total} frames "
-                     f"at {runner.frame_rate:g} Hz")
-        if cues:
-            self._hold_preview_rows(spec, True, slot=slot)
-
-        def finished():
-            logging.info(f"Effect preview finished: {spec.name}")
-            if cues:
-                self._hold_preview_rows(spec, False)
-            if on_finished is not None:
-                on_finished()
-
-        self._effect_preview = TimedPreview(runner, on_finished=finished)
-        self._effect_preview.start()
-        return True
-
-    def stop_effect_preview(self):
-        """Stop this instance's own preview (the local runner).  A group
-        run's children are stopped by _stop_group_preview; a child told to
-        stop over IPC lands here and its finished callback reports back."""
-        preview = getattr(self, '_effect_preview', None)
-        if preview is not None and preview.running:
-            preview.stop()
-        self._effect_preview = None
-
     def add_debug_menu(self):
         # debug mode
         for action in self.menu.actions():
@@ -1753,10 +1500,10 @@ class MainWindow(QMainWindow):
         for name, spec in PREVIEW_SPECS.items():
             preview_action = QAction(f"{name}  ({spec.kind}, {spec.duration:g}s)", self)
             preview_action.triggered.connect(
-                lambda checked=False, s=spec: self.start_effect_preview(s))
+                lambda checked=False, s=spec: self.preview.start(s))
             preview_menu.addAction(preview_action)
         stop_preview_action = QAction("Stop preview", self)
-        stop_preview_action.triggered.connect(self.stop_effect_preview)
+        stop_preview_action.triggered.connect(self.preview.stop)
         preview_menu.addAction(stop_preview_action)
 
         configurator_settings_action = QAction('Configurator Gain Override', self)

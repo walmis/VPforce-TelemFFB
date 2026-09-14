@@ -570,8 +570,8 @@ class SettingsLayout(QGridLayout):
 
         # a rebuild mid-preview (an erase, an expander, a checkbox elsewhere)
         # makes fresh rows: the playing spec's come back held, its button a stop
-        mw = self.mainwindow
-        spec, slot = getattr(mw, 'effect_preview_running_spec', lambda: (None, None))()
+        preview = getattr(self.mainwindow, 'preview', None)
+        spec, slot = preview.running_spec() if preview is not None else (None, None)
         if spec is not None and self.parentWidget() is not None:
             lock_preview_rows(self.parentWidget(), spec, True, slot=slot)
 
@@ -874,8 +874,8 @@ class SettingsLayout(QGridLayout):
         that stays silent is never mistaken for a broken one.  Resolved
         once per rebuild for all three devices, then cached.
         """
-        mw = self.mainwindow
-        running = list(getattr(mw, 'effect_preview_running_devices', lambda: [G.device_type])())
+        preview = getattr(self.mainwindow, 'preview', None)
+        running = list(preview.running_devices()) if preview is not None else [G.device_type]
         if len(running) < 2:
             return running[:1] if setting_name else []
         if getattr(self, '_preview_rows_by_device', None) is None:
@@ -918,12 +918,12 @@ class SettingsLayout(QGridLayout):
         slots.setContentsMargins(0, 0, 0, 0)
         sl_layout.addLayout(slots)
         spec = preview_for_row(item['name'])
-        if spec is None or not spec.supports(G.settings_mgr.current_sim):
+        preview = getattr(self.mainwindow, 'preview', None)   # the window's EffectPreviewController
+        if spec is None or preview is None or not spec.supports(G.settings_mgr.current_sim):
             for tag in ('pvpad', 'pvpadall'):
                 self._add_preview_pad(slots, tag, item['name'])
             return
-        mw = self.mainwindow
-        blockers = list(getattr(mw, 'effect_preview_blockers', lambda: [])())
+        blockers = list(preview.blockers())
 
         def make(text, object_prefix, tip, on_click, small=False):
             button = QPushButton(text)
@@ -959,7 +959,7 @@ class SettingsLayout(QGridLayout):
         paragraphs.append("Click again to stop.")
         tip = preview_tooltip_html(paragraphs)
         make(PREVIEW_GLYPHS['pv'], 'pv', tip,
-             lambda checked=False, s=spec: mw.toggle_effect_preview(s))
+             lambda checked=False, s=spec: preview.toggle(s))
 
         devices = self._preview_devices_for(item['name'])
         if len(devices) >= 2:
@@ -967,7 +967,7 @@ class SettingsLayout(QGridLayout):
             all_tip = preview_tooltip_html([f"<b>Play on {names} together.</b>"] + paragraphs)
             make(PREVIEW_GLYPHS['pvall'], 'pvall', all_tip,
                  lambda checked=False, s=spec, d=tuple(devices):
-                 mw.toggle_effect_preview(s, devices=d),
+                 preview.toggle(s, devices=d),
                  small=True)
         else:
             self._add_preview_pad(slots, 'pvpadall', item['name'])
