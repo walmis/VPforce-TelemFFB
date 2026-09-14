@@ -5,6 +5,7 @@ cascade: sim defaults → class defaults → user sim → user class → model d
 """
 import logging
 import re
+from . import match as xmatch
 from typing import Optional, TYPE_CHECKING
 
 import telemffb.globals as G
@@ -42,6 +43,7 @@ class ConfigResolver:
         """
         self._store = store
         self._hidden = hidden
+        self._shadow_logged: set = set()   # (sim, aircraft) already warned about
 
     # ── Main entry point ──────────────────────────────────────
 
@@ -57,33 +59,33 @@ class ConfigResolver:
 
         Returns (model_class, model_pattern, sorted_data).
         """
+        ptrn = self.get_pattern_by_sim_fullname(sim, aircraft_name)
         if active_profile is None:
-            ptrn = self.get_pattern_by_sim_fullname(sim, aircraft_name)
             cls = self.get_class_for_sim_model(sim, ptrn)
             active_profile = self.get_active_profile_for_model(sim, cls or '', ptrn or '')
 
         dev = instance_device or self._store.device
 
-        # Read model data from defaults and user
+        # Read model data from defaults and user: the identity's rows only
         model_data, def_pattern = self._read_models_data(
-            'defaults', sim, aircraft_name, False, dev)
+            'defaults', sim, aircraft_name, False, dev, identity=ptrn)
         user_model_data, usr_pattern = self._read_models_data(
-            'user', sim, aircraft_name, False, dev, user=True, profile=active_profile)
+            'user', sim, aircraft_name, False, dev, user=True, profile=active_profile,
+            identity=ptrn)
 
-        pattern = def_pattern or usr_pattern
-        logging.info("Reading from XML: Pattern Match: %s", pattern)
+        # The identity is the most specific type row in either tree, the
+        # shipped file winning a tie; settings are written against it and
+        # the class comes from it.  With no type row at all, the most
+        # specific settings-only pattern stands in.
+        pattern = ptrn or xmatch.best_pattern([p for p in (usr_pattern, def_pattern) if p], aircraft_name) or ''
+        self._log_pattern_match(sim, aircraft_name, pattern)
+        self._warn_collision(sim, aircraft_name)
 
-        # Resolve class
-        model_class = input_modeltype
-        for m in model_data:
-            if m['name'] == 'type':
-                model_class = m['value']
-                break
-        if user_model_data:
-            for m in user_model_data:
-                if m['name'] == 'type':
-                    model_class = m['value']
-                    break
+        # The class belongs to the pattern that named the aircraft; the
+        # caller's hint stands only when nothing did.
+        model_class = self.get_class_for_sim_model(sim, pattern) if pattern else None
+        if not model_class:
+            model_class = input_modeltype
 
         # Layer 1: sim defaults
         defaultdata = self.read_xml_file(sim, dev)
@@ -254,16 +256,32 @@ class ConfigResolver:
         instance_device: str = '',
         user: bool = False,
         profile: Optional[str] = None,
+        identity: Optional[str] = None,
     ) -> tuple[list[ModelDataRow], str]:
         """Extract model-specific config entries by regex matching."""
         return self._read_models_data(which_root, sim, full_model_name, alldevices,
-                                      instance_device, user, profile)
+                                      instance_device, user, profile, identity)
 
-    def read_sc_overrides(self, aircraft_name: str) -> list[ScOverrideRow]:
-        """Merged SC overrides (defaults + user)."""
-        def_ovr = self._read_models_sc_overrides('defaults', aircraft_name, 'default')
-        usr_ovr = self._read_models_sc_overrides('user', aircraft_name, 'user')
-        return xmmerge.update_sc_overrides_with_user(def_ovr, usr_ovr)
+    def read_sc_overrides(self, aircraft_name: str, identity: Optional[str] = None,
+                          sim: Optional[str] = None) -> list[ScOverrideRow]:
+        """The SimConnect overrides of the pattern that names the aircraft,
+        like any other setting: the shipped ones for that pattern, the
+        user's under the same pattern replacing them by name, and nothing
+        from any other pattern.  ``identity`` is that pattern when the
+        caller knows it; otherwise it is resolved for ``sim`` (the current
+        one by default).  With no type row naming the aircraft, the most
+        specific override pattern stands in, as a settings-only pattern
+        does for settings."""
+        if not sim:
+            current = getattr(getattr(G, 'settings_mgr', None), 'current_sim', None)
+            sim = current if isinstance(current, str) and current else 'MSFS'
+        def_rows = self._read_models_sc_overrides('defaults', aircraft_name, 'default', sim)
+        usr_rows = self._read_models_sc_overrides('user', aircraft_name, 'user', sim)
+        if not identity:
+            identity = (self.get_pattern_by_sim_fullname(sim, aircraft_name)
+                        or xmatch.best_pattern([p for p, _ in def_rows + usr_rows], aircraft_name))
+        return xmmerge.update_sc_overrides_with_user([r for p, r in def_rows if p == identity],
+                                                     [r for p, r in usr_rows if p == identity])
 
     def read_default_class_data(
         self,
@@ -449,25 +467,224 @@ class ConfigResolver:
                 classes.append(cn)
         return classes
 
+    def _tree_type_patterns(self, root, sim: str) -> list[str]:
+        if root is None:
+            return []
+        return [p for p in (e.findtext('model') for e in root.findall(f'models[sim="{sim}"][name="type"]')) if p]
+
+    def _type_patterns(self, sim: str, user_first: bool = False) -> list[str]:
+        """Every model pattern that names an aircraft type, each tree in
+        document order.  The shipped file comes first so that it wins a
+        tie: a curated profile arriving for an aircraft the user already
+        covered is meant to be noticed, not shadowed.  ``user_first`` is
+        the order the rule before ranking used, kept for its log line."""
+        trees = (self._store.defaults_root, self._store.user_root)
+        if user_first:
+            trees = trees[::-1]
+        return [p for root in trees for p in self._tree_type_patterns(root, sim)]
+
     def get_pattern_by_sim_fullname(self, sim: str, full_name: str) -> Optional[str]:
-        """Regex-match full name to config pattern; user first, then defaults."""
-        def matches(pattern: str) -> bool:
-            return bool(re.match(pattern, full_name) or pattern == full_name)
+        """The pattern that names this aircraft: the most specific match in
+        either tree, the user tree winning a tie (see xml.match)."""
+        return xmatch.best_pattern(self._type_patterns(sim), full_name)
 
-        user_root = self._store.user_root
-        if user_root is not None:
-            for elem in user_root.findall(f'models[sim="{sim}"][name="type"]'):
-                p = elem.findtext('model')
-                if p and matches(p):
-                    return p
+    def first_match_pattern(self, sim: str, full_name: str) -> Optional[str]:
+        """What the rule before ranking would have chosen: the first match
+        in document order, user tree first.  Kept for the comparison log."""
+        return xmatch.first_match(self._type_patterns(sim, user_first=True), full_name)
 
+    def display_names(self, names) -> dict:
+        """Setting name -> the label the UI shows for it, for the settings
+        that declare one.  Names with no <defaults> row map to themselves."""
+        wanted = set(names)
+        out = {n: n for n in wanted}
         root = self._store.defaults_root
-        if root is not None:
-            for elem in root.findall(f'models[sim="{sim}"][name="type"]'):
-                p = elem.findtext('model')
-                if p and matches(p):
-                    return p
-        return None
+        if root is None:
+            return out
+        for e in root.findall('defaults'):
+            n = e.findtext('name')
+            if n in wanted:
+                label = e.findtext('displayname')
+                if label:
+                    out[n] = label
+        return out
+
+    def is_user_pattern(self, sim: str, pattern: str) -> bool:
+        """Whether the user config defines this pattern as an aircraft type."""
+        root = self._store.user_root
+        if root is None or not pattern:
+            return False
+        return root.find(f'models[sim="{sim}"][model="{pattern}"][name="type"]') is not None
+
+    def collision(self, sim: str, name: str) -> Optional[dict]:
+        """The one situation the merge offer exists for: a type pattern of
+        the user's and a shipped one both match this aircraft.  Returns the
+        most specific of each, which of them names the aircraft, and
+        whether the two claim exactly the same aircraft; None otherwise."""
+        user = xmatch.best_pattern(self._tree_type_patterns(self._store.user_root, sim), name)
+        curated = xmatch.best_pattern(self._tree_type_patterns(self._store.defaults_root, sim), name)
+        if not user or not curated:
+            return None
+        winner = 'user' if xmatch.specificity(user, name) > xmatch.specificity(curated, name) else 'curated'
+        return {'user': user, 'curated': curated, 'winner': winner,
+                'same_claim': xmatch.same_claim(user, curated)}
+
+    def curated_rows_for_fingerprint(self, sim: str, pattern: str) -> list:
+        """What a shipped pattern does, as plain tuples for a fingerprint:
+        its settings rows, the class on its type row, and its SimConnect
+        overrides for this sim.  Notes are left out, so rewording one is
+        not a change in what the profile does."""
+        root = self._store.defaults_root
+        if root is None or not pattern:
+            return []
+        rows = [('setting', e.findtext('name', ''), e.findtext('value', ''),
+                 e.findtext('unit', ''), e.findtext('device', ''))
+                for e in root.findall(f'models[sim="{sim}"][model="{pattern}"]')]
+        rows += [('override', e.findtext('name', ''), e.findtext('var', ''),
+                  e.findtext('sc_unit', ''), e.findtext('scale', ''))
+                 for e in root.findall(f'sc_overrides[model="{pattern}"]')
+                 if (e.findtext('sim') or '') in ('', sim)]
+        return rows
+
+    def user_rows_by_profile(self, sim: str, pattern: str) -> list:
+        """(profile, setting, value with unit, device) for every settings
+        row the user holds under a pattern, every profile and device: what
+        a merge carries across.  Type and profile rows are structure, not
+        settings, and are left out."""
+        root = self._store.user_root
+        if root is None or not pattern:
+            return []
+        out = []
+        for e in root.findall(f'models[sim="{sim}"][model="{pattern}"]'):
+            name = e.findtext('name', '') or ''
+            if name in ('', 'type', 'profile'):
+                continue
+            out.append((e.findtext('profile') or 'User Default', name,
+                        (e.findtext('value', '') or '') + (e.findtext('unit', '') or ''),
+                        e.findtext('device', '') or ''))
+        return out
+
+    @staticmethod
+    def _same_value(a: Optional[str], b: Optional[str]) -> bool:
+        """Whether two stored values mean the same thing.  Equal as written
+        counts, and so does equal once each is read with its unit, so a row
+        holding 10kt does not read as a disagreement with one holding
+        5.1444m/s.  The tolerance covers that conversion's own rounding and
+        nothing wider: a value a user rounded by hand is a real difference,
+        small enough for them to dismiss at a glance once they see both."""
+        from telemffb import utils
+        if (a or '') == (b or ''):
+            return True
+        na, nb = utils.to_number(a or ''), utils.to_number(b or '')
+        numeric = [x for x in (na, nb) if isinstance(x, (int, float)) and not isinstance(x, bool)]
+        if len(numeric) == 2:
+            return abs(na - nb) <= 1e-4 * max(1.0, abs(na), abs(nb))
+        return na == nb
+
+    def merge_preview(self, sim: str, name: str, user_pattern: str, curated_pattern: str,
+                      instance_device: str = '') -> dict:
+        """The two sides of the merge and its result, entry by entry: every
+        setting either pattern holds, then the SimConnect overrides of both.
+
+        Each entry carries ``built_in`` and ``yours`` - what each side holds,
+        or None where it holds nothing - and ``after``, the result, which is
+        the built-in with the user's active profile laid over it.  Reading
+        the two side by side is what makes a merge legible: a row where they
+        differ is a ``conflict``, and there the user's value stands, which is
+        what a User Profile means everywhere else.  ``changes`` is whether the
+        result differs from what the aircraft flies with today, which is only
+        the winning side's rows.
+
+        Settings and overrides alike follow the identity: only the naming
+        pattern's apply now, both apply after (theirs on top)."""
+        dev = instance_device or self._store.device
+        cls = self.get_class_for_sim_model(sim, user_pattern) or ''
+        active = self.get_active_profile_for_model(sim, cls, user_pattern) or 'User Default'
+        curated, _ = self._read_models_data('defaults', sim, name, False, dev, identity=curated_pattern)
+        mine, _ = self._read_models_data('user', sim, name, False, dev, user=True,
+                                         profile=active, identity=user_pattern)
+        c = {r['name']: (r['value'] or '') + (r['unit'] or '') for r in curated if r['name'] not in ('type', 'profile')}
+        u = {r['name']: (r['value'] or '') + (r['unit'] or '') for r in mine if r['name'] not in ('type', 'profile')}
+        same = user_pattern == curated_pattern
+        theirs_wins = xmatch.specificity(user_pattern, name) > xmatch.specificity(curated_pattern, name)
+        now = {**c, **u} if same else (dict(u) if theirs_wins else dict(c))
+        after = {**c, **u}
+
+        def rows(kind, now_, after_, theirs, built_in):
+            out = []
+            for n in sorted(set(now_) | set(after_)):
+                out.append({
+                    'kind': kind, 'name': n,
+                    'built_in': built_in.get(n), 'yours': theirs.get(n),
+                    'after': after_.get(n),
+                    'changes': now_.get(n) != after_.get(n),
+                    'conflict': (n in theirs and n in built_in
+                                 and not self._same_value(theirs[n], built_in[n])),
+                })
+            return out
+
+        c_ov = {r['name']: r['var'] for p, r in self._read_models_sc_overrides('defaults', name, 'default', sim)
+                if p == curated_pattern}
+        u_ov = {r['name']: r['var'] for p, r in self._read_models_sc_overrides('user', name, 'user', sim)
+                if p == user_pattern}
+        now_ov = {**c_ov, **u_ov} if same else (dict(u_ov) if theirs_wins else dict(c_ov))
+        after_ov = {**c_ov, **u_ov}
+
+        entries = (rows('setting', now, after, u, c)
+                   + rows('override', now_ov, after_ov, u_ov, c_ov))
+        # What each column stands for, and which side the aircraft is flying
+        # on today: the built-in, theirs, or both where one string carries a
+        # row in each tree and the user's sits on top.
+        in_effect = 'both' if same else ('yours' if theirs_wins else 'built-in')
+        under_user = {e.findtext('profile') or 'User Default'
+                      for e in (self._store.user_root.findall(f'models[sim="{sim}"][model="{user_pattern}"]')
+                                if self._store.user_root is not None else [])
+                      if e.findtext('name') != 'type'} or {'User Default'}
+        under_curated = {e.findtext('profile') or 'User Default'
+                         for e in (self._store.user_root.findall(f'models[sim="{sim}"][model="{curated_pattern}"]')
+                                   if self._store.user_root is not None else [])
+                         if e.findtext('name') != 'type'}
+        renamed = xmmerge.merged_profile_names(
+            sorted(under_user), under_curated if not same else under_user,
+            xmatch.required_literal(user_pattern)[0].strip(' -_.:') or user_pattern, same_string=same)
+        return {
+            'active_profile': active,
+            'built_in_pattern': curated_pattern,
+            'your_pattern': user_pattern,
+            'your_profile': active,
+            'after_pattern': curated_pattern,
+            'after_profile': renamed.get(active, active),
+            'in_effect': in_effect,
+            'entries': entries,
+            'gains': sum(1 for e in entries if e['changes'] and e['yours'] is None),
+            'restores': sum(1 for e in entries if e['changes'] and e['yours'] is not None),
+            'keeps': sum(1 for e in entries if not e['changes'] and e['yours'] is not None),
+            'conflicts': sum(1 for e in entries if e['conflict']),
+            # Every profile registered under theirs moves, settings or not, and
+            # each is named as it arrives: "User Default" is the base of an
+            # aircraft the user added and cannot exist under a built-in.
+            'other_profiles': sorted(renamed.get(p, p) for p in under_user - {active}),
+            'curated_notes': self.read_default_model_notes(sim, name, prefer_pattern=curated_pattern),
+        }
+
+    def _warn_collision(self, sim: str, name: str) -> None:
+        if (sim, name) in self._shadow_logged:
+            return
+        col = self.collision(sim, name)
+        if not col:
+            return
+        self._shadow_logged.add((sim, name))
+        logging.warning("%s is matched by both %s (user config) and %s (defaults.xml); %s names it. "
+                        "The main window offers to merge them.", name, col['user'], col['curated'],
+                        col['user'] if col['winner'] == 'user' else col['curated'])
+
+    def _log_pattern_match(self, sim: str, name: str, pattern: str) -> None:
+        legacy = self.first_match_pattern(sim, name)
+        if legacy and legacy != pattern:
+            logging.info("Reading from XML: Pattern Match: %s (the first-match rule would have chosen %s)",
+                         pattern, legacy)
+        else:
+            logging.info("Reading from XML: Pattern Match: %s", pattern)
 
     def get_class_for_sim_model(self, sim: str, model: Optional[str]) -> Optional[str]:
         """Find aircraft class for sim+model; user first, then defaults."""
@@ -588,7 +805,7 @@ class ConfigResolver:
             pattern = elem.findtext('model') or ''
             if not pattern:
                 continue
-            if re.match(pattern, full_model_name) or pattern == full_model_name:
+            if xmatch.pattern_matches(pattern, full_model_name):
                 row_notes = elem.findtext('notes') or ''
                 if prefer_pattern and pattern == prefer_pattern:
                     return row_notes
@@ -653,7 +870,14 @@ class ConfigResolver:
         instance_device: str = '',
         user: bool = False,
         profile: Optional[str] = None,
+        identity: Optional[str] = None,
     ) -> tuple[list[ModelDataRow], str]:
+        """The rows of the one pattern that applies: ``identity``, the type
+        row that names the aircraft, when given; else the most specific
+        matching pattern in this tree.  User rows are limited to
+        ``profile``.  Nothing from any other matching pattern: a profile
+        owns its values and does not follow the pattern it was forked from.
+        Returns the rows and the pattern they belong to ('' when none)."""
         root = self._store.user_root if which_root == 'user' else self._store.defaults_root
         if root is None:
             return [], ''
@@ -666,8 +890,11 @@ class ConfigResolver:
             profile = profile.active_profile if profile else None
 
         dev = instance_device or self._store.device
-        # Only add profile filter if user=True and profile is set (non-empty)
-        profile_match = f"[profile='{profile}']" if (user and profile) else ''
+        # The profile filter belongs in the query.  The dedup below keys on
+        # (pattern, setting) alone, so a row from another profile under the
+        # same pattern would overwrite the active profile's before any later
+        # filter could see it, and the setting would fall to the sim default.
+        profile_match = f'[profile="{profile}"]' if (user and profile) else ''
 
         if alldevices:
             any_models = root.findall(f'.//models[sim="any"]{profile_match}')
@@ -684,41 +911,50 @@ class ConfigResolver:
         for e in all_models:
             model_dict[(e.findtext('model'), e.findtext('name'))] = e
 
+        ranked = xmatch.rank_matches(
+            ((e.findtext('model', ''), e) for e in model_dict.values()),
+            full_model_name)
+        if identity:
+            winner = identity if any(p == identity for p, _ in ranked) else ''
+        else:
+            winner = ranked[-1][0] if ranked else ''
         data: list[ModelDataRow] = []
-        found_pattern = ''
-        for e in model_dict.values():
-            pattern = e.findtext('model', '')
-            if pattern and (re.match(pattern, full_model_name) or pattern == full_model_name):
-                data.append({
-                    'name': e.findtext('name', ''),
-                    'value': e.findtext('value', ''),
-                    'unit': e.findtext('unit', ''),
-                    'device': e.findtext('device', ''),
-                })
-                found_pattern = pattern
-        return data, found_pattern
+        for pattern, e in ranked:
+            if pattern != winner:
+                continue
+            data.append({
+                'name': e.findtext('name', ''),
+                'value': e.findtext('value', ''),
+                'unit': e.findtext('unit', ''),
+                'device': e.findtext('device', ''),
+            })
+        return data, winner
 
     def _read_models_sc_overrides(
         self,
         which_root: str,
         full_model_name: str,
         source: str,
-    ) -> list[ScOverrideRow]:
+        sim: Optional[str] = None,
+    ) -> list[tuple[str, ScOverrideRow]]:
+        """Every matching override row with its pattern, least specific
+        first.  A row that names a sim belongs to that sim only; one that
+        names none - every row written before rows carried a sim - belongs
+        to any."""
         root = self._store.user_root if which_root == 'user' else self._store.defaults_root
         if root is None:
             return []
-        data: list[ScOverrideRow] = []
-        for elem in root.findall('.//sc_overrides'):
-            pattern = elem.findtext('model', '')
-            if pattern and (re.match(pattern, full_model_name) or pattern == full_model_name):
-                data.append({
-                    'name': elem.findtext('name', ''),
-                    'var': elem.findtext('var', ''),
-                    'sc_unit': elem.findtext('sc_unit', ''),
-                    'scale': elem.findtext('scale', ''),
-                    'source': source,
-                })
-        return data
+        rows = [(elem.findtext('model', ''), elem) for elem in root.findall('.//sc_overrides')
+                if not sim or (elem.findtext('sim') or '') in ('', sim)]
+        ranked = xmatch.rank_matches(rows, full_model_name)
+        return [(pattern, {
+            'name': elem.findtext('name', ''),
+            'var': elem.findtext('var', ''),
+            'sc_unit': elem.findtext('sc_unit', ''),
+            'scale': elem.findtext('scale', ''),
+            'source': source,
+            'sim': elem.findtext('sim', '') or '',
+        }) for pattern, elem in ranked]
 
     def _apply_validvalue_overrides(
         self,

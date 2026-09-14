@@ -357,7 +357,10 @@ li.checked::marker { content: &quot;\2612&quot;; }
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;TelemFFB uses regex to match aircraft names. For example:&lt;/p&gt;
 &lt;p style=&quot; margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;    Name.*		- &lt;/span&gt;matches anything starting with '&lt;span style=&quot; font-style:italic;&quot;&gt;Name'&lt;/span&gt;&lt;/p&gt;
 &lt;p style=&quot; margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;    ^Name$		- &lt;/span&gt;matches &lt;span style=&quot; font-weight:700;&quot;&gt;only&lt;/span&gt; the exact &lt;span style=&quot; font-style:italic;&quot;&gt;'Name'&lt;/span&gt;&lt;/p&gt;
-&lt;p style=&quot; margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;    (The )?Name.*	- &lt;/span&gt;matches &lt;span style=&quot; font-style:italic;&quot;&gt;'Name'&lt;/span&gt; or '&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;The&lt;/span&gt; Name'&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+&lt;p style=&quot; margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;    (The )?Name.*	- &lt;/span&gt;matches &lt;span style=&quot; font-style:italic;&quot;&gt;'Name'&lt;/span&gt; or '&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;The&lt;/span&gt; Name'&lt;/p&gt;&lt;p style=&quot; margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;When more than one match string fits an aircraft, the &lt;span style=&quot; font-weight:700;&quot;&gt;most specific&lt;/span&gt; one is used: a name pinned at both ends (^Name$) beats a pattern, and a longer pattern beats a shorter one.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
