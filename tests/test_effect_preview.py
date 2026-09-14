@@ -32,7 +32,8 @@ from telemffb.preview import (
     SPOILER_BUFFET, FLAPS_MOTION, SPEEDBRAKE_MOTION, SPOILER_MOTION, CANOPY_MOTION,
     TAILHOOK_MOTION, FUELBOOM_MOTION, WINGFOLD_MOTION,
     GUNFIRE, WEAPON_RELEASE, COUNTERMEASURES, DAMAGE,
-    IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits, Jitter,
+    IL2_GUNFIRE, IL2_BOMB_RELEASE, IL2_ROCKET_RELEASE, steps, RandomHits, Jitter, RoundCounter,
+    GUN_BURSTS, GUN_BURSTS_DURATION, GUN_PREVIEW_FRAME_RATE,
     TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, REFERENCE_SPRING, Gusts, TURBULENCE, WIND,
     ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP,
     NOSEWHEEL_SHIMMY, AOA_REDUCTION, LATERAL_FORCE, LATERAL_G_REFERENCE,
@@ -1234,12 +1235,24 @@ class TestWeaponEdgePreviews(EdgePreviewCase):
         return ac
 
     @pytest.mark.parametrize("sim", ['DCS', 'BMS'])
-    def test_gunfire_is_a_continuous_burst(self, sim):
-        fired, params = self._events(self._aircraft(sim), GUNFIRE, sim, 'gunfire')
-        # 20 frames; the first primes the tracker, every later one fires
-        assert fired == list(range(1, 20))
+    def test_gunfire_plays_three_bursts_slow_to_fast(self, sim):
+        """The effect re-triggers on every frame the round count changed,
+        so the count must change on exactly the frames the gun would fire:
+        ten times a second at 600 rpm, twenty-five at 1500, and on every
+        frame at 6000 rpm (the gun outruns the 60 Hz cadence).  Nothing
+        in the pauses."""
+        assert GUNFIRE.frame_rate == GUN_PREVIEW_FRAME_RATE == 60.0
+        fired, params = self._events(self._aircraft(sim), GUNFIRE, sim, 'gunfire', rate=60.0)
+        n = round(GUN_BURSTS_DURATION * 60.0)
+        seconds = lambda i: GUN_BURSTS_DURATION * i / (n - 1)
+        per_burst = [sum(1 for i in fired if start <= seconds(i) <= end)
+                     for rpm, start, end in GUN_BURSTS]
+        assert sum(per_burst) == len(fired)                   # none in the pauses
+        assert per_burst[0] == pytest.approx(20, abs=1)       # 600 rpm x 2 s
+        assert per_burst[1] == pytest.approx(50, abs=1)       # 1500 rpm x 2 s
+        assert per_burst[2] == pytest.approx(120, abs=2)      # every frame of the burst
         freq, mag, direction, kw = params
-        assert (freq, mag, direction) == (10, 0.3, 45)
+        assert (freq, mag, direction) == (10, 0.3, 45)        # the effect's own fixed burst
         assert kw == {'effect_type': 6, 'duration': 80}      # sawtooth up
         assert 'payload_rel' not in self.mock_effects or \
             self.mock_effects.get('payload_rel') is None
@@ -1268,25 +1281,73 @@ class TestWeaponEdgePreviews(EdgePreviewCase):
 
 
 class TestIl2WeaponPreviews(EdgePreviewCase):
-    """The basic IL-2 weapon path, one preview per tuned effect, with the
-    shake master forced on and the dynamic gunfire mode (which needs
-    real gun telemetry) switched off for the throwaway."""
+    """The IL-2 weapon path, one preview per tuned effect, with the shake
+    master forced on.  The gunfire preview follows the profile's gunfire
+    mode; the bomb and rocket previews pin the basic path."""
 
-    def _aircraft(self):
+    def _aircraft(self, dynamic=True):
         ac = aircrafts_il2.Aircraft('preview')
         ac.il2_shake_master = 0
         ac.il2_enable_weapons = 0
-        ac.il2_dynamic_gunfire_mode = True             # must be switched off for the preview
+        ac.il2_dynamic_gunfire_mode = dynamic
         ac.il2_weapon_release_intensity = 0.3
         ac.il2_bomb_release_intensity = 0.25
         ac.il2_rocket_release_intensity = 0.2
         return ac
 
-    def test_gunfire_is_one_held_burst(self):
-        ac = self._aircraft()
-        fired, params = self._events(ac, IL2_GUNFIRE, 'IL2', 'il2_gunfire')
-        assert ac.il2_shake_master is True and ac.il2_dynamic_gunfire_mode is False
-        assert fired == [1]                                          # primes, fires, holds
+    def test_dynamic_gunfire_plays_three_rounds_heavy_to_light(self):
+        """In dynamic mode each burst is a different round and the effect
+        derives rate and recoil from the round's mass and velocity, so
+        the three slots come up with the production function's numbers
+        for those rounds, in order, one start each."""
+        from telemffb.preview import _IL2_GUN_ROUNDS
+        ac = self._aircraft(dynamic=True)
+        runner = PreviewRunner(ac, IL2_GUNFIRE, 'IL2', frame_rate=10.0)
+        assert ac.il2_shake_master is True and ac.il2_dynamic_gunfire_mode is True
+        first_start = {}
+        for i in range(runner.frames_total):
+            runner.step()
+            for key, _, _ in _IL2_GUN_ROUNDS:
+                fx = self.mock_effects.get(f"il2_gunfire_{key}")
+                if fx is not None and fx.start_count and key not in first_start:
+                    first_start[key] = (i, fx._periodic)
+        while runner.step():
+            pass
+        assert list(first_start) == [key for key, _, _ in _IL2_GUN_ROUNDS]      # heavy to light
+        for key, start, _ in _IL2_GUN_ROUNDS:
+            i, (freq, mag, direction, kw) = first_start[key]
+            assert GUN_BURSTS_DURATION * i / (runner.frames_total - 1) == pytest.approx(start, abs=0.15)
+            m, v = (float(x) for x in key.split(','))
+            sps, rfac = ac.gun_effect_from_mv(m, v)
+            assert (freq, mag, direction, kw) == (int(sps), min(1.0, max(0.0, 0.3 * rfac)), 0,
+                                                  {'effect_type': 6})
+        assert self.mock_effects.get('il2_gunfire') is None          # the basic slot stays silent
+
+    def test_basic_gunfire_plays_the_fixed_shake_three_times(self, monkeypatch):
+        """In basic mode the same frames drive the plain gun counter: the
+        fixed 10 Hz square starts once per burst and drops out in the
+        pauses (a wall-clock quiet period, hence the advancing clock)."""
+        _advancing_clock(monkeypatch, step=0.02)
+        ac = self._aircraft(dynamic=False)
+        runner = PreviewRunner(ac, IL2_GUNFIRE, 'IL2', frame_rate=30.0)
+        assert ac.il2_dynamic_gunfire_mode is False                  # left as the profile had it
+        # the effect DISPOSES its slot in a pause, so a restart is a fresh
+        # mock object: count starts across instances (holding each one,
+        # or a recycled id would pass for the old object)
+        starts, instances, params = [], [], None
+        for i in range(runner.frames_total):
+            runner.step()
+            fx = self.mock_effects.get('il2_gunfire')
+            if fx is not None and (not instances or fx is not instances[-1]) and fx.start_count:
+                instances.append(fx)
+                starts.append(i)
+                params = fx._periodic
+        while runner.step():
+            pass
+        assert len(starts) == 3
+        seconds = [GUN_BURSTS_DURATION * i / (runner.frames_total - 1) for i in starts]
+        for t, (_, start, _) in zip(seconds, GUN_BURSTS):
+            assert t == pytest.approx(start, abs=0.15)              # one per burst, at its start
         assert params == (10, 0.3, 0, {'effect_type': 3})           # 600 rpm square
         for slot in ('il2_bombs', 'il2_rockets'):
             fx = self.mock_effects.get(slot)
@@ -1305,6 +1366,63 @@ class TestIl2WeaponPreviews(EdgePreviewCase):
     def test_only_il2(self):
         with pytest.raises(ValueError):
             PreviewRunner(aircrafts_dcs.Aircraft('preview'), IL2_GUNFIRE, 'DCS')
+
+
+class TestRoundCounter:
+    """The ammunition counter behind the gunfire preview: it changes on
+    exactly the frames a gun at ``rpm`` would fire a round."""
+
+    def _run(self, counter, seconds=2.0, rate=60.0, ac=None):
+        ac = ac or SimpleNamespace()
+        ac._preview_duration = seconds
+        n = round(seconds * rate)
+        values = [counter(ac, i / (n - 1)) for i in range(n)]
+        return values, sum(1 for a, b in zip(values, values[1:]) if a != b)
+
+    def test_a_slow_gun_changes_the_count_at_its_own_rate(self):
+        values, changes = self._run(RoundCounter(600))
+        assert changes == pytest.approx(20, abs=1)                  # 10 rounds a second for 2 s
+        assert values[0] == 500 and values[-1] == pytest.approx(480, abs=1)
+        assert all(a >= b for a, b in zip(values, values[1:]))      # only ever falls
+
+    def test_a_rotary_cannon_changes_the_count_on_every_frame(self):
+        values, changes = self._run(RoundCounter(6000))
+        assert changes == len(values) - 1                           # 100 rps outruns 60 Hz
+        assert values[-1] == pytest.approx(300, abs=2)              # but every round is counted
+
+    def test_fractions_carry_across_frames(self):
+        _, changes = self._run(RoundCounter(90))                    # 1.5 rounds a second
+        assert changes == 3
+
+    def test_a_pause_freezes_the_count(self):
+        _, changes = self._run(RoundCounter(0))
+        assert changes == 0
+
+    def test_the_rate_may_follow_progress(self):
+        counter = RoundCounter(lambda ac, p: 600 if p < 0.5 else 0)
+        values, changes = self._run(counter)
+        assert changes == pytest.approx(10, abs=1)
+        assert values[len(values) // 2:] == [values[-1]] * (len(values) - len(values) // 2)
+
+    def test_every_run_starts_from_a_full_count(self):
+        counter = RoundCounter(600, start=100)
+        a, _ = self._run(counter)
+        b, _ = self._run(counter)                                   # a new throwaway
+        assert a[0] == b[0] == 100 and a == b
+
+
+class TestSpecFrameRate(BaseTelemetryEffectTestCase):
+    def test_the_gunfire_spec_sets_its_own_cadence(self):
+        ac = aircrafts_dcs.Aircraft('preview')
+        runner = PreviewRunner(ac, GUNFIRE, 'DCS')
+        assert runner.frame_rate == 60.0
+        assert runner.frames_total == round(GUN_BURSTS_DURATION * 60)
+        assert PreviewRunner(ac, GUNFIRE, 'DCS', frame_rate=10.0).frame_rate == 10.0   # explicit wins
+
+    def test_specs_without_one_keep_the_default(self):
+        from telemffb.preview import FRAME_RATE_HZ
+        assert JET_ENGINE_RUMBLE.frame_rate is None
+        assert PreviewRunner(aircrafts_dcs.Aircraft('preview'), JET_ENGINE_RUMBLE, 'DCS').frame_rate == FRAME_RATE_HZ
 
 
 class TestRandomHits:

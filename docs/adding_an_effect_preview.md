@@ -108,6 +108,10 @@ Field by field:
 - **`duration`**, **`tail`**, **`dwell`**, **`schedule`** — the timing, section 4.
 - **`kwargs`** — extra keyword arguments for the method, resolved per frame like fields.
 - **`force_attrs`** — attributes set on the throwaway aircraft alongside the toggle.
+- **`frame_rate`** — frames per second the preview is stepped at; default 30. Set it only where
+  the frame cadence *is* the effect's character: DCS gunfire re-triggers on every frame the
+  round count changed, so the preview runs at a representative 60 Hz export cadence and a
+  rotary cannon is felt as that cap.
 
 ### Field values
 
@@ -122,6 +126,7 @@ A value in `fields` (or `kwargs`) may be:
 | a callable `(aircraft, progress) -> value` | anything else: a list that varies, a threshold plus an offset |
 | `steps(count, start, step)` | a counter that changes `count` times, evenly spaced — for change-driven effects |
 | `RandomHits(...)` | a counter that steps at random moments, redrawn per run — for irregular streams (damage) |
+| `RoundCounter(rpm)` | an ammunition count falling at a firing rate, fractions carried, so it changes on exactly the frames a gun at `rpm` fires; `rpm` may be a callable of progress (zero = a pause) — the DCS gunfire bursts |
 
 **Reference values must be profile-relative wherever a threshold exists.** "The RPM where this
 profile's rumble peaks", not `650`. That way the preview tracks the user's tuning. A constant is

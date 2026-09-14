@@ -65,6 +65,7 @@ two threads, and a preview mid-flight is meaningless anyway):
 (``step`` per frame) so the app can drive it from a timer and tests
 from a loop.
 """
+import json
 import logging
 import math
 import random
@@ -185,6 +186,11 @@ class PreviewSpec:
     # binds it either way.
     frame_arg: bool = True
     sims: Tuple[str, ...] = SIMS
+    # Frames per second the preview is stepped at; None for the default.
+    # Matters only where the effect's character is the frame cadence
+    # itself: DCS gunfire re-triggers on every frame the round count
+    # changed, so a rotary cannon is felt as the export frame rate.
+    frame_rate: Optional[float] = None
 
     def __post_init__(self):
         if self.kind not in KINDS:
@@ -297,7 +303,7 @@ class PreviewRunner:
 
     def __init__(self, aircraft, spec: PreviewSpec, sim: str,
                  device_type: Optional[str] = None,
-                 frame_rate: float = FRAME_RATE_HZ,
+                 frame_rate: Optional[float] = None,
                  force_enable: bool = True):
         if not spec.supports(sim):
             raise ValueError(f"{spec.effect_id} is not previewable on {sim}")
@@ -308,6 +314,8 @@ class PreviewRunner:
         self.spec = spec
         self.sim = sim
         self.device_type = device_type or G.device_type
+        # an explicit rate (tests, scripts) wins over the spec's own
+        frame_rate = frame_rate or spec.frame_rate or FRAME_RATE_HZ
         self.frame_rate = frame_rate
         self.frames_total = max(2, round(spec.duration * frame_rate))   # scripted frames
         self.tail_frames = max(0, round(spec.tail * frame_rate))          # last frame repeated
@@ -901,16 +909,72 @@ class Jitter:
         return list(values) if self.size else values[0]
 
 
+class RoundCounter:
+    """An ammunition count that falls at a firing rate, per run.
+
+    DCS and BMS export the cannon's remaining rounds every frame, and the
+    gunfire effect re-triggers its short burst on every frame the count
+    changed - there is no rate in the effect itself.  So what the user
+    feels is the gun's rate, capped by the frame rate: a slow cannon
+    thumps round by round, a rotary cannon changes the count on every
+    frame and buzzes at the frame rate.  The counter reproduces exactly
+    that.  It decrements by the rounds fired since the last frame,
+    carrying the fraction, so a 600 rpm gun changes the count on ten
+    frames a second at any frame rate above 10 Hz.  ``rpm`` is a number
+    or a callable(aircraft, progress); zero is a pause.  The count lives
+    on the throwaway aircraft, like the other stateful stimuli.
+    """
+
+    def __init__(self, rpm, start: int = 500):
+        self.rpm = rpm
+        self.start = start
+
+    def _state(self, aircraft):
+        store = aircraft.__dict__.setdefault('_preview_rounds', {})
+        if id(self) not in store:
+            store[id(self)] = {'count': self.start, 'carry': 0.0, 'progress': None}
+        return store[id(self)]
+
+    def __call__(self, aircraft, progress):
+        st = self._state(aircraft)
+        if st['progress'] is not None:
+            dt = max(0.0, progress - st['progress']) * getattr(aircraft, '_preview_duration', 1.0)
+            rpm = self.rpm(aircraft, progress) if callable(self.rpm) else self.rpm
+            rounds = st['carry'] + rpm / 60.0 * dt
+            fired = int(rounds)
+            st['carry'] = rounds - fired
+            st['count'] -= fired
+        st['progress'] = progress
+        return st['count']
+
+
+# The gunfire previews: three 2 s bursts with 0.4 s pauses, slow to
+# fast.  Nothing in the telemetry says which gun the aircraft carries,
+# so instead of guessing the preview plays the envelope: a 600 rpm
+# cannon (Hispano, MK 108, M230), a 1500 rpm cannon (GSh-30-1, M39,
+# ADEN) and a 6000 rpm rotary cannon (M61).  (rpm, start s, end s)
+GUN_BURSTS = ((600, 0.0, 2.0), (1500, 2.4, 4.4), (6000, 4.8, 6.8))
+GUN_BURSTS_DURATION = 6.8
+GUN_PREVIEW_FRAME_RATE = 60.0     # a representative DCS export cadence: the rotary cannon's cap
+
+
+def _burst_rpm(ac, progress):
+    t = progress * GUN_BURSTS_DURATION
+    return next((rpm for rpm, start, end in GUN_BURSTS if start <= t <= end), 0)
+
+
 GUNFIRE = PreviewSpec(
     effect_id='gunfire_effect_enabled',
-    reference='a 2 s gun burst',
+    reference=('three 2 s bursts with pauses between: a 600 rpm cannon, a 1500 rpm cannon, '
+               'then a 6000 rpm rotary cannon; the shake re-triggers on every reported round, '
+               'so the rate is the gun\'s, up to the frame rate'),
     rows=('gun_vibration_intensity',),
     method='ac_update_cm_weapons',
     kind='edge',
-    # the gun signal changes every frame while firing; a 2 s burst
-    fields={'*': {'Gun': lambda ac, p: p,
+    fields={'*': {'Gun': RoundCounter(_burst_rpm),
                   'PayloadInfo': 4, 'Flares': 10, 'Chaff': 10}},
-    duration=2.0,
+    duration=GUN_BURSTS_DURATION,
+    frame_rate=GUN_PREVIEW_FRAME_RATE,
     sims=('DCS', 'BMS'),
 )
 
@@ -957,24 +1021,44 @@ DAMAGE = PreviewSpec(
 )
 
 # IL-2's three basic weapon effects share one toggle but have three
-# intensities, so three previews.  The dynamic gunfire mode computes its
-# pattern from the aircraft's real gun telemetry and is not previewable;
-# the throwaway is switched to the basic path, and the shake master the
-# effects sit behind is forced on.
+# intensities, so three previews.  The shake master the effects sit
+# behind is forced on; the bomb and rocket previews also pin the basic
+# gunfire path so the mode cannot matter to them.
 _IL2_WEAPON_FORCE = {'il2_shake_master': True, 'il2_dynamic_gunfire_mode': False}
+
+# The IL-2 gunfire preview follows the profile's gunfire mode.  In the
+# dynamic mode the effect derives rate and recoil from the round's mass
+# and velocity (gun_effect_from_mv), keyed by the "mass, velocity" string
+# IL2Manager builds, so the preview feeds it three representative rounds,
+# heavy to light, in the same three-burst shape as the DCS preview; in
+# the basic mode the same frames drive the plain gun counter.  (key,
+# start s, end s)
+_IL2_GUN_ROUNDS = (('0.33, 505.0', 0.0, 2.0),      # 30 mm MK 108
+                   ('0.13, 800.0', 2.4, 4.4),      # 20 mm
+                   ('0.0128, 800.0', 4.8, 6.8))    # 7.92 mm machine gun
+
+
+def _il2_gun_counts(progress):
+    """Per-round counts: rising through the round's burst, frozen outside it."""
+    t = progress * GUN_BURSTS_DURATION
+    return {key: 1 + int(max(0.0, min(t - start, end - start)) * 60)
+            for key, start, end in _IL2_GUN_ROUNDS}
+
 
 IL2_GUNFIRE = PreviewSpec(
     name='il2_gunfire',
-    reference='a 2 s gun burst (basic gunfire mode)',
+    reference=('three 2 s bursts with pauses between; in dynamic gunfire mode a 30 mm cannon, '
+               'a 20 mm cannon, then a 7.92 mm machine gun (rate and recoil from the round\'s '
+               'mass and velocity), in basic mode the fixed-rate gun shake three times'),
     rows=('il2_weapon_release_intensity',),
     effect_id='il2_enable_weapons',
     method='ac_update_cm_weapons',
     kind='edge',
-    # the gun counter changes every frame for a 2 s burst; the tail holds
-    # it so the effect winds down as it does live
-    fields={'IL2': {'Gun': lambda ac, p: p, 'Bombs': 2, 'Rockets': 4}},
-    duration=2.0,
-    force_attrs=_IL2_WEAPON_FORCE,
+    fields={'IL2': {'GunFireData': lambda ac, p: json.dumps(_il2_gun_counts(p)),
+                    'Gun': lambda ac, p: sum(_il2_gun_counts(p).values()),
+                    'Bombs': 2, 'Rockets': 4}},
+    duration=GUN_BURSTS_DURATION,
+    force_attrs={'il2_shake_master': True},
     sims=('IL2',),
 )
 
