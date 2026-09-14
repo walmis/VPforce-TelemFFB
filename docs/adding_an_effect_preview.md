@@ -201,7 +201,7 @@ spring; a DirectInput device is not). So a constant-force spec sets `constant_fo
 which does two things:
 
 - the UI asks the user to take hold of the controls before every run (the message box in
-  `MainWindow.confirm_constant_force_preview`), and the row's tooltip says so;
+  `EffectPreviewController.confirm_constant_force`), and the row's tooltip says so;
 - the runner puts up a **5% reference spring** (`REFERENCE_SPRING`) in the preview's own
   effect table for the run. It is not there to counter the force — only to take the odd
   freewheel feel off DirectInput devices that misbehave at 0% spring.
@@ -232,8 +232,9 @@ instead of taking one (`update_turbulence`) sets `frame_arg=False`.
 Nothing to do per spec, but worth knowing. The master's settings form hosts the play button
 for every device's rows (the config scope switches between joystick, pedals, collective),
 while the effect must play on the instance that owns the device. When the scope is not the
-master's own device, `MainWindow.toggle_effect_preview` sends `PREVIEW:<device>:<name>` to
-the children over IPC; the owner runs the same `start_effect_preview` on its own device (no
+master's own device, `EffectPreviewController.toggle` (the window's `preview` attribute, in
+`telemffb/preview_controller.py`) sends `PREVIEW:<device>:<name>` to the children over IPC;
+the owner's controller runs the same `start` on its own device (no
 confirmation there — the master already asked, and the child's window is hidden) and reports
 `PREVIEW DONE:<device>:<name>` back, at which point the master resets the button and slider
 cues. A fallback timer on the master covers a child that never answers. The child resolves
