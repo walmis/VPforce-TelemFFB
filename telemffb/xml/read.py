@@ -485,7 +485,7 @@ class ConfigResolver:
 
     def get_pattern_by_sim_fullname(self, sim: str, full_name: str) -> Optional[str]:
         """The pattern that names this aircraft: the most specific match in
-        either tree, the user tree winning a tie (see xml.match)."""
+        either tree, the shipped file winning a tie (see xml.match)."""
         return xmatch.best_pattern(self._type_patterns(sim), full_name)
 
     def first_match_pattern(self, sim: str, full_name: str) -> Optional[str]:

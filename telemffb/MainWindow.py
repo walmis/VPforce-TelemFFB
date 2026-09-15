@@ -2372,7 +2372,13 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.Yes)
         if ans != QMessageBox.StandardButton.Yes:
             return
-        match_history.forget_declines()
+        try:
+            match_history.forget_declines()
+        except Exception:
+            # The history lock can time out; an exception escaping a Qt slot
+            # takes the process down, so it is logged here instead.
+            logging.exception("Could not forget the declined profile offers")
+            return
         logging.info("Declined profile offers forgotten at the user's request")
         # The loaded aircraft may be one of them, so bring its prompt back now
         # rather than on whichever frame next resolves it.

@@ -6,7 +6,12 @@ Kept in a small JSON file beside the user config rather than inside it: a
 record is not a user choice, must not bump the config's mtime (every
 instance reloads its aircraft on that), and must not travel with a config
 that is copied, shared or exported.  Only the master instance writes it,
-from the main thread.
+and two of its threads do: the telemetry thread records which pattern
+named an aircraft as it resolves, and the main thread records what the
+user answered in the dialog.  Each write is a read-modify-write of the
+whole file, so the same per-path lock the config store uses holds across
+it; the file itself is replaced atomically, so a reader on either thread
+always sees a whole document.
 
 A collision is remembered per pattern pair, not per aircraft: it is the
 two patterns that compete, and the same pair covers every aircraft both
@@ -27,9 +32,22 @@ import os
 from typing import Optional
 
 import telemffb.globals as G
+from telemffb.namedmutex import FileLock
 
 FILENAME = "match_history.json"
 MERGED, DECLINED = "merged", "declined"
+
+
+
+def _write_lock() -> FileLock:
+    """The lock every read-modify-write below holds: the same per-path
+    lock the config store takes on userconfig_v2.xml, keyed on this file.
+    Without it a match recorded from the telemetry thread and an answer
+    recorded from the main thread at the same instant each load the file
+    and each save their own copy, and on Windows the shared temporary name
+    makes the second replace fail outright.  A named mutex also covers a
+    second process, which nothing needs today but costs nothing."""
+    return FileLock(path())
 
 
 def path() -> str:
@@ -79,13 +97,14 @@ def record_match(sim: str, aircraft_name: str, pattern: str) -> None:
     the file already says is not rewritten."""
     if not path() or not aircraft_name or not pattern:
         return
-    data = _load()
-    matches = data.setdefault("matches", {}).setdefault(sim, {})
-    if matches.get(aircraft_name) == pattern:
-        return
-    matches[aircraft_name] = pattern
-    data.setdefault("collisions", {})
-    _save(data)
+    with _write_lock():
+        data = _load()
+        matches = data.setdefault("matches", {}).setdefault(sim, {})
+        if matches.get(aircraft_name) == pattern:
+            return
+        matches[aircraft_name] = pattern
+        data.setdefault("collisions", {})
+        _save(data)
 
 
 def fingerprint(rows: list) -> str:
@@ -124,14 +143,15 @@ def resolve(sim: str, user_pattern: str, curated_pattern: str, how: str,
     is the built-in's fingerprint when the answer was given."""
     if not path() or not user_pattern or not curated_pattern or how not in (MERGED, DECLINED):
         return
-    data = _load()
-    data.setdefault("matches", {})
-    pairs = data.setdefault("collisions", {}).setdefault(sim, {}).setdefault(user_pattern, {})
-    answer = {"how": how, "shipped": shipped or ""}
-    if pairs.get(curated_pattern) == answer:
-        return
-    pairs[curated_pattern] = answer
-    _save(data)
+    with _write_lock():
+        data = _load()
+        data.setdefault("matches", {})
+        pairs = data.setdefault("collisions", {}).setdefault(sim, {}).setdefault(user_pattern, {})
+        answer = {"how": how, "shipped": shipped or ""}
+        if pairs.get(curated_pattern) == answer:
+            return
+        pairs[curated_pattern] = answer
+        _save(data)
 
 
 def _declines(data: dict):
@@ -157,18 +177,22 @@ def forget_declines() -> None:
     a record of what happened, not a choice the user made."""
     if not path():
         return
-    data = _load()
-    gone = list(_declines(data))
-    if not gone:
-        return
-    for sim, user, curated in gone:
-        del data["collisions"][sim][user][curated]
-    data.setdefault("matches", {})
-    _save(data)
+    with _write_lock():
+        data = _load()
+        gone = list(_declines(data))
+        if not gone:
+            return
+        for sim, user, curated in gone:
+            del data["collisions"][sim][user][curated]
+        data.setdefault("matches", {})
+        _save(data)
 
 
 def reset() -> None:
     """Forget every record, as a config reset does for the config."""
     p = path()
-    if p and os.path.isfile(p):
-        os.remove(p)
+    if not p:
+        return
+    with _write_lock():
+        if os.path.isfile(p):
+            os.remove(p)

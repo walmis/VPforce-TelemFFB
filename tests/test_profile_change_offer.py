@@ -726,3 +726,30 @@ def test_which_side_is_in_effect_is_reported_for_each_shape(store):
     _added("737-600.*", ("aileron_expo", "0.9"))   # the identical string
     pv = xmlutils.merge_preview(SIM, AC, "737-600.*", "737-600.*")
     assert pv["in_effect"] == "both"
+
+
+def test_a_match_and_an_answer_written_at_the_same_instant_are_both_kept(store):
+    # the telemetry thread records matches while the main thread records
+    # answers; each is a read-modify-write of one file, so without a lock
+    # one side's write can overwrite the other's
+    import threading
+    aircraft = [f"Plane {i}" for i in range(40)]
+    pairs = [(f"mine {i}.*", "737-600.*") for i in range(40)]
+    start = threading.Barrier(80)
+
+    def rec(name):
+        start.wait()
+        match_history.record_match(SIM, name, "737.*")
+
+    def ans(user):
+        start.wait()
+        match_history.resolve(SIM, user, "737-600.*", match_history.DECLINED, "fp")
+
+    threads = [threading.Thread(target=rec, args=(n,)) for n in aircraft] + \
+              [threading.Thread(target=ans, args=(u,)) for u, _ in pairs]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert all(match_history.last_match(SIM, n) == "737.*" for n in aircraft)
+    assert all(match_history.resolution(SIM, u, c) == "declined" for u, c in pairs)
