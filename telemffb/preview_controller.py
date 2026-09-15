@@ -182,8 +182,7 @@ class EffectPreviewController:
             self.window, "Constant Force Preview",
             "Constant force effect previews may move the axis in unexpected ways.\n\n"
             "Please firmly grasp the controls before proceeding.\n\n"
-            f"This preview plays {spec.reference} at the maximum force your settings "
-            "allow. In flight the telemetry sets the level, and it is usually lower.",
+            f"This preview plays {spec.reference}.",
             QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel)
         return answer == QMessageBox.StandardButton.Ok

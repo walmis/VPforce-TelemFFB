@@ -951,8 +951,6 @@ class SettingsLayout(QGridLayout):
         # the width of the screen.  One short paragraph per idea.
         paragraphs = [
             f"<b>Preview:</b> {html.escape(spec.reference, quote=False)} ({spec.duration:g} s).",
-            "Plays at the maximum your settings allow; in flight the telemetry "
-            "sets the level, usually lower.",
         ]
         if spec.constant_force:
             paragraphs.append("<b>Constant force:</b> keep a firm hold on the controls.")
