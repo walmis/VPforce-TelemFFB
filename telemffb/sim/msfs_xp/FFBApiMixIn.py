@@ -185,6 +185,12 @@ class FFBApiMixIn:
         any aircraft, including one with no config entry, so this deliberately does
         not ride ``sc_overrides``.  An LVAR the aircraft does not define reads as 0
         (or stays None), which is exactly the "not implemented" sentinel.
+
+        Called every frame from :meth:`ffb_api_on_telemetry` and guarded on
+        ``sv_dict``, because a SimConnectManager subscription added at runtime lives
+        in ``temp_sim_vars``, which is cleared by the subscribe cycle that consumes
+        it - a later ``_resubscribe()`` from anywhere rebuilds from the predefined
+        list alone and drops these vars.  Re-checking is how they come back.
         """
         if not self._simconnect:
             return
@@ -201,22 +207,26 @@ class FFBApiMixIn:
 
         Telemetry:
             Read: ffbApiVersion - Optional[float]; L:FFB_API_VERSION.  None until the
-                                  subscription lands; 0/absent = not implemented.
+                                  subscription lands; 0 = not implemented, or not
+                                  published yet - see below.
                   ffbFeatures   - Optional[float]; L:FFB_FEATURES bitfield.
         """
         if self._ffb_api_latched:
             return
 
         version = telem_data.get("ffbApiVersion", None)
-        if version is None:
-            # Subscription has not produced a value yet.  Stay unlatched: an aircraft
-            # that never publishes simply remains unsupported forever, which is correct.
+        if version is None or int(round(version)) < 1:
+            # Not implemented, or not implemented *yet*.  MSFS reads an LVAR the
+            # aircraft has not created as 0, exactly like one it never creates, and
+            # the subscription usually lands a few frames before the aircraft's own
+            # init publishes FFB_API_VERSION.  Latching that first 0 would mark a
+            # supported aircraft unsupported for the rest of the flight, so stay
+            # unlatched and keep looking - an aircraft that never publishes simply
+            # stays unsupported forever, which is correct.
             return
 
         self._ffb_api_latched = True
         self._ffb_api_version = int(round(version))
-        if self._ffb_api_version < 1:
-            return
 
         features = telem_data.get("ffbFeatures", 0) or 0
         self._ffb_api_features = int(round(features))
@@ -459,6 +469,13 @@ class FFBApiMixIn:
             return
         if not self.ffb_api_enable:
             return
+
+        # Per frame, not once at construction: an aircraft handler is built before
+        # any telemetry is attached, so a constructor-time _sim_is_msfs() is still
+        # False and a subscription made there never happens.  The sv_dict guard
+        # inside makes the steady-state call a dict lookup, and re-running it also
+        # re-instates the subscription if an unrelated _resubscribe() dropped it.
+        self.subscribe_ffb_api_simvars()
 
         self._ffb_api_latch_discovery(telem_data)
 

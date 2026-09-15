@@ -192,10 +192,23 @@ def subscribe_ffb_api_simvars(self):
         self._simconnect._resubscribe()
 ```
 
+**Call it from the per-frame path, not from `Helicopter.__init__`.** The constructor
+runs before any telemetry is attached to the handler, so `_sim_is_msfs()` is still
+`False` there (it reads `_telem_data.src`, and `TelemManager` assigns `_telem_data`
+only after `Aircraft_Class(...)` returns) — a subscription made in the constructor
+never happens at all. Two further reasons the per-frame call is the right one: a
+runtime-added simvar lives in `SimConnectManager.temp_sim_vars`, which the subscribe
+cycle that consumes it clears, so any later `_resubscribe()` rebuilds from the
+predefined list and silently drops these vars; and the `sv_dict` guard makes the
+steady-state cost a dict lookup. This is the same self-healing shape as
+`_sync_controls_lock_simvar`.
+
 TelemFFB's SimConnect layer has only one cadence (subscribe → per-frame telemetry), so
 the discovery vars ride the same subscription. Honour the spec's "read once" by
 *latching* them in the aircraft class rather than by throttling the transport: capture
-`ffbApiVersion` / `ffbFeatures` on the first frame after aircraft load, cache the
+`ffbApiVersion` / `ffbFeatures` on the first frame that reports a version >= 1
+(a 0 read means "not implemented" *or* "the aircraft has not created the LVAR yet",
+so latching one would strand a supported aircraft), cache the
 decoded bits, and ignore later changes until the next aircraft change (which already
 constructs a new aircraft object). This keeps behavior stable if an aircraft glitches
 the value mid-flight, and costs nothing.
@@ -647,13 +660,13 @@ parity) is not started and remains optional.
 
 | File | Change |
 |---|---|
-| [FFBApiMixIn.py](../telemffb/sim/msfs_xp/FFBApiMixIn.py) | New. Discovery/latching, `ENABLED` lifecycle, feature decode, the three control paths, fly-through, hydraulic conversion. |
+| [FFBApiMixIn.py](../telemffb/sim/msfs_xp/FFBApiMixIn.py) | New. Subscription (from the per-frame path), discovery/latching, `ENABLED` lifecycle, feature decode, the three control paths, fly-through, hydraulic conversion. |
 | [MsfsXpHeliControlsMixIn.py](../telemffb/sim/msfs_xp/MsfsXpHeliControlsMixIn.py) | Inherits `FFBApiMixIn`; cyclic dispatch guard; `_update_cyclic_trim` suppressed under the API. |
-| [Helicopter.py](../telemffb/sim/msfs_xp/Helicopter.py) | Subscribes the API vars; per-frame hook; collective and pedal dispatch guards; release on timeout. |
+| [Helicopter.py](../telemffb/sim/msfs_xp/Helicopter.py) | Per-frame hook; collective and pedal dispatch guards; release on timeout. |
 | [BaseTelemetryData.py](../telemffb/sim/BaseTelemetryData.py) | 13 new documented fields. |
 | [defaults.xml](../defaults.xml) | 9 user parameters under an "FFB API" grouping. |
 | [utils.py](../telemffb/utils.py) | `release_ffb_api_controls()`, called from `exit_application()`. |
-| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 61 tests. |
+| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 64 tests. |
 
 ### Verified
 

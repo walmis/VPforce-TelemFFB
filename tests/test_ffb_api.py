@@ -140,9 +140,56 @@ class TestFFBApiDiscovery(FFBApiTestBase):
         telem = self.make_telem(version=0, features=0)
         self.arm(instance, telem)
 
-        assert instance._ffb_api_latched is True
+        # Deliberately still unlatched: see test_version_zero_does_not_latch_early.
+        assert instance._ffb_api_latched is False
         assert instance._ffb_api_active(FFB_API_CYCLIC) is False
         assert self.ffb_writes() == []
+
+    def test_version_zero_does_not_latch_early(self):
+        """A 0 read is "not created yet" as often as it is "not implemented".
+
+        MSFS reads an LVAR the aircraft has not defined as 0, and the subscription
+        normally lands a few frames before the aircraft's own init publishes
+        FFB_API_VERSION.  Latching that first 0 would strand a supported aircraft.
+        """
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem(version=0, features=0))
+        self.arm(instance, self.make_telem(version=1, features=ALL_TRIM))
+
+        assert instance._ffb_api_latched is True
+        assert instance._ffb_api_version == 1
+        assert instance._ffb_api_features == ALL_TRIM
+
+    def test_telemetry_path_subscribes_without_an_explicit_call(self):
+        """Regression: nothing else subscribes these vars in the running app.
+
+        Helicopter.__init__ gates its subscribe on _sim_is_msfs(), which reads the
+        telemetry that is only attached *after* the handler is constructed - so the
+        constructor-time call never ran and ffbApiVersion never arrived.  Discovery
+        has to (re)subscribe from the per-frame path.
+        """
+        instance = self.make_instance()
+        assert "ffbApiVersion" not in self.mock_simconnect.sv_dict
+
+        instance.ffb_api_on_telemetry(self.make_telem())
+
+        for name in ("ffbApiVersion", "ffbFeatures", "ffbTrimCyclicPitch", "ffbTrOnCyclic"):
+            assert name in self.mock_simconnect.sv_dict, f"{name} not subscribed"
+
+    def test_dropped_subscription_is_reinstated(self):
+        """A SimConnectManager resubscribe from anywhere else drops runtime-added vars.
+
+        temp_sim_vars is cleared by the subscribe cycle that consumes it, so the next
+        _resubscribe() rebuilds from the predefined list alone.  The per-frame check
+        is what brings them back.
+        """
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem())
+        self.mock_simconnect.sv_dict.clear()
+
+        self.arm(instance, self.make_telem())
+
+        assert "ffbApiVersion" in self.mock_simconnect.sv_dict
 
     def test_version_one_enables_and_writes_enabled_flag(self):
         instance = self.make_instance()
