@@ -17,6 +17,7 @@
 #
 
 
+import html
 import inspect
 import json
 import logging
@@ -40,6 +41,63 @@ import telemffb.utils as utils
 import styles
 from . import globals as G
 from . import xmlutils
+
+PREVIEW_BUTTON_SIZE = 20          # matches the -/+ step buttons
+PREVIEW_ACTIVE_HANDLE = "#17c411"  # the green the live loop paints active effects
+
+
+def preview_tooltip_html(paragraphs):
+    """A tooltip that wraps: Qt only word-wraps RICH text tooltips, so the
+    paragraphs go out as HTML.  Callers escape their own dynamic text;
+    the template keeps a small gap between paragraphs."""
+    return "".join(f"<p style='margin:0 0 4px 0'>{p}</p>" for p in paragraphs)
+
+
+PREVIEW_GLYPHS = {'pv': "▶", 'pvall': "▶▶"}   # the play buttons, by slot
+PREVIEW_STOP_GLYPH = "■"
+_PREVIEW_HELD = 'previewHeld'      # dynamic property: this widget was disabled by the lock
+
+
+def lock_preview_rows(root, spec, locked, slot=None):
+    """A playing preview's rows are hands-off until it ends.
+
+    The preview reads its settings once, when it starts; an edit mid-run
+    would not be heard, and the form rebuild an erase triggers leaves the
+    row in a state the run knows nothing about.  So while it plays: the
+    slider handle(s) go the live-effect green (the cue the telemetry loop
+    gives an active effect), the slider, its -/+ steppers, value entry,
+    unit box and erase button are disabled, and the button that started
+    it (``slot``: 'pv' play, 'pvall' play-all) reads as a stop.  Unlocking
+    re-enables only what the lock disabled - a row disabled for its own
+    reasons stays so - and puts every play glyph back.
+
+    Everything is found by object name under ``root`` (any widget above
+    the settings form), so this is also what a rebuild mid-run replays on
+    the fresh widgets: no reference to a widget survives a rebuild.
+    """
+    for row in spec.rows:
+        for prefix in ('sld_', 'dsld_', 'dfsld_'):
+            for slider in root.findChildren(NoWheelSlider, f"{prefix}{row}"):
+                slider.setHandleColor(PREVIEW_ACTIVE_HANDLE if locked else vpf_purple)
+                _hold(slider, locked)
+        for cls, prefix in ((QPushButton, 'sldm_'), (QPushButton, 'sldp_'), (QPushButton, 'eb_'),
+                            (QLineEdit, 'vle_'), (NoWheelComboBox, 'ud_')):
+            for widget in root.findChildren(cls, f"{prefix}{row}"):
+                _hold(widget, locked)
+        for kind, glyph in PREVIEW_GLYPHS.items():
+            for button in root.findChildren(QPushButton, f"{kind}_{row}"):
+                button.setText(PREVIEW_STOP_GLYPH if locked and kind == slot else glyph)
+
+
+def _hold(widget, locked):
+    if locked:
+        if widget.isEnabled():
+            widget.setProperty(_PREVIEW_HELD, True)
+            widget.setEnabled(False)
+    elif widget.property(_PREVIEW_HELD):
+        widget.setProperty(_PREVIEW_HELD, False)
+        widget.setEnabled(True)
+
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
@@ -449,6 +507,7 @@ class SettingsLayout(QGridLayout):
 
 
     def build_rows(self, datalist):
+        self._preview_rows_by_device = None      # recomputed per rebuild (see _preview_devices_for)
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
         self.convert_to_springmode(sorted_data)
@@ -489,6 +548,13 @@ class SettingsLayout(QGridLayout):
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
+
+        # a rebuild mid-preview (an erase, an expander, a checkbox elsewhere)
+        # makes fresh rows: the playing spec's come back held, its button a stop
+        preview = getattr(self.mainwindow, 'preview', None)
+        spec, slot = preview.running_spec() if preview is not None else (None, None)
+        if spec is not None and self.parentWidget() is not None:
+            lock_preview_rows(self.parentWidget(), spec, True, slot=slot)
 
         # set expander column minimum size so it does not shrink and shift layout when no expanders are visible
         self.setColumnMinimumWidth(0, 30)
@@ -676,7 +742,7 @@ class SettingsLayout(QGridLayout):
             notice.setText(text)
         self.addWidget(notice, 0, 1, 1, 6)
         if not G.settings_mgr.offline_mode and G.master_instance and self.mainwindow is not None:
-            btn = QPushButton('Open Offline Editor')
+            btn = QPushButton(r'Offline Editor/Effect Preview')
             btn.clicked.connect(lambda checked=False: self.mainwindow.toggle_offline_mode(True))
             self.addWidget(btn, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         spacer = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
@@ -742,6 +808,120 @@ class SettingsLayout(QGridLayout):
             logging.info(f"Moving {setting} setting ({value}) from {model} to {csim} Sim for all aircraft")
             xmlutils.write_sim_to_xml(csim,value,setting, unit)
             xmlutils.erase_models_from_xml(csim,model,setting)
+
+    def _preview_devices_for(self, setting_name):
+        """The running devices whose settings offer ``setting_name`` for the
+        current sim / class / model - this instance's own device first.
+
+        defaults.xml flags every setting per device and the resolver takes
+        a device, so "which devices does this effect play on" is looked up,
+        never guessed: the play-all button is offered only where two or
+        more of these are running, and its tooltip names them, so a device
+        that stays silent is never mistaken for a broken one.  Resolved
+        once per rebuild for all three devices, then cached.
+        """
+        preview = getattr(self.mainwindow, 'preview', None)
+        running = list(preview.running_devices()) if preview is not None else [G.device_type]
+        if len(running) < 2:
+            return running[:1] if setting_name else []
+        if getattr(self, '_preview_rows_by_device', None) is None:
+            sm = G.settings_mgr
+            by_device = {}
+            for dev in ('joystick', 'pedals', 'collective'):
+                try:
+                    _, _, rows = xmlutils.read_single_model(
+                        sm.current_sim, sm.current_aircraft_name, sm.current_class, dev)
+                    by_device[dev] = {r['name'] for r in rows}
+                except Exception:
+                    logging.exception(f"preview: could not resolve {dev} settings")
+                    by_device[dev] = set()
+            self._preview_rows_by_device = by_device
+        return [d for d in running if setting_name in self._preview_rows_by_device.get(d, ())]
+
+    def _add_preview_button(self, sl_layout, item):
+        """Append the preview controls to a slider row's -/+ pair.
+
+        Offline editing only: that is where the user tunes without a sim
+        streaming, and the preview runs on the device alongside whatever
+        a paused session left there (it has its own effect table).  Two
+        slots, always filled so every slider in the form is the same
+        length: ``\u25b6`` plays on the device the form is scoped to, and
+        ``\u25b6\u25b6`` plays on every running device that offers the
+        effect, when that is more than one.  Rows without a preview get same-size pads.
+        A blocked preview (device gone, telemetry streaming) shows its
+        button disabled with the reason as its tooltip.  The playing
+        state (stop glyph, held row) is not drawn here: build_rows
+        replays it over the finished form, so a rebuild mid-run and a
+        fresh start look the same.
+        """
+        if not G.settings_mgr.offline_mode:
+            return
+        from telemffb.preview import preview_for_row
+        # the two preview slots sit tight together, apart from the row's
+        # own -/slider/+ spacing
+        slots = QHBoxLayout()
+        slots.setSpacing(2)
+        slots.setContentsMargins(0, 0, 0, 0)
+        sl_layout.addLayout(slots)
+        spec = preview_for_row(item['name'])
+        preview = getattr(self.mainwindow, 'preview', None)   # the window's EffectPreviewController
+        if spec is None or preview is None or not spec.supports(G.settings_mgr.current_sim):
+            for tag in ('pvpad', 'pvpadall'):
+                self._add_preview_pad(slots, tag, item['name'])
+            return
+        blockers = list(preview.blockers())
+
+        def make(text, object_prefix, tip, on_click, small=False):
+            button = QPushButton(text)
+            button.setProperty('buttonType', 'p_m_button')
+            button.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
+            button.setObjectName(f"{object_prefix}_{item['name']}")
+            button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            if small:
+                # two play glyphs side by side need a smaller face to fit
+                # the 20 px button; they center the way the single one does
+                f = button.font()
+                f.setPointSizeF(max(6.0, f.pointSizeF() * 0.7))
+                button.setFont(f)
+            if blockers:
+                button.setDisabled(True)
+                button.setToolTip("Preview unavailable: " + "; ".join(blockers))
+            else:
+                button.setToolTip(tip)
+                button.clicked.connect(on_click)
+            slots.addWidget(button)
+            return button
+
+        # Rich text: Qt word-wraps a rich-text tooltip to a sensible width,
+        # a plain one only breaks where told to and a reference line runs
+        # the width of the screen.  One short paragraph per idea.
+        paragraphs = [
+            f"<b>Preview:</b> {html.escape(spec.reference, quote=False)} ({spec.duration:g} s).",
+        ]
+        if spec.constant_force:
+            paragraphs.append("<b>Constant force:</b> keep a firm hold on the controls.")
+        paragraphs.append("Click again to stop.")
+        tip = preview_tooltip_html(paragraphs)
+        make(PREVIEW_GLYPHS['pv'], 'pv', tip,
+             lambda checked=False, s=spec: preview.toggle(s))
+
+        devices = self._preview_devices_for(item['name'])
+        if len(devices) >= 2:
+            names = ", ".join(devices[:-1]) + " and " + devices[-1]
+            all_tip = preview_tooltip_html([f"<b>Play on {names} together.</b>"] + paragraphs)
+            make(PREVIEW_GLYPHS['pvall'], 'pvall', all_tip,
+                 lambda checked=False, s=spec, d=tuple(devices):
+                 preview.toggle(s, devices=d),
+                 small=True)
+        else:
+            self._add_preview_pad(slots, 'pvpadall', item['name'])
+
+    def _add_preview_pad(self, sl_layout, tag, name):
+        """Same footprint as a preview button, so rows line up."""
+        pad = QtWidgets.QWidget()
+        pad.setFixedSize(PREVIEW_BUTTON_SIZE, PREVIEW_BUTTON_SIZE)
+        pad.setObjectName(f"{tag}_{name}")
+        sl_layout.addWidget(pad)
 
     def generate_settings_row(self, item, i,  rowdisabled=False ):
         self.setRowMinimumHeight(i, 25)
@@ -906,11 +1086,13 @@ class SettingsLayout(QGridLayout):
         m_butt = QPushButton("-")
         m_butt.setProperty('buttonType', 'p_m_button')
         m_butt.setFixedSize(20, 20)
+        m_butt.setObjectName(f"sldm_{item['name']}")
 
         # Create the "+" button
         p_butt = QPushButton("+")
         p_butt.setProperty('buttonType', 'p_m_button')
         p_butt.setFixedSize(20, 20)
+        p_butt.setObjectName(f"sldp_{item['name']}")
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
@@ -983,6 +1165,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignmentFlag.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1014,6 +1197,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt);
             sl_layout.addWidget(dfs);
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1050,6 +1234,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(n_slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignmentFlag.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1078,6 +1263,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(df_slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1108,6 +1294,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1136,6 +1323,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(m_butt)
             sl_layout.addWidget(d_slider)
             sl_layout.addWidget(p_butt)
+            self._add_preview_button(sl_layout, item)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -1394,13 +1582,8 @@ class SettingsLayout(QGridLayout):
         m_butt.setDisabled(rowdisabled)
         p_butt.setDisabled(rowdisabled)
         value_label.setDisabled(rowdisabled)
-        if rowdisabled:
-            # Qt's default disabled frame looks bad on these borderless +/-
-            # glyphs; keep them borderless and just grey the glyph colour.
-            _pm_disabled_css = ('QPushButton[buttonType="p_m_button"] { color: #808080; '
-                                'border: none; background-color: transparent; }')
-            m_butt.setStyleSheet(_pm_disabled_css)
-            p_butt.setStyleSheet(_pm_disabled_css)
+        # (the disabled look of the borderless -/+ and erase glyphs is the
+        # app stylesheet's, so a row held by a preview reads the same way)
 
         self.parent().parent().parent().addSlider(slider)
         self.parent().parent().parent().addSlider(d_slider)
