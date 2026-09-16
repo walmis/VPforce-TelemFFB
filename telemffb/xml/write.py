@@ -609,7 +609,7 @@ class ConfigWriter:
                                      m.get('unit', ''), m.get('device', ''), new_profile)
 
         # Clone SC overrides
-        for ov in self._resolver.read_sc_overrides(old_pattern, identity=old_pattern):
+        for ov in self._resolver.read_sc_overrides(old_pattern, identity=old_pattern, sim=sim):
             self.write_sc_override_to_xml(new_pattern, ov['var'], ov['name'],
                                           ov.get('sc_unit', ''), ov.get('scale', ''),
                                           sim=ov.get('sim') or None)

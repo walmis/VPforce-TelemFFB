@@ -271,10 +271,12 @@ class ConfigResolver:
         caller knows it; otherwise it is resolved for ``sim`` (the current
         one by default).  With no type row naming the aircraft, the most
         specific override pattern stands in, as a settings-only pattern
-        does for settings."""
+        does for settings.  With no sim known at all, nothing is guessed:
+        rows are read whatever sim they name, as every row was before rows
+        carried one."""
         if not sim:
             current = getattr(getattr(G, 'settings_mgr', None), 'current_sim', None)
-            sim = current if isinstance(current, str) and current else 'MSFS'
+            sim = current if isinstance(current, str) and current else None
         def_rows = self._read_models_sc_overrides('defaults', aircraft_name, 'default', sim)
         usr_rows = self._read_models_sc_overrides('user', aircraft_name, 'user', sim)
         if not identity:
