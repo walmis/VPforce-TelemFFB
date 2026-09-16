@@ -753,3 +753,19 @@ def test_a_match_and_an_answer_written_at_the_same_instant_are_both_kept(store):
         t.join()
     assert all(match_history.last_match(SIM, n) == "737.*" for n in aircraft)
     assert all(match_history.resolution(SIM, u, c) == "declined" for u, c in pairs)
+
+
+def test_a_failed_replace_leaves_no_temp_file_behind(store, monkeypatch):
+    """The file is written beside its final name and swapped in; if the
+    swap fails the partial file must not linger, since the next writer
+    opens the same name."""
+    match_history.record_match(SIM, AC, "737.*")
+
+    def refuse(src, dst):
+        raise PermissionError(src)
+
+    monkeypatch.setattr(match_history.os, "replace", refuse)
+    with pytest.raises(PermissionError):
+        match_history.record_match(SIM, AC, "737-600.*")
+    assert not os.path.exists(match_history.path() + ".tmp")
+    assert match_history.last_match(SIM, AC) == "737.*"

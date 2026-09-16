@@ -79,9 +79,13 @@ def _load() -> dict:
 def _save(data: dict) -> None:
     p = path()
     tmp = p + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=1, sort_keys=True)
-    os.replace(tmp, p)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=1, sort_keys=True)
+        os.replace(tmp, p)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 def last_match(sim: str, aircraft_name: str) -> Optional[str]:
