@@ -2322,7 +2322,12 @@ class MainWindow(QMainWindow):
         choice = self._ask_profile_change(change)
         if choice == ProfileOfferDialog.LATER:
             return                      # the prompt stays put, and returns next load
-        G.settings_mgr.profile_change = None
+        # Clear only the offer that was answered.  The telemetry thread
+        # replaces the field on every resolution, so if the aircraft
+        # changed while the dialog was open the field now holds the next
+        # aircraft's offer, and that one must stay for its own prompt.
+        if G.settings_mgr.profile_change is change:
+            G.settings_mgr.profile_change = None
         self.profile_change_button.hide()
         sim, user, curated = change['sim'], change['user'], change['curated']
         shipped = change.get('shipped', '')

@@ -120,6 +120,46 @@ class TestWizardFinishedHook:
         assert calls == ['reload']
 
 
+class TestAnsweringTheOfferClearsOnlyThatOffer:
+    """The telemetry thread replaces ``profile_change`` on every resolution
+    while the main thread answers it in a modal dialog.  If the aircraft
+    changed while the dialog was open, the field holds the next aircraft's
+    offer by the time the answer lands, and the answer must not wipe it."""
+
+    def _answer(self, monkeypatch, during_dialog):
+        from telemffb.MainWindow import MainWindow
+        from telemffb.ProfileOfferDialog import ProfileOfferDialog
+        from telemffb import match_history
+        answered = {'sim': 'MSFS', 'user': '737.*', 'curated': '737-600.*'}
+        sm = SimpleNamespace(profile_change=answered, offline_mode=True)
+        monkeypatch.setattr(G, 'settings_mgr', sm, raising=False)
+        monkeypatch.setattr(G, 'telem_manager', None, raising=False)
+        resolved = []
+        monkeypatch.setattr(match_history, 'resolve',
+                            lambda *a, **k: resolved.append(a[:4]))
+
+        def ask(self_, change):
+            during_dialog(sm)
+            return ProfileOfferDialog.DECLINE
+
+        win = SimpleNamespace(
+            profile_change_button=MagicMock(),
+            settings_layout=SimpleNamespace(reload_layout=lambda *_: None),
+            _ask_profile_change=lambda change: ask(None, change))
+        MainWindow._on_profile_change_link(win, '#')
+        return sm, answered, resolved
+
+    def test_an_offer_that_arrived_during_the_dialog_survives_the_answer(self, monkeypatch):
+        later = {'sim': 'MSFS', 'user': 'C172.*', 'curated': 'C172SP.*'}
+
+        def aircraft_changes(sm):
+            sm.profile_change = later
+
+        sm, answered, resolved = self._answer(monkeypatch, aircraft_changes)
+        assert sm.profile_change is later
+        assert resolved == [('MSFS', '737.*', '737-600.*', 'declined')]   # the answer was for the first
+
+
 class TestSuggestedMatchDefault:
     """Which suggestion the wizard starts on. The whole title ends in the
     livery, the variant or the registration, so preselecting it would pin a
