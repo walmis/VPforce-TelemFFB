@@ -146,9 +146,31 @@ class TelemManager(QObject, threading.Thread):
         logging.info(f"Sim exit received from {src} - resetting sim listeners")
         if self.currentAircraft:
             self.currentAircraft.on_timeout()
-            self.currentAircraft = None
+            self._retire_current_aircraft()
         self.currentAircraftName = None
         self.sim_exited.emit(src)
+
+    def _retire_current_aircraft(self):
+        """Drop the current aircraft handler, giving it a chance to release resources.
+
+        Every path that stops using a handler for good comes through here: sim exit, the
+        load of a different aircraft, and application quit.  on_timeout() is not enough
+        on its own - an aircraft change produces no timeout, so a handler that holds
+        external state (an aircraft-side mode flag, say) would otherwise never be told
+        it is finished.
+        """
+        if self.currentAircraft is None:
+            return
+        try:
+            self.currentAircraft.on_shutdown()
+        except Exception:
+            logging.exception("Error shutting down aircraft handler")
+        self.currentAircraft = None
+
+    def on_shutdown(self):
+        """Called on the application quit path, before the event loop stops."""
+        self._retire_current_aircraft()
+        self.currentAircraftName = None
 
     def set_simconnect(self, sc : SimConnectManager):
         self._simconnect = sc
@@ -387,6 +409,11 @@ class TelemManager(QObject, threading.Thread):
         data_source = aircraft_info.data_source
 
         logging.info(f"New aircraft loaded {aircraft_name}: resetting current aircraft config")
+
+        # An aircraft change produces no timeout, so the outgoing handler is retired
+        # explicitly here.  Without this a handler that sets state on the sim side has
+        # no point at which to clear it, and that state leaks into the next aircraft.
+        self._retire_current_aircraft()
         self.currentAircraftConfig = {}
 
         params, cls_name = self.get_aircraft_config(aircraft_name, data_source)

@@ -334,6 +334,9 @@ class EffectTranslator:
         "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
         "etl.*": ["ETL Shaking", "etl_effect_intensity"],
         "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
+        "ffb_api_cyclic_spring": ["FFB API Cyclic Spring", "cyclic_spring_gain"],
+        "ffb_api_collective_spring": ["FFB API Collective Spring", "collective_ap_spring_gain"],
+        "ffb_api_pedal_spring": ["FFB API Pedal Spring", "pedal_spring_gain"],
         "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
         "FI_vibration": ["FI Vibration", "FI_vibration_intensity"],
         "friction": ["Friction Override", "friction_force"],
@@ -3520,26 +3523,11 @@ def threaded(daemon=False):
     return _threaded
 
 
-def release_ffb_api_controls():
-    """Best-effort ``L:FFB_<CONTROL>_ENABLED = 0`` on a clean shutdown.
-
-    The write is queued on the SimConnect send path, so a quit that races the
-    transport teardown may drop it.  That is acceptable: the standard requires the
-    aircraft to default the flag to 0 on load and forbids persisting it, so a missed
-    write costs at most a stale flag in the current session, never the next flight.
-    Wrapped defensively - a shutdown must never fail because of a cleanup write.
-    """
-    try:
-        aircraft = getattr(G.telem_manager, "currentAircraft", None)
-        if aircraft is not None and hasattr(aircraft, "_ffb_api_disable"):
-            aircraft._ffb_api_disable()
-    except Exception:
-        logging.debug("FFB API: release on shutdown failed", exc_info=True)
-
-
 def exit_application():
     # Perform any cleanup or save operations here
-    release_ffb_api_controls()
+    telem_manager = getattr(G, "telem_manager", None)
+    if telem_manager is not None:
+        telem_manager.on_shutdown()
     G.main_window.save_main_window_geometry()
     QCoreApplication.instance().quit()
 

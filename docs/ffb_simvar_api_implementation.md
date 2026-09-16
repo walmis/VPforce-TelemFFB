@@ -135,12 +135,13 @@ Four pieces of work:
 
 1. **Read/subscribe layer** — subscribe the `FFB_*` read vars automatically for MSFS
    heli, surface them on `BaseTelemetryData`.
-2. **Discovery + mode-gating** — read `FFB_API_VERSION`; if `>= 1`, drive the
-   `ENABLED` lifecycle; otherwise treat the aircraft as unsupported and fall back to
-   existing behavior.
-3. **`FFBApiMixIn`** on the base `Helicopter` — consumes the standardized vars to drive
-   cyclic/collective/pedal springs, trim, hydraulics; writes back `FLY_THROUGH`.
-   Inert until discovery succeeds, so every heli class inherits it at zero cost.
+2. **Discovery + mode-gating** — read `FFB_API_VERSION`; once it settles at `>= 1`,
+   drive the `ENABLED` lifecycle; until then fall back to generic `Helicopter`
+   behaviour. Activation itself is the class selection, not this read (§10.1).
+3. **`FFBApiHelicopter`**, a `Helicopter` subclass selected per model from
+   `defaults.xml` — consumes the standardized vars to drive cyclic/collective/pedal
+   springs, trim, hydraulics; writes back `FLY_THROUGH`. Every other heli class is
+   untouched and writes no `L:FFB_*` API variable.
 4. **Config, defaults, docs, tests.**
 
 ### 4.1 Read / subscribe layer
@@ -251,7 +252,7 @@ and must land before step 3, because the trim wiring depends on the cached bits.
 `L:FFB_*` variable — not just `ENABLED`. That includes `FLY_THROUGH`, and it raises a
 question about the existing legacy `L:FFB_HANDS_ON_*` / `L:FFB_FEET_ON_PEDALS` writes,
 which share the namespace but predate the API (see §10.6). Keep them on the legacy
-classes; `FFBApiMixIn` emits *only* the standardized names, and only while enabled.
+classes; `FFBApiHelicopter` emits *only* the standardized names, and only while enabled.
 
 Lifecycle rules (from the proposal, mapped to TelemFFB):
 
@@ -311,71 +312,80 @@ supported and both must be validated. Consequences:
 Because both paths ship, the axis-sending branch is not a legacy leftover to be
 tolerated — it is a supported configuration under the API and gets equal test coverage.
 
-### 4.3 The API layer: `FFBApiMixIn`
+### 4.3 The API layer: `FFBApiHelicopter`
 
-**Decision (§10.1): a mixin on the base `Helicopter`, not a new aircraft class.**
-New file `telemffb/sim/msfs_xp/FFBApiMixIn.py`, mixed into
-[`Helicopter`](../telemffb/sim/msfs_xp/Helicopter.py#L31) alongside the existing
-`MsfsXpHeliControlsMixIn`. It is **inert** until `ffbApiVersion >= 1` is latched, so
-it costs nothing on aircraft that don't implement the API.
+**Decision (§10.1): a dedicated `FFBApiHelicopter(Helicopter)` class, selected per model
+from `defaults.xml` — not a mixin on the base `Helicopter`.** New file
+`telemffb/sim/msfs_xp/FFBApiHelicopter.py`. Being configured as this class *is* the
+activation decision; `FFB_API_VERSION` is then a liveness check ("has the aircraft
+initialized yet?"), not a gate on whether to participate at all.
 
-This avoids the two alternatives' problems: no mid-flight class swap (which would mean
-tearing down and re-initialising effect state a few seconds into every flight), and no
-per-aircraft `defaults.xml` entry (which would defeat the spec's discovery goal).
+Registration follows the five wiring points in
+[`docs/adding_an_aircraft_class.md`](adding_an_aircraft_class.md) (on branch
+`refactor_new`), with `SASHelicopter` as the worked example: class file, re-export in
+`aircrafts_msfs_xp.py`, `<classes>` entry, `friendly_class_names`, and
+`<classdefaults_MSFS>` for the class's own parameters. No `<models>` mapping ships yet —
+no released aircraft implements the spec — so the class is reached by user configuration
+(the New Aircraft Wizard) until one does. It is deliberately *not* in
+`mandatory_clone_types`: that list forces a clone from an existing profile of the same
+class, and with no shipped `<models>` entry there would be nothing to clone from.
 
-#### Precedence over vendor classes — three dispatch sites, zero vendor edits
+#### Why a class rather than a mixin
 
-Six classes inherit from `Helicopter`, but only three carry a competing trim/spring
-source:
+See §10.1 for the full record. In short: `L:FFB_*` variables are global to the sim
+session, so a mixin that switches itself on from `L:FFB_API_VERSION` can latch a
+*previous* aircraft's value and drive an aircraft that implements nothing. A class
+cannot misfire — an unconfigured helicopter resolves to plain `Helicopter` and touches
+no `L:FFB_*` variable.
 
-| Class | Overrides that matter | Conflicts with API? |
-|---|---|---|
-| [`HPGHelicopter`](../telemffb/sim/msfs_xp/HPGHelicopter.py#L34) | `msfs_update_heli_controls`, `msfs_update_pedals`, `msfs_update_collective` (SEMA trim inline) | **Yes** |
-| [`XAW109Helicopter`](../telemffb/sim/msfs_xp/XAW109Helicopter.py#L34) | same three (AFCS trim inline) | **Yes** |
-| [`SASHelicopter`](../telemffb/sim/msfs_xp/SASHelicopter.py#L25) | `msfs_update_heli_controls` (AFCS trim inline) | **Yes** |
-| [`TaogH500Helicopter`](../telemffb/sim/msfs_xp/TaogH500Helicopter.py#L32) | `msfs_send_heli_*_pos` only | No — axis *send* path, orthogonal to trim (see §4.2) |
-| [`FlyInsideHelicopter`](../telemffb/sim/msfs_xp/FlyInsideHelicopter.py#L27) | ETL / VRS / vibration effects only | No — no control path at all |
-| [`CowanSimHelicopter`](../telemffb/sim/msfs_xp/CowanSimHelicopter.py#L21) | `__init__` only | No |
+#### How it takes over — `@override`, no shared-code edits
 
-**Precedence rule: for a given control, the API wins whenever that control's
-`ENABLED == 1`** — the vendor path for that control is replaced, not blended. The
-aircraft has zeroed its `ROTOR *_TRIM PCT` per spec §3.2, so the vendor path would be
-integrating AFCS/SEMA state the aircraft is no longer maintaining.
-
-The replacement must happen at **method** granularity, not inside the trim logic: on an
-API aircraft the vendor's whole `msfs_update_heli_controls` is invalid, since it drives
-the spring centre from AFCS/SEMA LVARs rather than from `_TRIM`. Conveniently, all
-three vendor classes are reached through exactly three polymorphic `self.` dispatch
-sites, both in shared base files:
-
-| Dispatch site | Control |
-|---|---|
-| [MsfsXpHeliControlsMixIn.py:389](../telemffb/sim/msfs_xp/MsfsXpHeliControlsMixIn.py#L389) | cyclic |
-| [Helicopter.py:105](../telemffb/sim/msfs_xp/Helicopter.py#L105) | collective |
-| [Helicopter.py:107](../telemffb/sim/msfs_xp/Helicopter.py#L107) | pedals |
-
-Guarding those three call sites routes around every vendor override at once:
-
-```python
-if self._ffb_api_active('CYCLIC'):
-    self._ffb_api_update_cyclic(telem_data)
+Everything the API needs to influence is reached by polymorphic `self.` dispatch, so
+the class overrides it at **MRO position 0** and no dispatch guard is needed anywhere
 else:
-    self.msfs_update_heli_controls(telem_data)
-```
 
-**Net cost: three guards in two shared files, and no edits to any vendor class.**
-Per-control granularity falls out for free — a user with an FFB cyclic but a normal
-collective gets the API path for cyclic and the untouched vendor path for collective,
-decided independently at each site.
+| Override | Why it is at position 0 |
+|---|---|
+| `on_telemetry` | Discovery, `ENABLED` lifecycle and `HydSys` injection run before `super()`, so `HydraulicLossMixIn` (MRO 8) reads the injected value in the same frame. |
+| `on_timeout` | Unconditional and ahead of `super()`: [`Aircraft.on_timeout`](../telemffb/sim/msfs_xp/Aircraft.py#L195) gates the rest of the chain on the pause spring, so a release placed deeper would be skipped on a paused sim. |
+| `on_shutdown` | New generic hook (below). Releases the control on app quit and on aircraft change. |
+| `subscribe_simvars` | Adds the API read vars on top of the base subscription. |
+| `msfs_update_heli_controls` / `msfs_update_collective` / `msfs_update_pedals` | Full replacements while that control is live; they call `super()` otherwise. |
+| `_update_cyclic_trim` | Suppresses the generic `CyclicTrimX/Y` follow while the API owns the cyclic — the same idiom HPG, SAS and XAW109 already use. |
 
-Two properties worth noting:
+**Precedence rule: for a given control, the API path runs whenever that control is
+live** — the generic path for that control is replaced, not blended, because the
+aircraft has zeroed its `ROTOR *_TRIM PCT` per spec §3.2 and the generic path would be
+integrating state nobody maintains. When the API is *not* live — the master toggle is
+off, or the aircraft has not published a version yet — each override defers to `super()`
+and the aircraft behaves exactly like a plain `Helicopter`.
 
-- The existing `_update_cyclic_trim` overrides in HPG, SAS and XAW109 are already bare
-  `pass` suppressors ("trimming is handled by the AFCS integration"). They need **no
-  change** — the API path does not route through `_update_cyclic_trim` at all.
-- This is the codebase's established idiom rather than a new pattern: "a class with its
-  own trim source suppresses the generic one" is exactly what those `pass` overrides
-  do. The API is simply a third trim source, arbitrated one level higher.
+Per-control granularity falls out for free: TelemFFB runs one process per device, so a
+user with an FFB cyclic and a normal collective gets the API path in the cyclic instance
+and the untouched generic path in the collective one.
+
+#### Vendor classes are untouched
+
+`HPGHelicopter`, `SASHelicopter`, `XAW109Helicopter`, `TaogH500Helicopter`,
+`FlyInsideHelicopter` and `CowanSimHelicopter` neither inherit from nor are modified by
+this class. They have no `ffb_api_*` attributes, never subscribe the read vars, and
+write no `L:FFB_*` API variable — pinned by `TestFFBApiContainment`. A vendor aircraft
+that later adopts the spec is served by a vendor subclass of `FFBApiHelicopter`, not by
+switching the base class over.
+
+#### The one shared-file addition: `on_shutdown()`
+
+`AircraftEffectUtilsBase` gains a no-op `on_shutdown()` alongside `on_telemetry` /
+`on_timeout` / `on_event`, for the case those three do not cover: an instance being
+retired for good. `TelemManager._retire_current_aircraft()` invokes it from every path
+that stops using a handler — sim exit, application quit, and **aircraft change**.
+
+That last one is a pre-existing gap this work exposed:
+[`_initialize_new_aircraft`](../telemffb/telem/TelemManager.py#L384) replaced
+`currentAircraft` without calling anything on the outgoing instance, and an aircraft
+change produces no timeout — so a handler holding sim-side state had no point at which
+to clear it. Under the API that meant `L:FFB_<CONTROL>_ENABLED` staying at `1` into the
+next aircraft. The hook is generic, so any future lifecycle need can use it.
 
 The per-control mapping:
 
@@ -427,12 +437,12 @@ Two corrections to the original sketch, both found while implementing:
    The spec's `_HYD_ASSIST_LOSS` is *loss* — `1` = unassisted/locked. Assigning one to
    the other directly would invert the whole effect: a healthy aircraft would feel
    locked. The conversion is `health = 1.0 - loss`.
-2. **Inject `HydSys` rather than branch inside the mixin.** Setting
+2. **Inject `HydSys` rather than branch inside the effect.** Setting
    `telem_data.HydSys = 1.0 - loss` before the effect mixins run lets the existing
    float path, threshold and damper/inertia/friction scaling all execute unchanged —
    no edit to `HydraulicLossMixIn` at all. For a two-axis control the worst axis wins.
 
-Implemented in `FFBApiMixIn._ffb_api_apply_hydraulic_loss`, called from
+Implemented in `FFBApiHelicopter._ffb_api_apply_hydraulic_loss`, called from
 `ffb_api_on_telemetry` early in `Helicopter.on_telemetry` so the injected value is in
 place before `HydraulicLossMixIn.on_telemetry` reads it. This overrides any `HydSys`
 from `sc_overrides` while the API is active, which is intended: the API is
@@ -470,12 +480,18 @@ the existing inverted convention table in HPG before wiring.
 
 ## 5. Configuration & XML
 
-- **No new aircraft class to register** (§10.1 chose a mixin). Instead, expose the
-  mixin's parameters on the existing heli classes in `defaults.xml`, so they are
-  available on all six vendor classes plus generic `Helicopter`. Parameters should be
-  visibly grouped (e.g. an "FFB API" section) and ideally shown as inactive when the
-  loaded aircraft reports `API_VERSION 0`, so users aren't tuning knobs that do
-  nothing.
+- **Register `FFBApiHelicopter`** per
+  [`docs/adding_an_aircraft_class.md`](adding_an_aircraft_class.md): `<classes>` entry,
+  `type` dropdown `validvalues`, `friendly_class_names`, module re-export, and the
+  self-referential `type` class default so the class survives profile cloning.
+- **Scope the eight `ffb_api_*` parameters to the class.** Their `<defaults>` rows carry
+  *no* `<value>`, which per the defaults.xml reference means they do not appear for any
+  aircraft; the value is supplied only by `<classdefaults_MSFS>` entries typed
+  `FFBApiHelicopter`. This is the same pattern `afcs_motion_rate` uses for
+  `XAW109Helicopter`, and it keeps the knobs off every other MSFS aircraft. Because the
+  scoping is carried by an *absence*, `TestFFBApiSettingsScope` guards it: re-adding a
+  single `<value>` would surface all eight on every MSFS aircraft with nothing else
+  failing.
 - Reuse existing user parameters where they map (`trim_release_spring_gain`,
   `cyclic_spring_gain`, `collective_ap_spring_gain`, `hpg_pedal_spring_gain`,
   fly-through / hands-on deadzones and force thresholds). Rename the exposed
@@ -497,9 +513,9 @@ the existing inverted convention table in HPG before wiring.
   SimConnect connections and can write LVARs (they do — each process constructs its
   own `SimConnectManager`). Verify during the spike that a child instance's
   `set_simdatum_to_msfs` reaches MSFS.
-- Shutdown: the disable-write on `on_timeout` covers per-instance sim exit; add a
-  best-effort `ENABLED = 0` write in the master/children shutdown path
-  (`main.py` Phase 16) so a clean quit leaves the aircraft in normal mode.
+- Shutdown: the disable-write on `on_timeout` covers per-instance sim exit;
+  `on_shutdown()` (§4.3) covers a clean quit and an aircraft change, driven by
+  `TelemManager._retire_current_aircraft()`.
 
 ---
 
@@ -507,7 +523,9 @@ the existing inverted convention table in HPG before wiring.
 
 | Case | Behavior |
 |---|---|
-| Aircraft doesn't implement API (`FFB_API_VERSION` absent → 0) | `UNSUPPORTED`; class behaves like generic `Helicopter`. Never write **any** `L:FFB_*` var (spec §4 step 1) — not `ENABLED`, not `FLY_THROUGH`. |
+| Aircraft isn't configured as `FFBApiHelicopter` | The class is never instantiated. No subscription, no read, no write — the strongest form of "never write any `L:FFB_*` var" (spec §4 step 1). |
+| Configured aircraft hasn't published `FFB_API_VERSION` yet | Stay inert and keep looking; behave like generic `Helicopter`. Never write **any** `L:FFB_*` var. After `FFB_API_DISCOVERY_WARN_MS` of silence, warn once that the class may be misconfigured — a soft check, not a latch. |
+| Two API aircraft loaded in succession | `L:FFB_*` survive the change, so the fresh instance can briefly read the previous aircraft's values. Discovery debounces: `(VERSION, FEATURES)` must hold for `FFB_API_DISCOVERY_STABLE_FRAMES` frames before latching (§10.1). |
 | `FFB_FEATURES` absent / `0` with `API_VERSION >= 1` | Legal. No control is trimmed: no trim spring anywhere, `_TRIM` and `_TR_ON` ignored. Hydraulics and fly-through still active. Log once. |
 | `FFB_FEATURES` has bits set above bit 2 | Unknown future capabilities — mask off and ignore; never treat an unknown bit as an error or as "no features". |
 | Read vars published while our control is *not* enabled | Ignore them (spec §3.4). Consuming `_TRIM` in normal mode would fight the aircraft's own trim, which is exactly what the mode gate prevents. |
@@ -518,7 +536,8 @@ the existing inverted convention table in HPG before wiring.
 | `FFB_*_TRIM` jumps (aircraft publishes coarse/stepped values) | **Consume raw (§10.4).** No rig-side filtering. A stepped `_TRIM` is an aircraft-side spec violation (§3.4: it tracks the actuator, updated every frame) and should be reported as such, not papered over. Revisit only if a shipped aircraft proves otherwise. |
 | Device not connected on a child instance | Don't write `ENABLED` for that control; other controls unaffected. |
 | User binds axes in MSFS vs. `telemffb_controls_axes` | Support both (§10.2), no new default. Trim is applied via spring center only, never double-applied to a sent axis. |
-| Vendor class (HPG, SAS, XAW109) on an API-implementing aircraft | API wins per control while that control's `ENABLED == 1`; the vendor control method for that control is replaced at the dispatch site, not blended (§4.3). Cowan / FlyInside / Taog have no competing trim path and need nothing. |
+| Vendor class (HPG, SAS, XAW109) on an API-implementing aircraft | Mutually exclusive: an aircraft is configured as one class or the other. A vendor aircraft that adopts the spec gets a vendor subclass of `FFBApiHelicopter` (§4.3). |
+| User wants the API off for an aircraft | Set the aircraft's class back to `Helicopter`. The reload retires the outgoing handler, which writes `ENABLED = 0` on the way out. There is deliberately no separate "enable" setting duplicating the `type` decision. |
 | Mixed enablement (e.g. FFB cyclic, normal collective) on a vendor class | Falls out of per-dispatch-site gating: API cyclic path + untouched vendor collective path, no special case. |
 
 ---
@@ -543,7 +562,7 @@ the existing inverted convention table in HPG before wiring.
   that control (spy on `msfs_update_heli_controls` / `_pedals` / `_collective`) and the
   spring center comes from `_TRIM` alone. Add a mixed-enablement case: cyclic enabled,
   collective not → API cyclic path *and* vendor collective path both run. This is the
-  regression that protects the mixin decision (§4.3).
+  regression that protects the containment decision (§4.3).
 - **Axis ownership:** run the spring/trim assertions under both
   `telemffb_controls_axes = True` and `False`; with `True`, additionally assert the
   sent axis value is the raw input and carries no trim contribution (§10.2).
@@ -563,7 +582,7 @@ the existing inverted convention table in HPG before wiring.
    (esp. missing-LVAR behavior and child-instance write capability).
 2. **Read path + BaseTelemetryData fields + discovery gating**, including the
    `FFB_FEATURES` latch/decode and the "no writes while unsupported" rule.
-3. **`FFBApiMixIn` cyclic:** spring center from `FFB_*_TRIM`, `TR_ON` unclutch,
+3. **`FFBApiHelicopter` cyclic:** spring center from `FFB_*_TRIM`, `TR_ON` unclutch,
    `ENABLED` lifecycle, `FLY_THROUGH` write. Validate on hardware.
 3b. **Dispatch-site guards** (three call sites, two shared files) plus the vendor
    precedence tests for HPG / SAS / XAW109. Land with step 3 rather than after it: the
@@ -581,31 +600,62 @@ the existing inverted convention table in HPG before wiring.
 All six questions resolved 2026-09-04. Recorded with rationale so they are not
 re-litigated; each links to where it is implemented above.
 
-1. **Class wiring → mixin on base `Helicopter`.** `FFBApiMixIn`, inert until discovery
-   succeeds. *Re-examined against the code after the initial decision; confirmed, and
-   the cost came in well under the original estimate.*
+1. **Class wiring → a dedicated `FFBApiHelicopter(Helicopter)` class, selected from
+   `defaults.xml`.** *Superseded the original "mixin on base `Helicopter`" decision
+   after code review, 2026-09-16.*
 
-   **Cost: three guards at three polymorphic dispatch sites in two shared files, and
-   zero vendor-class edits** — not the "six mechanical edits across six classes" first
-   estimated. Only three of the six subclasses have a competing trim source at all, and
-   all three are reached through those same sites (§4.3).
+   **What changed the decision: `L:FFB_*` variables are global to the sim session, not
+   per aircraft.** Discovery-based activation reads them to decide whether the loaded
+   aircraft implements the spec — but an aircraft that does *not* implement it cannot
+   clear variables it has never heard of, so a value an earlier aircraft published stays
+   readable underneath it. On a mixin attached to the base `Helicopter`, that produces a
+   real misfire: a non-implementing helicopter loads, a fresh instance reads the
+   previous aircraft's `L:FFB_API_VERSION`, latches, and the API then drives an aircraft
+   that zeroed no `ROTOR * TRIM PCT` and publishes no `_TRIM` — spring centre driven by
+   stale values, generic trim path bypassed, `FLY_THROUGH` written into an aircraft that
+   ignores it.
 
-   Rejected — **explicit `defaults.xml` class selection**: needs a config entry per
-   aircraft, defeating discovery. Note that
-   [`_resolve_aircraft_class`](../telemffb/telem/TelemManager.py#L411) is config-driven
-   first and only falls back to SimConnect type resolution, so this would mean no
-   API support at all on any aircraft without a shipped config entry.
+   The asymmetry is the point. A mixin can misfire *onto* an aircraft that never asked
+   for it; a class cannot — an unconfigured model resolves to plain `Helicopter` through
+   [`_resolve_aircraft_class`](../telemffb/telem/TelemManager.py#L411)'s SimConnect
+   fallback and reads or writes no `L:FFB_*` variable at all. For a spec with a handful
+   of implementing aircraft, explicit beats implicit.
 
-   Rejected — **mid-flight class swap to a standalone `FFBApiHelicopter`**: the
-   mechanics are cheaper than first assumed
-   ([`_initialize_new_aircraft`](../telemffb/telem/TelemManager.py#L384) is a reusable
-   re-entry point), but the swap is wrong on the merits. The API covers *only*
-   trim/feel/hydraulics, while vendor classes carry much more — HPG alone adds
+   **Cost: zero edits to shared code.** Every method the mixin needed to influence is
+   reached by polymorphic `self.` dispatch, so the class overrides them at MRO position
+   0 — `on_telemetry`, `on_timeout`, `subscribe_simvars`, `msfs_update_heli_controls`,
+   `msfs_update_collective`, `msfs_update_pedals` and `_update_cyclic_trim`. The three
+   dispatch-site guards that lived in `Helicopter.py` and `MsfsXpHeliControlsMixIn.py`
+   are gone. The one shared-file addition is a generic `on_shutdown()` lifecycle hook on
+   `AircraftEffectUtilsBase`, alongside `on_telemetry` / `on_timeout` / `on_event`.
+
+   **What is given up: zero-config auto-enablement.** A spec-compliant aircraft needs a
+   `<models>` entry (or a user profile) before the API engages. Accepted for now; if the
+   spec sees wider adoption, mapping discovery onto a class is a later `TelemManager`
+   concern and this class stays the implementation either way. `FFB_API_VERSION` is
+   demoted from gate to soft check accordingly: a configured aircraft that never
+   publishes one gets a one-shot warning, not a latching "unsupported" verdict.
+
+   **Residual — stale reads between two API aircraft.** Loading one implementing
+   helicopter after another is the case a class does *not* close: both are legitimately
+   configured, and for a few frames the fresh instance can still read the previous
+   aircraft's values. Handled by debouncing discovery — `(FFB_API_VERSION, FFB_FEATURES)`
+   must read identically for `FFB_API_DISCOVERY_STABLE_FRAMES` consecutive frames before
+   it is latched, which spans the window. Latching (rather than reading the bits per
+   frame) is kept because the spec declares both values static per aircraft, and a
+   transient 0 during aircraft init must not momentarily retract a trim capability.
+
+   Rejected — **mixin on base `Helicopter`** (the original decision): misfire mode
+   above. Its stated advantage, zero-config discovery, is real, and its cost estimate
+   held up — but correctness on the wrong aircraft outweighs convenience on the right
+   one.
+
+   Rejected — **mid-flight class swap** to this class on discovery: the API covers
+   *only* trim/feel/hydraulics, while vendor classes carry much more — HPG alone adds
    `ac_update_vrs_effect`, `check_feet_on` and custom pedal/collective handling.
-   Swapping `HPGHelicopter` out for a generic API class to gain standardized trim would
-   discard vendor behaviour that stays perfectly valid. Composition is right precisely
-   *because* the API is a partial concern; a swap forces an all-or-nothing choice the
-   domain doesn't call for.
+   Swapping `HPGHelicopter` out to gain standardized trim would discard vendor behaviour
+   that stays perfectly valid. A vendor aircraft that adopts the spec is better served
+   by a vendor subclass of `FFBApiHelicopter` than by a swap.
 
 2. **Axis ownership → honour the user's existing `telemffb_controls_axes` setting.**
    No new default, both models supported and tested. The spec's "rig drives position
@@ -634,7 +684,7 @@ re-litigated; each links to where it is implemented above.
 
 6. **Legacy `L:FFB_HANDS_ON_*` → document as reserved-legacy in the standard.**
    TelemFFB keeps writing `L:FFB_HANDS_ON_CYCLIC` / `L:FFB_HANDS_ON_CYCLICX/Y` /
-   `L:FFB_FEET_ON_PEDALS` from the legacy path; `FFBApiMixIn` emits only the
+   `L:FFB_FEET_ON_PEDALS` from the legacy path; `FFBApiHelicopter` emits only the
    standardized names. The standard gains a short note listing these as pre-API and
    reserved, so no future revision reuses them and other rig implementers know to
    expect them. This makes the §4 step-1 rule ("write no `L:FFB_*` var to an
@@ -660,17 +710,28 @@ parity) is not started and remains optional.
 
 | File | Change |
 |---|---|
-| [FFBApiMixIn.py](../telemffb/sim/msfs_xp/FFBApiMixIn.py) | New. Subscription (from the per-frame path), discovery/latching, `ENABLED` lifecycle, feature decode, the three control paths, fly-through, hydraulic conversion. |
-| [MsfsXpHeliControlsMixIn.py](../telemffb/sim/msfs_xp/MsfsXpHeliControlsMixIn.py) | Inherits `FFBApiMixIn`; cyclic dispatch guard; `_update_cyclic_trim` suppressed under the API. |
-| [Helicopter.py](../telemffb/sim/msfs_xp/Helicopter.py) | Per-frame hook; collective and pedal dispatch guards; release on timeout. |
+| [FFBApiHelicopter.py](../telemffb/sim/msfs_xp/FFBApiHelicopter.py) | New `Helicopter` subclass. Subscription (from the per-frame path), discovery/latching with debounce, `ENABLED` lifecycle, feature decode, the three control overrides, fly-through, hydraulic conversion. |
+| [aircrafts_msfs_xp.py](../telemffb/sim/aircrafts_msfs_xp.py) | Re-export, so the class name resolves. |
+| [AircraftEffectUtilsBase.py](../telemffb/sim/base/AircraftEffectUtilsBase.py) | New generic `on_shutdown()` lifecycle hook (the only shared-code addition). |
+| [TelemManager.py](../telemffb/telem/TelemManager.py) | `_retire_current_aircraft()` / `on_shutdown()`; the outgoing handler is now retired on aircraft change as well as on sim exit and quit. |
+| [NewAircraftWizard.py](../telemffb/NewAircraftWizard.py) | Friendly class name. |
 | [BaseTelemetryData.py](../telemffb/sim/BaseTelemetryData.py) | 13 new documented fields. |
-| [defaults.xml](../defaults.xml) | 9 user parameters under an "FFB API" grouping. |
-| [utils.py](../telemffb/utils.py) | `release_ffb_api_controls()`, called from `exit_application()`. |
-| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 64 tests. |
+| [defaults.xml](../defaults.xml) | Class registration (`<classes>`, `type` `validvalues`, self-referential `type` default) and 8 user parameters under an "FFB API" grouping, scoped to the class via `<classdefaults_MSFS>`. |
+| [utils.py](../telemffb/utils.py) | `exit_application()` calls the generic `TelemManager.on_shutdown()`; three `ffb_api_*` spring names registered in `EffectTranslator.effect_dict`. |
+| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 105 tests. |
+
+`TelemManager._retire_current_aircraft()` itself is **not** unit tested: `TelemManager`
+cannot be imported under pytest, because `from simconnect import *` resolves to the
+empty `simconnect/` namespace package in this repo and `DATATYPE_FLOAT64` is undefined.
+That is why the repo has no `TelemManager` tests at all. The aircraft-facing half of the
+behaviour — `on_shutdown()` writing `ENABLED = 0` exactly once — is covered.
+
+**Unchanged:** `Helicopter.py` and `MsfsXpHeliControlsMixIn.py` carry no FFB API code at
+all — the property `TestFFBApiContainment` exists to keep true.
 
 ### Verified
 
-Full suite: **458 passed** (397 pre-existing + 61 new). One unrelated test,
+Full suite: **502 passed**. One unrelated test,
 `test_turbulence_modulator.py::TestHighPassFilter::test_constant_wind_decays_to_zero`,
 flakes intermittently under load — it derives `dt` from `time.perf_counter()`, so its
 decay assertion depends on wall-clock timing. Confirmed pre-existing (it also fails

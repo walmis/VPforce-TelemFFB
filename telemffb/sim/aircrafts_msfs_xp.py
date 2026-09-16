@@ -23,6 +23,7 @@ from .msfs_xp.PropellerAircraft import PropellerAircraft
 from .msfs_xp.TurbopropAircraft import TurbopropAircraft
 from .msfs_xp.GliderAircraft import GliderAircraft
 from .msfs_xp.CowanSimHelicopter import CowanSimHelicopter
+from .msfs_xp.FFBApiHelicopter import FFBApiHelicopter
 from .msfs_xp.FlyInsideHelicopter import FlyInsideHelicopter
 from .msfs_xp.Helicopter import Helicopter
 from .msfs_xp.HPGHelicopter import HPGHelicopter

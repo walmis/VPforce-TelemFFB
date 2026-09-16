@@ -20,25 +20,39 @@ Implementation plan: ``docs/ffb_simvar_api_implementation.md``
 
 The aircraft publishes a small, vendor-neutral set of ``L:FFB_*`` LVARs describing
 trim actuator position, trim-release state and hydraulic assist loss.  The rig writes
-back a per-control mode flag and per-axis fly-through detection.  This mixin owns both
+back a per-control mode flag and per-axis fly-through detection.  This class owns both
 directions for the MSFS backend.
 
 Design notes
 ------------
-* **Mode gated.** Nothing is read or written until ``L:FFB_API_VERSION >= 1`` is
-  latched, and the per-axis read values are only consumed while this control's
-  ``L:FFB_<CONTROL>_ENABLED`` is 1 (spec 3.4).
-* **Capability gated.** The trim spring exists only when this control's
-  ``L:FFB_FEATURES`` bit is set (spec 3.1).  Hydraulics and fly-through are not
-  feature-gated.
-* **Inert by default.** Every entry point returns immediately when the API is not
-  active, so all six vendor helicopter classes inherit this at zero cost.
+* **Config selected, not auto-detected.** ``L:FFB_*`` variables are global to the sim
+  session rather than per-aircraft, so a variable an implementing aircraft set can still
+  be readable while a *non*-implementing aircraft is loaded - and an aircraft that does
+  not know the spec cannot clear variables it has never heard of.  Activating on the
+  L:var alone could therefore misfire onto the wrong aircraft; selecting this class from
+  ``defaults.xml`` cannot.  An unconfigured helicopter resolves to plain
+  :class:`~telemffb.sim.msfs_xp.Helicopter.Helicopter` and touches no ``L:FFB_*``
+  variable at all.  See ``docs/adding_an_aircraft_class.md`` (branch ``refactor_new``)
+  for the registration procedure, and plan section 10.1 for the decision record.
+* **Version is a soft check, not a gate.** Being configured for this class is the
+  activation decision.  ``L:FFB_API_VERSION`` still has to be observed before anything
+  is written - the aircraft may not have initialized yet - but never publishing it is
+  reported as a misconfiguration rather than silently latched as "unsupported".
+* **Capability gated.** The trim spring exists only when this control's ``L:FFB_FEATURES``
+  bit is set (spec 3.1).  Hydraulics and fly-through are not feature-gated.
+* **Falls back cleanly.** Until discovery settles, every control path defers to the
+  generic :class:`Helicopter` behaviour via ``super()``.  To opt out permanently, set the
+  aircraft's class back to ``Helicopter`` - there is deliberately no second "enable"
+  switch duplicating that decision.
 """
 
 import logging
 import time
 
+from typing import override
+
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.sim.msfs_xp.Helicopter import Helicopter
 from telemffb.utils import clamp
 
 # --- Controls and axes (spec 3.1 / 3.3) ------------------------------------- #
@@ -110,6 +124,17 @@ FFB_API_TR_FIELD = {
 #: Re-assert ENABLED at least this often even when unchanged (ms).
 FFB_API_ENABLED_HEARTBEAT_MS = 1000
 
+#: Consecutive frames ``(FFB_API_VERSION, FFB_FEATURES)`` must read identically before
+#: they are latched.  Loading one API helicopter after another is the case this exists
+#: for: ``L:FFB_*`` variables survive the aircraft change, so for a short window the
+#: fresh instance can read the *previous* aircraft's values.  Requiring the pair to hold
+#: still spans that window, after which what is read belongs to the current aircraft.
+FFB_API_DISCOVERY_STABLE_FRAMES = 10
+
+#: Warn if a configured aircraft has not published a usable version within this long
+#: (ms) of telemetry.  Not a gate - it stays inert and keeps looking.
+FFB_API_DISCOVERY_WARN_MS = 15000
+
 #: Reserved pre-API names TelemFFB writes from the legacy hands-on path.  Listed here
 #: only so the exception to "write no L:FFB_* var when unsupported" is discoverable
 #: from the code as well as from spec 3.6.
@@ -121,15 +146,10 @@ FFB_API_RESERVED_LEGACY_LVARS = (
 )
 
 
-class FFBApiMixIn:
-    """Consume and produce the standardized ``L:FFB_*`` helicopter API."""
+class FFBApiHelicopter(Helicopter):
+    """Helicopter that consumes and produces the standardized ``L:FFB_*`` API."""
 
-    # ------------------------------------------------------------------ #
     # user parameters
-    # ------------------------------------------------------------------ #
-
-    #: Master switch.  When False the rig stays in legacy mode and writes nothing.
-    ffb_api_enable: bool = True
 
     #: Spring gain applied while the trim actuator is unclutched (TR_ON).
     ffb_api_tr_spring_gain: float = 0.0
@@ -157,13 +177,63 @@ class FFBApiMixIn:
 
     # end user parameters
 
-    def __init__(self, *args, **kwargs):
-        # cooperative init for mixin ordering
-        super().__init__(*args, **kwargs)
+    def __init__(self, name, **kwargs):
         self._ffb_api_reset()
+        super().__init__(name, **kwargs)
 
     # ------------------------------------------------------------------ #
-    # lifecycle: discovery, latching, mode gating
+    # lifecycle hooks
+    # ------------------------------------------------------------------ #
+
+    @override
+    def on_telemetry(self, telem_data: BaseTelemetryData):
+        """Run discovery, the ENABLED lifecycle and hydraulics, then the base chain.
+
+        Most-derived position in the MRO is what makes the ordering work: the injected
+        ``HydSys`` is in place before ``HydraulicLossMixIn`` reads it in the same frame.
+        The per-control spring/trim work happens later, in the control overrides the
+        base chain dispatches to.
+        """
+        if telem_data.N is not None:
+            # Mirror the base class' own guard - it returns before doing anything when
+            # N is absent, and there is no aircraft to talk to in that state either.
+            self._ffb_api_on_telemetry(telem_data)
+        super().on_telemetry(telem_data)
+
+    @override
+    def on_timeout(self):
+        """Release the aircraft on telemetry timeout / sim exit.
+
+        Unconditional and ahead of ``super()``: ``Aircraft.on_timeout`` gates the rest
+        of the chain on the pause spring, so a release placed deeper down would be
+        skipped exactly when a paused sim needs it.
+        """
+        self._ffb_api_release()
+        super().on_timeout()
+
+    @override
+    def on_shutdown(self):
+        """Release the aircraft when this instance is retired (app quit, aircraft change).
+
+        Defensive: a shutdown, or the load of the next aircraft, must never fail because
+        of a cleanup write.  The write is queued on the SimConnect send path, so a quit
+        that races the transport teardown may drop it - acceptable, because the standard
+        requires the aircraft to default the flag to 0 on load and forbids persisting
+        it, so a missed write costs at most a stale flag in the current session.
+        """
+        try:
+            self._ffb_api_release()
+        except Exception:
+            logging.debug("FFB API: release on shutdown failed", exc_info=True)
+        super().on_shutdown()
+
+    @override
+    def subscribe_simvars(self):
+        super().subscribe_simvars()
+        self._subscribe_ffb_api_simvars()
+
+    # ------------------------------------------------------------------ #
+    # discovery, latching, mode gating
     # ------------------------------------------------------------------ #
 
     def _ffb_api_reset(self):
@@ -171,26 +241,25 @@ class FFBApiMixIn:
         self._ffb_api_latched = False
         self._ffb_api_version = 0
         self._ffb_api_features = 0
+        self._ffb_api_pending_discovery = None
+        self._ffb_api_pending_frames = 0
+        self._ffb_api_first_seen_ms = None
         self._ffb_api_enabled_state = None
         self._ffb_api_enabled_last_write_ms = 0
         self._ffb_api_spring_init = 0
         self._ffb_api_tr_active = False
         self._ffb_api_fly_through_state = {}
         self._ffb_api_warned_no_features = False
+        self._ffb_api_warned_no_version = False
 
-    def subscribe_ffb_api_simvars(self):
+    def _subscribe_ffb_api_simvars(self):
         """Subscribe the discovery and runtime read variables.
 
-        Subscription is unconditional for MSFS helicopters: discovery must work for
-        any aircraft, including one with no config entry, so this deliberately does
-        not ride ``sc_overrides``.  An LVAR the aircraft does not define reads as 0
-        (or stays None), which is exactly the "not implemented" sentinel.
-
-        Called every frame from :meth:`ffb_api_on_telemetry` and guarded on
-        ``sv_dict``, because a SimConnectManager subscription added at runtime lives
-        in ``temp_sim_vars``, which is cleared by the subscribe cycle that consumes
-        it - a later ``_resubscribe()`` from anywhere rebuilds from the predefined
-        list alone and drops these vars.  Re-checking is how they come back.
+        Called every frame from :meth:`_ffb_api_on_telemetry` and guarded on ``sv_dict``,
+        because a SimConnectManager subscription added at runtime lives in
+        ``temp_sim_vars``, which is cleared by the subscribe cycle that consumes it - a
+        later ``_resubscribe()`` from anywhere rebuilds from the predefined list alone
+        and drops these vars.  Re-checking is how they come back.
         """
         if not self._simconnect:
             return
@@ -205,10 +274,13 @@ class FFBApiMixIn:
     def _ffb_api_latch_discovery(self, telem_data: BaseTelemetryData):
         """Latch API version and capability bits once per aircraft (spec 4, steps 1-2).
 
+        Both values are static per aircraft, so they are read until they settle and then
+        never consumed again.  "Settle" means ``FFB_API_DISCOVERY_STABLE_FRAMES``
+        identical consecutive reads - see that constant for why the debounce is needed.
+
         Telemetry:
             Read: ffbApiVersion - Optional[float]; L:FFB_API_VERSION.  None until the
-                                  subscription lands; 0 = not implemented, or not
-                                  published yet - see below.
+                                  subscription lands; 0 = not published yet.
                   ffbFeatures   - Optional[float]; L:FFB_FEATURES bitfield.
         """
         if self._ffb_api_latched:
@@ -216,20 +288,28 @@ class FFBApiMixIn:
 
         version = telem_data.get("ffbApiVersion", None)
         if version is None or int(round(version)) < 1:
-            # Not implemented, or not implemented *yet*.  MSFS reads an LVAR the
-            # aircraft has not created as 0, exactly like one it never creates, and
-            # the subscription usually lands a few frames before the aircraft's own
-            # init publishes FFB_API_VERSION.  Latching that first 0 would mark a
-            # supported aircraft unsupported for the rest of the flight, so stay
-            # unlatched and keep looking - an aircraft that never publishes simply
-            # stays unsupported forever, which is correct.
+            # Not published yet.  MSFS reads an LVAR the aircraft has not created as 0,
+            # and the subscription usually lands a few frames before the aircraft's own
+            # init publishes FFB_API_VERSION, so keep looking rather than concluding
+            # anything.  An aircraft configured for this class that never publishes is
+            # a misconfiguration, and _ffb_api_warn_missing_version says so.
+            self._ffb_api_pending_discovery = None
+            self._ffb_api_pending_frames = 0
+            self._ffb_api_warn_missing_version()
+            return
+
+        observed = (int(round(version)), int(round(telem_data.get("ffbFeatures", 0) or 0)))
+        if observed != self._ffb_api_pending_discovery:
+            self._ffb_api_pending_discovery = observed
+            self._ffb_api_pending_frames = 1
+            return
+
+        self._ffb_api_pending_frames += 1
+        if self._ffb_api_pending_frames < FFB_API_DISCOVERY_STABLE_FRAMES:
             return
 
         self._ffb_api_latched = True
-        self._ffb_api_version = int(round(version))
-
-        features = telem_data.get("ffbFeatures", 0) or 0
-        self._ffb_api_features = int(round(features))
+        self._ffb_api_version, self._ffb_api_features = observed
 
         logging.info(
             f"FFB API detected: version={self._ffb_api_version} "
@@ -250,6 +330,30 @@ class FFBApiMixIn:
             )
             self._ffb_api_warned_no_features = True
 
+    def _ffb_api_warn_missing_version(self):
+        """One-shot warning for an aircraft configured for this class that stays silent.
+
+        The class selection was the activation decision, so this is a config error worth
+        surfacing - but not worth latching on, because the aircraft may simply be slow
+        to initialize.  The rig stays inert and keeps looking either way.
+        """
+        now_ms = time.monotonic() * 1000
+        if self._ffb_api_first_seen_ms is None:
+            self._ffb_api_first_seen_ms = now_ms
+            return
+        if self._ffb_api_warned_no_version:
+            return
+        if now_ms - self._ffb_api_first_seen_ms < FFB_API_DISCOVERY_WARN_MS:
+            return
+        self._ffb_api_warned_no_version = True
+        logging.warning(
+            f"FFB API: this aircraft is configured as {type(self).__name__} but has not "
+            f"published L:FFB_API_VERSION after "
+            f"{FFB_API_DISCOVERY_WARN_MS / 1000:.0f}s.  TelemFFB is running the generic "
+            f"helicopter behaviour.  If the aircraft does not implement the FFB API, "
+            f"set its class to Helicopter."
+        )
+
     def _ffb_api_control(self):
         """Return the API control name this device instance owns, or None.
 
@@ -265,10 +369,9 @@ class FFBApiMixIn:
         return None
 
     def _ffb_api_supported(self) -> bool:
-        """True once an aircraft has been confirmed to implement the API."""
+        """True once the configured aircraft has been confirmed live on the API."""
         return (
-            self.ffb_api_enable
-            and self._ffb_api_latched
+            self._ffb_api_latched
             and self._ffb_api_version >= 1
             and self._sim_is_msfs()
             and self._simconnect is not None
@@ -277,7 +380,7 @@ class FFBApiMixIn:
     def _ffb_api_active(self, control=None) -> bool:
         """True when the API owns ``control`` on this device instance.
 
-        This is the single gate every entry point and dispatch site consults.  When
+        This is the single gate every entry point and control override consults.  When
         ``control`` is omitted it defaults to the control this device owns.
         """
         if not self._ffb_api_supported():
@@ -322,7 +425,9 @@ class FFBApiMixIn:
         if control is None:
             return
 
-        now_ms = time.time() * 1000
+        # Monotonic: a wall-clock step (NTP, DST, manual clock change) would either
+        # stall the heartbeat or fire it every frame until the clock caught up.
+        now_ms = time.monotonic() * 1000
         changed = self._ffb_api_enabled_state != enabled
         stale = (now_ms - self._ffb_api_enabled_last_write_ms) > FFB_API_ENABLED_HEARTBEAT_MS
         if not changed and not stale:
@@ -335,7 +440,11 @@ class FFBApiMixIn:
             self._ffb_api_enabled_state = enabled
 
     def _ffb_api_disable(self):
-        """Best-effort ``ENABLED = 0`` on timeout, sim exit, or shutdown (spec 4, step 5).
+        """Best-effort ``ENABLED = 0`` whenever the rig stops driving this control.
+
+        Covers timeout, sim exit, shutdown and aircraft change (spec 4, step 5) - and,
+        through the last of those, a user switching the aircraft's class back to
+        ``Helicopter`` and reloading.
 
         The aircraft is required to restore normal trim/feel when the flag clears, so
         emitting the zero reliably is the rig's whole obligation here - there is no
@@ -348,7 +457,13 @@ class FFBApiMixIn:
             return
         self._ffb_api_write_lvar(f"L:FFB_{control}_ENABLED", 0)
         self._ffb_api_enabled_state = False
-        logging.info(f"FFB API: {control} disabled (shutdown/timeout)")
+        self._ffb_api_spring_init = 0
+        logging.info(f"FFB API: {control} released (ENABLED=0)")
+
+    def _ffb_api_release(self):
+        """Release the control and drop every latched value."""
+        self._ffb_api_disable()
+        self._ffb_api_reset()
 
     def _ffb_api_write_fly_through(self, telem_data: BaseTelemetryData, control, results: dict):
         """Publish per-axis fly-through detection (spec 3.3).
@@ -455,19 +570,13 @@ class FFBApiMixIn:
     # per-frame entry point
     # ------------------------------------------------------------------ #
 
-    def ffb_api_on_telemetry(self, telem_data: BaseTelemetryData):
+    def _ffb_api_on_telemetry(self, telem_data: BaseTelemetryData):
         """Run discovery, the ENABLED lifecycle and hydraulics for this frame.
-
-        Called early in :meth:`Helicopter.on_telemetry`, before the effect mixins run,
-        so injected ``HydSys`` is in place by the time the hydraulic effect reads it.
-        The per-control spring/trim work happens later, at the dispatch sites.
 
         Telemetry:
             Written: _ffb_api_version, _ffb_api_features, _ffb_api_enabled (debug)
         """
         if not self._sim_is_msfs() or not self._simconnect:
-            return
-        if not self.ffb_api_enable:
             return
 
         # Per frame, not once at construction: an aircraft handler is built before
@@ -475,12 +584,13 @@ class FFBApiMixIn:
         # False and a subscription made there never happens.  The sv_dict guard
         # inside makes the steady-state call a dict lookup, and re-running it also
         # re-instates the subscription if an unrelated _resubscribe() dropped it.
-        self.subscribe_ffb_api_simvars()
+        self._subscribe_ffb_api_simvars()
 
         self._ffb_api_latch_discovery(telem_data)
 
         if not self._ffb_api_supported():
-            # Unsupported: write no L:FFB_* variable at all (spec 4, step 1).
+            # Not live yet: write no L:FFB_* variable at all (spec 4, step 1), and let
+            # the generic Helicopter paths run this frame.
             return
 
         telem_data._ffb_api_version = self._ffb_api_version
@@ -491,13 +601,8 @@ class FFBApiMixIn:
 
         self._ffb_api_apply_hydraulic_loss(telem_data)
 
-    def ffb_api_on_timeout(self):
-        """Release the aircraft on telemetry timeout / sim exit."""
-        self._ffb_api_disable()
-        self._ffb_api_reset()
-
     # ------------------------------------------------------------------ #
-    # control paths - these replace the vendor/generic path when active
+    # control overrides - these replace the generic path while the API is live
     # ------------------------------------------------------------------ #
 
     # ``ConditionEffect.set_coefficient`` dispatches on Python type: a float is scaled
@@ -519,12 +624,29 @@ class FFBApiMixIn:
             return True
         return False
 
-    def _ffb_api_update_cyclic(self, telem_data: BaseTelemetryData):
+    @override
+    def _update_cyclic_trim(self, telem_data: BaseTelemetryData):
+        """Suppress generic trim following while the API owns the cyclic.
+
+        The aircraft has zeroed ``ROTOR *_TRIM PCT`` and owns trim, so the generic
+        ``CyclicTrimX/Y`` follow would be integrating dead state.  Trim reaches the
+        stick through the spring center instead, and the sent axis must stay raw so it
+        is never applied twice.
+        """
+        if not self._ffb_api_active(FFB_API_CYCLIC):
+            super()._update_cyclic_trim(telem_data)
+            return
+        self.cyclic_physical_trim_x_offs = 0
+        self.cyclic_physical_trim_y_offs = 0
+        self.cyclic_virtual_trim_x_offs = 0
+        self.cyclic_virtual_trim_y_offs = 0
+
+    @override
+    def msfs_update_heli_controls(self, telem_data: BaseTelemetryData):
         """Drive the cyclic spring from the published trim actuator position.
 
-        Replaces ``msfs_update_heli_controls`` while CYCLIC is enabled.  The aircraft
-        has zeroed ``ROTOR *_TRIM PCT`` and owns trim, so the generic and vendor trim
-        paths would be integrating state nobody maintains.
+        Replaces the generic cyclic path entirely while CYCLIC is live - the aircraft
+        owns trim, so force-trim/AFCS state nobody maintains must not drive the spring.
 
         Telemetry:
             Read:    ffbTrimCyclicPitch, ffbTrimCyclicRoll - float (-1..+1)
@@ -533,6 +655,10 @@ class FFBApiMixIn:
                      StickXY             ([float, float]; stick position)
                      StickXY_offset      ([float, float]; spring center)
         """
+        if not self._ffb_api_active(FFB_API_CYCLIC):
+            super().msfs_update_heli_controls(telem_data)
+            return
+
         phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
@@ -590,13 +716,18 @@ class FFBApiMixIn:
         self.last_device_x, self.last_device_y = phys_x, phys_y
         self._send_cyclic_axis_output(telem_data, force_trim_active=False)
 
-    def _ffb_api_update_collective(self, telem_data: BaseTelemetryData):
+    @override
+    def msfs_update_collective(self, telem_data: BaseTelemetryData):
         """Drive the collective spring from the published trim actuator position.
 
         Telemetry:
             Read:    ffbTrimCollective - float (-1..+1); ffbTrOnCollective - bool
             Written: phys_y            (float, -1..1)
         """
+        if not self._ffb_api_active(FFB_API_COLLECTIVE):
+            super().msfs_update_collective(telem_data)
+            return
+
         _, phys_y = self._get_device_raw_axes()
         telem_data.phys_y = phys_y
 
@@ -637,13 +768,18 @@ class FFBApiMixIn:
             self.collective_init = 1
             self._send_collective_outputs(telem_data, phys_y, y_var, y_range)
 
-    def _ffb_api_update_pedals(self, telem_data: BaseTelemetryData):
+    @override
+    def msfs_update_pedals(self, telem_data: BaseTelemetryData):
         """Drive the pedal spring from the published trim actuator position.
 
         Telemetry:
             Read:    ffbTrimPedals - float (-1..+1); ffbTrOnPedals - bool
             Written: phys_x        (float, -1..1)
         """
+        if not self._ffb_api_active(FFB_API_PEDALS):
+            super().msfs_update_pedals(telem_data)
+            return
+
         phys_x, _ = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
 

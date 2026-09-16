@@ -421,3 +421,11 @@ class AircraftEffectUtilsBase(object):
     def on_event(self, event, *args):
         """Each mixin can implement this to handle input events. important: super().on_event() must be called in subclasses."""
         pass
+
+    def on_shutdown(self):
+        """Each mixin can implement this to release resources when this aircraft instance
+        is retired - the application is quitting, or a different aircraft has been loaded
+        and a new handler is replacing this one.  Unlike on_timeout() this is terminal:
+        the instance is not reused afterwards.  important: super().on_shutdown() must be
+        called in subclasses."""
+        pass

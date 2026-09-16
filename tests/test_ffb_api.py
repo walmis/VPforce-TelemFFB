@@ -1,4 +1,4 @@
-"""Tests for the standardized MSFS helicopter FFB LVAR API (FFBApiMixIn).
+"""Tests for the standardized MSFS helicopter FFB LVAR API (FFBApiHelicopter).
 
 Spec: https://github.com/CK-AT/DIY-FFB/blob/ck_dev/Standards/MSFS_Helicopter_FFB_API.md
 Plan: docs/ffb_simvar_api_implementation.md
@@ -6,11 +6,11 @@ Plan: docs/ffb_simvar_api_implementation.md
 No aircraft implements this API yet, so everything here drives the rig side with
 synthetic telemetry.  Coverage follows plan section 8:
 
-- discovery gating, including "write no L:FFB_* variable at all when unsupported"
+- discovery, including "write no L:FFB_* variable at all until the aircraft is live"
 - the FFB_FEATURES capability matrix, and that it is latched rather than re-read
 - trim spring, TR_ON unclutch and fly-through per control
 - hydraulic assist loss, including the loss/health inversion
-- vendor-class precedence at the three dispatch sites
+- containment: every other helicopter class is untouched by the API
 - axis ownership under both telemffb_controls_axes modes
 """
 import pytest
@@ -18,15 +18,19 @@ from unittest.mock import patch
 
 from tests.framework.base import BaseTelemetryEffectTestCase
 from tests.framework.utils import TelemetryDataBuilder
-from telemffb.sim.msfs_xp.FFBApiMixIn import (
+from telemffb.sim.msfs_xp.FFBApiHelicopter import (
+    FFBApiHelicopter,
     FFB_API_CYCLIC,
     FFB_API_COLLECTIVE,
     FFB_API_PEDALS,
+    FFB_API_DISCOVERY_STABLE_FRAMES,
+    FFB_API_DISCOVERY_WARN_MS,
 )
+from telemffb.sim.msfs_xp.CowanSimHelicopter import CowanSimHelicopter
 from telemffb.sim.msfs_xp.Helicopter import Helicopter
 from telemffb.sim.msfs_xp.HPGHelicopter import HPGHelicopter
-from telemffb.sim.msfs_xp.MsfsXpHeliControlsMixIn import MsfsXpHeliControlsMixIn
 from telemffb.sim.msfs_xp.SASHelicopter import SASHelicopter
+from telemffb.sim.msfs_xp.TaogH500Helicopter import TaogH500Helicopter
 from telemffb.sim.msfs_xp.XAW109Helicopter import XAW109Helicopter
 from telemffb.utils import clamp
 
@@ -80,7 +84,21 @@ class FFBApiTestBase(BaseTelemetryEffectTestCase):
             telem[key] = value
         return telem
 
-    def make_instance(self, cls=Helicopter, device="joystick", **kwargs):
+    def make_flyable_telem(self, **kwargs):
+        """make_telem plus the fields the *full* on_telemetry chain dereferences.
+
+        Most tests drive one entry point and never reach the generic effect mixins;
+        the containment tests deliberately run the whole chain, which needs these.
+        """
+        telem = self.make_telem(**kwargs)
+        telem["VelWorld"] = [0, 0, 0]
+        telem["AmbWind"] = [0, 0, 0]
+        telem["Heading"] = 0
+        telem["Pitch"] = 0
+        telem["Roll"] = 0
+        return telem
+
+    def make_instance(self, cls=FFBApiHelicopter, device="joystick", **kwargs):
         instance = self.create_aircraft_instance(
             cls, name="TestHeli", _test_sim_is_msfs=True, _test_device_type=device, **kwargs
         )
@@ -90,10 +108,16 @@ class FFBApiTestBase(BaseTelemetryEffectTestCase):
         instance.local_disable_axis_control = False
         return instance
 
-    def arm(self, instance, telem):
-        """Set telemetry and run one discovery/lifecycle pass."""
+    def arm(self, instance, telem, frames=FFB_API_DISCOVERY_STABLE_FRAMES):
+        """Set telemetry and run enough lifecycle passes for discovery to settle.
+
+        Discovery debounces on a stable read (see FFB_API_DISCOVERY_STABLE_FRAMES), so
+        a single pass would never latch.  Tests that care about the debounce itself
+        drive the frame count explicitly.
+        """
         self.set_telemetry(instance, telem)
-        instance.ffb_api_on_telemetry(telem)
+        for _ in range(frames):
+            instance._ffb_api_on_telemetry(telem)
 
     def ffb_writes(self):
         """Every L:FFB_* variable written so far, as (name, value) pairs."""
@@ -119,7 +143,7 @@ class TestFFBApiDiscovery(FFBApiTestBase):
 
     def test_subscribes_discovery_and_runtime_vars(self):
         instance = self.make_instance()
-        instance.subscribe_ffb_api_simvars()
+        instance._subscribe_ffb_api_simvars()
 
         for name in ("ffbApiVersion", "ffbFeatures", "ffbTrimCyclicPitch", "ffbTrOnCyclic"):
             assert name in self.mock_simconnect.sv_dict, f"{name} not subscribed"
@@ -171,7 +195,7 @@ class TestFFBApiDiscovery(FFBApiTestBase):
         instance = self.make_instance()
         assert "ffbApiVersion" not in self.mock_simconnect.sv_dict
 
-        instance.ffb_api_on_telemetry(self.make_telem())
+        instance._ffb_api_on_telemetry(self.make_telem())
 
         for name in ("ffbApiVersion", "ffbFeatures", "ffbTrimCyclicPitch", "ffbTrOnCyclic"):
             assert name in self.mock_simconnect.sv_dict, f"{name} not subscribed"
@@ -206,14 +230,6 @@ class TestFFBApiDiscovery(FFBApiTestBase):
 
         assert instance._ffb_api_active(FFB_API_CYCLIC) is True
 
-    def test_master_toggle_disables_everything(self):
-        instance = self.make_instance()
-        instance.ffb_api_enable = False
-        self.arm(instance, self.make_telem(version=1))
-
-        assert instance._ffb_api_active(FFB_API_CYCLIC) is False
-        assert self.ffb_writes() == []
-
     def test_features_are_latched_not_re_read(self):
         """Discovery values are static (spec 3.1): a later change must not take effect."""
         instance = self.make_instance()
@@ -228,7 +244,7 @@ class TestFFBApiDiscovery(FFBApiTestBase):
     def test_features_relatched_after_timeout(self):
         instance = self.make_instance()
         self.arm(instance, self.make_telem(version=1, features=BIT_CYCLIC))
-        instance.ffb_api_on_timeout()
+        instance._ffb_api_release()
 
         assert instance._ffb_api_latched is False
         self.arm(instance, self.make_telem(version=1, features=ALL_TRIM))
@@ -237,11 +253,77 @@ class TestFFBApiDiscovery(FFBApiTestBase):
     def test_missing_features_warns_once(self):
         """Legal per spec, but nearly always a forgotten FFB_FEATURES."""
         instance = self.make_instance()
-        with patch("telemffb.sim.msfs_xp.FFBApiMixIn.logging") as mock_log:
+        with patch("telemffb.sim.msfs_xp.FFBApiHelicopter.logging") as mock_log:
             self.arm(instance, self.make_telem(version=1, features=0))
             self.arm(instance, self.make_telem(version=1, features=0))
 
         assert mock_log.warning.call_count == 1
+
+
+# ───────────────────────────────────────────────────────────────
+# Discovery robustness: L:FFB_* survive an aircraft change
+# ───────────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestFFBApiDiscoveryDebounce(FFBApiTestBase):
+    """The one stale-read window a dedicated class does not close on its own.
+
+    Loading one API helicopter straight after another leaves the previous aircraft's
+    values readable for a few frames, and both aircraft are legitimately configured
+    for this class.  Discovery therefore waits for the pair to hold still.
+    """
+
+    def test_a_short_lived_value_is_not_latched(self):
+        instance = self.make_instance()
+        stale = self.make_telem(version=1, features=BIT_CYCLIC)
+
+        # Previous aircraft's values, readable but about to be replaced.
+        self.arm(instance, stale, frames=FFB_API_DISCOVERY_STABLE_FRAMES - 1)
+        assert instance._ffb_api_latched is False
+
+        fresh = self.make_telem(version=1, features=ALL_TRIM)
+        self.arm(instance, fresh)
+
+        assert instance._ffb_api_features == ALL_TRIM
+
+    def test_a_changing_value_restarts_the_count(self):
+        instance = self.make_instance()
+        for features in (BIT_CYCLIC, BIT_COLLECTIVE, BIT_PEDALS):
+            self.arm(instance, self.make_telem(version=1, features=features),
+                     frames=FFB_API_DISCOVERY_STABLE_FRAMES - 1)
+            assert instance._ffb_api_latched is False
+
+    def test_a_stable_value_latches_and_writes_nothing_before_then(self):
+        instance = self.make_instance()
+        telem = self.make_telem(version=1, features=ALL_TRIM)
+
+        self.arm(instance, telem, frames=FFB_API_DISCOVERY_STABLE_FRAMES - 1)
+        assert self.ffb_writes() == []
+
+        self.arm(instance, telem, frames=1)
+        assert instance._ffb_api_latched is True
+        assert self.written_values("L:FFB_CYCLIC_ENABLED") == [1]
+
+    def test_configured_but_silent_aircraft_warns_once(self):
+        """A soft check: stay inert and keep looking, but say so."""
+        instance = self.make_instance()
+        telem = self.make_telem(version=0, features=0)
+        clock = [0.0]
+        with patch("telemffb.sim.msfs_xp.FFBApiHelicopter.time.monotonic", lambda: clock[0]), \
+             patch("telemffb.sim.msfs_xp.FFBApiHelicopter.logging") as mock_log:
+            self.arm(instance, telem, frames=1)
+            assert mock_log.warning.call_count == 0
+
+            clock[0] = FFB_API_DISCOVERY_WARN_MS / 1000 + 1
+            self.arm(instance, telem, frames=5)
+
+        assert mock_log.warning.call_count == 1
+        # Still not a gate: a late publisher is still picked up.
+        self.arm(instance, self.make_telem(version=1, features=ALL_TRIM))
+        assert instance._ffb_api_active(FFB_API_CYCLIC) is True
 
 
 # ───────────────────────────────────────────────────────────────
@@ -286,7 +368,7 @@ class TestFFBApiFeatureMatrix(FFBApiTestBase):
             version=1, features=0, ffbTrimCyclicPitch=0.5, ffbTrimCyclicRoll=0.5
         )
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert instance.cpO_x == 0
         assert instance.cpO_y == 0
@@ -321,7 +403,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         instance = self.make_instance()
         telem = self.make_telem(ffbTrimCyclicRoll=0.25, ffbTrimCyclicPitch=-0.5)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert instance.cpO_x == round(0.25 * 4096)
         assert instance.cpO_y == round(-0.5 * 4096)
@@ -331,18 +413,18 @@ class TestFFBApiTrim(FFBApiTestBase):
         instance = self.make_instance()
         telem = self.make_telem(ffbTrimCyclicRoll=0.0)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
         assert instance.cpO_x == 0
 
         telem["ffbTrimCyclicRoll"] = 0.8
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
         assert instance.cpO_x == round(0.8 * 4096)
 
     def test_trim_is_clamped_to_unit_range(self):
         instance = self.make_instance()
         telem = self.make_telem(ffbTrimCyclicRoll=3.0, ffbTrimCyclicPitch=-9.0)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert instance.cpO_x == 4096
         assert instance.cpO_y == -4096
@@ -355,7 +437,7 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         telem = self.make_telem(ffbTrimCyclicRoll=0.9, ffbTrimCyclicPitch=0.9, ffbTrOnCyclic=1)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         # Centre follows the stick, not the (stale) published trim.
         assert instance.cpO_x == round(0.3 * 4096)
@@ -368,11 +450,11 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         telem = self.make_telem(ffbTrimCyclicRoll=0.3, ffbTrOnCyclic=1)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
         centre_under_tr = instance.cpO_x
 
         telem["ffbTrOnCyclic"] = 0
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert instance.cpO_x == centre_under_tr
 
@@ -381,7 +463,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         instance = self.make_instance(device="collective")
         telem = self.make_telem(device="collective", ffbTrimCollective=0.5)
         self.arm(instance, telem)
-        instance._ffb_api_update_collective(telem)
+        instance.msfs_update_collective(telem)
 
         assert instance.cpO_y == round(-0.5 * 4096)
 
@@ -390,7 +472,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         instance.ffb_api_invert_collective = False
         telem = self.make_telem(device="collective", ffbTrimCollective=0.5)
         self.arm(instance, telem)
-        instance._ffb_api_update_collective(telem)
+        instance.msfs_update_collective(telem)
 
         assert instance.cpO_y == round(0.5 * 4096)
 
@@ -398,7 +480,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         instance = self.make_instance(device="pedals")
         telem = self.make_telem(device="pedals", ffbTrimPedals=-0.4)
         self.arm(instance, telem)
-        instance._ffb_api_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
 
         assert instance.cpO_x == round(-0.4 * 4096)
 
@@ -410,7 +492,7 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         telem = self.make_telem(device="collective", features=0, ffbTrimCollective=0.9)
         self.arm(instance, telem)
-        instance._ffb_api_update_collective(telem)
+        instance.msfs_update_collective(telem)
 
         # Centre is the lever, not the (ignored) published trim.
         assert instance.cpO_y == round(0.4 * 4096)
@@ -424,7 +506,7 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         telem = self.make_telem(device="pedals", ffbTrimPedals=0.0)
         self.arm(instance, telem)
-        instance._ffb_api_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
 
         # Full-scale spring, not a raw coefficient of 1.
         assert instance.spring_x.positiveCoefficient == 4096
@@ -437,7 +519,7 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         telem = self.make_telem(device="pedals", ffbTrimPedals=0.9)
         self.arm(instance, telem)
-        instance._ffb_api_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
 
         assert instance._ffb_api_spring_init == 0
         assert instance.spring_x.positiveCoefficient == 0
@@ -517,7 +599,7 @@ class TestFFBApiFlyThrough(FFBApiTestBase):
 
         telem = self.make_telem(ffbTrimCyclicRoll=0.0, ffbTrimCyclicPitch=0.0)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert self.written_values("L:FFB_CYCLIC_ROLL_FLY_THROUGH") == [1]
         assert self.written_values("L:FFB_CYCLIC_PITCH_FLY_THROUGH") == [0]
@@ -529,7 +611,7 @@ class TestFFBApiFlyThrough(FFBApiTestBase):
 
         telem = self.make_telem(ffbTrimCyclicRoll=0.0, ffbTrimCyclicPitch=0.0)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert self.written_values("L:FFB_CYCLIC_ROLL_FLY_THROUGH") == [1]
         assert self.written_values("L:FFB_CYCLIC_PITCH_FLY_THROUGH") == [1]
@@ -542,17 +624,17 @@ class TestFFBApiFlyThrough(FFBApiTestBase):
         self.arm(instance, telem)
 
         self.mock_device._input_data.set_axis(x=0.3)
-        instance._ffb_api_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
         assert self.written_values("L:FFB_PEDALS_FLY_THROUGH") == [1]
 
         # Between the release and trigger deadzones: stays latched.
         self.mock_device._input_data.set_axis(x=0.1)
-        instance._ffb_api_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
         assert self.written_values("L:FFB_PEDALS_FLY_THROUGH") == [1, 1]
 
         # Below the release deadzone: clears.
         self.mock_device._input_data.set_axis(x=0.01)
-        instance._ffb_api_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
         assert self.written_values("L:FFB_PEDALS_FLY_THROUGH") == [1, 1, 0]
 
     def test_deviation_is_measured_from_the_trim_reference(self):
@@ -563,7 +645,7 @@ class TestFFBApiFlyThrough(FFBApiTestBase):
 
         telem = self.make_telem(device="pedals", ffbTrimPedals=0.6)
         self.arm(instance, telem)
-        instance._ffb_api_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
 
         assert self.written_values("L:FFB_PEDALS_FLY_THROUGH") == [0]
 
@@ -590,14 +672,36 @@ class TestFFBApiEnabledLifecycle(FFBApiTestBase):
     def test_timeout_releases_the_control(self):
         instance = self.make_instance()
         self.arm(instance, self.make_telem())
-        instance.ffb_api_on_timeout()
+        instance._ffb_api_release()
 
         assert self.written_values("L:FFB_CYCLIC_ENABLED") == [1, 0]
+
+    def test_shutdown_releases_the_control(self):
+        """App quit and aircraft change both arrive through on_shutdown()."""
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem())
+        instance.on_shutdown()
+
+        assert self.written_values("L:FFB_CYCLIC_ENABLED") == [1, 0]
+
+    def test_shutdown_never_raises(self):
+        """A failing cleanup write must not take the quit path down with it."""
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem())
+        with patch.object(type(instance), "_ffb_api_release", side_effect=RuntimeError("boom")):
+            instance.on_shutdown()
+
+    def test_shutdown_without_enable_writes_nothing(self):
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem(version=0))
+        instance.on_shutdown()
+
+        assert self.ffb_writes() == []
 
     def test_timeout_without_enable_writes_nothing(self):
         instance = self.make_instance()
         self.arm(instance, self.make_telem(version=0))
-        instance.ffb_api_on_timeout()
+        instance._ffb_api_release()
 
         assert self.ffb_writes() == []
 
@@ -622,97 +726,170 @@ class TestFFBApiEnabledLifecycle(FFBApiTestBase):
         enabled = [name for name, _ in self.ffb_writes() if name.endswith("_ENABLED")]
         assert enabled == [f"L:FFB_{control}_ENABLED"]
 
-
 # ───────────────────────────────────────────────────────────────
-# Vendor precedence at the dispatch sites (plan 4.3)
+# Containment: the API lives in one class and nowhere else
 # ───────────────────────────────────────────────────────────────
 
 
 @pytest.mark.unit
 @pytest.mark.msfs
 @pytest.mark.helicopter
-class TestFFBApiVendorPrecedence(FFBApiTestBase):
+class TestFFBApiContainment(FFBApiTestBase):
+    """L:FFB_* variables are global to the sim session, not per aircraft.
 
-    def _dispatch_cyclic(self, instance, telem):
-        """Run only MsfsXpHeliControlsMixIn.on_telemetry's dispatch."""
-        mro = type(instance).__mro__
-        idx = mro.index(MsfsXpHeliControlsMixIn)
-        nxt = next(c for c in mro[idx + 1:] if "on_telemetry" in c.__dict__)
-        with patch.object(nxt, "on_telemetry", lambda self, td: None):
-            MsfsXpHeliControlsMixIn.on_telemetry(instance, telem)
+    That is the whole reason activation is a class rather than a discovery latch: an
+    aircraft that does not implement the spec cannot clear variables it has never
+    heard of, so a rig that switched itself on from the L:var alone could drive the
+    wrong aircraft with the previous one's trim.  These tests pin the containment.
+    """
 
-    def _dispatch_collective_and_pedals(self, instance, telem):
-        """Run only Helicopter.on_telemetry's two dispatch sites."""
-        from telemffb.sim.msfs_xp.Aircraft import Aircraft
-        with patch.object(Aircraft, "on_telemetry", lambda self, td: None):
-            Helicopter.on_telemetry(instance, telem)
+    OTHER_HELI_CLASSES = [
+        Helicopter,
+        HPGHelicopter,
+        SASHelicopter,
+        CowanSimHelicopter,
+        TaogH500Helicopter,
+        XAW109Helicopter,
+    ]
 
-    @pytest.mark.parametrize("cls", [HPGHelicopter, SASHelicopter, XAW109Helicopter])
-    def test_vendor_cyclic_path_is_replaced_when_api_active(self, cls):
-        """These three drive cyclic trim from their own AFCS/SEMA state inline."""
+    #: Every control entry point the API class overrides.  Driving these directly
+    #: keeps the assertion on the API and off the generic effect chain.
+    CONTROL_PATHS = ["msfs_update_heli_controls", "msfs_update_collective", "msfs_update_pedals"]
+
+    @pytest.mark.parametrize("cls", OTHER_HELI_CLASSES)
+    @pytest.mark.parametrize("device,method", [
+        ("joystick", "msfs_update_heli_controls"),
+        ("collective", "msfs_update_collective"),
+        ("pedals", "msfs_update_pedals"),
+    ])
+    def test_other_classes_write_no_ffb_api_variable(self, cls, device, method):
+        """Even with every API variable present and valid in telemetry."""
+        instance = self.make_instance(cls, device=device)
+        telem = self.make_telem(
+            device=device,
+            ffbTrimCyclicRoll=0.25, ffbTrimCyclicPitch=0.25, ffbTrOnCyclic=1,
+            ffbTrimCollective=0.25, ffbTrimPedals=0.25,
+        )
+        self.set_telemetry(instance, telem)
+        getattr(instance, method)(telem)
+
+        api_writes = [w for w in self.ffb_writes() if "_ENABLED" in w[0] or "_FLY_THROUGH" in w[0]]
+        assert api_writes == []
+
+    @pytest.mark.parametrize("cls", OTHER_HELI_CLASSES)
+    def test_other_classes_have_no_api_state(self, cls):
+        """No inherited attributes, so no way to be switched on by accident."""
         instance = self.make_instance(cls)
+
+        assert not hasattr(instance, "_ffb_api_latched")
+        assert not hasattr(instance, "ffb_api_tr_spring_gain")
+
+    @pytest.mark.parametrize("cls", OTHER_HELI_CLASSES)
+    def test_other_classes_never_subscribe_the_api_vars(self, cls):
+        """subscribe_simvars is the only place the read vars are ever registered."""
+        instance = self.make_instance(cls)
+        instance.subscribe_simvars()
+
+        assert "ffbApiVersion" not in self.mock_simconnect.sv_dict
+
+    def test_api_class_does_subscribe_them(self):
+        """The counterpart to the above: the override is what puts them back."""
+        instance = self.make_instance()
+        instance.subscribe_simvars()
+
+        assert "ffbApiVersion" in self.mock_simconnect.sv_dict
+
+    def test_api_class_is_a_helicopter(self):
+        """It inherits the whole generic helicopter effect chain, and adds to it."""
+        assert issubclass(FFBApiHelicopter, Helicopter)
+
+    def test_hydraulic_injection_precedes_the_hydraulic_effect(self):
+        """Ordering requirement: HydSys must be in place before HydraulicLossMixIn reads it."""
+        from telemffb.sim.base.HydraulicLossMixIn import HydraulicLossMixIn
+
+        mro = FFBApiHelicopter.__mro__
+        assert mro.index(FFBApiHelicopter) < mro.index(HydraulicLossMixIn)
+
+
+# ───────────────────────────────────────────────────────────────
+# Control paths replace the generic ones only while the API is live
+# ───────────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestFFBApiControlPaths(FFBApiTestBase):
+
+    def test_cyclic_path_replaces_the_generic_one(self):
+        instance = self.make_instance()
         telem = self.make_telem(ffbTrimCyclicRoll=0.25)
         self.arm(instance, telem)
 
         called = []
-        instance.msfs_update_heli_controls = lambda td: called.append("vendor")
-        self._dispatch_cyclic(instance, telem)
+        with patch.object(Helicopter, "msfs_update_heli_controls",
+                          lambda self, td: called.append("generic")):
+            instance.msfs_update_heli_controls(telem)
 
         assert called == []
         assert instance.cpO_x == round(0.25 * 4096)
 
-    @pytest.mark.parametrize("cls", [HPGHelicopter, SASHelicopter, XAW109Helicopter])
-    def test_vendor_cyclic_path_still_runs_when_api_absent(self, cls):
-        instance = self.make_instance(cls)
-        telem = self.make_telem(version=0)
-        self.arm(instance, telem)
-
-        called = []
-        instance.msfs_update_heli_controls = lambda td: called.append("vendor")
-        self._dispatch_cyclic(instance, telem)
-
-        assert called == ["vendor"]
-
-    def test_mixed_enablement_runs_api_cyclic_and_vendor_collective(self):
-        """A user with an FFB cyclic but a normal collective needs no special case."""
-        instance = self.make_instance(HPGHelicopter, device="joystick")
-        telem = self.make_telem(device="joystick")
-        self.arm(instance, telem)
-
-        collective_calls = []
-        instance.msfs_update_collective = lambda td: collective_calls.append("vendor")
-        instance.msfs_update_pedals = lambda td: None
-        self._dispatch_collective_and_pedals(instance, telem)
-
-        # This instance owns CYCLIC, so COLLECTIVE is not ours to take over.
-        assert instance._ffb_api_active(FFB_API_COLLECTIVE) is False
-        assert collective_calls == ["vendor"]
-
-    def test_collective_dispatch_replaces_generic_path(self):
+    def test_collective_path_replaces_the_generic_one(self):
         instance = self.make_instance(device="collective")
         telem = self.make_telem(device="collective", ffbTrimCollective=0.25)
         self.arm(instance, telem)
 
         called = []
-        instance.msfs_update_collective = lambda td: called.append("generic")
-        instance.msfs_update_pedals = lambda td: None
-        self._dispatch_collective_and_pedals(instance, telem)
+        with patch.object(Helicopter, "msfs_update_collective",
+                          lambda self, td: called.append("generic")):
+            instance.msfs_update_collective(telem)
 
         assert called == []
         assert instance.cpO_y == round(-0.25 * 4096)
 
-    def test_pedal_dispatch_replaces_generic_path(self):
+    def test_pedal_path_replaces_the_generic_one(self):
         instance = self.make_instance(device="pedals")
         telem = self.make_telem(device="pedals", ffbTrimPedals=0.25)
         self.arm(instance, telem)
 
         called = []
-        instance.msfs_update_pedals = lambda td: called.append("generic")
-        instance.msfs_update_collective = lambda td: None
-        self._dispatch_collective_and_pedals(instance, telem)
+        with patch.object(Helicopter, "msfs_update_pedals",
+                          lambda self, td: called.append("generic")):
+            instance.msfs_update_pedals(telem)
 
         assert called == []
         assert instance.cpO_x == round(0.25 * 4096)
+
+    @pytest.mark.parametrize("device,method", [
+        ("joystick", "msfs_update_heli_controls"),
+        ("collective", "msfs_update_collective"),
+        ("pedals", "msfs_update_pedals"),
+    ])
+    def test_generic_path_runs_while_the_aircraft_is_still_silent(self, device, method):
+        """Configured but not yet publishing: behave exactly like a plain Helicopter."""
+        instance = self.make_instance(device=device)
+        telem = self.make_telem(device=device, version=0)
+        self.arm(instance, telem)
+
+        called = []
+        with patch.object(Helicopter, method, lambda self, td: called.append("generic")):
+            getattr(instance, method)(telem)
+
+        assert called == ["generic"]
+
+    def test_only_the_owned_control_is_taken_over(self):
+        """A user with an FFB cyclic but a normal collective needs no special case."""
+        instance = self.make_instance(device="joystick")
+        telem = self.make_telem(device="joystick")
+        self.arm(instance, telem)
+
+        called = []
+        with patch.object(Helicopter, "msfs_update_collective",
+                          lambda self, td: called.append("generic")):
+            instance.msfs_update_collective(telem)
+
+        assert instance._ffb_api_active(FFB_API_COLLECTIVE) is False
+        assert called == ["generic"]
 
 
 # ───────────────────────────────────────────────────────────────
@@ -730,7 +907,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
         instance.telemffb_controls_axes = False
         telem = self.make_telem(ffbTrimCyclicRoll=0.5)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert self.mock_simconnect.sent_events == []
 
@@ -762,7 +939,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
             CyclicTrimX=100.0, CyclicTrimY=100.0,
         )
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         lateral = [
             value for name, value in self.mock_simconnect.sent_events
@@ -785,6 +962,65 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
         instance.cyclic_spring_init = 1
         telem = self.make_telem(ffbTrimCyclicRoll=0.3)
         self.arm(instance, telem)
-        instance._ffb_api_update_cyclic(telem)
+        instance.msfs_update_heli_controls(telem)
 
         assert instance.cpO_x == round(0.3 * 4096)
+
+
+# ───────────────────────────────────────────────────────────────
+# Settings containment (defaults.xml)
+# ───────────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+class TestFFBApiSettingsScope:
+    """The ffb_api_* knobs must not appear on aircraft that are not FFBApiHelicopter.
+
+    The whole mechanism is the *absence* of <value> on the <defaults> row: a row with
+    no baseline default is dropped unless a <classdefaults_{sim}> entry supplies one for
+    that aircraft's class.  Re-adding a single <value> would silently surface every one
+    of these on every MSFS aircraft, with nothing else failing - hence this test.
+    """
+
+    OWNER = "FFBApiHelicopter"
+
+    @pytest.fixture(scope="class")
+    def root(self):
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+        return ET.parse(str(Path(__file__).parents[1] / "defaults.xml")).getroot()
+
+    def _rows(self, root):
+        return [d for d in root.findall(".//defaults")
+                if (d.findtext("name") or "").startswith("ffb_api_")]
+
+    def _class_defaults(self, root):
+        return [cd for cd in root.iter()
+                if cd.tag.startswith("classdefaults_")
+                and (cd.findtext("name") or "").startswith("ffb_api_")]
+
+    def test_rows_exist(self, root):
+        """Guard the guard: a rename must not turn these tests into no-ops."""
+        assert len(self._rows(root)) == 8
+
+    def test_no_row_carries_a_baseline_value(self, root):
+        offenders = [d.findtext("name") for d in self._rows(root)
+                     if d.find("value") is not None]
+        assert offenders == [], (
+            f"{offenders} carry a <value>, which makes them visible on every MSFS "
+            f"aircraft.  Supply the value from <classdefaults_MSFS> typed "
+            f"{self.OWNER} instead."
+        )
+
+    def test_every_row_is_reachable_from_the_owning_class(self, root):
+        """The other half: no value anywhere means the setting is dead, not scoped."""
+        defined = {d.findtext("name") for d in self._rows(root)}
+        supplied = {cd.findtext("name") for cd in self._class_defaults(root)
+                    if cd.findtext("type") == self.OWNER}
+        assert defined - supplied == set()
+
+    def test_no_other_class_supplies_them(self, root):
+        strays = {(cd.findtext("name"), cd.findtext("type"))
+                  for cd in self._class_defaults(root)
+                  if cd.findtext("type") != self.OWNER}
+        assert strays == set()
