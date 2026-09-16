@@ -20871,7 +20871,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the FlyInsideHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The rotor RPM source this class reads is specific to each aircraft and only a clone carries it, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -20991,7 +20991,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the FlyInsideHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The rotor RPM source this class reads is specific to each aircraft and only a clone carries it, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -21027,7 +21027,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the FlyInsideHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The rotor RPM source this class reads is specific to each aircraft and only a clone carries it, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>max_aileron_coeff</name>
@@ -22059,7 +22059,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The hydraulic switch source is specific to the R66 and only a clone carries it.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>

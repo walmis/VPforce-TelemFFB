@@ -899,6 +899,15 @@ class TestClassScopedScOverrides:
         assert rows["EngRPM"]["source"] == "user"
         assert rows["EngRPM"]["scope"] == "model"
 
+    def test_with_no_sim_known_nothing_is_guessed(self, xml_tmpdir, monkeypatch):
+        """No caller sim and no current sim: the class layer is skipped
+        rather than read for a sim picked out of the air, and model rows
+        are read whatever sim they name, as before the class layer."""
+        monkeypatch.setattr(G, "settings_mgr", None, raising=False)
+        assert xmlutils.read_sc_overrides("Piper Cub", cls="PropellerAircraft") == []
+        names = set(self._by_name(xmlutils.read_sc_overrides("Cessna 172", cls="PropellerAircraft")))
+        assert names == {"EngRPM", "OilPress"}
+
     def test_a_class_row_in_the_user_config_is_not_read(self, xml_tmpdir):
         """There is no user class layer: telemetry sources are not something
         a user configures per class, and nothing in the application writes

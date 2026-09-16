@@ -280,8 +280,10 @@ class ConfigResolver:
         otherwise it is resolved for ``sim`` (the current one by default).
         With no type row naming the aircraft, the most specific override
         pattern stands in, as a settings-only pattern does for settings.
-        With no sim known at all, nothing is guessed: rows are read
-        whatever sim they name, as every row was before rows carried one."""
+        With no sim known at all, nothing is guessed: model rows are read
+        whatever sim they name, as every row was before rows carried one,
+        and the class layer is skipped, since a class row means nothing
+        without a sim."""
         if not sim:
             current = getattr(getattr(G, 'settings_mgr', None), 'current_sim', None)
             sim = current if isinstance(current, str) and current else None
@@ -290,7 +292,7 @@ class ConfigResolver:
         if not identity:
             identity = (self.get_pattern_by_sim_fullname(sim, aircraft_name)
                         or xmatch.best_pattern([p for p, _ in def_rows + usr_rows], aircraft_name))
-        layers = [self._read_class_sc_overrides(cls, sim)] if cls else []
+        layers = [self._read_class_sc_overrides(cls, sim)] if cls and sim else []
         layers.append([r for p, r in def_rows if p == identity])
         layers.append([r for p, r in usr_rows if p == identity])
         return xmmerge.merge_sc_override_layers(*layers)
