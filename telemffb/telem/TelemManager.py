@@ -35,6 +35,7 @@ import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.utils import dbprint
 import telemffb.xmlutils as xmlutils
+from telemffb import match_history
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
@@ -144,6 +145,7 @@ class TelemManager(QObject, threading.Thread):
         self._sim_exit_signaled = False   # True after notify_sim_exited fires; prevents re-entrancy until reset_sim_connected() clears it
         self._process_check_deadline: Optional[float] = None  # perf_counter() timestamp of the next scheduled process check; None when inactive
         self._device_swap_attempt = None  # (aircraft, devpath) already requested - one attempt per aircraft
+        self._last_aircraft_info = None   # the last frame's aircraft, for a config reload while the sim is paused
 
 
     def set_paused(self, pause_state: bool = False):
@@ -199,6 +201,7 @@ class TelemManager(QObject, threading.Thread):
             self.currentAircraft = None
         self.currentAircraftName = None
         self.currentDataSource = None
+        self._last_aircraft_info = None
         self.sim_exited.emit(src)
 
     def set_simconnect(self, sc : SimConnectManager):
@@ -245,8 +248,6 @@ class TelemManager(QObject, threading.Thread):
                 input_modeltype = input[1]
             else:
                 the_sim = send_source
-            ptrn = xmlutils.get_pattern_by_sim_fullname(the_sim, aircraft_name)
-
             cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.device_type)
             active_profile = xmlutils.get_active_profile_for_model(the_sim, cls_name, pattern)
             #globals.settings_mgr.current_pattern = pattern
@@ -279,12 +280,59 @@ class TelemManager(QObject, threading.Thread):
                 current_class=cls_name,
                 current_pattern=pattern,
                 active_profile=active_profile)
+            self._note_profile_change(the_sim, aircraft_name, pattern, active_profile)
 
             return params, cls_name
 
             # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
         except Exception as e:
             logging.exception(f"Error getting settings from Settings Manager:{e}")
+
+    def _note_profile_change(self, sim, aircraft_name, pattern, active_profile):
+        """The one collision the merge offer exists for: a type pattern of
+        the user's and a shipped one both match this aircraft.  Left on the
+        settings manager for the main window's prompt, and recomputed on
+        every resolution, so an answered or merged pair drops off by
+        itself.  The master records which pattern named the aircraft; a
+        child instance resolves the same one and must not write it."""
+        try:
+            G.settings_mgr.profile_change = self._collision_offer(sim, aircraft_name) if pattern else None
+            if pattern and G.master_instance:
+                match_history.record_match(sim, aircraft_name, pattern)
+        except Exception:
+            logging.exception("Could not check the aircraft's profile against the patterns it matches")
+
+    def recheck_profile_offer(self) -> None:
+        """Recompute the collision offer for the loaded aircraft from what the
+        settings manager holds, without re-resolving anything.  For a change
+        to the record alone - a decline forgotten - which alters nothing about
+        the aircraft.  Works even while a full re-resolve is pending and the
+        loop's own aircraft name is cleared."""
+        sm = G.settings_mgr
+        sim, name, pattern = sm.current_sim, sm.current_aircraft_name, sm.current_pattern
+        try:
+            sm.profile_change = self._collision_offer(sim, name) if (sim and name and pattern) else None
+        except Exception:
+            logging.exception("Could not recheck the aircraft's profile against the patterns it matches")
+
+    def _collision_offer(self, sim, aircraft_name):
+        col = xmlutils.collision(sim, aircraft_name)
+        if not col:
+            return None
+        # A decline was given against the built-in as it stood then; if the
+        # shipped profile has changed since, the pair is open again.
+        shipped = match_history.fingerprint(
+            xmlutils.curated_rows_for_fingerprint(sim, col['curated']))
+        if match_history.resolution(sim, col['user'], col['curated'], shipped):
+            return None
+        # A broader pattern of the user's may be the only thing naming some
+        # other aircraft, so a merge from it copies and leaves it; one that
+        # claims exactly what the built-in claims is dead weight after, and
+        # moves.  When theirs wins, merging is a choice to give it up.
+        keep = col['winner'] == 'curated' and not col['same_claim']
+        return {'sim': sim, 'aircraft': aircraft_name, 'user': col['user'], 'curated': col['curated'],
+                'winner': col['winner'], 'same_claim': col['same_claim'], 'keep': keep,
+                'shipped': shipped}
 
     def quit(self):
         self._run = False
@@ -476,7 +524,7 @@ class TelemManager(QObject, threading.Thread):
             data_source=data_source,
             module=module,
             sc_aircraft_type=sc_aircraft_type,
-            sc_engine_type=sc_engine_type
+            sc_engine_type=sc_engine_type,
         )
 
     def _handle_aircraft_changes(self, aircraft_info: AircraftInfo, telem_data: BaseTelemetryData):
@@ -487,6 +535,7 @@ class TelemManager(QObject, threading.Thread):
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                 self._initialize_new_aircraft(aircraft_info, telem_data)
             self.currentAircraftName = aircraft_name
+        self._last_aircraft_info = aircraft_info
 
     def _initialize_new_aircraft(self, aircraft_info: AircraftInfo, telem_data: BaseTelemetryData):
         """Initialize a new aircraft when it changes."""
@@ -686,7 +735,7 @@ class TelemManager(QObject, threading.Thread):
     def _setup_simconnect_overrides(self, aircraft_name, data_source):
         """Setup SimConnect variable overrides for MSFS aircraft."""
         if data_source == "MSFS" and aircraft_name:
-            overrides = xmlutils.read_sc_overrides(aircraft_name)
+            overrides = xmlutils.read_sc_overrides(aircraft_name, sim=data_source)
             for sv in overrides:
                 self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
             self._simconnect._resubscribe()
@@ -696,7 +745,7 @@ class TelemManager(QObject, threading.Thread):
         if data_source == "XPLANE" and aircraft_name != '':
             if not getattr(self, "_socket", None):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-            d1 = xmlutils.read_sc_overrides(aircraft_name)
+            d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source)
             for sv in d1:
                 scale = self._xplane_conversion(sv['scale'], sv['name'])
                 sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={scale}"
@@ -1018,6 +1067,14 @@ class TelemManager(QObject, threading.Thread):
                 if not self._events and not self._data:
                     if not self._cond.wait(self.timeout_sec):
                         self._safe_call("on_timeout", self.on_timeout)
+                        # A paused sim sends no frames, and a profile edit
+                        # (the new-aircraft wizard included) must not wait
+                        # for one: re-check the config against the last
+                        # frame's aircraft.
+                        info = self._last_aircraft_info
+                        if info is not None and self.currentAircraft is not None:
+                            self._safe_call("_handle_config_changes",
+                                            lambda: self._handle_config_changes(info))
 
                         # Arm the process-check deadline on the first timeout.
                         # The _PROCESS_CHECK_DELAY grace period lets us ignore brief

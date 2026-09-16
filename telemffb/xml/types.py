@@ -74,6 +74,7 @@ class ScOverrideEntry(TypedDict):
     sc_unit: str
     scale: str
     source: str
+    sim: str            # '' on a row written before rows carried one: any sim
 
 
 class PrereqEntry(TypedDict):

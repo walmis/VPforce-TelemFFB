@@ -44,6 +44,10 @@ class SettingsManager(QObject):
         self.current_aircraft_name = ""
         self.current_pattern = ""
         self.active_profile = None
+        # Set when the pattern naming the loaded aircraft differs from
+        # the one recorded at its last load; the main window offers to
+        # copy the old profile's rows across and then clears it.
+        self.profile_change = None
         self.device = device
 
         # offline state variables
