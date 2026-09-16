@@ -799,6 +799,12 @@ class TelemManager(QObject, threading.Thread):
 
     def _recreate_aircraft_with_new_type(self, aircraft_info: AircraftInfo, params, cls_name):
         """Recreate aircraft instance when type changes."""
+        # The class changed under a live aircraft, so the outgoing handler is finished
+        # even though the aircraft itself has not changed and no timeout fired.  This is
+        # the path a user takes to opt *out* of a class, so it is exactly when a handler
+        # holding sim-side state has to clear it - otherwise that state is inherited by
+        # a class that knows nothing about it.  No-ops when currentAircraft is None.
+        self._retire_current_aircraft()
         Aircraft_Class = getattr(aircraft_info.module, cls_name, None)
         self.currentAircraft = Aircraft_Class(aircraft_info.name)
         self.currentAircraft.apply_settings(params)

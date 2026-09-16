@@ -9236,13 +9236,6 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>force_trim_button</name>
-			<type>FFBApiHelicopter</type>
-			<value>0</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>force_trim_button</name>
 			<type>HPGHelicopter</type>
 			<value>0</value>
 			<sim>MSFS</sim>
@@ -11354,13 +11347,6 @@
 			<value>0.2</value>
 			<sim>MSFS</sim>
 			<device>any</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>telemffb_controls_axes</name>
-			<type>FFBApiHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>trimwheel</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>vrs_effect_enable</name>

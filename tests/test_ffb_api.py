@@ -1119,10 +1119,20 @@ class TestFFBApiSettingsScope:
                 and (cd.findtext("type") or "").lstrip("!") == cls
                 and cd.findtext("name") != "type"}
 
+    def _excluded(self, root):
+        return {(cd.findtext("name"), cd.findtext("device")) for cd in root.iter()
+                if cd.tag == "classdefaults_MSFS"
+                and cd.findtext("type") == f"!{self.OWNER}"}
+
     def test_inherits_every_base_class_default(self, root):
         base = self._msfs_rows(root, self.BASE)
         mine = self._msfs_rows(root, self.OWNER)
-        missing = {r for r in base - mine if (r[0], r[2]) not in self.EXPECTED_DIVERGENCE}
+        # A value this class excludes is not "missing" - the exclusion supersedes it,
+        # and carrying both would be the dead-code pairing the test below rejects.
+        excluded = self._excluded(root)
+        missing = {r for r in base - mine
+                   if (r[0], r[2]) not in self.EXPECTED_DIVERGENCE
+                   and (r[0], r[2]) not in excluded}
         assert missing == set(), (
             f"{self.OWNER} is missing {sorted(missing)} that {self.BASE} defines. "
             f"classdefaults are keyed by class name, so a subclass inherits none of "
@@ -1180,6 +1190,42 @@ class TestFFBApiSettingsScope:
                 and cd.findtext("device") == device]
         assert len(rows) == 1
         assert rows[0].findtext("value") == "false"
+
+    def test_effect_dict_names_real_settings(self, root):
+        """The slider matcher is a substring test, so a wrong name fails silently.
+
+        MainWindow highlights a slider when the effect_dict setting name is a substring
+        of the slider's object name.  Pointing these at the generic gains happened to
+        work for cyclic and pedals ('cyclic_spring_gain' is inside
+        'ffb_api_cyclic_spring_gain') but silently failed for the collective, whose
+        generic name is collective_ap_spring_gain and is *not* a substring of
+        ffb_api_collective_spring_gain.  Name the real settings instead of relying on
+        the coincidence.
+        """
+        from telemffb.utils import EffectTranslator
+
+        defined = {d.findtext("name") for d in root.findall(".//defaults")}
+        for effect in ("ffb_api_cyclic_spring", "ffb_api_collective_spring",
+                       "ffb_api_pedal_spring"):
+            _label, setting = EffectTranslator.effect_dict[effect]
+            assert setting == f"{effect}_gain"
+            assert setting in defined, f"{setting} is not a setting in defaults.xml"
+            assert hasattr(FFBApiHelicopter, setting), f"the class never reads {setting}"
+
+    def test_no_setting_is_both_excluded_and_supplied(self, root):
+        """A positive row for an excluded name is dead code, not an override.
+
+        read_default_class_data applies removals before the class values are merged,
+        and the merge is update-only, so it cannot re-add a removed name.
+        """
+        rows = [cd for cd in root.iter()
+                if cd.tag == "classdefaults_MSFS"
+                and (cd.findtext("type") or "").lstrip("!") == self.OWNER]
+        excluded = {(r.findtext("name"), r.findtext("device"))
+                    for r in rows if (r.findtext("type") or "").startswith("!")}
+        supplied = {(r.findtext("name"), r.findtext("device"))
+                    for r in rows if not (r.findtext("type") or "").startswith("!")}
+        assert excluded & supplied == set()
 
     def test_spring_mode_is_excluded(self, root):
         """Everything else spring-related is a prereq child of spring_mode."""
@@ -1266,6 +1312,30 @@ class TestAircraftRetirement:
         aircraft.on_shutdown.assert_called_once_with()
         assert mgr.currentAircraft is None
         assert mgr.currentAircraftName is None
+
+    def test_in_place_class_change_retires_the_handler(self, mgr):
+        """The documented opt-out path: switch the class, keep the same aircraft.
+
+        _recreate_aircraft_with_new_type runs when only `type` changed, so the aircraft
+        never "changes" and no timeout fires.  Without a retire here, switching
+        FFBApiHelicopter -> Helicopter leaves L:FFB_<CONTROL>_ENABLED at 1 on an
+        aircraft whose new class never writes that variable - the stale-L:var leak the
+        dedicated class exists to prevent, through the one path that opts out of it.
+        """
+        from telemffb.telem.TelemManager import TelemManager
+
+        outgoing = MagicMock()
+        mgr.currentAircraft = outgoing
+        info = MagicMock()
+        info.name = "TestHeli"
+        info.data_source = "MSFS"
+        info.module = MagicMock()
+
+        with patch.object(TelemManager, "_stamp_trim_cal_availability"):
+            mgr._recreate_aircraft_with_new_type(info, {}, "Helicopter")
+
+        outgoing.on_shutdown.assert_called_once_with()
+        assert mgr.currentAircraft is not outgoing
 
     def test_sim_exit_retires_the_handler(self, mgr):
         """notify_sim_exited must release before the effect sweep, not instead of it."""

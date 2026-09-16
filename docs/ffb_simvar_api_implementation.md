@@ -787,7 +787,7 @@ all — the property `TestFFBApiContainment` exists to keep true.
 
 ### Verified
 
-Full suite after merging the baseline: **2612 passed, 2 skipped**. One unrelated
+Full suite after merging the baseline: **2615 passed, 2 skipped**. One unrelated
 failure, `test_updater_backup.py::TestWaitForAppExit::test_returns_when_no_instances`,
 calls the real `tasklist` without mocking `subprocess`, so `result.stdout` is `None`
 in this environment. It comes in with the baseline and is untouched by this work.
