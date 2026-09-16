@@ -154,9 +154,13 @@ class SettingsManager(QObject):
 
     def write_to_xml(self, sim, class_name, model, value, setting, unit='', the_device='', scope='MODEL'):
         if not self.offline_mode:
-
+            if not model:
+                # An aircraft nothing names has no profile to hold a change.
+                # The form is read-only in that state; this is the backstop,
+                # since an exception here would escape a Qt slot.
+                logging.warning(f"No profile names the loaded aircraft; not writing {setting}")
+                return
             xmlutils.write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device, profile_name=self.active_profile)
-
             return
         else:
             match self.offline_scope:
@@ -173,6 +177,9 @@ class SettingsManager(QObject):
 
     def erase_from_xml(self, sim, class_name, model, setting, the_device=''):
         if not self.offline_mode:
+            if not model:
+                logging.warning(f"No profile names the loaded aircraft; nothing to erase for {setting}")
+                return
             xmlutils.erase_models_from_xml(sim, model, setting, the_device=the_device, profile_name=self.active_profile)
             return
         else:

@@ -19,6 +19,7 @@
 
 import inspect
 import json
+import html
 import logging
 import os
 import re
@@ -71,6 +72,7 @@ class SettingsLayout(QGridLayout):
         self.exclusive_list = []
         self.parent_expander_dict = {}
         self.revert_targets = {}  # per-setting: value the setting resolves to without the user override
+        self.unit_previous_values = {}  # Track previous unit for conversion; build_rows below reads it
         result = None
         if G.settings_mgr.current_sim != 'nothing':
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
@@ -87,7 +89,6 @@ class SettingsLayout(QGridLayout):
         self.adv_spr_dialog = None
         self.advanced_g_settings = None
         self.adv_g_dialog = None
-        self.unit_previous_values = {}  # Track previous unit for conversion
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -465,6 +466,16 @@ class SettingsLayout(QGridLayout):
         self.get_parent_indent(sorted_data)
         newlist = self.eliminate_invisible(sorted_data)
 
+        # With no profile to hold a change, every row is built disabled and
+        # says so in its tooltip; row 0 explains once and offers the wizard.
+        # Trim calibration is hidden in this state for the same reason.
+        missing = self._profile_missing()
+        if missing:
+            for item in newlist:
+                item['force_disabled'] = True
+                item['disabled_reason'] = ("This aircraft has no profile, so this setting cannot "
+                                           "be changed. Create a new profile or clone one.")
+
         def is_expanded(item):
             if item['name'] in self.expanded_items:
                 return True
@@ -473,7 +484,7 @@ class SettingsLayout(QGridLayout):
                     return True
             return False
 
-        i = 0
+        i = 1 if missing else 0         # leave row 0 to the notice
         for item in newlist:
             bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             rowdisabled = bool(item.get('force_disabled', False))
@@ -489,6 +500,14 @@ class SettingsLayout(QGridLayout):
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
+
+        if missing:
+            # The per-row flag greys the value widgets and sets the tooltip;
+            # this catches everything else on the form - erase buttons, enum
+            # dropdowns, whatever a later row type adds - so nothing on it can
+            # write.  The notice goes in afterward, so its button stays live.
+            self._disable_every_widget(self)
+            self._build_no_profile_notice()
 
         # set expander column minimum size so it does not shrink and shift layout when no expanders are visible
         self.setColumnMinimumWidth(0, 30)
@@ -643,6 +662,41 @@ class SettingsLayout(QGridLayout):
             area.verticalScrollBar().setValue(new_y - target_y)
         except Exception:
             logging.exception("scroll-anchor restore failed")
+
+    def _profile_missing(self) -> bool:
+        """An aircraft is loaded and nothing names it.  The form can show
+        the defaults it flies with, but a change would have no profile to
+        land in.  Offline editing picks its own scope and is never in this
+        state; with no aircraft loaded there is nothing to show at all."""
+        sm = G.settings_mgr
+        return (not getattr(sm, 'offline_mode', False)
+                and bool(getattr(sm, 'current_aircraft_name', ''))
+                and not getattr(sm, 'current_pattern', ''))
+
+    @classmethod
+    def _disable_every_widget(cls, layout):
+        """Disable every widget in a layout, descending into sub-layouts:
+        sliders and their buttons sit in nested rows of their own."""
+        for n in range(layout.count()):
+            item = layout.itemAt(n)
+            widget, sub = item.widget(), item.layout()
+            if widget is not None:
+                widget.setDisabled(True)
+            elif sub is not None:
+                cls._disable_every_widget(sub)
+
+    def _build_no_profile_notice(self):
+        """Row 0, above the disabled settings: why they cannot be changed.
+        The way to change that is the prompt the main window already shows
+        above the tabs, so it is not repeated here."""
+        name = html.escape(str(G.settings_mgr.current_aircraft_name))
+        notice = QLabel(
+            f"<b>{name}</b> does not have a profile and is using the default settings, "
+            f"which cannot be modified. Create a new profile or clone from an existing one "
+            f"to adjust settings.")
+        notice.setTextFormat(Qt.TextFormat.RichText)
+        notice.setWordWrap(True)
+        self.addWidget(notice, 0, 1, 1, 6)
 
     def _build_empty_notice(self):
         """Populate the (empty) layout with guidance instead of leaving the

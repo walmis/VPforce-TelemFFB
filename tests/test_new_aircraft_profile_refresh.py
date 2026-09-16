@@ -223,3 +223,114 @@ class TestSimStatusLeavesTheProfileComboAlone:
         w = self._widget(monkeypatch)
         w.set_profile_state(True)
         assert w.cb_selectProfileCombo.isEnabled() is True
+
+class TestNoProfileToWriteTo:
+    """An MSFS aircraft nothing names is auto-classified and flies the class
+    defaults.  A change then has no profile to land in: the funnel must
+    refuse quietly, because it is reached from a slider's Qt slot."""
+
+    def _mgr(self):
+        from telemffb.SettingsManager import SettingsManager
+        sm = SettingsManager.__new__(SettingsManager)
+        sm.offline_mode = False
+        sm.active_profile = None
+        return sm
+
+    def test_a_write_with_no_pattern_is_refused_not_raised(self, monkeypatch):
+        written = []
+        monkeypatch.setattr(xmlutils, 'write_models_to_xml', lambda *a, **k: written.append(a))
+        self._mgr().write_to_xml('MSFS', 'Helicopter', '', '0.01', 'trim_release_spring_gain')
+        assert written == []
+
+    def test_an_erase_with_no_pattern_is_refused_not_raised(self, monkeypatch):
+        erased = []
+        monkeypatch.setattr(xmlutils, 'erase_models_from_xml', lambda *a, **k: erased.append(a))
+        self._mgr().erase_from_xml('MSFS', 'Helicopter', '', 'trim_release_spring_gain')
+        assert erased == []
+
+    def test_a_write_with_a_pattern_still_goes_through(self, monkeypatch):
+        written = []
+        monkeypatch.setattr(xmlutils, 'write_models_to_xml', lambda *a, **k: written.append(a))
+        self._mgr().write_to_xml('MSFS', 'Helicopter', 'Hoist.*', '0.01', 'trim_release_spring_gain')
+        assert len(written) == 1
+
+
+class TestSettingsFormWithoutProfile:
+    """The form still shows what the aircraft flies with, but nothing on it
+    can be changed until a profile names the aircraft."""
+
+    @pytest.fixture
+    def form(self, qt_app, monkeypatch, tmp_path):
+        from PyQt6 import QtWidgets
+        import pathlib
+        defaults = pathlib.Path(__file__).resolve().parents[1] / "defaults.xml"
+        user = tmp_path / "userconfig_v2.xml"
+        user.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<TelemFFB>\n</TelemFFB>\n')
+        monkeypatch.setattr(G, 'userconfig_path', str(user), raising=False)
+        monkeypatch.setattr(G, 'defaults_path', str(defaults), raising=False)
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        monkeypatch.setattr(G, 'useDarkMode', False, raising=False)
+        monkeypatch.setattr(G, 'system_settings', {}, raising=False)
+        xmlutils.update_vars('joystick', str(user), str(defaults))
+        xmlutils.update_roots()
+        # the real manager: the form calls its enum and setting readers
+        from telemffb.SettingsManager import SettingsManager
+        sm = SettingsManager(datasource='MSFS', device='joystick',
+                             userconfig_path=str(user), defaults_path=str(defaults))
+        sm.update_state_vars(current_sim='MSFS', current_class='Helicopter',
+                             current_aircraft_name='Mystery Rotorcraft', current_pattern='')
+        monkeypatch.setattr(G, 'settings_mgr', sm, raising=False)
+        from telemffb.SettingsLayout import SettingsLayout
+
+        from telemffb.custom_widgets import NoKeyScrollArea
+
+        def build(pattern):
+            sm.current_pattern = pattern
+            # the form reaches three parents up for the scroll area that
+            # collects its sliders, so nest it the way the window does
+            area = NoKeyScrollArea()
+            host = QtWidgets.QWidget()
+            area.setWidget(host)
+            layout = SettingsLayout(parent=host, mainwindow=None)
+            layout.reload_layout(None)
+            build.keep = (area, host)          # hold the ancestry alive
+            return layout
+        return build
+
+    @staticmethod
+    def _inputs(layout):
+        """Every widget a user could act on, wherever the form nests it."""
+        from PyQt6 import QtWidgets
+        kinds = (QtWidgets.QSlider, QtWidgets.QAbstractButton, QtWidgets.QComboBox, QtWidgets.QLineEdit)
+        found = []
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            if item.widget() is not None and isinstance(item.widget(), kinds):
+                found.append(item.widget())
+            elif item.layout() is not None:
+                found.extend(TestSettingsFormWithoutProfile._inputs(item.layout()))
+        return found
+
+    def test_every_input_is_disabled_when_nothing_names_the_aircraft(self, form, monkeypatch):
+        monkeypatch.setattr(xmlutils, 'read_single_model',
+                            lambda sim, name, cls='', dev='', active_profile=None:
+                            xmlutils._resolver().resolve(sim, name, cls, dev or 'joystick'))
+        layout = form('')
+        inputs = self._inputs(layout)
+        assert inputs, "the form should still show the defaults the aircraft flies with"
+        assert all(not w.isEnabled() for w in inputs)
+
+    def test_inputs_come_back_once_a_pattern_names_it(self, form, monkeypatch):
+        monkeypatch.setattr(xmlutils, 'read_single_model',
+                            lambda sim, name, cls='', dev='', active_profile=None:
+                            xmlutils._resolver().resolve(sim, name, cls, dev or 'joystick'))
+        # what the wizard writes: a type row and a profile mapping, after
+        # which the form resolves the pattern for itself
+        xmlutils.write_models_to_xml('MSFS', 'Mystery.*', 'Helicopter', 'type', '', 'joystick', 'User Default')
+        xmlutils.update_active_profile_entry('MSFS', 'Helicopter', 'Mystery.*', 'User Default')
+        xmlutils.update_roots()
+        layout = form('')
+        assert G.settings_mgr.current_pattern == 'Mystery.*'
+        inputs = self._inputs(layout)
+        assert inputs and any(w.isEnabled() for w in inputs)
