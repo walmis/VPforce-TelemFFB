@@ -858,10 +858,19 @@ class TelemManager(QObject, threading.Thread):
                 self.gain_overrides_active = False
                 G.main_window.refresh_scope_status_indicators(force=True)
 
+    def _current_class_name(self) -> Optional[str]:
+        """The class the loaded aircraft actually resolved to - what its
+        class-scoped overrides are keyed on.  The stored ``type`` string is
+        not enough: an unmapped MSFS aircraft lands on a generic class by
+        engine type, and that class's rows must apply too."""
+        aircraft = getattr(self, 'currentAircraft', None)
+        return type(aircraft).__name__ if aircraft is not None else None
+
     def _setup_simconnect_overrides(self, aircraft_name, data_source):
         """Setup SimConnect variable overrides for MSFS aircraft."""
         if data_source == "MSFS" and aircraft_name:
-            overrides = xmlutils.read_sc_overrides(aircraft_name, sim=data_source)
+            overrides = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
+                                                   cls=self._current_class_name())
             for sv in overrides:
                 self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
             self._simconnect._resubscribe()
@@ -871,7 +880,8 @@ class TelemManager(QObject, threading.Thread):
         if data_source == "XPLANE" and aircraft_name != '':
             if not getattr(self, "_socket", None):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-            d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source)
+            d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
+                                            cls=self._current_class_name())
             for sv in d1:
                 scale = self._xplane_conversion(sv['scale'], sv['name'])
                 sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={scale}"

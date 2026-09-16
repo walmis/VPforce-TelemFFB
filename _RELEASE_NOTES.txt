@@ -37,6 +37,10 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - The wizard opens already filled in for the loaded aircraft, suggesting match strings built from its name so you can decide how much of the name to keep.  Leaving part of it off keeps a family of liveries or variants together on one profile
   - Then it asks what the new profile should start from.  Inherit copies the settings and overrides of the profile that matched, which is what you want when the aircraft is close to its neighbors and needs a few changes.  New model starts with nothing but its class, for an aircraft that was matched by the wrong profile in the first place
   - The button is available only once a profile actually names the aircraft.  With no match there is nothing to fork, and the wizard fires on its own
+- **NEW: Telemetry sources can belong to an aircraft class**
+  - A SimConnect or dataref override can now be keyed by aircraft class instead of by aircraft name.  Every aircraft resolved to that class subscribes it, so a special class carries the telemetry its code reads without a shipped profile having to be cloned
+  - The SAS, Taog H500 and X-Trident AW109 classes no longer require cloning a shipped profile in the New Aircraft Wizard.  HPG and FlyInside still do, because some of their variables differ per aircraft
+  - Your own overrides are untouched and still win over anything shipped.  The overrides editor shows class rows grayed out beside the aircraft's own; it adds and removes rows for the loaded aircraft only
 - **NEW: Effect previews - feel an effect at your configured strength without flying**
   - Accessible via Offline Editor only - use the new Offline/Preview mode button to quickly enter offline mode for an actively loaded aircraft.
   - A play button (>) next to each effect's intensity slider in the offline editor plays that effect on the device from synthesized telemetry. Tune most effects in isolation, without needing to replicate flying conditions where they occur.

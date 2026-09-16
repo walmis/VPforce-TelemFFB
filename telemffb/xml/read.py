@@ -263,17 +263,25 @@ class ConfigResolver:
                                       instance_device, user, profile, identity)
 
     def read_sc_overrides(self, aircraft_name: str, identity: Optional[str] = None,
-                          sim: Optional[str] = None) -> list[ScOverrideRow]:
-        """The SimConnect overrides of the pattern that names the aircraft,
-        like any other setting: the shipped ones for that pattern, the
-        user's under the same pattern replacing them by name, and nothing
-        from any other pattern.  ``identity`` is that pattern when the
-        caller knows it; otherwise it is resolved for ``sim`` (the current
-        one by default).  With no type row naming the aircraft, the most
-        specific override pattern stands in, as a settings-only pattern
-        does for settings.  With no sim known at all, nothing is guessed:
-        rows are read whatever sim they name, as every row was before rows
-        carried one."""
+                          sim: Optional[str] = None, cls: Optional[str] = None) -> list[ScOverrideRow]:
+        """The SimConnect overrides an aircraft flies with, in three layers,
+        each replacing the one before by name:
+
+        1. the shipped rows of its class, ``cls``, which is how a class
+           carries the telemetry sources its code reads, so an aircraft
+           assigned to the class in the wizard gets them without a clone;
+        2. the shipped rows of the pattern that named the aircraft, and
+           nothing from any other pattern, like any other setting;
+        3. the user's rows under that same pattern.
+
+        There is no user class layer.  Nothing in the application writes
+        one, and telemetry sources are not something a user configures per
+        class.  ``identity`` is the naming pattern when the caller knows it;
+        otherwise it is resolved for ``sim`` (the current one by default).
+        With no type row naming the aircraft, the most specific override
+        pattern stands in, as a settings-only pattern does for settings.
+        With no sim known at all, nothing is guessed: rows are read
+        whatever sim they name, as every row was before rows carried one."""
         if not sim:
             current = getattr(getattr(G, 'settings_mgr', None), 'current_sim', None)
             sim = current if isinstance(current, str) and current else None
@@ -282,8 +290,10 @@ class ConfigResolver:
         if not identity:
             identity = (self.get_pattern_by_sim_fullname(sim, aircraft_name)
                         or xmatch.best_pattern([p for p, _ in def_rows + usr_rows], aircraft_name))
-        return xmmerge.update_sc_overrides_with_user([r for p, r in def_rows if p == identity],
-                                                     [r for p, r in usr_rows if p == identity])
+        layers = [self._read_class_sc_overrides(cls, sim)] if cls else []
+        layers.append([r for p, r in def_rows if p == identity])
+        layers.append([r for p, r in usr_rows if p == identity])
+        return xmmerge.merge_sc_override_layers(*layers)
 
     def read_default_class_data(
         self,
@@ -542,10 +552,15 @@ class ConfigResolver:
         rows = [('setting', e.findtext('name', ''), e.findtext('value', ''),
                  e.findtext('unit', ''), e.findtext('device', ''))
                 for e in root.findall(f'models[sim="{sim}"][model="{pattern}"]')]
+        # Overrides keyed by the pattern, and by its class: a class row is as
+        # much a part of what the built-in does as one of its own, so a
+        # decline lapses when either changes.
+        cls = self.get_class_for_sim_model(sim, pattern) or ''
         rows += [('override', e.findtext('name', ''), e.findtext('var', ''),
                   e.findtext('sc_unit', ''), e.findtext('scale', ''))
-                 for e in root.findall(f'sc_overrides[model="{pattern}"]')
-                 if (e.findtext('sim') or '') in ('', sim)]
+                 for e in root.findall('sc_overrides')
+                 if (e.findtext('model') == pattern or (cls and e.findtext('class') == cls))
+                 and (e.findtext('sim') or '') in ('', sim)]
         return rows
 
     def user_rows_by_profile(self, sim: str, pattern: str) -> list:
@@ -625,8 +640,12 @@ class ConfigResolver:
                 })
             return out
 
-        c_ov = {r['name']: r['var'] for p, r in self._read_models_sc_overrides('defaults', name, 'default', sim)
-                if p == curated_pattern}
+        # The built-in's overrides are its class's rows with its own on top,
+        # the same two shipped layers the aircraft flies with.
+        c_ov = {r['name']: r['var']
+                for r in self._read_class_sc_overrides(self.get_class_for_sim_model(sim, curated_pattern) or '', sim)}
+        c_ov.update({r['name']: r['var'] for p, r in self._read_models_sc_overrides('defaults', name, 'default', sim)
+                     if p == curated_pattern})
         u_ov = {r['name']: r['var'] for p, r in self._read_models_sc_overrides('user', name, 'user', sim)
                 if p == user_pattern}
         now_ov = {**c_ov, **u_ov} if same else (dict(u_ov) if theirs_wins else dict(c_ov))
@@ -932,6 +951,25 @@ class ConfigResolver:
             })
         return data, winner
 
+    @staticmethod
+    def _sc_override_row(elem, source: str, scope: str) -> ScOverrideRow:
+        return {
+            'name': elem.findtext('name', ''),
+            'var': elem.findtext('var', ''),
+            'sc_unit': elem.findtext('sc_unit', ''),
+            'scale': elem.findtext('scale', ''),
+            'source': source,
+            'scope': scope,
+            'sim': elem.findtext('sim', '') or '',
+        }
+
+    @staticmethod
+    def _sc_override_sim_matches(elem, sim: Optional[str]) -> bool:
+        """A row naming a sim applies to that sim only; one naming none
+        applies everywhere, as every row did before the class layer."""
+        row_sim = elem.findtext('sim', '')
+        return not sim or not row_sim or row_sim == sim
+
     def _read_models_sc_overrides(
         self,
         which_root: str,
@@ -939,24 +977,32 @@ class ConfigResolver:
         source: str,
         sim: Optional[str] = None,
     ) -> list[tuple[str, ScOverrideRow]]:
-        """Every matching override row with its pattern, least specific
-        first.  A row that names a sim belongs to that sim only; one that
-        names none - every row written before rows carried a sim - belongs
-        to any."""
+        """Every override row selected by aircraft-name pattern (``<model>``)
+        that matches, with its pattern, least specific first.  A row keyed
+        by class is not a model row and is not read here.  A row that names
+        a sim belongs to that sim only; one that names none - every row
+        written before rows carried a sim - belongs to any."""
         root = self._store.user_root if which_root == 'user' else self._store.defaults_root
         if root is None:
             return []
         rows = [(elem.findtext('model', ''), elem) for elem in root.findall('.//sc_overrides')
-                if not sim or (elem.findtext('sim') or '') in ('', sim)]
+                if elem.findtext('model') and self._sc_override_sim_matches(elem, sim)]
         ranked = xmatch.rank_matches(rows, full_model_name)
-        return [(pattern, {
-            'name': elem.findtext('name', ''),
-            'var': elem.findtext('var', ''),
-            'sc_unit': elem.findtext('sc_unit', ''),
-            'scale': elem.findtext('scale', ''),
-            'source': source,
-            'sim': elem.findtext('sim', '') or '',
-        }) for pattern, elem in ranked]
+        return [(pattern, self._sc_override_row(elem, source, 'model')) for pattern, elem in ranked]
+
+    def _read_class_sc_overrides(self, cls: str, sim: Optional[str]) -> list[ScOverrideRow]:
+        """The shipped rows selected by aircraft class (``<class>``).  Only
+        the shipped file is read: there is no user class layer.
+
+        The class modules are shared between MSFS and X-Plane, so a class
+        row is expected to name its sim; one that does not applies to both.
+        """
+        root = self._store.defaults_root
+        if root is None:
+            return []
+        return [self._sc_override_row(elem, 'default', 'class')
+                for elem in root.findall('.//sc_overrides')
+                if elem.findtext('class', '') == cls and self._sc_override_sim_matches(elem, sim)]
 
     def _apply_validvalue_overrides(
         self,

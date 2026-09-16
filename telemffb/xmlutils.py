@@ -301,20 +301,23 @@ def read_models_data(which_root: str, sim: str, full_model_name: str, alldevices
 
 
 def read_sc_overrides(aircraft_name: str, identity: Optional[str] = None,
-                      sim: Optional[str] = None) -> list[ScOverrideRow]:
-    """The SimConnect/dataref overrides of the pattern that names an
-    aircraft: shipped ones replaced by the user's by name, nothing from any
-    other pattern.  Pass ``identity`` when the pattern is already known.
+                      sim: Optional[str] = None, cls: Optional[str] = None) -> list[ScOverrideRow]:
+    """The SimConnect/dataref overrides an aircraft flies with: the shipped
+    rows of its class, then the shipped rows of the pattern that named it,
+    then the user's rows under that same pattern, each layer replacing the
+    one before by name.  Nothing from any other pattern.
 
     Args:
         aircraft_name: Aircraft identifier
-        identity: The pattern whose overrides apply, if known
-        sim: The sim to resolve the identity under; the current one by default
+        identity: The pattern that named the aircraft, if the caller knows it
+        sim: The sim to resolve under; the current one by default
+        cls: The aircraft's class; its shipped rows sit underneath the rest
 
     Returns:
-        List of override dicts (``name``, ``var``, ``sc_unit``, ``scale``, ``source``)
+        List of override dicts (``name``, ``var``, ``sc_unit``, ``scale``,
+        ``source``, ``scope``)
     """
-    return _resolver().read_sc_overrides(aircraft_name, identity, sim)
+    return _resolver().read_sc_overrides(aircraft_name, identity, sim, cls)
 
 
 def read_default_class_data(the_sim: str, the_class: str, instance_device: str = '') -> tuple[list[ClassDataRow], Optional[list[str]]]:

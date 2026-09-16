@@ -3034,17 +3034,21 @@ class MainWindow(QMainWindow):
         text, tip = '', ''
         if sim in ('MSFS', 'XPLANE') and aircraft:
             try:
-                overrides = xmlutils.read_sc_overrides(aircraft, sim=sim)
+                overrides = xmlutils.read_sc_overrides(
+                    aircraft, sim=sim, cls=G.settings_mgr.current_class or None)
             except Exception:
                 logging.exception('Failed to read sc_overrides for status pill')
                 overrides = []
             if overrides:
-                n_def = sum(1 for o in overrides if o.get('source') == 'defaults')
-                n_usr = len(overrides) - n_def
-                parts = ([f'Default ({n_def})'] if n_def else []) + \
+                n_usr = sum(1 for o in overrides if o.get('source') == 'user')
+                n_cls = sum(1 for o in overrides
+                            if o.get('source') != 'user' and o.get('scope') == 'class')
+                n_def = len(overrides) - n_usr - n_cls
+                parts = ([f'Class ({n_cls})'] if n_cls else []) + \
+                        ([f'Default ({n_def})'] if n_def else []) + \
                         ([f'User ({n_usr})'] if n_usr else [])
                 text = ' + '.join(parts)
-                lines = [f"{o['name']}  ←  {o['var']}   [{o['source']}]"
+                lines = [f"{o['name']}  ←  {o['var']}   [{o['source']} {o.get('scope', 'model')}]"
                          for o in overrides[:15]]
                 if len(overrides) > 15:
                     lines.append(f"... and {len(overrides) - 15} more")

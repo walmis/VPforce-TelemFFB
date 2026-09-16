@@ -127,8 +127,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.lb_InfoLabel.setText('')
             self.fill_cb_name()
 
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
-                                                        sim=G.settings_mgr.current_sim)
+            self.overrides = xmlutils.read_sc_overrides(
+                G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                sim=G.settings_mgr.current_sim, cls=G.settings_mgr.current_class or None)
 
 
             if not any(self.overrides) :
@@ -188,10 +189,12 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
                 scale_item = QTableWidgetItem(str(override['scale']))
             else:
                 scale_item = QTableWidgetItem('')
-            source_item = QTableWidgetItem(override['source'])
+            source_item = QTableWidgetItem(
+                f"{override['source']} {override.get('scope', 'model')}")
 
-            # If source is 'defaults', make the text color grey
-            if override['source'] == 'defaults':
+            # Shipped rows (defaults.xml, model- or class-scoped) are shown
+            # grayed and cannot be selected: only user rows can be deleted
+            if override['source'] != 'user':
                 name_item.setForeground(Qt.GlobalColor.gray)
                 var_item.setForeground(Qt.GlobalColor.gray)
                 sc_unit_item.setForeground(Qt.GlobalColor.gray)
@@ -303,8 +306,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.tb_scale.setStyleSheet("")
             self.tb_scale.setToolTip("")
 
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
-                                                        sim=G.settings_mgr.current_sim)
+            self.overrides = xmlutils.read_sc_overrides(
+                G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                sim=G.settings_mgr.current_sim, cls=G.settings_mgr.current_class or None)
             self.fill_table()
 
     def delete_button_clicked(self):
@@ -316,6 +320,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.pb_delete.setEnabled(False)
             xmlutils.erase_sc_override_from_xml(G.settings_mgr.current_pattern, name,
                                                 sim=G.settings_mgr.current_sim)
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
-                                                        sim=G.settings_mgr.current_sim)
+            self.overrides = xmlutils.read_sc_overrides(
+                G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                sim=G.settings_mgr.current_sim, cls=G.settings_mgr.current_class or None)
             self.fill_table()
