@@ -28,7 +28,11 @@ from telemffb.telem.TelemParserBase import TelemParserBase
 class NetworkThread(threading.Thread):
     def __init__(self, telemetry: TelemManager, host: str = "", port: int = 34380, telem_parser: Optional[TelemParserBase] = None,
                  raw_packet_hook: Optional[Callable[[bytes], None]] = None) -> None:
-        super().__init__()
+        # Daemon: a telemetry reader must never hold the process open.  These
+        # threads are told to stop at exit, but one asleep in a retry backoff
+        # would keep the interpreter - and the master's mutex - alive until it
+        # woke; the BMS listener's ten-second sleep did exactly that.
+        super().__init__(daemon=True)
         self._run: bool = False
         self._port: int = port
         self._host: str = host

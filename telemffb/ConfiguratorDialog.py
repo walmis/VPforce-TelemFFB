@@ -262,6 +262,10 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         except Exception as e:
             logging.warning(f"Error getting gain values from the device: {e}")
             return
+        if gains is None:
+            # device backend has no Configurator gains (generic DirectInput)
+            logging.debug("construct_setting_table: no gains available from this device")
+            return
         state = {
             "master_gain": {"enabled": self.cb_MasterGain.isChecked(), "value": gains.master_gain},
             "periodic_gain": {"enabled": self.cb_Periodic.isChecked(), "value": gains.periodic_gain},
@@ -347,7 +351,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
         if state:
             slider.setEnabled(True)
-            slider.setValue(getattr(current_gains, cb.setting_key))
+            slider.setValue(getattr(current_gains, cb.setting_key) if current_gains is not None else 0)
             label.setText(f"%{slider.value()}")
         else:
             print(f"Disabling {cb.setting_key}")
@@ -395,20 +399,49 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         method when user saves the gain config.
         """
         dev = HapticEffect.device
-        # need to check here that for any non included gain, we should set that back to the G.vpconf_configurator_gains value
+        # For any gain whose override is DISABLED, restore it to the baseline
+        # (the vpconf-profile gains, else the startup/live device gains). The
+        # baseline can be unset when telemetry loads an override aircraft
+        # before the async startup init populated G.vpconf_configurator_gains
+        # (sim already running at launch) — guard rather than crash.
+        baseline = self._baseline_gains()
         for setting in state.keys():
             enabled = state[setting]['enabled']
             id = self.ui_dict[setting]['gain_id']
             if enabled:
                 dev.set_gain(id, int(state[setting]['value']))
-            else:
-                last_vpconf_gain = getattr(G.vpconf_configurator_gains, setting)
-                dev.set_gain(id, last_vpconf_gain)
+            elif baseline is not None:
+                dev.set_gain(id, getattr(baseline, setting))
 
 
+
+    @staticmethod
+    def _baseline_gains():
+        """Baseline configurator gains for restoring non-overridden values.
+
+        Prefers the gains captured after the active vpconf profile was pushed,
+        then the gains learned at startup, then the device's live gains.
+        Guards the startup race where telemetry loads an override aircraft
+        before the async init populated G.vpconf_configurator_gains.
+        """
+        baseline = G.vpconf_configurator_gains
+        if baseline is None:
+            baseline = G.startup_configurator_gains
+        if baseline is None and HapticEffect.device is not None:
+            try:
+                baseline = HapticEffect.device.get_gains()
+            except Exception:
+                logging.exception("Could not read device gains for override baseline")
+        return baseline
 
     def set_gains_from_object(self, gains_object):
         dev = HapticEffect.device
+        if gains_object is None:
+            gains_object = self._baseline_gains()
+        if gains_object is None:
+            logging.warning("No baseline configurator gains available; "
+                            "leaving device gains unchanged")
+            return
 
         dev.set_gain(FFB_GAIN_MASTER, gains_object.master_gain)
         dev.set_gain(FFB_GAIN_PERIODIC, gains_object.periodic_gain)

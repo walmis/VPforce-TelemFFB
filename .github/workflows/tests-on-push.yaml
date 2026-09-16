@@ -23,5 +23,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # A native death (a PyQt qFatal, an access violation) ends the
+      # run with no test failure and no traceback.  The step shell
+      # reports such exit codes as a plain 1, so print the real one -
+      # and run unbuffered, or the last printed test name is only the
+      # last flushed one, not where the process actually died.
       - name: Run pytest
-        run: pytest
+        shell: pwsh
+        run: |
+          pytest
+          $code = $LASTEXITCODE
+          Write-Host ("pytest exit code: {0} (0x{1:X8})" -f $code, ($code -band 0xFFFFFFFF))
+          exit $code
+        env:
+          PYTHONFAULTHANDLER: "1"
+          PYTHONUNBUFFERED: "1"

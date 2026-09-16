@@ -1,10 +1,12 @@
 import logging
+import math
 
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
-from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SQUARE, HapticEffect
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.util.conversions import FFB_UNITS
 
 perftracker = utils.PerformanceTracker()
 
@@ -30,6 +32,20 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
     overspeed_shake_intensity: float = 0.2
     overspeed_shake_frequency: float = 0.0
 
+    # Blade slap (blade-vortex interaction)
+    blade_slap_enable: bool = False
+    blade_slap_intensity: float = 0.15
+    blade_slap_use_native: bool = True    # XPLANE only: sim-computed signal, exclusively
+    blade_slap_band_center: float = 32.4  # m/s (63 kt); heuristic speed-band peak
+    blade_slap_g_factor: float = 0.8      # weight of maneuvering load in the inferred signal
+
+    # Band edges as ratios of the center: at the 63 kt default this spans
+    # ~19-107 kt, matching the original fixed band.  Scaling with the center
+    # keeps the response shape consistent and out of the hover regime when a
+    # user tunes the band down for a lightly-loaded rotor.
+    BLADE_SLAP_BAND_LO = 0.31
+    BLADE_SLAP_BAND_HI = 1.69
+
     # Vortex Ring State (VRS)
     vrs_effect_enable: bool = False
     vrs_effect_intensity: float = 0.0
@@ -47,7 +63,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
     collective_ft_init: bool = False
     collective_ft_ovd_trim_down = 0
     collective_ft_ovd_trim_up = 0
-    collective_ft_ovd_cp0_y = 4096
+    collective_ft_ovd_cp0_y: float = 1.0
     collective_ft_use_master_buttons: bool = False
     # end of user parameters
     
@@ -242,8 +258,8 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
                      ForceTrimSW    - bool; cockpit force-trim switch state; when False
                                       the spring follows the stick position without locking
             Written: _coll_ft_dt      (float, s; frame delta time)
-                     _coll_ft_step    (float; trim step size in device units/frame)
-                     _coll_ft_trim_pos (int, –4096 to 4096; current trim offset in device units)
+                     _coll_ft_step    (float; normalized trim step per frame)
+                     _coll_ft_trim_pos (float, -1.0 to 1.0; normalized trim offset)
         """
 
         if not self.is_collective():
@@ -252,24 +268,32 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # If feature disabled, ensure spring is stopped and abort
             self.effects["collective_ft"].stop()
             return
+        if not self.collective_ft_ovd_release:
+            # Force trim on the collective is unusable without a release
+            # button (unlike pedals, where an unbound button is a valid
+            # configuration). Flagged per-frame so the message persists while
+            # the condition exists and clears once a button is bound.
+            self.flag_error("Collective force trim enabled but the trim release button is not configured")
+            return
 
         dt = perftracker.get_time_delta("collective_ft_perf")
         self.telem_data._coll_ft_dt = dt
 
         wow = sum(telem_data.WeightOnWheels or [1])
 
-        input_data = HapticEffect.device.get_input()
+        input_data = HapticEffect.get_device_input()
         _, y = self._get_device_axes()
-        current_buttons = input_data.getPressedButtons()
+        # No live device: buttons unreadable, none can be pressed.
+        current_buttons = input_data.getPressedButtons() if input_data is not None else ()
 
-        force_trim_active = telem_data.ForceTrimSW
+        force_trim_active = telem_data.get("ForceTrimSW", True)
         if force_trim_active is None:
             force_trim_active = True
 
         if not force_trim_active:
             # Force trim is enabled, but the 'ForceTrimSW' flag is false, just move
             self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
-            self.collective_ft_ovd_cp0_y = round(y * 4096)
+            self.collective_ft_ovd_cp0_y = float(utils.clamp(y, -1.0, 1.0))
             self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
             return
@@ -281,7 +305,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # return from method so default spring gains do not get applied at the end of the method
             self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
 
-            self.collective_ft_ovd_cp0_y = round(y * 4096)
+            self.collective_ft_ovd_cp0_y = float(utils.clamp(y, -1.0, 1.0))
             self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
             spring.start(override=True)
@@ -290,12 +314,12 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         elif self.check_button_press(self.collective_ft_ovd_reset, self.collective_ft_use_master_buttons):
             # if trim reset button pressed, set offsets back to 0
             # print("TRIM RESET")
-            self.collective_ft_ovd_cp0_y = 4096
+            self.collective_ft_ovd_cp0_y = 1.0
             self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
 
         # calculate step size based on configured rate and delta time
-        trim_step_size = self.collective_ft_ovd_trim_rate * dt
+        trim_step_size = self.collective_ft_ovd_trim_rate * dt / FFB_UNITS
 
         self.telem_data._coll_ft_step = trim_step_size
 
@@ -303,16 +327,18 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM DOWN")
             self.collective_ft_ovd_cp0_y += trim_step_size
-            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
-            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
+            self.collective_ft_ovd_cp0_y = utils.clamp(
+                self.collective_ft_ovd_cp0_y, -1.0, 1.0)
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
         elif self.check_button_press(self.collective_ft_ovd_trim_up, self.collective_ft_use_master_buttons):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM UP")
             self.collective_ft_ovd_cp0_y -= trim_step_size
-            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
-            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
+            self.collective_ft_ovd_cp0_y = utils.clamp(
+                self.collective_ft_ovd_cp0_y, -1.0, 1.0)
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
 
-        self.telem_data._coll_ft_trim_pos = round(self.collective_ft_ovd_cp0_y)
+        self.telem_data._coll_ft_trim_pos = self.collective_ft_ovd_cp0_y
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_y.set_coefficient(self.collective_ft_ovd_spring_gain)
@@ -321,10 +347,111 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         # ensure spring is started with override = true
         spring.start(override=True)
 
+    def _blade_slap_signal(self, telem_data: BaseTelemetryData) -> float:
+        """Blade-vortex-interaction intensity, 0..1.
+
+        On X-Plane with blade_slap_use_native enabled, the
+        sim-computed signal (rotor_blade_slap_rat via the plugin) drives the
+        effect exclusively.  Everywhere else, and on X-Plane with the toggle
+        off, the signal is inferred from wake geometry: BVI happens when the rotor
+        flies through its own wake — moderate forward speed on a shallow
+        descent gradient, plus flares and loaded turns pushing the wake back
+        into the disc.
+
+        Telemetry:
+            Read: BladeSlap     - float (0..1, XPLANE plugin); native signal
+                  IAS           - float (m/s); speed band peaks at blade_slap_band_center
+                  VerticalSpeed - float (m/s); descent angle band peaks ~6 deg
+                  G             - float (MSFS/XP); loaded-flare/turn contribution
+                  ACCs          - List[float] (g, DCS/IL2); index [1] = normal
+                                  load factor, used when G is absent
+            Written: _blade_slap_src ("native" | "inferred"; active source)
+        """
+        if self._sim_is_xplane() and self.blade_slap_use_native:
+            telem_data._blade_slap_src = "native"
+            return utils.clamp(telem_data.get("BladeSlap", 0) or 0, 0.0, 1.0)
+        telem_data._blade_slap_src = "inferred"
+
+        ias = telem_data.IAS or 0
+        if ias < 5.0:
+            return 0.0
+        center = self.blade_slap_band_center or 32.4
+        speed_band = utils.gaussian_scaling(
+            ias, center * self.BLADE_SLAP_BAND_LO, center * self.BLADE_SLAP_BAND_HI,
+            peak_percentage=0.5, curve_width=0.8)
+
+        vs = telem_data.VerticalSpeed or 0
+        descent_deg = math.degrees(math.atan2(-vs, ias))
+        # Both gates must pass: the angle band (wake stays in the disc plane)
+        # AND a genuine sink rate.  At low band speeds a 1 deg "descent" is
+        # only ~50-150 fpm — the transient sink of an accelerating nose-down
+        # attitude — which is not wake re-entry and must stay silent.
+        if vs < -1.0 and 1.0 < descent_deg < 14.0:
+            descent_term = utils.gaussian_scaling(descent_deg, 0.0, 12.0,
+                                                  peak_percentage=0.5, curve_width=0.5)
+        else:
+            descent_term = 0.0
+
+        # G source differs per sim: MSFS/XP report G directly; DCS/IL2 ship
+        # the body acceleration vector (ACCs, normal axis at [1]) instead.
+        g_load = telem_data.G
+        if g_load is None:
+            accs = telem_data.ACCs
+            if isinstance(accs, (list, tuple)) and len(accs) > 1:
+                g_load = accs[1]
+        g_term = utils.clamp(((g_load or 1.0) - 1.15) * 1.5, 0.0, 1.0)
+
+        return utils.clamp(
+            speed_band * (descent_term + self.blade_slap_g_factor * g_term), 0.0, 1.0)
+
+    def ac_update_blade_slap(self, telem_data: BaseTelemetryData, blade_ct=None):
+        """Blade-slap kicks through the controls: a sharp sawtooth periodic at
+        blade-passage rate, gated by the BVI signal.  Two-bladed teetering
+        rotors slap loudest (blade-count character scale).
+
+        Telemetry:
+            Read: WeightOnWheels - List[float]; sum > 0 suppresses the effect
+                  PropRPM[0] (XPLANE) / RotorRPM (others) - rev rate for the
+                  blade-passage frequency
+            Written: _blade_slap_sig (float; debug - current signal value)
+        """
+        if not (self.blade_slap_enable and self.blade_slap_intensity):
+            self.effects.dispose("blade_slap_x", "blade_slap_y")
+            return
+        if sum(telem_data.WeightOnWheels or [0, 0, 0]) > 0:
+            self.effects.dispose("blade_slap_x", "blade_slap_y")
+            return
+
+        if self._sim_is_xplane():
+            rotor = telem_data.PropRPM or 0
+            if isinstance(rotor, list):
+                rotor = rotor[0]
+        else:
+            rotor = telem_data.RotorRPM or 0
+            if isinstance(rotor, list):
+                rotor = max(rotor)
+        blade_ct = blade_ct or 2
+        freq = (rotor / 60.0) * blade_ct
+
+        sig = self._blade_slap_signal(telem_data)
+        telem_data._blade_slap_sig = sig
+        if freq < 1.0 or sig < 0.05:
+            self.effects.dispose("blade_slap_x", "blade_slap_y")
+            return
+
+        mag = self.blade_slap_intensity * sig
+        # two-bladed rotors are the wop-wop kings; soften for higher counts
+        mag *= utils.clamp(2.0 / blade_ct, 0.6, 1.0)
+        mag = utils.clamp(mag, 0.0, 1.0)
+
+        self.effects["blade_slap_y"].periodic(freq, mag, 0, effect_type=EFFECT_SAWTOOTHDOWN).start()
+        self.effects["blade_slap_x"].periodic(freq, mag, 90, effect_type=EFFECT_SAWTOOTHDOWN).start()
+
     def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         if self.is_helicopter():
             self.ac_calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
             self.ac_update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
             self.ac_update_vrs_effect(telem_data)
+            self.ac_update_blade_slap(telem_data, blade_ct=self.rotor_blade_count)
     

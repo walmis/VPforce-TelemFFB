@@ -17,7 +17,7 @@ processed:
 - DeadzoneMixIn
 - HydraulicLossMixIn
 - MsfsXpTrimwheelMixIn
-- MfsfXpSteeringFrictionEffectMixIn
+- MsfsXpSteeringFrictionMixIn
 - DecelerationEffectMixIn
 - EngineRumbleMixIn
 - WindEffectMixIn

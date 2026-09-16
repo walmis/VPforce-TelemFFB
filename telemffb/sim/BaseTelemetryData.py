@@ -127,10 +127,11 @@ class BaseTelemetryData:
     """
 
     VerticalSpeed: Optional[float]
-    """Vertical speed (rate of climb/descent).  
-    DCS: LoGetVerticalVelocity() — m/s.  
-    MSFS: VERTICAL SPEED SimVar — m/s.  
-    IL2/BMS: not available (BMS hardcodes 0).  
+    """Vertical speed (rate of climb/descent).
+    DCS: LoGetVerticalVelocity() — m/s.
+    MSFS: VERTICAL SPEED SimVar — m/s.
+    XP: sim/flightmodel/position/vh_ind — m/s.
+    IL2/BMS: not available (BMS hardcodes 0).
     """
 
     GroundSpeed: Optional[float]
@@ -169,25 +170,81 @@ class BaseTelemetryData:
     """
 
     StallWarning: Optional[Union[bool, int]]
-    """Stall warning indicator active.  
-    MSFS: STALL WARNING SimVar — bool.  
+    """Stall warning indicator active.
+    MSFS: STALL WARNING SimVar — bool.
+    XP: sim/cockpit2/annunciators/stall_warning via the plugin — int 0/1.
     """
 
+    StallFracL: Optional[float]
+    """Fraction of the LEFT main-wing's active elements currently stalled,
+    0.0–1.0 (~10% span resolution).
+    XP: sim/flightmodel2/wing/elements/element_is_stalled (documented
+    wing1L,1R..4L,4R indexing), normalized to elements that exist per
+    element_MAC_mtr, plugin-computed. Drives asymmetric stall buffet
+    (wing-drop cue): compare against StallFracR.
+    Other sims: not available.
+    """
+
+    StallFracR: Optional[float]
+    """Fraction of the RIGHT main-wing's active elements currently stalled,
+    0.0–1.0. XP only; see StallFracL."""
+
+    StallFrac: Optional[float]
+    """Fraction of ALL active aerosurface elements (wings + stabs + rudders
+    + misc wings) currently stalled, 0.0–1.0 — the overall separation-depth
+    signal. XP only; see StallFracL."""
+
     WarnAlpha: Optional[float]
-    """Warning alpha (approach-to-stall AoA threshold).  
-    Currently not populated by any sim.  
+    """Warning alpha (approach-to-stall AoA threshold) — degrees.
+    XP: Read from the X-Plane plugin (sim/aircraft/overflow/acf_stall_warn_alpha,
+    the author-set stall-warning AoA). Used as the buffet onset threshold.
+    Other sims: not available (MSFS uses StallAoA instead).
     """
 
     Vle: Optional[float]
-    """Maximum landing-gear-extended speed.  
-    Currently not populated by any sim.  
+    """Maximum landing-gear-extended speed.
+    XP: Read from the X-Plane plugin (acf_Vle, converted kt -> m/s).
+    Other sims: not available.
+    """
+
+    Vfe: Optional[float]
+    """Maximum flaps-extended speed.
+    XP: Read from the X-Plane plugin (acf_Vfe, converted kt -> m/s).
+    Other sims: not available.
+    """
+
+    Vno: Optional[float]
+    """Maximum structural cruising speed (level-flyable in smooth air).
+    XP: Read from the X-Plane plugin (acf_Vno, converted kt -> m/s).
+    Other sims: not available (MSFS has no equivalent; DESIGN SPEED VC is
+    the closest level-flight ceiling).
+    """
+
+    Vs: Optional[float]
+    """Clean-configuration stall speed.
+    XP: Read from the X-Plane plugin (acf_Vs, converted kt -> m/s).
+    MSFS: not populated — use DesignSpeed[2] (VS1).
     """
 
     Vne: Optional[float]
-    """Never-exceed speed.  
-    MSFS: Computed from DESIGN SPEED VC × 1.4 via barometric formula in _calculate_vne_and_gains().  
-    XP: Read directly from X-Plane plugin dataref.  
-    Can be overridden via vne_override XML setting per aircraft.  
+    """Never-exceed speed.
+    MSFS: Computed from DESIGN SPEED VC × 1.4 via barometric formula in _calculate_vne_and_gains().
+    XP: Read directly from X-Plane plugin dataref.
+    Can be overridden via vne_override XML setting per aircraft.
+    """
+
+    RefMaxIAS: Optional[float]
+    """Aircraft-declared maximum indicated airspeed (Vne-equivalent).
+    MSFS: REFERENCE SPEED MAX IAS SimVar — m/s. Reported by the aircraft's
+    own reference data, unlike Vne which is estimated from DESIGN SPEED VC;
+    when present it is the more authoritative red-line figure.
+    """
+
+    RefMaxIAS_kt: Optional[float]
+    """Aircraft-declared maximum indicated airspeed (Vne-equivalent).
+    MSFS: REFERENCE SPEED MAX IAS SimVar — knots. Reported by the aircraft's
+    own reference data, unlike Vne which is estimated from DESIGN SPEED VC;
+    when present it is the more authoritative red-line figure.
     """
 
     Vne_ms_calc: Optional[float]
@@ -232,10 +289,18 @@ class BaseTelemetryData:
     """
 
     SideSlip: Optional[float]
-    """Sideslip angle (beta).  
-    DCS: computed from velocity vectors in TelemFFB.lua — degrees.  
-    MSFS: INCIDENCE BETA SimVar — degrees.  
-    IL2/BMS: not available.  
+    """Sideslip angle (beta).
+    DCS: computed from velocity vectors in TelemFFB.lua — degrees.
+    MSFS: INCIDENCE BETA SimVar — degrees.
+    IL2/BMS: not available.
+    """
+
+    VelRotBody: Optional[List[float]]
+    """Body-axis rotation velocities [X, Y, Z] — degrees per second.
+    MSFS: ROTATION VELOCITY BODY X/Y/Z SimVars. X = pitch axis, Y = yaw
+    axis, Z = roll (longitudinal) axis — Z drives the wing-drop buffet
+    asymmetry proxy.
+    Other sims: not available.
     """
 
     Incidence: Optional[List[float]]
@@ -254,17 +319,21 @@ class BaseTelemetryData:
     """
 
     Pitch: Optional[float]
-    """Pitch angle (nose up positive).  
-    DCS: LoGetADIPitchBankYaw()[0] — converted from radians to degrees.  
-    MSFS: PLANE PITCH DEGREES SimVar — degrees.  
-    IL2/BMS: not available.  
+    """Pitch angle in degrees.
+    DCS: LoGetADIPitchBankYaw()[0] — converted from radians to degrees.
+    MSFS: PLANE PITCH DEGREES SimVar — NOTE: negative = nose up.
+    XP: sim/flightmodel/position/theta — positive = nose up.
+    IL2/BMS: not available.
+    Sign convention differs between sims; consumers should use relative /
+    absolute-value comparisons (see TrimCalibrator pitch guard).
     """
 
     Roll: Optional[float]
-    """Bank/roll angle (right wing down positive).  
-    DCS: LoGetADIPitchBankYaw()[1] — converted from radians to degrees.  
-    MSFS: PLANE BANK DEGREES SimVar — degrees.  
-    IL2/BMS: not available.  
+    """Bank/roll angle in degrees.
+    DCS: LoGetADIPitchBankYaw()[1] — converted from radians to degrees.
+    MSFS: PLANE BANK DEGREES SimVar — degrees.
+    XP: sim/flightmodel/position/phi — positive = right wing down.
+    IL2/BMS: not available.
     """
 
     # -- Position --
@@ -538,8 +607,16 @@ class BaseTelemetryData:
     """
 
     ElevDeflPctLR: Optional[Tuple[float, float]]
-    """Elevator deflection percentage per side [left, right].  
-    MSFS: ELEVATOR DEFLECTION PCT LR SimVars when available.  
+    """Elevator deflection percentage per side [left, right].
+    MSFS: ELEVATOR DEFLECTION PCT LR SimVars when available.
+    """
+
+    ElevPos: Optional[float]
+    """Elevator INPUT position (control-side, not the surface).
+    MSFS: ELEVATOR POSITION SimVar — -1.0 to +1.0, 0 at neutral.
+    Comparing this against the commanded axis separates input-layer
+    mangling (Just Flight-style event mishandling) from genuine aero
+    response, and measures speed-scaled input attenuation (C208B class).
     """
 
     ElevTrim: Optional[float]
@@ -587,9 +664,18 @@ class BaseTelemetryData:
     MSFS: AILERON <> DEFLECTION PCT (L, R) SimVars — percent.  
     """
 
+    AileronPos: Optional[float]
+    """Aileron INPUT position (control-side, not the surface).
+    MSFS: AILERON POSITION SimVar — -1.0 to +1.0, 0 at neutral.
+    The roll-axis counterpart of ElevPos, and the readback a second
+    writer on the axis shows up in: a binding left mapped in the sim
+    contends with the axis TelemFFB sends, which appears here as
+    frame-rate alternation rather than as a steady offset.
+    """
+
     AileronTrim: Optional[float]
-    """Aileron trim angle.  
-    MSFS: AILERON TRIM SimVar — degrees.  
+    """Aileron trim angle.
+    MSFS: AILERON TRIM SimVar — degrees.
     """
 
     AileronTrimPct: Optional[float]
@@ -609,9 +695,30 @@ class BaseTelemetryData:
     MSFS: RUDDER DEFLECTION PCT SimVar — percent (-1.0 to 1.0).  
     """
 
+    RudderPos: Optional[float]
+    """Rudder INPUT position (control-side, not the surface).
+    MSFS: RUDDER POSITION SimVar — -1.0 to +1.0, 0 at neutral.
+    The yaw-axis counterpart of ElevPos, carrying the same contention
+    signature when a rudder binding is left mapped in the sim.
+    """
+
+    CollectivePos: Optional[float]
+    """Helicopter collective INPUT position (control-side).
+    MSFS: COLLECTIVE POSITION SimVar - 0.0 fully up to 1.0 fully depressed,
+    unlike the other control axes, which run -1.0 to +1.0.  The contention
+    probe rescales it before comparing against a commanded value.
+    """
+
+    TailRotorPos: Optional[float]
+    """Helicopter tail-rotor pedal INPUT position (control-side).
+    MSFS: TAIL ROTOR PEDAL POSITION SimVar - Percent Over 100.  Whether it
+    runs -1..1 like the rudder or 0..1 like the collective is unconfirmed,
+    so the contention probe measures this axis without judging it.
+    """
+
     RudderTrimPct: Optional[float]
-    """Rudder trim as percentage.  
-    MSFS: RUDDER TRIM PCT SimVar — percent.  
+    """Rudder trim as percentage.
+    MSFS: RUDDER TRIM PCT SimVar — percent.
     """
 
     # -- Controls lock --
@@ -630,11 +737,19 @@ class BaseTelemetryData:
     """
 
     EngRPM: Optional[Union[float, List[float]]]
-    """Engine RPM as percentage of max.  
-    DCS: LoGetEngineInfo().RPM — list per engine.  
-    MSFS: GENERAL ENG PCT MAX RPM SimVar — list per engine.  
-    BMS: engine_rpm + engine_rpm2 — list RPM %.  
-    IL2: not available (use RPM field instead).  
+    """Engine RPM as percentage of max.
+    DCS: LoGetEngineInfo().RPM — list per engine.
+    MSFS: GENERAL ENG PCT MAX RPM SimVar — list per engine.
+    BMS: engine_rpm + engine_rpm2 — list RPM %.
+    IL2: not available (use RPM field instead).
+    """
+
+    ThrottlePct: Optional[List[float]]
+    """Throttle lever positions, engines 1-4.
+    MSFS: GENERAL ENG THROTTLE LEVER POSITION SimVars — 0-100 percent per
+    lever; slots for engines the aircraft does not have are pinned at 0.
+    Used by the trim calibrator's throttle-movement tracker to distinguish
+    a real power change from airspeed drifting on its own.
     """
 
     ActualRPM: Optional[Union[float, List[float]]]
@@ -951,13 +1066,21 @@ class BaseTelemetryData:
     """
 
     CyclicTrimY: Optional[float]
-    """Cyclic trim position (longitudinal).  
-    MSFS: ROTOR LONGITUDINAL TRIM PCT SimVar — percent.  
+    """Cyclic trim position (longitudinal).
+    MSFS: ROTOR LONGITUDINAL TRIM PCT SimVar — percent.
+    """
+
+    BladeSlap: Optional[float]
+    """Rotor blade slap intensity ratio (0..1), computed by X-Plane.
+    XP: rotor_blade_slap_rat (plugin, engine 0).
+    Other sims: not available — the blade-slap effect infers it from wake
+    geometry (IAS/VerticalSpeed/G) instead.
     """
 
     ForceTrimSW: Optional[bool]
     """Force trim switch state (helicopter force-trim / SAS release).  
-    MSFS: L:TelemFFBHeliFT — custom local SimVar (bool).  
+    MSFS: L:TelemFFBHeliFT — custom local SimVar (bool). 
+    DCS: Current state of force trim switch in UH1, OH58 - not present for helicopters with no switch 
     Default when absent: True (use .get("ForceTrimSW", True)).  
     """
 

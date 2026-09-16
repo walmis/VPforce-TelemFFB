@@ -17,6 +17,7 @@
 #
 
 
+import html
 import inspect
 import json
 import logging
@@ -46,14 +47,16 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
+from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
     SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
-from telemffb.DevicePanel import DeviceIconPanel
+from telemffb.DevicePanel import DeviceIconPanel, device_status_state
 from telemffb.ExceptionTracker import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
+from telemffb.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.SettingsLayout import SettingsLayout
 # from telemffb.UserModelDialog import UserModelDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
@@ -66,13 +69,36 @@ from telemffb.utils import exit_application, HiDpiPixmap
 class MainWindow(QMainWindow):
     version_check_complete = pyqtSignal()
 
+    #: Number-sliders whose handle shows a live force readout: setting name
+    #: -> the telemetry key its aircraft code publishes (fraction 0..1 of
+    #: the relevant full scale, so 100% on the handle means clipping/max).
+    N_SLIDER_LIVE_KEYS = {
+        'max_elevator_coeff': '_pct_max_e',
+        'max_aileron_coeff': '_pct_max_a',
+        'max_rudder_coeff': '_pct_max_r',
+        'steering_friction_intensity': '_pct_steer_f',
+        'tap_spring_gain_x': '_pct_tap_x',
+        'tap_spring_gain_y': '_pct_tap_y',
+        'tap_effect_constant_gain': '_pct_tap_const',
+        'tap_effect_periodic_gain': '_pct_tap_periodic',
+        'tap_effect_damper_gain': '_pct_tap_damper',
+        'tap_effect_inertia_gain': '_pct_tap_inertia',
+        'tap_effect_friction_gain': '_pct_tap_friction',
+    }
+    #: How long the error status is held after the LAST error-bearing
+    #: frame before it clears.  Wall-clock on purpose: child-instance
+    #: errors reach the master over IPC on whichever frames catch them,
+    #: and a frame-counted debounce shrinks with sim frame rate.
+    ERROR_CLEAR_HOLD_S = 3.0
+
     def __init__(self):
         super().__init__()
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_notifications = {}
         self.new_craft_notification_sent = False
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
-        self.error_clean_counter = 0 # counter to use as hysteresis for clearing error condition - not always 'error' from child instance on every loop
+        self._error_last_seen = 0.0 # monotonic time an 'error' key was last seen; the clear path holds ERROR_CLEAR_HOLD_S past it (child errors arrive over IPC on whichever frames catch them)
+        self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
         self.telemetry_timed_out = True
         self.last_telemetry_refresh = utils.millis()
         self.show_simvars = False
@@ -172,9 +198,12 @@ class MainWindow(QMainWindow):
 
         system_menu = self.menu.addMenu('&System')
 
-        system_settings_action = QAction('System Settings', self)
-        system_settings_action.triggered.connect(self.open_system_settings_dialog)
-        system_menu.addAction(system_settings_action)
+        if G.master_instance:
+            # Settings for every device live in the master's dialog; a child
+            # has none of its own to show.
+            system_settings_action = QAction('System Settings', self)
+            system_settings_action.triggered.connect(self.open_system_settings_dialog)
+            system_menu.addAction(system_settings_action)
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         def do_open_cfg_dir():
@@ -207,7 +236,12 @@ class MainWindow(QMainWindow):
         reset_geometry.triggered.connect(do_reset_window_size)
         system_menu.addAction(reset_geometry)
 
-        exit_app_action = QAction('Quit TelemFFB', self)
+        # Quitting a child ends that instance; only the master takes the
+        # whole application down with it.
+        exit_app_action = QAction(
+            'Quit TelemFFB' if G.master_instance else
+            f'Quit the {utils.device_display_name(G.device_type)} Instance',
+            self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
@@ -262,6 +296,35 @@ class MainWindow(QMainWindow):
         reload_action = QAction('Force Reload Aircraft (Ctrl+Shift+R)', self)
         reload_action.triggered.connect(self.force_reload_aircraft)
         utilities_menu.addAction(reload_action)
+
+        sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
+
+        def do_open_sc_override_dialog():
+            dialog = SCOverridesEditor(self)
+            # Overrides save immediately in the editor; refresh the status
+            # pill once the dialog closes so it reflects any changes.
+            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
+            dialog.raise_()
+            dialog.activateWindow()
+            dialog.show()
+
+        # dialog.exec_()
+        sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
+        utilities_menu.addAction(sc_overrides_action)
+
+
+        trim_cal_action = QAction('Elevator Trim Calibration...', self)
+        trim_cal_action.triggered.connect(self.open_trim_calibration_dialog)
+        utilities_menu.addAction(trim_cal_action)
+
+        # A window on the tap's shared-memory mirror: whether a game is
+        # publishing, which devices the wrapper captured, and what every
+        # effect slot is being told - with a timestamped change log to
+        # save and send in.  The remote-troubleshooting answer to "no
+        # forces in DCS".
+        tap_monitor_action = QAction('DirectInput Tap Monitor...', self)
+        tap_monitor_action.triggered.connect(self.open_tap_monitor)
+        utilities_menu.addAction(tap_monitor_action)
 
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             """
@@ -369,8 +432,9 @@ class MainWindow(QMainWindow):
 
         if not G.master_instance:
             self.device_panel.set_devices([G.device_type])
-            self.device_panel.set_device_status(G.device_type, "ok")
+            self.device_panel.set_device_status(G.device_type, device_status_state())
             self.device_panel.set_active_device(G.device_type)
+            self.refresh_device_labels()
 
 
         """ Create Status Panel """
@@ -382,6 +446,7 @@ class MainWindow(QMainWindow):
         status_layout.addWidget(self.status_container)
 
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
+        self.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.status_container.sim_status_label.set_waiting()
 
         def on_sims_changed(sim: SimTelemListener):
@@ -432,28 +497,62 @@ class MainWindow(QMainWindow):
         """ Create new craft button - pops when unknown aircraft is detected """
 
         new_craft_layout = QVBoxLayout()
-        self.new_craft_button = QPushButton('Create/clone config for new aircraft')
-        ncb_css = """QPushButton {
-                            background-color: #ab37c8;
-                            border-style: outset;
-                            border-width: 1px;
-                            border-radius: 10px;
-                            border-color: black;
-                            color: white;
-                            font: bold 14px;
-                            min-width: 10em;
-                            padding: 5px;
-                        }"""
-        self.new_craft_button.setStyleSheet(ncb_css)
-        self.new_craft_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        new_craft_layout.addWidget(self.new_craft_button)
+        # Pill-and-pulse prompts are QLabels with an embedded link, not
+        # QPushButtons: rich text allows partial emphasis (bold aircraft
+        # name, medium-weight fixed words) which buttons cannot render.
+        # The link spans the whole text, so the entire pill is clickable
+        # and Qt supplies the hand cursor.
+        self.new_craft_button = QLabel()
+        self.new_craft_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        # Red fill breathing dim<->bright, white text/border, content-sized
+        # and centered (the old full-width slab was routinely missed
+        # despite its size). The animation runs only while visible.
+        self._new_craft_anim = QtCore.QVariantAnimation(self)
+        self._new_craft_anim.setStartValue(0.0)
+        self._new_craft_anim.setKeyValueAt(0.5, 1.0)
+        self._new_craft_anim.setEndValue(0.0)
+        self._new_craft_anim.setDuration(2600)
+        self._new_craft_anim.setLoopCount(-1)
+        self._new_craft_anim.valueChanged.connect(self._style_new_craft_button)
+        self._style_new_craft_button(0.0)
+        new_craft_layout.addWidget(self.new_craft_button,
+                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         new_craft_layout.addSpacing(7)
 
+        # Trim-calibration discovery prompt: shares the new-craft button's
+        # space (the two are mutually exclusive — no matched profile means
+        # nowhere to save a calibration). The calibration settings live
+        # three prereqs deep under Axis Control; this puts the feature in
+        # front of the user when an aircraft loads without one. Styled as an
+        # outlined notice card — content-sized and centered — so it pops
+        # without impersonating the solid new-craft action button.
+        self.trim_cal_prompt_button = QLabel()
+        self.trim_cal_prompt_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self.trim_cal_prompt_button.setText(
+            "<a href='#trimcal' style='color:black; text-decoration:none;'>"
+            "<span style='font-weight:500;'>No Trim Calibration Found for this "
+            "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
+            " to Set Up Realistic Trim</span></a>")
+        self.trim_cal_prompt_button.linkActivated.connect(
+            lambda _: self.open_trim_calibration_dialog())
+        # Slow breathing pulse (fill + border alpha) while visible — started
+        # and stopped with visibility so it costs nothing when hidden.
+        self._trim_prompt_anim = QtCore.QVariantAnimation(self)
+        self._trim_prompt_anim.setStartValue(0.0)
+        self._trim_prompt_anim.setKeyValueAt(0.5, 1.0)
+        self._trim_prompt_anim.setEndValue(0.0)
+        self._trim_prompt_anim.setDuration(2600)
+        self._trim_prompt_anim.setLoopCount(-1)
+        self._trim_prompt_anim.valueChanged.connect(self._style_trim_cal_prompt)
+        self._style_trim_cal_prompt(0.0)
+        new_craft_layout.addWidget(self.trim_cal_prompt_button,
+                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
 
         """ Add new craft button to main layout """
 
         layout.addLayout(new_craft_layout)
         self.new_craft_button.hide()
+        self.trim_cal_prompt_button.hide()
 
 
         """ Create offline config control area QWidget """
@@ -746,7 +845,7 @@ class MainWindow(QMainWindow):
 
         self.effect_lbl = QLabel('Active Effects:')
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
+            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
 
 
         """ Add headers and labels to the monitor layout """
@@ -826,15 +925,7 @@ class MainWindow(QMainWindow):
         self.version_label.setOpenExternalLinks(True)
         self.setStatusBar(self.status_bar)
         self.firmware_label = QLabel()
-        if not HapticEffect.device:
-            f_vers = 'Device Disconnected'
-            self.firmware_label.setText("Device Disconnected")
-        else:
-            try:
-                f_vers = HapticEffect.device.get_firmware_version()
-            except:
-                f_vers = 'error fetching'
-            self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
+        self.refresh_firmware_label()
 
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -873,6 +964,11 @@ class MainWindow(QMainWindow):
 
         reload_shortcut = QShortcut(QKeySequence('Ctrl+Shift+R'), self)
         reload_shortcut.activated.connect(self.force_reload_aircraft)
+
+        # System Settings announces device-configuration changes here
+        # rather than calling each UI consumer by hand
+        app_events().device_config_changed.connect(
+            self.on_device_config_changed)
 
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
@@ -1157,6 +1253,91 @@ class MainWindow(QMainWindow):
             "Enable or Disable in System -> System Settings"
         )
 
+    def refresh_firmware_label(self):
+        if not HapticEffect.device:
+            self.firmware_label.setText("Device Disconnected")
+        elif not HapticEffect.device.caps.has_firmware_version:
+            self.firmware_label.setText('DirectInput device')
+        else:
+            try:
+                f_vers = HapticEffect.device.get_firmware_version()
+            except:
+                f_vers = 'error fetching'
+            self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
+
+    def refresh_configurator_gating(self):
+        # the action is part of the Debug menu, which only exists with the
+        # debug registry key (or Alt+D) - on a normal install there is
+        # nothing to gate
+        action = getattr(self, 'configurator_settings_action', None)
+        if action is None:
+            return
+        caps = getattr(HapticEffect.device, 'caps', None)
+        no_gains = caps is not None and not caps.has_gains
+        action.setEnabled(not no_gains)
+        action.setToolTip(
+            'Not supported on this device (no Configurator gains)'
+            if no_gains else '')
+
+    def refresh_device_identity(self):
+        """Bring every device-identity-derived piece of the UI in line with
+        the currently open device - called after a live device switch."""
+        self.refresh_firmware_label()
+        self.refresh_configurator_gating()
+        self.update_device_status(G.device_connection_status)
+        self.refresh_device_labels()
+
+    def on_device_config_changed(self, before, after):
+        """The stored device configuration changed (System Settings save,
+        announced via app_events) - bring every UI consumer in line.
+
+        The status labels refresh unconditionally: identity details the
+        path snapshots cannot see (idents, icon choices) may have
+        changed.  The aircraft settings form only rebuilds when the
+        joystick slots really changed - its Device section and dropdown
+        are read at build time - and a section APPEARING at the top
+        (one device becoming several) also scrolls there, since holding
+        the reading position would leave it silently off-screen above.
+        """
+        try:
+            self.refresh_device_labels()
+        except Exception:
+            logging.exception('Device label refresh failed')
+        try:
+            joy = [key for key in after if key.startswith('devpath_joystick')]
+            if any(before.get(key, '') != after.get(key, '') for key in joy):
+                was_multi = sum(1 for key in joy if before.get(key)) > 1
+                now_multi = sum(1 for key in joy if after.get(key)) > 1
+                self.settings_layout.reload_caller(
+                    reveal_top=now_multi and not was_multi)
+        except Exception:
+            logging.exception('Aircraft settings form refresh failed')
+
+    def refresh_device_labels(self):
+        """Name the hardware under each status icon (the stored per-slot
+        identity) and show its icon choice, flashing any icon whose device
+        just changed."""
+        for role in self.device_panel.get_device_names():
+            try:
+                slot_suffix = ''
+                if role == 'joystick' and G.device_type == 'joystick':
+                    # a per-aircraft swap may have an ALTERNATE slot's
+                    # device in hand; the icon names what is actually
+                    # connected, not the stored primary
+                    slot_suffix = utils.active_joystick_slot_suffix(
+                        G.system_settings,
+                        getattr(G, 'device_devpath', '')) or ''
+                label = utils.device_panel_label(
+                    role, G.system_settings, slot_suffix=slot_suffix)
+                icon = utils.device_panel_icon(
+                    role, G.system_settings, slot_suffix=slot_suffix)
+            except Exception:
+                label, icon = '', ''
+            changed = self.device_panel.set_device_label(role, label)
+            changed = self.device_panel.set_device_icon(role, icon) or changed
+            if changed:
+                self.device_panel.flash_device(role)
+
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
         G.telem_manager.currentAircraftName = None
@@ -1168,6 +1349,30 @@ class MainWindow(QMainWindow):
         """Show the exception viewer dialog."""
         dialog = ExceptionViewerDialog(G.exception_tracker, self)
         dialog.exec()
+
+    def on_child_exception(self, data):
+        """Ingest an exception forwarded from a child instance over IPC.
+
+        The record lands in the master's own tracker with the module prefixed
+        by the child's device name, so the status-bar notification fires and
+        the viewer shows the full record labeled with its origin. Runs on the
+        main thread (queued from the IPC thread via child_exception_signal).
+        """
+        from datetime import datetime
+
+        from telemffb.ExceptionTracker import ExceptionRecord
+        try:
+            ts = datetime.fromisoformat(data.get("timestamp", ""))
+        except (ValueError, TypeError):
+            ts = datetime.now()
+        record = ExceptionRecord(
+            timestamp=ts,
+            message=data.get("message", ""),
+            traceback=data.get("traceback", ""),
+            level=data.get("level", "ERROR"),
+            module=f"{data.get('device', 'child')}: {data.get('module', 'unknown')}",
+        )
+        G.exception_tracker.add_exception(record)
         
     def update_exception_count(self):
         """Update the exception count in the status bar."""
@@ -1233,11 +1438,16 @@ class MainWindow(QMainWindow):
             dialog.activateWindow()
             dialog.show()
         configurator_settings_action.triggered.connect(do_open_configurator_dialog)
+        self.configurator_settings_action = configurator_settings_action
+        self.refresh_configurator_gating()
         debug_menu.addAction(configurator_settings_action)
 
         sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
         def do_open_sc_override_dialog():
             dialog = SCOverridesEditor(self)
+            # Overrides save immediately in the editor; refresh the status
+            # pill once the dialog closes so it reflects any changes.
+            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
             dialog.raise_()
             dialog.activateWindow()
             dialog.show()
@@ -1263,16 +1473,15 @@ class MainWindow(QMainWindow):
     @pyqtSlot(bool)
     def update_device_status(self, connected):
         G.device_connection_status = connected
-        status = "ACTIVE" if connected else "DISCONNECTED"
-        self.device_panel.set_device_status(G.device_type, status)
+        # three states, derived from the device object itself (the signal
+        # only says a transition happened): never opened (zombie),
+        # opened-but-dead (reconnecting), or alive (active).
+        self.device_panel.set_device_status(G.device_type, device_status_state())
 
     @pyqtSlot(str, str)
     def update_child_status(self, device, status):
         # self.instance_status_row.set_status(device, status)
         self.device_panel.set_device_status(device, status)
-
-    def show_child_settings(self):
-        G.ipc_instance.send_broadcast_message("SHOW SETTINGS")
 
     def reset_user_config(self):
         ans = QMessageBox.warning(self, "Caution", "Are you sure you want to proceed?  All contents of your user configuration will be erased\n\nA backup of the configuration will be generated containing the current timestamp.", QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
@@ -1330,9 +1539,10 @@ class MainWindow(QMainWindow):
         for d in G.launched_instances:
             d_list.append(d)
         self.device_panel.set_devices(d_list)
-        self.device_panel.set_device_status(G.device_type, "ok")
+        self.device_panel.set_device_status(G.device_type, device_status_state())
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)
+        self.refresh_device_labels()
 
 
     def show_device_logo(self):
@@ -1436,7 +1646,8 @@ class MainWindow(QMainWindow):
             self._update_available = True
             logging.info(f"<<<<Update available - new version={vers}>>>>")
 
-            status_text = f"New version <a href='{url}'><b>{vers}</b></a> is available!"
+            status_text = (f"New version <a href='{url}'><b>{vers}</b></a> is available! "
+                           f"(<a href='{G.release_notes_url}'>release notes</a>)")
             self.update_action.setDisabled(False)
             self.update_action.setText("Install Latest TelemFFB")
             self.version_label.setToolTip(url)
@@ -1495,8 +1706,44 @@ class MainWindow(QMainWindow):
         #self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
+            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
+        self.refresh_scope_status_indicators(force=True)
         self.settings_layout.reload_caller()
+
+    def refresh_scope_status_indicators(self, force=False):
+        """Update the vpconf-profile and gain-override indicators to reflect
+        the device currently selected as the config scope.
+
+        The master shows its own state while scoped to its own device, and the
+        state reported over IPC (effects payload / keepalive STATUS message)
+        while scoped to a child; child instances always show their own state.
+        Safe to call from any thread — the display update goes through the
+        widget's queued request signals — and repeat values are deduplicated
+        so the pulse animation only fires when something actually changed.
+        """
+        scope = G.current_device_config_scope or G.device_type
+        own_vpconf = G.current_vpconf_profile or ''
+        own_ovd = bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False
+        # Snapshot the IPC-reported dict: it is mutated by the IPC thread and
+        # this method may run on the telemetry thread.
+        fx = dict(G.ipc_instance._ipc_telem_effects) if (G.master_instance and G.ipc_instance) else {}
+        if scope == G.device_type or not G.master_instance:
+            vpconf, ovd = own_vpconf, own_ovd
+        else:
+            vpconf = fx.get(f'{scope}_vpconf_profile', '') or ''
+            ovd = bool(fx.get(f'{scope}_gain_ovd_active', False))
+        # A row is only present at all while at least one device (master or
+        # child) is using the feature; devices without a value then show a
+        # "(None)" placeholder so the panel geometry is identical across
+        # scopes. Users not using the feature don't lose the UI space.
+        any_vpconf = bool(own_vpconf) or any(v for k, v in fx.items() if k.endswith('_vpconf_profile'))
+        any_ovd = own_ovd or any(v for k, v in fx.items() if k.endswith('_gain_ovd_active'))
+        shown = (scope, vpconf, ovd, any_vpconf, any_ovd)
+        if not force and shown == getattr(self, '_scope_status_shown', None):
+            return
+        self._scope_status_shown = shown
+        self.status_container.request_set_active_vpconf.emit(vpconf, any_vpconf)
+        self.status_container.request_set_active_configurator.emit(ovd, any_ovd)
 
     def resize_offline_combos(self):
         """
@@ -1559,12 +1806,22 @@ class MainWindow(QMainWindow):
             # reset the craft area text to default
             self.status_container.reset()
             self.settings_layout.reload_caller()
+            # go_online restored the pre-offline context; re-evaluate the
+            # notes button against it (dedupe dropped so a re-load of the
+            # same context still refreshes)
+            self._profile_notes_shown = None
+            self.refresh_profile_notes_button()
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
             self.status_container.set_offline("None")
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
+
+            # Nothing is selected in the offline editor yet; disable the notes
+            # button until force_sim_aircraft establishes an offline scope
+            self._profile_notes_shown = None
+            self.status_container.set_notes_state(False)
 
             # Block signals so we don't trigger text change on .clear() calls
             self.offline_name.blockSignals(True)
@@ -1786,6 +2043,9 @@ class MainWindow(QMainWindow):
         G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
         G.settings_mgr.active_profile = self.offline_profile.currentText()
         self.settings_layout.reload_caller()
+        # reload_caller resolves current_pattern; refresh the notes button for
+        # the newly selected offline scope (no telemetry loop runs it here)
+        self.refresh_profile_notes_button()
 
 
     def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
@@ -1795,7 +2055,7 @@ class MainWindow(QMainWindow):
         if wizard.exec():
             try:
                 # make sure no other calls are connected to avoid stacking lambda calls if user cancels and doesn't add new aircraft
-                self.new_craft_button.clicked.disconnect()
+                self.new_craft_button.linkActivated.disconnect()
             except TypeError:
                 pass  # No handler connected yet
 
@@ -1917,6 +2177,70 @@ class MainWindow(QMainWindow):
             logging.exception("Exception")
         # dialog.exec_()
 
+    def open_tap_monitor(self):
+        """One monitor, re-raised rather than duplicated: two pollers
+        on the same mapping would only double the wakeups."""
+        from telemffb.TapMonitorDialog import TapMonitorDialog
+        dlg = getattr(self, '_tap_monitor', None)
+        if dlg is not None and dlg.isVisible():
+            dlg.raise_()
+            dlg.activateWindow()
+            return
+        self._tap_monitor = TapMonitorDialog(self)
+        self._tap_monitor.show()
+
+    def open_trim_calibration_dialog(self):
+        """Open (or focus) the elevator trim calibration dialog.
+
+        Shared entry point for the Utilities menu action and the settings-row
+        'trimcal' button; one dialog instance serves both.
+
+        Trim calibration is MSFS/X-Plane only, so refuse to open (with an
+        explanation) when nothing is loaded or the active aircraft is for a
+        different simulator.
+        """
+        # Offline editing with no aircraft selected: the settings manager
+        # still carries the ONLINE aircraft's identity and offline writes go
+        # nowhere (scope fall-through) — the dialog would show a misleading
+        # limbo state. Refuse with directions instead.
+        if getattr(G.settings_mgr, "offline_mode", False):
+            from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+            if not TrimCalibrationDialog._offline_target_valid():
+                QMessageBox.information(
+                    self, "Elevator Trim Calibration",
+                    "Offline editing mode is active but no aircraft is "
+                    "selected.\n\nChoose a Sim, Class and Aircraft in the "
+                    "Offline Editor Setup panel first, then open the "
+                    "Elevator Trim Calibration tool to view or import its "
+                    "calibrations.")
+                return
+
+        sim = (G.settings_mgr.current_sim or "").upper()
+        if sim not in ("MSFS", "XPLANE"):
+            if sim in ("", "NOTHING"):
+                msg = ("No aircraft is loaded.\n\nLoad into an MSFS or X-Plane "
+                       "aircraft, then open the Elevator Trim Calibration tool.")
+            else:
+                msg = (f"Elevator Trim Calibration is only available for MSFS and "
+                       f"X-Plane.\n\nThe active aircraft is for {sim}.")
+            QMessageBox.information(self, "Elevator Trim Calibration", msg)
+            return
+
+        from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+        if getattr(self, 'trim_cal_dialog', None) is None:
+            # The dialog destroys itself on close (stale-display safety); the
+            # destroyed signal clears this reference so the next open builds
+            # a fresh one against the then-current aircraft.
+            self.trim_cal_dialog = TrimCalibrationDialog(self)
+            self.trim_cal_dialog.result_saved.connect(self.settings_layout.save_trim_calibration)
+            self.trim_cal_dialog.position_mode_changed.connect(
+                self.settings_layout.save_trim_position_mode)
+            self.trim_cal_dialog.destroyed.connect(
+                lambda: setattr(self, 'trim_cal_dialog', None))
+        self.trim_cal_dialog.raise_()
+        self.trim_cal_dialog.activateWindow()
+        self.trim_cal_dialog.show()
+
     def update_settings(self):
         # utils.debug_caller_args('blue')
         self.populate_profile_combo(None) # populate combo with any new profiles
@@ -1969,8 +2293,18 @@ class MainWindow(QMainWindow):
         if source is None:
             return
 
+        # Called only on state transitions (error onset / clear / timeout), so
+        # this is not on the per-frame hot path — traces which state the App
+        # Status area is being driven to.
+        logging.info(f"App status indicator -> {'error' if error else 'paused' if paused else 'running'} (src={source})")
+
         if error:
             self.status_container.set_error(source)
+            # The in-window error notification must show on child instances too
+            # (they are headless but the widget retains state until the user
+            # opens the window). Only the tray icon/popup below stay master-only,
+            # since children have no system tray.
+            self.status_container.request_flag_error.emit(message)
         elif paused:
             self.status_container.set_paused(source)
         else:
@@ -1984,9 +2318,12 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
 
-                self.status_container.flag_error(message)
-
-                self.pop_tray_notification("Error", message, renew_period= 2)
+                # The popup's job is initial attention; the tray icon and
+                # tooltip carry the persistent state.  A short renew period
+                # made a persistent error a metronome - the same message
+                # popped every couple of seconds for as long as it held.
+                self.pop_tray_notification("Error", message,
+                                           renew_period=300)
 
 
             elif paused:
@@ -1997,6 +2334,23 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_run.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
                 # re-show the "current aircraft" label once error cleared
+
+    def on_first_sim_frame(self, src):
+        """Handle first_frame_received: clear the initial 'Waiting' state by
+        flipping the status to Running.
+
+        Guarded against error_state: process_data emits telemetryReceived
+        before first_frame_received, so when the very first frame is the one
+        that raises a config error (common at startup), on_update_telemetry has
+        already set the error indicator by the time this runs. Without this
+        guard the unconditional flip to Running clobbers that error and, since
+        error_state stays set, it is never re-asserted. The paused-in-menus
+        case is unaffected (error_state is False there: Running here, then the
+        telemetry timeout flips it to Paused).
+        """
+        if self.error_state:
+            return
+        self.update_sim_indicators(src, paused=False)
 
 
 
@@ -2056,8 +2410,9 @@ class MainWindow(QMainWindow):
         """
         SELECT_LABEL = 'Select...'
         ADD_NEW_LABEL = "Add New..."
-        if not self.status_container.cb_selectProfileCombo.isEnabled():
-            self.status_container.cb_selectProfileCombo.setEnabled(True)
+        # Profiles belong to the pattern that names the aircraft, so with
+        # nothing matched there are none to pick between and none to add to.
+        self.status_container.set_profile_state(bool(G.settings_mgr.current_pattern))
         if new_items is None:
             new_items = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
@@ -2140,6 +2495,12 @@ class MainWindow(QMainWindow):
                 self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         else:
             xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, profile_name)
+            # Keep the in-memory active profile in sync with the mapping we
+            # just wrote (the Add New path already does this). Without it, the
+            # timed-out reload below re-reads settings through the STALE
+            # profile filter — so the form never appears to change while the
+            # sim is paused — and the notes dialog targets the old profile.
+            G.settings_mgr.update_state_vars(active_profile=profile_name)
             if G.telem_manager.timed_out:
                 self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=profile_name)
         if G.telem_manager.timed_out:
@@ -2160,6 +2521,9 @@ class MainWindow(QMainWindow):
         logging.info(f"Application Status: clearing display after {src} exit")
         self.lbl_effects_data.setText("")
         self.status_container.reset_sim_state(src)
+        # reset_sim_state disabled the notes button; drop the dedupe context
+        # so the next aircraft load re-evaluates it even if identical.
+        self._profile_notes_shown = None
         self.settings_layout.clear_layout()
         self.telemetry_timed_out = False
 
@@ -2214,6 +2578,10 @@ class MainWindow(QMainWindow):
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)
 
+            # Keep the scoped device-status indicators current (deduped; only
+            # repaints when the scoped device's reported state changes).
+            self.refresh_scope_status_indicators()
+
             if G.child_instance:
                 child_effects = str(G.effects.dict.keys())
                 if child_effects:
@@ -2221,10 +2589,6 @@ class MainWindow(QMainWindow):
 
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
-            pct_max_a = data.get('_pct_max_a', 0)
-            pct_max_e = data.get('_pct_max_e', 0)
-            pct_max_r = data.get('_pct_max_r', 0)
-            pct_steer_f = data.get('_pct_steer_f', 0)
             qcolor_green = QColor("#17c411")
             qcolor_grey = QColor("grey")
             if window_mode == 1:
@@ -2248,28 +2612,11 @@ class MainWindow(QMainWindow):
                     slidername = my_slider.objectName().replace('sld_', '')
                     my_slider.blockSignals(True)
 
-                    if slidername == 'max_elevator_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_e)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_e *100)}%")
-                        # print(int(pct_max_e * 100))
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'max_aileron_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_a)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_a * 100)}%")
-                        # print(new_color)
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'max_rudder_coeff':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_r)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_r * 100)}%")
-                        # print(new_color)
-                        my_slider.blockSignals(False)
-                        continue
-                    if slidername == 'steering_friction_intensity':
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_steer_f)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct_steer_f * 100)}%")
-                        # print(new_color)
+                    live_key = self.N_SLIDER_LIVE_KEYS.get(slidername)
+                    if live_key is not None:
+                        pct = min(data.get(live_key, 0), 1.0)
+                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
+                        my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
                         my_slider.blockSignals(False)
                         continue
                     for a_s in active_settings:
@@ -2285,19 +2632,34 @@ class MainWindow(QMainWindow):
 
             if error_cond is None:  # no 'error' key in telemetry
                 if self.telemetry_timed_out or self.error_state:  # only set status to run if previously debug_timed out or error status was true
-                    if not self.error_clean_counter:  # avoid flapping due to ipc_telem not populating on every frame due to thread timing between instances
+                    # Hold the error state for a wall-clock window after the
+                    # last sighting: a child instance's error arrives over
+                    # IPC on whichever master frames happen to catch it, so
+                    # error-free frames BETWEEN sightings are routine.  The
+                    # old debounce counted 5 frames, a window that shrank
+                    # with sim frame rate (~30ms at 150fps) - thread timing
+                    # alone could flap clear->onset, and every re-onset
+                    # popped the tray notification again.
+                    if time.monotonic() - self._error_last_seen >= self.ERROR_CLEAR_HOLD_S:
+                        if self.error_state:
+                            logging.info("App status error cleared by an error-free frame (hold window elapsed)")
                         self.update_sim_indicators(data.get('src'), paused=False)
                         self.error_state = False
                         self.telemetry_timed_out = False
-                        self.status_container.clear_error()
-                    else:
-                        self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
+                        self.status_container.request_clear_error.emit()
+                        # The condition was rectified: drop the flag_error
+                        # records this session logged into the exception
+                        # tracker so it agrees with the (cleared) app status
+                        for msg in self.flagged_error_msgs:
+                            G.exception_tracker.remove_matching(msg)
+                        self.flagged_error_msgs.clear()
             elif error_cond is not None:
 
-                self.error_clean_counter = 5
+                self._error_last_seen = time.monotonic()
                 if not self.error_state:  # only set error status once when there is error cond but state is not yet true
                     self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
                     logging.error(error_cond)
+                    self.flagged_error_msgs.add(error_cond)
                     self.error_state = True
 
 
@@ -2309,10 +2671,17 @@ class MainWindow(QMainWindow):
                 new_sim = data.get('src', None)
                 new_aircraft = data.get('N', None)
                 new_class = G.settings_mgr.current_class
+                self.trim_cal_prompt_button.hide()  # profile creation first
                 if G.master_instance:
                     if not self.new_craft_button.isVisible():
-                        self.new_craft_button.clicked.connect(lambda: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
+                        self.new_craft_button.setText(
+                            "<a href='#newcraft' style='color:white; text-decoration:none;'>"
+                            "<span style='font-weight:500;'>No Profile Found for </span>"
+                            f"<b>{html.escape(str(new_aircraft or ''))}</b>"
+                            "<span style='font-weight:500;'> — Click Here to Create a New Profile</span></a>")
+                        self.new_craft_button.linkActivated.connect(lambda _: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
                         self.new_craft_button.show()
+                        self._new_craft_anim.start()
 
                     if not data.get('STOP', False):
                         if not self.new_craft_notification_sent:
@@ -2328,8 +2697,11 @@ class MainWindow(QMainWindow):
 
 
             else:
-                self.new_craft_button.hide()
+                if self.new_craft_button.isVisible():
+                    self.new_craft_button.hide()
+                    self._new_craft_anim.stop()
                 self.new_craft_notification_sent = False
+                self._update_trim_cal_prompt()
 
             # Update the status labels and profile selection box
             self.status_container.set_fullname(data.get('N', ''))
@@ -2346,9 +2718,9 @@ class MainWindow(QMainWindow):
                 if self.teleplot_dialog.isVisible:
                     update_telem_vars = True
 
-            if window_mode == 0 or update_telem_vars:
-                self.lbl_telem_data.setText(telem_items)
-                self.lbl_effects_data.setText(active_effects)
+            # if window_mode == 0 or update_telem_vars:
+            self.lbl_telem_data.setText(telem_items)
+            self.lbl_effects_data.setText(active_effects)
 
         except Exception:
             logging.exception("Exception")
@@ -2391,10 +2763,168 @@ class MainWindow(QMainWindow):
         self.status_container.cur_craft_label.setText(craft)
         self.status_container.cur_pattern_label.setText(pattern)
         self.status_container.active_profile_label.setText(profile)
+        # The resolved pattern, not the label: with nothing matched the label
+        # reads "Using defaults", which has no profiles to pick between.
+        self.status_container.set_profile_state(
+            bool(craft) and bool(G.settings_mgr.current_pattern) and G.master_instance
+            and G.settings_mgr.current_sim not in ('', 'nothing')
+            and not G.settings_mgr.offline_mode)
+        self.refresh_profile_notes_button()
+
+    def refresh_telem_override_pill(self, force=False):
+        """Update the telemetry-override pill in the status area for the
+        current aircraft context. SimConnect/Dataref overrides are
+        aircraft-scoped (every device instance subscribes the same set), so
+        unlike the vpconf/gains indicators there is no per-device scope or
+        IPC handling. Rides the same telemetry-update cadence as the
+        profile-notes button, with the same context deduplication so the
+        XML is not re-read every frame."""
+        sim = G.settings_mgr.current_sim
+        aircraft = G.settings_mgr.current_aircraft_name
+        ctx = (sim, aircraft, G.settings_mgr.current_pattern)
+        if not force and ctx == getattr(self, '_telem_ovd_shown', None):
+            return
+        self._telem_ovd_shown = ctx
+        text, tip = '', ''
+        if sim in ('MSFS', 'XPLANE') and aircraft:
+            try:
+                overrides = xmlutils.read_sc_overrides(aircraft)
+            except Exception:
+                logging.exception('Failed to read sc_overrides for status pill')
+                overrides = []
+            if overrides:
+                n_def = sum(1 for o in overrides if o.get('source') == 'defaults')
+                n_usr = len(overrides) - n_def
+                parts = ([f'Default ({n_def})'] if n_def else []) + \
+                        ([f'User ({n_usr})'] if n_usr else [])
+                text = ' + '.join(parts)
+                lines = [f"{o['name']}  ←  {o['var']}   [{o['source']}]"
+                         for o in overrides[:15]]
+                if len(overrides) > 15:
+                    lines.append(f"... and {len(overrides) - 15} more")
+                tip = ('Active SimConnect/Dataref overrides for this aircraft\n'
+                       '(Utilities → SimConnect/Dataref Overrides Editor):\n\n'
+                       + '\n'.join(lines))
+        self.status_container.request_set_telem_overrides.emit(text, tip)
+
+    def refresh_profile_notes_button(self):
+        """Update the profile-notes button (enabled + notes-exist tint) for
+        the current aircraft/profile context. Runs from the telemetry update
+        path, so repeat contexts are deduplicated to avoid re-reading the
+        XML tables every frame."""
+        self.refresh_telem_override_pill()
+        sim = G.settings_mgr.current_sim
+        aircraft = G.settings_mgr.current_aircraft_name
+        pattern = G.settings_mgr.current_pattern
+        profile = G.settings_mgr.active_profile
+        ctx = (sim, aircraft, pattern, profile)
+        if ctx == getattr(self, '_profile_notes_shown', None):
+            return
+        self._profile_notes_shown = ctx
+        # A note is written against the pattern that names the aircraft, so
+        # with nothing matched there is nothing to attach one to: the dialog
+        # would open, fail to save and log an error.
+        enabled = bool(aircraft) and bool(pattern) and sim not in ('', 'nothing')
+        has_notes = False
+        if enabled:
+            target = profile if profile and str(profile).lower() not in ('none', 'built-in', 'default') else 'Auto User'
+            # Same tiers the dialog shows: curated defaults type notes, user
+            # default (user config type row) notes, and the active profile's
+            # own note — never another profile's.
+            has_notes = bool(
+                xmlutils.read_default_model_notes(sim, aircraft, prefer_pattern=pattern)
+                or xmlutils.read_user_default_model_notes(sim, pattern)
+                or xmlutils.read_user_model_notes(sim, pattern, target))
+        self.status_container.set_notes_state(enabled, has_notes)
+
+    def open_profile_notes_dialog(self):
+        dlg = ProfileNotesDialog(self)
+
+        def on_saved():
+            # Force a re-read so the button tint reflects the new note state.
+            self._profile_notes_shown = None
+            self.refresh_profile_notes_button()
+
+        dlg.notes_saved.connect(on_saved)
+        dlg.show()
 
     def new_ac_wizard_finished(self):
         self.new_craft_button.setVisible(False)
+        self._new_craft_anim.stop()
+        # The wizard just wrote the type row and the profile mapping. The
+        # telemetry loop only re-resolves the active profile when a frame
+        # notices the config change; a setting changed before that frame
+        # (sim paused, in a menu) would be written against the stale None
+        # profile, as a row that belongs to no profile. Re-resolve now, so
+        # the form we reload below already edits the new profile.
+        if not G.settings_mgr.offline_mode and G.telem_manager is not None:
+            G.telem_manager.refresh_aircraft_profile()
         self.settings_layout.reload_layout(None)
+
+    def _update_trim_cal_prompt(self):
+        """Show the trim-calibration discovery prompt when the loaded
+        MSFS/X-Plane aircraft has a matched profile, its config RESOLVES the
+        trim-curve setting, and no calibration is stored.
+
+        Availability is stamped ONCE per aircraft load by
+        TelemManager._stamp_trim_cal_availability from the "!class"
+        exclusion markers in defaults.xml — the same data that hides the
+        curve settings rows for helicopter classes — so this method only
+        reads two attributes per pass. Prereq VALUES are deliberately not
+        part of availability: trim_following defaults off, and users who
+        have not enabled it yet are exactly the audience this prompt exists
+        for (the calibration dialog's banner walks them through enabling).
+
+        Self-maintaining thereafter: a saved (or imported) calibration
+        populates the aircraft's parsed curve family and hides the prompt;
+        deleting the last calibration brings it back."""
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        show = (G.master_instance and G.device_type == "joystick"
+                and ac is not None
+                and getattr(ac, "_trim_cal_available", False)
+                and getattr(ac, "_trim_curve_y_fam", None) is None)
+        if show != self.trim_cal_prompt_button.isVisible():
+            self.trim_cal_prompt_button.setVisible(show)
+            if show:
+                self._trim_prompt_anim.start()
+            else:
+                self._trim_prompt_anim.stop()
+
+    def _style_new_craft_button(self, v):
+        """One pulse frame for the new-aircraft prompt: a red pill breathing
+        dim<->bright, white text and border (weights come from the rich
+        text — bold aircraft name, medium fixed words)."""
+        r = int(150 + (225 - 150) * v)
+        g = int(28 + (45 - 28) * v)
+        b = int(28 + (45 - 28) * v)
+        self.new_craft_button.setStyleSheet(f"""QLabel {{
+                            background-color: rgb({r}, {g}, {b});
+                            border: 3px solid white;
+                            border-radius: 17px;
+                            color: white;
+                            padding: 8px 18px;
+                        }}
+                        QLabel:hover {{
+                            background-color: #ef5350;
+                        }}""")
+
+    def _style_trim_cal_prompt(self, v):
+        """One pulse frame for the discovery prompt: a mustard pill (same
+        family as the Paused status badge) breathing between dim and bright,
+        solid fill so the black text keeps contrast throughout."""
+        r = int(130 + (242 - 130) * v)
+        g = int(100 + (180 - 100) * v)
+        b = int(12 + (34 - 12) * v)
+        self.trim_cal_prompt_button.setStyleSheet(f"""QLabel {{
+                            background-color: rgb({r}, {g}, {b});
+                            border: 3px solid black;
+                            border-radius: 17px;
+                            color: black;
+                            padding: 8px 18px;
+                        }}
+                        QLabel:hover {{
+                            background-color: #f5bc28;
+                        }}""")
 
 
     def perform_update(self, auto=True):
@@ -2422,8 +2952,17 @@ class MainWindow(QMainWindow):
         if self._update_available:
             update_ans = QMessageBox.StandardButton.Yes
             if auto:
+                # Rich text so the release-notes link is clickable; clicking
+                # it opens the browser without closing the dialog.
                 update_ans = QMessageBox.information(self, "Update Available!!",
-                                                     f"A new version of TelemFFB is available ({self.latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
+                                                     f"A new version of TelemFFB is available (<b>{self.latest_version}</b>).<br><br>"
+                                                     f"<a href='{G.release_notes_url}'>View the release notes</a> to see what's new.<br><br>"
+                                                     f"Would you like to automatically download and install it now?<br><br>"
+                                                     f"You may also update later from the Utilities menu, or the "
+                                                     f"next time TelemFFB starts.<br><br>"
+                                                     f"~~ Note ~~ If you no longer wish to see this message on startup, "
+                                                     f"you may enable `ignore_auto_updates` in your user config. "
+                                                     f"You will still be able to update via the Utilities menu",
                                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
             if update_ans == QMessageBox.StandardButton.Yes:

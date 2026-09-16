@@ -72,11 +72,23 @@ class MockInputData:
 
 class MockFFBDevice:
     """Mock FFB device for testing."""
-    
+
     def __init__(self):
         self._input_data = MockInputData()
+        self._connected = True
         self.axis_override_commands = []
+        # full native capability set: existing tests model the VPforce device
+        from telemffb.hw.ffb_backend import VPFORCE_CAPABILITIES
+        self.caps = VPFORCE_CAPABILITIES
     
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    def set_connected(self, value: bool):
+        self._connected = value
+
     def get_input(self) -> MockInputData:
         """Return mock input data."""
         return self._input_data
@@ -88,12 +100,16 @@ class MockFFBDevice:
     def supports_axis_override(self):
         import telemffb.globals as G
         import re
-        if G.device_firmware_version is None:
+        ver_str = getattr(G, "device_firmware_version", None)
+        if ver_str is None:
             return False
         # v1.0.18b14 -> 101814, v1.0.18 -> 1018
         # Use numeric comparison to ensure beta versions (>1018) pass
-        ver = int(re.sub(r'\D', '', G.device_firmware_version))
-        return ver > 1018
+        # Non-numeric placeholders (e.g. "Unknown") yield no digits -> unsupported.
+        digits = re.sub(r'\D', '', str(ver_str))
+        if not digits:
+            return False
+        return int(digits) > 1018
 
     def send_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
         self.axis_override_commands.append(
@@ -148,8 +164,9 @@ class MockConditionEffect:
         self.start_count += 1
         return self
     
-    def stop(self):
-        """Stop the effect."""
+    def stop(self, *args, **kwargs):
+        """Stop the effect.  Accepts and ignores the production
+        ``destroy_after`` timeout the motion effects pass."""
         self.started = False
         if self._envelope_once:
             self._envelope = None
@@ -192,6 +209,19 @@ class MockConditionEffect:
         # Store as magnitude/direction (polar form)
         self._magnitude = magnitude
         self._direction = direction
+        return self
+
+    def periodic(self, frequency=0, magnitude=0, direction=0, *args, **kwargs):
+        """Set periodic effect parameters (rumble/vibration; chainable).
+
+        Mirrors production's refusal of a positional waveform (only a
+        DirectionModulator class as ``direction`` may take extra
+        positional arguments), so a stray call site fails the suite
+        instead of silently rendering as sine."""
+        from telemffb.utils import DirectionModulator
+        if args and not (isinstance(direction, type) and issubclass(direction, DirectionModulator)):
+            raise TypeError("periodic(): pass the waveform as effect_type=")
+        self._periodic = (frequency, magnitude, direction, kwargs)
         return self
     
     def setEffect(self):
@@ -301,6 +331,12 @@ class MockEffectDispenser:
         if key not in self._effects:
             self._effects[key] = MockConditionEffect(key)
         return self._effects[key]
+
+    def __contains__(self, key: str) -> bool:
+        """Mirror the real Dispenser: membership checks the dict and must
+        not fall back to the legacy __getitem__(0), (1), ... iteration
+        protocol, which never terminates on a create-on-access mapping."""
+        return key in self._effects
     
     def get(self, key: str, default=None):
         """Get effect by name with optional default."""
@@ -403,13 +439,30 @@ class MockSpringCondition:
         self.negativeSaturation = 0
     
     def set_coefficient(self, coefficient, override=False):
-        """Set spring coefficient."""
+        """Set spring coefficient.
+
+        .. note::
+            Intentionally does **not** mimic the production FFBReport_SetCondition
+            type-sniffing contract (float in [-1..1] gets scaled by 4096
+            internally). This mock stores whatever value it is given, both
+            int device units and normalized floats pass through unchanged.
+            Tests that assert a specific device-unit value (e.g.,
+            ``assert x_offset == int(0.3 * 4096)``) verify the caller's
+            normalization convention, not the production scaling. Keep this
+            pass-through when adding assertions, and treat any test that
+            depends on the mock performing the 4096 scaling as a bug."""
         self.positiveCoefficient = coefficient
         self.negativeCoefficient = coefficient
-    
+
     def set_offset(self, offset):
-        """Set spring offset."""
-        self.cpOffset = int(offset * 4096) if abs(offset) <= 1 else int(offset)
+        """Set spring offset.
+
+        Mirrors the production FFBReport_SetCondition.set_offset contract:
+        a normalized float (|value| <= 1) is scaled by 4096 and rounded; a
+        device-unit int (|value| > 1) passes through unchanged. The magnitude
+        heuristic stands in for the production int-vs-float type sniff.
+        """
+        self.cpOffset = round(offset * 4096) if abs(offset) <= 1 else int(offset)
 
 
 class BaseTelemetryEffectTestCase:
@@ -487,12 +540,17 @@ class BaseTelemetryEffectTestCase:
                 self.aoa_effect_gain = 0.5
                 # self.steering_friction = 0
                 # self.steering_friction_spring = 0
-                self.joystick_trim_follow_gain_physical_x = 0
-                self.joystick_trim_follow_gain_physical_y = 0
-                self.joystick_trim_follow_gain_virtual_x = 0
-                self.joystick_trim_follow_gain_virtual_y = 0
-                self.rudder_trim_follow_gain_physical_x = 0
-                self.rudder_trim_follow_gain_virtual_x = 0
+                # Trim-following gains mirror the SHIPPED defaults
+                # (defaults.xml), not zero: a test that does not set them
+                # should exercise the configuration users actually fly.
+                # Zeroes silently scaled trim-following contributions to
+                # nothing, which read as passing tests for the wrong reason.
+                self.joystick_trim_follow_gain_physical_x = 1.0
+                self.joystick_trim_follow_gain_physical_y = 1.0
+                self.joystick_trim_follow_gain_virtual_x = 0.2
+                self.joystick_trim_follow_gain_virtual_y = 0.2
+                self.rudder_trim_follow_gain_physical_x = 1.0
+                self.rudder_trim_follow_gain_virtual_x = 0.2
                 self.joystick_x_axis_scale = 1.0
                 self.joystick_y_axis_scale = 1.0
                 self.rudder_x_axis_scale = 1.0

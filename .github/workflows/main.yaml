@@ -1,9 +1,12 @@
 name: Release build
 
-on: 
+on:
   push:
     tags:
-    - '*'
+    # Release-shaped tags only (2.1.260823, 2.0.251007_p1).  Every tag used
+    # to build and publish - a stray alpha/build tag pushed by accident went
+    # straight to the download server as "latest", twice.
+    - '[0-9]+.[0-9]+.[0-9]+*'
 
 jobs:
   build:

@@ -14,7 +14,7 @@ synthetic telemetry.  Coverage follows plan section 8:
 - axis ownership under both telemffb_controls_axes modes
 """
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests.framework.base import BaseTelemetryEffectTestCase
 from tests.framework.utils import TelemetryDataBuilder
@@ -1024,3 +1024,98 @@ class TestFFBApiSettingsScope:
                   for cd in self._class_defaults(root)
                   if cd.findtext("type") != self.OWNER}
         assert strays == set()
+
+
+# ───────────────────────────────────────────────────────────────
+# Handler retirement (TelemManager) — the path on_timeout does not cover
+# ───────────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+class TestAircraftRetirement:
+    """An aircraft change produces no timeout, so it needs its own release.
+
+    Before on_shutdown() existed, _initialize_new_aircraft replaced currentAircraft
+    outright: the outgoing handler was never told it was finished, and under the FFB
+    API that left L:FFB_<CONTROL>_ENABLED at 1 for the aircraft that followed.
+    """
+
+    @pytest.fixture
+    def mgr(self, monkeypatch):
+        """A TelemManager with only the globals these paths touch stubbed out."""
+        import types
+        import telemffb.globals as G
+        from telemffb.telem.TelemManager import TelemManager
+        monkeypatch.setattr(G, "settings_mgr",
+                            types.SimpleNamespace(timed_out=False, active_profile=None),
+                            raising=False)
+        monkeypatch.setattr(G, "ipc_instance", None, raising=False)
+        return TelemManager()
+
+    def test_retire_calls_on_shutdown_and_clears_the_handler(self, mgr):
+        aircraft = MagicMock()
+        mgr.currentAircraft = aircraft
+
+        mgr._retire_current_aircraft()
+
+        aircraft.on_shutdown.assert_called_once_with()
+        assert mgr.currentAircraft is None
+
+    def test_retire_is_idempotent(self, mgr):
+        mgr.currentAircraft = None
+        mgr._retire_current_aircraft()  # must not raise
+        assert mgr.currentAircraft is None
+
+    def test_a_failing_shutdown_still_drops_the_handler(self, mgr):
+        """A broken handler must not pin itself in place or break the next load."""
+        aircraft = MagicMock()
+        aircraft.on_shutdown.side_effect = RuntimeError("boom")
+        mgr.currentAircraft = aircraft
+
+        mgr._retire_current_aircraft()
+
+        assert mgr.currentAircraft is None
+
+    def test_manager_shutdown_retires_the_handler(self, mgr):
+        """utils.exit_application() drives this on the quit path."""
+        aircraft = MagicMock()
+        mgr.currentAircraft = aircraft
+        mgr.currentAircraftName = "TestHeli"
+
+        mgr.on_shutdown()
+
+        aircraft.on_shutdown.assert_called_once_with()
+        assert mgr.currentAircraft is None
+        assert mgr.currentAircraftName is None
+
+    def test_sim_exit_retires_the_handler(self, mgr):
+        """notify_sim_exited must release before the effect sweep, not instead of it."""
+        aircraft = MagicMock()
+        mgr.currentAircraft = aircraft
+        mgr._sim_exit_signaled = False
+        mgr.sim_exited = MagicMock()
+
+        with patch("telemffb.telem.TelemManager.HapticEffect") as haptic:
+            haptic.destroy_all.return_value = 0
+            mgr.notify_sim_exited("MSFS")
+
+        aircraft.on_timeout.assert_called_once_with()
+        aircraft.on_shutdown.assert_called_once_with()
+        haptic.destroy_all.assert_called_once_with()
+        assert mgr.currentAircraft is None
+
+    def test_sim_exit_sweeps_effects_even_if_on_timeout_raises(self, mgr):
+        """Upstream's hardening: a crashing hook must not abort the cleanup."""
+        aircraft = MagicMock()
+        aircraft.on_timeout.side_effect = RuntimeError("boom")
+        mgr.currentAircraft = aircraft
+        mgr._sim_exit_signaled = False
+        mgr.sim_exited = MagicMock()
+
+        with patch("telemffb.telem.TelemManager.HapticEffect") as haptic:
+            haptic.destroy_all.return_value = 2
+            mgr.notify_sim_exited("MSFS")
+
+        aircraft.on_shutdown.assert_called_once_with()
+        haptic.destroy_all.assert_called_once_with()
+        assert mgr.currentAircraft is None

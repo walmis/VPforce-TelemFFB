@@ -43,8 +43,39 @@ for p in paths:
     except:
         pass
 
+import telemffb.hw.ffb_backend as ffb_backend
 import telemffb.hw.hid as hid
 from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
+
+
+#: Exponential backoff schedule (seconds) for hot-unplug reconnect
+#: attempts: 1s, 3s, 9s, 27s, then capped at 30s per attempt.
+RECONNECT_BACKOFF_S = (1, 3, 9, 27, 30)
+
+
+def _next_reconnect_delay(attempts: int) -> float:
+    """Seconds to wait before the given (0-based) reconnect attempt.
+
+    Capped at the end of the schedule: attempts beyond the last entry
+    wait the final (30 s) delay indefinitely until the device returns.
+    """
+    idx = min(attempts, len(RECONNECT_BACKOFF_S) - 1)
+    return float(RECONNECT_BACKOFF_S[idx])
+
+
+class HIDDisconnectedError(Exception):
+    """Raised by a state-safe HID primitive when the device handle is gone.
+
+    The underlying ``hid`` layer reports a dead handle in several ways
+    (``None`` after ``timerEvent`` clears it, or a native ``HIDException``
+    from a failed ``hid_read``/``hid_write``).  Rather than letting an
+    ``assert`` (stripped under ``-O``) or a raw ``HIDException`` escape into
+    the 60-120 Hz telemetry hot path, every primitive that dereferences the
+    handle raises this single, catchable exception instead.  Callers on the
+    hot path (effect ``start``/``stop``) do not even need to catch it: they
+    check ``device.connected`` first and no-op.
+    """
+
 
 USB_REQTYPE_DEVICE_TO_HOST = 0x80
 USB_REQTYPE_VENDOR = 0x40
@@ -629,26 +660,66 @@ input_report_handlers = {
     HID_REPORT_ID_PID_STATE_REPORT: FFBReport_PIDStatus_Input
 }
 
-class FFBEffectHandle:
+class FFBEffectHandle(ffb_backend.BaseEffectHandle):
     def __init__(self, device, effect_id, effect_type) -> None:
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
         self.type = effect_type
         self._finalizer = weakref.finalize(self, lambda ref: ref() and ref().destroy(), weakref.ref(self))
         self._cache = {}
+        self._cache_device_alive = True  # liveness snapshot for change-cache flushes
         self._started = False
 
     def invalidate(self):
+        # The block is gone, so the playback state is gone with it (the
+        # DInput handle's invalidate does the same); the owning effect
+        # re-creates and re-starts on the next live frame.
         self.effect_id = 0
+        self._started = False
+
+    def _device_alive(self) -> bool:
+        """Whether the handle's HID handle can still be written to.
+
+        ``self.ffb`` is the exact device this handle was allocated on (the same
+        object as ``HapticEffect.device`` in normal operation).  After a
+        hot-unplug ``timerEvent`` clears its ``_dev``, so ``connected`` is the
+        single source of truth for whether a device write would succeed.
+        """
+        dev = self.ffb
+        return dev is not None and dev.connected
 
     def _data_changed(self, key, data) -> bool:
         h = hash(data)
+        alive = self._device_alive()
+        if alive != self._cache_device_alive:
+            # Liveness flipped: while dead, writes were skipped, so the
+            # cache no longer reflects what the firmware actually holds.
+            # Forget it, and the current value re-sends once.
+            self._cache.clear()
+            self._cache_device_alive = alive
         if not self._cache.get(key):
             self._cache[key] = h
             return True
         changed = self._cache[key] != h
         self._cache[key] = h
-        return changed  
+        return changed
+
+    def forget_playback(self):
+        """Clear in-memory playback state without touching the device."""
+        self._started = False
+
+    def _write(self, data) -> int:
+        """Offline-safe device write for per-frame configuration writers.
+
+        A dead handle (hot-unplug or failed open) must not raise into the
+        60-120 Hz telemetry path, so the write is skipped.  The change
+        cache is flushed on the dead->alive transition (see
+        ``_data_changed``), so skipped configuration re-sends exactly once
+        after the device returns.
+        """
+        if not self._device_alive():
+            return 0
+        return self.ffb.write(data)
 
     def __del__(self):
         self.destroy()
@@ -678,6 +749,15 @@ class FFBEffectHandle:
         return self
 
     def stop(self):
+        if not self._device_alive():
+            # Handle is dead (hot-unplugged or never opened): clear the
+            # in-memory playback state only.  The device write would raise
+            # HIDDisconnectedError, which must never reach the 60-120 Hz
+            # timeout path.  The effect replays automatically on recovery.
+            logging.debug(
+                f"FFBEffectHandle.stop: device disconnected, no-op for block {self.effect_id}")
+            self._started = False
+            return self
         op = FFBReport_EffectOperation(effectBlockIndex=self.effect_id, operation=OP_STOP)
         self.ffb.write(bytes(op))
         self._started = False
@@ -685,9 +765,14 @@ class FFBEffectHandle:
 
     def destroy(self):
         if self.effect_id:
-            logging.debug(f"Destroying effect {self.effect_id} ({effect_names[self.type]})")
-            op = FFBReport_BlockFree(effectBlockIndex=self.effect_id)
-            self.ffb.write(bytes(op))
+            if self._device_alive():
+                op = FFBReport_BlockFree(effectBlockIndex=self.effect_id)
+                self.ffb.write(bytes(op))
+            else:
+                # The device block is gone with the handle; freeing it
+                # in-memory only keeps the finalizer/teardown paths exception-free.
+                logging.debug(
+                    f"FFBEffectHandle.destroy: device disconnected, freeing block {self.effect_id} in-memory only")
             self.type = 0
             self.effect_id = None
             self._started = False
@@ -697,6 +782,7 @@ class FFBEffectHandle:
 
         :param magnitude: Magnitude [-1..1]
         :type magnitude: float
+        Note: float in [-1..1] is scaled by 4096 internally and clamped (see :class:`FFBReport_SetCondition`)
         :param direction: Direction in degrees [0..360]
         :type direction: float
         """
@@ -705,8 +791,15 @@ class FFBEffectHandle:
             logging.warn("setConstantForce on an invalidated effect")
             return
 
-        assert(self.type == EFFECT_CONSTANT)
-        assert(magnitude >= -1.0 and magnitude <= 1.0)
+        if self.type != EFFECT_CONSTANT:
+            logging.warning("setConstantForce called on a non-constant effect (type=%s), ignoring", self.type)
+            return
+        if not -1.0 <= magnitude <= 1.0:
+            # Don't assert in the 60-120 Hz telemetry path; clamp and warn once
+            if not getattr(self, "_magnitude_clamp_warned", False):
+                logging.warning("setConstantForce magnitude %s out of [-1, 1], clamping", magnitude)
+                self._magnitude_clamp_warned = True
+            magnitude = clamp(magnitude, -1.0, 1.0)
 
         direction %= 360
         direction = round((direction*255/360))
@@ -715,7 +808,7 @@ class FFBEffectHandle:
 
         op = bytes(FFBReport_SetConstantForce(magnitude=round(4096*magnitude), effectBlockIndex=self.effect_id))
         if self._data_changed("SetConstantForce", op): 
-            self.ffb.write(op)
+            self._write(op)
 
         return self
 
@@ -730,7 +823,7 @@ class FFBEffectHandle:
 
         op = bytes(FFBReport_SetEffect(**args))
         if self._data_changed("setEffect", op):  
-            self.ffb.write(op)
+            self._write(op)
     
     def setCondition(self, cond : FFBReport_SetCondition):
         cond.effectBlockIndex = self.effect_id
@@ -744,7 +837,7 @@ class FFBEffectHandle:
             cond.negativeCoefficient = clamp(cond.negativeCoefficient, -4096, 4096)
         data = bytes(cond)
         if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
-            self.ffb.write(data)
+            self._write(data)
 
     def setEnvelope(self, envelope: FFBReport_SetEnvelope):
         """Set envelope parameters for the effect.
@@ -755,11 +848,18 @@ class FFBEffectHandle:
         envelope.effectBlockIndex = self.effect_id
         data = bytes(envelope)
         if self._data_changed("setEnvelope", data):
-            self.ffb.write(data)
+            self._write(data)
 
     def setPeriodic(self, freq, magnitude, direction, duration=0, **kwargs):
-        assert(self.type in PERIODIC_EFFECTS)
-        assert(magnitude >= 0 and magnitude <= 1.0)
+        if self.type not in PERIODIC_EFFECTS:
+            logging.warning("setPeriodic called on a non-periodic effect (type=%s), ignoring", self.type)
+            return self
+        if not 0 <= magnitude <= 1.0:
+            # Don't assert in the 60-120 Hz telemetry path; clamp and warn once
+            if not getattr(self, "_magnitude_clamp_warned", False):
+                logging.warning("setPeriodic magnitude %s out of [0, 1], clamping", magnitude)
+                self._magnitude_clamp_warned = True
+            magnitude = clamp(magnitude, 0, 1)
         direction %= 360
         direction = round(direction*255/360)
 
@@ -774,7 +874,7 @@ class FFBEffectHandle:
         op = bytes(FFBReport_SetPeriodic(magnitude=mag, effectBlockIndex=self.effect_id, period=period, **kwargs))
 
         if self._data_changed("SetPeriodic", op):
-            self.ffb.write(op)
+            self._write(op)
 
         return self
 
@@ -800,10 +900,14 @@ class DeviceInfo:
         """Returns the device name set in the VPforce Configurator"""
         return self.product_string.replace("Rhino FFB ", "").strip()
 
-class FFBRhino(QObject):
-    buttonPressed = pyqtSignal(int)
-    buttonReleased = pyqtSignal(int)
-    deviceConnected = pyqtSignal(bool)
+class FFBRhino(ffb_backend.BaseFFBDevice):
+    # signals (buttonPressed/buttonReleased/deviceConnected) are defined on
+    # BaseFFBDevice; the native VPforce backend carries the full capability set
+    deviceReconnected = pyqtSignal()
+
+    @property
+    def caps(self) -> ffb_backend.DeviceCapabilities:
+        return ffb_backend.VPFORCE_CAPABILITIES
 
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path : Optional[str] = None) -> None:
 
@@ -829,20 +933,80 @@ class FFBRhino(QObject):
         self._in_reports = {}
         self._effect_handles : List[FFBEffectHandle] = []
         self._dev = None
+        self._shutdown = False
 
-        QObject.__init__(self)
-        self.startTimer(1) # start Qt timer to read HID reports every 1ms
+        # hot-unplug recovery bookkeeping (see reconnect()/timerEvent)
+        self._reconnect_attempts = 0
+        self._reconnect_pending = False
+        self._last_connected: Optional[bool] = None
+
+        super().__init__()
+        self._timer_id = self.startTimer(1) # start Qt timer to read HID reports every 1ms
 
         self.reconnect()
+        self._emit_connection_state()
 
-    def reconnect(self):
-        if self._dev:
-            self._dev.close()
+    def reconnect(self) -> bool:
+        """Reopen the HID handle, returning True on success.
+
+        Re-enumerates by PID instead of reusing the path captured at the
+        last successful open: USB path strings change when the board is
+        replugged (different port, hub, or OS-assigned suffix), so the
+        stored path is not a stable identity - reusing it is exactly why
+        the old reconnect loop never recovered from a replugged board.
+        When a serial number is known, that specific board is preferred.
+        """
+        if self._dev is not None:
+            try:
+                self._dev.close()
+            except Exception:
+                pass
             self._dev = None
 
+        devs = FFBRhino.enumerate(self.pid)
+        known_serial = getattr(self, 'info', None)
+        if known_serial is not None and known_serial.serial_number:
+            same = [d for d in devs if d.serial_number == known_serial.serial_number]
+            if same:
+                devs = same
+        if not devs:
+            raise hid.HIDException(f'no {self.vid:04X}:{self.pid:04X} device found')
+
+        self.info = devs[0]
         self._dev = hid.Device(path=self.info.path)
         self._dev.nonblocking = True
+        return True
 
+    def shutdown(self):
+        """Release the device deliberately (live device switch).
+
+        The read timer and the unplug-reconnect loop both exist to keep a
+        process-lifetime device alive at all costs; a deliberate close must
+        stop them, or a queued reconnect would silently re-open the old
+        hardware behind the new one.
+        """
+        self._shutdown = True
+        try:
+            self.killTimer(self._timer_id)
+        except Exception:
+            pass
+        if self._dev:
+            try:
+                self._dev.close()
+            except Exception:
+                pass
+            self._dev = None
+        logging.info(f"HID device released: {self.info.product_string}")
+
+    @property
+    def connected(self) -> bool:
+        """Whether the HID handle is currently open.
+
+        False after a failed read / hot-unplug until reconnect() succeeds.
+        _in_reports intentionally keeps the last (stale) report after a
+        disconnect, so handle state is the only reliable liveness signal.
+        """
+        return self._dev is not None
     @property
     def serial(self):
         if not self._dev:
@@ -879,14 +1043,18 @@ class FFBRhino(QObject):
 
     # Get global effect slider values as seen in VPConfigurator
     def get_gains(self) -> FFBReport_Get_Gains_Feature_Data:
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("get_gains: HID device is not connected")
         d = self._dev.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
         data = FFBReport_Get_Gains_Feature_Data.from_buffer_copy(d)
         return data
     
     # Set global effect class gain, same as in VPConfigurator sliders
     def set_gain(self, slider_id, value):
-        assert(self._dev and value >= 0 and value <= 100)
+        if self._dev is None:
+            raise HIDDisconnectedError("set_gain: HID device is not connected")
+        if not 0 <= value <= 100:
+            raise ValueError(f"set_gain: value {value} out of range [0, 100]")
         data = FFBReport_Set_Gain_Feature_Data_t()
         data.reportId = HID_REPORT_FEATURE_ID_SET_GAIN
         data.gain_id = slider_id
@@ -899,7 +1067,10 @@ class FFBRhino(QObject):
 
         :param deadzone: Deadzone value in the range 0-4096.
         """
-        assert(self._dev and 0 <= deadzone <= 4096)
+        if self._dev is None:
+            raise HIDDisconnectedError("set_deadzone: HID device is not connected")
+        if not 0 <= deadzone <= 4096:
+            raise ValueError(f"set_deadzone: value {deadzone} out of range [0, 4096]")
         data = FFBReport_SetDeadzone(deadzone=deadzone)
         self._dev.write(bytes(data))
 
@@ -915,7 +1086,8 @@ class FFBRhino(QObject):
         y_value: int = 0,
         watchdog_ms: int = 1000,
     ):
-        assert self._dev
+        if self._dev is None:
+            raise HIDDisconnectedError("send_axis_override: HID device is not connected")
         data = FFBReport_AxisOverride_Output(
             x_mode=x_mode,
             x_value=x_value,
@@ -928,28 +1100,81 @@ class FFBRhino(QObject):
     def clear_axis_override(self):
         self.send_axis_override(watchdog_ms=0)
 
+    def _emit_connection_state(self):
+        """Emit deviceConnected only on a connection state transition.
+
+        The old code emitted on every one-second reconnect tick, so a
+        prolonged device absence spammed the MainWindow status update.
+        Only True->False and False->True transitions are emitted now.
+        """
+        connected = self.connected
+        if self._last_connected != connected:
+            self._last_connected = connected
+            self.deviceConnected.emit(connected)
+
+    def _schedule_reconnect(self):
+        """Queue one reconnect attempt after the current backoff delay.
+
+        At most one attempt is ever pending: repeated read failures on
+        the 1 ms report timer must not stack up a chain of overlapping
+        singleShot timers (the old do_reconnect recursion did).
+        """
+        if self._reconnect_pending:
+            return
+        self._reconnect_pending = True
+        delay_s = _next_reconnect_delay(self._reconnect_attempts)
+        logging.warning(f"Reconnecting HID device in {delay_s:g}s (attempt {self._reconnect_attempts + 1})")
+        QTimer.singleShot(int(delay_s * 1000), self._try_reconnect)
+
+    def _try_reconnect(self):
+        """One reconnect attempt (Qt main thread, via QTimer.singleShot)."""
+        if self._shutdown:
+            return   # deliberately released mid-retry (live device switch)
+        self._reconnect_pending = False
+        self._reconnect_attempts += 1
+        try:
+            self.reconnect()
+            logging.info("HID reconnected!")
+            # The power cycle emptied the firmware's effect pool: every
+            # handle names a block that no longer exists.  Invalidate
+            # them (no CONTROL_RESET - the pool is already empty) so each
+            # owning HapticEffect lazily re-creates on its next start, the
+            # same self-heal reset_effects() performs.
+            for ref in self._effect_handles:
+                handle = ref()
+                if handle is not None:
+                    handle.invalidate()
+            self._reconnect_attempts = 0
+            self._emit_connection_state()
+            try:
+                self.deviceReconnected.emit()
+            except Exception:
+                # slots run inline on the main thread (direct
+                # connection) - a raising slot must not kill the
+                # reconnect chain
+                logging.exception("Exception")
+        except Exception:
+            logging.exception("Exception")
+            self._emit_connection_state()
+            self._schedule_reconnect()
+
     # runs on mainThread
     @override
     def timerEvent(self, a0: QTimerEvent) -> None:
+        if self._shutdown:
+            return
         try:
             self.read_reports()
         except Exception:
             logging.exception("Exception")
-            self._dev.close()
-            self._dev = None
-
-            logging.warn("Reconnecting HID device in 1s")
-            def do_reconnect():
+            if self._dev is not None:
                 try:
-                    self.reconnect()
-                    logging.info("HID connected!")
-                    self.deviceConnected.emit(True)
+                    self._dev.close()
                 except Exception:
-                    self.deviceConnected.emit(False)
-                    logging.warn("Reconnecting HID device in 1s")
-                    QTimer.singleShot(1000, do_reconnect)
-
-            QTimer.singleShot(1000, do_reconnect)
+                    pass
+            self._dev = None
+            self._emit_connection_state()
+            self._schedule_reconnect()
             
     def _process_hats(self, hats):
         if hats != self._prev_hats:
@@ -999,45 +1224,106 @@ class FFBRhino(QObject):
                 logging.info("Device FFB state was reset, telemFFB will recreate all effects")
                 for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
-                    effect.invalidate()
+                    if effect is not None:
+                        effect.invalidate()
 
             if report.effectPlaying == 0:
                 for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
-                    if effect.effect_id == report.effectBlockIndex:
+                    if effect is not None and effect.effect_id == report.effectBlockIndex:
                         effect._started = False
+
+    #: How long a denied firmware read keeps retrying, and how often.
+    #: Windows grants the vendor interface exclusively and does not say
+    #: who holds it.  A brief hold rides out on the retries (the recovery
+    #: log line reports how long); the one denial chased down in the
+    #: field was a persistent hold that outlived every process suspected
+    #: of it and cleared only with a reboot - holder never identified.
+    FIRMWARE_READ_RETRIES = 3
+    FIRMWARE_RETRY_DELAY_S = 0.1
+    #: After the retries are exhausted, how long further reads are skipped
+    #: outright.  A persistently held interface would otherwise cost every
+    #: caller the full retry ladder - two per device switch, on the main
+    #: thread, for a read that cannot succeed.
+    FIRMWARE_DENIAL_BACKOFF_S = 5.0
 
     def get_firmware_version(self, cached=True):
         if self.firmware_version and cached:
             return self.firmware_version
-        
-        try:
-            with usb1.USBContext() as context:
-                handle = context.openByVendorIDAndProductID(
-                    self.vid,
-                    self.pid,
-                    skip_on_error=True,
-                )
-                #if handle is None:
-                    # Device not present, or user is not allowed to access device.
-                ##request_type, request, value, index, length
 
-                self.firmware_version = handle.controlRead(USB_REQTYPE_DEVICE_TO_HOST|USB_REQTYPE_VENDOR, 
-                                        USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
-                return self.firmware_version
-        except Exception:
-            logging.exception("Unable to read Firmware Version")
-        
+        denied_until = getattr(self, '_firmware_denied_until', 0)
+        if time.perf_counter() < denied_until:
+            logging.debug("Firmware version read skipped: exclusive access "
+                          "was denied moments ago")
+            return None
+
+        denied_at = None
+        for attempt in range(1 + self.FIRMWARE_READ_RETRIES):
+            if attempt:
+                time.sleep(self.FIRMWARE_RETRY_DELAY_S)
+            try:
+                with usb1.USBContext() as context:
+                    handle = context.openByVendorIDAndProductID(
+                        self.vid,
+                        self.pid,
+                        skip_on_error=True,
+                    )
+                    self.firmware_version = handle.controlRead(
+                        USB_REQTYPE_DEVICE_TO_HOST | USB_REQTYPE_VENDOR,
+                        USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
+                    if denied_at is not None:
+                        held_ms = (time.perf_counter() - denied_at) * 1000
+                        logging.info(
+                            "Firmware version read succeeded on retry - the "
+                            f"device was held for under {held_ms:.0f} ms "
+                            f"(vid={self.vid:04X} pid={self.pid:04X})")
+                    return self.firmware_version
+            except usb1.USBErrorAccess:
+                # Windows grants the vendor interface exclusively and does
+                # not say who holds it.  Retried above; only a persistent
+                # hold is worth a warning.
+                if denied_at is None:
+                    denied_at = time.perf_counter()
+                continue
+            except Exception:
+                logging.exception("Unable to read Firmware Version")
+                return None
+
+        self._firmware_denied_until = (time.perf_counter()
+                                       + self.FIRMWARE_DENIAL_BACKOFF_S)
+        logging.warning(
+            "Firmware version read deferred: exclusive access to the "
+            f"device was denied for over "
+            f"{self.FIRMWARE_READ_RETRIES * self.FIRMWARE_RETRY_DELAY_S:.1f}s"
+            f" (vid={self.vid:04X} pid={self.pid:04X}).  Another program "
+            "may have the device open, or the USB stack may be in a stale "
+            "state - the latter has been seen in the field and cleared by "
+            "a reboot.  Harmless here: the device works normally and the "
+            "version is retried later.")
         return None
 
     def reset_effects(self):
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("reset_effects: HID device is not connected")
         logging.info("FFB: Reset device effects")
         self._dev.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
+        # The reset wiped the device-side effect pool; every Python handle
+        # must forget its effect id or a running effect keeps writing to a
+        # slot that no longer exists - silently dead forces.  Field case:
+        # a mid-flight settings save restarts the sim listeners, SimConnect
+        # reconnects fast enough to skip the telemetry timeout, and its
+        # Open event resets the device under a still-flying aircraft.
+        # Invalidated handles lazily re-create on next use - the same
+        # self-heal the DirectInput backend's reset uses.
+        for ref in self._effect_handles:
+            handle = ref()
+            if handle is not None:
+                handle.invalidate()
         time.sleep(0.01)
 
     def create_effect(self, type) -> FFBEffectHandle:
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("create_effect: HID device is not connected")
         self._dev.send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
         r = bytearray(self._dev.get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
 
@@ -1054,10 +1340,25 @@ class FFBRhino(QObject):
         return handle
     
     def write(self, data):
-        assert(self._dev)
+        if self._dev is None:
+            raise HIDDisconnectedError("write: HID device is not connected")
         if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
+    def pump_input(self):
+        """One non-blocking drain of pending HID reports, input intake
+        only (see BaseFFBDevice.pump_input).  Unlike read_reports, the
+        report handlers do NOT run: a device switch pumps this while it
+        holds the main thread, and button events must not fire
+        mid-teardown."""
+        if not self._dev:
+            return
+        while True:
+            tmp = self._dev.read(64)
+            if not tmp:
+                break
+            self._in_reports[tmp[0]] = tmp
+
     def read_reports(self):
         if not self._dev:
             return
@@ -1109,6 +1410,42 @@ class HapticEffect(Destroyable):
 
     device : Optional[FFBRhino] = None
 
+    @staticmethod
+    def device_alive() -> bool:
+        """Whether the shared device can accept writes right now.
+
+        A device is alive only when the class-level reference is set and
+        its HID handle is open.  ``None`` covers a failed startup open
+        (the app keeps running as a zombie); a live-but-disconnected
+        handle covers a hot-unplug mid-run.
+        """
+        dev = HapticEffect.device
+        return dev is not None and dev.connected
+
+    @staticmethod
+    def get_device_input():
+        """The device's latest input report, or None when it is not alive.
+
+        Per-frame consumers (trim buttons, force-trim, stick-center
+        scaling) used to dereference ``HapticEffect.device`` directly, which
+        raised every frame in the 08:30:31 zombie state (startup open
+        failed, device is None).  A hot-unplugged device is also excluded:
+        its input buffer only holds stale data, and a stale "button
+        pressed" state would trigger wrong trim actions.  Callers treat
+        None as "no input": buttons not pressed, center 0.
+        """
+        dev = HapticEffect.device
+        if not HapticEffect.device_alive():
+            return None
+        return dev.get_input()
+
+    #: Every effect this application has created, so a session can be torn
+    #: down completely.  Most effects live in the global `G.effects`
+    #: dispenser, but some are held directly on a mixin (the advanced spring
+    #: adjuster, the MSFS/X-Plane constant force) and would otherwise stay
+    #: allocated on the device after the sim or the app goes away.
+    _instances = weakref.WeakSet()
+
     def __init__(self):
         """Create a new HapticEffect controller.
 
@@ -1117,11 +1454,13 @@ class HapticEffect(Destroyable):
         `.constant(...)`) and then call `.start()` to ensure allocation and
         playback.
         """
+        HapticEffect._instances.add(self)
         self.name : Optional[str] = None
         self._stopped_time : int = 0
         self._h_effect : Optional[FFBEffectHandle] = None
         self.modulator : Optional[FFBReport_SetCondition] = None
         self.effect_type : Optional[int] = None
+        self._defer_start_logged : bool = False  # rate-limit the offline no-op debug log
         # Lazy initialization state
         self._pending_create = None  # function for creating the effect (lazy initialization)
         self._pending_conditions = {} # functions for setting condition (lazy initialization)
@@ -1161,15 +1500,41 @@ class HapticEffect(Destroyable):
 
         return cls.device
 
+    @classmethod
+    def open_dinput(cls, guid: str):
+        """Open a generic DirectInput FFB device (via the DInput bridge DLL)
+        and attach it for all HapticEffect instances.
+
+        Args:
+            guid: The DirectInput instance GUID string of the device.
+
+        Returns:
+            The opened `DInputFFBDevice` instance.
+        """
+        # local import: ffb_dinput imports the effect constants from this module
+        from telemffb.hw.ffb_dinput import DInputFFBDevice
+        logging.info(f"Open DirectInput FFB device {guid}")
+        cls.device = DInputFFBDevice(guid)
+        logging.info(f"Successfully opened '{cls.device.info.product_string}' ({cls.device.info.vidpid()})")
+
+        return cls.device
+
     def _ensure_effect_created(self):
         """Allocate the underlying effect on the device if it hasn't been yet.
 
         If this object was configured before allocation, the pending create
-        function and any pending condition setters will be executed. Raises
-        an AssertionError if the effect was previously destroyed.
+        function and any pending condition setters will be executed. If the
+        device is not alive the pending creation is left intact so the
+        effect replays unchanged on recovery.
         """
         if not self._h_effect:
             assert self._pending_create is not None
+            if not self.device_alive():
+                # Defense in depth: the handle was dropped between the
+                # caller check and now.  Keep _pending_create untouched.
+                logging.debug(
+                    f"HapticEffect._ensure_effect_created: device not connected, deferring {self.name!r}")
+                return
             # Execute the pending create function
             self._pending_create()
             # If there are pending conditions to set, do it now
@@ -1180,6 +1545,13 @@ class HapticEffect(Destroyable):
             if self._h_effect and self._pending_envelope and not self._envelope_applied:
                 self._h_effect.setEnvelope(self._pending_envelope)
                 self._envelope_applied = True
+            # Log a one-shot allocation line.  Start/stop playback logging is
+            # DEBUG-only (it can fire every telemetry frame), so this is the
+            # single INFO-level anchor for an effect's device lifecycle; a
+            # re-allocation after destroy() logs again here.
+            if self._h_effect:
+                name = f" (\"{self.name}\")" if self.name else ""
+                logging.info(f"Effect created {self._h_effect.effect_id} ({self._h_effect.name}){name}")
 
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
         """Set condition parameters for condition-style effects.
@@ -1207,8 +1579,9 @@ class HapticEffect(Destroyable):
         if self._h_effect:
             self._h_effect.setCondition(cond)
         else:
-            # Queue the condition for application once effect is created
-            self._pending_conditions[cond.effectBlockIndex] = lambda: self._h_effect.setCondition(cond)
+            # Queued per axis: the block index is 0 until the device assigns
+            # one, so it cannot tell the axes apart.
+            self._pending_conditions[cond.parameterBlockOffset] = lambda: self._h_effect.setCondition(cond)
 
         return self
 
@@ -1221,7 +1594,9 @@ class HapticEffect(Destroyable):
 
         Keyword Args:
             coef_x (int|float|None): Positive/negative coefficient for the X axis.
-                If a float is provided it is scaled internally where appropriate.
+                A float is a normalized -1..1 value (scaled by 4096 internally,
+                matching FFBReport_SetCondition.set_coefficient); an int is a
+                raw device-unit value (passthrough).
             coef_y (int|float|None): Positive/negative coefficient for the Y axis.
             sat_x (int|float|None): Positive/negative saturation for the X axis.
             sat_y (int|float|None): Positive/negative saturation for the Y axis.
@@ -1231,23 +1606,32 @@ class HapticEffect(Destroyable):
         """
         self.effect_type = effect_type
 
+        def _to_device_units(value):
+            # Same type-sniffing contract as FFBReport_SetCondition.set_coefficient:
+            # float = normalized -1..1 (scaled by 4096), int = raw device units.
+            if value is None:
+                return 0
+            if isinstance(value, float):
+                return int(round(clamp(value, -1.0, 1.0) * 4096))
+            return int(value)
+
         def set_conditions():
             assert self._h_effect is not None, "Effect must be created before setting condition"
 
             if coef_x is not None or sat_x is not None:
                 cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                                positiveCoefficient=int(coef_x or 0),
-                                                negativeCoefficient=int(coef_x or 0),
-                                                positiveSaturation=int(sat_x or 0),
-                                                negativeSaturation=int(sat_x or 0))
+                                                positiveCoefficient=_to_device_units(coef_x),
+                                                negativeCoefficient=_to_device_units(coef_x),
+                                                positiveSaturation=_to_device_units(sat_x),
+                                                negativeSaturation=_to_device_units(sat_x))
                 self._h_effect.setCondition(cond_x)
 
             if coef_y is not None or sat_y is not None:
                 cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                                positiveCoefficient=int(coef_y or 0),
-                                                negativeCoefficient=int(coef_y or 0),
-                                                positiveSaturation=int(sat_y or 0),
-                                                negativeSaturation=int(sat_y or 0))
+                                                positiveCoefficient=_to_device_units(coef_y),
+                                                negativeCoefficient=_to_device_units(coef_y),
+                                                positiveSaturation=_to_device_units(sat_y),
+                                                negativeSaturation=_to_device_units(sat_y))
                 self._h_effect.setCondition(cond_y)
 
         if not self._h_effect:
@@ -1352,31 +1736,36 @@ class HapticEffect(Destroyable):
         gate_pos_x, _y      | e->saturation.pos.x/y| Upper gate/bound position
         gate_neg_x, _y      | e->saturation.neg.x/y| Lower gate/bound position
         deadband_x, _y      | e->deadband.x, .y    | Deadband size on X/Y axis
-        
+
+        All parameters follow the same type-sniffing contract as
+        FFBReport_SetCondition.set_coefficient: a float is a normalized -1..1
+        value (clamped and scaled by 4096 internally); an int is a raw
+        device-unit value (passthrough, no clamp).
+
         Args:
-            position_x (int, optional): Center position of detent on X-axis (default: 0).
+            position_x (int|float, optional): Center position of detent on X-axis (default: 0).
                 Firmware: e->cp.x
-            position_y (int, optional): Center position of detent on Y-axis (default: 0).
+            position_y (int|float, optional): Center position of detent on Y-axis (default: 0).
                 Firmware: e->cp.y
-            peak_x (int, optional): Detent size/peak strength on X-axis.
+            peak_x (int|float, optional): Detent size/peak strength on X-axis.
                 Firmware: e->coef.pos.x (e.g., groove_detent_size = 2500)
-            peak_y (int, optional): Detent size/peak strength on Y-axis.
+            peak_y (int|float, optional): Detent size/peak strength on Y-axis.
                 Firmware: e->coef.pos.y (e.g., latch_detent_size = 1500)
-            range_x (int, optional): Detent range/width on X-axis.
+            range_x (int|float, optional): Detent range/width on X-axis.
                 Firmware: e->coef.neg.x (e.g., groove_detent_range = 3000)
-            range_y (int, optional): Detent range/width on Y-axis.
+            range_y (int|float, optional): Detent range/width on Y-axis.
                 Firmware: e->coef.neg.y (e.g., latch_detent_range = 2000)
-            gate_pos_x (int, optional): Upper gate/bound position on X-axis.
+            gate_pos_x (int|float, optional): Upper gate/bound position on X-axis.
                 Firmware: e->saturation.pos.x
-            gate_neg_x (int, optional): Lower gate/bound position on X-axis.
+            gate_neg_x (int|float, optional): Lower gate/bound position on X-axis.
                 Firmware: e->saturation.neg.x
-            gate_pos_y (int, optional): Upper gate/bound position on Y-axis.
+            gate_pos_y (int|float, optional): Upper gate/bound position on Y-axis.
                 Firmware: e->saturation.pos.y (e.g., -400 for shifter groove)
-            gate_neg_y (int, optional): Lower gate/bound position on Y-axis.
+            gate_neg_y (int|float, optional): Lower gate/bound position on Y-axis.
                 Firmware: e->saturation.neg.y (e.g., -10000 for shifter groove)
-            deadband_x (int, optional): Deadband size on X-axis (default: None).
+            deadband_x (int|float, optional): Deadband size on X-axis (default: None).
                 Firmware: e->deadband.x
-            deadband_y (int, optional): Deadband size on Y-axis (default: None).
+            deadband_y (int|float, optional): Deadband size on Y-axis (default: None).
                 Firmware: e->deadband.y
         
         Returns:
@@ -1414,6 +1803,17 @@ class HapticEffect(Destroyable):
         """
         self.effect_type = EFFECT_DETENT
 
+        def _to_device_units(value):
+            # Same type-sniffing contract as FFBReport_SetCondition.set_coefficient:
+            # float = normalized -1..1 (clamped, scaled by 4096); int = raw
+            # device units (passthrough, no clamp — callers may use out-of-range
+            # values such as the firmware's -10000 gate).
+            if value is None:
+                return 0
+            if isinstance(value, float):
+                return int(round(clamp(value, -1.0, 1.0) * 4096))
+            return int(value)
+
         def set_conditions():
             assert self._h_effect is not None, "Effect must be created before setting condition"
 
@@ -1421,12 +1821,12 @@ class HapticEffect(Destroyable):
             if peak_x is not None or range_x is not None or gate_pos_x is not None or gate_neg_x is not None or deadband_x is not None:
                 cond_x = FFBReport_SetCondition(
                     parameterBlockOffset=0,
-                    cpOffset=int(position_x),               # e->cp.x
-                    positiveCoefficient=int(peak_x or 0),   # e->coef.pos.x (detent size/peak)
-                    negativeCoefficient=int(range_x or 0),  # e->coef.neg.x (detent range/width)
-                    positiveSaturation=int(gate_pos_x or 0),  # e->saturation.pos.x
-                    negativeSaturation=int(gate_neg_x or 0),   # e->saturation.neg.x
-                    deadBand=int(deadband_x or 0)           # e->deadband.x
+                    cpOffset=_to_device_units(position_x),               # e->cp.x
+                    positiveCoefficient=_to_device_units(peak_x),   # e->coef.pos.x (detent size/peak)
+                    negativeCoefficient=_to_device_units(range_x),  # e->coef.neg.x (detent range/width)
+                    positiveSaturation=_to_device_units(gate_pos_x),  # e->saturation.pos.x
+                    negativeSaturation=_to_device_units(gate_neg_x),   # e->saturation.neg.x
+                    deadBand=_to_device_units(deadband_x)           # e->deadband.x
                 )
                 self._h_effect.setCondition(cond_x)
 
@@ -1434,12 +1834,12 @@ class HapticEffect(Destroyable):
             if peak_y is not None or range_y is not None or gate_pos_y is not None or gate_neg_y is not None or deadband_y is not None:
                 cond_y = FFBReport_SetCondition(
                     parameterBlockOffset=1,
-                    cpOffset=int(position_y),               # e->cp.y
-                    positiveCoefficient=int(peak_y or 0),   # e->coef.pos.y
-                    negativeCoefficient=int(range_y or 0),  # e->coef.neg.y
-                    positiveSaturation=int(gate_pos_y or 0),  # e->saturation.pos.y
-                    negativeSaturation=int(gate_neg_y or 0),   # e->saturation.neg.y
-                    deadBand=int(deadband_y or 0)           # e->deadband.y
+                    cpOffset=_to_device_units(position_y),               # e->cp.y
+                    positiveCoefficient=_to_device_units(peak_y),   # e->coef.pos.y
+                    negativeCoefficient=_to_device_units(range_y),  # e->coef.neg.y
+                    positiveSaturation=_to_device_units(gate_pos_y),  # e->saturation.pos.y
+                    negativeSaturation=_to_device_units(gate_neg_y),   # e->saturation.neg.y
+                    deadBand=_to_device_units(deadband_y)           # e->deadband.y
                 )
                 self._h_effect.setCondition(cond_y)
 
@@ -1482,6 +1882,16 @@ class HapticEffect(Destroyable):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
+        elif args:
+            # *args exists only to feed a DirectionModulator's constructor.
+            # A waveform passed positionally as the fourth argument landed
+            # here and was silently discarded - nine effects rendered as
+            # sine for years while their code said square or sawtooth.
+            # Refuse it so the call site gets fixed instead.
+            raise TypeError(
+                "periodic(): extra positional arguments are only for a "
+                "DirectionModulator's constructor; pass the waveform as "
+                "effect_type=")
 
         if not self._h_effect:
             # Store the creation and setup function
@@ -1507,8 +1917,10 @@ class HapticEffect(Destroyable):
         class. If the underlying effect is not yet allocated the creation is
         queued for lazy allocation.
 
+        The magnitude is scaled by 4096 internally (see setConstantForce).
+
         Args:
-            magnitude: Float in range [0.0, 1.0] representing effect strength.
+            magnitude: Float in range [-1.0, 1.0] representing effect strength.
             direction: Angle in degrees or a DirectionModulator subclass.
 
         Returns:
@@ -1619,9 +2031,36 @@ class HapticEffect(Destroyable):
 
         Returns:
             Self for chaining.
+
+        With a missing or disconnected device this is a silent no-op that
+        keeps ``_pending_create`` intact, so the effect replays exactly
+        when the device returns.  It never raises into the 60-120 Hz
+        telemetry path.
         """
+        if not self.device_alive():
+            if self._h_effect and self._h_effect.started:
+                # The (now impossible) playback is forgotten, so a live
+                # start() after recovery re-sends OP_START.
+                self._h_effect.forget_playback()
+            if not self._defer_start_logged:
+                self._defer_start_logged = True
+                logging.debug(
+                    f"HapticEffect.start: device not connected, deferring effect {self.name!r} until recovery")
+            return self
+        self._defer_start_logged = False
+
         # Ensure effect is created before starting
-        self._ensure_effect_created()
+        try:
+            self._ensure_effect_created()
+        except HIDDisconnectedError:
+            # The handle was dropped mid-creation; its block is gone with
+            # it, so drop the half-configured handle and replay from the
+            # pending creation on the next live frame.
+            self._h_effect = None
+            self._envelope_applied = False
+            logging.debug(
+                f"HapticEffect.start: device disconnected during creation, effect {self.name!r} will replay")
+            return self
 
         if self._h_effect and (not self.started or force):
             if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -1630,7 +2069,15 @@ class HapticEffect(Destroyable):
                 logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""
             logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
-            self._h_effect.start(**kw)
+            try:
+                self._h_effect.start(**kw)
+            except HIDDisconnectedError:
+                # Lost the handle between the liveness check and the
+                # write; recreate on the next live frame.  The one-time
+                # envelope stays pending so the re-created block gets it.
+                self._h_effect = None
+                self._envelope_applied = False
+                return self
             self._stopped_time = 0
 
         return self
@@ -1646,16 +2093,25 @@ class HapticEffect(Destroyable):
             Self for chaining.
         """
         if self._h_effect and self._h_effect.started:
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                caller_frame = inspect.currentframe().f_back
-                caller_name = caller_frame.f_code.co_name
-                logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
-            name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            if self.device_alive():
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    caller_frame = inspect.currentframe().f_back
+                    caller_name = caller_frame.f_code.co_name
+                    logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
+                name = f" (\"{self.name}\")" if self.name else ""
+                logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            else:
+                # Device is gone: stop playback in memory only.  The
+                # one-time envelope stays pending so it is (re)applied on
+                # the next live start, matching live stop() semantics.
+                logging.debug(
+                    f"HapticEffect.stop: device disconnected, stopping effect {self._h_effect.effect_id} in-memory only")
+            # FFBEffectHandle.stop() is itself offline-safe.
             self._h_effect.stop()
-            
-            # Clear envelope if it was marked as one-time use
-            if self._envelope_once and self._pending_envelope:
+
+            # Clear envelope if it was marked as one-time use (and the
+            # device can actually receive the clear).
+            if self.device_alive() and self._envelope_once and self._pending_envelope:
                 clear_envelope = FFBReport_SetEnvelope(
                     attackFromForce=0,
                     decayToForce=0,
@@ -1666,7 +2122,7 @@ class HapticEffect(Destroyable):
                 self._pending_envelope = None
                 self._envelope_applied = False
                 self._envelope_once = False
-            
+
             if destroy_after:
                 if not self._stopped_time:
                     self._stopped_time = millis()
@@ -1684,18 +2140,49 @@ class HapticEffect(Destroyable):
         that require an allocated effect will recreate it lazily.
         """
         if self._h_effect:
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                caller_frame = inspect.currentframe().f_back
-                caller_name = caller_frame.f_code.co_name
-                logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
-            name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            if self.device_alive():
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    caller_frame = inspect.currentframe().f_back
+                    caller_name = caller_frame.f_code.co_name
+                    logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
+                name = f" (\"{self.name}\")" if self.name else ""  
+                logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            else:
+                # The block dies with the handle; freeing it in memory only
+                # keeps teardown/finalizer paths exception-free.
+                logging.debug(
+                    f"HapticEffect.destroy: device disconnected, freeing effect {self._h_effect.effect_id} in-memory only")
+            # FFBEffectHandle.destroy() is itself offline-safe.
             self._h_effect.destroy()
             self._h_effect = None
 
     def __del__(self):
         """Destructor helper to ensure resources are freed."""
         self.destroy()
+
+    @classmethod
+    def destroy_all(cls) -> int:
+        """Free every effect block this application allocated.
+
+        Deliberately per-effect: each one is released with its own block-free
+        so only blocks TelemFFB owns are touched.  A device-level reset would
+        be simpler but must never be used here - on VPforce hardware the sim
+        renders its own effects into the same device, and wiping those leaves
+        DCS unable to recreate its spring until the sim is restarted (the
+        same reason Utilities -> Reset carries a warning).
+
+        Returns the number of effects freed.
+        """
+        freed = 0
+        for effect in list(cls._instances):
+            if effect._h_effect is None:
+                continue
+            try:
+                effect.destroy()
+                freed += 1
+            except Exception:
+                logging.exception("Failed to destroy effect during teardown")
+        return freed
 
 # unit test
 if __name__ == "__main__":

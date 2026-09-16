@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional, override
 
 import telemffb.utils as utils
@@ -8,6 +9,7 @@ from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.util.conversions import FFB_UNITS
 
 perftracker = utils.PerformanceTracker()
 
@@ -63,8 +65,19 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             if value in SpringModeEnum.__members__:
                 self._spring_mode = SpringModeEnum[value]
                 return
-            else:
-                raise ValueError(f"Invalid spring mode string: {value}")
+            # Unknown name: a config written by a build that has modes this
+            # one does not.  Fall back to the least intrusive mode instead of
+            # raising - the exception would abort the aircraft load, and with
+            # it the settings form needed to correct the value.  The stored
+            # value is left untouched so it still resolves under the build
+            # that wrote it.
+            logging.error(
+                f"Unknown spring mode '{value}' in this aircraft's configuration - "
+                f"falling back to {SpringModeEnum.NONE.name} (game managed). "
+                "Choose a spring mode in the settings to replace it."
+            )
+            self._spring_mode = SpringModeEnum.NONE
+            return
 
         # Any other type is invalid
         raise ValueError("Invalid type for spring_mode")
@@ -80,21 +93,24 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         # condition objects and adjuster used by the advanced spring override
         self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        # the spring_adjuster effect object (wrapper) from the global effects dispenser
-        self.spring_adjuster = HapticEffect().spring_adjuster()
 
     def spring_mode_is(self, mode : SpringModeEnum):
         return mode == self.spring_mode
 
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):
-            self.spring_adjuster.stop()
+            self.effects['adv_spr'].stop()
             return
         if self._sim_is_il2():
             if not self.adv_spr_use_hardware_trim:
                 self.il2_ffb_spring(force=True)
             else:
                 self.effects['il2_ffb_spring'].stop()
+        caps = getattr(HapticEffect.device, 'caps', None)
+        if caps is not None and not caps.has_spring_adjuster:
+            self.flag_error('The Advanced/Custom Spring Override is not supported on this device.\n'
+                            'It requires the spring adjuster feature of VPforce hardware.')
+            return
         # Verify the device firmware meets the minimum version required to execute this effect
         # Flag error and abort if not met
         if self.__firmware_supported is None:
@@ -110,24 +126,23 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
 
         gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.IAS or 0)
 
-        self.spring_adjuster.name = 'adv_spr'
         self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
         self.spring_adjuster_x.set_coefficient(gains.get('x', 0))
 
         if self.adv_spr_use_hardware_trim:
             dt = perftracker.get_time_delta('override_spring_perf')
-            trim_step_size = self.override_spring_trim_rate * dt
-            # trim_step_size = 200 * dt
+            trim_step_size = self.override_spring_trim_rate * dt / FFB_UNITS
             self.telem_data._ovrd_spr_step = trim_step_size
             self.telem_data._ovrd_spr_dt = dt
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
-            input_data = HapticEffect.device.get_input()
+            input_data = HapticEffect.get_device_input()
             x, y = self._get_device_axes()
-            current_buttons = input_data.getPressedButtons()
+            # No live device: hat buttons unreadable, none can be pressed.
+            current_buttons = input_data.getPressedButtons() if input_data is not None else ()
             if self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
-                self.override_spring_cp0_x = 0
-                self.override_spring_cp0_y = 0
+                self.override_spring_cp0_x = 0.0
+                self.override_spring_cp0_y = 0.0
 
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 self.override_spring_cp0_y -= trim_step_size
@@ -139,24 +154,29 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
                 self.override_spring_cp0_x += trim_step_size
 
-            self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
-            self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
+            self.override_spring_cp0_x = utils.clamp(self.override_spring_cp0_x, -1.0, 1.0)
+            self.override_spring_cp0_y = utils.clamp(self.override_spring_cp0_y, -1.0, 1.0)
         else:
-            self.override_spring_cp0_x = 0
-            self.override_spring_cp0_y = 0
+            self.override_spring_cp0_x = 0.0
+            self.override_spring_cp0_y = 0.0
 
         offset = super().ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
-        g_y_offset = offset if offset is not None else 0
-        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), g_y_offset]
-        self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + g_y_offset))
-        self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
+        g_y_offset = offset if offset is not None else 0.0
+        self.telem_data._ovrd_spr_trim_pos = [
+            self.override_spring_cp0_x,
+            self.override_spring_cp0_y,
+            g_y_offset,
+        ]
+        self.spring_adjuster_y.set_offset(self.override_spring_cp0_y + g_y_offset)
+        self.spring_adjuster_x.set_offset(self.override_spring_cp0_x)
 
-        self.spring_adjuster.setCondition(self.spring_adjuster_y)
-        self.spring_adjuster.setCondition(self.spring_adjuster_x)
-        self.spring_adjuster.start()
+        adjuster = self.effects['adv_spr'].spring_adjuster()
+        adjuster.setCondition(self.spring_adjuster_y)
+        adjuster.setCondition(self.spring_adjuster_x)
+        adjuster.start()
 
     @override
-    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr: bool = False) -> Optional[int]:
+    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr: bool = False) -> Optional[float]:
         """If advanced spring is enabled and in offset mode, handle gforce effect as part of advanced spring processing.
         else defer to GForceEffectMixIn implementation."""
         if not (self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED) and self.g_effect_get_adv_mode() == "offset"):

@@ -7,3 +7,7 @@ __pycache__
 *.exe
 *dist
 /pyenv
+.idea/
+dll/directlink.dlk
+*.lock
+/pyenv

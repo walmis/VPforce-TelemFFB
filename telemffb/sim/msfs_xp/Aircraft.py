@@ -17,7 +17,6 @@
 #
 from typing import override
 
-from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
 from telemffb.sim.msfs_xp.MsfsXpNosewheelShimmyMixIn import MsfsXpNosewheelShimmyMixIn
 from telemffb.sim.msfs_xp.MsfsXpTrimwheelMixIn import MsfsXpTrimwheelMixIn
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
@@ -26,6 +25,8 @@ import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect, EFFECT_SQUARE
 from telemffb.sim.aircraft_base import AircraftBase
+from telemffb.util.AxisJitter import (AXIS_EVENT_RANGE, AxisJitterMonitor,
+                                      take_axis_command)
 from telemffb.util.Vector import Vector
 from telemffb.util.conversions import rad
 from telemffb.sim.msfs_xp.TurbulenceMixIn import TurbulenceMixIn
@@ -123,7 +124,7 @@ class Aircraft(
 
         stall = telem_data.StallWarning or 0
         if stall:
-            self.effects["stick_shaker"].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
+            self.effects["stick_shaker"].periodic(14, self.stick_shaker_intensity, 0, effect_type=EFFECT_SQUARE).start()
         else:
             self.effects["stick_shaker"].destroy()
 
@@ -160,12 +161,88 @@ class Aircraft(
         if event == "STOP":
             self.on_timeout()
 
+    #: Axis-contention probe, built on the first telemetry frame.  It runs
+    #: on every installation; only its raw capture is behind a setting.
+    _axis_jitter = None
+
+    #: The axis a reading belongs to, the telemetry field it arrives in, and
+    #: which of this role's two custom-axis settings governs it.  Commands
+    #: are collected from the send itself rather than from the effect path
+    #: that raised them, so this holds for every aircraft class and control
+    #: layout without each having to take part.
+    #:
+    #: A role drives one pair, so 'x' is the aileron on a joystick and the
+    #: rudder on pedals; only the role's own axes ever carry a command.
+    _PROBE_AXES = (('elevator', 'ElevPos', 'y'),
+                   ('aileron', 'AileronPos', 'x'),
+                   ('rudder', 'RudderPos', 'x'),
+                   ('collective', 'CollectivePos', 'y'),
+                   ('tail_rotor', 'TailRotorPos', 'x'),
+                   # The axis key names the control; the field names the
+                   # variable it is read from, which is not cyclic-specific.
+                   ('cyclic_lat', 'YokeXLinearPos', 'x'),
+                   ('cyclic_lon', 'YokeYPos', 'y'),
+                   ('elev_trim', 'ElevTrimPct', None))
+
+    def _probe_command_scale(self, side):
+        """What a recorded command must be multiplied by to be comparable
+        with the reported position.
+
+        The recording is made where the axis is sent, which sees only the
+        already-scaled value and assumes the usual range.  An aircraft
+        configured with a custom axis may be sending at 1, 100, 256 or 4096
+        instead, and reading that at the usual range would put the residual
+        out by the ratio - a false finding rather than a missing one.  The
+        ratio is applied here, where the configuration is known; sign is
+        left to the probe, which fits it either way.
+        """
+        if side is None:
+            return 1.0
+        try:
+            if not getattr(self, 'enable_custom_%s_axis' % side, False):
+                return 1.0
+            used = float(getattr(self, 'raw_%s_axis_scale' % side, 0) or 0)
+            if used <= 0:
+                return None            # unknown range: better uncovered
+            return AXIS_EVENT_RANGE / used
+        except (TypeError, ValueError):
+            return None
+
+    def _probe_axis_jitter(self, telem_data: BaseTelemetryData):
+        """Feed the simulator's control-input positions to the probe.
+
+        Commands are taken, not read, so an axis nothing was sent on this
+        frame offers none and is recorded with nothing to difference it
+        against rather than against a stale value.  They come from the
+        previous frame, this running ahead of the send, and the probe fits
+        that lag out.  An axis the simulator does not report arrives as
+        None and is skipped.
+        """
+        probe = self._axis_jitter
+        if probe is None:
+            probe = self._axis_jitter = AxisJitterMonitor.if_enabled()
+        for axis, field, side in self._PROBE_AXES:
+            command, verified = take_axis_command(axis)
+            if command is not None:
+                scale = self._probe_command_scale(side)
+                command = None if scale is None else command * scale
+                probe.set_provisional(axis, not verified)
+            reported = getattr(telem_data, field, None)
+            if axis == 'collective' and reported is not None:
+                # reported fully up to fully down as 0..1; the command is
+                # in the -1..1 the other axes share
+                reported = reported * 2.0 - 1.0
+            probe.sample(axis, reported, command)
+        probe.poll()
+
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
         self.effects["pause_spring"].destroy()
 
         if telem_data.Parked: # MSFS in Hangar
             return
+
+        self._probe_axis_jitter(telem_data)
 
         if self._sim_is_xplane():
             self.toggle_xp_control()
@@ -186,6 +263,17 @@ class Aircraft(
         ### Generic Aircraft Class Telemetry Handler
         if not "AircraftClass" in telem_data:
             telem_data.AircraftClass = "GenericAircraft"  # inject aircraft class into telemetry
+
+        if self.is_trimwheel():
+            # A trimwheel is a single-purpose device: run ONLY the trimwheel
+            # routine. Skipping super() stops the entire cooperative effects
+            # chain (engine rumble, buffeting, g-force, ...) — those effects
+            # played through the wheel after the mixin refactor lost the old
+            # early-return guards. Subclass on_telemetry overrides with code
+            # AFTER their super() call must carry their own is_trimwheel()
+            # guard (cf. Helicopter/GliderAircraft/FlyInsideHelicopter).
+            self.msfs_update_trimwheel(telem_data)
+            return
 
         super().on_telemetry(telem_data)
 

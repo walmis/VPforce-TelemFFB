@@ -71,7 +71,9 @@ and per-sim `validvalues` lists are handled.
 | `info` | No | Tooltip text. May contain HTML entities (e.g., `&lt;br&gt;`). |
 | `grouping` | No | Label of the UI group under which this setting appears. |
 | `parentgroup` | No | Organizational label used for XML-internal tracking. Does not affect UI rendering. |
-| `prereq` | No | Conditional visibility rule. See [The `prereq` Field](#the-prereq-field). |
+| `prereq` | No | Conditional visibility rule tied to tree parentage. See [The `prereq` Field](#the-prereq-field). |
+| `render_prereq` | No | Cross-tree gate: **hide** this setting when the condition (based on other bool settings' values) fails. See [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields). |
+| `enable_prereq` | No | Cross-tree gate: render but **disable** this setting (with an auto-generated explanatory tooltip) when the condition fails. See [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields). |
 | `debug_only` | No | If `true`, the setting is only parsed/shown when the app is in debug mode (`G.system_settings.get('debug', False)`). See [The `debug_only` Field](#the-debug_only-field). |
 | `order` | Yes | Float; controls row position and layout behavior. See [The `order` Field](#the-order-field). |
 | `unit` | No | If present, adds a unit dropdown next to the value field. Supported unit groups: speed (`m/s`, `ft/s`, `km/h`, `kts`, `mph`) and length (`m`, `ft`, `km`, `mi`, `nm`). Switching units auto-converts the stored value. |
@@ -131,7 +133,7 @@ Each `<models>` block is an aircraft-specific default override stored in `defaul
 ## Section: `<sc_overrides>`
 
 SimConnect variable override entries. Each block maps a setting name + aircraft pattern to a
-specific SimConnect variable or L:var, allowing per-aircraft telemetry source customization.
+specific SimConnect variable, L:var, or B: input event, allowing per-aircraft telemetry source customization.
 
 ### Child Elements
 
@@ -139,7 +141,7 @@ specific SimConnect variable or L:var, allowing per-aircraft telemetry source cu
 |---------|-------------|
 | `name` | The setting identifier this override applies to. |
 | `model` | Python regex pattern matching the aircraft name. |
-| `var` | The SimConnect variable name or L:var (`L:VarName`) to use as the data source. |
+| `var` | The SimConnect variable name, L:var (`L:VarName`), or input event (`B:VarName`, MSFS 2020 SU12 and later) to use as the data source. Input events are looked up on the loaded aircraft; a name the aircraft does not define is logged once and left unset. Their value is the event's own (a switch often reads 0 or 100), `sc_unit` is ignored for them, and `scale` still applies. |
 | `sc_unit` | SimConnect unit string (e.g., `"percent"`, `"feet per second"`). |
 | `scale` | Numeric scale factor applied to the raw SimConnect value. |
 
@@ -363,6 +365,23 @@ Dropdown populated from a named Python enum dict in `SettingsManager`.
 
 ---
 
+### `devicelist`
+
+Dropdown of the joystick role's configured devices (the per-aircraft device selection).
+
+- Stored value: the devpath of a configured joystick slot, or `"primary"` (the default) for
+  whichever device is marked active in System Settings.
+- `validvalues`: not used — the options are built at render time from the configured slots
+  (`utils.joystick_device_choices`), labeled by stored ident with USB ids appended.
+- A stored devpath that no longer matches a configured slot renders as
+  "(no longer configured)" and stays deselectable; at aircraft load such a reference falls
+  back to the primary device.
+- Used by exactly one setting: `joystick_device`. When a slot's device is replaced in System
+  Settings, the save offers to rewrite user-config references to the outgoing devpath
+  (`xmlutils.update_joystick_device_references`).
+
+---
+
 ### `button`
 
 USB HID button capture. Clicking the button prompts the user to press a physical button.
@@ -405,12 +424,31 @@ File browse button for selecting a `.vpconf` VPforce Configurator profile.
 
 ### `group`
 
-Collapsible section header. Renders as a bold, clickable label with no value entry widget.
+Section header. Renders as a bold, clickable label with no value entry widget.
 Child settings reference this group's `name` via their `prereq` field.
 
-- Stored value: `"true"` — presence indicates the group header itself is enabled/shown
-- `order`: should use `.0` suffix (e.g., `50.0`) to mark it as a group container
+- Stored value: **must be** `"true"` — children are only retained (`eliminate_no_prereq`)
+  and revealed (`is_visible`) when their parent group's value is `true`.
 - A `group` item with no children pointing to it via `prereq` is automatically hidden.
+
+**Top-level vs nested groups.** A group with no `prereq` is a top-level section header
+(Aerodynamics, Inertial, …): it is pinned to column 0 and its children start at indent 0.
+A group that carries its own `prereq` is a *nested* sub-header — it renders as an ordinary
+indented row and its children indent one level further. Nested groups let a set of related
+settings collapse together without inventing a dummy `bool` toggle to hang them under.
+Example: `tap_axis_group` (`prereq=spring_mode.DINPUT_TAP`) collecting the three tap axis
+correction toggles.
+
+**Whether a group collapses is decided by `order`:**
+
+| Group `order` | Behavior |
+|---------------|----------|
+| Contains `.0` (e.g. `50.0`) | **Locked open** — no arrow; children always shown while the parent chain is satisfied (`basic_group`) |
+| Anything else (e.g. `10000`, `700.2`) | **Collapsible** — label gains a ►/▼ arrow that toggles its children |
+
+A nested group's children must dodge both magic suffixes themselves: no `.0` (that would
+make the child a locked group container) and no trailing `1` (bump-up). A workable set is
+group `700.2` with children `700.22`, `700.23`, `700.24`.
 
 ---
 
@@ -443,6 +481,13 @@ Visibility is resolved recursively up the ancestor chain. A setting is visible o
 1. Its own `prereq` condition is satisfied, **and**
 2. Its parent (the setting named in `prereq`) is itself visible and expanded in the UI.
 
+> **Name-collision hazard:** the parent lookup is a *substring* match
+> (`parent_name in child_prereq`), not an equality test. A new setting whose name is a
+> substring of another setting's name — or of a value-qualified prereq string — can
+> resolve to the wrong parent, and a name that is a substring of its *own* prereq can
+> make a row its own parent (guarded against, but it renders as hidden). Keep new names
+> distinctive; `tests/test_settings_nested_groups.py` demonstrates the check.
+
 ---
 
 ## The `debug_only` Field
@@ -464,6 +509,58 @@ debug_only = true
 
 `debug_only` can be combined with `prereq` on the same entry; both conditions must be
 satisfied for the setting to appear.
+
+---
+
+## The `render_prereq` and `enable_prereq` Fields
+
+Where `prereq` couples a setting's visibility to its **tree parent**, these two fields gate a
+setting on the current value of **any other bool setting(s)**, regardless of where they sit in
+the hierarchy. Use them when a setting is made irrelevant or conflicting by a control elsewhere
+in the tree — e.g. two legacy trim knobs that become inert once the auto-calibrated trim curve
+is enabled.
+
+| Field | Effect when the condition **fails** |
+|-------|-------------------------------------|
+| `render_prereq` | The setting is **hidden** (removed from the form entirely). |
+| `enable_prereq` | The setting still **renders but is disabled/greyed**, and its tooltip is prefixed with an auto-generated reason (e.g. *"Disabled because Use Calibrated Trim Curve is enabled"*). |
+
+### Syntax (both fields)
+
+```
+render_prereq = name
+enable_prereq = !name
+render_prereq = name1,!name2
+```
+
+- Comma-separated list of tokens. `name` requires that setting be `true`; `!name` requires it
+  be `false`. **All** tokens must pass for the condition to hold.
+- Each referenced name must be an existing `bool` setting (enforced by the schema tests).
+- A referenced setting absent from the resolved set is treated as `false`.
+
+### Evaluation
+
+Unlike `debug_only` (a parse-time gate against a global), these depend on another setting's
+**resolved value**, so they are evaluated in the view layer (`SettingsLayout.apply_conditional_gates`),
+after normal `prereq` visibility and before invisible rows are dropped. Evaluation is against the
+referenced setting's **value**, not its visibility — so the gate still works when the controlling
+toggle is itself collapsed or hidden.
+
+### Precedence
+
+`render_prereq` (hide) wins over `enable_prereq` (disable) if both are present and both fail — a
+hidden row cannot be disabled. The two may target different controllers (e.g. hide when a feature
+is inapplicable, disable when a conflicting setting is active).
+
+### Example
+
+```xml
+<!-- Inert once the calibrated trim curve is in use -->
+<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
+```
+
+on `joystick_trim_follow_gain_virtual_y` and `joystick_ap_y_follow_axis`: both stay visible but
+grey out with an explanatory tooltip whenever `joystick_trim_follow_use_curve_y` is `true`.
 
 ---
 
@@ -534,7 +631,10 @@ writing to prevent drift.
 2. Set `datatype`, `value`, `validvalues`, and `sliderfactor` appropriately (see
    [Datatypes](#datatypes)).
 3. Set `prereq` to the name of a parent `bool` or `group` setting if the new setting should
-   only be visible when that parent is enabled.
+   only be visible when that parent is enabled. If visibility or enablement should instead
+   depend on a setting **elsewhere** in the tree (not its parent), use `render_prereq` (hide)
+   or `enable_prereq` (disable) — see
+   [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields).
 4. Set `order` to a value that places the row logically within its group.
 5. Add `<classdefaults_{sim}>` entries if the default value should differ by aircraft class.
 6. Add `<validvalues_overrides>` entries if the dropdown options should differ by class.

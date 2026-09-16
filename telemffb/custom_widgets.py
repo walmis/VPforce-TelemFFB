@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import html
+import logging
 import os.path
 from typing import Optional
 
@@ -25,9 +27,9 @@ from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayo
     QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout, QSizePolicy, \
     QGraphicsColorizeEffect
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
-    QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
+    QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
-    QLinearGradient, QFont
+    QLinearGradient, QFont, QIcon
 from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
 
 from PyQt6.QtCore import Qt
@@ -150,9 +152,79 @@ class DetachedTabWindow(QtWidgets.QMainWindow):
             self.reattachRequested.emit(self._title)
         super().closeEvent(e)
 
+def svg_icon(svg_name, color="#d0d0d0", disabled_color="#707070", size=20):
+    """Build a QIcon from a ``currentColor`` SVG, rendered at explicit
+    colors — standalone SVG rendering resolves currentColor to black, which
+    is invisible on the dark theme. One source file yields the normal and
+    disabled variants, crisp at 2x for scaled displays.
+
+    Loads from the compiled Qt resource (":/image/<name>") when present so
+    frozen builds work once the SVG is added to the resource file, falling
+    back to the source tree (utils.get_resource_path) for dev runs.
+    """
+    from PyQt6.QtCore import QFile, QIODevice
+    from PyQt6.QtSvg import QSvgRenderer
+    data = None
+    qf = QFile(f":/image/{svg_name}")
+    if qf.exists() and qf.open(QIODevice.OpenModeFlag.ReadOnly):
+        data = bytes(qf.readAll())
+        qf.close()
+    else:
+        import telemffb.utils as _utils  # local: avoids import cycle
+        try:
+            with open(_utils.get_resource_path(f"image/{svg_name}"), "rb") as f:
+                data = f.read()
+        except OSError as e:
+            logging.warning(f"svg_icon: could not load {svg_name} ({e})")
+            return QIcon()
+    # Render at the APPLICATION's device-pixel ratio (the HiDpiPixmap
+    # pattern) — a hardcoded ratio draws oversized/clipped on displays
+    # running a different scale.
+    app = QGuiApplication.instance()
+    ratio = app.devicePixelRatio() if app is not None else 1.0
+    icon = QIcon()
+    for col, mode in ((color, QIcon.Mode.Normal),
+                      (disabled_color, QIcon.Mode.Disabled)):
+        svg = data.replace(b'fill="currentColor"', f'fill="{col}"'.encode())
+        renderer = QSvgRenderer(svg)
+        pm = QPixmap(round(size * ratio), round(size * ratio))
+        pm.setDevicePixelRatio(ratio)
+        pm.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pm)
+        renderer.render(painter)
+        painter.end()
+        icon.addPixmap(pm, mode)
+    return icon
+
+
+class ElidedLabel(QLabel):
+    """QLabel that elides its text at a fixed pixel budget so long values
+    can't grow the surrounding layout. When elided, the full text is shown
+    in the tooltip; text() always returns the full string."""
+    def __init__(self, text='', max_text_px=200, parent=None):
+        super().__init__(parent)
+        self._full_text = ''
+        self._max_text_px = max_text_px
+        if text:
+            self.setText(text)
+
+    def setText(self, text):
+        self._full_text = text
+        elided = self.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, self._max_text_px)
+        super().setText(elided)
+        super().setToolTip(text if elided != text else '')
+
+    def text(self):
+        return self._full_text
+
+
 class AppStatusWidget(QWidget):
-    request_set_active_vpconf = pyqtSignal(str)
-    request_set_active_configurator = pyqtSignal(bool)
+    request_set_active_vpconf = pyqtSignal(str, bool)
+    request_set_active_configurator = pyqtSignal(bool, bool)
+    request_set_telem_overrides = pyqtSignal(str, str)
+    request_flag_error = pyqtSignal(str)
+    request_clear_error = pyqtSignal()
+    profile_notes_clicked = pyqtSignal()
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -164,52 +236,94 @@ class AppStatusWidget(QWidget):
         # connect signal to slot (QueuedConnection by default across threads)
         self.request_set_active_vpconf.connect(self.set_active_vpconf)
         self.request_set_active_configurator.connect(self.set_active_configurator)
+        self.request_set_telem_overrides.connect(self.set_telem_overrides)
+        # flag_error/clear_error mutate the notification widget, a one-shot
+        # change that never repaints if called from the telemetry thread.
+        # Route through signals so the mutation runs on the GUI thread.
+        self.request_flag_error.connect(self.flag_error)
+        self.request_clear_error.connect(self.clear_error)
 
         grid = QGridLayout(self)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         grid.setContentsMargins(10, 10, 10, 10)
         grid.setVerticalSpacing(10)
         grid.setHorizontalSpacing(10)
+        # Pin the value column so the panel width is constant regardless of
+        # content: every value widget's width is capped below this (elided
+        # labels / chip budgets), so nothing can grow the column and shorter
+        # values can't shrink it.
+        grid.setColumnMinimumWidth(1, 280)
 
         row = 0
-        label_align = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        label_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         value_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
+        # Item labels are dimmed (values full-brightness) so the label/value
+        # distinction reads across the alignment gap. Derived from the active
+        # theme's text color so it stays legible in both dark and light mode.
+        dim = self.palette().color(QPalette.ColorRole.WindowText)
+        dim_label_style = f"color: rgba({dim.red()}, {dim.green()}, {dim.blue()}, 150);"
+
+        def make_item_label(text):
+            lbl = QLabel(text)
+            lbl.setStyleSheet(dim_label_style)
+            return lbl
+
         sim_status_header = InfoLabel()
-        sim_status_header.text_label.setText('Sim Status:')
+        sim_status_header.text_label.setText('Sim Status')
+        sim_status_header.text_label.setStyleSheet(dim_label_style)
         sim_status_header.setToolTip('Enabled Sims:\n  DCS\n  MSFS\n  XPLANE\n\nDisabled Sims:\n  IL2')
 
         self.sim_status_label = SimStatusWidget()
-        self.cur_craft_label = QLabel("None Detected")
-        self.cur_pattern_label = QLabel("(No Match)")
-        self.active_profile_label = QLabel("(None)")
-        self.active_vpconf_header = QLabel('VPconf File:')
-        self.active_vpconf_label = QLabel('')
-        self.active_vpconf_label.hide()
-
-        self.active_vpconf_label.setStyleSheet(f"""
-                    QLabel {{
+        # Semibold values against the dimmed labels: two-tier hierarchy.
+        # Set via QFont (not stylesheet) so ElidedLabel's fontMetrics-based
+        # elide budget accounts for the wider weight.
+        value_font = QFont(self.font())
+        value_font.setWeight(QFont.Weight.DemiBold)
+        self.cur_craft_label = ElidedLabel("None Detected", max_text_px=260)
+        self.cur_pattern_label = ElidedLabel("(No Match)", max_text_px=260)
+        self.active_profile_label = ElidedLabel("(None)", max_text_px=150)
+        for lbl in (self.cur_craft_label, self.cur_pattern_label, self.active_profile_label):
+            lbl.setFont(value_font)
+        # Pill styling for the vpconf/override labels; also used for the
+        # "None" placeholder so the row height never changes.
+        self._chip_style = """
+                    QLabel {
                         padding: 2px 8px;
                         border-radius: 10px;
                         background-color: rgba(128,128,128, 100);
                         font-weight: bold;
-                    }}
-                """)
+                    }
+                """
 
+        self.active_vpconf_header = make_item_label('VPconf File')
+        self.active_vpconf_label = QLabel('')
+        self.active_vpconf_label.setStyleSheet(self._chip_style)
+        self.active_vpconf_label.hide()
         self.active_vpconf_header.hide()
 
-        self.active_configurator_header = QLabel('Gains Ovd:')
+        self.active_configurator_header = make_item_label('Gains Ovd')
         self.active_configurator_label = QLabel('Active')
-        self.active_configurator_label.setStyleSheet(f"""
-                            QLabel {{
-                                padding: 2px 8px;
-                                border-radius: 10px;
-                                background-color: rgba(128,128,128, 100);
-                                font-weight: bold;
-                            }}
-                        """)
+        self.active_configurator_label.setStyleSheet(self._chip_style)
         self.active_configurator_label.hide()
         self.active_configurator_header.hide()
+
+        self.telem_ovd_header = InfoLabel()
+        self.telem_ovd_header.text_label.setText('Telem Ovd')
+        self.telem_ovd_header.text_label.setStyleSheet(dim_label_style)
+        self.telem_ovd_header.setToolTip(
+            'Active SimConnect/Dataref telemetry overrides for the loaded aircraft,\n'
+            'counted by tier (shipped Default vs User). Hover the value for the full\n'
+            'list, and edit via Utilities -> SimConnect/Dataref Overrides Editor.\n\n'
+            'IMPORTANT: overrides belong to the matched model profile. If you create\n'
+            'an additional profile for this aircraft (a non-matching livery, for\n'
+            'example), you must CLONE it from the default profile — an entry created\n'
+            'from scratch will NOT pick up the overrides.'
+        )
+        self.telem_ovd_label = QLabel('')
+        self.telem_ovd_label.setStyleSheet(self._chip_style)
+        self.telem_ovd_label.hide()
+        self.telem_ovd_header.hide()
 
         self.notification_label = QLabel('')
         self.notification_label.setWordWrap(True)
@@ -218,15 +332,18 @@ class AppStatusWidget(QWidget):
         size_policy.setRetainSizeWhenHidden(True)
         self.notification_label.setSizePolicy(size_policy)
         self.notification_label.hide()
-        self.notification_label.setStyleSheet("""
-            QLabel {
+        # Bright red reads on the dark theme; on the light theme's pale-pink
+        # notification background it washes out, so use a strong dark red.
+        err_text_color = "#ff6b6b" if G.useDarkMode else "#a02020"
+        self.notification_label.setStyleSheet(f"""
+            QLabel {{
                 padding-left: 10px;
                 padding-top: 2px;
-                color: #ff6b6b;
+                color: {err_text_color};
                 background-color: rgba(255, 50, 50, 30);
                 border: 1px solid #c33;
                 border-radius: 4px;
-            }
+            }}
         """)
 
         self.offline_label = QLabel('Telemetry is paused while in offline editing mode')
@@ -259,11 +376,11 @@ class AppStatusWidget(QWidget):
         grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
         row += 1
 
-        grid.addWidget(QLabel("Current Aircraft:"), row, 0, alignment=label_align)
+        grid.addWidget(make_item_label("Current Aircraft"), row, 0, alignment=label_align)
         grid.addWidget(self.cur_craft_label, row, 1, alignment=value_align)
         row += 1
 
-        grid.addWidget(QLabel("Matched Model:"), row, 0, alignment=label_align)
+        grid.addWidget(make_item_label("Matched Model"), row, 0, alignment=label_align)
         grid.addWidget(self.cur_pattern_label, row, 1, alignment=value_align)
         row += 1
 
@@ -274,10 +391,31 @@ class AppStatusWidget(QWidget):
         profile_row_layout.setContentsMargins(0, 0, 0, 0)
         profile_row_layout.setSpacing(6)
         profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.btn_profile_notes = QtWidgets.QToolButton()
+        # currentColor SVG rendered at explicit colors: muted glyph when no
+        # notes exist, full-contrast (white on dark / black on light) when
+        # notes are present.
+        if G.useDarkMode:
+            notes_plain_color, notes_active_color = '#d0d0d0', '#ffffff'
+        else:
+            notes_plain_color, notes_active_color = '#707070', '#000000'
+        self._notes_icon_plain = svg_icon('profile-notes.svg', color=notes_plain_color)
+        self._notes_icon_active = svg_icon('profile-notes.svg', color=notes_active_color)
+        self.btn_profile_notes.setIcon(self._notes_icon_plain)
+        self.btn_profile_notes.setIconSize(QSize(20, 20))
+        self.btn_profile_notes.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_profile_notes.setToolTip('View or edit notes for this aircraft profile')
+        self.btn_profile_notes.setEnabled(False)
+        self.btn_profile_notes.clicked.connect(self.profile_notes_clicked.emit)
+
         profile_row_layout.addWidget(self.active_profile_label)
         profile_row_layout.addWidget(self.cb_selectProfileCombo)
+        profile_row_layout.addWidget(self.btn_profile_notes)
+        # Absorb the value column's spare width so the combo keeps its natural
+        # size instead of stretching to fill the (fixed-width) cell.
+        profile_row_layout.addStretch(1)
 
-        grid.addWidget(QLabel("Active Profile:"), row, 0, alignment=label_align)
+        grid.addWidget(make_item_label("Active Profile"), row, 0, alignment=label_align)
         grid.addLayout(profile_row_layout, row, 1)
         row += 1
 
@@ -287,6 +425,10 @@ class AppStatusWidget(QWidget):
 
         grid.addWidget(self.active_configurator_header, row, 0, alignment=label_align)
         grid.addWidget(self.active_configurator_label, row, 1, alignment=value_align)
+        row += 1
+
+        grid.addWidget(self.telem_ovd_header, row, 0, alignment=label_align)
+        grid.addWidget(self.telem_ovd_label, row, 1, alignment=value_align)
         row += 1
 
         grid.addWidget(self.message_container, row, 0, 1, 2)
@@ -310,27 +452,23 @@ class AppStatusWidget(QWidget):
     def set_running(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Running')
-        self.cb_selectProfileCombo.setDisabled(False)
         self.message_stack.setCurrentIndex(0)
         self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(0,200,0))
 
     def set_paused(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Paused')
-        self.cb_selectProfileCombo.setDisabled(False)
         self.message_stack.setCurrentIndex(0)
         self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(255,200,0))
 
     def set_error(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Error')
-        self.cb_selectProfileCombo.setDisabled(False)
         self.pulse_label(self.sim_status_label.status_label, pulses=20000, color=QColor(200,0,0))
 
     def set_waiting(self, source):
         if self.offline: return
         self.sim_status_label.set_waiting()
-        self.cb_selectProfileCombo.setDisabled(False)
 
     def set_offline(self, source):
         self.offline = True
@@ -346,7 +484,22 @@ class AppStatusWidget(QWidget):
         self.pulse_label(self.sim_status_label.status_label, stop=True)
 
     def flag_error(self, message):
-        self.notification_label.setText(message)
+        # A rectified config error only clears when the runtime sees a fresh
+        # telemetry frame without the error, so it stays displayed until the
+        # sim is running again. Spell that out under the message so a user who
+        # fixes the config while paused isn't confused that it persists.
+        note = ("Note: A rectified error will only clear when the simulator is running/unpaused...")
+        body = html.escape(message or "").replace("\n", "<br>")
+        # The notification background is a translucent red: a light muted red
+        # reads on the dark theme but washes out on the light theme's pale-pink,
+        # so use a darker red there.
+        note_color = "#e6a6a6" if G.useDarkMode else "#a83232"
+        self.notification_label.setTextFormat(Qt.TextFormat.RichText)
+        self.notification_label.setText(
+            f"{body}"
+            f"<div style='margin-top:6px; font-size:11px; font-style:italic; color:{note_color};'>"
+            f"{html.escape(note)}</div>"
+        )
         self.notification_label.show()
         self.message_stack.setCurrentIndex(1)
 
@@ -371,28 +524,93 @@ class AppStatusWidget(QWidget):
         self.cur_craft_label.setText("None Detected")
         self.cur_pattern_label.setText("(No Match)")
         self.active_profile_label.setText("(None)")
+        self.set_notes_state(False)
+        self.set_telem_overrides('', '')
         self.set_waiting(src)
 
-    @pyqtSlot(str)
-    def set_active_vpconf(self, file):
-        self.active_vpconf_label.setText(os.path.splitext(os.path.basename(file))[0])
+    def set_profile_state(self, enabled):
+        """Whether a profile can be picked: only once a pattern names the
+        aircraft, since profiles belong to the pattern.  Owned here, not by
+        the sim-status transitions, which run every frame and used to switch
+        the combo back on regardless."""
+        self.cb_selectProfileCombo.setEnabled(bool(enabled))
+
+    def set_notes_state(self, enabled, has_notes=False):
+        """Enable/disable the profile-notes button. When notes exist (curated
+        or user) the icon glyph goes full-contrast (white on dark / black on
+        light theme) and the button pulses green briefly — same flash as the
+        vpconf/configurator pills — so notes are discoverable at a glance."""
+        self.btn_profile_notes.setEnabled(enabled)
+        if has_notes:
+            self.btn_profile_notes.setIcon(self._notes_icon_active)
+            self.btn_profile_notes.setToolTip('Notes exist for this aircraft profile - click to view or edit')
+            self.pulse_label(self.btn_profile_notes, color=QColor(0, 200, 0))
+        else:
+            self.pulse_label(self.btn_profile_notes, stop=True)
+            self.btn_profile_notes.setIcon(self._notes_icon_plain)
+            self.btn_profile_notes.setToolTip('View or edit notes for this aircraft profile')
+
+    @pyqtSlot(str, bool)
+    def set_active_vpconf(self, file, row_visible=True):
+        if not file:
+            # No profile pushed for the scoped device. Keep the row as a
+            # "None" chip while any device is using the feature — same chip
+            # styling as a real value so the row height is identical across
+            # scopes — and hide it entirely when no device is. Placeholders
+            # never pulse.
+            self.active_vpconf_label.setText('None')
+            self.active_vpconf_label.setToolTip('No vpconf profile has been pushed by TelemFFB for this device')
+            self.active_vpconf_header.setVisible(row_visible)
+            self.active_vpconf_label.setVisible(row_visible)
+            return
+        name = os.path.splitext(os.path.basename(file))[0]
+        # Elide long profile names so the chip can't stretch the panel; the
+        # tooltip carries the full path. The budget is the value column's
+        # 280px minus the chip's horizontal padding, so the chip can use the
+        # full width that is reserved for it anyway. Metrics use a bold font
+        # to match the chip stylesheet's font-weight.
+        font = QFont(self.active_vpconf_label.font())
+        font.setBold(True)
+        name = QtGui.QFontMetrics(font).elidedText(name, Qt.TextElideMode.ElideRight, 260)
+        self.active_vpconf_label.setText(name)
         self.active_vpconf_label.setToolTip(f"Last profile pushed by TelemFFB:\n{file}")
         self.active_vpconf_header.setVisible(True)
         self.active_vpconf_label.setVisible(True)
         self.pulse_label(self.active_vpconf_label, color=QColor(0, 200, 0))
 
-    def set_active_configurator(self, active=True):
-        #debug_caller_args('blue')
+    @pyqtSlot(str, str)
+    def set_telem_overrides(self, text, tooltip=''):
+        """Show/hide the telemetry-override pill. ``text`` describes the
+        active SimConnect/Dataref overrides for the loaded aircraft by tier
+        (e.g. "Default (4) + User (2)"); empty text hides the row entirely —
+        the overrides are aircraft-scoped, so unlike the vpconf/gains rows
+        there is no per-device placeholder state to hold geometry for."""
+        if not text:
+            self.pulse_label(self.telem_ovd_label, stop=True)
+            self.telem_ovd_header.setVisible(False)
+            self.telem_ovd_label.setVisible(False)
+            return
+        changed = self.telem_ovd_label.text() != text
+        self.telem_ovd_label.setText(text)
+        self.telem_ovd_label.setToolTip(tooltip)
+        self.telem_ovd_header.setVisible(True)
+        self.telem_ovd_label.setVisible(True)
+        if changed:
+            self.pulse_label(self.telem_ovd_label, color=QColor(0, 200, 0))
+
+    @pyqtSlot(bool, bool)
+    def set_active_configurator(self, active=True, row_visible=True):
         if active:
-            self.active_configurator_header.show()
-            self.active_configurator_label.show()
             self.active_configurator_label.setText('Active')
             self.active_configurator_label.setToolTip('The configurator gains have been modified from the currently\nactive configurator profile (if any)')
+            self.active_configurator_header.setVisible(True)
+            self.active_configurator_label.setVisible(True)
             self.pulse_label(self.active_configurator_label, color=QColor(0, 200, 0))
         else:
             self.active_configurator_label.setText('None')
             self.active_configurator_label.setToolTip('Configurator gains have been reset to those applied by\nthe current vpconf profile (if active) or the gains learned on startup')
-            self.pulse_label(self.active_configurator_label, color=QColor(0, 200, 0))
+            self.active_configurator_header.setVisible(row_visible)
+            self.active_configurator_label.setVisible(row_visible)
 
 
 
@@ -403,7 +621,8 @@ class AppStatusWidget(QWidget):
                 "DCS": False,
                 "MSFS": False,
                 "XPLANE": False,
-                "IL2": False
+                "IL2": False,
+                "BMS": False,
             }
 
         # Update the state for the provided sim
@@ -674,6 +893,12 @@ class NoWheelSlider(QSlider):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        # The groove and handle are painted manually, so the standard disabled
+        # palette never applies — dim the whole render when disabled so a
+        # greyed-out row actually looks greyed.
+        if not self.isEnabled():
+            painter.setOpacity(0.4)
+
         # --- Draw groove manually ---
         groove_rect = QRectF()
         if self.orientation() == Qt.Orientation.Horizontal:
@@ -833,6 +1058,12 @@ class NoWheelNumberSlider(NoWheelSlider):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # The groove and handle are painted manually, so the standard disabled
+        # palette never applies — dim the whole render when disabled so a
+        # greyed-out row actually looks greyed.
+        if not self.isEnabled():
+            painter.setOpacity(0.4)
 
         # --- Draw groove manually ---
         groove_rect = QRectF()
@@ -1398,131 +1629,242 @@ class SimStatusLabel(QWidget):
         return pixmap
 
 class Toggle(QCheckBox):
-    """Borrowed from qtwidgets library: https://github.com/pythonguis/python-qtwidgets
-    Modified default behavior to support simple checkbox widget replacement in QT designer"""
-    _transparent_pen = QPen(Qt.GlobalColor.transparent)
-    _light_grey_pen = QPen(Qt.GlobalColor.lightGray)
+    """A switch, drawn to read at the size it is actually shown.
 
-    def __init__(self,
-                 parent=None,
-                 bar_color=QColor("#44ab37c8"),
-                 checked_color="#ab37c8",
-                 handle_color=Qt.GlobalColor.white,
-                 disabled_color=Qt.GlobalColor.gray):
+    Originally from the qtwidgets library, since reworked.  Two things drove
+    the rework:
+
+    * The colours were hardcoded around a dark background, so on the light
+      theme the off-track composited to a pale lilac and the white handle
+      sat on it at 1.7:1 - all but invisible.  Everything except the accent
+      is now derived from the palette's window colour, as a fixed step away
+      from it, so the switch reads the same on either theme.
+
+    * The old handle was 14px across with a 12px bar, overhanging it by a
+      single pixel and running past both ends; and its shape came from a
+      three-stop radial gradient and a heavy rim, neither of which survives
+      being drawn in 14 pixels.  The handle now sits inset in the track,
+      travel bounded, with shading as a garnish rather than the substance.
+
+    `checked_color` is the accent, in both themes: lifting it for dark is
+    right for text, where thin strokes need the help, but a filled track
+    only loses saturation - and the handle loses definition against it.
+    """
+    #: How long the handle takes to slide, and how it eases.
+    SLIDE_MS = 150
+
+    #: Gap between the handle and the inside of the track.
+    HANDLE_INSET = 2.0
+
+    #: The switch as drawn.  The widget is a little larger, leaving room
+    #: for the handle's shadow and the focus ring; the old widget was 45x30
+    #: with a 22x12 bar rattling around inside it.
+    TRACK_W, TRACK_H = 29, 15
+    MARGIN_X, MARGIN_Y = 3, 4
+
+    def __init__(self, parent=None, checked_color=vpf_purple):
         super().__init__(parent)
         self.setStyleSheet("QCheckBox::indicator { width: 0px; height: 0px; }")
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
-        # Save our properties on the object via self, so we can access them later
-        # in the paintEvent.
-        self._bar_color = bar_color
-        self._checked_color = checked_color
-        self._handle_color = handle_color
-        self._disabled_color = QColor(disabled_color)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self._checked_color = QColor(checked_color)
+        self._hover = False
+        self._interactive = False
+        self._settling = False
+        self._handle_position = 0.0
 
-        self._bar_brush = QBrush(bar_color)
-        self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
+        # The whole widget is the switch, so all of it should be clickable.
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setFixedSize(QSize(self.TRACK_W + 2 * self.MARGIN_X,
+                                self.TRACK_H + 2 * self.MARGIN_Y))
 
-        self._handle_brush = QBrush(handle_color)
-        self._handle_checked_brush = QBrush(QColor(checked_color))
-
-        # Setup the rest of the widget.
-        self.setContentsMargins(8, 0, 8, 0)
-        self._handle_position = 0
-        self.setMaximumSize(QSize(45, 30))
-        self.setMinimumSize(QSize(45, 30))
+        self._animation = QPropertyAnimation(self, b"handle_position", self)
+        self._animation.setDuration(self.SLIDE_MS)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         self.stateChanged.connect(self.handle_state_change)
 
     def sizeHint(self):
-        return QSize(58, 45)
+        return self.minimumSize()
 
     def hitButton(self, pos: QPointF):
         return self.contentsRect().contains(pos)
 
+    def nextCheckState(self):
+        """Mark a change the user made.
+
+        Mouse clicks and the space bar arrive here; setChecked() does not.
+        That is exactly the line between a toggle the user flipped and one
+        the app set, and only the first is worth animating - the aircraft
+        settings page rebuilds its rows on every edit, and a page full of
+        switches all sliding at once is noise.
+        """
+        self._interactive = True
+        self._settling = True
+        try:
+            super().nextCheckState()
+        finally:
+            self._interactive = False
+            self._settling = False
+
+    def setChecked(self, checked):
+        """Set the state, put the handle where that state says, and stay
+        safe to call from a slot reacting to this very switch.
+
+        Two things are handled here.
+
+        The handle: Qt calls its own C++ setChecked for clicks, so this
+        override only sees changes the app makes - exactly the ones that
+        should snap rather than slide.  Doing it here rather than only in
+        the stateChanged slot matters because a caller may block signals,
+        which would leave the track drawn one way and the handle sitting
+        the other.
+
+        The timing: a slot that answers stateChanged by setting the state
+        back - "you can't turn that on, here's why" - would otherwise
+        wedge the switch.  QCheckBox emits stateChanged only when the new
+        state differs from the last one it published, and setting it from
+        inside that emission leaves those two out of step; the next click
+        then flips the switch silently, with no signal for anyone to
+        answer.  So a re-entrant call is deferred by one pass of the event
+        loop, arriving as a change in its own right.  Only that case
+        waits: an ordinary call still takes effect before it returns.
+        """
+        if self._settling:
+            QTimer.singleShot(0, lambda: self._settle(checked))
+            return
+        self._settling = True
+        try:
+            super().setChecked(checked)
+        finally:
+            self._settling = False
+        self._animation.stop()
+        self.handle_position = 1.0 if checked else 0.0
+
+    def _settle(self, checked):
+        """A deferred setChecked, landing a pass after it was asked for -
+        by which time the widget may have been destroyed."""
+        try:
+            self.setChecked(checked)
+        except RuntimeError:
+            pass
+
+    def enterEvent(self, event):
+        self._hover = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self.update()
+        super().leaveEvent(event)
+
+    # ------------------------------------------------------------------
+    def _colors(self):
+        """Every colour the switch needs, for whichever theme is running.
+
+        Taken as a step away from the window colour rather than as absolute
+        greys, so the track keeps the same separation from the page on a
+        dark background and a light one.
+        """
+        window = self.palette().color(QPalette.ColorRole.Window)
+        dark = window.lightness() < 128
+        hover = self._hover and self.isEnabled()
+        return {
+            'accent': self._checked_color,
+            # Chosen for two ratios at once: the track has to separate
+            # from the page (>=2:1) and the handle from the track (>=2.5:1).
+            # A lighter track reads better on dark but washes out the handle
+            # on light, so the two sides are not mirror images.
+            'off': (window.lighter(220 if hover else 190) if dark
+                    else window.darker(170 if hover else 150)),
+            'handle': QColor("#f2f2f4") if dark else QColor("#ffffff"),
+            'track_disabled': window.lighter(122) if dark else window.darker(112),
+            'handle_disabled': window.lighter(165) if dark else window.darker(126),
+            'rim': QColor(0, 0, 0, 40 if dark else 55),
+            'shadow': QColor(0, 0, 0, 70 if dark else 45),
+            'hover': hover,
+        }
+
+    def _geometry(self, position=None):
+        """Where the track and the handle go.
+
+        The one place this arithmetic lives, so what the tests check is what
+        paintEvent draws.
+
+        Returns:
+            (track, handle_radius, handle_centre)
+        """
+        if position is None:
+            position = self._handle_position
+        track = QRectF(0, 0, self.TRACK_W, self.TRACK_H)
+        track.moveCenter(QRectF(self.rect()).center())
+        handle_r = track.height() / 2 - self.HANDLE_INSET
+        # bounded travel, so the handle never leaves the track
+        left = track.x() + self.HANDLE_INSET + handle_r
+        right = track.right() - self.HANDLE_INSET - handle_r
+        return track, handle_r, QPointF(left + (right - left) * position,
+                                        track.center().y())
+
     def paintEvent(self, e: QPaintEvent):
-        contRect = self.contentsRect()
-        handleRadius = round(0.24 * contRect.height())
+        c = self._colors()
+        track, handle_r, centre = self._geometry()
+        radius = track.height() / 2
+        x, y = centre.x(), centre.y()
 
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        p.setPen(self._transparent_pen)
-        barRect = QRectF(
-            0, 0,
-            contRect.width() - handleRadius, 0.40 * contRect.height()
-        )
-        barRect.moveCenter(QPointF(contRect.center()))
-        rounding = barRect.height() / 2
-
-        # the handle will move along this line
-        trailLength = contRect.width() - 2 * handleRadius
-        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
-
-        # Draw the bar with a subtle 3D sunken effect
-        barGradient = QLinearGradient(0, 0, 0, barRect.height())
-        barGradient.setStart(barRect.topLeft())
-        barGradient.setFinalStop(barRect.bottomLeft())
-
         if not self.isEnabled():
-            barGradient.setColorAt(0.0, self._disabled_color.lighter(150))
-            barGradient.setColorAt(0.0, self._disabled_color)
-            barGradient.setColorAt(1.0, self._disabled_color.darker(150))
+            base = c['track_disabled']
+        elif self.isChecked():
+            base = c['accent'].lighter(110) if c['hover'] else c['accent']
         else:
-            barGradient.setColorAt(0.0, self._bar_color.lighter(150))
-            barGradient.setColorAt(0.5, self._bar_color)
-            barGradient.setColorAt(1.0, self._bar_color.darker(150))
+            base = c['off']
 
-            if self.isChecked():
-                barGradient.setColorAt(0.0, QColor(self._checked_color).lighter(150))
-                barGradient.setColorAt(0.5, QColor(self._checked_color))
-                barGradient.setColorAt(1.0, QColor(self._checked_color).darker(150))
+        track_gradient = QLinearGradient(track.topLeft(), track.bottomLeft())
+        track_gradient.setColorAt(0.0, base.darker(115))
+        track_gradient.setColorAt(1.0, base.lighter(108))
+        p.setPen(QPen(c['rim'], 1))
+        p.setBrush(QBrush(track_gradient))
+        p.drawRoundedRect(track.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
 
-        p.setBrush(QBrush(barGradient))
-        p.drawRoundedRect(barRect, rounding, rounding)
+        if self.hasFocus():
+            p.setPen(QPen(c['accent'].lighter(130), 1.5))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(track.adjusted(0.75, 0.75, -0.75, -0.75),
+                              radius, radius)
 
-        # Draw the border around the bar
+        handle = c['handle_disabled'] if not self.isEnabled() else c['handle']
+        handle_gradient = QLinearGradient(QPointF(x, y - handle_r),
+                                          QPointF(x, y + handle_r))
+        handle_gradient.setColorAt(0.0, handle.lighter(104))
+        handle_gradient.setColorAt(1.0, handle.darker(110))
+
+        # a soft drop shadow lifts the handle off the track; at this size it
+        # carries the depth that a radial gradient cannot
         p.setPen(Qt.PenStyle.NoPen)
-        p.drawRoundedRect(barRect, rounding, rounding)
+        p.setBrush(QBrush(c['shadow']))
+        p.drawEllipse(QPointF(x, y + 0.8), handle_r, handle_r)
 
-        if not self.isEnabled():
-            handle_color = self._disabled_color.darker(110)
-        elif self.isChecked():
-            handle_color = self._handle_checked_brush.color()
-        else:
-            handle_color = self._handle_brush.color()
-
-        # Draw the handle with a gradient for 3D effect
-        handleGradient = QRadialGradient(
-            QPointF(xPos - handleRadius / 3, barRect.center().y() - handleRadius / 3),
-            handleRadius
-        )
-
-        if not self.isEnabled():
-            handleGradient.setColorAt(0.0, handle_color.lighter(120))
-            handleGradient.setColorAt(0.4, handle_color)
-            handleGradient.setColorAt(1.0, handle_color.darker(130))
-        elif self.isChecked():
-            handleGradient.setColorAt(0.0, QColor(255, 255, 255, 180))
-            handleGradient.setColorAt(0.3, handle_color)
-            handleGradient.setColorAt(1.0, handle_color.darker(120))
-        else:
-            # OFF + Enabled: More subtle highlight
-            handleGradient.setColorAt(0.0, handle_color.lighter(150))
-            handleGradient.setColorAt(0.3, handle_color)
-            handleGradient.setColorAt(1.0, handle_color.darker(300))
-
-        p.setBrush(handleGradient)
-        p.setPen(QPen(handle_color.darker()))
-        p.drawEllipse(
-            QPointF(xPos, barRect.center().y()),
-            handleRadius, handleRadius)
-
+        p.setBrush(QBrush(handle_gradient))
+        p.setPen(QPen(c['rim'], 0.8))
+        p.drawEllipse(QPointF(x, y), handle_r, handle_r)
         p.end()
 
+    # ------------------------------------------------------------------
     @pyqtSlot(int)
     def handle_state_change(self, value):
-        self._handle_position = 1 if value else 0
+        """Slide the handle for a change the user made; snap for one the
+        app made."""
+        target = 1.0 if value else 0.0
+        self._animation.stop()
+        if not self._interactive:
+            self.handle_position = target
+            return
+        self._animation.setStartValue(self._handle_position)
+        self._animation.setEndValue(target)
+        self._animation.start()
 
     @pyqtProperty(float)
     def handle_position(self):
@@ -1530,25 +1872,31 @@ class Toggle(QCheckBox):
 
     @handle_position.setter
     def handle_position(self, pos):
-        """change the property
-        we need to trigger QWidget.update() method, either by:
-            1- calling it here [ what we're doing ].
-            2- connecting the QPropertyAnimation.valueChanged() signal to it.
-        """
+        """Driven by the slide animation; setting it repaints."""
         self._handle_position = pos
         self.update()
 
+
 class LabeledToggle(QWidget):
-    """Combo widget that creates a single widget with label and connectable slots using the Toggle widget"""
+    """Combo widget that creates a single widget with label and connectable slots using the Toggle widget
+
+    The label is an InfoLabel, so a toggle that carries a tooltip advertises
+    it with the same information icon used elsewhere in the app - a tooltip
+    nothing points at is a tooltip nobody hovers.
+    """
     stateChanged = pyqtSignal(int)  # Expose the stateChanged signal
     clicked = pyqtSignal(bool)      # Expose the clicked signal
 
-    def __init__(self, parent=None, label=""):
+    def __init__(self, parent=None, label="", tooltip=None):
         super().__init__(parent)
 
         self.toggle = Toggle(self)
-        self.label = QLabel(label, self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Ensure the label is vertically centered
+        self.label = InfoLabel(self, text=label)
+        # InfoLabel lets its text shrink to nothing, which suits the settings
+        # tree's narrow columns but truncates a toggle's caption in a form.
+        # Hold it to the width its text asks for.
+        self.label.setSizePolicy(QSizePolicy.Policy.Minimum,
+                                 QSizePolicy.Policy.Preferred)
 
         layout = QHBoxLayout(self)
         layout.addWidget(self.toggle)
@@ -1560,6 +1908,9 @@ class LabeledToggle(QWidget):
         self.toggle.stateChanged.connect(self.stateChanged)  # Forward the stateChanged signal
         self.toggle.clicked.connect(self.clicked)  # Forward the clicked signal
 
+        if tooltip:
+            self.setToolTip(tooltip)
+
     def isChecked(self):
         return self.toggle.isChecked()
 
@@ -1568,6 +1919,13 @@ class LabeledToggle(QWidget):
 
     def setText(self, text):
         self.label.setText(text)
+
+    def setToolTip(self, tooltip):
+        """Mark the label with the information icon, and answer a hover
+        anywhere on the row rather than only over the icon."""
+        self.label.setToolTip(tooltip)
+        self.toggle.setToolTip(tooltip or '')
+        super().setToolTip(tooltip or '')
 
     def connect(self, *args, **kwargs):
         return self.stateChanged.connect(*args, **kwargs)
@@ -1580,136 +1938,6 @@ class LabeledToggle(QWidget):
 
     def click(self):
         self.toggle.click()
-
-class AnimatedToggle(QCheckBox):
-    """Borrowed from qtwidgets library: https://github.com/pythonguis/python-qtwidgets"""
-    _transparent_pen = QPen(Qt.GlobalColor.transparent)
-    _light_grey_pen = QPen(Qt.GlobalColor.lightGray)
-
-    def __init__(self,
-        parent=None,
-        bar_color=Qt.GlobalColor.gray,
-        checked_color="#ab37c8",
-        handle_color=Qt.GlobalColor.white,
-        pulse_unchecked_color="#44999999",
-        pulse_checked_color="#44#ab37c8"
-        ):
-        super().__init__(parent)
-
-        # Save our properties on the object via self, so we can access them later
-        # in the paintEvent.
-        self._bar_brush = QBrush(bar_color)
-        self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
-
-        self._handle_brush = QBrush(handle_color)
-        self._handle_checked_brush = QBrush(QColor(checked_color))
-
-        self._pulse_unchecked_animation = QBrush(QColor(pulse_unchecked_color))
-        self._pulse_checked_animation = QBrush(QColor(pulse_checked_color))
-
-        # Setup the rest of the widget.
-        self.setContentsMargins(8, 0, 8, 0)
-        self._handle_position = 0
-
-        self._pulse_radius = 0
-
-        self.animation = QPropertyAnimation(self, b"handle_position", self)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        self.animation.setDuration(200)  # time in ms
-
-        self.pulse_anim = QPropertyAnimation(self, b"pulse_radius", self)
-        self.pulse_anim.setDuration(350)  # time in ms
-        self.pulse_anim.setStartValue(10)
-        self.pulse_anim.setEndValue(20)
-
-        self.animations_group = QSequentialAnimationGroup()
-        self.animations_group.addAnimation(self.animation)
-        self.animations_group.addAnimation(self.pulse_anim)
-
-        self.stateChanged.connect(self.setup_animation)
-
-    def sizeHint(self):
-        return QSize(58, 45)
-
-    def hitButton(self, pos: QPoint):
-        return self.contentsRect().contains(pos)
-
-    @pyqtSlot(int)
-    def setup_animation(self, value):
-        self.animations_group.stop()
-        if value:
-            self.animation.setEndValue(1)
-        else:
-            self.animation.setEndValue(0)
-        self.animations_group.start()
-
-    def paintEvent(self, e: QPaintEvent):
-
-        contRect = self.contentsRect()
-        handleRadius = round(0.24 * contRect.height())
-
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        p.setPen(self._transparent_pen)
-        barRect = QRectF(
-            0, 0,
-            contRect.width() - handleRadius, 0.40 * contRect.height()
-        )
-        barRect.moveCenter(contRect.center())
-        rounding = barRect.height() / 2
-
-        # the handle will move along this line
-        trailLength = contRect.width() - 2 * handleRadius
-
-        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
-
-        if self.pulse_anim.state() == QPropertyAnimation.Running:
-            p.setBrush(
-                self._pulse_checked_animation if
-                self.isChecked() else self._pulse_unchecked_animation)
-            p.drawEllipse(QPointF(xPos, barRect.center().y()),
-                          self._pulse_radius, self._pulse_radius)
-
-        if self.isChecked():
-            p.setBrush(self._bar_checked_brush)
-            p.drawRoundedRect(barRect, rounding, rounding)
-            p.setBrush(self._handle_checked_brush)
-
-        else:
-            p.setBrush(self._bar_brush)
-            p.drawRoundedRect(barRect, rounding, rounding)
-            p.setPen(self._light_grey_pen)
-            p.setBrush(self._handle_brush)
-
-        p.drawEllipse(
-            QPointF(xPos, barRect.center().y()),
-            handleRadius, handleRadius)
-
-        p.end()
-
-    @pyqtProperty(float)
-    def handle_position(self):
-        return self._handle_position
-
-    @handle_position.setter
-    def handle_position(self, pos):
-        """change the property
-        we need to trigger QWidget.update() method, either by:
-            1- calling it here [ what we doing ].
-            2- connecting the QPropertyAnimation.valueChanged() signal to it.
-        """
-        self._handle_position = pos
-        self.update()
-
-    @pyqtProperty(float)
-    def pulse_radius(self):
-        return self._pulse_radius
-
-    @pulse_radius.setter
-    def pulse_radius(self, pos):
-        self._pulse_radius = pos
-        self.update()
 
 class InstanceStatusRow(QWidget):
     changeConfigScope = QtCore.pyqtSignal(str)
@@ -2581,6 +2809,327 @@ class GForceCurveWidget(CurveWidget):
         self.update()
 
 
+class TrimCurveWidget(CurveWidget):
+    """Read-only display of the auto-trim calibration measurement.
+
+    Sibling of :class:`SpringCurveWidget`/:class:`GForceCurveWidget`. Plots the
+    measured ``elevator_axis(trim)`` samples (scatter) against the fitted line
+    used to solve ``virtual_y``. X is trim %, Y is the elevator-axis command %
+    (signed). It is not editable — the base's point-drag machinery is stubbed
+    out — and it carries none of the spring-specific unit/airspeed/smoothing
+    behavior.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Trim Calibration")
+        self.x_label_text = "Trim:"
+        self.x_label_legend = "Elevator Trim %"
+        self.y_label_text = "Elevator:"
+        self.y_label_legend = "Elevator Axis %"
+        self.current_unit = "%"
+
+        # Label band sized for this widget's tick labels ("-103%") plus the
+        # rotated Y legend; the base margins are too tight and put ticks and
+        # legends in the same pixel columns.
+        self.margin_left = 58
+        self.margin_bottom = 42
+
+        # Full-scale view while idle/measuring; set_result() zooms to the data.
+        self.x_min = -100.0
+        self.x_max = 100.0
+        self.y_min = -100.0
+        self.y_max = 100.0
+
+        self.sample_points = []          # [QPointF(trim%, elevator%)]
+        self.flagged_indices = set()     # sample indices taken with a VS residual
+        self.fit_line = None             # (QPointF, QPointF) in %-space
+        self.curve_polyline = []         # sorted samples joined = the calibrated curve
+        self.extrap_tails = []           # dashed edge-slope segments beyond the band
+        self.live_point = None           # QPointF(trim%, elevator%) or None
+        self.family_polylines = []       # ghosted stored-family curves ([QPointF] each)
+        self.points = []                 # unused; keeps base paint helpers safe
+
+    # ---- data API -----------------------------------------------------------
+
+    def set_result(self, samples, slope, intercept, flagged=None, show_fit=True):
+        """Populate from calibration output.
+
+        Args:
+            samples: list of (trim_frac, u_elev_frac), both normalized [-1, 1].
+            slope, intercept: linear fit of u_elev vs trim (normalized units).
+            flagged: sample indices accepted with a VS residual (drawn amber).
+            show_fit: draw the dotted linear-fit reference line. True for
+                fresh results (it is that run's own fit, paired with the R²
+                readout); the stored-family view passes False — a stale
+                static-gain tangent among several curves reads as noise.
+        """
+        self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
+        self.flagged_indices = set(flagged or [])
+        xs = [p.x() for p in self.sample_points]
+        ys = [p.y() for p in self.sample_points]
+        if not xs:
+            self.update()
+            return
+
+        # The calibrated curve is the sorted samples joined; dashed tails show
+        # the edge-slope extrapolation the runtime applies beyond the band.
+        pts = sorted(self.sample_points, key=lambda p: p.x())
+        self.curve_polyline = pts
+        self.extrap_tails = []
+        span = pts[-1].x() - pts[0].x()
+        ext = max(span * 0.15, 2.0)
+        if len(pts) >= 2:
+            p0, p1 = pts[0], pts[1]
+            s0 = (p1.y() - p0.y()) / (p1.x() - p0.x()) if p1.x() != p0.x() else 0.0
+            self.extrap_tails.append(
+                (QPointF(p0.x() - ext, p0.y() - s0 * ext), QPointF(p0.x(), p0.y())))
+            q0, q1 = pts[-2], pts[-1]
+            s1 = (q1.y() - q0.y()) / (q1.x() - q0.x()) if q1.x() != q0.x() else 0.0
+            self.extrap_tails.append(
+                (QPointF(q1.x(), q1.y()), QPointF(q1.x() + ext, q1.y() + s1 * ext)))
+
+        xmin, xmax = min(xs), max(xs)
+        self.x_min, self.x_max = xmin - ext - 1.0, xmax + ext + 1.0
+        # A ghosted stored family widens the view (never shrinks it) so all
+        # speeds stay visible around the highlighted/new curve.
+        fam_x = [p.x() for c in self.family_polylines for p in c]
+        fam_y = [p.y() for c in self.family_polylines for p in c]
+        if fam_x:
+            self.x_min = min(self.x_min, min(fam_x) - 2.0)
+            self.x_max = max(self.x_max, max(fam_x) + 2.0)
+
+        if show_fit:
+            y1 = (slope * (self.x_min / 100.0) + intercept) * 100.0
+            y2 = (slope * (self.x_max / 100.0) + intercept) * 100.0
+            self.fit_line = (QPointF(self.x_min, y1), QPointF(self.x_max, y2))
+        else:
+            self.fit_line = None
+            y1 = y2 = 0.0
+
+        tail_ys = [p.y() for seg in self.extrap_tails for p in seg]
+        ylim = max(max((abs(v) for v in ys), default=0.0),
+                   max((abs(v) for v in tail_ys), default=0.0),
+                   max((abs(v) for v in fam_y), default=0.0),
+                   abs(y1), abs(y2), 5.0) * 1.2
+        self.y_min, self.y_max = -ylim, ylim
+        self.update()
+
+    def set_live_point(self, trim_frac, u_elev_frac):
+        """Optional live marker for the current trim/elevator during a run."""
+        if trim_frac is None or u_elev_frac is None:
+            self.live_point = None
+        else:
+            self.live_point = QPointF(trim_frac * 100.0, u_elev_frac * 100.0)
+        self.update()
+
+    def set_samples(self, samples):
+        """Live scatter of the stations accepted so far (no zoom/fit).
+
+        Used while a run is in progress; the view stays at full scale so the
+        picture is stable — set_result() does the zoom at completion.
+        """
+        self.sample_points = [QPointF(t * 100.0, u * 100.0) for t, u in samples]
+        self.update()
+
+    def set_family(self, curves):
+        """Ghost-overlay the STORED multi-speed calibration family.
+
+        ``curves`` is a list of point-lists [(trim_frac, u_frac), ...] in
+        display space (the dialog mirrors stored offsets back to measured-
+        axis space). Ghosts render behind everything; the selected/new curve
+        is drawn on top through the normal :meth:`set_result` path. When no
+        result is loaded the view fits the family; a later set_result()
+        re-fits around its own data and widens for the ghosts.
+        """
+        self.family_polylines = [
+            sorted((QPointF(t * 100.0, u * 100.0) for t, u in c),
+                   key=lambda p: p.x())
+            for c in curves if len(c) >= 2
+        ]
+        if self.family_polylines and not self.curve_polyline:
+            xs = [p.x() for c in self.family_polylines for p in c]
+            ys = [p.y() for c in self.family_polylines for p in c]
+            self.x_min, self.x_max = min(xs) - 4.0, max(xs) + 4.0
+            ylim = max(max(abs(v) for v in ys), 5.0) * 1.2
+            self.y_min, self.y_max = -ylim, ylim
+        self.update()
+
+    def clear(self):
+        self.sample_points = []
+        self.flagged_indices = set()
+        self.fit_line = None
+        self.curve_polyline = []
+        self.extrap_tails = []
+        self.live_point = None
+        self.family_polylines = []
+        # Back to the stable full-scale measuring view (a previous result may
+        # have zoomed the axes to its data).
+        self.x_min, self.x_max = -100.0, 100.0
+        self.y_min, self.y_max = -100.0, 100.0
+        self.update()
+
+    # ---- coordinate mapping (signed Y range) --------------------------------
+
+    def map_to_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        xr = (self.x_max - self.x_min) or 1.0
+        yr = (self.y_max - self.y_min) or 1.0
+        x = rect.left() + ((point.x() - self.x_min) / xr) * rect.width()
+        y = rect.top() + (1 - (point.y() - self.y_min) / yr) * rect.height()
+        return QPointF(x, y)
+
+    def map_from_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        x = self.x_min + ((point.x() - rect.left()) / rect.width()) * (self.x_max - self.x_min)
+        y = self.y_min + (1 - (point.y() - rect.top()) / rect.height()) * (self.y_max - self.y_min)
+        return QPointF(x, y)
+
+    # ---- rendering ----------------------------------------------------------
+
+    def draw_axis_labels(self, painter, *args, **kwargs):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        painter.setFont(QFont('Arial', 8))
+        painter.setPen(QPen(self.axis_color))
+        fm = painter.fontMetrics()
+
+        # Every other gridline gets a tick label — all 11 collide at typical
+        # widget heights. Y ticks are right-aligned against the plot edge so
+        # they never reach the rotated legend at the far left.
+        for i in range(0, 11, 2):
+            y = int(rect.top() + i * rect.height() / 10)
+            val = self.y_max - (self.y_max - self.y_min) * i / 10
+            text = f"{val:.0f}%"
+            painter.drawText(rect.left() - fm.horizontalAdvance(text) - 6,
+                             y + fm.ascent() // 2, text)
+
+        for i in range(0, 11, 2):
+            x = int(rect.left() + i * rect.width() / 10)
+            val = self.x_min + (self.x_max - self.x_min) * i / 10
+            text = f"{val:.0f}"
+            painter.drawText(x - fm.horizontalAdvance(text) // 2,
+                             rect.bottom() + fm.ascent() + 4, text)
+
+        painter.setFont(QFont('Arial', 9))
+        fm = painter.fontMetrics()
+        if self.x_label_legend:
+            tw = fm.horizontalAdvance(self.x_label_legend)
+            painter.drawText(rect.left() + rect.width() // 2 - tw // 2,
+                             rect.bottom() + self.margin_bottom - 6, self.x_label_legend)
+        if self.y_label_legend:
+            painter.save()
+            th = fm.horizontalAdvance(self.y_label_legend)
+            painter.translate(12, rect.top() + rect.height() // 2 + th // 2)
+            painter.rotate(-90)
+            painter.drawText(0, 0, self.y_label_legend)
+            painter.restore()
+
+    def _draw_zero_axes(self, painter):
+        """Emphasize the x=0 and y=0 reference lines within the plot band."""
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        painter.setPen(QPen(self.axis_color, 1, Qt.PenStyle.SolidLine))
+        if self.y_min <= 0 <= self.y_max:
+            zy = self.map_to_widget_space(QPointF(self.x_min, 0)).y()
+            painter.drawLine(rect.left(), int(zy), rect.right(), int(zy))
+        if self.x_min <= 0 <= self.x_max:
+            zx = self.map_to_widget_space(QPointF(0, self.y_min)).x()
+            painter.drawLine(int(zx), rect.top(), int(zx), rect.bottom())
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.draw_grid(painter)
+        self._draw_zero_axes(painter)
+        self.draw_axis_labels(painter)
+
+        # Stored family ghosts: behind everything, translucent — context for
+        # the highlighted/new curve drawn through the normal layers on top.
+        if self.family_polylines:
+            painter.setPen(QPen(QColor(128, 128, 128, 110), 1))
+            for poly in self.family_polylines:
+                wpts = [self.map_to_widget_space(p) for p in poly]
+                for a, b in zip(wpts, wpts[1:]):
+                    painter.drawLine(a, b)
+
+        # Static best-fit: dotted, de-emphasized — the calibrated curve is the
+        # recommended output; the fit is the legacy single-gain reference.
+        if self.fit_line is not None:
+            painter.setPen(QPen(self.curve_color, 1, Qt.PenStyle.DotLine))
+            painter.drawLine(self.map_to_widget_space(self.fit_line[0]),
+                             self.map_to_widget_space(self.fit_line[1]))
+
+        if len(self.curve_polyline) >= 2:
+            painter.setPen(QPen(self.curve_color, 2))
+            wpts = [self.map_to_widget_space(p) for p in self.curve_polyline]
+            for a, b in zip(wpts, wpts[1:]):
+                painter.drawLine(a, b)
+
+        # Edge-slope extrapolation beyond the measured band: dashed.
+        if self.extrap_tails:
+            painter.setPen(QPen(self.curve_color, 2, Qt.PenStyle.DashLine))
+            for seg in self.extrap_tails:
+                painter.drawLine(self.map_to_widget_space(seg[0]),
+                                 self.map_to_widget_space(seg[1]))
+
+        for i, p in enumerate(self.sample_points):
+            wp = self.map_to_widget_space(p)
+            if i in self.flagged_indices:
+                # taken with a residual VS (deadline compromise) — draw amber
+                painter.setPen(QPen(QColor("#8a6510"), 1))
+                painter.setBrush(QColor("#e6a817"))
+            else:
+                painter.setPen(QPen(self.axis_color, 1))
+                painter.setBrush(self.point_fill)
+            painter.drawEllipse(QRectF(wp.x() - 3, wp.y() - 3, 6, 6))
+
+        if self.live_point is not None:
+            wp = self.map_to_widget_space(self.live_point)
+            painter.setBrush(QColor("#33cc33"))
+            painter.setPen(QPen(QColor("#116611"), 1))
+            painter.drawEllipse(QRectF(wp.x() - 4, wp.y() - 4, 8, 8))
+
+        if not self._enabled:
+            self.apply_disabled_overlay(painter)
+
+    # ---- read-only: no point editing; right-click hits family curves --------
+
+    # Emitted with the family-polyline index under a right-click; the dialog
+    # owns the context menu and the delete flow (with all its gating).
+    curve_context_requested = pyqtSignal(int)
+
+    def _family_hit_test(self, wp, radius=6.0):
+        """Index of the family polyline within ``radius`` px of widget-space
+        point ``wp`` (nearest point-to-segment distance), or None."""
+        best, best_d = None, radius
+        for i, poly in enumerate(self.family_polylines):
+            pts = [self.map_to_widget_space(p) for p in poly]
+            for a, b in zip(pts, pts[1:]):
+                dx, dy = b.x() - a.x(), b.y() - a.y()
+                seg2 = dx * dx + dy * dy
+                if seg2 <= 1e-9:
+                    px, py = a.x(), a.y()
+                else:
+                    t = ((wp.x() - a.x()) * dx + (wp.y() - a.y()) * dy) / seg2
+                    t = max(0.0, min(1.0, t))
+                    px, py = a.x() + t * dx, a.y() + t * dy
+                d = ((wp.x() - px) ** 2 + (wp.y() - py) ** 2) ** 0.5
+                if d < best_d:
+                    best, best_d = i, d
+        return best
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.RightButton and self.family_polylines:
+            idx = self._family_hit_test(QPointF(event.position()))
+            if idx is not None:
+                self.curve_context_requested.emit(idx)
+
+    def mouseMoveEvent(self, event):
+        pass
+
+    def mouseReleaseEvent(self, event):
+        pass
+
+
 class ExceptionStatusWidget(QWidget):
     """Status bar widget showing logged exception count with clickable link."""
     
@@ -2635,3 +3184,77 @@ class ExceptionStatusWidget(QWidget):
 
 
 
+
+
+class IasTrendWidget(QWidget):
+    """Tiny vertical trend arrow for an airspeed readout.
+
+    The arrow grows with the rate of change — square-root scaled, because
+    the interesting regime is slow creep (MSFS takes a minute-plus to
+    asymptote after a power change) which linear scaling would render as an
+    invisible nub — points up/down with the sign, and shifts green -> amber
+    -> red with magnitude. A flat green dash means the airspeed is truly
+    static; blank means no rate is known (no telemetry).
+    """
+
+    FULL_SCALE_KTS = 1.5   # kt/s at full arrow length
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Line-height sized: the indicator must not change the row's
+        # geometry (a taller widget shifted every other status column).
+        self.setFixedSize(14, 20)
+        self._rate = None
+        self._static = False
+
+    def set_rate(self, kt_per_s, static=False):
+        """Update the display. ``static`` is the caller's verdict that the
+        speed is truly settled (accumulation-aware, not just instantaneous
+        rate); None blanks the indicator."""
+        if kt_per_s == self._rate and static == self._static:
+            return
+        self._rate = kt_per_s
+        self._static = static
+        self.setToolTip("" if kt_per_s is None
+                        else f"Airspeed trend: {kt_per_s:+.2f} kt/s")
+        self.update()
+
+    @staticmethod
+    def _blend(c1, c2, f):
+        f = max(0.0, min(1.0, f))
+        return QColor(int(c1.red() + (c2.red() - c1.red()) * f),
+                      int(c1.green() + (c2.green() - c1.green()) * f),
+                      int(c1.blue() + (c2.blue() - c1.blue()) * f))
+
+    def paintEvent(self, event):
+        if self._rate is None:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        cx, cy = w / 2.0, h / 2.0
+
+        if self._static:
+            p.setPen(QPen(QColor(51, 170, 51), 3))
+            p.drawLine(QPointF(2.0, cy), QPointF(w - 2.0, cy))
+            return
+
+        frac = min(abs(self._rate) / self.FULL_SCALE_KTS, 1.0) ** 0.5
+        green = QColor(51, 170, 51)
+        amber = QColor(230, 168, 23)
+        red = QColor(204, 51, 51)
+        color = self._blend(green, amber, frac / 0.5) if frac < 0.5 \
+            else self._blend(amber, red, (frac - 0.5) / 0.5)
+
+        length = max(6.0, frac * (cy - 2.0))
+        d = 1.0 if self._rate > 0 else -1.0     # positive rate draws UP
+        tip_y = cy - d * length
+        base_y = cy + d * length * 0.5
+        p.setPen(QPen(color, 2.2))
+        p.drawLine(QPointF(cx, base_y), QPointF(cx, tip_y + d * 4.0))
+        head = QtGui.QPolygonF([QPointF(cx, tip_y),
+                                QPointF(cx - 3.5, tip_y + d * 5.0),
+                                QPointF(cx + 3.5, tip_y + d * 5.0)])
+        p.setBrush(QBrush(color))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawPolygon(head)

@@ -29,8 +29,14 @@ if TYPE_CHECKING:
     from telemffb.telem.TelemManager import TelemManager
 
 class DcsIpcThread(threading.Thread):
+    _instance: Optional['DcsIpcThread'] = None
+
     def __init__(self, telemetry: 'TelemManager') -> None:
-        super().__init__()
+        # Daemon: a telemetry reader must never hold the process open.  These
+        # threads are told to stop at exit, but one asleep in a retry backoff
+        # would keep the interpreter - and the master's mutex - alive until it
+        # woke; the BMS listener's ten-second sleep did exactly that.
+        super().__init__(daemon=True)
         assert telemetry is not None, "Telemetry manager must be provided"
         self._run: bool = False
         self._telem: 'TelemManager' = telemetry
@@ -56,6 +62,9 @@ class DcsIpcThread(threading.Thread):
         :param command: Command string to send.
         """
         self = cls._instance
+        if self is None:
+            logging.debug("DcsIpcThread.send_commands: no DCS thread yet, dropping command")
+            return
         port = self._telem.getTelemValue("UDP_Port")
         if port:
             try:

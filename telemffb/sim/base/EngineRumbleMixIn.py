@@ -74,18 +74,39 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         modulation_neg = 1
         frequency2 = frequency + median_modulation
 
-        r1_modulation = utils.sine_point_in_time(3, 10000)
-        r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
+        # The detuned twins tenderize the low end but curse the high end:
+        # each pair (tone + equal-amplitude twin) beats at FULL depth
+        # (0..2x) regardless of how small the detune is, so at cruise any
+        # detune at all reads as a slow wah-wah undertone (field reports
+        # 2026-08 — first the fixed +-3 Hz sweep, then, with only the
+        # sweep RATE tapered, a slower but still full-depth beat). Both
+        # the detune (beat rate) AND the twin amplitude (beat depth) now
+        # taper inversely with frequency above the user's Low RPM point:
+        # identity at and below it (the chunky recip throb at idle is
+        # untouched), fading to a steady hum at cruise. The main tones
+        # get an RMS compensation as the twins fade so the felt level
+        # tracks the intensity taper — the factor is exactly 1.0 at full
+        # depth, leaving the low end bit-identical.
+        f_ref = max(self.engine_rumble_lowrpm, 60) / 60.0
+        detune_scale = utils.clamp(f_ref / frequency, 0.0, 1.0)
+        beat_depth = detune_scale ** 2
+
+        r1_modulation = utils.sine_point_in_time(3 * detune_scale, 10000)
+        r2_modulation = utils.sine_point_in_time(3 * detune_scale, 17500, phase_offset_deg=45)
 
         if frequency > 0:
             force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
             dynamic_rumble_intensity = utils.clamp(self.ac_calc_engine_intensity(rpm), 0, force_limit)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
-            self.effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()
-            self.effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()
-            self.effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()
-            self.effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()
+            main_mag = utils.clamp(
+                dynamic_rumble_intensity * (2.0 - beat_depth ** 2) ** 0.5, 0.0, 1.0)
+            twin_mag = utils.clamp(dynamic_rumble_intensity * beat_depth, 0.0, 1.0)
+
+            self.effects["prop_rpm0-1"].periodic(frequency, main_mag, 0).start()
+            self.effects["prop_rpm0-2"].periodic(frequency + r1_modulation, twin_mag, 0).start()
+            self.effects["prop_rpm1-1"].periodic(frequency2, main_mag, 90).start()
+            self.effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, twin_mag, 90).start()
         else:
             self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
 
@@ -154,10 +175,10 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         intensity = utils.clamp(intensity, 0, 1)
         rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
         rt_freq2 = round(rt_freq + median_modulation, 4)
-        self.effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
-        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
-        self.effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
-        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
+        self.effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=effect_index).start()
+        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=effect_index).start()
+        self.effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=effect_index, phase=phase_offset).start()
+        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=effect_index, phase=phase_offset+30).start()
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
     def ac_update_ab_effect(self, telem_data: BaseTelemetryData):
@@ -187,11 +208,11 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
 
         if afterburner_pos and (self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation", r1_modulation)):
             # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
-            intensity = self.afterburner_effect_intensity * afterburner_pos
+            intensity = utils.clamp(self.afterburner_effect_intensity * afterburner_pos, 0, 1)
             self.effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=EFFECT_TRIANGLE ).start()
             # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
             self.effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=EFFECT_TRIANGLE ).start()
-            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
+            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, effect_type=4, phase=120,
             #                                   offset=60).start()
             # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
         elif afterburner_pos == 0:

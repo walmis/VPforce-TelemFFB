@@ -55,30 +55,48 @@ class AircraftInfo:
 _config_mtime = 0
 _future_config_update_time = time.time()
 _pending_config_update = False
+# time.time() of the last mtime stat(); None until the first check. The mtime()
+# syscall previously ran on every telemetry frame (60-120 Hz). Config edits are
+# human-scale, so re-statting at most once per _MTIME_CHECK_INTERVAL removes the
+# per-frame filesystem I/O from the frame thread, at the cost of at most
+# _MTIME_CHECK_INTERVAL of extra change-detection latency.
+_last_mtime_check = None
+_MTIME_CHECK_INTERVAL = 0.1
 
 def config_has_changed(update=False) -> bool:
     # if update is true, update the current modified time
-    global _config_mtime, _future_config_update_time, _pending_config_update
-    # "hash" both mtimes together
-    tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(G.defaults_path))
+    global _config_mtime, _future_config_update_time, _pending_config_update, _last_mtime_check
     time_now = time.time()
     update_delay = 0.1  # Delay added here to avoid file access errors with multiple instances
 
-    if not _config_mtime:
-        # if the first time called, initialize times and return - to avoid double config load on first call
-        _config_mtime = tm
-        return False
+    if _last_mtime_check is None or time_now - _last_mtime_check >= _MTIME_CHECK_INTERVAL:
+        _last_mtime_check = time_now
+        # "hash" both mtimes together
+        tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(G.defaults_path))
+        if not _config_mtime:
+            # First real check: seed the baseline and report no change, to avoid
+            # a spurious config load on the very first frame.
+            _config_mtime = tm
+        elif _config_mtime != tm:
+            _future_config_update_time = time_now + update_delay
+            _pending_config_update = True
+            _config_mtime = tm
+            logging.info(f'Config changed: Waiting {update_delay} seconds to read changes')
 
-    if _config_mtime != tm:
-        _future_config_update_time = time_now + update_delay
-        _pending_config_update = True
-        _config_mtime = tm
-        logging.info(f'Config changed: Waiting {update_delay} seconds to read changes')
     if _pending_config_update and time_now >= _future_config_update_time:
         _pending_config_update = False
         logging.info(f'Config changed: {update_delay} second timer expired, reading changes')
         return True
     return False
+
+def force_config_change() -> None:
+    """Force the next config_has_changed() call to report a change, regardless
+    of the file mtime. Used after a programmatic XML write (e.g. the DCS
+    settings channel) where two writes in the same wall-clock second would
+    otherwise produce an identical integer-second mtime and be missed."""
+    global _pending_config_update, _future_config_update_time
+    _pending_config_update = True
+    _future_config_update_time = time.time()
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
@@ -89,6 +107,10 @@ class TelemManager(QObject, threading.Thread):
 
     first_frame_received = pyqtSignal(str)
     sim_exited = pyqtSignal(str)   # emitted when a sim exit detected
+    #: per-aircraft device swap, handled on the main thread (the device's
+    #: read timer must live there); the payload is the devpath to acquire,
+    #: or '' for the stored primary
+    deviceSwapRequested = pyqtSignal(str)
 
     currentAircraft: Optional['AircraftBase'] = None
     currentAircraftName: Optional[str] = None
@@ -116,13 +138,26 @@ class TelemManager(QObject, threading.Thread):
         self.gain_overrides_active = False
         self.stop_state = False
         self.pause_state = False
+        self._vpconf_deferred_frame = None   # single-slot buffer for a frame arriving during the startup vpconf push
+        self._flushing_deferred = False      # True only while re-injecting the deferred frame (diagnostic logging)
         self._first_frame_from_sim = False
         self._sim_exit_signaled = False   # True after notify_sim_exited fires; prevents re-entrancy until reset_sim_connected() clears it
         self._process_check_deadline: Optional[float] = None  # perf_counter() timestamp of the next scheduled process check; None when inactive
+        self._device_swap_attempt = None  # (aircraft, devpath) already requested - one attempt per aircraft
 
 
     def set_paused(self, pause_state: bool = False):
         self.pause_state = pause_state
+
+    def frame_hold(self):
+        """The lock guarding frame processing.
+
+        Pausing only gates NEW frames; one already being processed (or
+        buffered) keeps driving effects.  A device teardown pauses, then
+        acquires this for the duration, so no frame ever writes to a
+        half-switched device - the per-aircraft swap made that race a
+        near-certainty, since the request originates mid-frame."""
+        return self._cond
 
     def reset_sim_connected(self):
         """Called by SimListenerManager.allStarted when all sim listeners have been
@@ -145,9 +180,27 @@ class TelemManager(QObject, threading.Thread):
         self._process_check_deadline = None  # cancel any pending process check
         logging.info(f"Sim exit received from {src} - resetting sim listeners")
         if self.currentAircraft:
-            self.currentAircraft.on_timeout()
+            try:
+                self.currentAircraft.on_timeout()
+            except Exception as e:
+                # A crashing aircraft hook must not abort the rest of the
+                # sim-exit cleanup (effect release, listener restart).
+                logging.error(f"Aircraft on_timeout failed for {src}: {e}", exc_info=True)
+            # Retire ahead of the sweep below, so a handler's own on_shutdown()
+            # still sees its effects rather than ones already freed under it.
             self._retire_current_aircraft()
+            # on_timeout() is *pause* semantics: with keep_forces_on_pause it
+            # deliberately leaves the condition effects running so the stick
+            # does not go limp mid-session.  A sim exit ends the session and the
+            # handler has just been dropped, so without this those forces would
+            # stay on the device with nothing left to manage them.  Frees each
+            # effect individually - never a device reset, which would also wipe
+            # effects the sim itself created.
+            freed = HapticEffect.destroy_all()
+            if freed:
+                logging.info(f"Sim exit: freed {freed} effect(s) from the device")
         self.currentAircraftName = None
+        self.currentDataSource = None
         self.sim_exited.emit(src)
 
     def _retire_current_aircraft(self):
@@ -179,7 +232,27 @@ class TelemManager(QObject, threading.Thread):
     def simconnect(self) -> Optional[SimConnectManager]:
         return self._simconnect
 
+    def refresh_aircraft_profile(self) -> Optional[str]:
+        """Re-resolve the loaded aircraft's class, pattern and active profile
+        from the userconfig right now, on the caller's thread.
+
+        The telemetry loop only re-resolves them when a frame notices the
+        config file changed. After the new-aircraft wizard writes the type
+        row and profile mapping, that frame may be a long way off (sim
+        paused, sitting in a menu), and a setting changed before it arrives
+        would be written against the stale ``None`` profile.
+
+        Returns the resolved profile, or None when no aircraft is loaded.
+        """
+        name = self.currentAircraftName
+        data_source = getattr(self, 'currentDataSource', None)
+        if not name or not data_source:
+            return None
+        self.get_aircraft_config(name, data_source)
+        return G.settings_mgr.active_profile
+
     def get_aircraft_config(self, aircraft_name, data_source) -> Tuple[dict, str]:
+        self.currentDataSource = data_source
         params = {}
         cls_name = "UNKNOWN"
         input_modeltype = ''
@@ -209,10 +282,13 @@ class TelemManager(QObject, threading.Thread):
                 u = setting['unit']
                 if v is None:
                     v = '0'
-                if u is not None:
-                    vu = v + u
-                else:
-                    vu = v
+                # Attach the unit only when there is a value to attach it to. An
+                # empty value (e.g. the shipped default for vne_override, which is
+                # the documented "leave blank to use sim data") must stay empty:
+                # concatenating a <unit> to it produced a bare unit string ("kt")
+                # that to_number() returns verbatim, so the value reached aircraft
+                # code as a string and crashed downstream arithmetic (`vne * ms2kt`).
+                vu = (v + u) if v else v
                 if setting['value'] != '-':
                     params[k] = vu
                     logging.debug(f"Got from Settings Manager: {k} : {vu}")
@@ -238,13 +314,43 @@ class TelemManager(QObject, threading.Thread):
         self._run = False
         self.join()
 
+    def flush_deferred_startup_frame(self):
+        """Deliver the last telemetry frame that arrived while the startup
+        vpconf push had frame processing suspended (see submit_frame). Called
+        by utils.init_vpconf_profile right after clearing the pending flag."""
+        frame = self._vpconf_deferred_frame
+        self._vpconf_deferred_frame = None
+        if frame is None:
+            return
+        logging.info("Delivering telemetry frame deferred during the "
+                     "startup vpconf push")
+        # _flushing_deferred lets the drop/pause branches below distinguish a
+        # re-injected startup frame (a real loss) from an ordinary dropped
+        # frame, without logging on the per-frame hot path.
+        self._flushing_deferred = True
+        try:
+            self.submit_frame(frame)
+        finally:
+            self._flushing_deferred = False
+
     def submit_frame(self, data_in: bytes):
         if G.vpconf_init_pending:
-            # Startup vpconf push is configured by async push is not complete yet
-            # gets reset by utils.init_vpconf_profile()
+            # Startup vpconf push not complete yet (reset by
+            # utils.init_vpconf_profile, which then flushes the frame stashed
+            # here). DEFER the frame instead of discarding it: while MSFS sits
+            # in the menus the SimConnect stop latch delivers exactly ONE
+            # telemetry packet, and dropping it in this window left the master
+            # instance with no aircraft until a camera-state change — a
+            # milliseconds-wide race, master-only, maddeningly intermittent.
+            if self._vpconf_deferred_frame is None:
+                # log once per window (empty->full); overwrites stay silent
+                logging.info("Deferring telemetry frame during startup vpconf push")
+            self._vpconf_deferred_frame = data_in
             return
         if self.pause_state:
             # don't process frames while paused state True
+            if self._flushing_deferred:
+                logging.warning("Deferred startup frame swallowed by pause_state gate")
             return
 
         data : str
@@ -262,6 +368,9 @@ class TelemManager(QObject, threading.Thread):
                 self._cond.notify()  # notify waiting thread of new data
             else:
                 self._dropped_frames += 1
+                if self._flushing_deferred:
+                    logging.warning("Deferred startup frame dropped on re-inject "
+                                    "(previous frame not yet consumed)")
                 # log dropped frames, this is not necessarily a bad thing
                 # USB interrupt transfers (1ms) might take longer than one video frame
                 # we drop frames to keep latency to a minimum
@@ -419,6 +528,7 @@ class TelemManager(QObject, threading.Thread):
         params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
         Aircraft_Class = self._resolve_aircraft_class(aircraft_info, cls_name, params)
 
+        self._handle_device_selection(aircraft_name, params)
         self._handle_vpconf_setup(params)
         self._handle_command_runner(params)
         self._handle_configurator_overrides(params)
@@ -429,11 +539,89 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraft : AircraftBase = Aircraft_Class(aircraft_name)
         self.currentAircraft.apply_settings(params)
         self.currentAircraftConfig = params
+        self._stamp_trim_cal_availability(data_source, cls_name)
 
         self._setup_simconnect_overrides(aircraft_name, data_source)
         self._setup_xpplugin_overrides(aircraft_name, data_source)
         # self._update_settings_ui()
         self.aircraftUpdated.emit()
+
+    def _handle_device_selection(self, aircraft_name, params):
+        """Acquire the device this aircraft asks for (per-aircraft swap).
+
+        The ``joystick_device`` aircraft setting stores the devpath of one
+        of the joystick role's configured devices; absent or empty means
+        the user's primary.  The swap is EPHEMERAL - the stored settings
+        are never touched, so a restart, or the next aircraft without a
+        preference, comes back up on the primary.  Only the joystick
+        instance acts: the setting addresses the one role that can hold
+        alternate devices.
+
+        The switch itself runs on the main thread (the device's read
+        timer must live there), so this emits and finishes the current
+        pass on the old device; the switch forces an aircraft reload
+        whose second pass finds the right device already in place.  One
+        request per aircraft: a swap that fails (device unplugged) falls
+        back to the primary on the main-thread side and is not retried
+        until another aircraft loads.
+        """
+        if G.device_type != 'joystick':
+            return
+        primary = str(G.system_settings.get('devpath_joystick', '') or '')
+        value = str(params.get('joystick_device', '') or '')
+        wanted = primary if value in ('', 'primary') else value
+        if wanted != primary:
+            configured = {primary} | {
+                str(G.system_settings.get(f'devpath_joystick_{slot}', '') or '')
+                for slot in (2, 3)}
+            if wanted not in configured:
+                logging.warning(
+                    f"'{aircraft_name}' asks for a device that is no "
+                    f"longer configured ({wanted}) - staying on the "
+                    "primary device")
+                wanted = primary
+        current = str(getattr(G, 'device_devpath', '') or '')
+        if wanted == current and getattr(G, 'device_connection_status', False):
+            return
+        request = (aircraft_name, wanted)
+        if self._device_swap_attempt == request:
+            return
+        self._device_swap_attempt = request
+        which = 'primary device' if wanted == primary else wanted
+        logging.info(f"'{aircraft_name}' asks for {which} - requesting a "
+                     "device swap")
+        self.deviceSwapRequested.emit('' if wanted == primary else wanted)
+
+    def _stamp_trim_cal_availability(self, data_source, cls_name):
+        """Evaluate ONCE per aircraft load whether elevator trim-curve
+        calibration applies to this aircraft, and stamp the instance so UI
+        consumers (the main-window discovery prompt) read a plain attribute.
+
+        Availability is a per-class CONFIGURATION fact, taken from the same
+        "!class" exclusion markers in defaults.xml that hide the curve
+        settings rows for helicopter classes — one data source, no class
+        names in code. Prereq VALUES are deliberately ignored: a user who
+        has not enabled trim following yet is still a valid discovery
+        target (the whole chain defaults off out of the box); a class
+        excluded anywhere along the chain is not.
+        """
+        ac = self.currentAircraft
+        if ac is None:
+            return
+        available = False
+        try:
+            ds = str(data_source or "")
+            sim = "MSFS" if "MSFS" in ds else ("XPLANE" if "XPLANE" in ds else None)
+            if sim and hasattr(ac, "get_trim_calibrator"):
+                _, removal = xmlutils.read_default_class_data(
+                    sim, cls_name, G.device_type)
+                chain = {"joystick_trim_follow_curve_y",
+                         "joystick_trim_follow_use_curve_y",
+                         "trim_following", "telemffb_controls_axes"}
+                available = not (removal and chain.intersection(removal))
+        except Exception as e:
+            logging.debug(f"trim-cal availability stamp failed: {e}")
+        ac._trim_cal_available = available
 
     def _resolve_aircraft_class(self, aircraft_info: AircraftInfo, cls_name, params):
         """Resolve the appropriate aircraft class to use."""
@@ -446,8 +634,26 @@ class TelemManager(QObject, threading.Thread):
 
         return Aircraft_Class
 
+    @staticmethod
+    def _device_has_gains() -> bool:
+        """VPConf profiles and Configurator gain overrides only apply to
+        devices with Configurator gain sliders (VPforce hardware)."""
+        caps = getattr(HapticEffect.device, 'caps', None)
+        return caps is None or caps.has_gains
+
     def _handle_vpconf_setup(self, params):
         """Handle VPConf profile setup for the aircraft."""
+        # Nothing to do (and no dereference) without a live device.  A
+        # push arriving while the device is dead is dropped here, but
+        # the firmware holds profiles in RAM only, so the recovery
+        # replay (main._replay_device_setup) re-pushes the current
+        # context's profile when the device comes back.
+        if not HapticEffect.device_alive():
+            return
+        if not self._device_has_gains():
+            if "vpconf" in params:
+                logging.info("vpconf profile configured but this device has no Configurator gains; skipping")
+            return
         if "vpconf" in params:
             if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
                 upload_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
@@ -458,6 +664,12 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_global_vpconf_default(self):
         """Handle global VPConf default profile setup."""
+        # Same drop rule as _handle_vpconf_setup: a push while the device
+        # is dead is dropped here; the recovery replay re-pushes the
+        # global default on the device's return, since the firmware
+        # profile is RAM-only and died with the power cycle.
+        if not HapticEffect.device_alive():
+            return
         load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
         global_path = G.system_settings.get("pathVPConfStartup", "")
         if load_global and global_path != G.current_vpconf_profile:
@@ -477,6 +689,10 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_configurator_overrides(self, params):
         """Handle configurator gain overrides for the aircraft."""
+        if not self._device_has_gains():
+            if params.get('configurator_override_enabled', False):
+                logging.info("configurator overrides enabled but this device has no Configurator gains; skipping")
+            return
         if params.get('configurator_override_enabled', False):
             state = params.get('configurator_gains', 'none')
             if state != "none":
@@ -485,17 +701,16 @@ class TelemManager(QObject, threading.Thread):
                 G.current_configurator_gains = state
                 any_true = any(sub.get('enabled', False) for sub in state.values())
                 self.gain_overrides_active = any_true
-                G.main_window.status_container.request_set_active_configurator.emit(any_true)
+                G.main_window.refresh_scope_status_indicators(force=True)
             else:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.status_container.request_set_active_configurator.emit(False)
-                pass
+                G.main_window.refresh_scope_status_indicators(force=True)
         else:
             if self.gain_overrides_active:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.status_container.request_set_active_configurator.emit(False)
+                G.main_window.refresh_scope_status_indicators(force=True)
 
     def _setup_simconnect_overrides(self, aircraft_name, data_source):
         """Setup SimConnect variable overrides for MSFS aircraft."""
@@ -512,12 +727,24 @@ class TelemManager(QObject, threading.Thread):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
             d1 = xmlutils.read_sc_overrides(aircraft_name)
             for sv in d1:
-                scale = sv['scale'] if sv['scale'] is not None or sv['scale'] == '' else 1.0
+                scale = self._xplane_conversion(sv['scale'], sv['name'])
                 sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={scale}"
-                # if sv['scale'] is None or sv['scale'] == '':
-                #     print(f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion=>{scale}<")
-                # sendstr = f"SUBSCRIBE:dataref=sim/flightmodel/position/latitude,type=float,tag=LLLatitude,precision=6,conversion=0.51444"
                 self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+
+    @staticmethod
+    def _xplane_conversion(scale, name) -> float:
+        """The conversion factor the X-Plane plugin can take: a plain
+        number.  The plugin parses the field with no fallback, so an
+        empty transform (stored as '' or the text 'None') and an
+        expression it cannot evaluate both go out as 1.0."""
+        if scale is None or (isinstance(scale, str) and scale.strip().lower() in ('', 'none')):
+            return 1.0
+        try:
+            return float(scale)
+        except (TypeError, ValueError):
+            logging.warning(f"X-Plane override {name!r}: transform {scale!r} is not a number; "
+                            "the plugin applies numeric factors only, sending 1.0")
+            return 1.0
 
     # def _update_settings_ui(self):
     #     """Update settings UI if visible."""
@@ -536,6 +763,11 @@ class TelemManager(QObject, threading.Thread):
             updated_params = self.get_changed_params(params)
             self.currentAircraft.apply_settings(updated_params)
 
+            # the user picked a different device for the LOADED aircraft:
+            # the swap must not wait for the next aircraft change
+            if 'joystick_device' in updated_params:
+                self._handle_device_selection(aircraft_name, params)
+
             self._handle_vpconf_setup(params)
             self._handle_command_runner(params)
             self._handle_configurator_overrides_update(params)
@@ -549,6 +781,8 @@ class TelemManager(QObject, threading.Thread):
 
     def _handle_configurator_overrides_update(self, params):
         """Handle configurator overrides during config updates."""
+        if not self._device_has_gains():
+            return
         if params.get('configurator_override_enabled', False):
             state = params.get('configurator_gains', 'none')
             if state != "none":
@@ -557,11 +791,11 @@ class TelemManager(QObject, threading.Thread):
                 G.current_configurator_gains = state
                 any_true = any(sub.get('enabled', False) for sub in state.values())
                 self.gain_overrides_active = any_true
-                G.main_window.status_container.request_set_active_configurator.emit(any_true)
+                G.main_window.refresh_scope_status_indicators(force=True)
             else:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.status_container.request_set_active_configurator.emit(False)
+                G.main_window.refresh_scope_status_indicators(force=True)
 
     def _recreate_aircraft_with_new_type(self, aircraft_info: AircraftInfo, params, cls_name):
         """Recreate aircraft instance when type changes."""
@@ -569,10 +803,26 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraft = Aircraft_Class(aircraft_info.name)
         self.currentAircraft.apply_settings(params)
         self.currentAircraftConfig = params
+        self._stamp_trim_cal_availability(aircraft_info.data_source, cls_name)
 
     def _process_current_aircraft_telemetry(self, telem_data: BaseTelemetryData):
         """Process telemetry for the current aircraft."""
         if self.currentAircraft:
+            # A just-(re)opened device has no input snapshot until its
+            # first report arrives, and the aircraft mixins read input
+            # every frame assuming it is always there - hold frames for
+            # the moment that takes (a device switch mid-session is when
+            # this window actually gets hit).
+            device = HapticEffect.device
+            if device is not None:
+                try:
+                    if device.get_input() is None:
+                        logging.debug(
+                            "Telemetry frame skipped: no input report "
+                            "from the device yet")
+                        return
+                except Exception:
+                    pass
             try:
                 _tm = time.perf_counter()
                 self.currentAircraft._last_telem_data = self.currentAircraft._telem_data.copy()
@@ -671,6 +921,13 @@ class TelemManager(QObject, threading.Thread):
         if self.currentAircraft:
             return self.currentAircraft._telem_data.get(key, None)
 
+    def force_config_change(self) -> None:
+        """Force a config re-read on the next frame (see module-level
+        force_config_change). Called after a programmatic XML write so the
+        change is picked up even if the file mtime didn't advance a whole
+        second."""
+        force_config_change()
+
     def on_timeout(self):
         """Called by the run() loop each time the telemetry condition variable times out
         without receiving new data.  Fires once per timeout event (guarded by timed_out)
@@ -683,7 +940,13 @@ class TelemManager(QObject, threading.Thread):
                 f"Telemetry timeout from {src} — no data received for {self.timeout_sec * 1000:.0f}ms. "
                 f"Process status will be checked every {self._PROCESS_CHECK_INTERVAL:.0f}s."
             )
-            self.currentAircraft.on_timeout()
+            try:
+                self.currentAircraft.on_timeout()
+            except Exception as e:
+                # A crashing aircraft hook must not block the timed_out
+                # transition, or it would re-fire (and re-log with a stack
+                # trace) on every timeout cycle.  One error per episode.
+                logging.error(f"Aircraft on_timeout failed for {src}: {e}", exc_info=True)
             self.telemetryTimeout.emit(True)
             self.timed_out = True
             G.settings_mgr.timed_out = True
@@ -746,6 +1009,21 @@ class TelemManager(QObject, threading.Thread):
             logging.info(f"Process check: {src} process not found ({process_names})— treating as sim exit")
             self.notify_sim_exited(src)
 
+    def _safe_call(self, what: str, fn) -> None:
+        """Run a per-frame/per-event hook without letting exceptions kill this thread.
+
+        The TelemManager thread is the only consumer of telemetry for every
+        aircraft; a single unhandled exception (e.g. from a device that was
+        never opened or was hot-unplugged) used to terminate the thread and
+        freeze FFB permanently.  Exceptions here are logged with a stack
+        trace and the loop continues - the same isolation the per-aircraft
+        on_telemetry path already has.
+        """
+        try:
+            fn()
+        except Exception as e:
+            logging.error(f"TelemManager {what} failed: {e}", exc_info=True)
+
     def run(self):
         """Main telemetry processing loop.
 
@@ -768,7 +1046,7 @@ class TelemManager(QObject, threading.Thread):
             with self._cond:
                 if not self._events and not self._data:
                     if not self._cond.wait(self.timeout_sec):
-                        self.on_timeout()
+                        self._safe_call("on_timeout", self.on_timeout)
 
                         # Arm the process-check deadline on the first timeout.
                         # The _PROCESS_CHECK_DELAY grace period lets us ignore brief
@@ -786,7 +1064,7 @@ class TelemManager(QObject, threading.Thread):
                             self._process_check_deadline = (
                                 time.perf_counter() + self._PROCESS_CHECK_INTERVAL
                             )
-                            self._check_sim_process()
+                            self._safe_call("_check_sim_process", self._check_sim_process)
 
                         continue
 
@@ -794,6 +1072,7 @@ class TelemManager(QObject, threading.Thread):
                     if self.timed_out:
                         # Data has resumed after a timeout — clear timeout state and
                         # cancel the process-check so it doesn't fire spuriously.
+                        logging.info("Telemetry resumed after timeout")
                         self.telemetryTimeout.emit(False)
                         self.timed_out = False
                         self._process_check_deadline = None  # sim resumed; cancel check
@@ -801,7 +1080,7 @@ class TelemManager(QObject, threading.Thread):
                     G.settings_mgr.timed_out = False
                     data = self._data
                     self._data = None
-                    self.process_data(data)
+                    self._safe_call("process_data", lambda: self.process_data(data))
                 
                 if self._events:
-                    self.process_events()
+                    self._safe_call("process_events", self.process_events)

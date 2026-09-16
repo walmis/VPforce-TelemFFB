@@ -45,7 +45,7 @@ class WindEffectMixIn(AircraftEffectUtilsBase):
         v = utils.clamp(v, 0, self.wind_effect_max_intensity)
         v = utils.clamp(v * self.wind_effect_scaling, 0.0, 1.0)
         if v == 0:
-            self.effects.dispose("wind")
+            self.effects.dispose("wnd")
             return
         logging.debug(f"Adding wind effect intensity:{v}")
         self.effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()

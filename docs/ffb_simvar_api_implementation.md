@@ -321,8 +321,8 @@ activation decision; `FFB_API_VERSION` is then a liveness check ("has the aircra
 initialized yet?"), not a gate on whether to participate at all.
 
 Registration follows the five wiring points in
-[`docs/adding_an_aircraft_class.md`](adding_an_aircraft_class.md) (on branch
-`refactor_new`), with `SASHelicopter` as the worked example: class file, re-export in
+[`docs/adding_an_aircraft_class.md`](adding_an_aircraft_class.md), with
+`SASHelicopter` as the worked example: class file, re-export in
 `aircrafts_msfs_xp.py`, `<classes>` entry, `friendly_class_names`, and
 `<classdefaults_MSFS>` for the class's own parameters. No `<models>` mapping ships yet —
 no released aircraft implements the spec — so the class is reached by user configuration
@@ -718,24 +718,17 @@ parity) is not started and remains optional.
 | [BaseTelemetryData.py](../telemffb/sim/BaseTelemetryData.py) | 13 new documented fields. |
 | [defaults.xml](../defaults.xml) | Class registration (`<classes>`, `type` `validvalues`, self-referential `type` default) and 8 user parameters under an "FFB API" grouping, scoped to the class via `<classdefaults_MSFS>`. |
 | [utils.py](../telemffb/utils.py) | `exit_application()` calls the generic `TelemManager.on_shutdown()`; three `ffb_api_*` spring names registered in `EffectTranslator.effect_dict`. |
-| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 105 tests. |
-
-`TelemManager._retire_current_aircraft()` itself is **not** unit tested: `TelemManager`
-cannot be imported under pytest, because `from simconnect import *` resolves to the
-empty `simconnect/` namespace package in this repo and `DATATYPE_FLOAT64` is undefined.
-That is why the repo has no `TelemManager` tests at all. The aircraft-facing half of the
-behaviour — `on_shutdown()` writing `ENABLED = 0` exactly once — is covered.
+| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 111 tests. |
 
 **Unchanged:** `Helicopter.py` and `MsfsXpHeliControlsMixIn.py` carry no FFB API code at
 all — the property `TestFFBApiContainment` exists to keep true.
 
 ### Verified
 
-Full suite: **502 passed**. One unrelated test,
-`test_turbulence_modulator.py::TestHighPassFilter::test_constant_wind_decays_to_zero`,
-flakes intermittently under load — it derives `dt` from `time.perf_counter()`, so its
-decay assertion depends on wall-clock timing. Confirmed pre-existing (it also fails
-with this branch's source changes reverted) and left alone.
+Full suite after merging the baseline: **2595 passed, 2 skipped**. One unrelated
+failure, `test_updater_backup.py::TestWaitForAppExit::test_returns_when_no_instances`,
+calls the real `tasklist` without mocking `subprocess`, so `result.stdout` is `None`
+in this environment. It comes in with the baseline and is untouched by this work.
 
 ### Not verifiable without hardware
 

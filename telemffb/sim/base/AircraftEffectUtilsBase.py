@@ -142,7 +142,19 @@ class AircraftEffectUtilsBase(object):
                 logging.warning(f"Trying to assign unknown parameter {k} ")
                 continue
             logging.info(f" [cyan]set[/cyan]: {k} = {v}")
-            setattr(self, k, v)
+            try:
+                setattr(self, k, v)
+            except Exception:
+                # A setting that refuses its stored value must not take the
+                # rest of the aircraft down with it: the exception would
+                # escape the aircraft load, leaving a half-configured
+                # aircraft and no settings form to correct the value from.
+                logging.error(
+                    f"Could not apply setting '{k}' = {v!r}; it keeps its "
+                    "default for this session. Review this setting in the "
+                    "aircraft configuration.",
+                    exc_info=True,
+                )
 
     def has_changed(self, item: str, delta_ms=0, data=None) -> bool:
         """Check if a telemetry data item has changed since last call.
@@ -351,8 +363,26 @@ class AircraftEffectUtilsBase(object):
         input_data = device.get_input()
         if input_data is None:
             return 0.0, 0.0
-        return input_data.forceXY()
-    
+        forces = input_data.forceXY()
+        if forces is None:
+            # no force output telemetry on this backend (generic DirectInput)
+            return 0.0, 0.0
+        return forces
+
+    def _device_feeding(self) -> bool:
+        """Whether the FFB device is connected and delivering HID input.
+
+        Axis overrides must never be claimed without a live device: the
+        plugin pins the virtual yoke/rudder to whatever we send, so a dead
+        instance would feed zeros/stale values and silence the user's real
+        controller. Re-checked every frame, so a hot-unplug releases the
+        override and a reconnect reclaims it.
+        """
+        device = HapticEffect.device
+        if device is None or not device.connected:
+            return False
+        return device.get_input() is not None
+
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""
         import random
@@ -373,6 +403,13 @@ class AircraftEffectUtilsBase(object):
 
     def _should_skip_airborne_effect(self, telem_data: BaseTelemetryData) -> bool:
         """Common check for effects that should be disabled when on ground."""
+        if self._sim_is("IL2"):
+            # Some IL-2 aircraft report non-zero gear pressure (WeightOnWheels) while airborne
+            # after retraction (sim bug). Use gear extraction state as the authoritative gate:
+            # if all gear are fully retracted, treat as airborne regardless of pressure.
+            gear_state = telem_data.GearPos
+            if gear_state and max(gear_state) < 0.1:
+                return False
         return bool(sum(telem_data.WeightOnWheels or [0]))
 
     def _should_skip_no_airspeed_effect(self, telem_data: BaseTelemetryData) -> bool:

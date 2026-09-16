@@ -55,6 +55,7 @@ import logging
 import os
 import re
 import shutil
+import time
 import subprocess
 import traceback
 from datetime import datetime
@@ -80,6 +81,8 @@ from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             upload_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
+import telemffb.api_server as api_server
+import telemffb.telem.DcsSettingsChannel as dcs_settings
 import styles
 resources # used
 mutex = None
@@ -106,6 +109,54 @@ def _launch_children():
 
     except Exception:
         logging.exception("Error during Auto-Launch sequence")
+
+
+#: Held for this process's lifetime so the dinput8 tap wrapper can tell which
+#: devices TelemFFB is managing.  Must stay referenced - closing a handle
+#: retracts that beacon.
+beacons = []
+
+#: Must match the names built in the wrapper (TelemFFB-DInput-Tap,
+#: src/telemffb_presence.cpp).  The per-device beacon is the real signal; the
+#: coarse one is a fallback for devices whose USB ids the wrapper cannot read.
+TELEMFFB_RUNNING_BEACON = r"Local\TelemFFB_Running"
+TELEMFFB_DEVICE_BEACON = r"Local\TelemFFB_Dev_{vid:04X}_{pid:04X}"
+
+
+def _publish_beacons():
+    """Announce which device this instance is driving, for the tap wrapper.
+
+    The wrapper's 'sink' and 'tap' rules hand a device over to TelemFFB, so
+    they only make sense for a device TelemFFB is actually managing.  It
+    checks for the matching beacon once as the game starts and otherwise
+    leaves that device's own force feedback alone - which is what keeps a
+    wrapper left behind in a game folder, or a stale rule naming a device
+    nobody manages, from silently swallowing the game's forces.
+
+    Keyed on USB vendor/product id because that is the one identifier both
+    sides share: the wrapper reads it from DirectInput, while TelemFFB may
+    hold the device over raw HID (a VPforce device using the tap for gain
+    tuning) or over DirectInput, and only the latter has an instance GUID.
+
+    Named mutexes are used rather than a file or registry flag because
+    Windows releases them when the process ends for any reason, crashes
+    included, so there is no stale state to clean up.
+    """
+    names = [TELEMFFB_RUNNING_BEACON]
+    if G.device_info is not None:
+        names.append(TELEMFFB_DEVICE_BEACON.format(
+            vid=G.device_info.vendor_id, pid=G.device_info.product_id))
+    published = {b.name for b in beacons}
+    for name in names:
+        if name in published:
+            continue   # already claimed (a live device switch re-publishes)
+        try:
+            beacons.append(NamedMutex(name))
+            logging.info(f"Published beacon '{name}' for the DirectInput tap wrapper")
+        except Exception:
+            # Non-fatal: the wrapper simply stays inert for that device, and
+            # everything not involving the tap keeps working.
+            logging.exception(f"Unable to publish the beacon '{name}'")
 
 
 def _check_master_instance_mutex():
@@ -155,8 +206,11 @@ def _setup_device_configuration():
         devpath = G.system_settings.get(f'devpath_{devname}', None)
         if devpath:
             G.device_devpath = devpath
+            # a DirectInput device selection is stored as 'dinput:{GUID}'
+            if str(devpath).startswith('dinput:'):
+                G.device_di_guid = str(devpath)[len('dinput:'):]
 
-        G.device_usbpid = str(G.system_settings.get(f'pid{devname.capitalize()}', "2055"))
+        G.device_usbpid = str(G.system_settings.get(utils.device_pid_key(devname), "2055"))
         G.device_type = devname
 
 
@@ -173,9 +227,41 @@ def _setup_device_configuration():
 
         devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
         G.device_devpath = devpath
+        if devpath and str(devpath).startswith('dinput:'):
+            G.device_di_guid = str(devpath)[len('dinput:'):]
         G.device_usbpid = G.args.device.split(":")[1]
         
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
+
+def _check_directinput_support():
+    """Turn DirectInput support off if the bridge DLL is not usable.
+
+    The DLL is distributed separately from TelemFFB, so an install can lose
+    it - to an update, a move, or a beta build reaching its expiry. Leaving
+    the setting on would list no devices and explain nothing, and any
+    instance already assigned a [DI] device would fail to connect with no
+    obvious cause. Better to switch it off and say why.
+    """
+    if G.child_instance:
+        # one report per launch: the master owns the setting, and four
+        # instances each raising the same dialog helps nobody
+        return
+    if not G.system_settings.get('enableDirectInput', False):
+        return
+    from telemffb.hw.ffb_dinput import bridge_availability
+    available, reason = bridge_availability()
+    if available:
+        return
+
+    G.system_settings.setValue('enableDirectInput', False)
+    logging.error(f"DirectInput support disabled: {reason.splitlines()[0]}")
+    QMessageBox.warning(
+        None, "DirectInput Support Disabled",
+        "DirectInput support was enabled, but has been automatically turned off.\n\n"
+        + reason
+        + "\n\nAny instance assigned a [DI] device will not connect until "
+        "this is resolved and the setting is re-enabled in System Settings.")
+
 
 def _setup_theme_and_styling(app):
     """
@@ -299,9 +385,39 @@ def _setup_config_paths():
     elif G.beta_build:
         G.vpf_logo = ":/image/BETAlogo.png"
         _setup_standard_config_paths()
+        _backup_userconfig_for_beta()
 
     else:
         _setup_standard_config_paths()
+
+
+def _backup_userconfig_for_beta():
+    """Snapshot the user's config before a beta build touches it.
+
+    Betas can write settings the release version does not understand, so a
+    frozen beta keeps a one-time copy of the config as it was BEFORE the
+    beta first ran - an easy path back to the release version.
+
+    Only the master instance writes it (children share the same file), and
+    only if the backup does not already exist: on later runs the live config
+    may already carry beta edits, and overwriting would destroy the very
+    snapshot this exists to preserve.
+    """
+    if not getattr(sys, 'frozen', False) or not G.master_instance:
+        return
+    try:
+        if not os.path.isfile(G.userconfig_path):
+            return  # fresh install, nothing to preserve
+        tag = re.sub(r'[<>:"/\\|?*]', '_', G.beta_build_str).strip()
+        backup_path = os.path.join(
+            G.userconfig_rootpath, f'userconfig_v2_pre-{tag}_backup.xml')
+        if os.path.exists(backup_path):
+            return  # already snapshotted before this beta's first run
+        shutil.copy2(G.userconfig_path, backup_path)
+        logging.info(f"Beta build: backed up pre-beta user config to {backup_path}")
+    except OSError as e:
+        # Never block startup over a backup failure.
+        logging.error(f"Beta build: could not back up user config: {e}")
 
 def _setup_dev_userconfig_paths():
     """Setup development userconfig paths."""
@@ -327,6 +443,25 @@ def _setup_standard_config_paths():
     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
 
+def _device_is_configured() -> bool:
+    """True if any STORED system setting assigns this instance's device
+    (PID or device path, instance-scoped or global).
+
+    A first launch has neither — G.device_usbpid then only holds the
+    built-in default (2055), which is wrong for any DIY/non-default
+    device. In that state the connection attempt is skipped entirely (no
+    error dialog) and the System Settings dialog opens for first-time
+    setup instead.
+    """
+    pid_key = utils.device_pid_key(G.device_type)
+    path_key = f'devpath_{G.device_type}'
+    for key in (pid_key, path_key,
+                f'{G.device_type}/{pid_key}', f'{G.device_type}/{path_key}'):
+        if G.system_settings.value(key) not in (None, ''):
+            return True
+    return False
+
+
 def _initialize_device_connection():
     """
     Initialize connection to the Rhino device and check firmware.
@@ -351,28 +486,125 @@ def _initialize_device_connection():
     # except Exception:
     #     return dev, dev_serial, dev_firmware_version
 
+    # First-launch probe BEFORE auto-assign below writes devpath settings:
+    # only pre-existing stored configuration counts as "configured".
+    device_configured = _device_is_configured()
+
     devs = _enumerate_and_log_devices()
 
     # Attempt to auto-assign unconfigured devpath_* settings based on discovered devices
     _auto_assign_devices(devs)
+    _record_device_identity(devs)
 
+    if G.args.device is None and not device_configured:
+        # Nothing stored for this device: don't guess at the default PID
+        # and raise a connection error on a brand-new install. The
+        # System Settings dialog opens later in startup
+        # (_check_system_settings_required) regardless of whether the
+        # auto-assign above identified the device — first launch always
+        # gets the settings page so the user can review and save all
+        # preferences.
+        auto_assigned = G.system_settings.value(
+            f'devpath_{G.device_type}') not in (None, '')
+        G.first_launch_autoconfig = auto_assigned
+        if auto_assigned:
+            logging.warning(
+                f"First launch: no stored configuration for "
+                f"'{G.device_type}'; the device was auto-configured by "
+                "name. Skipping connection — System Settings will open "
+                "for the user to review and save.")
+        else:
+            logging.warning(
+                f"First launch: no stored configuration for "
+                f"'{G.device_type}' and the device could not be "
+                "determined by name from the connected devices. Skipping "
+                "connection — System Settings will open for setup.")
+        return dev, dev_serial, dev_firmware_version
+
+    dev, dev_serial, dev_firmware_version = _open_device_and_derive(
+        min_firmware_version)
+    if dev is None:
+        # the configured device may simply not be plugged in yet; connect
+        # unattended when it appears
+        device_retry_ticker.start()
+    return dev, dev_serial, dev_firmware_version
+
+
+def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
+    """Open the device named by the identity globals and derive the rest.
+
+    The shared core of startup and the live device switch: opens by
+    G.device_di_guid / G.device_usbpid, wires the device signals to the
+    main window, and fills every G.device_* value that describes the open
+    device.  Returns (device, serial, firmware_version); device is None
+    when the open fails - with the connection-error dialog shown unless
+    ``show_error`` is False (background retries must not pop modals).
+    """
+    dev = None
+    dev_serial = None
+    dev_firmware_version = 'ERROR'
     try:
-        dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+        if G.device_di_guid:
+            dev = HapticEffect.open_dinput(G.device_di_guid)
+        else:
+            # By exact path when one is known - a PID-only open cannot
+            # tell identical devices apart (two of the same side stick).
+            # A stale path (device moved to another USB port) falls back
+            # to the PID open that was always used, so port moves keep
+            # working the way they did.
+            dev = None
+            if G.device_devpath:
+                try:
+                    dev = HapticEffect.open(pid=int(G.device_usbpid, 16),
+                                            path=str(G.device_devpath))
+                except Exception:
+                    logging.info(
+                        "Open by stored device path failed; falling back "
+                        f"to PID {G.device_usbpid}")
+            if dev is None:
+                dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
 
         def connect_signals():
-            dev.deviceConnected.connect(G.main_window.update_device_status)
-            dev.buttonPressed.connect(G.main_window.get_active_buttons)
-            dev.buttonReleased.connect(G.main_window.get_active_buttons)
+            # Deferred one event-loop pass so startup can build the main
+            # window first - but by the time this fires the world may
+            # have moved on: no window at all (headless, tests), or the
+            # device already replaced by a newer switch.  An exception
+            # in a Qt-invoked callback is fatal (PyQt turns it into
+            # qFatal, killing the process with 0xC0000409 and no
+            # traceback), so refuse quietly instead of assuming.
+            mw = getattr(G, 'main_window', None)
+            if mw is None:
+                logging.warning(
+                    "Deferred device-signal hookup skipped: no main "
+                    "window - device status and button events will not "
+                    "reach the UI")
+                return
+            if getattr(HapticEffect, 'device', None) is not dev:
+                logging.info(
+                    "Deferred device-signal hookup skipped: the device "
+                    "was replaced before the hookup fired; the "
+                    "replacement device gets its own")
+                return
+            dev.deviceConnected.connect(mw.update_device_status)
+            dev.buttonPressed.connect(mw.get_active_buttons)
+            dev.buttonReleased.connect(mw.get_active_buttons)
         # Use QTimer.singleShot to connect signals after event loop starts
+        # (at startup the main window does not exist yet)
         QTimer.singleShot(0, connect_signals)
 
         G.device_info = dev.info
+        G.device_capabilities = dev.caps
+        dev.deviceReconnected.connect(_replay_device_setup)
 
         if G.args.reset:
             dev.reset_effects()
         dev_firmware_version = dev.get_firmware_version()
         G.device_firmware_version = dev_firmware_version
         dev_serial = dev.serial
+        # kept as a global: the startup locals freeze whatever this was at
+        # launch, and a live device switch must update what exit-time and
+        # startup-deferred consumers (vpconf pushes) see
+        G.device_serial = dev_serial
 
         if dev_firmware_version:
             logging.info(f"Rhino Firmware: {dev_firmware_version}")
@@ -384,11 +616,381 @@ def _initialize_device_connection():
     except Exception as e:
         G.device_connection_status = False
         logging.exception("Exception")
-        QMessageBox.warning(None, "Cannot connect to Rhino",
+        # the one warning for the zombie state: the device panel stays red
+        # and the retry ticker auto-opens the device when it appears, so no
+        # manual restart is needed
+        if show_error:
+            # parent to whatever the user is looking at (the System
+            # Settings dialog during a live switch, the main window
+            # otherwise) so the error appears over the app, not centered
+            # on the monitor; at startup neither exists yet and None is
+            # all there is
+            parent = (QApplication.activeWindow()
+                      or getattr(G, 'main_window', None))
+            QMessageBox.warning(parent, "Cannot connect to FFB device",
                           f"Unable to open device: {G.device_type}\nError: {e}\n\n"
-                          "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
+                          "The application will open the device automatically when it appears.\n"
+                          "Please open the System Settings and verify the device configuration is correct")
 
     return dev, dev_serial, dev_firmware_version
+
+
+def _replay_device_setup():
+    """Replay one-shot device setup after a hot-unplug recovery.
+
+    Connected to ``deviceReconnected``.  Effect playback does not
+    need a manual restart here: the offline-safe effect writers in
+    ffb_rhino detect the dead->alive transition and re-send pending
+    effect configuration on the next telemetry frame.  This only covers
+    the one-shot items that do not replay per frame.  The deadzone is
+    force-re-applied below: its per-frame write is transition-gated, so a
+    steady configured value would never re-send itself after the firmware
+    lost it on the power cycle.  The VPConf profile is re-pushed too:
+    firmware holds it in RAM only, so the power cycle wiped it - the
+    profile the current context should hold is resolved by
+    _recovery_vpconf_profile().  Configurator gains are re-read last,
+    after the re-push, so they reflect the restored profile.
+    """
+    dev = HapticEffect.device
+    if dev is None:
+        return
+    try:
+        dev.set_deadzone(0)
+    except Exception:
+        pass  # transient; the force-apply below restores the configured value
+    # Force-apply the current deadzone: the MixIn's per-frame write only
+    # fires on a value transition, so the value the firmware lost on the
+    # power cycle comes back here, not on the next telemetry frame.
+    telem = getattr(G, 'telem_manager', None)
+    aircraft = getattr(telem, 'currentAircraft', None) if telem is not None else None
+    if aircraft is not None and hasattr(aircraft, 'ac_update_deadzone'):
+        aircraft.ac_update_deadzone(force=True)
+    profile = _recovery_vpconf_profile()
+    if profile:
+        logging.info(f"Re-pushing VPConf profile after recovery: {profile}")
+        try:
+            upload_vpconf_profile(profile, dev.serial)
+        except Exception:
+            logging.exception("Unable to re-push VPConf profile after recovery")
+    try:
+        G.vpconf_configurator_gains = dev.get_gains()
+    except Exception:
+        logging.exception("Exception")
+
+
+def _recovery_vpconf_profile():
+    """The VPConf profile the device should hold after a power-cycle
+    recovery - the same resolution _handle_vpconf_setup applies on an
+    aircraft change, so the pre-unplug state comes back.
+
+    Priority: the active aircraft's own profile, then the global default
+    (enabled and configured), then the last successfully pushed profile
+    (e.g. the startup push).  None when nothing was ever configured.
+    """
+    telem = getattr(G, 'telem_manager', None)
+    cfg = getattr(telem, 'currentAircraftConfig', None)
+    if isinstance(cfg, dict) and cfg.get('vpconf'):
+        return cfg['vpconf']
+    if G.system_settings.get('enableVPConfGlobalDefault', False):
+        path = G.system_settings.get('pathVPConfStartup', '')
+        if path:
+            return path
+    return G.current_vpconf_profile
+
+
+def _configured_device_present() -> bool:
+    """Whether the device this instance's saved selection names is
+    currently enumerable - without opening it."""
+    try:
+        devpath = str(G.system_settings.get(
+            f'devpath_{G.device_type}', '') or '')
+        if not devpath:
+            return False
+        if devpath.startswith('dinput:'):
+            guid = devpath[len('dinput:'):]
+            from telemffb.hw.ffb_dinput import DInputFFBDevice
+            return any(d.guid == guid for d in DInputFFBDevice.enumerate())
+        pid = int(str(G.system_settings.get(
+            utils.device_pid_key(G.device_type), '') or '2055'), 16)
+        return any(d.product_id == pid for d in FFBRhino.enumerate())
+    except Exception:
+        return False
+
+
+class _DeviceRetryTicker:
+    """Reconnects an instance that has a saved device selection but no open
+    device.
+
+    A device that was opened successfully heals itself after an unplug (the
+    device object's own reconnect loop); a device whose OPEN failed leaves
+    no object and therefore no watcher - historically the user had to know
+    that saving System Settings again was the retry button.  This ticker
+    closes that gap: while the instance is device-less it checks every
+    couple of seconds whether the configured device has appeared, and only
+    then runs the switch primitive - quietly, since a background retry must
+    never pop the connection-error dialog.  Started by every failed open
+    (startup and live switch alike); stops itself the moment a device is
+    connected, however that came about.
+    """
+    INTERVAL_MS = 2000
+
+    def __init__(self):
+        self._timer = None
+
+    def start(self):
+        if self._timer is None:
+            # created lazily: a QTimer wants the Qt application, which does
+            # not exist when this module is merely imported
+            self._timer = QTimer()
+            self._timer.timeout.connect(self._tick)
+        if not self._timer.isActive():
+            logging.info("Device watcher: waiting for the configured "
+                         f"'{G.device_type}' device to appear")
+            self._timer.start(self.INTERVAL_MS)
+
+    def stop(self):
+        if self._timer is not None and self._timer.isActive():
+            self._timer.stop()
+
+    def _tick(self):
+        if G.device_connection_status:
+            self.stop()            # connected by other means
+            return
+        devpath = G.system_settings.get(f'devpath_{G.device_type}', '') or ''
+        if not devpath:
+            self.stop()            # nothing selected: nothing to wait for
+            return
+        if not _configured_device_present():
+            return
+        logging.info("Device watcher: configured device appeared - connecting")
+        if switch_to_device(show_error=False):
+            self.stop()
+        # on failure the switch already re-armed this ticker; the device
+        # enumerated but would not open (e.g. still initializing) - the
+        # next tick tries again
+
+
+device_retry_ticker = _DeviceRetryTicker()
+
+
+class _MainThreadWatchdog:
+    """Names the culprit when the UI freezes.
+
+    A blocked main thread leaves no log signature at all - the freeze
+    the user sees is silence in the file.  A half-second heartbeat runs
+    on the main event loop; a daemon thread watches it, and when the
+    beat goes stale it dumps every thread's stack into the log at ERROR,
+    once per stall.  Costs one timer tick and one sleeping thread.
+    """
+
+    STALL_SECS = 3.0
+
+    def __init__(self):
+        import threading
+        self._beat = time.monotonic()
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._on_beat)
+        self._timer.start(500)
+        self._reported = False
+        threading.Thread(target=self._watch, daemon=True,
+                         name='main-thread-watchdog').start()
+
+    def _on_beat(self):
+        self._beat = time.monotonic()
+
+    def _watch(self):
+        while True:
+            time.sleep(1.0)
+            try:
+                self._check()
+            except Exception:
+                # never let the diagnostic become a problem itself -
+                # interpreter teardown can fail even the logging call
+                pass
+
+    def _check(self):
+        """One watch iteration: report a fresh stall, note a recovery."""
+        age = time.monotonic() - self._beat
+        if age >= self.STALL_SECS and not self._reported:
+            self._reported = True
+            try:
+                frames = sys._current_frames()
+                dump = []
+                for thread_id, frame in frames.items():
+                    stack = ''.join(traceback.format_stack(frame))
+                    dump.append(f'Thread {thread_id}:\n{stack}')
+                logging.error(
+                    f"Main thread stalled for {age:.1f}s - stacks of "
+                    "all threads follow\n" + '\n'.join(dump))
+            except Exception:
+                logging.exception('Watchdog stack dump failed')
+        elif age < 1.0 and self._reported:
+            logging.error('Main thread recovered from the stall')
+            self._reported = False
+
+
+def _pid_from_devpath(devpath: str):
+    """The USB product id embedded in a HID device path, as the hex string
+    G.device_usbpid carries ('2054'), or None for paths without one (a
+    dinput: GUID)."""
+    m = re.search(r'PID_([0-9A-Fa-f]{4})', devpath)
+    return m.group(1).lower() if m else None
+
+
+def switch_to_device(devpath=None, show_error=True) -> bool:
+    """Live device switch: re-acquire this instance's device, no restart.
+
+    The hot-swap primitive.  Without ``devpath``, the caller has already
+    SAVED the new selection for this instance's role and this re-reads it.
+    With ``devpath``, that exact device is acquired instead - the
+    per-aircraft ephemeral swap: nothing is read from or written to the
+    stored settings, which keep naming the user's primary device, and a
+    later parameterless call (or a restart) returns to it.
+
+    Either way the old device is torn down completely - every effect
+    destroyed on the hardware, the poll and reconnect machinery stopped -
+    the new one opens through the same core as startup, and the
+    identity-derived state (beacons, UI, the loaded aircraft's capability
+    gates) is brought in line.  Telemetry is held for the duration so no
+    effect code runs against a half-switched device.
+
+    Beacons are only ever ADDED: a beacon says "TelemFFB took
+    responsibility for this device's FFB role this session", and a game
+    that latched onto the old device's tap at launch keeps that
+    arrangement until the game restarts.
+
+    Returns True when the new device is open; on failure the instance is
+    left device-less (connection status false), exactly like a failed
+    startup open - the user fixes the selection and tries again (an
+    ephemeral caller falls back to a parameterless call instead).
+    """
+    old_dev = HapticEffect.device
+    old_name = getattr(getattr(old_dev, 'info', None), 'product_string', None)
+    logging.info(f"Live device switch: releasing "
+                 f"'{old_name or 'no device'}' for '{G.device_type}'")
+    G.telem_manager.set_paused(True)
+    # The pause only stops NEW frames; a frame in flight (or one already
+    # buffered) would keep writing effects to the device being torn down.
+    # Hold the frame lock for the whole switch so nothing runs against a
+    # half-switched device; on a wedged telemetry thread, proceed rather
+    # than hang (the old, racy behavior - with a warning).
+    hold = getattr(G.telem_manager, 'frame_hold', None)
+    frame_lock = hold() if callable(hold) else None
+    frames_held = False
+    if frame_lock is not None:
+        frames_held = frame_lock.acquire(timeout=2.0)
+        if not frames_held:
+            logging.warning("Device switch: telemetry frame lock not "
+                            "acquired within 2s - switching anyway")
+    try:
+        # 1. Effects die first, while the old device can still be written:
+        #    they would otherwise keep rendering on hardware nobody drives.
+        try:
+            freed = HapticEffect.destroy_all()
+            if freed:
+                logging.info(f"Device switch: freed {freed} effect(s)")
+        except Exception:
+            logging.exception("Device switch: unable to free effects")
+        effects = getattr(G, 'effects', None)
+        if effects is not None:
+            effects.clear()
+
+        # 2. Release the old device and its keep-alive machinery.
+        if old_dev is not None:
+            try:
+                old_dev.shutdown()
+            except Exception:
+                logging.exception("Device switch: old device shutdown failed")
+        HapticEffect.device = None
+        G.device_connection_status = False
+
+        # 3. The identity to acquire.  An explicit devpath (the ephemeral
+        #    swap) carries its own PID in the HID path; the stored pid key
+        #    describes the primary, which may be a different device.
+        if devpath is None:
+            # re-derive the stored identity for this role (the dialog
+            # saved it before asking for the switch)
+            devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
+            pid = str(G.system_settings.get(
+                utils.device_pid_key(G.device_type), '') or '2055')
+        else:
+            pid = _pid_from_devpath(str(devpath)) or str(G.system_settings.get(
+                utils.device_pid_key(G.device_type), '') or '2055')
+        G.device_devpath = devpath
+        G.device_di_guid = None
+        if devpath and str(devpath).startswith('dinput:'):
+            G.device_di_guid = str(devpath)[len('dinput:'):]
+        G.device_usbpid = pid
+
+        # 4. Open through the same core as startup.
+        dev, _, _ = _open_device_and_derive(show_error=show_error)
+        main_window = getattr(G, 'main_window', None)
+        if dev is None:
+            # the device status icon and firmware label only hear about
+            # state through the device object's signals, and a failed open
+            # has no object - show the disconnected state explicitly
+            if main_window is not None:
+                main_window.refresh_device_identity()
+            # watch for the configured device to appear and finish the
+            # job unattended (replug, powered hub, late USB init)
+            device_retry_ticker.start()
+            return False
+        device_retry_ticker.stop()
+
+        # A freshly opened device has no input snapshot until its first
+        # report arrives, and the aircraft mixins read input every frame
+        # assuming it is always there.  The read timer cannot fire while
+        # this stack holds the main thread, so pump the backend's input
+        # intake directly (pump_input: part of the device contract, and
+        # input only - no button events mid-teardown); the frame-level
+        # guard in TelemManager covers whatever window remains.
+        try:
+            deadline = time.perf_counter() + 0.5
+            while (dev.get_input() is None
+                    and time.perf_counter() < deadline):
+                dev.pump_input()
+                time.sleep(0.005)
+            if dev.get_input() is None:
+                logging.warning("Device switch: no input report within "
+                                "500ms of open")
+        except Exception:
+            logging.exception("Device switch: input pump failed")
+
+        # 5. Beacon for the new device (additive; see docstring), UI, and
+        #    the loaded aircraft's capability gates.
+        _publish_beacons()
+        if main_window is not None:
+            main_window.refresh_device_identity()
+        G.force_reload_aircraft_trigger = True
+        G.telem_manager.currentAircraftName = None
+        logging.info(f"Live device switch complete: now driving "
+                     f"'{dev.info.product_string}'")
+        return True
+    finally:
+        if frames_held:
+            frame_lock.release()
+        G.telem_manager.set_paused(False)
+
+
+def _on_device_swap_requested(devpath: str):
+    """Per-aircraft device swap, on the main thread (queued from the
+    telemetry thread - the device's read timer must live here).  An empty
+    devpath means back to the stored primary.  A failed ephemeral open
+    falls back to the primary rather than leaving the instance
+    device-less mid-session; never a modal - the wrong-but-working
+    device beats a dead one."""
+    if devpath:
+        if switch_to_device(devpath=devpath, show_error=False):
+            return
+        logging.warning("Per-aircraft device swap could not open the "
+                        "requested device - falling back to the primary")
+    switch_to_device(show_error=False)
+
+
+# Registered on G so the System Settings dialog can trigger a live switch
+# without importing this entry-script module (which would re-execute it).
+G.switch_to_device = switch_to_device
+
 
 def _enumerate_and_log_devices() -> List[DeviceInfo]:
     """Enumerate and log available Rhino devices."""
@@ -439,6 +1041,19 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
             0x2052: 'trimwheel',
         }
 
+        # Paths already holding a role (stored settings): a device may hold
+        # at most ONE role. Without this, a device whose role was assigned
+        # on a previous launch falls straight through the name pass (its
+        # own role reads as "existing") and the PID fallback re-assigns
+        # the SAME device into a different empty slot — field case: pedals
+        # stored as devpath_pedals on first launch, then re-assigned to
+        # devpath_trimwheel by the 0x2052 fallback on the next one.
+        assigned_paths = set()
+        for role in role_keywords:
+            p = G.system_settings.get(f'devpath_{role}', None)
+            if p:
+                assigned_paths.add(str(p))
+
         # Build reverse lookup from product_string/ident to role
         for devinfo in devs:
             try:
@@ -447,6 +1062,9 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                 # prefer ident (configurator name) if present
                 label = ident.lower()
                 devpath = devinfo.path.decode()
+
+                if devpath in assigned_paths:
+                    continue
 
                 assigned = False
                 for role, keywords in role_keywords.items():
@@ -461,6 +1079,7 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                             logging.info(f"Auto-assigning {key} -> {devpath} (matched '{kw}' in '{label}')")
                             try:
                                 G.system_settings.setValue(key, devpath)
+                                assigned_paths.add(devpath)
                                 if role == G.device_type:
                                     G.device_devpath = devpath
                             except Exception:
@@ -472,8 +1091,12 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                         # move to next device if already assigned by name match
                         break
 
-                # If not matched by product string/name, try VID:PID mapping
-                if not assigned:
+                # If not matched by product string/name, try VID:PID mapping —
+                # but never for a device whose NAME identifies a known role:
+                # if its named slot is taken, re-routing it by PID into a
+                # different role would contradict what the device says it is.
+                if not assigned and not any(
+                        kw in label for kws in role_keywords.values() for kw in kws):
                     try:
                         pid = int(devinfo.product_id)
                         role = vidpid_role_map.get(pid, None)
@@ -484,6 +1107,7 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
                                 logging.info(f"Auto-assigning {key} -> {devpath} (matched pid 0x{pid:04X})")
                                 try:
                                     G.system_settings.setValue(key, devpath)
+                                    assigned_paths.add(devpath)
                                     if role == G.device_type:
                                         G.device_devpath = devpath
                                 except Exception:
@@ -495,6 +1119,37 @@ def _auto_assign_devices(devs: List[DeviceInfo]):
 
     except Exception:
         logging.exception("_auto_assign_devices failure")
+
+def _record_device_identity(devs: List[DeviceInfo]):
+    """Write the ids and name of each configured device, where missing.
+
+    Every install that predates these keys - and every slot the auto-assign
+    above has ever filled, since it writes only the path - holds a
+    ``devpath_`` and nothing else.  The ids are what a tap rule is keyed
+    on and what lets one be written while the device is switched off; the
+    name is how a dialog shows the device.  Either gap would otherwise
+    persist until the user happened to reselect the device in the settings
+    dialog, and looks like TelemFFB not recognizing hardware that works.
+
+    Healed here, once, from the devices just enumerated - HID, and
+    DirectInput when that support is on.  Master only, as with every other
+    settings write at startup.  Only empty keys are written: see
+    ``recover_device_identity``.
+    """
+    if not G.master_instance:
+        return
+    try:
+        # DirectInput devices too, while support is on: a stick driven through
+        # the bridge sits in a slot like any other, and the selectors would
+        # otherwise be the only place its identity could be recovered.
+        listed = list(devs) + utils.directinput_selection_devices(G.system_settings)
+        updates = utils.recover_device_identity(G.system_settings, listed)
+        for key, value in updates.items():
+            logging.info(f"Recording {key} = {value!r} for a configured device")
+            G.system_settings.setValue(key, value)
+    except Exception:
+        logging.exception("_record_device_identity failure")
+
 
 def _check_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
@@ -534,8 +1189,8 @@ def _convert_user_config():
     Converts user config from legacy single user profile to multi-user profile capabilities.
     """
     if G.master_instance:
-        xmlutils.update_roots()
         xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+        xmlutils.update_roots()
         utils.convert_legacy_userconfig(G.userconfig_path)
 
 
@@ -550,8 +1205,8 @@ def _initialize_settings_manager():
     3. If corruption detected, offer backup/reset option
     4. Create new default config if user agrees
     """
-    xmlutils.update_roots()
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+    xmlutils.update_roots()
     try:
         G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
                                       userconfig_path=G.userconfig_path,
@@ -601,17 +1256,24 @@ def _setup_ipc_and_connections():
     """
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
     G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
+    G.ipc_instance.child_exception_signal.connect(G.main_window.on_child_exception)
+    G.ipc_instance.child_status_signal.connect(G.main_window.refresh_scope_status_indicators)
     G.ipc_instance.exit_signal.connect(exit_application)
     G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
     G.ipc_instance.show_signal.connect(G.main_window.show)
     G.ipc_instance.hide_signal.connect(G.main_window.hide)
     G.ipc_instance.showlog_signal.connect(G.log_window.show)
-    G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
+    if G.master_instance:
+        # Children ask the master to open settings when their device is
+        # unassigned; nothing asks a child to open its own.
+        G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
     G.ipc_instance.show_adv_spr_signal.connect(G.main_window.settings_layout.advanced_spring_button_clicked)
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.reload_caller_signal.connect(G.main_window.settings_layout.reload_caller)
     G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)
+    # master saved a new device selection for this instance's role: switch live
+    G.ipc_instance.reacquire_device_signal.connect(switch_to_device)
     G.ipc_instance.toggle_offline_mode_signal.connect(G.main_window.toggle_offline_mode)
     G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_sim.setCurrentText)
     G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_class.setCurrentText)
@@ -627,11 +1289,15 @@ def _sim_connected_events():
     # When the first frame from a (new) sim arrives, flip the status widget to Running.
     # first_frame_received fires once per restart cycle (reset_sim_connected resets the flag),
     # so this fires on initial startup AND after each sim_exited → restart_all() cycle.
-    G.telem_manager.first_frame_received.connect(
-        lambda src: G.main_window.update_sim_indicators(src, paused=False)
-    )
+    # on_first_sim_frame guards against clobbering an error the same frame raised.
+    G.telem_manager.first_frame_received.connect(G.main_window.on_first_sim_frame)
+    G.telem_manager.first_frame_received.connect(api_server.on_first_frame)
+    G.telem_manager.first_frame_received.connect(dcs_settings.on_first_frame)
     G.telem_manager.sim_exited.connect(lambda src: G.sim_listeners.restart_all())
     G.telem_manager.sim_exited.connect(G.main_window.on_sim_exited)
+    G.telem_manager.sim_exited.connect(api_server.on_sim_exited)
+    G.telem_manager.sim_exited.connect(dcs_settings.on_sim_exited)
+    G.telem_manager.aircraftUpdated.connect(dcs_settings.on_aircraft_updated)
 
 def _handle_window_display(headless_mode):
     """Handle initial window display based on configuration."""
@@ -670,10 +1336,29 @@ def _check_version_update():
 def _check_system_settings_required():
     """Check if system settings dialog should be opened."""
 
-    #for key in ["devpath_joystick", "devpath_pedals", "devpath_collective", "devpath_trimwheel"]:
-    #    if G.system_settings.get(key, None):
+    dev_cap = G.device_type.capitalize()
+    if G.first_launch_autoconfig is not None:
+        # First launch (no stored device configuration): the settings page
+        # always opens so the user can review device assignments and the
+        # rest of their preferences, whether or not auto-config succeeded.
+        if G.first_launch_autoconfig:
+            msg = (f"First launch: the {dev_cap} device was automatically "
+                   "configured from the connected devices.\n\n"
+                   "Please review the device assignment and your other "
+                   "preferences in System Settings, then save to complete "
+                   "setup.")
+        else:
+            msg = (f"First launch: the {dev_cap} device could not be "
+                   "determined by name from the connected devices.\n\n"
+                   "Please assign your device and review your preferences "
+                   "in System Settings.")
+        QMessageBox.information(None, "System Settings Required", msg)
+        if G.child_instance:
+            G.ipc_instance.send_message("SHOW SETTINGS")
+        else:
+            G.main_window.open_system_settings_dialog()
+        return
 
-    #        return
     if G.device_devpath is None:
         QMessageBox.information(None, "System Settings Required",
                                 f"VPforce Device for {G.device_type} is not assigned.  Please assign a device in System Settings.")
@@ -692,18 +1377,37 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
+        device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
         if G.system_settings.enableVPConfStartup:
-            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
-            try:
-                upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
-            except Exception:
-                logging.exception("Unable to set VPConfigurator startup profile")
+            if not device_has_gains:
+                logging.info("Startup vpconf profile configured but this device has no Configurator gains; skipping")
+            else:
+                logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
+                try:
+                    upload_vpconf_profile(G.system_settings.pathVPConfStartup,
+                                          getattr(G, 'device_serial', None))
+                except Exception:
+                    logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
             if dev:
                 G.vpconf_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
+
+        # Startup race: when the sim is already running with an aircraft loaded,
+        # the sim-listener thread loads that aircraft and applies its vpconf /
+        # configurator-override layer BEFORE this async init establishes the
+        # device's startup state — and the startup vpconf push above can wipe it.
+        # If an aircraft is already loaded, force a clean reload so its config is
+        # re-applied on top, exactly as the normal aircraft-change path does.
+        # No-op when nothing is loaded yet (the common start-before-sim case).
+        tm = G.telem_manager
+        if tm is not None and tm.currentAircraftName is not None:
+            logging.info("Async device init finished after an aircraft was already "
+                         "loaded; forcing a config reload to re-apply its settings/overrides")
+            G.force_reload_aircraft_trigger = True
+            tm.currentAircraftName = None
 
     init_async()
 
@@ -714,35 +1418,73 @@ def _cleanup_on_exit(dev_serial):
     Flow:
     1. Notify child instances to close
     2. Stop IPC communication
-    3. Stop all simulation listeners
-    4. Quit telemetry manager
-    5. Apply exit VPConfigurator profile if configured
-    6. Reset device gains to startup values if configured
+    3. Release any X-Plane axis override this instance holds
+    4. Stop all simulation listeners
+    5. Quit telemetry manager
+    6. Apply exit VPConfigurator profile if configured
+    7. Reset device gains to startup values if configured
     """
     if G.ipc_instance:
         G.ipc_instance.notify_close_children()
         G.ipc_instance.stop()
 
+    # Give X-Plane its axis back before we go.  The override datarefs live in
+    # the sim, so one left latched outlives this process and leaves the user's
+    # physical control inert until they clear it from the plugin menu.  Done
+    # before the listeners stop, while the aircraft object is still current.
+    try:
+        _aircraft = G.telem_manager.currentAircraft if G.telem_manager else None
+        _release = getattr(_aircraft, "release_xp_axis_override", None)
+        if callable(_release):
+            _release()
+    except Exception:
+        logging.exception("Unable to release X-Plane axis override on exit")
+
     G.sim_listeners.stop_all()
     G.telem_manager.quit()
 
-    if G.system_settings.enableVPConfExit:
+    device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
+    if G.system_settings.enableVPConfExit and device_has_gains:
         try:
-            upload_vpconf_profile(G.system_settings.pathVPConfExit, dev_serial)
+            upload_vpconf_profile(G.system_settings.pathVPConfExit,
+                                  getattr(G, 'device_serial', None))
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
 
-    if G.system_settings.enableResetGainsExit:
+    if G.system_settings.enableResetGainsExit and device_has_gains:
         try:
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
         except:
             pass
         
     if HapticEffect.device:
+        # Hand the device back clean: effects we allocated would otherwise
+        # keep rendering after we are gone (the process exiting does not
+        # free them).  Each is released individually so effects the sim
+        # created on the same device are left alone.
+        try:
+            freed = HapticEffect.destroy_all()
+            if freed:
+                logging.info(f"Exit: freed {freed} effect(s) from the device")
+        except Exception:
+            logging.error("Unable to free effects on exit.. device likely disconnected")
+
         try:
             HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
         except Exception:
             logging.error("Unable to reset device deadzone.. device likely disconnected")
+
+        # Release the device properly rather than letting the process die
+        # with it: the DirectInput release path device-resets first, which
+        # is the ONLY thing that clears effects a driver glitch orphaned
+        # away from their interfaces - those kept rendering on the hardware
+        # after exit (a stranded constant force held the stick forward).
+        try:
+            shutdown = getattr(HapticEffect.device, 'shutdown', None)
+            if shutdown is not None:
+                shutdown()
+        except Exception:
+            logging.error("Unable to release the device on exit")
 
 def _init_excepthooks():
     orig_stdout = sys.stdout
@@ -753,8 +1495,10 @@ def _init_excepthooks():
             return
         # Log the unhandled exception including the full traceback via the logging module
         logging.getLogger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
-        # Also write the formatted traceback to stdout for the in-app log window
-        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        # Also write the formatted traceback to stdout for the in-app log window.
+        # stackprinter adds source context + local variable values; falls back to
+        # the standard traceback if unavailable.
+        tb = utils.format_exception_stackprinter((exc_type, exc_value, exc_tb))
         orig_stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
         # Optionally exit the Qt application:
         # QtWidgets.QApplication.quit()
@@ -774,8 +1518,9 @@ def _init_excepthooks():
             f"Uncaught exception in thread {thread.name}",
             exc_info=(exc_type, exc_value, exc_tb)
         )
-        # Also write to stdout for visibility in log window
-        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        # Also write to stdout for visibility in log window (stackprinter adds
+        # source context + local variable values; falls back to std traceback).
+        tb = utils.format_exception_stackprinter((exc_type, exc_value, exc_tb))
         orig_stdout.write(
             f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}] Exception in thread {thread.name}{AnsiColors.WHITE}\n{tb}{AnsiColors.END}"
         )
@@ -805,6 +1550,10 @@ def main():
 
     dev : FFBRhino = None
 
+    # Before anything in startup logs: everything from here to
+    # _init_logging is buffered rather than lost.
+    utils.begin_early_logging()
+
     # Initialize Qt application with Fusion style for consistent cross-platform appearance
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
@@ -816,6 +1565,25 @@ def main():
     # Parse command line arguments to determine device type, ports, and operation mode
     G.args = CmdLineArgs.parse()
     G.is_exe = getattr(sys, 'frozen', False)
+
+    # Refuse to run from unsafe locations (Desktop, drive roots, Downloads,
+    # ...).  The auto-updater manages the ENTIRE folder containing the
+    # executable, so a shared folder would be swept wholesale into the
+    # update/backup process (field incident: a release unzipped straight
+    # onto the Desktop - the updater relocated the user's whole Desktop
+    # into the previous-version backup folder).
+    if G.is_exe:
+        unsafe_reason = utils.unsafe_install_location_reason(os.path.dirname(sys.executable))
+        if unsafe_reason:
+            QMessageBox.critical(
+                None, "Unsafe Install Location",
+                f"TelemFFB cannot run from this location: it is installed directly on {unsafe_reason}.\n\n"
+                "TelemFFB must live in its own dedicated folder (for example C:\\TelemFFB, "
+                "or a 'TelemFFB' folder on your Desktop), because the auto-updater manages "
+                "everything in the folder that contains VPforce-TelemFFB.exe.\n\n"
+                "Please move all TelemFFB files into their own folder and start it from there.")
+            sys.exit(1)
+
     headless_mode = G.args.headless
     G.master_instance = not G.args.child
 
@@ -830,6 +1598,11 @@ def main():
     # Set child instance flag and load system-wide settings
     G.child_instance = G.args.child
     G.system_settings = utils.SystemSettings()
+    _check_directinput_support()
+    migrated = G.system_settings.migrate_instance_scoped_globals()
+    if migrated:
+        logging.info(f"Migrated instance-scoped copies of global settings to "
+                     f"global: {', '.join(migrated)}")
 
     # Configure application theme (light/dark/system) and apply custom styling
     _setup_theme_and_styling(app)
@@ -930,12 +1703,24 @@ def main():
     # Connect to Rhino FFB device and validate firmware version
     dev, dev_serial, dev_firmware_version = _initialize_device_connection()
 
+    # Tell the dinput8 tap wrapper which device we are driving.  Published
+    # here rather than earlier because it is keyed on the device's USB ids,
+    # which are only known once the device is open (see _publish_beacons).
+    _publish_beacons()
+
 
     # ============================================================================
     # PHASE 10: Core Component Initialization
     # ============================================================================
     # Initialize telemetry manager for handling sim data
     G.telem_manager = TelemManager()
+    # queued explicitly: the request comes from the telemetry thread and
+    # the swap must run here on the main thread (PyQt gives the proxy for
+    # a plain-callable queued connection the affinity of the connecting
+    # thread - this one)
+    G.telem_manager.deviceSwapRequested.connect(
+        _on_device_swap_requested,
+        QtCore.Qt.ConnectionType.QueuedConnection)
     G.telem_manager.start()
 
     # Initialize simulation listener manager for multiple sim support
@@ -943,6 +1728,10 @@ def main():
 
     # Create main application window
     G.main_window = MainWindow()
+
+    # UI freezes leave no log signature; this dumps all stacks when the
+    # event loop stalls, so the next one names its culprit
+    G.main_thread_watchdog = _MainThreadWatchdog()
 
     # ============================================================================
     # PHASE 11: Inter-Process Communication Setup
@@ -981,11 +1770,33 @@ def main():
     # Prompt for system settings if no devices are configured
     _check_system_settings_required()
 
+    # The tap files live in game folders, not per instance, so both offers
+    # are master only.  A game update empties its folders and takes the
+    # wrapper and config with it: offer to put them back first, then offer
+    # to bring whatever survived up to the bundled build.
+    if G.master_instance:
+        try:
+            from telemffb.TapRepairDialog import offer_wrapper_repairs
+            offer_wrapper_repairs(G.main_window)
+        except Exception:
+            logging.exception("DirectInput tap: startup repair offer failed")
+        try:
+            from telemffb.TapUpdateDialog import offer_wrapper_updates
+            offer_wrapper_updates(G.main_window)
+        except Exception:
+            logging.exception("DirectInput tap: startup update offer failed")
+
     # ============================================================================
     # PHASE 14: Background Initialization
     # ============================================================================
     # Start background tasks that don't block UI appearance
     _setup_async_initialization(dev, dev_serial)
+
+    # Zombie-state recovery: the configured board was absent at startup.
+    # The phase-9 retry ticker (self-stopping) opens it automatically
+    # when it appears; re-arm it here as a belt-and-braces no-op.
+    if dev is None:
+        device_retry_ticker.start()
 
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop
@@ -1165,6 +1976,10 @@ def _init_logging(log_widget : QPlainTextEdit):
     dedup = DedupHandler(handlers=[console_handler, file_handler])
     # Attach the dedup handler to the root logger. Individual handlers are still owned by DedupHandler.
     logger.addHandler(dedup)
+
+    # handlers.clear() above dropped the early buffer along with anything
+    # else on root; replay what it held into the handlers that will keep it.
+    utils.replay_early_logging(dedup)
 
     # Create a list of keywords to filter
     log_filter_strings = [

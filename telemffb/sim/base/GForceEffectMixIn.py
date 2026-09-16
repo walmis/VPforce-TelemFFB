@@ -36,8 +36,15 @@ class GForceEffectProperties:
             if value in GEffectModeEnum.__members__:
                 self._gforce_effect_mode = GEffectModeEnum[value]
                 return
-            else:
-                raise ValueError(f"Invalid GEffectModeEnum mode string: {value}")
+            # Unknown name: see the spring_mode setter - fall back rather than
+            # raise, so a stale config cannot block the aircraft from loading.
+            logging.error(
+                f"Unknown G-force effect mode '{value}' in this aircraft's "
+                f"configuration - falling back to {GEffectModeEnum.DISABLED.name}. "
+                "Choose a mode in the settings to replace it."
+            )
+            self._gforce_effect_mode = GEffectModeEnum.DISABLED
+            return
         
         # Any other type is invalid
         raise ValueError("Invalid type for gforce_effect_mode")
@@ -99,6 +106,21 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
 
     def __check_firmware_support(self):
         if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
+            caps = getattr(HapticEffect.device, 'caps', None)
+            if caps is not None and not caps.has_spring_adjuster:
+                # The Advanced curve itself is device-neutral: 'constant'
+                # output renders via a plain constant force and works on any
+                # backend.  Only the 'offset' output style needs the VPforce
+                # spring adjuster.
+                if self.g_effect_get_adv_mode() == "offset":
+                    self.flag_error(
+                        "The Advanced G-Force effect's 'offset' output mode is not supported on this device.\n"
+                        "It requires the spring adjuster feature of VPforce hardware.\n"
+                        "Switch the Advanced G-Force output mode to 'constant'."
+                    )
+                    return False
+                # no firmware on generic devices: skip the version check
+                return True
             # Verify the device firmware meets the minimum version required to execute this portion of the effect
             # Flag error and abort if not met
             if self.__firmware_supported is None:
@@ -208,9 +230,12 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
             self.effects["new_gforce"].stop()
             return
 
-        input_data = HapticEffect.device.get_input()
+        input_data = HapticEffect.get_device_input()
         x, y = self._get_device_axes()
-        _, spring_y_center = input_data.CP_XY()
+        if input_data is not None:
+            _, spring_y_center = input_data.CP_XY()
+        else:
+            spring_y_center = 0
         if spring_y_center is None:
             spring_y_center = 0
         derivative_k = 0.1  # derivative gain value, or damping ratio
@@ -254,7 +279,9 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
     def g_effect_get_adv_mode(self) -> Literal["constant", "offset"]:
         return self.gforce_effect_adv_curve.get("mode", "constant") if self.gforce_effect_adv_curve else "constant"
            
-    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr=False):
+    def ac_update_gforce_effect(
+            self, telem_data: BaseTelemetryData, adv_spr: bool = False
+    ) -> Optional[float]:
         """Dispatch to the configured G-force effect mode (DISABLED/LEGACY/ADVANCED/NEW).
 
         Telemetry:
@@ -357,8 +384,10 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
                 g_factor = utils.clamp(g_factor, 0.0, 1.0)
                 self.effects["gforce"].constant(g_factor, direction).start()
 
-            elif mode == "offset":               
-                adjuster_cpOy = int(-g_factor * 4096)
+            elif mode == "offset":
+                # Keep the center shift normalized. set_offset() performs the
+                # sole conversion to Rhino device units at the HID boundary.
+                adjuster_cpOy = -float(g_factor)
 
                 if adv_spr:
                     # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
@@ -372,9 +401,17 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
                     cond_x = FFBReport_SetCondition(parameterBlockOffset=0)
                     cond_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
-                    # saturation > 0 means relative adjustment mode for spring adjuster
-                    cond_x.set_offset(0).set_coefficient(4096).set_saturation(1)
-                    cond_y.set_offset(adjuster_cpOy).set_coefficient(4096).set_saturation(1)
+                    # Adjuster parameters restored to the original pre-refactor
+                    # (field-proven) usage: coefficients stay 0 so the active
+                    # spring's gain is untouched, saturation stays full scale,
+                    # cpOffset carries the G-based center shift.  A refactor-era
+                    # change to coefficient=4096/saturation=1 clamped the
+                    # adjusted spring's output to ~zero - all spring force died
+                    # the moment the effect started.
+                    cond_x.set_offset(0.0)
+                    cond_x.positiveSaturation = cond_x.negativeSaturation = 4096
+                    cond_y.set_offset(adjuster_cpOy)
+                    cond_y.positiveSaturation = cond_y.negativeSaturation = 4096
 
                     offset_adjuster.setCondition(cond_y).setCondition(cond_x).start()
 

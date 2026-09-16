@@ -32,5 +32,24 @@ P0 = 101325  # Pa, ISA static pressure at sealevel
 rho0 = 1.225  # kg/m^3, ISA air density at sea level
 std_air_pressure = rho0  # legacy alias kept for compatibility
 
+# FFB device units. The Rhino firmware encodes force-feedback coefficients,
+# offsets, saturation and constant-force magnitudes as 16-bit fixed point:
+# 4096 == full scale. All TelemFFB math is done in the normalized -1..1 range
+# convention; convert to device units only at the end of the pipeline, right
+# before writing device state. (The FFBReport_SetCondition setters also scale
+# float args by 4096 internally - this helper exists so the conversion is
+# named, clamped and explicit instead of hiding inside type sniffing.)
+FFB_UNITS = 4096
+
+
+def to_device_units(value: float) -> int:
+    """Convert a normalized -1..1 value to FFB fixed-point device units.
+
+    Input is clamped to [-1.0, 1.0]; the result is an integer in the range
+    [-4096, 4096] safe for c_int16 device fields.
+    """
+    return int(round(max(-1.0, min(1.0, value)) * FFB_UNITS))
+
+
 # Convenience
 percent = 0.01

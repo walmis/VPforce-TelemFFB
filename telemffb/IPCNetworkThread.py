@@ -36,6 +36,7 @@ class IPCNetworkThread(QObject, threading.Thread):
     exit_signal = pyqtSignal(str)
     restart_sim_signal = pyqtSignal(str)
     reload_aircraft_signal = pyqtSignal()
+    reacquire_device_signal = pyqtSignal()
     show_signal = pyqtSignal()
     showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
@@ -44,6 +45,8 @@ class IPCNetworkThread(QObject, threading.Thread):
     show_cfg_ovds_signal = pyqtSignal()
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
+    child_exception_signal = pyqtSignal(object)
+    child_status_signal = pyqtSignal()
     toggle_offline_mode_signal = pyqtSignal(bool)
     set_offline_sim_signal = pyqtSignal(str)
     set_offline_class_signal = pyqtSignal(str)
@@ -71,7 +74,12 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+        # Generous kernel receive buffer: the master ingests continuous
+        # telemetry/effects datagrams from every child instance, and a small
+        # buffer (formerly 4 KB = ~1-3 datagrams) overflows under load, making
+        # the kernel silently drop packets — including the 1 Hz child
+        # keepalives, which showed up as spurious child TIMEOUT flaps.
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 262144)
         self._socket.settimeout(0.1)
 
         try:
@@ -107,10 +115,27 @@ class IPCNetworkThread(QObject, threading.Thread):
         while self._running.is_set():
             now = time.monotonic()
 
-            # 1. Handle socket input
+            # 1. Handle socket input: block briefly for the first datagram,
+            # then drain everything already queued without blocking. Reading a
+            # single datagram per pass (with the 10 ms sleep below) capped
+            # intake at ~100 msg/s — below the combined telemetry/effects rate
+            # of multiple child instances — so packets were dropped wholesale.
+            # recvfrom(65535) also prevents Windows from silently discarding
+            # datagrams larger than the read size (WSAEMSGSIZE).
             try:
-                data, fromaddr = self._socket.recvfrom(4096)
+                data, fromaddr = self._socket.recvfrom(65535)
                 self._handle_message(data.decode("utf-8"), fromaddr)
+                self._socket.settimeout(0)
+                try:
+                    # Bounded drain so a sustained flood can never starve the
+                    # periodic keepalive send below.
+                    for _ in range(500):
+                        data, fromaddr = self._socket.recvfrom(65535)
+                        self._handle_message(data.decode("utf-8"), fromaddr)
+                except (BlockingIOError, socket.timeout, OSError):
+                    pass
+                finally:
+                    self._socket.settimeout(0.1)
             except (socket.timeout, OSError):
                 pass
 
@@ -163,6 +188,24 @@ class IPCNetworkThread(QObject, threading.Thread):
             self.send_broadcast_message("Keepalive")
         else:
             self.send_message(f"Child Keepalive:{G.device_type}:{G.device_connection_status}")
+            self.send_ipc_status()
+
+    def send_ipc_status(self):
+        """Child -> master device-status report (vpconf profile / gain
+        overrides), sent on the keepalive tick.
+
+        The effects payload also carries these keys, but it only flows while
+        telemetry is arriving — a startup vpconf profile is pushed before any
+        telemetry exists, so without this the master never learns about it
+        until an aircraft loads. Riding the 1 Hz keepalive keeps the master
+        correct from child boot and self-heals a master restart.
+        """
+        payload = {
+            f'{G.device_type}_vpconf_profile': G.current_vpconf_profile or '',
+            f'{G.device_type}_gain_ovd_active':
+                bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False,
+        }
+        self.send_message(f"STATUS:{json.dumps(payload)}")
 
     def _handle_message(self, msg, fromaddr):
         if msg == 'Keepalive':
@@ -188,6 +231,12 @@ class IPCNetworkThread(QObject, threading.Thread):
             self.restart_sim_signal.emit('Restart Sims')
         elif msg == "RELOAD AIRCRAFT":
             self.reload_aircraft_signal.emit()
+        elif msg.startswith('REACQUIRE:'):
+            dev = msg.removeprefix('REACQUIRE:')
+            if dev == G.device_type:
+                logging.info("Device reacquire command received via IPC - "
+                             "switching to the saved device selection")
+                self.reacquire_device_signal.emit()
         elif msg.startswith('SHOW LOG:'):
             dev = msg.removeprefix('SHOW LOG:')
             if dev == G.device_type:
@@ -246,13 +295,48 @@ class IPCNetworkThread(QObject, threading.Thread):
 
             except json.JSONDecodeError:
                 pass
+        elif msg.startswith("STATUS:"):
+            payload = msg.removeprefix("STATUS:")
+            try:
+                self._ipc_telem_effects.update(json.loads(payload))
+                # Queued to the main thread; refreshes the scope status display
+                # if the reported device is the active scope.
+                self.child_status_signal.emit()
+            except json.JSONDecodeError:
+                pass
+        elif msg.startswith("EXCEPTION:"):
+            payload = msg.removeprefix("EXCEPTION:")
+            try:
+                # Emitted (queued) to the main thread; the tracker and its UI
+                # consumers must not be touched from the IPC thread.
+                self.child_exception_signal.emit(json.loads(payload))
+            except json.JSONDecodeError:
+                pass
         elif msg.startswith("LOADCONFIG:"):
             path = msg.removeprefix("LOADCONFIG:")
             load_custom_userconfig(path)
+        elif msg == "REAPPLY_AXIS_MAP":
+            # a settings save changed an FFB axis mapping somewhere; each
+            # instance re-reads ITS OWN settings, so an unchanged map is
+            # a no-op.  Flag only - the device work runs on the owning
+            # instance's poll tick, never this IPC thread.
+            from telemffb.hw.ffb_rhino import HapticEffect
+            request = getattr(HapticEffect.device,
+                              'request_axis_map_reapply', None)
+            if request:
+                request()
         elif msg.startswith("MASTER_BUTTONS:"):
             payload = msg.removeprefix("MASTER_BUTTONS:")
             G.master_buttons = json.loads(payload)
             # print(f"MB: {G.master_buttons}")
+        elif msg.startswith("TRIMCAL HOLD:"):
+            # Master is running a trim calibration: hold/release this
+            # instance's trimwheel sim writes. Refreshed ~1/s while active and
+            # self-expiring, so a crashed master cannot mute the wheel forever.
+            if msg.removeprefix("TRIMCAL HOLD:") == "1":
+                G.trimcal_hold_until = time.perf_counter() + 3.0
+            else:
+                G.trimcal_hold_until = 0.0
         elif msg.startswith("BUTTONS:"):
             payload = msg.removeprefix("BUTTONS:").split("_")
             dev = payload[0]
@@ -288,7 +372,13 @@ class IPCNetworkThread(QObject, threading.Thread):
     def send_ipc_effects(self, active_effects, active_settings):
         payload = {
             f'{G.device_type}_active_effects': active_effects,
-            f'{G.device_type}_active_settings': active_settings
+            f'{G.device_type}_active_settings': active_settings,
+            # Device-status context so the master can mirror this instance's
+            # vpconf-profile / gain-override indicators when the user selects
+            # this device as the config scope.
+            f'{G.device_type}_vpconf_profile': G.current_vpconf_profile or '',
+            f'{G.device_type}_gain_ovd_active':
+                bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False,
         }
         self.send_message(f"effects:{json.dumps(payload)}")
 
@@ -302,6 +392,12 @@ class IPCNetworkThread(QObject, threading.Thread):
             self._socket.sendto(message.encode("utf-8"), (self._host, self._dstport))
         except OSError as e:
             logging.warning(f"IPC send error: {e}")
+
+    def child_device_connected(self, role):
+        """The device-connection state a child last reported in its
+        keepalive, or None when that child has never reported."""
+        info = self._child_keepalive_info.get(role)
+        return None if info is None else bool(info.get("connected"))
 
     def send_broadcast_message(self, message):
         for addr in self._child_addrs.values():

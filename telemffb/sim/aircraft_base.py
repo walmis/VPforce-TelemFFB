@@ -34,6 +34,7 @@ from telemffb.sim.base.HelicopterEffectsMixIn import HelicopterEffectsMixIn
 from telemffb.sim.base.DeadzoneMixIn import DeadzoneMixIn
 from telemffb.sim.base.HydraulicLossMixIn import HydraulicLossMixIn
 from telemffb.sim.base.PedalSpringOverrideMixIn import PedalSpringOverrideMixIn
+from telemffb.sim.base.FfbTapMixIn import FfbTapMixIn
 
 from telemffb.hw.ffb_rhino import (
     HapticEffect,
@@ -51,6 +52,7 @@ G.effects = utils.Dispenser(HapticEffect)
 
 
 class AircraftBase(
+    FfbTapMixIn,
     PedalSpringOverrideMixIn,
     HelicopterEffectsMixIn,
     WeaponsEffectMixIn,

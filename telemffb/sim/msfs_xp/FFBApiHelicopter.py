@@ -32,8 +32,8 @@ Design notes
   L:var alone could therefore misfire onto the wrong aircraft; selecting this class from
   ``defaults.xml`` cannot.  An unconfigured helicopter resolves to plain
   :class:`~telemffb.sim.msfs_xp.Helicopter.Helicopter` and touches no ``L:FFB_*``
-  variable at all.  See ``docs/adding_an_aircraft_class.md`` (branch ``refactor_new``)
-  for the registration procedure, and plan section 10.1 for the decision record.
+  variable at all.  See ``docs/adding_an_aircraft_class.md`` for the registration
+  procedure, and plan section 10.1 for the decision record.
 * **Version is a soft check, not a gate.** Being configured for this class is the
   activation decision.  ``L:FFB_API_VERSION`` still has to be observed before anything
   is written - the aircraft may not have initialized yet - but never publishing it is

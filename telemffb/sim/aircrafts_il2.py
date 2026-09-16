@@ -146,6 +146,33 @@ class Aircraft(AircraftBase):
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
+    @staticmethod
+    def _il2_engine_value(val) -> float:
+        """Reduce an IL-2 per-engine indicator (ENG_RPM, ENG_SHAKE_FRQ, ...) to one float.
+
+        The sim sends one value per engine slot, but the slot count is not stable across
+        sim builds: 4.003 sent Values_count=1 for the single-engine F-51D, a later build
+        sends 3 zero-padded slots for the same aircraft.  The telemetry string pipeline
+        then collapses a one-element array back to a bare scalar (TelemManager only builds
+        a list when len(values) > 1), and to_number() passes through the original string
+        when it can't parse it.  So this can legitimately arrive as a float, a list, or ''
+        before the first indicator has been received.  Normalize every shape, and treat
+        anything non-finite or unparseable as 0 so the caller's zero-check catches it.
+        """
+        def num(x) -> float:
+            try:
+                x = float(x)
+            except (TypeError, ValueError):
+                return 0.0
+            return x if math.isfinite(x) else 0.0
+
+        if isinstance(val, (list, tuple)):
+            # Coerce per element, not after max():  a NaN slot round-trips as the
+            # string 'nan', which would make this a mixed str/float list and blow
+            # up the comparison inside max().
+            return max((num(x) for x in val), default=0.0)
+        return num(val)
+
     def il2_update_engine_shake(self, telem_data: BaseTelemetryData):
         """Alternative engine shake using harmonic ratios, amplitude taper, and direction spread.
 
@@ -171,14 +198,14 @@ class Aircraft(AircraftBase):
         else:
             return
 
-        frequency = telem_data.get('EngineShakeFrequency', 0)
-        amplitude = telem_data.get('EngineShakeAmplitude', 0)
+        frequency = self._il2_engine_value(telem_data.get('EngineShakeFrequency'))
+        amplitude = self._il2_engine_value(telem_data.get('EngineShakeAmplitude'))
 
         if not frequency or not amplitude:
             return
 
         frequency = float(frequency) + freq_offset
-        amplitude = float(amplitude) * factor * 3
+        amplitude = utils.clamp(float(amplitude) * factor * 3, 0.0, 1.0)
 
         if frequency <= 0:
             self.effects.dispose("il2_eng_shk1", "il2_eng_shk2", "il2_eng_shk3", "il2_eng_shk4", "il2_jet_shk1", "il2_jet_shk2")
@@ -261,10 +288,17 @@ class Aircraft(AircraftBase):
         if not self.il2_shake_master: return
         if not self.il2_enable_runway_rumble: return
 
+        # This wrapper translates IL-2's own settings onto the shared base
+        # effect's inputs.  The base method re-checks the DCS-family toggle
+        # (runway_rumble_enabled), which IL-2 profiles never carry, so the
+        # toggle has to be translated along with the intensity - without
+        # it the base disposed every frame and IL-2 rumble never played.
         if telem_data.TAS > 1.0 and telem_data.AGL < 10.0 and utils.average(telem_data.GearPos) == 1:
+            self.runway_rumble_enabled = True          # the IL-2 toggle passed above
             self.runway_rumble_intensity = self.il2_runway_rumble_intensity
             super().ac_update_runway_rumble(telem_data)
         else:
+            self.runway_rumble_enabled = False
             self.runway_rumble_intensity = 0
             self.effects.dispose("runway0", "runway1")
 
@@ -333,7 +367,9 @@ class Aircraft(AircraftBase):
         super().on_telemetry(telem_data)
         # self._update_focus_loss(telem_data)
         self.il2_override_spring()
-        self.il2_ffb_spring()
+        self.il2_ffb_spring()      # spring mode TELEM: Korea ffbdevice records
+        self.ffb_tap_spring()      # spring mode DINPUT_TAP: dinput8 wrapper tap
+        self.il2_ffb_forces()
         if self.damage_effect_intensity > 0:
             self.il2_update_damage(telem_data)
 
@@ -410,38 +446,10 @@ class Aircraft(AircraftBase):
 
         if self.override_spring_ft_enabled:
             input_data = self._get_device_report()
-            x, y = self._get_device_axes()
             current_buttons = input_data.getPressedButtons() if input_data is not None else []
-            # print(f"BUTTONS:>{current_buttons}<")
-            # decide what to do depending on which button is pressed
-            # if self.override_spring_trim_release and self.override_spring_trim_release in current_buttons:
-            #     # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
-            #     # as it is moved while spring force is enabled.
-            #     # return from method so default spring gains do not get applied at the end of the method
-            #     gain = int(self.override_spring_tr_damper * 4096)
-            #     self.spring_x.set_coefficient(gain)
-            #     self.spring_y.set_coefficient(gain)
-            #
-            #     self.override_spring_cp0_x = round(x * 4096)
-            #     self.spring_x.set_offset(self.override_spring_cp0_x)
-            #
-            #     self.override_spring_cp0_y = round(y * 4096)
-            #     self.spring_y.set_offset(self.override_spring_cp0_y)
-            #     spring.setCondition(self.spring_x)
-            #     spring.setCondition(self.spring_y)
-            #     spring.start(override=True)
-            #     return
-
-            # elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
-            #     # if trim reset button pressed, set offsets back to 0
-            #     # print("TRIM RESET")
-            #     self.spring_x.cpOffset = self.override_spring_cp0_x = 0
-            #     self.spring_y.cpOffset = self.override_spring_cp0_y = 0
-            #     spring.setCondition(self.spring_x)
-            #     spring.setCondition(self.spring_y)
 
             # calculate step size based on configured rate and delta time
-            trim_step_size = self.override_spring_trim_rate * dt
+            trim_step_size = self.override_spring_trim_rate * dt / conv.FFB_UNITS
 
             self.telem_data._ovrd_spr_step = trim_step_size
 
@@ -450,38 +458,33 @@ class Aircraft(AircraftBase):
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM DOWN")
-                if self.override_spring_cp0_y - trim_step_size < -4096:
-                    self.override_spring_cp0_y = -4096
-                else:
-                    self.override_spring_cp0_y -= trim_step_size
-                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+                self.override_spring_cp0_y = utils.clamp(
+                    self.override_spring_cp0_y - trim_step_size, -1.0, 1.0)
+                self.spring_y.set_offset(self.override_spring_cp0_y)
             elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM UP")
-                if self.override_spring_cp0_y + trim_step_size > 4096:
-                    self.override_spring_cp0_y = 4096
-                else:
-                    self.override_spring_cp0_y += trim_step_size
-                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+                self.override_spring_cp0_y = utils.clamp(
+                    self.override_spring_cp0_y + trim_step_size, -1.0, 1.0)
+                self.spring_y.set_offset(self.override_spring_cp0_y)
 
             if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM LEFT")
-                if self.override_spring_cp0_x - trim_step_size < -4096:
-                    self.override_spring_cp0_x = -4096
-                else:
-                    self.override_spring_cp0_x -= trim_step_size
-                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+                self.override_spring_cp0_x = utils.clamp(
+                    self.override_spring_cp0_x - trim_step_size, -1.0, 1.0)
+                self.spring_x.set_offset(self.override_spring_cp0_x)
             elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM RIGHT")
-                if self.override_spring_cp0_x + trim_step_size > 4096:
-                    self.override_spring_cp0_x = 4096
-                else:
-                    self.override_spring_cp0_x += trim_step_size
-                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+                self.override_spring_cp0_x = utils.clamp(
+                    self.override_spring_cp0_x + trim_step_size, -1.0, 1.0)
+                self.spring_x.set_offset(self.override_spring_cp0_x)
 
-        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
+        self.telem_data._ovrd_spr_trim_pos = [
+            self.override_spring_cp0_x,
+            self.override_spring_cp0_y,
+        ]
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_x.set_coefficient(self.override_spring_gain)
@@ -540,6 +543,81 @@ class Aircraft(AircraftBase):
                 self.telem_data['FFB_Y_Force'] = round(r['force'], 4)
                 self.telem_data['FFB_Y_Center'] = round(r['pos'], 4)
         spring.start(override=True)
+
+    def il2_ffb_forces(self):
+        """Render IL-2 Korea Const/Damper FFB records on generic DirectInput
+        devices.
+
+        On VPforce hardware these records are already rendered by the game
+        itself through its native DirectInput channel (TelemFFB rides the
+        separate raw-HID channel, so both coexist) - re-rendering them here
+        would double the forces.  A generic DirectInput device is held
+        exclusively by TelemFFB, so the game's own channel cannot reach it
+        and the records must be re-rendered from telemetry.
+
+        STATUS as of 2026-08: IL-2 Korea exclusive-acquires every attached
+        controller regardless of its force-feedback setting AND only emits
+        ffbdevice records while its FFB is enabled.  On a DI device both
+        problems are solved by the tap/sink dinput8 wrapper in the game
+        folder (game acquisition downgraded, its FFB output absorbed) -
+        but the current Korea build has a regression that stopped the
+        ffbdevice export entirely (bug reported), so these records are
+        absent until the game is fixed.  The wrapper's tap also mirrors
+        the game spring directly (see FfbTapMixIn), which does not
+        depend on the ffbdevice export.
+
+        Const and Damper records are treated as transient per-frame commands
+        (no caching, unlike the spring records): a stale constant-force
+        record must not keep pushing after the game stops commanding it.
+        Records also carry 'amp'/'freq' fields whose semantics are still
+        under observation; they are exposed in telemetry for discovery.
+        """
+        from telemffb.telem.IL2Manager import ForceType
+
+        if not G.device_di_guid:
+            return  # VPforce: the game renders these natively
+        if G.il2_ffb_device_ordinal is None:
+            return
+
+        raw = self.telem_data.FFBRecords
+        records = json.loads(raw) if isinstance(raw, str) and raw else []
+
+        const_recs = {}
+        damper_recs = {}
+        for r in records:
+            if r.get('dev') != G.il2_ffb_device_ordinal:
+                continue
+            if r.get('type') == ForceType.Const:
+                const_recs[r.get('axis')] = r
+            elif r.get('type') == ForceType.Damper:
+                damper_recs[r.get('axis')] = r
+
+        # --- constant force: combine per-axis commands into one vector ---
+        fx = utils.clamp((const_recs.get(0) or {}).get('force', 0.0), -1.0, 1.0)
+        fy = utils.clamp((const_recs.get(1) or {}).get('force', 0.0), -1.0, 1.0)
+        magnitude = min(math.sqrt(fx * fx + fy * fy), 1.0)
+        if magnitude >= 0.005:
+            # measured DirectInput polar convention: 0 deg pushes +Y,
+            # 90 -> -X, 180 -> -Y, 270 -> +X  =>  direction = atan2(-fx, fy)
+            direction = math.degrees(math.atan2(-fx, fy)) % 360
+            self.effects['il2_ffb_const'].constant(magnitude, direction).start()
+            for axis_name, rec in (('X', const_recs.get(0)), ('Y', const_recs.get(1))):
+                if rec:
+                    self.telem_data[f'FFB_Const{axis_name}'] = [
+                        round(rec.get('force', 0.0), 3),
+                        round(rec.get('amp', 0.0), 3),
+                        round(rec.get('freq', 0.0), 2)]
+        else:
+            self.effects['il2_ffb_const'].stop()
+
+        # --- damper: per-axis coefficients ---
+        dx = utils.clamp((damper_recs.get(0) or {}).get('force', 0.0), 0.0, 1.0)
+        dy = utils.clamp((damper_recs.get(1) or {}).get('force', 0.0), 0.0, 1.0)
+        if dx or dy:
+            self.effects['il2_ffb_damper'].damper(int(dx * 4096), int(dy * 4096)).start()
+            self.telem_data['FFB_Damper'] = [round(dx, 3), round(dy, 3)]
+        else:
+            self.effects['il2_ffb_damper'].stop()
 
 
 class PropellerAircraft(Aircraft):

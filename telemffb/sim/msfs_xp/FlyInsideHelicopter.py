@@ -41,6 +41,8 @@ class FlyInsideHelicopter(Helicopter):
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
+        if self.is_trimwheel():
+            return  # single-purpose device; effects chain gated in Aircraft
         self._update_vibration()
 
     @override

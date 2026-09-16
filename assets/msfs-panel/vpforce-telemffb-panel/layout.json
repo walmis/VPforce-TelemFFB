@@ -1,0 +1,49 @@
+{
+  "content": [
+    {
+      "path": "html_ui/icons/toolbar/icon_toolbar_vpforce_telemffb_settings.svg",
+      "size": 1291,
+      "date": 134326034032708384
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/panel.css",
+      "size": 7093,
+      "date": 134331872265905952
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/panel.html",
+      "size": 847,
+      "date": 134326034032753488
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/panel.js",
+      "size": 18399,
+      "date": 134331854799650288
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/vpforcelogo.svg",
+      "size": 7685,
+      "date": 134326034032753488
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/VpforceSettings.css",
+      "size": 1294,
+      "date": 134326034032733424
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/VpforceSettings.html",
+      "size": 1850,
+      "date": 134326034032733424
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/VpforceSettings.js",
+      "size": 1978,
+      "date": 134326034032773488
+    },
+    {
+      "path": "InGamePanels/vpforce-telemffb-panel.spb",
+      "size": 724,
+      "date": 134326034028349120
+    }
+  ]
+}

@@ -4,18 +4,33 @@ Verifies structural integrity, cross-references, and data consistency
 of the shipped defaults.xml configuration file.
 """
 import re
-import xml.etree.ElementTree as ET
+import tempfile
+import os
 from pathlib import Path
 
 import pytest
+
+from telemffb.utils import to_number
+from telemffb.xml import XmlConfigManager
 
 
 @pytest.fixture(scope="module")
 def defaults_root():
     """Load defaults.xml once for all tests in this module."""
     defaults_path = str(Path(__file__).parents[1] / "defaults.xml")
-    tree = ET.parse(defaults_path)
-    return tree.getroot()
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?><TelemFFB/>')
+        userconfig_path = f.name
+    try:
+        mgr = XmlConfigManager(
+            device="joystick",
+            userconfig_path=userconfig_path,
+            defaults_path=defaults_path,
+        )
+        mgr.store.update_roots()
+        yield mgr.store.defaults_root
+    finally:
+        os.unlink(userconfig_path)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -29,11 +44,22 @@ VALID_DATATYPES = {
     "float", "d_float", "n_float", "negfloat", "pct_float", "anyfloat",
     "int", "d_int",
     "anylist", "text", "path", "button", "convert",
-    "configurator", "advspr", "advgs",
+    "configurator", "advspr", "advgs", "trimcal", "devicelist",
 }
 
 # Internal prereq markers used to hide UI elements (may have leading whitespace/underscores)
 INTERNAL_PREREQS = {"do_not_show", "do not show"}
+
+# Datatypes whose value the runtime parses as a number. A field declared with
+# one of these must hold a value that parses (via to_number) to a non-string;
+# otherwise the runtime carries a string into numeric comparisons and crashes
+# (e.g. `force_trim_reset_button > 0` when a button value is the string "s").
+NUMERIC_DATATYPES = {
+    "int", "d_int", "button",
+    "float", "d_float", "n_float", "negfloat", "pct_float", "anyfloat",
+}
+# Values the runtime treats as unset / ignore rather than a number.
+NUMERIC_VALUE_SENTINELS = {"", "-", "none"}
 
 
 def _is_placeholder_default(elem):
@@ -468,3 +494,206 @@ class TestExclusivityReferences:
                     f"<defaults> '{elem.findtext('name')}' exclusive_with='{exc}' "
                     f"not found in <defaults>"
                 )
+
+
+class TestConditionalGateReferences:
+    """`render_prereq` / `enable_prereq` reference existing bool settings.
+
+    These cross-tree gates hide (render_prereq) or disable (enable_prereq) a
+    setting based on another setting's value, evaluated as a boolean. So each
+    referenced name must exist in <defaults> and be datatype 'bool'. Grammar:
+    comma-separated tokens, each `name` (require true) or `!name` (require
+    false). Catches typos and gating on a non-boolean.
+    """
+
+    def _name_datatypes(self, root):
+        dt = {}
+        for e in root.findall(".//defaults"):
+            if _is_placeholder_default(e):
+                continue
+            name = e.findtext("name")
+            if name:
+                dt[name] = e.findtext("datatype")
+        return dt
+
+    def _check(self, root, tag):
+        name_dt = self._name_datatypes(root)
+        for elem in root.findall(".//defaults"):
+            if _is_placeholder_default(elem) or _is_dummy_setting(elem):
+                continue
+            expr = (elem.findtext(tag) or "").strip()
+            if not expr:
+                continue
+            for token in expr.split(","):
+                token = token.strip()
+                if not token:
+                    continue
+                ref = token[1:].strip() if token.startswith("!") else token
+                assert ref in name_dt, (
+                    f"<defaults> '{elem.findtext('name')}' {tag}='{expr}' "
+                    f"references unknown setting '{ref}'"
+                )
+                assert name_dt[ref] == "bool", (
+                    f"<defaults> '{elem.findtext('name')}' {tag}='{expr}' references "
+                    f"'{ref}' which is datatype '{name_dt[ref]}', not bool"
+                )
+
+    def test_render_prereq_refs_existing_bool(self, defaults_root):
+        self._check(defaults_root, "render_prereq")
+
+    def test_enable_prereq_refs_existing_bool(self, defaults_root):
+        self._check(defaults_root, "enable_prereq")
+
+
+# ─────────────────────────────────────────────────────────────
+# Numeric value parseability
+# ─────────────────────────────────────────────────────────────
+
+class TestNumericValuesParse:
+    """A field declared with a numeric datatype must hold a value that parses
+    as a number.
+
+    Anchored to the datatype declaration (stable), not to the set of allowed
+    values (fluid) — so it needs no maintenance as valid button numbers/gains
+    change, yet still catches editor corruption like <value>s</value> on a
+    button field. Uses the runtime's own to_number so parseability is judged
+    exactly as production does.
+    """
+
+    def _numeric_setting_names(self, root):
+        """Setting names whose base <defaults> datatype is numeric."""
+        numeric = set()
+        for elem in root.findall(".//defaults"):
+            name = elem.findtext("name")
+            if name and elem.findtext("datatype") in NUMERIC_DATATYPES:
+                numeric.add(name)
+        return numeric
+
+    def _assert_numeric(self, elem, tag):
+        val = elem.findtext("value")
+        if val is None:
+            return  # missing <value> is covered by the required-field tests
+        v = val.strip()
+        if v.lower() in NUMERIC_VALUE_SENTINELS:
+            return  # unset / ignore markers are not numbers
+        assert not isinstance(to_number(v), str), (
+            f"<{tag}> name='{elem.findtext('name')}' has non-numeric value "
+            f"'{val}' for a numeric datatype"
+        )
+
+    def test_defaults_numeric_values_parse(self, defaults_root):
+        for elem in defaults_root.findall(".//defaults"):
+            if _is_placeholder_default(elem) or _is_dummy_setting(elem):
+                continue
+            if elem.findtext("datatype") in NUMERIC_DATATYPES:
+                self._assert_numeric(elem, "defaults")
+
+    def test_classdefaults_numeric_values_parse(self, defaults_root):
+        numeric = self._numeric_setting_names(defaults_root)
+        for tag in _all_classdefault_tags(defaults_root):
+            for elem in defaults_root.findall(f".//{tag}"):
+                if elem.findtext("name") in numeric:
+                    self._assert_numeric(elem, tag)
+
+    def test_models_numeric_values_parse(self, defaults_root):
+        numeric = self._numeric_setting_names(defaults_root)
+        for elem in defaults_root.findall(".//models"):
+            if elem.findtext("name") in numeric:
+                self._assert_numeric(elem, "models")
+
+
+# ─────────────────────────────────────────────────────────────
+# XiMpLe editor "stray s" corruption guard
+# ─────────────────────────────────────────────────────────────
+
+class TestXimpleEditorCorruption:
+    """Guard against the XiMpLe XML editor's stray-'s' corruption.
+
+    defaults.xml is hand-maintained in the XiMpLe tree editor, which has a
+    known bug: while resizing columns it intermittently overwrites a random
+    cell with the single character 's'. This has silently corrupted a default
+    once already (``force_trim_reset_button`` became ``s``), which slipped past
+    the runtime's ``== 0`` guard as a string and crashed on ``'s' > 0``.
+
+    The corruption can land on ANY element value, element name, or attribute
+    anywhere in the file — not only numeric fields — so this scans the whole
+    tree for a bare 's'.
+
+    ─────────────────────────────────────────────────────────────────────────
+    FUTURE MAINTAINER — read this before "fixing" a failure of this test:
+
+    If this test fails, assume editor corruption FIRST. A cell that should
+    hold a real value or name was almost certainly clobbered to 's' by XiMpLe
+    during a column resize. The failure message names the setting — restore
+    its intended value.
+
+    ONLY if you *deliberately* need a default whose value is literally 's'
+    (a genuine, intended value — not editor damage) do you add that specific
+    (setting-name, field-tag) to LEGITIMATE_S below, WITH a comment saying
+    why. Do not disable the test wholesale: a bare 's' is overwhelmingly more
+    likely to be corruption than intent, which is the entire reason this guard
+    exists. A corrupted element name or attribute is never legitimate in this
+    schema and has no allowlist.
+    ─────────────────────────────────────────────────────────────────────────
+    """
+
+    # (setting_name, field_tag) locations where a bare 's' VALUE is genuinely
+    # intended. Empty today — nothing in the schema legitimately holds 's'.
+    # Add entries here (with justification) only if that ever changes.
+    LEGITIMATE_S: set = set()
+
+    def test_no_ximple_stray_s(self, defaults_root):
+        # ElementTree has no parent pointers; build a child->parent map so an
+        # offending element can be reported against its owning setting's <name>.
+        parents = {child: parent for parent in defaults_root.iter() for child in parent}
+
+        def setting_of(elem):
+            cur = elem
+            while cur is not None:
+                name = cur.findtext("name")
+                if name and name.strip():
+                    return name.strip()
+                cur = parents.get(cur)
+            return "(unknown setting)"
+
+        offenders = []
+        for elem in defaults_root.iter():
+            name = setting_of(elem)
+            # A value overwritten to 's' — allowlist-able, since a real 's'
+            # value could conceivably be intended some day.
+            if (elem.text or "").strip() == "s" and (name, elem.tag) not in self.LEGITIMATE_S:
+                offenders.append(f"<{elem.tag}>s</{elem.tag}> in setting '{name}'")
+            # An element NAME overwritten to 's' — never valid in this schema.
+            if elem.tag == "s":
+                offenders.append(f"element named <s> in setting '{name}'")
+            # An attribute name/value overwritten to 's' — never valid here.
+            for attr_name, attr_val in elem.attrib.items():
+                if attr_name == "s" or (attr_val or "").strip() == "s":
+                    offenders.append(
+                        f"attribute {attr_name}={attr_val!r} on <{elem.tag}> in setting '{name}'"
+                    )
+
+        assert not offenders, (
+            "Stray 's' found in defaults.xml — almost certainly XiMpLe editor "
+            "corruption (a cell overwritten with 's' during a column resize). "
+            "Restore the intended value(s). If an 's' is genuinely intended, add "
+            "it to TestXimpleEditorCorruption.LEGITIMATE_S with a reason "
+            "(see this test's docstring).\nOffenders:\n  " + "\n  ".join(offenders)
+        )
+
+class TestNoDuplicateChildElements:
+    def test_no_block_repeats_a_child_tag(self, defaults_root):
+        """Each <defaults> child appears at most once.  A duplicated
+        child (field case: two <grouping> tags after a hand edit went
+        wrong) parses fine and even renders fine - findtext returns the
+        first - but corrupts the block for grid editors and for whichever
+        consumer reads the other copy."""
+        from collections import Counter
+        for elem in defaults_root.findall(".//defaults"):
+            if _is_placeholder_default(elem) or _is_dummy_setting(elem):
+                continue
+            counts = Counter(child.tag for child in elem)
+            dupes = {tag: n for tag, n in counts.items() if n > 1}
+            assert not dupes, (
+                f"'{elem.findtext('name')}' repeats child element(s): "
+                f"{dupes}")

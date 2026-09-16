@@ -46,7 +46,7 @@ class SASHelicopter(Helicopter):
         super().__init__(name, **kwargs)
         
         self.phys_x, self.phys_y = self._get_device_axes()
-        self.cpO_y = round(self.phys_y * 4096)
+        self.cpO_y = self.phys_y
 
 
     def on_telemetry(self, telem_data: BaseTelemetryData):
@@ -80,8 +80,8 @@ class SASHelicopter(Helicopter):
                 sx = round(abs(sema_x_avg), 3)
                 sy = round(abs(sema_y_avg), 3)
 
-                self.afcsx_step_size = sx * 0.1
-                self.afcsy_step_size = sy * 0.3
+                self.afcsx_step_size = sx * 0.1 / 4096
+                self.afcsy_step_size = sy * 0.3 / 4096
 
                 if not (self.hands_on_x_active or self.hands_on_active):
                     if sema_x_avg > 0:
@@ -95,8 +95,8 @@ class SASHelicopter(Helicopter):
                     elif sema_y_avg < 0:
                         self.cpO_y += self.afcsy_step_size
 
-            self.spring_x.cpOffset = round(self.cpO_x)
-            self.spring_y.cpOffset = round(self.cpO_y)
+            self.spring_x.set_offset(self.cpO_x)
+            self.spring_y.set_offset(self.cpO_y)
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
 

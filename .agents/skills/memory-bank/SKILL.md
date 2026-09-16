@@ -152,7 +152,7 @@ When updating a task, always:
 
 ## TelemFFB-Specific Guardrails
 
-This project already has established conventions in `AGENTS.md` and `docs/dev_guidelines.md`. When maintaining the memory bank:
+This project already has established conventions in `AGENTS.md`. When maintaining the memory bank:
 
 - **Scoping**: Tag tasks with sim scope (`msfs-xp`, `dcs`, `il2`, `bms`, `xplane`) and device scope (`joystick`, `pedals`, `collective`, `trimwheel`) when applicable.
 - **MixIn work**: Note which MixIns are affected and whether changes touch the MRO chain in `AircraftBase`.

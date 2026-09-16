@@ -35,6 +35,7 @@ import logging
 import sys
 
 import socket
+import bisect
 import time
 import traceback
 import urllib.error
@@ -67,6 +68,87 @@ def check_min_firmware_version(dev_firmware_version, min_firmware_version):
     minver = re.sub(r'\D', '', min_firmware_version)
     devver = re.sub(r'\D', '', dev_firmware_version)
     return devver >= minver
+
+
+def _shared_shell_locations() -> dict:
+    """Shared user locations that must never BE the app's install folder.
+
+    Shell folders are resolved via the registry so folder redirection
+    (e.g. a OneDrive-synced Desktop) is handled correctly.  Values map a
+    human-readable label (used in the refusal message) to the folder path.
+    """
+    locations = {}
+    try:
+        import winreg
+        with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders") as key:
+            for label, value_name in (
+                    ("your Desktop", "Desktop"),
+                    ("your Documents folder", "Personal"),
+                    ("your Downloads folder", "{374DE290-123F-4565-9164-39C4925E467B}")):
+                try:
+                    locations[label] = winreg.QueryValueEx(key, value_name)[0]
+                except OSError:
+                    pass
+    except Exception:
+        logging.exception("Unable to resolve shell folders for the install-location check")
+
+    for label, env_var in (
+            ("your user profile folder", "USERPROFILE"),
+            ("the OneDrive root folder", "OneDrive"),
+            ("the Program Files folder", "ProgramFiles"),
+            ("the Program Files (x86) folder", "ProgramFiles(x86)"),
+            ("the Windows folder", "SystemRoot")):
+        value = os.environ.get(env_var)
+        if value:
+            locations[label] = value
+
+    public = os.environ.get("PUBLIC")
+    if public:
+        locations["the Public Desktop"] = os.path.join(public, "Desktop")
+
+    return locations
+
+
+def unsafe_install_location_reason(app_dir: str, locations: dict = None):
+    """Return a human-readable reason when app_dir is an unsafe place for a
+    TelemFFB installation, or None when it is acceptable.
+
+    The auto-updater manages the ENTIRE folder containing the executable
+    (backing up and replacing its contents), so running from a shared
+    location would sweep unrelated files into the update process.  Field
+    incident: a release unzipped directly onto the Desktop - the updater
+    moved the user's whole Desktop into the previous-version backup folder.
+
+    Subfolders of shared locations are fine (e.g. Desktop\\TelemFFB); only
+    the shared folder ITSELF (or a drive root, or anywhere under the temp
+    directory) is refused.
+    """
+    def norm(p):
+        return os.path.normcase(os.path.abspath(p)).rstrip('\\/')
+
+    root = norm(app_dir)
+
+    # drive roots (C:\, D:\, ...)
+    drive, tail = os.path.splitdrive(root)
+    if drive and not tail.strip('\\/'):
+        return f"the root of drive {drive.upper()}\\"
+
+    if locations is None:
+        locations = _shared_shell_locations()
+
+    for label, path in locations.items():
+        if path and root == norm(path):
+            return label
+
+    # anywhere under the temp directory usually means the executable was
+    # launched directly from inside the downloaded .zip
+    tmp = norm(tempfile.gettempdir())
+    if root == tmp or root.startswith(tmp + os.sep):
+        return "a temporary folder (was it started from inside the .zip file?)"
+
+    return None
 
 
 def schedule_on_main_thread(func):
@@ -313,11 +395,16 @@ class EffectTranslator:
     effect_dict = {
         "ab_rumble_.*": ["Afterburner Rumble", "afterburner_effect_intensity"],
         'adv_spr': ["Advanced Spring Override", ""],
+        'rudder_const_force': ["Rudder Constant Force", ""],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
         "ap_spring": ["Autopilot Spring", ""],
+        "adv_gforce_constant": ["G-Force Loading (Advanced)", ""],
+        "blade_slap.*": ["Blade Slap", "blade_slap_intensity"],
         "buffeting": ["AoA/Stall Buffeting", "buffeting_intensity"],
         "bombs": ["Bomb Release", "weapon_release_intensity"],
+        "canopyclunk": ["Canopy Clunk", "canopy_motion_intensity"],
         "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
+        "clunk": ["Tail Hook Clunk", "tailhook_motion_intensity"],
         "collective_ap_spring": ["Collective Spring", "collective_ap_spring_gain"],
         "collective_damper": ["Collective Dampening Force", "collective_dampening_gain"],
         "collective_ft": ["Collective Force Trim", "collective_ft_ovd_spring_gain"],
@@ -342,6 +429,7 @@ class EffectTranslator:
         "friction": ["Friction Override", "friction_force"],
         "boommovement" : ["Fuel Boom/Door","fuelboom_motion_intensity"],
         "gearbuffet.*": ["Gear Drag Buffeting", "gear_buffet_intensity"],
+        "gearclunk": ["Gear Clunk", "gear_motion_intensity"],
         "gearmovement.*": ["Gear Motion", "gear_motion_intensity"],
         "gforce": ["G-Force Loading", "gforce_effect_max_intensity"],
         "new_gforce": ["G-Force Loading V2", "new_gforce_effect_max_intensity"],
@@ -353,6 +441,17 @@ class EffectTranslator:
         "il2_bombs": ["Bomb Release", "il2_bomb_release_intensity"],
         "il2_rockets": ["Rocket Fire", "il2_rocket_release_intensity"],
         "il2_ffb_spring": ["FFB Telemetry Spring Override", ""],
+        "ffb_tap_spring": ["Game Spring (DirectInput Tap)", ""],
+        # the game's non-spring effects rendered from the tap mirror: slot-
+        # keyed names 'tap_game_{slot}_{type}', matched by effect type code
+        # ($-anchored so _1 does not also swallow _10/_11)
+        r"tap_game_\d+_1$": ["Game Constant Force (DirectInput Tap)", "tap_effect_constant_gain"],
+        r"tap_game_\d+_[34567]$": ["Game Periodic Vibration (DirectInput Tap)", "tap_effect_periodic_gain"],
+        r"tap_game_\d+_9$": ["Game Damper (DirectInput Tap)", "tap_effect_damper_gain"],
+        r"tap_game_\d+_10$": ["Game Inertia (DirectInput Tap)", "tap_effect_inertia_gain"],
+        r"tap_game_\d+_11$": ["Game Friction (DirectInput Tap)", "tap_effect_friction_gain"],
+        "il2_ffb_const": ["FFB Telemetry Constant Force", ""],
+        "il2_ffb_damper": ["FFB Telemetry Damper", ""],
         "il2_eng_shk1": ["IL2 Prop Eng Shake (Telemetry)", ""],
         "il2_eng_shk2": ["IL2 Prop Eng Shake (Telemetry)", ""],
         "il2_eng_shk3": ["IL2 Prop Eng Shake (Telemetry)", ""],
@@ -379,7 +478,10 @@ class EffectTranslator:
         "stick_shaker.*" : ["Stick Shaker","stick_shaker_intensity"],
         "hookmovement" : ["Tail Hook","tailhook_motion_intensity"],
         "touchdown": ["Touch-down Effect", "touchdown_effect_max_force"],
+        "trim_cal_spring": ["Trim Calibration Spring", ""],
         "trim_spring": ["Trim Override Spring", ""],
+        "trimwheel_ap_spring": ["Trimwheel AP Spring", "trimwheel_ap_spring_gain"],
+        "turbulence": ["Turbulence", "turbulence_intensity"],
         "control_weight": ["Control Weight", ""],
         "vrs_buffet.*": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
         "wnd": ["Wind Effect", "wind_effect_max_intensity"],
@@ -424,9 +526,11 @@ def archive_logs(directory):
                     log_file_path = os.path.join(directory, filename)
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
-    if G.system_settings.get("pruneLogs", False):
+    # the fallbacks mirror SystemSettings.defaults, which is what is actually
+    # returned; they only matter if a key is missing there too
+    if G.system_settings.get("pruneLogs", True):
         num = G.system_settings.get('pruneLogsNum', 1)
-        unit = G.system_settings.get('pruneLogsUnit', "Month(s)")
+        unit = G.system_settings.get('pruneLogsUnit', "Week(s)")
         prune_log_files(directory, num, unit)
 
 
@@ -584,23 +688,40 @@ def classify_http_exception(exc):
 #     except WindowsError:
 #         return None
 
-def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=None):
+def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=None, user_info=None):
     """Internal helper to create a support bundle zip file.
-    
+
     Args:
         zip_file_path: Output path for the zip file
         userconfig_rootpath: Path to user config directory
         exceptions: Optional list of ExceptionRecord objects to include
+        user_info: Optional dict from the report dialog
+            ('discord_username', 'notes') — written as the FIRST archive
+            entry so support can map the bundle to a user at a glance
     """
     from datetime import datetime
     import telemffb.winpaths as winpaths
 
-    
+
     # Get the system settings
     sys_dict = read_all_system_settings()
-    
+
     # Create the support zip file directly
     with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_LZMA, compresslevel=9) as support_zip:
+        # User-supplied report context first: bundle-to-user mapping and
+        # the reporter's own words are the highest-value triage data.
+        if user_info is not None:
+            lines = [
+                f"Report created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Device instance: {getattr(G, 'device_type', 'unknown')}",
+                f"Discord username: {user_info.get('discord_username') or '(not provided)'}",
+                "",
+                "Additional information from the user:",
+                user_info.get('notes') or '(none)',
+                "",
+            ]
+            support_zip.writestr("user_report.txt", "\n".join(lines))
+
         # Add userconfig_v2.xml
         userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
         legacy_userconfig_path = os.path.join(userconfig_rootpath, "userconfig.xml")
@@ -665,22 +786,66 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
             pass
 
 
-def create_support_bundle_data(userconfig_rootpath, exceptions=None):
+def format_exception_stackprinter(exc_info):
+    """Format an exception with stackprinter for a debug-friendly traceback.
+
+    The output includes source-code context and the values of local variables
+    at each frame, which is far more useful for diagnosing field issues than
+    the stock ``traceback`` output.
+
+    ``exc_info`` may be a ``sys.exc_info()``-style 3-tuple
+    ``(type, value, tb)`` or a single exception instance.
+
+    This is always safe to call from logging / excepthook paths: if
+    ``stackprinter`` is not installed, or fails (e.g. source files are
+    unavailable in a frozen build), it falls back to the standard
+    :mod:`traceback` formatting. ``style='plaintext'`` keeps the output
+    ANSI-free, which the log pipeline (and the file handler) require.
+    """
+    # Normalize to a (type, value, tb) triple.
+    if isinstance(exc_info, BaseException):
+        etype, evalue, tb = type(exc_info), exc_info, exc_info.__traceback__
+    elif isinstance(exc_info, tuple) and len(exc_info) == 3:
+        etype, evalue, tb = exc_info
+    else:
+        return ""
+
+    try:
+        import stackprinter
+        return stackprinter.format(
+            (etype, evalue, tb),
+            style='plaintext',
+            show_vals='like_source',
+            truncate_vals=500,
+            source_lines=5,
+        )
+    except Exception:
+        # Never let a formatting failure break logging; fall back to the
+        # standard traceback.
+        try:
+            return "".join(traceback.format_exception(etype, evalue, tb))
+        except Exception:
+            return ""
+
+
+def create_support_bundle_data(userconfig_rootpath, exceptions=None, user_info=None):
     """Create support bundle as bytes (in memory) for API upload.
-    
+
     Args:
         userconfig_rootpath: Path to user config directory
         exceptions: Optional list of ExceptionRecord objects to include
-        
+        user_info: Optional dict from the report dialog (see
+            _create_support_bundle_zip)
+
     Returns:
         bytes: Support bundle as zip file data
     """
     # Use a temporary file to create the zip, then read it into memory
     with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp:
         tmp_path = tmp.name
-    
+
     try:
-        _create_support_bundle_zip(tmp_path, userconfig_rootpath, exceptions)
+        _create_support_bundle_zip(tmp_path, userconfig_rootpath, exceptions, user_info=user_info)
         with open(tmp_path, 'rb') as f:
             return f.read()
     finally:
@@ -707,24 +872,59 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
     
     exceptions_list = G.exception_tracker.get_exceptions()
 
-    # Confirm upload
-    reply = QMessageBox.question(
-        parent_widget,
-        "Report Exceptions",
-        (
-            f"Upload Support Bundle to VPforce support?\n\n"
-            f"This will include:\n"
-            f"  • Exception details and tracebacks\n"
-            f"  • System configuration\n"
-            f"  • Application logs\n\n"
-            f"You will need to complete a verification challenge."
-        ),
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        QMessageBox.StandardButton.Yes,
-    )
+    # Confirmation dialog with optional reporter context. The Discord
+    # username lets support map an uploaded bundle to the person asking
+    # about it on the VPforce Discord. It is remembered for THIS SESSION
+    # only (module attribute) — deliberately never persisted to the
+    # registry/disk: it is personal data the user types for a support
+    # interaction, not configuration. Both fields land in user_report.txt
+    # at the top of the bundle.
+    from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QLabel,
+                                 QLineEdit, QPlainTextEdit, QVBoxLayout)
+    dlg = QDialog(parent_widget)
+    dlg.setWindowTitle("Report Exceptions")
+    dlg_layout = QVBoxLayout(dlg)
+    dlg_layout.addWidget(QLabel(
+        "Upload Support Bundle to VPforce support?\n\n"
+        "**Note** - this is not a replacement for posting your issue/question\n"
+        "in the VPforce discord.  Nobody is going to proactively reachout to you.\n"
+        "It will simply help associate your discord message with this support bundle.\n\n"
+        "This will include:\n"
+        "  • Exception details and tracebacks\n"
+        "  • System configuration\n"
+        "  • Application logs"
+    ))
+    dlg_layout.addSpacing(8)
+    dlg_layout.addWidget(QLabel(
+        "Discord username (optional) — lets support match this bundle to "
+        "you\non the VPforce Discord:"))
+    tb_discord = QLineEdit()
+    tb_discord.setPlaceholderText("your Discord username")
+    tb_discord.setText(getattr(report_exceptions, '_session_discord_username', ''))
+    dlg_layout.addWidget(tb_discord)
+    dlg_layout.addWidget(QLabel(
+        "Additional information (optional) — what were you doing when the\n"
+        "problem occurred, or anything else support should know:"))
+    tb_notes = QPlainTextEdit()
+    tb_notes.setPlaceholderText("Describe what happened…")
+    tb_notes.setMinimumHeight(90)
+    dlg_layout.addWidget(tb_notes)
+    dlg_layout.addWidget(QLabel(
+        "You will need to complete a verification challenge."))
+    dlg_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+    dlg_buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Upload")
+    dlg_buttons.accepted.connect(dlg.accept)
+    dlg_buttons.rejected.connect(dlg.reject)
+    dlg_layout.addWidget(dlg_buttons)
 
-    if reply != QMessageBox.StandardButton.Yes:
+    if dlg.exec() != QDialog.DialogCode.Accepted:
         return False
+
+    discord_username = tb_discord.text().strip()
+    user_notes = tb_notes.toPlainText().strip()
+    report_exceptions._session_discord_username = discord_username
+    user_info = {'discord_username': discord_username, 'notes': user_notes}
 
     # Progress dialog (indeterminate)
     progress = QProgressDialog("Creating support bundle and uploading to server...", None, 0, 0, parent_widget)
@@ -738,20 +938,33 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
     class UploadWorker(QObject):
         finished = pyqtSignal(bool, dict)
 
-        def __init__(self, api_url: str, userconfig_rootpath: str, exceptions_list):
+        def __init__(self, api_url: str, userconfig_rootpath: str, exceptions_list, user_info=None):
             super().__init__()
             self.api_url = api_url
             self.userconfig_rootpath = userconfig_rootpath
             self.exceptions_list = exceptions_list
+            self.user_info = user_info
 
         def run(self):
             try:
                 # Create bundle in memory
-                bundle = create_support_bundle_data(self.userconfig_rootpath, self.exceptions_list)
+                bundle = create_support_bundle_data(self.userconfig_rootpath, self.exceptions_list,
+                                                    user_info=self.user_info)
+
+                # Embed the (sanitized) Discord username in the uploaded
+                # filename: if the support server passes the client filename
+                # through to the Discord attachment, the bundle-to-user
+                # mapping becomes visible right in the automated message —
+                # no server change needed. Falls back to the plain name.
+                filename = 'support_bundle.zip'
+                uname = (self.user_info or {}).get('discord_username') or ''
+                uname = re.sub(r'[^A-Za-z0-9_.-]', '', uname)[:48]
+                if uname:
+                    filename = f'support_bundle_{uname}.zip'
 
                 status_code, response_text = post_multipart_url(
                     self.api_url,
-                    files=[('bundle', 'support_bundle.zip', bundle, 'application/zip')],
+                    files=[('bundle', filename, bundle, 'application/zip')],
                     timeout=30,
                 )
 
@@ -773,7 +986,7 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
 
     # Prepare thread and worker
     thread = QThread(parent_widget)
-    worker = UploadWorker(api_url, userconfig_rootpath, exceptions_list)
+    worker = UploadWorker(api_url, userconfig_rootpath, exceptions_list, user_info=user_info)
     worker.moveToThread(thread)
 
     # Connect signals
@@ -1005,14 +1218,18 @@ class SystemSettings(QSettings):
     startToTray: bool
     closeToTray: bool
     enableDCS: bool
+    pathDCS: str
     enableMSFS: bool
     enableXPLANE: bool
     validateXPLANE: bool
     pathXPLANE: str
     validateIL2: bool
     pathIL2: str
+    pathIL2_K: str
     portIL2: int
     enableBMS: bool
+    pathBMS: str
+    enableDirectInput: bool
     masterInstance: int
     autolaunchMaster: bool
     autolaunchJoystick: bool
@@ -1042,13 +1259,20 @@ class SystemSettings(QSettings):
     }
 
     globl_sys_dict = {
-        'pruneLogs': False,
+        # On by default, one week: a log level left at DEBUG by accident fills
+        # a disk quickly, and a user who never opens this setting should not
+        # find out that way.  Only day-archives older than the window go.
+        'pruneLogs': True,
         'pruneLogsNum': 1,
         'pruneLogsUnit': 'Week(s)',
         'ignoreUpdate': False,
         'startToTray': False,
         'closeToTray': False,
         'enableDCS': False,
+        # Empty means "find it": every sim path here overrides discovery
+        # rather than seeding it, so a default would be a wrong answer on
+        # any machine that installed somewhere else.
+        'pathDCS': '',
         'enableMSFS': False,
         'enableXPLANE': False,
         'validateXPLANE': False,
@@ -1058,10 +1282,19 @@ class SystemSettings(QSettings):
         'focus_pauseIL2': True,
         'validateDCS': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
+        'pathIL2_K': '',
         'portIL2': 34385,
         'il2_fwd_enable': False,
         'il2_fwd_destinations': '[]',
         'enableBMS': False,
+        'pathBMS': '',
+        # opt-in per sim: the tap is a thing most VPforce owners never
+        # need, and defaulting it on would imply otherwise
+        'enableTapDCS': False,
+        'enableTapIL2': False,
+        'enableTapIL2_K': False,
+        'enableTapBMS': False,
+        'enableDirectInput': False,
         'masterInstance': 1,
         'autolaunchMaster': False,
         'autolaunchJoystick': False,
@@ -1070,11 +1303,51 @@ class SystemSettings(QSettings):
         'startMinJoystick': False,
         'startMinPedals': False,
         'startMinCollective': False,
-        'startHeadlessJoystick': False,
-        'startHeadlessPedals': False,
-        'startHeadlessCollective': False,
+        # children default to headless: they exist to drive their device
+        # and everything is configured from the master
+        'startHeadlessJoystick': True,
+        'startHeadlessPedals': True,
+        'startHeadlessCollective': True,
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
     }
+
+    #: Roles by their masterInstance id, as the dialog's radio group numbers
+    #: them.
+    INSTANCE_ROLES = {1: 'joystick', 2: 'pedals', 3: 'collective',
+                      4: 'trimwheel'}
+
+    def migrate_instance_scoped_globals(self):
+        """Clear instance-scoped copies of settings that are global.
+
+        Some settings used to be written under `{role}/` even though they
+        describe the installation rather than one device - ignoreUpdate is
+        the one that mattered, since only the master ever checks for
+        updates.  `get()` resolves instance-scoped first, so leaving those
+        copies in place would let a stale value shadow the global one
+        forever: the setting would appear not to stick, and the updater
+        would keep reading the old answer.
+
+        The instance copy is what the app has actually been honoring, so
+        the master's copy is promoted before the rest are removed.  Runs on
+        every start and does nothing once there is nothing left to move.
+
+        Returns:
+            list[str]: the keys that were migrated, for logging.
+        """
+        master = self.INSTANCE_ROLES.get(self.value('masterInstance'), 'joystick')
+        moved = []
+        for name in self.globl_sys_dict:
+            scoped = [f"{role}/{name}" for role in self.INSTANCE_ROLES.values()
+                      if self.value(f"{role}/{name}") is not None]
+            if not scoped:
+                continue
+            authoritative = self.value(f"{master}/{name}")
+            if authoritative is not None:
+                super().setValue(name, authoritative)
+            for key in scoped:
+                self.remove(key)
+            moved.append(name)
+        return moved
 
     @property
     def defaults(self):
@@ -1083,8 +1356,18 @@ class SystemSettings(QSettings):
         s.update(self.globl_sys_dict)
         return s
 
-    def __init__(self, pid=None, tp=None):
-        super().__init__('VPforce', 'TelemFFB')
+    def __init__(self, pid=None, tp=None, path=None):
+        """Open the settings store.
+
+        `path` points the store at an ini file instead of the user's real
+        settings.  Tests need it: QSettings.setDefaultFormat() does not
+        redirect the two-argument constructor on Windows, so without an
+        explicit path a test store *is* the live registry.
+        """
+        if path:
+            super().__init__(path, QSettings.Format.IniFormat)
+        else:
+            super().__init__('VPforce', 'TelemFFB')
         #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
         # No additional initialization required. Keep QSettings initialization intact.
         return
@@ -1137,9 +1420,17 @@ class SystemSettings(QSettings):
             extra = []
         return sorted(set(super().__dir__() + extra))
 
-    def get(self, name, default=None):       
+    def get(self, name, default=None, instance=None):
+        """Resolve a setting, instance-scoped first then global.
+
+        `instance` names the device whose value to read, defaulting to this
+        process's own.  The master instance passes it explicitly so it can
+        read and write every instance's settings from one dialog, rather
+        than each child having to configure itself.
+        """
+        instance = instance or G.device_type
         # check instance params
-        val = self.value(f"{G.device_type}/{name}")
+        val = self.value(f"{instance}/{name}")
         if val is None:
             # check global param
             val = self.value(name)
@@ -1148,7 +1439,7 @@ class SystemSettings(QSettings):
             val = self.defaults.get(name, None)
             if val is not None:
                 if name in self.default_inst:
-                    self.setValue(f"{G.device_type}/{name}", val) # save instance variable
+                    self.setValue(f"{instance}/{name}", val) # save instance variable
                 else:
                     self.setValue(name, val)
                 return val
@@ -1185,6 +1476,22 @@ _UNIT_CONVERSIONS = {
     "ft": conv.ft2m,
     "in": conv.in2m,
 }
+
+def convert_between_units(value: float, from_unit: str, to_unit: str):
+    """Convert ``value`` between two units of the same dimension using the
+    canonical ``_UNIT_CONVERSIONS`` factors (each maps its unit to base SI).
+
+    Returns the converted float, or None when either unit is unknown so the
+    caller can leave the original value untouched.  Rows only ever offer
+    same-dimension unit choices in their validvalues, so no dimensional
+    checking is needed here.
+    """
+    f = _UNIT_CONVERSIONS.get(from_unit)
+    t = _UNIT_CONVERSIONS.get(to_unit)
+    if not f or not t:
+        return None
+    return value * f / t
+
 
 def to_number(v: str):
     """Try to convert string to number
@@ -1306,11 +1613,268 @@ def scale(val, src: tuple, dst: tuple, return_round=False, return_int=False):
 
 def scale_clamp(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
-    Scale the given value from the scale of src to the scale of dst. 
+    Scale the given value from the scale of src to the scale of dst.
     and clamp the result to dst
     """
     v = scale(val, src, dst, return_round=return_round, return_int=return_int)
     return clamp(v, dst[0], dst[1])
+
+
+def piecewise_linear(xs, ys, x):
+    """Piecewise-linear lookup with edge-slope extrapolation.
+
+    :param xs: sample x values, strictly increasing
+    :param ys: sample y values, same length as xs (>= 2 points)
+    :param x: lookup position
+    :returns: interpolated y inside [xs[0], xs[-1]]; outside that range the
+        nearest edge segment's slope is continued linearly (a flat clamp would
+        silently stop correcting past the sampled band).
+    """
+    i = bisect.bisect_left(xs, x)
+    if i <= 0:
+        i = 1
+    elif i >= len(xs):
+        i = len(xs) - 1
+    x0, x1 = xs[i - 1], xs[i]
+    y0, y1 = ys[i - 1], ys[i]
+    slope = (y1 - y0) / (x1 - x0) if x1 != x0 else 0.0
+    return y0 + slope * (x - x0)
+
+
+def _parse_trim_curve_entry(data):
+    """Parse ONE stored curve entry into an anchor-referenced dict, or None.
+
+    Points are sorted and deduped on trim, then REBASED so offs(t0) == 0:
+    t0 from the payload, falling back to the measured band's midpoint for
+    curves saved before t0 existed (the sweep centers its band on the
+    natural point). The rebase is idempotent. This pins the runtime
+    invariant "trimmed for level => stick at physical center, zero force,
+    zero delivered input" and keeps every lookup band-internal regardless
+    of where the trim gauge's zero lies.
+    """
+    pts = sorted((float(p["t"]), float(p["offs"])) for p in data["points"])
+    xs, ys = [], []
+    for t, o in pts:  # drop duplicate trim values, keep xs strictly increasing
+        if xs and abs(t - xs[-1]) < 1e-9:
+            ys[-1] = o
+        else:
+            xs.append(t)
+            ys.append(o)
+    if len(xs) < 2:
+        logging.warning("Trim-follow curve has fewer than 2 usable points; ignoring")
+        return None
+    t0 = float(data["t0"]) if "t0" in data else (xs[0] + xs[-1]) / 2.0
+    ref = piecewise_linear(xs, ys, t0)
+    return {
+        "ias_kt": float(data.get("ias_kt") or 0.0),
+        "t0": t0,
+        "date": data.get("date"),
+        # Provenance only (glider runs): the sink held while measuring.
+        # Displayed in the stored-curve description; never used at runtime.
+        "vs_fpm": data.get("vs_fpm"),
+        "xs": xs,
+        "ys": [y - ref for y in ys],
+    }
+
+
+def parse_trim_follow_family(value):
+    """Parse the stored trim-calibration setting into a speed-sorted family.
+
+    Single source of truth for the curve convention — the runtime property
+    setter AND any display/offline reader must go through here (hand-rolled
+    re-derivations of the runtime's math have rotted before: the takeover
+    baseline computed a false value for months).
+
+    Accepts the family form ``{"curves": [entry, ...]}``, the legacy
+    single-curve blob ``{"points": ...}``, a JSON string of either, or
+    'none'/empty. Returns a list of entries ``{ias_kt, t0, date, xs, ys, r}``
+    sorted by ias_kt (ys anchor-rebased per entry, see
+    :func:`_parse_trim_curve_entry`), or None when nothing is usable.
+    Entries within 0.5 kt of each other dedupe to the later one in payload
+    order (re-calibration semantics).
+
+    ``r`` is the positional track R(v) at each entry — where the trimmed
+    stick RESTS in follows-trim mode. Per adjacent speed pair the
+    displacement is the AVERAGE of the two curves' independent estimates of
+    the elevator-equivalent between their anchors (field data: the two
+    estimates agree within ~2%); the chain is normalized to 0 at the
+    median-index entry (the reference constant is sim-invisible — it rides
+    identically in the virtual offset and the spring center) and clamped to
+    +-1 WITH a warning: an extreme aircraft's follows-trim rest position
+    truncates at the stick limits rather than silently changing behavior.
+    """
+    if not value or value == 'none':
+        return None
+    try:
+        data = json.loads(value) if isinstance(value, str) else value
+        raw_entries = data["curves"] if "curves" in data else [data]
+        entries = []
+        for raw in raw_entries:
+            parsed = _parse_trim_curve_entry(raw)
+            if parsed is not None:
+                entries.append(parsed)
+    except (ValueError, KeyError, TypeError) as e:
+        logging.warning(f"Invalid trim-follow curve setting; ignoring ({e})")
+        return None
+    if not entries:
+        return None
+
+    # Sort by speed; near-identical speeds keep the later payload entry
+    # (stable sort preserves payload order within equal keys).
+    entries.sort(key=lambda e: e["ias_kt"])
+    deduped = []
+    for e in entries:
+        if deduped and abs(e["ias_kt"] - deduped[-1]["ias_kt"]) < 0.5:
+            deduped[-1] = e
+        else:
+            deduped.append(e)
+    entries = deduped
+
+    # Positional track: chain the averaged inter-anchor displacements.
+    # xs are absolute trim, ys anchor-rebased, so offs_a evaluated at b's
+    # anchor IS the displacement estimate S_a(t0_b - t0_a).
+    chain = [0.0]
+    for a, b in zip(entries, entries[1:]):
+        est_a = piecewise_linear(a["xs"], a["ys"], b["t0"])
+        est_b = -piecewise_linear(b["xs"], b["ys"], a["t0"])
+        chain.append(chain[-1] + (est_a + est_b) / 2.0)
+    ref = chain[len(entries) // 2]
+    for e, c in zip(entries, chain):
+        r = c - ref
+        if abs(r) > 1.0:
+            logging.warning(
+                f"Trim-follow positional track clamped at the stick limits "
+                f"for the {e['ias_kt']:.0f} kt calibration (R={r:+.2f}) — "
+                f"the follows-trim rest position truncates there")
+            r = clamp(r, -1.0, 1.0)
+        e["r"] = r
+    return entries
+
+
+def parse_trim_follow_curve(value):
+    """Legacy single-curve view of the stored setting: the median-speed
+    entry's anchor-referenced ``(xs, ys)``, or None. Superseded by
+    :func:`parse_trim_follow_family`; kept for transitional callers."""
+    fam = parse_trim_follow_family(value)
+    if fam is None:
+        return None
+    mid = fam[len(fam) // 2]
+    return mid["xs"], mid["ys"]
+
+
+def suggest_calibration_speeds(telem_data, sim):
+    """Suggest 2-3 trim-calibration speeds (knots, rounded to 5) from the
+    aircraft's declared speed envelope, or [] when the data is implausible.
+
+    Anchors (clean configuration — calibrations are config-specific):
+    LOW = 1.3 x clean stall (approach-margin factor: safely level-flyable,
+    solidly in the nose-up trim region). HIGH = the max LEVEL-FLIGHT speed,
+    not the red-line (most aircraft cannot hold Vne level): MSFS design
+    cruise VC capped at 0.85 x the red-line, X-Plane Vno capped the same
+    way. MIDDLE = the midpoint, only when the envelope is wide enough to
+    need it (high/low > 1.6). All telemetry sources are m/s (the sims'
+    kt/ft-per-s units are normalized upstream).
+
+    Guards degrade to fewer (or no) suggestions rather than ever returning
+    a confidently wrong number: MSFS's VS1 defaults to 0 when absent from
+    the flightmodel, VC can be an internal estimate, and X-Plane datarefs
+    can hold junk on oddball aircraft.
+    """
+    def pos(v):
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return None
+        return v if v > 0 else None
+
+    kt = 1.94384  # m/s -> knots
+    vs = level_max = redline = None
+    if sim == "MSFS":
+        ds = getattr(telem_data, "DesignSpeed", None)
+        if ds is not None and len(ds) >= 3:
+            level_max = pos(ds[0])   # VC (design cruise) — TAS-referenced
+            vs = pos(ds[2])          # VS1 (clean stall) — indicated
+        # VC (flightmodel.cfg cruise_speed) is TAS at the design cruise
+        # altitude, but suggestions are IAS targets: scale by the LIVE
+        # IAS/TAS ratio — the exact conversion for the air currently being
+        # flown in, no assumed altitude (and correctly altitude-aware:
+        # achievable IAS falls as the user climbs). Guarded to a sane band;
+        # outside it (or on the ground) the raw value stands, which field
+        # data shows is a good low-altitude approximation for GA anyway.
+        ratio = 1.0
+        ias = pos(getattr(telem_data, "IAS", None))
+        tas = pos(getattr(telem_data, "TAS", None))
+        if ias and tas and tas > 5.0 and 0.5 <= ias / tas <= 1.05:
+            ratio = ias / tas
+        if level_max is not None:
+            level_max *= ratio
+        redline = pos(getattr(telem_data, "RefMaxIAS", None))  # indicated: no scaling
+        if redline is None:
+            # The estimated Vne is VC-derived, so it is TAS-referenced too.
+            vne_kt = pos(getattr(telem_data, "Vne_kt", None))
+            redline = (vne_kt / kt) * ratio if vne_kt else None
+    elif sim == "XPLANE":
+        vs = pos(getattr(telem_data, "Vs", None))
+        # Vno is a structural LIMIT (top of the green arc), not a
+        # performance capability — draggy GA aircraft often cannot hold it
+        # in level flight (X-Plane's C172 tops out well below it). 0.9x
+        # errs conservative: an unreachable suggestion strands the user
+        # chasing a number; a slightly low one costs a few knots the
+        # blend's edge-clamping absorbs.
+        vno = pos(getattr(telem_data, "Vno", None))
+        level_max = 0.9 * vno if vno is not None else None
+        redline = pos(getattr(telem_data, "Vne", None))
+    if vs is None or level_max is None:
+        return []
+
+    low = 1.3 * vs * kt
+    high = level_max * kt
+    if redline:
+        high = min(high, 0.85 * redline * kt)
+    if low < 40.0 or high <= low * 1.15:
+        return []
+    speeds = [low, high]
+    if high / low > 1.6:
+        speeds.insert(1, (low + high) / 2.0)
+    rounded = [int(round(s / 5.0) * 5) for s in speeds]
+    out = [rounded[0]]
+    for s in rounded[1:]:
+        if s - out[-1] >= 15:   # comfortably clear of the replace window
+            out.append(s)
+    return out if len(out) >= 2 else []
+
+
+def trim_follow_blend(fam, t, ias_kt, include_r=True):
+    """Evaluate the multi-speed trim-follow offset at trim ``t`` (ElevTrimPct
+    space) and speed ``ias_kt`` (knots).
+
+    Bracketing interpolation between the two nearest calibrated speeds in
+    ANCHOR-ALIGNED space: the anchor t0(v) lerps, each bracket's shape is
+    looked up at the same anchor-relative position, and the shapes lerp —
+    which reconstructs translating-knee aircraft exactly where absolute-trim
+    lerping smears them (SR22T: 2.5x under-correction). Beyond the
+    calibrated speed range the exact lowest/highest calibration applies (no
+    extrapolation across speed; per-curve edge-slope extrapolation across
+    TRIM is unchanged). ``include_r`` folds in the positional track
+    (follows-trim mode); centered mode passes False. Result clamped +-1.
+    """
+    lo = hi = fam[-1]
+    w = 0.0
+    for i, e in enumerate(fam):
+        if ias_kt <= e["ias_kt"]:
+            hi = e
+            lo = fam[i - 1] if i > 0 else e
+            span = hi["ias_kt"] - lo["ias_kt"]
+            w = (ias_kt - lo["ias_kt"]) / span if span > 1e-9 else 0.0
+            break
+    t0v = lo["t0"] + w * (hi["t0"] - lo["t0"])
+    x = t - t0v   # anchor-relative position, shared by both brackets
+    s = piecewise_linear(lo["xs"], lo["ys"], lo["t0"] + x)
+    if hi is not lo:
+        s += w * (piecewise_linear(hi["xs"], hi["ys"], hi["t0"] + x) - s)
+    if include_r:
+        s += lo["r"] + w * (hi["r"] - lo["r"])
+    return clamp(s, -1.0, 1.0)
 
 
 def non_linear_scaling(x, min_val, max_val, curvature=1.0):
@@ -1621,6 +2185,93 @@ class Dampener(Derivative):
         return value
 
 
+class PID:
+    """Minimal dt-aware PID controller.
+
+    Written for the trim-calibration leveling loops but generic. Pass ``dt``
+    explicitly to :meth:`update` for deterministic stepping (fixed-rate loops or
+    unit tests); leave it ``None`` to measure wall-clock dt via
+    ``time.perf_counter()``.
+
+    Features:
+      - output clamping (``output_limits``)
+      - conditional-integration anti-windup: the integral only accumulates when
+        doing so would not drive an already-saturated output further into
+        saturation
+      - optional low-pass filtered derivative-on-error term
+    """
+
+    def __init__(self, kp=0.0, ki=0.0, kd=0.0, output_limits=(-1.0, 1.0),
+                 integral_limit=None, derivative_lpf_hz=None):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.output_limits = output_limits
+        # Optional symmetric clamp on the integral term contribution (ki * integral).
+        self.integral_limit = integral_limit
+        self._d_lpf = LowPassFilter(derivative_lpf_hz) if derivative_lpf_hz else None
+        self.reset()
+
+    def reset(self):
+        self._integral = 0.0
+        self._prev_error = None
+        self._prev_time = None
+        self.output = 0.0
+
+    def set_gains(self, kp, ki, kd, preserve_integral_term=True):
+        """Change gains in place (e.g. adaptive backoff on a live loop).
+
+        With ``preserve_integral_term`` the integral state is rescaled so the
+        integral's output contribution (``ki * integral``) does not step when
+        ``ki`` changes — that contribution typically carries the steady-state
+        component holding the plant, and a step there jolts the output.
+        """
+        if preserve_integral_term and self.ki != ki:
+            if ki:
+                self._integral *= self.ki / ki
+            else:
+                self._integral = 0.0
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+
+    def update(self, error, dt=None):
+        now = time.perf_counter()
+        if dt is None:
+            dt = 0.0 if self._prev_time is None else now - self._prev_time
+        self._prev_time = now
+        dt = max(dt, 0.0)
+
+        p_term = self.kp * error
+
+        # Derivative on error (optionally low-pass filtered).
+        if self._prev_error is None or dt <= 0:
+            d_raw = 0.0
+        else:
+            d_raw = (error - self._prev_error) / dt
+        self._prev_error = error
+        if self._d_lpf is not None:
+            d_raw = self._d_lpf.update(d_raw)
+        d_term = self.kd * d_raw
+
+        pd = p_term + d_term
+        new_integral = self._integral + error * dt
+        lo, hi = self.output_limits
+
+        # Conditional-integration anti-windup: predict saturation from the full
+        # output; only commit the new integral if it would not push a saturated
+        # output further out.
+        raw = pd + self.ki * new_integral
+        if not ((raw > hi and error > 0) or (raw < lo and error < 0)):
+            self._integral = new_integral
+            if self.integral_limit is not None and self.ki:
+                max_i = abs(self.integral_limit / self.ki)
+                self._integral = clamp(self._integral, -max_i, max_i)
+
+        self.output = clamp(pd + self.ki * self._integral, lo, hi)
+        return self.output
+
+
 class DirectionModulator:
     pass
 
@@ -1778,6 +2429,25 @@ def _il2_config_diff_table(section_name, existing: dict, proposed: dict) -> str:
     """
 
 
+def il2_korea_game_root(root_path):
+    """Resolve IL-2 Korea's game directory under the configured install root.
+
+    The standalone release nests the game one level down
+    (``<root>/game/data/startup.cfg``); the Steam release ("IL2Series")
+    drops that level (``<root>/data/startup.cfg``). Returns whichever
+    layout actually contains ``data/startup.cfg``; a user pointing at the
+    standalone ``game`` folder itself also resolves. Falls back to the
+    historical standalone layout so error messages keep naming the
+    expected default location.
+    """
+    root_path = root_path or ''
+    for sub in ('game', ''):
+        candidate = os.path.join(root_path, sub) if sub else root_path
+        if os.path.isfile(os.path.join(candidate, 'data', 'startup.cfg')):
+            return candidate
+    return os.path.join(root_path, 'game')
+
+
 def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
     """
     Look up this device's DirectInput-style attach ordinal from IL-2 Korea's
@@ -1789,7 +2459,8 @@ def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
 
     Returns None if the file is missing, malformed, or no entry matches the given VID/PID.
     """
-    known_devices_path = os.path.join(il2_korea_path, 'game\\data\\Input\\known.devices.json')
+    known_devices_path = os.path.join(
+        il2_korea_game_root(il2_korea_path), 'data', 'Input', 'known.devices.json')
     if not os.path.exists(known_devices_path):
         logging.warning(f"IL2 Korea known.devices.json not found at: {known_devices_path}")
         return None
@@ -2170,21 +2841,20 @@ def get_dcs_variant():
 
 
 def _check_dcrealistic_autostart(export_data, export_lua_path, window):
-    """Warn if DCRealistic autostart is active in Export.lua (known to break FFB spring effects in DCS)."""
+    """Warn if DCRealistic or Simhaptic (rkApps) autostart is active in Export.lua (known to break FFB spring effects in DCS)."""
     for line in export_data.splitlines():
         stripped = line.strip()
         if stripped.startswith("--"):
             continue
-        if "DCREALISTIC_AUTOSTART" in stripped:
+        if "DCREALISTIC_AUTOSTART" in stripped or "SIMHAPTIC_AUTOSTART" in stripped:
             logging.error(
-                f"The DCRealistic autostart feature is enabled in:\n{export_lua_path}\n\n"
+                f"The DCRealistic or SimHaptic autostart feature is enabled in:\n{export_lua_path}\n\n"
                 "This is known to cause FFB spring effects to fail on aircraft load in DCS.\n\n"
                 "If you experience issues with the spring effect not starting after loading into "
                 "an aircraft in DCS, disable the DCRealistic autostart option in the DCRealistic "
                 "settings.\n\n"
                 "This is a warning and does not affect the operation of TelemFFB."
             )
-
 
 def _prepare_dcs_export_context():
     import telemffb.winpaths as winpaths
@@ -2686,25 +3356,135 @@ class OutLog(QtCore.QObject):
         pass
 
 
+#: Records logged before _init_logging can run.  It needs the LogWindow
+#: widget, so it cannot run until Qt is up - but startup logs plenty
+#: before that, including the version banner and the DirectLink build
+#: identity.  Without this those records went to the throwaway handler
+#: logging.info() installs when root has none, and _init_logging's
+#: handlers.clear() then dropped them: never written to the log file, so
+#: the one line support always asks for was the one line not on disk.
+_early_log_buffer: 'logging.handlers.MemoryHandler | None' = None
+_early_log_replayed = False
+
+
+def begin_early_logging():
+    """Start buffering log records until the real handlers exist.
+
+    Called before anything else in main() logs.  Holding a handler on
+    root also stops logging.info() from installing its own, which is
+    what produced the unformatted 'INFO:root:' lines."""
+    global _early_log_buffer
+    import atexit
+    import logging.handlers
+    if _early_log_buffer is not None:
+        return
+    # capacity is a flush trigger, not a cap on what is kept, and a
+    # MemoryHandler with no target DISCARDS on flush - so it is set far
+    # above any plausible startup, and flushLevel above CRITICAL so that
+    # an early error does not trigger the same discard.
+    buf = logging.handlers.MemoryHandler(capacity=100000,
+                                         flushLevel=logging.CRITICAL + 1)
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.addHandler(buf)
+    _early_log_buffer = buf
+    atexit.register(flush_early_logging_to_stderr)
+
+
+def replay_early_logging(target):
+    """Hand the buffered records to the real handlers, timestamps intact.
+
+    Called by _init_logging once they exist.  Nothing is re-formatted:
+    each record carries its own creation time, so the order holds."""
+    global _early_log_replayed
+    buf = _early_log_buffer
+    if buf is None or _early_log_replayed:
+        return
+    _early_log_replayed = True
+    buf.setTarget(target)
+    buf.flush()
+    buf.close()
+
+
+def flush_early_logging_to_stderr():
+    """Last resort: print buffered records if the real handlers never came.
+
+    Startup can exit before _init_logging - the single-instance mutex, the
+    unsafe-location refusal - and those paths are exactly the ones whose
+    reason someone needs.  Buffering them must not be what makes the
+    reason disappear."""
+    buf = _early_log_buffer
+    if buf is None or _early_log_replayed or not buf.buffer:
+        return
+    # the original stderr, not sys.stderr: by now that may be the OutLog
+    # wrapper around a widget that is being torn down.  A frozen windowed
+    # build has neither, and print(file=None) would quietly go to stdout.
+    stream = sys.__stderr__ or sys.stderr
+    if stream is None:
+        return
+    try:
+        for record in buf.buffer:
+            print(f"{record.levelname}: {record.getMessage()}", file=stream)
+    except Exception:
+        pass
+
+
 class DedupHandler(logging.Handler):
-    """Handler that suppresses immediate duplicate log records and emits
-    a summary when a different message arrives or periodically while the
-    same message keeps repeating.
+    """Handler that suppresses repeated log records and summarizes them.
 
     It forwards records to one or more inner handlers passed during
     construction. Thread-safe.
+
+    Two suppression behaviors, both driven by a rolling window of the last
+    ``period_seconds`` of records:
+
+    - *Consecutive repeats*: the same message arriving back-to-back is emitted
+      once, then a "(message repeated N times)" summary every ``period_seconds``
+      and a final summary when a different message arrives. Same as the
+      original single-message dedup.
+    - *Repeating cycles*: a message that was already seen earlier in the window
+      (e.g. A, B, A, B) confirms a cycle; the whole cycle is then summarized in
+      a single line and subsequent repetitions of its members are suppressed
+      (with a periodic update) until the log goes quiet for ``period_seconds``
+      or a genuinely different message arrives.
     """
+
+    #: max distinct messages listed in a cycle summary (more are folded into a
+    #: "+N more" count)
+    MAX_LISTED_TYPES = 5
 
     def __init__(self, handlers=None, period_seconds: float = 5.0):
         super().__init__()
         self.handlers = handlers or []
         self._lock = threading.Lock()
-        self._last_key = None
-        self._count = 0
-        self._last_record = None
-        self._first_ts = 0.0
-        self._last_periodic_emit_ts = 0.0
         self.period_seconds = float(period_seconds)
+        # clock indirection so tests can advance time without sleeping
+        self._clock = time.monotonic
+        # rolling window of (timestamp, key) for the last period_seconds
+        self._window: deque = deque()
+        # keys already seen in the current window generation
+        self._seen: set = set()
+        # True once a cycle summary has been emitted for the current generation;
+        # while set, cycle members are suppressed instead of forward-checked
+        self._collapsed = False
+        # per-key bookkeeping for summaries (last record, occurrence count,
+        # first-seen timestamp, most-recent-seen timestamp)
+        # _key_last_ts drives window-pruning so long-running cycles stay alive
+        self._records: dict = {}
+        self._counts: dict = {}
+        self._first_ts: dict = {}
+        self._key_last_ts: dict = {}
+        self._last_key = None
+        self._last_entry_ts = 0.0
+        # consecutive-repetition bookkeeping (preserves the original
+        # single-message "(repeated N times)" behavior)
+        self._repeat_count = 0
+        self._repeat_record = None
+        self._repeat_first_ts = 0.0
+        self._repeat_periodic_ts = 0.0
+        # timestamp of the last emitted cycle summary (initial or periodic);
+        # only refreshed when a summary is actually emitted
+        self._last_cycle_ts = 0.0
 
     def _normalize_message(self, record: logging.LogRecord) -> str:
         """
@@ -2757,54 +3537,177 @@ class DedupHandler(logging.Handler):
         new_rec.created = base_record.created
         return new_rec
 
+    def _make_cycle_summary_record(self, keys, periodic: bool = False) -> logging.LogRecord:
+        """Build one record summarizing an entire repeated message cycle.
+
+        ``keys`` is the list of distinct message keys (in first-seen order) in
+        the current window. The summary lists up to ``MAX_LISTED_TYPES``
+        messages and reports per-type occurrence counts, for example::
+
+            Cycle detected: 24 messages across 2 types over the last 5s.
+                - Start effect 8 (Sine) ("flapsmovement"): 12
+                - Stop effect 8 (Sine) ("flapsmovement"): 12
+                (see DEBUG for details)
+        """
+        if not keys:
+            raise ValueError("no keys to summarize")
+        listed = keys[:self.MAX_LISTED_TYPES]
+        extra = len(keys) - len(listed)
+        total = sum(self._counts.get(k, 0) for k in keys)
+        suffix = " so far" if periodic else ""
+
+        lines = [f"Cycle detected: {total} messages across {len(keys)} types over the last {self.period_seconds:g}s{suffix}."]
+        for k in listed:
+            lines.append(f"    - {self._normalize_message(self._records[k])}: {self._counts[k]}")
+        if extra > 0:
+            lines.append(f"    \u2026 +{extra} more")
+        if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
+            lines.append("    (see DEBUG for details)")
+        msg = "\n".join(lines)
+
+        ref = self._records[keys[0]]
+        new_rec = logging.LogRecord(
+            name=ref.name,
+            level=ref.levelno,
+            pathname=ref.pathname,
+            lineno=ref.lineno,
+            msg=msg,
+            args=(),
+            exc_info=None,
+            func=ref.funcName,
+        )
+        # preserve the original record's wall-clock timestamp
+        new_rec.created = ref.created
+        return new_rec
+
+    def _prune_window(self, now):
+        """Drop keys whose most-recent appearance is older than period_seconds.
+
+        Uses ``_key_last_ts`` (not the first-seen timestamps in ``_window``)
+        so that a long-running cycle whose members keep recurring stays in
+        the window even after their first-seen entries have aged out.
+        """
+        cutoff = now - self.period_seconds
+        self._key_last_ts = {
+            k: ts for k, ts in self._key_last_ts.items() if ts >= cutoff
+        }
+        self._window = deque(
+            (ts, k) for ts, k in self._window if k in self._key_last_ts
+        )
+
+    def _reset(self):
+        self._window.clear()
+        self._seen.clear()
+        self._collapsed = False
+        self._records.clear()
+        self._counts.clear()
+        self._first_ts.clear()
+        self._key_last_ts.clear()
+        self._last_key = None
+        self._last_entry_ts = 0.0
+        self._repeat_count = 0
+        self._repeat_record = None
+        self._repeat_first_ts = 0.0
+        self._repeat_periodic_ts = 0.0
+        self._last_cycle_ts = 0.0
+
+    def _forward(self, record):
+        for h in self.handlers:
+            try:
+                h.emit(record)
+            except Exception:
+                pass
+
+    def _emit_summary_record(self, summary_record):
+        for h in self.handlers:
+            try:
+                h.emit(summary_record)
+            except Exception:
+                pass
+
+    def _distinct_keys_in_window(self):
+        return list(dict.fromkeys(k for _, k in self._window))
+
     def emit(self, record: logging.LogRecord):
         try:
             key = self._make_key(record)
-            now = time.time()
+            now = self._clock()
             with self._lock:
-                if key == self._last_key:
-                    # same as previous: increment and buffer
-                    self._count += 1
-                    self._last_record = record
+                # The window is pruned by time only (period_seconds); a full reset
+                # happens only after the log has been quiet for at least one
+                # period, so an episode is over and the next identical message
+                # should print normally again.
+                self._prune_window(now)
+                if self._last_entry_ts and (now - self._last_entry_ts) >= self.period_seconds:
+                    self._reset()
+                self._last_entry_ts = now
 
-                    # On first repeat, set first timestamp if not set
-                    if not self._first_ts:
-                        self._first_ts = now
-
-                    # If enough time passed since last periodic emit, emit a periodic summary
-                    if self.period_seconds and (now - self._last_periodic_emit_ts) >= self.period_seconds and self._count > 1:
-                        summary = self._make_summary_record(self._last_record, self._count, periodic=True)
-                        for h in self.handlers:
-                            try:
-                                h.emit(summary)
-                            except Exception:
-                                pass
-                        self._last_periodic_emit_ts = now
-
+                if key == self._last_key and self._repeat_count and not self._collapsed:
+                    # same message back-to-back, and no cycle in play yet: keep
+                    # the original consecutive-repetition behavior
+                    if self._repeat_count == 1:
+                        self._repeat_first_ts = now
+                    self._repeat_count += 1
+                    self._repeat_record = record
+                    if (now - self._repeat_periodic_ts) >= self.period_seconds:
+                        self._emit_summary_record(
+                            self._make_summary_record(record, self._repeat_count, periodic=True)
+                        )
+                        self._repeat_periodic_ts = now
                     return
 
-                # Different message: if previous one was repeated, emit final summary
-                if self._count > 1 and self._last_record is not None:
-                    summary = self._make_summary_record(self._last_record, self._count, periodic=False)
-                    for h in self.handlers:
-                        try:
-                            h.emit(summary)
-                        except Exception:
-                            pass
+                if key in self._seen:
+                    self._counts[key] = self._counts.get(key, 0) + 1
+                    self._key_last_ts[key] = now
+                    if self._collapsed:
+                        # cycle already summarized: refresh it periodically only;
+                        # the interval is measured from the last emitted summary
+                        if (now - self._last_cycle_ts) >= self.period_seconds:
+                            self._emit_summary_record(
+                                self._make_cycle_summary_record(self._distinct_keys_in_window(), periodic=True)
+                            )
+                            self._last_cycle_ts = now
+                        return
+                    # this arrival means a previously-seen message is recurring,
+                    # i.e. a genuine multi-message cycle: summarize it once and
+                    # stop forwarding its individual repetitions from here on
+                    self._emit_summary_record(self._make_cycle_summary_record(self._distinct_keys_in_window()))
+                    self._collapsed = True
+                    self._last_cycle_ts = now
+                    return
 
-                # Forward current record to inner handlers
-                for h in self.handlers:
-                    try:
-                        h.emit(record)
-                    except Exception:
-                        pass
+                # first time this key is seen within this episode
 
-                # update tracking state
+                # When a distinct message interrupts a run of consecutive
+                # repeats (and no cycle collapse is in progress), emit the
+                # original final summary for the interrupted message, mirroring
+                # the original single-message dedup behavior.
+                if (
+                    not self._collapsed
+                    and self._repeat_count > 1
+                    and self._repeat_record is not None
+                ):
+                    self._emit_summary_record(
+                        self._make_summary_record(
+                            self._repeat_record, self._repeat_count, periodic=False
+                        )
+                    )
+
+                # register this key in the rolling window
+                self._window.append((now, key))
+                self._seen.add(key)
+                self._records[key] = record
+                self._counts[key] = 1
+                self._first_ts[key] = now
+                self._key_last_ts[key] = now
+                # a new distinct message starts fresh consecutive-repeat
+                # bookkeeping for itself
                 self._last_key = key
-                self._count = 1
-                self._last_record = record
-                self._first_ts = now
-                self._last_periodic_emit_ts = now
+                self._repeat_count = 1
+                self._repeat_record = record
+                self._repeat_first_ts = now
+                self._repeat_periodic_ts = now
+                self._forward(record)
         except Exception:
             # In case of any failure in dedup logic, fallback to best-effort forwarding
             for h in self.handlers:
@@ -2822,11 +3725,12 @@ class DedupHandler(logging.Handler):
                 pass
 
     def close(self):
-        # Emit pending summary if any
+        # flush a collapsed cycle summary before shutting down so the final
+        # occurrence counts are not lost
         try:
             with self._lock:
-                if self._count > 1 and self._last_record is not None:
-                    summary = self._make_summary_record(self._last_record, self._count)
+                if self._collapsed and self._window:
+                    summary = self._make_cycle_summary_record(self._distinct_keys_in_window())
                     for h in self.handlers:
                         try:
                             h.emit(summary)
@@ -3245,14 +4149,17 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             pid (int): Device PID
             
         Returns:
-            str: Device identifier
+            str or None: Device identifier, or None when no connected device
+            has that PID.
         """
         dev_info = G.instance_dev_dict.get(pid)
         if dev_info is not None:
             return dev_info.ident
         if G.device_info and G.device_info.product_id == pid:
             return G.device_info.ident
-        return G.device_info.ident if G.device_info else "UnknownDevice"
+        # Answering with this instance's own identifier would compare the
+        # profile against the wrong device entirely.
+        return None
 
 
     def _show_error_message(title, message, silent, window):
@@ -3298,7 +4205,7 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             f"Target device:\n"
             f"  Type: {dev_type}\n"
             f"  PID: {pid:04X}\n"
-            f"  Name: {target_device_ident}\n\n"
+            f"  Name: {target_device_ident or 'not connected'}\n\n"
             f"Profile settings:\n"
             f"  PID: {cfg_pid:04X}\n"
             f"  Name: {cfg_device_name}\n"
@@ -3309,6 +4216,10 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
     
     # Step 4: Validate device identifier matching
     current_device_ident = _get_current_device_ident(pid)
+    if current_device_ident is None:
+        # Configured but not connected, so there is no identifier to compare
+        # against; the PID matched, which is as much as can be checked here.
+        return True
     if cfg_device_name != current_device_ident:
         error_msg = (
             f"Device identifier mismatch detected:\n\n"
@@ -3380,6 +4291,20 @@ def load_custom_userconfig(new_path=""):
 def upload_vpconf_profile(config_filepath, serial):
     from .namedmutex import NamedMutex
 
+    # central gate: VPConfigurator profiles only apply to VPforce hardware
+    # (covers aircraft-change, startup and exit pushes in one place)
+    caps = G.device_capabilities
+    if caps is not None and not caps.has_gains:
+        logging.info("vpconf push skipped: the connected device has no Configurator gains")
+        return
+    if not serial:
+        # no serial means no device was ever successfully opened (or the
+        # caller carries stale identity); Configurator selects the target
+        # device by serial, so pushing without one is at best a crash and
+        # at worst the wrong device
+        logging.warning("vpconf push skipped: no device serial available")
+        return
+
     settings = QSettings("VPforce", "RhinoFFB")
     vpconf_path = settings.value("path")
 
@@ -3399,7 +4324,11 @@ def upload_vpconf_profile(config_filepath, serial):
 
         logging.info(f"upload_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
         G.current_vpconf_profile = config_filepath
-        G.main_window.status_container.request_set_active_vpconf.emit(config_filepath)
+        # Scope-aware: only updates the indicator if this device is the
+        # selected config scope (a master scoped to a child keeps showing the
+        # child's reported state; ours shows when the user switches back).
+        if G.main_window is not None:
+            G.main_window.refresh_scope_status_indicators(force=True)
 
         def exec():
             # Use NamedMutex to ensure only one instance of the configurator is executed at a time
@@ -3411,6 +4340,16 @@ def upload_vpconf_profile(config_filepath, serial):
                     logging.info(f"VPForce Configurator exited with code {ret}")
             finally:
                 G.vpconf_init_pending = False
+                # Deliver any telemetry frame that arrived while frames were
+                # suspended — in the MSFS menus it is the ONLY frame there is
+                # (stop latch), and losing it meant no aircraft until a
+                # camera-state change.
+                tm = getattr(G, "telem_manager", None)
+                if tm is not None:
+                    try:
+                        tm.flush_deferred_startup_frame()
+                    except Exception:
+                        logging.exception("deferred startup frame flush failed")
 
         thread = threading.Thread(target=exec)
         thread.start()
@@ -3523,6 +4462,287 @@ def threaded(daemon=False):
     return _threaded
 
 
+#: Device roles as they are written for a reader.  ``capitalize()`` gets
+#: three of the four right and turns the trim wheel into "Trimwheel".
+DEVICE_DISPLAY_NAMES = {
+    'joystick': 'Joystick',
+    'pedals': 'Pedals',
+    'collective': 'Collective',
+    'trimwheel': 'Trim Wheel',
+}
+
+
+def device_display_name(role):
+    """The name to show a user for a device role."""
+    return DEVICE_DISPLAY_NAMES.get(role, str(role).capitalize())
+
+
+def device_ids_key(role):
+    """The settings key holding a device role's USB vendor and product ids.
+
+    Stored as the device reports them rather than parsed back out of its
+    path.  A DirectInput device's path is its DirectInput instance GUID,
+    which carries no ids at all - so deriving them from the path works for
+    HID devices and silently fails for the DirectInput ones.
+    """
+    return 'devids_' + role
+
+
+def format_usb_ids(vid, pid):
+    """``VVVV:PPPP``, or empty when the device did not report real ids."""
+    if not vid or not pid:
+        return ''
+    return f'{int(vid):04X}:{int(pid):04X}'
+
+
+def parse_usb_ids(value):
+    """The (vid, pid) in a stored ``VVVV:PPPP``, or None."""
+    match = re.fullmatch(r'([0-9A-Fa-f]{4}):([0-9A-Fa-f]{4})', str(value or ''))
+    return (int(match.group(1), 16), int(match.group(2), 16)) if match else None
+
+
+def device_ident_key(role):
+    """The settings key holding a device role's product name.
+
+    A display hint only.  Owners rename VPforce devices and vendors reword
+    models, so this can be stale; USB ids are what anything functional is
+    keyed on.
+    """
+    return 'devident_' + role
+
+
+def device_panel_icon(role, settings, slot_suffix=''):
+    """Resource path for a role's status icon, or '' for the role default.
+
+    The joystick role's devices each carry an icon choice (stored as
+    devicon_joystick / devicon_joystick_2 ...); the ACTIVE device's choice
+    is what the panel shows, and it follows the device through swaps.
+    ``slot_suffix`` reads an alternate slot's choice - what the panel
+    needs while a per-aircraft swap has that slot's device in hand.
+    """
+    kind = str(settings.get(f'devicon_{role}{slot_suffix}', '') or '')
+    if kind == 'yoke':
+        return ':/image/icon_yoke.png'
+    return ''
+
+
+def device_panel_label(role, settings, max_chars=14, slot_suffix=''):
+    """A short device name for the role's status icon, or '' when unknown.
+
+    VPforce idents are the owner's own Configurator names and already
+    short; a generic DirectInput ident is the full product string
+    ("Microsoft SideWinder Force Feedback 2"), so it is cut to its first
+    word or two.  Either way the result fits under the icon.
+    ``slot_suffix`` reads an alternate slot's identity - what the panel
+    needs while a per-aircraft swap has that slot's device in hand.
+    """
+    ident = str(settings.get(
+        device_ident_key(role) + slot_suffix, '') or '').strip()
+    if not ident:
+        return ''
+    devpath = str(settings.get(f'devpath_{role}{slot_suffix}', '') or '')
+    if devpath.startswith('dinput:'):
+        words = ident.split()
+        # the selector lists these as '[DI] name' and the ident was stored
+        # that way; the marker is not part of the device's name
+        if words and words[0].strip('[]').upper() == 'DI':
+            words = words[1:]
+        short = words[0] if words else ident
+        for word in words[1:]:
+            if len(short) + 1 + len(word) > max_chars:
+                break
+            short += ' ' + word
+        ident = short
+    if len(ident) > max_chars:
+        ident = ident[:max_chars - 1] + '…'
+    return ident
+
+
+def usb_ids_from_devpath(devpath):
+    r"""The (vid, pid) a Windows device path names, or None.
+
+    Paths look like \\?\HID#VID_FFFF&PID_2054&MI_00#... - the ids are in
+    there, which is what lets a rule be written for a device that is not
+    currently plugged in.
+    """
+    if not devpath:
+        return None
+    # case-insensitive: Windows writes these uppercase, but a path that
+    # has been round-tripped through other tooling may not be
+    match = re.search(r'VID_([0-9A-F]{4})&PID_([0-9A-F]{4})', str(devpath),
+                      re.IGNORECASE)
+    if not match:
+        return None
+    return int(match.group(1), 16), int(match.group(2), 16)
+
+
+#: Slots TelemFFB can configure, in the order they are shown.
+DEVICE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel')
+
+
+def recover_device_identity(settings, devices):
+    """What a configured slot should remember but does not, taken from the
+    hardware that is connected right now.
+
+    Returns ``{settings_key: value}`` for every ``devids_``/``devident_``
+    key that is empty while its slot's ``devpath_`` names a device in
+    ``devices``.  Empty when nothing is missing or nothing is connected to
+    learn it from.
+
+    Two things produce these gaps and neither is the user's doing: a
+    settings base written before the keys existed, and first-launch
+    auto-assignment, which only ever wrote the path.  The ids are the
+    device's identity - a rule or a comparison keyed on a slot with no ids
+    silently matches nothing - and the name is how a dialog shows the
+    device, which without it reads as "unnamed device" next to hardware
+    that is plugged in and working.
+
+    Only empty keys are filled.  A stored name is the one that was on the
+    device when the slot was set, and a rename the owner has not reselected
+    through yet is theirs to keep until they do.  ``devices`` need only
+    carry ``path``, ``vendor_id``, ``product_id`` and ``ident``.
+    """
+    by_path = {}
+    for device in devices:
+        path = getattr(device, 'path', None)
+        if isinstance(path, (bytes, bytearray)):
+            path = path.decode(errors='replace')
+        if path:
+            by_path[str(path)] = device
+
+    updates = {}
+    for role in DEVICE_ROLES:
+        path = str(settings.get(f'devpath_{role}', '') or '')
+        device = by_path.get(path)
+        if device is None:
+            continue
+        key = device_ids_key(role)
+        if not settings.get(key, ''):
+            ids = format_usb_ids(getattr(device, 'vendor_id', 0),
+                                 getattr(device, 'product_id', 0))
+            if ids:
+                updates[key] = ids
+        key = device_ident_key(role)
+        if not settings.get(key, ''):
+            ident = str(getattr(device, 'ident', '') or '')
+            if ident:
+                updates[key] = ident
+    return updates
+
+
+def directinput_selection_devices(settings, enabled=None):
+    """Generic DirectInput FFB devices, as the device selectors list them.
+
+    Empty unless DirectInput support is on: with it off no [DI] entry
+    appears anywhere and the bridge is never loaded, so a stock install
+    behaves exactly as it did before the backend existed.  ``enabled``
+    overrides the stored setting so a dialog can re-list live as the box
+    is ticked.
+
+    VPforce hardware also enumerates as a DirectInput FFB device, so VID
+    0xFFFF is filtered out - those entries come from the native HID
+    enumeration.  Debug override: the registry value ``vpforce_as_dinput``
+    = 1 under HKCU\\Software\\VPforce\\TelemFFB lists VPforce devices as
+    [DI] entries too, so a Rhino can be driven through the DirectInput
+    backend as a second test implementation.
+
+    The devpath encodes the backend (``dinput:{GUID}``) so a selection
+    flows through the existing devpath_* persistence untouched - and so a
+    stored slot can be matched back to the device it names, at startup or
+    in a dialog, by the same string.
+    """
+    if enabled is None:
+        enabled = settings.get('enableDirectInput', False)
+    if not enabled:
+        return []
+    try:
+        from telemffb.hw.ffb_dinput import DInputFFBDevice
+
+        # registry values arrive as strings; bool('0') is True
+        flag = str(settings.get('vpforce_as_dinput', '')).strip().lower()
+        include_vpforce = flag in ('1', 'true', 'yes', 'on')
+        listed = []
+        for dev in DInputFFBDevice.enumerate():
+            if dev.vendor_id == 0xFFFF and not include_vpforce:
+                continue
+            dev.product_string = f"[DI] {dev.product_string}"
+            dev.path = f"dinput:{dev.guid}".encode()
+            listed.append(dev)
+        return listed
+    except Exception as e:
+        # Support is explicitly on at this point, so silence would just
+        # look like "my device is missing".  The usual cause is the
+        # separately distributed bridge DLL not being installed.
+        logging.error(
+            f"DirectInput support is enabled but no devices could be "
+            f"enumerated: {e}. DirectLink is required - see the "
+            "TelemFFB DirectInput documentation.")
+        return []
+
+
+def device_pid_key(role):
+    """The settings key holding a device role's USB product ID."""
+    return 'pid' + device_display_name(role).replace(' ', '')
+
+
+def active_joystick_slot_suffix(settings, devpath):
+    """Which configured joystick slot holds this devpath: '' (primary),
+    '_2', '_3' - or None when no slot matches (device-less, or identity
+    that predates the slots).  How the status panel finds the icon and
+    name for whatever a per-aircraft swap actually put in hand."""
+    for suffix in ('', '_2', '_3'):
+        stored = str(settings.get(f'devpath_joystick{suffix}', '') or '')
+        if stored and stored == str(devpath or ''):
+            return suffix
+    return None
+
+
+def multiple_joystick_devices(settings=None):
+    """Whether the joystick role has more than one device configured.
+
+    The gate for the per-aircraft device selection: a single-device rig
+    has nothing to choose between, so that setting and its section
+    header disappear from the form and from runtime resolution.  A
+    stored preference goes inert, not lost - it resurfaces when a
+    second device is configured again.  Never hides on plumbing
+    failure: an unreadable settings store returns True, which shows
+    the setting rather than silently dropping it.
+    """
+    try:
+        settings = settings if settings is not None else G.system_settings
+        return len(joystick_device_choices(settings)) > 1
+    except Exception:
+        return True
+
+
+def joystick_device_choices(settings):
+    """The joystick role's configured devices, as (devpath, label) pairs.
+
+    What the per-aircraft device dropdown offers: the stored value is the
+    devpath (the slot system's own unique handle - a product name cannot
+    tell two identical side sticks apart), the label is the human side
+    (stored ident, with the USB ids appended to disambiguate twins).
+    Slot order: primary first, then the alternates; the primary's label
+    carries a trailing ' *' so the list shows which named device the
+    'Primary (default)' entry currently resolves to (the setting's
+    tooltip explains the mark).
+    """
+    choices = []
+    for suffix in ('', '_2', '_3'):
+        path = str(settings.get(f'devpath_joystick{suffix}', '') or '')
+        if not path:
+            continue
+        ident = str(settings.get(f'devident_joystick{suffix}', '') or '')
+        ids = str(settings.get(f'devids_joystick{suffix}', '') or '')
+        label = ident or 'Unnamed device'
+        if ids:
+            label = f'{label} ({ids})'
+        if suffix == '':
+            label += ' *'
+        choices.append((path, label))
+    return choices
+
+
 def exit_application():
     # Perform any cleanup or save operations here
     telem_manager = getattr(G, "telem_manager", None)
@@ -3590,7 +4810,12 @@ def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
 
         logging.info("Auto-Launch: starting instance: %s", args)
         proc = ChildPopen(args)
-        proc.udp_port = 60000 + int(usbpid)
+        try:
+            # pids are hex ('2055', or e.g. '1b' for a DirectInput device);
+            # QSettings may hand back digit-only values as int
+            proc.udp_port = 60000 + int(str(usbpid), 16)
+        except (ValueError, TypeError):
+            proc.udp_port = 60000
         G.launched_instances[dev_type] = proc
         return proc
 

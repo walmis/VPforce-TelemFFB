@@ -1,46 +1,133 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  July 2026 - Draft
+##  DRAFT - September 2026
 ############################################
 ## Platform
+- **NEW: Multiple joystick devices, with per-aircraft switching (MSFS / X-Plane)**
+  - Configure more than one joystick - a stick and a yoke, for example.  Switch between them by changing the primary device in the settings
+  - MSFS/X-Plane (where we externally provide the control input) get dynamic, per class/aircraft switching of the active joystick device
+- **NEW: The DirectInput Tap (DCS / IL-2 / Falcon BMS)**
+  - Based on the "dcs-force-feedback-fix" wrapper project
+  - "The tap" intercepts the games own FFB effects and lets TelemFFB render them locally.  The game is unaware
+  - New **Game Managed (DirectInput Tap)** spring mode re-renders the game's spring: trim center follow and force-trim collapse reproduce exactly. IL-2 Korea gets the matching pedal spring mode
+    - Per-axis spring and the other five effect types a game may generate get an enable and a gain slider, with the live output strength shown on the slider bar
+  - Per-sim setup in System Settings finds your sims, installs the wrapper and keeps its config in step with your devices. An existing community ffb-fix install is recognized and upgraded in place; DCS can also run the wrapper in **FFB-Fix only mode**, without the tap
+- **NEW: "DCS FFB Fix" installer (DCS)**
+  - Installs the DirectInput Tap wrapper without the tap - in the same way the "dcs-force-feedback-fix" wrapper is used today
+  - An option inside the DirectInput Tap configuration section on the DCS settings page
+- **NEW: DirectLink - force feedback devices from any manufacturer**
+  - An optional integration that lets TelemFFB drive any device exposing force feedback through DirectInput
+  - Usable in any role
+  - Enabled in System Settings > Integrations; DirectLink is a separate free download. VPforce-only features (Configurator, firmware effects, force telemetry) degrade cleanly
+## UI
+- **NEW: Device configuration UI re-work**
+  - Device cards with pull-down selection of detected devices
+  - More logical integration of the old "auto launch" configuration options
+- **NEW: All settings (master and child instances) are now configurable through the master instance system settings**
+  - The master's System Settings now carries a panel for each configured device (joystick, pedals, collective, trim wheel) - per-device options are set there and written to that device's settings directly
+  - Child instances no longer need (or have) a settings page of their own; they exist to drive their device and process telemetry
+  - VPforce Configurator (.vpconf) profiles are validated against the device they are selected for, not against whichever instance you happened to open the dialog from
+  - The USB Product ID column is gone; the device selector is the source. A slot with no device assigned can no longer be made the master or given launch options
+- **NEW: Backup and restore system settings**, from a new File menu on the System Settings dialog
+
+## General fixes
+- Fix: exiting TelemFFB could take up to ten seconds before its processes actually closed, and a restart in that window was refused as "already running"
+- Fix: effects are now properly freed when the sim exits and when TelemFFB exits preventing scenarios that may result in hung effects on the device
+- Fix: resetting the device's effects no longer strands the effects that were running on it
+
+## MSFS / X-Plane
+- Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
+- Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
+
+## X-Plane
+- Fix: the axis override is released when the FFB device disconnects, and a per-device axis disable is honored
+
+## MSFS
+- **NEW: In-sim settings panel (toolbar window)**
+  - View and change the current aircraft's TelemFFB settings from a toolbar window inside MSFS - toggles, choice pills, and sliders sized for VR laser-pointer/controller use, so you don't have to leave the cockpit or pull up the desktop app
+  - System Settings > MSFS now detects your installed MSFS 2020/2024 copies (Microsoft Store or Steam) and installs or updates the panel into the right Community folder with one click, showing the installed version alongside what's available
+  - Backed by a local HTTP server that only runs while MSFS is the active sim; can be turned off in System Settings > MSFS > Options if you don't use the panel
+
+---
+
+## Included from 2.1.260815 - August 15, 2026
+The full previous release, carried here so its many changes are not hidden behind this small patch.
+
+## Platform
+- **NEW: Aircraft profile notes**
+  - Many curated aircraft profiles now ship with notes explaining their quirks - why certain effects are disabled, control-system oddities, and custom-class aircraft where liveries must be cloned from the default profile rather than created new
+  - You can also add your own notes to any profile
+  - A notes button lives next to the Active Profile display and flashes green when the loaded aircraft has notes - click it to view/edit
+- Application Status panel: new 'Telem Ovd' indicator shows when the loaded aircraft has active SimConnect/Dataref telemetry overrides, with counts by tier (shipped default vs user-configured) and the full override list in the tooltip
 - Exception tracking and reporting system
   - New runtime exception tracker with UI viewer showing recent error history
   - Support bundle improvements: now includes DCS logs and Export.lua; switched to LZMA compression for smaller archives
-  - Automatic error deduplication prevents repeated alerts for the same issue
+- In-app updater rewritten for reliability: per-phase progress (download/backup/extract), live status log, and auto-close-and-launch option
 - FFB Device Management enhancements
   - Auto-assign device paths for unconfigured slots on startup; selections are persisted in system settings
   - Improved USB device selector in System Settings — prevents duplicate device assignments across slots
-- UI: Fix cyclic spring gain not displaying in settings panel
-- Fix error condition on app exit and SimConnect session halt
-- Fix error handling when launching VPforce Configurator from the app
-- In-app updater rewritten for reliability: per-phase progress (download/backup/extract), live status log, and auto-close-and-launch option
-- Fix crash when telemetry startup is interrupted by a plugin update prompt
+- Settings page usability improvements
+  - The settings page no longer creeps/jumps its scroll position when you change a setting - the row you are working on now stays put under your mouse across the form refresh
+- The Settings tab now shows helpful guidance when it is empty (start a sim and load an aircraft, or open the offline editor) instead of a blank page - including a scope explainer when using the offline editor
+- Settings QoL: changing a setting back to its inherited/default value now automatically removes the user override (and the circle-x revert button) instead of leaving a redundant entry in your config
+- Application Status panel stability
+   - The panel no longer resizes and shifts around when switching between device scopes
+   - Any active 'vpconf profile' or 'configurator gain override' for a child instance device are now displayed when you change the config scope to that device
+- Curve editor usability improvements (Advanced Spring / Advanced G-Force widgets): smarter curve bounds checking, fixed point-insert resetting the first point, better endpoint drag behavior
 - TelemFFB now detects when a sim process exits and automatically resets telemetry listeners and UI state
+- Fix: configurator gain overrides not being applied when TelemFFB started with the sim already loaded into an aircraft
+- Fix: master instance was incorrectly validating child device PID when selecting per-aircraft vpconf profiles
+- Fix: IPC telemetry datagrams could be dropped under load in multi-device setups causing erroneous device icon failure status changes
+- Fix: cyclic spring gain not displaying in settings panel
+- Fix: error condition on app exit and SimConnect session halt
+- Fix: error handling when launching VPforce Configurator from the app
+- Fix: crash when telemetry startup is interrupted by a plugin update prompt
 
 ## XPlane
-- Updated plugin adhering to new stricter coding requirements
-- X-Trident AW109 special implementation - WIP Implementation
+- **NEW: X-Trident AW109 special implementation - WIP Implementation**
   - KNOWN ISSUE: Must map controls in-game and disable "Axis Control" in TelemFFB - Aircraft does not honor axis override dataref nor properly accept external axis control inputs
   - 4-Axis AFCS integration: cyclic trim rate control, force trim release, and autopilot following
   - Pedal/rudder trim integration
     - KNOWN ISSUE: Pedal AFCS is not as active as would be expected in real aircraft.. this is due to telemetry limitations from the aircraft
   - Collective spring gain and force trim release
+- **NEW: 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with MSFS)**
+- Updated plugin adhering to new stricter coding requirements
 - X-Plane plugin: Added dataref write and command write support for expanded aircraft control
-- New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with MSFS)
+- X-Plane plugin: now exports vertical speed and pitch/roll rate data (used by the new trim calibration and future effects)
+
+## MSFS / X-Plane
+- **NEW: Automated Elevator Trim-Following Calibration** (fixed wing)
+  - See a full demo/walkthrough of the calibration feature here: https://www.youtube.com/watch?v=otveS5mgbu0
+  - Trim following has always assumed a 1:1 relationship between trim position and elevator - many aircraft (especially 3rd party) are far from 1:1, causing the nose to wander when trimming with the stick held
+  - A wizard-style assistant flies a short automated routine, measures your aircraft's real trim response, and produces a calibrated trim-following curve you can apply and test live in the sim before saving
+  - Run it at multiple airspeeds and the results blend into a single speed-aware curve; review, delete, export, and import stored calibrations from the dialog
+  - Trimmed stick position modes: 'Follows Trim' (cable/trim-tab aircraft: the stick rides the trim like the real linkage) or 'Stays Centered' (airliners/FBW - the jet default); out-of-trim force behavior is identical either way
+  - Glider support (steady-descent routine), suggested calibration speeds from each aircraft's own envelope, and a main-window prompt when an uncalibrated aircraft loads
+  - Factory calibrations included for several default aircraft (MSFS 2024: C172, C152, C208B, SR22T, Citation, Vision Jet, DG-1001E Neo | X-Plane 12: C172, SR22, RV-10)
+  - NOTE: some aircraft are non-calibratable - trim that overpowers full elevator, extreme trim sensitivity, or automatic trim systems that cannot be disabled
+- **NEW: 'Dynamic' stall buffet style** - irregular, gusty shaking that surges and grows heavier as the stall deepens ('Classic', the original steady shake, remains the default)
+  - Both styles now key buffet onset and strength to each aircraft's own stall speed and AoA - slow aircraft buffet fully at their own stall, and X-Plane buffet builds as the stall horn fires instead of arriving well after it
+- **NEW: Telemetry Overrides editor in the Utilities menu** (SimConnect/Dataref Overrides)
+  - Per-aircraft overrides that re-source a telemetry item from an addon's custom variable (SimVar/LVar or dataref) or subscribe to additional telemetry items - useful for sophisticated addons whose systems don't drive the standard variables (autopilot state, custom engine/flight models)
+  - Optional scale/transform converts the replacement value into the units the effects expect; changes save and apply immediately, verifiable in the Monitor tab
+  - See the 'Telemetry Overrides' section of the documentation for details
 
 ## MSFS
-- Control lock feature added for Fixed wing and Helicopter aircraft:
+- **NEW: Control lock feature added for Fixed wing and Helicopter aircraft:**
   - Saab 340, PC-6 Porter, Wilga, Beechcraft A36 Bonanza, Beechcraft B58 Baron, A2A Comanche PA-24, Cessna 414, Beechcraft Duke
   - Taog H500
-- Taog H500/OH6 special implementation with optimized spring and trim configuration
+- **NEW: Taog H500/OH6 special implementation with optimized spring and trim configuration**
+- **NEW: 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)**
 - CowanSim S76: Updated default profile; added option to disable ROTOR TRIM RESET command
 - FlyInsideHeli: Engine vibrations now mapped to pedals and collective axes
-- New 3-axis turbulence physics model with pitch/roll/yaw decomposition (shared with X-Plane)
 - HPG Pedals: Added force trim button option
 - HPG Collective: Sends axis position while vertical mode is active to avoid an axis snap when disengaging the autopilot
+- Fix: the 'AP Pitch - Follow axis instead of trim' setting had no effect (broken since mid-2025) - when enabled, autopilot following now correctly moves the stick with the elevator position instead of the trim
 - Fix: restored CowanSim and Taog H500 helicopter features that had been inadvertently dropped
-- Fix heli trim following issue (MSFS/X-Plane)
+- Fix: heli trim following issue (MSFS/X-Plane)
+- Fix: intermittent stale/missing aircraft display when starting TelemFFB while the sim was already running (telemetry frame arriving during startup could be silently dropped)
+
 
 ## DCS
 - Export DLL updates
@@ -49,17 +136,32 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Added F100D
   - Fixed rudder control surface telemetry
 - DCS start/stop event handling: TelemFFB UI now responds earlier when the DCS export module loads or unloads
+- TelemFFB will now log a (non blocking) exception if DCS Realistic or SimHaptic are installed with the autostart feature enabled in export.lua (breaks DCS FFB)
+- Hardware force trim modes (joystick, pedals, collective) now honor the in-cockpit force trim switch for UH1/OH58
 
 ## IL2
-- IL-2 Korea support: automatic telemetry/UDP configuration, new System Settings UI, and game process detection
-  - KNOWN ISSUE:  IL-2 Korea is not outputting any engine RPM info, therefore the engine rumble effects are non-functional
-- Decode additional IL-2 Korea telemetry channels: angle of sideslip (AOS) and vertical speed
-- New: forward raw IL-2 telemetry, motion, and FFB UDP streams to one or more external IP/port destinations, with each destination independently choosing which stream(s) to receive (System Settings > IL2)
-- Fix telemetry pause/flicker during multiplayer menus; removed unreliable window-focus-based pause detection
+- **NEW: IL-2 Korea support**
+  - KNOWN ISSUE:  IL-2 Korea is not outputting any engine RPM info, therefore the RPM-based engine rumble effects are non-functional (see the new alternative engine shake effect below)
+- IL-2 Korea: default aircraft profiles included with starter Advanced Spring curves
+- IL-2 Korea: new spring override option leveraging the 'ffbdevice' telemetry stream (stream is configured automatically by auto-setup)
+- **NEW: Alternative engine shake effect driven by raw engine shake frequency/amplitude data from the FFB telemetry stream**
+  - provides engine vibration feel on aircraft/titles where RPM telemetry is unavailable
+- **NEW: forward raw IL-2 telemetry, motion, and FFB UDP streams to one or more external IP/port destinations, with each destination independently choosing which stream(s) to receive (System Settings > IL2)**
+- Advanced Spring Override enhancements
+  - Game-supplied spring center ('ffb telemetry') can now stack with a custom spring gain curve - the sim controls the center while your curve controls the force
+  - New trim reset button binding
+- Fix: telemetry pause/flicker during multiplayer menus; removed unreliable window-focus-based pause detection
+- Fix: airborne deceleration effect
+- Fix: g-force effect activating incorrectly on aircraft that report weight-on-wheels while airborne (now treated as airborne when all gear are retracted)
 
 ## Effects
+- **NEW: Helicopter Blade Slap effect (MSFS / X-Plane / DCS)**
+  - The signature 'wop-wop' of blade-vortex interaction: sharp kicks at blade-passage rate, felt where you hear it - shallow descents, decelerating approaches, flares, and loaded turns - on joystick, pedals, and collective
+  - X-Plane drives it from the sim's own computed blade-slap signal (including tail rotor slap); MSFS and DCS infer it from flight state, tunable via 'Blade Slap Band Center' and 'G-Induced Slap Factor'
+  - Two-bladed teetering rotors (Huey, R22) slap hardest; per-model tuning ships for the default helicopter profiles
 - New envelope and detent effect support in HapticEffect
   - Attack envelope on constant force effects — reduces the risk of jarring axis slam on initial activation
+- Propeller engine rumble: smoother at high RPM (all sims) - the detune 'wobble' that gives the rumble its chunky character at idle now fades as RPM rises, instead of persisting as a wah-wah undertone at cruise; the low-RPM feel is unchanged
 
 ############################################
 ##  October 29, 2025
