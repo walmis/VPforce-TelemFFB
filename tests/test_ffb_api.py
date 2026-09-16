@@ -432,7 +432,7 @@ class TestFFBApiTrim(FFBApiTestBase):
     def test_tr_on_softens_spring_and_follows_stick(self):
         instance = self.make_instance()
         instance.ffb_api_tr_spring_gain = 0.0
-        instance.cyclic_spring_gain = 0.8
+        instance.ffb_api_cyclic_spring_gain = 0.8
         self.mock_device._input_data.set_axis(x=0.3, y=-0.2)
 
         telem = self.make_telem(ffbTrimCyclicRoll=0.9, ffbTrimCyclicPitch=0.9, ffbTrOnCyclic=1)
@@ -484,10 +484,10 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         assert instance.cpO_x == round(-0.4 * 4096)
 
-    def test_untrimmed_collective_holds_position_from_local_settings(self):
-        """No trim bit is not "no spring": fall back to the generic position hold."""
+    def test_untrimmed_collective_holds_position_at_the_trim_gain(self):
+        """No trim bit is not "no spring": hold the lever, at the trim spring's gain."""
         instance = self.make_instance(device="collective")
-        instance.collective_spring_coeff_y = 2048
+        instance.ffb_api_collective_spring_gain = 0.5
         self.mock_device._input_data.set_axis(y=0.4)
 
         telem = self.make_telem(device="collective", features=0, ffbTrimCollective=0.9)
@@ -496,12 +496,31 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         # Centre is the lever, not the (ignored) published trim.
         assert instance.cpO_y == round(0.4 * 4096)
-        assert instance.spring_y.positiveCoefficient == 1024
+        assert instance.spring_y.positiveCoefficient == round(0.5 * 4096)
+
+    def test_untrimmed_collective_springs_with_stock_settings(self):
+        """Regression: this branch used to read collective_spring_coeff_y.
+
+        That attribute has no <defaults> row anywhere and is only ever assigned by
+        HPGHelicopter, so on this class it reads its class default of 0 - and the
+        branch meant to *hold* the lever left it completely slack.  The old test hid
+        it by assigning collective_spring_coeff_y by hand, which the product never
+        does, so assert from stock settings only.
+        """
+        instance = self.make_instance(device="collective")
+        self.mock_device._input_data.set_axis(y=0.4)
+
+        telem = self.make_telem(device="collective", features=0)
+        self.arm(instance, telem)
+        instance.msfs_update_collective(telem)
+
+        assert instance.spring_y.positiveCoefficient > 0
+
 
     def test_normalized_gains_are_applied_as_scaled_floats(self):
         """set_coefficient scales floats by 4096 but takes ints raw - keep gains float."""
         instance = self.make_instance(device="pedals")
-        instance.pedal_spring_gain = 1  # an int, as a config round-trip can produce
+        instance.ffb_api_pedal_spring_gain = 1  # an int, as a config round-trip can produce
         self.mock_device._input_data.set_axis(x=0.0)
 
         telem = self.make_telem(device="pedals", ffbTrimPedals=0.0)
@@ -514,7 +533,7 @@ class TestFFBApiTrim(FFBApiTestBase):
     def test_spring_gated_until_control_reaches_trim_reference(self):
         """Mirrors the existing init handshake: do not yank a displaced control."""
         instance = self.make_instance(device="pedals")
-        instance.pedal_spring_gain = 0.7
+        instance.ffb_api_pedal_spring_gain = 0.7
         self.mock_device._input_data.set_axis(x=-0.9)
 
         telem = self.make_telem(device="pedals", ffbTrimPedals=0.9)
@@ -1001,7 +1020,33 @@ class TestFFBApiSettingsScope:
 
     def test_rows_exist(self, root):
         """Guard the guard: a rename must not turn these tests into no-ops."""
-        assert len(self._rows(root)) == 8
+        assert len(self._rows(root)) == 11
+
+    def test_orders_do_not_trigger_special_layout(self, root):
+        """`order` is not just a sort key - its suffix selects a layout mode.
+
+        An order ending in `1` *with a decimal point* means "bump-up": the row is drawn
+        on its prereq parent's row, replacing the parent's entry widget, which renders
+        as a mangled slider with the parent's label bleeding through it.  Any other
+        decimal suffix makes the row a collapsible child instead of a normal row, and
+        `.0` marks a group container.  These are all plain rows, so their orders must
+        be plain integers.  (`ffb_api_cyclic_spring_gain` shipped as 1235.1 and bumped.)
+        """
+        offenders = []
+        for d in self._rows(root):
+            order = (d.findtext("order") or "").strip()
+            if "." in order:
+                offenders.append((d.findtext("name"), order))
+        assert offenders == [], (
+            f"{offenders} carry a decimal order suffix, which selects a special layout "
+            f"mode rather than a normal row - see 'The order Field' in "
+            f"docs/defaults_xml_reference.md."
+        )
+
+    def test_orders_are_unique(self, root):
+        """A shared order makes row position depend on document order."""
+        orders = [d.findtext("order") for d in self._rows(root)]
+        assert len(orders) == len(set(orders))
 
     def test_no_row_carries_a_baseline_value(self, root):
         offenders = [d.findtext("name") for d in self._rows(root)
@@ -1024,6 +1069,140 @@ class TestFFBApiSettingsScope:
                   for cd in self._class_defaults(root)
                   if cd.findtext("type") != self.OWNER}
         assert strays == set()
+
+    # -- parity with the base class ---------------------------------------- #
+    #
+    # <classdefaults_*> and <validvalues_overrides> are keyed on the exact class
+    # NAME, not on Python inheritance, so a Helicopter subclass starts with none of
+    # Helicopter's configuration.  Left unmirrored that is not UI clutter but a
+    # behaviour change: ETL / blade slap / rotor rumble off, deceleration force on,
+    # fixed-wing AoA settings exposed, and spring_mode falling back to the fixed-wing
+    # option list.  Every bespoke heli class in the repo carries its own copy.
+
+    BASE = "Helicopter"
+
+    #: Deliberate divergences, each with the reason it is not a mirroring bug.
+    EXPECTED_DIVERGENCE = {
+        # The aircraft owns trim and has zeroed ROTOR * TRIM PCT, so the generic
+        # CyclicTrimX/Y follow has nothing to integrate - the same exclusion
+        # HPGHelicopter carries for the same reason.
+        ("trim_following", "joystick"),
+        # The API owns every spring this class drives, and its gains are the ffb_api_*
+        # ones below.  spring_mode selects between generic spring behaviours none of
+        # which apply, and almost every other spring setting hangs off it as a prereq -
+        # excluding it is what removes them all.
+        ("spring_mode", "joystick"),
+        ("spring_mode", "collective"),
+        ("spring_mode", "pedals"),
+        # Deprecated (Aircraft.py marks it so); it exists only to migrate to
+        # spring_mode = CENTER, which this class does not have.
+        ("aircraft_is_spring_centered", "joystick"),
+        ("aircraft_is_spring_centered", "pedals"),
+        # Defaulted off for this class - see test_axis_control_defaults_off.  Helicopter
+        # only carries a collective row (via the legacy classdefaults_any), so the
+        # joystick and pedal rows are additions rather than value overrides.
+        ("telemffb_controls_axes", "joystick"),
+        ("telemffb_controls_axes", "pedals"),
+    }
+
+    def _msfs_rows(self, root, cls):
+        """Every class default that applies to this class on MSFS.
+
+        read_default_class_data() queries classdefaults_MSFS *and* the legacy
+        classdefaults_any, so both count as the base set.  The mirrored rows are all
+        written as classdefaults_MSFS - the reference calls classdefaults_any legacy
+        and says not to use it for new entries - so the tag is normalised away here.
+        """
+        return {(cd.findtext("name"), cd.findtext("type").startswith("!"), cd.findtext("device"))
+                for cd in root.iter()
+                if cd.tag in ("classdefaults_MSFS", "classdefaults_any")
+                and (cd.findtext("type") or "").lstrip("!") == cls
+                and cd.findtext("name") != "type"}
+
+    def test_inherits_every_base_class_default(self, root):
+        base = self._msfs_rows(root, self.BASE)
+        mine = self._msfs_rows(root, self.OWNER)
+        missing = {r for r in base - mine if (r[0], r[2]) not in self.EXPECTED_DIVERGENCE}
+        assert missing == set(), (
+            f"{self.OWNER} is missing {sorted(missing)} that {self.BASE} defines. "
+            f"classdefaults are keyed by class name, so a subclass inherits none of "
+            f"them - mirror the row or add it to EXPECTED_DIVERGENCE with a reason."
+        )
+
+    def test_adds_nothing_to_the_base_beyond_the_api(self, root):
+        base = self._msfs_rows(root, self.BASE)
+        mine = self._msfs_rows(root, self.OWNER)
+        extra = {r for r in mine - base
+                 if not r[0].startswith("ffb_api_")
+                 and (r[0], r[2]) not in self.EXPECTED_DIVERGENCE}
+        assert extra == set()
+
+    @pytest.mark.parametrize("name,device", [
+        ("ffb_api_cyclic_spring_gain", "joystick"),
+        ("ffb_api_collective_spring_gain", "collective"),
+        ("ffb_api_pedal_spring_gain", "pedals"),
+    ])
+    def test_each_control_has_a_reachable_spring_gain(self, root, name, device):
+        """The gain is the only spring setting this class keeps, so it must resolve.
+
+        The generic gains cannot serve: cyclic_spring_gain is prereq'd on
+        spring_mode.FORCETRIM.CNTR_FT and pedal_spring_gain on spring_mode.FORCETRIM /
+        .STATIC.DYNAMIC.CUSTOM, and this class excludes spring_mode outright - so
+        SettingsLayout.is_visible() would never show either of them.
+        """
+        rows = [cd for cd in root.iter()
+                if cd.tag == "classdefaults_MSFS"
+                and cd.findtext("name") == name
+                and cd.findtext("type") == self.OWNER
+                and cd.findtext("device") == device]
+        assert len(rows) == 1 and rows[0].findtext("value") is not None
+
+        defs = [d for d in root.findall(".//defaults") if d.findtext("name") == name]
+        assert len(defs) == 1
+        # Must not hang off spring_mode, or excluding it would hide the gain too.
+        assert "spring_mode" not in (defs[0].findtext("prereq") or "")
+
+    @pytest.mark.parametrize("device", ["joystick", "collective", "pedals"])
+    def test_axis_control_defaults_off(self, root, device):
+        """The API does not need TelemFFB to send axes, so do not ask the user to.
+
+        telemffb_controls_axes ships `true` and its own info says it is "Required for
+        Trim/AP Following" and warns "Do not assign in game or SPAD.next".  Neither
+        applies here: the API delivers trim through the spring centre, not an axis
+        offset, so leaving it on would impose unbinding the axes in MSFS for no gain.
+        The setting stays available - a collective is awkward to bind in MSFS, and a
+        user who relies on TelemFFB sending it must be able to turn it back on.
+        """
+        rows = [cd for cd in root.iter()
+                if cd.tag == "classdefaults_MSFS"
+                and cd.findtext("name") == "telemffb_controls_axes"
+                and cd.findtext("type") == self.OWNER
+                and cd.findtext("device") == device]
+        assert len(rows) == 1
+        assert rows[0].findtext("value") == "false"
+
+    def test_spring_mode_is_excluded(self, root):
+        """Everything else spring-related is a prereq child of spring_mode."""
+        excluded = {cd.findtext("device") for cd in root.iter()
+                    if cd.tag == "classdefaults_MSFS"
+                    and cd.findtext("name") == "spring_mode"
+                    and cd.findtext("type") == f"!{self.OWNER}"}
+        assert excluded == {"joystick", "collective", "pedals"}
+
+    def test_inherits_the_base_validvalues_overrides(self, root):
+        def rows(cls):
+            return {(v.findtext("name"), v.findtext("device"), v.findtext("validvalues"))
+                    for v in root.iter("validvalues_overrides")
+                    if v.findtext("class") == cls and v.findtext("sim") == "MSFS"}
+        # An override for a setting this class excludes can never be consulted.
+        excluded = {cd.findtext("name") for cd in root.iter()
+                    if cd.tag == "classdefaults_MSFS"
+                    and cd.findtext("type") == f"!{self.OWNER}"}
+        missing = {r for r in rows(self.BASE) - rows(self.OWNER) if r[0] not in excluded}
+        assert missing == set(), (
+            f"{self.OWNER} is missing {sorted(missing)}; an option list that falls back "
+            f"to the base gives the fixed-wing choices."
+        )
 
 
 # ───────────────────────────────────────────────────────────────

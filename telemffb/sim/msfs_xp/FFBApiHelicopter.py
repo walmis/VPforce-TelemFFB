@@ -51,6 +51,7 @@ import time
 
 from typing import override
 
+from telemffb.SettingsManager import SpringModeEnum
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.Helicopter import Helicopter
 from telemffb.utils import clamp
@@ -151,6 +152,15 @@ class FFBApiHelicopter(Helicopter):
 
     # user parameters
 
+    #: Spring gain holding each control against its published trim position.  The
+    #: API owns trim, so these are the *only* spring settings the class needs - the
+    #: generic spring_mode tree is excluded for it in defaults.xml.  Deliberately not
+    #: the generic cyclic_spring_gain / pedal_spring_gain: those are gated behind
+    #: spring_mode values this class never selects, so they are unreachable in the UI.
+    ffb_api_cyclic_spring_gain: float = 0.8
+    ffb_api_collective_spring_gain: float = 1.0
+    ffb_api_pedal_spring_gain: float = 0.0
+
     #: Spring gain applied while the trim actuator is unclutched (TR_ON).
     ffb_api_tr_spring_gain: float = 0.0
 
@@ -180,6 +190,12 @@ class FFBApiHelicopter(Helicopter):
     def __init__(self, name, **kwargs):
         self._ffb_api_reset()
         super().__init__(name, **kwargs)
+        # spring_mode is excluded for this class (the API owns the springs, and every
+        # other spring setting hangs off that prereq), so no config value arrives and
+        # Aircraft.__init__'s BASIC default would stand.  Pin it: the generic paths
+        # this class falls back to treat BASIC and NOSPRING identically on a
+        # helicopter, but leaving it BASIC would misreport the class' intent.
+        self.spring_mode = SpringModeEnum.NOSPRING.name
 
     # ------------------------------------------------------------------ #
     # lifecycle hooks
@@ -670,7 +686,7 @@ class FFBApiHelicopter(Helicopter):
             # No trim system on this aircraft's cyclic: plain centering from local
             # settings, no published reference to follow.
             center_x, center_y = 0.0, 0.0
-            gain = float(self.cyclic_spring_gain)
+            gain = float(self.ffb_api_cyclic_spring_gain)
         elif tr_on:
             # Unclutched: soften and follow the stick.  On release the published
             # _TRIM has already followed to here, so the spring re-centers with no
@@ -680,7 +696,7 @@ class FFBApiHelicopter(Helicopter):
         else:
             center_x = self._ffb_api_trim(telem_data, "CYCLIC_ROLL")
             center_y = self._ffb_api_trim(telem_data, "CYCLIC_PITCH")
-            gain = float(self.cyclic_spring_gain)
+            gain = float(self.ffb_api_cyclic_spring_gain)
 
         if self._ffb_api_tr_active and not tr_on:
             logging.debug("FFB API: cyclic trim re-clutched")
@@ -739,14 +755,16 @@ class FFBApiHelicopter(Helicopter):
             center_y = phys_y
             gain = float(self.ffb_api_tr_spring_gain)
         elif not has_trim:
-            # No trim system: hold position from local settings, matching the generic
-            # collective path (_update_collective_spring_mode).  collective_spring_coeff_y
-            # is already a raw 0..4096 coefficient, so it stays an int.
+            # No trim system: hold the lever where it is, at the same gain the trim
+            # spring would use.  Deliberately NOT collective_spring_coeff_y, which the
+            # generic path uses here - that one has no <defaults> row at all, is only
+            # ever assigned by HPGHelicopter, and so reads 0 on this class, leaving the
+            # collective with no spring whatsoever.
             center_y = phys_y
-            gain = int(round(self.collective_spring_coeff_y / 2))
+            gain = float(self.ffb_api_collective_spring_gain)
         else:
             center_y = self._ffb_api_trim(telem_data, "COLLECTIVE")
-            gain = float(self.collective_ap_spring_gain)
+            gain = float(self.ffb_api_collective_spring_gain)
 
         self.cpO_y = round(clamp(center_y, -1.0, 1.0) * 4096)
         ready = self._ffb_api_spring_ready(phys_y, center_y)
@@ -788,13 +806,13 @@ class FFBApiHelicopter(Helicopter):
 
         if not has_trim:
             center_x = 0.0
-            gain = float(self.pedal_spring_gain)
+            gain = float(self.ffb_api_pedal_spring_gain)
         elif tr_on:
             center_x = phys_x
             gain = float(self.ffb_api_tr_spring_gain)
         else:
             center_x = self._ffb_api_trim(telem_data, "PEDALS")
-            gain = float(self.pedal_spring_gain)
+            gain = float(self.ffb_api_pedal_spring_gain)
 
         self.cpO_x = round(clamp(center_x, -1.0, 1.0) * 4096)
         ready = self._ffb_api_spring_ready(phys_x, center_x)

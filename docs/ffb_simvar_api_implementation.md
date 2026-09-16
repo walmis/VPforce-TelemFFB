@@ -492,6 +492,65 @@ the existing inverted convention table in HPG before wiring.
   scoping is carried by an *absence*, `TestFFBApiSettingsScope` guards it: re-adding a
   single `<value>` would surface all eight on every MSFS aircraft with nothing else
   failing.
+- **Mirror `Helicopter`'s configuration onto the class.** `<classdefaults_*>` and
+  `<validvalues_overrides>` are keyed on the exact class *name*, not on Python
+  inheritance, so a `Helicopter` subclass starts with **none** of `Helicopter`'s
+  configuration — which is why every bespoke heli class in the repo carries its own
+  copy (HPG 41 rows, SAS 34, CowanSim 8). Unmirrored this is not UI clutter but a
+  behaviour change: ETL / blade slap / rotor rumble default off, deceleration force
+  defaults *on*, fixed-wing AoA and stall-buffet settings appear, `cyclic_spring_gain`
+  reverts from the tuned 0.8 to the class attribute, and `spring_mode` falls back to
+  the fixed-wing option list. All 45 `Helicopter` MSFS rows (including the legacy
+  `classdefaults_any` ones, rewritten as `classdefaults_MSFS`) and the three
+  `spring_mode` `validvalues_overrides` are mirrored, and the parity is pinned by
+  `TestFFBApiSettingsScope`.
+- **One deliberate divergence from the base:** `trim_following` is excluded on
+  `joystick`. The aircraft owns trim and has zeroed `ROTOR * TRIM PCT`, so the generic
+  `CyclicTrimX/Y` follow has nothing to integrate — the same exclusion `HPGHelicopter`
+  carries for the same reason, and `Helicopter` already excludes it on `pedals`. It is
+  listed in the test's `EXPECTED_DIVERGENCE`, so any *other* divergence fails.
+- **The force-trim family needs no exclusions.** Every one of those settings is
+  prereq'd on `spring_mode.FORCETRIM` (or `.CNTR_FT`), and the mirrored
+  `spring_mode = NOSPRING` defaults collapse the whole tree on their own. Most of it
+  does not even resolve: `custom_ft_sw_var`, `trim_following`, `force_trim_enabled`
+  and the `joystick_trim_follow_gain_*` family are all eliminated before reaching the
+  UI. Auditing the other direction — every attribute the class' own control paths read
+  — leaves only four settings that resolve but are dead while the API is live
+  (`controls_lock_enable`, `custom_ft_sw_var_enabled`, `force_trim_reset_button`,
+  `force_trim_send_reset`), which is not enough to be worth excluding.
+- **The class keeps exactly one spring setting per control: the gain.** The API owns
+  every spring it drives, so `spring_mode` — which selects between generic spring
+  behaviours, none of which apply — is excluded for all three devices. That one
+  exclusion removes nearly every other spring setting with it, because they are prereq
+  children of it: the whole force-trim family, the `collective_ft_ovd_*` and
+  `pedal_ft_*` groups, `adv_spr_gains`, the FBW gains, and the aileron / elevator /
+  rudder centring gains. The deprecated `aircraft_is_spring_centered` goes too — it
+  exists only to migrate to `spring_mode = CENTER`.
+- **The gains are `ffb_api_*`, not the generic ones.** `cyclic_spring_gain` is prereq'd
+  on `spring_mode.FORCETRIM.CNTR_FT` and `pedal_spring_gain` on `spring_mode.FORCETRIM`
+  / `.STATIC.DYNAMIC.CUSTOM`, so with `spring_mode` excluded `SettingsLayout.is_visible`
+  would never show either — they were unreachable even *before* the exclusion, since
+  visibility needs the parent's value to appear in the prereq string and the class
+  defaults to `NOSPRING`. `ffb_api_cyclic_spring_gain`,
+  `ffb_api_collective_spring_gain` and `ffb_api_pedal_spring_gain` hang off
+  `basic_group` instead, alongside the other `ffb_api_*` settings, and carry the same
+  defaults the generic ones did (0.8 / 1.0 / 0.0).
+- **`spring_mode` is pinned in code** instead: `Aircraft.__init__` defaults it to
+  `BASIC`, and with no config value arriving that would stand. The property setter on
+  `AircraftEffectUtilsBase` converts the assigned name to the enum member, so the class
+  ends up on `NOSPRING` exactly as the config used to put it. On a helicopter the two
+  are behaviourally identical in every generic path, but leaving it `BASIC` would
+  misreport intent.
+- **`center_spring_on_pause` stays.** It hangs off `system_group`, not `spring_mode`,
+  and governs the pause/slew spring in `Aircraft.on_timeout` rather than control feel.
+- **`telemffb_controls_axes` defaults *off*.** It ships `true`, and its own info gives
+  the reason it does — "Required for Trim/AP Following", with a warning not to assign
+  the axes in game or SPAD.next. Neither applies under the API: trim arrives through
+  the spring centre, not an axis offset, so leaving it on would ask the user to unbind
+  their axes in MSFS for no gain. The setting stays *available* rather than excluded —
+  a collective is awkward to bind in MSFS, and a user who relies on TelemFFB sending it
+  needs a way back. This narrows the §10.2 decision: both axis models are still
+  supported and tested, but the API's default is now "the sim reads the stick".
 - Reuse existing user parameters where they map (`trim_release_spring_gain`,
   `cyclic_spring_gain`, `collective_ap_spring_gain`, `hpg_pedal_spring_gain`,
   fly-through / hands-on deadzones and force thresholds). Rename the exposed
@@ -657,8 +716,11 @@ re-litigated; each links to where it is implemented above.
    that stays perfectly valid. A vendor aircraft that adopts the spec is better served
    by a vendor subclass of `FFBApiHelicopter` than by a swap.
 
-2. **Axis ownership → honour the user's existing `telemffb_controls_axes` setting.**
-   No new default, both models supported and tested. The spec's "rig drives position
+2. **Axis ownership → both models supported, but `FFBApiHelicopter` defaults to
+   *not* sending axes.** *Amended 2026-09-16: the original decision was "no new
+   default". A class can carry one, and `true` is the wrong one here — it is documented
+   as "Required for Trim/AP Following", which the API supersedes, and it obliges the
+   user to unbind their axes in MSFS.* The spec's "rig drives position
    through normal axis inputs" describes what the API *permits*, not something TelemFFB
    forces on users who have working axis-send configurations today. The obligation is
    that the sent axis stays raw so trim is never double-applied — see §4.2.
@@ -718,14 +780,14 @@ parity) is not started and remains optional.
 | [BaseTelemetryData.py](../telemffb/sim/BaseTelemetryData.py) | 13 new documented fields. |
 | [defaults.xml](../defaults.xml) | Class registration (`<classes>`, `type` `validvalues`, self-referential `type` default) and 8 user parameters under an "FFB API" grouping, scoped to the class via `<classdefaults_MSFS>`. |
 | [utils.py](../telemffb/utils.py) | `exit_application()` calls the generic `TelemManager.on_shutdown()`; three `ffb_api_*` spring names registered in `EffectTranslator.effect_dict`. |
-| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 111 tests. |
+| [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 124 tests. |
 
 **Unchanged:** `Helicopter.py` and `MsfsXpHeliControlsMixIn.py` carry no FFB API code at
 all — the property `TestFFBApiContainment` exists to keep true.
 
 ### Verified
 
-Full suite after merging the baseline: **2595 passed, 2 skipped**. One unrelated
+Full suite after merging the baseline: **2612 passed, 2 skipped**. One unrelated
 failure, `test_updater_backup.py::TestWaitForAppExit::test_returns_when_no_instances`,
 calls the real `tasklist` without mocking `subprocess`, so `result.stdout` is `None`
 in this environment. It comes in with the baseline and is untouched by this work.

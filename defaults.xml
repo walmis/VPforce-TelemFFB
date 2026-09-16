@@ -1367,6 +1367,45 @@
 		<datatype>float</datatype>
 		<grouping>FFB API</grouping>
 		<parentgroup>basic</parentgroup>
+		<order>1231</order>
+		<name>ffb_api_cyclic_spring_gain</name>
+		<displayname>FFB API Cyclic Spring Gain</displayname>
+		<prereq>basic_group</prereq>
+		<info>Spring gain for the cyclic while the FFB API is driving it.&lt;br&gt;&lt;br&gt;The spring centre follows the trim actuator position the aircraft publishes; this sets how firmly it holds.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>float</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1233</order>
+		<name>ffb_api_collective_spring_gain</name>
+		<displayname>FFB API Collective Spring Gain</displayname>
+		<prereq>basic_group</prereq>
+		<info>Spring gain for the collective while the FFB API is driving it.&lt;br&gt;&lt;br&gt;Also used to hold the lever when the aircraft advertises no collective trim system.</info>
+		<MSFS>true</MSFS>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>float</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1234</order>
+		<name>ffb_api_pedal_spring_gain</name>
+		<displayname>FFB API Pedal Spring Gain</displayname>
+		<prereq>basic_group</prereq>
+		<info>Spring gain for the pedals while the FFB API is driving them.&lt;br&gt;&lt;br&gt;Defaults to 0 (no pedal spring), matching the stock MSFS helicopter setting - raise it to follow published pedal trim.</info>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>float</datatype>
+		<grouping>FFB API</grouping>
+		<parentgroup>basic</parentgroup>
 		<order>1236</order>
 		<name>ffb_api_tr_spring_gain</name>
 		<displayname>FFB API Trim Release Damper</displayname>
@@ -7888,6 +7927,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>aoa_effect_enabled</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
 			<type>!HPGHelicopter</type>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8151,7 +8196,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>controls_lock_enable</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
 			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>FFBApiHelicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
@@ -8244,6 +8303,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var</name>
+			<type>FFBApiHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
 			<type>Helicopter</type>
 			<value>L:TelemFFBHeliFT</value>
 			<sim>MSFS</sim>
@@ -8251,7 +8317,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var</name>
+			<type>FFBApiHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
 			<type>Helicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>FFBApiHelicopter</type>
 			<value>L:TelemFFBHeliFT</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
@@ -8313,6 +8393,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var_enabled</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
 			<type>Helicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
@@ -8320,7 +8407,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var_enabled</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
 			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>FFBApiHelicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
@@ -8369,6 +8470,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>cyclic_spring_gain</name>
+			<type>FFBApiHelicopter</type>
+			<value>0.8</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>cyclic_spring_gain</name>
 			<type>HPGHelicopter</type>
 			<value>0.8</value>
 			<sim>MSFS</sim>
@@ -8398,6 +8506,13 @@
 		<classdefaults_MSFS>
 			<name>deceleration_effect_enable</name>
 			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>deceleration_effect_enable</name>
+			<type>FFBApiHelicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8578,6 +8693,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>engine_jet_rumble_enabled</name>
+			<type>FFBApiHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>engine_jet_rumble_enabled</name>
 			<type>HPGHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -8614,6 +8736,13 @@
 		<classdefaults_MSFS>
 			<name>engine_rotor_rumble_enabled</name>
 			<type>Helicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>engine_rotor_rumble_enabled</name>
+			<type>FFBApiHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8661,6 +8790,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>etl_effect_enable</name>
+			<type>FFBApiHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>etl_effect_enable</name>
 			<type>HPGHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -8683,6 +8819,13 @@
 		<classdefaults_MSFS>
 			<name>blade_slap_enable</name>
 			<type>Helicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>blade_slap_enable</name>
+			<type>FFBApiHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8738,6 +8881,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>etl_effect_intensity</name>
+			<type>FFBApiHelicopter</type>
+			<value>0.25</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>etl_effect_intensity</name>
 			<type>HPGHelicopter</type>
 			<value>0.15</value>
 			<sim>MSFS</sim>
@@ -8768,6 +8918,14 @@
 		<classdefaults_MSFS>
 			<name>etl_start_speed</name>
 			<type>Helicopter</type>
+			<value>16</value>
+			<unit>kt</unit>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>etl_start_speed</name>
+			<type>FFBApiHelicopter</type>
 			<value>16</value>
 			<unit>kt</unit>
 			<sim>MSFS</sim>
@@ -8808,6 +8966,14 @@
 		<classdefaults_MSFS>
 			<name>etl_stop_speed</name>
 			<type>Helicopter</type>
+			<value>31</value>
+			<unit>kt</unit>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>etl_stop_speed</name>
+			<type>FFBApiHelicopter</type>
 			<value>31</value>
 			<unit>kt</unit>
 			<sim>MSFS</sim>
@@ -8871,6 +9037,78 @@
 			<value>0.5</value>
 			<sim>MSFS</sim>
 			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ffb_api_cyclic_spring_gain</name>
+			<type>FFBApiHelicopter</type>
+			<value>0.8</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ffb_api_collective_spring_gain</name>
+			<type>FFBApiHelicopter</type>
+			<value>1.0</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ffb_api_pedal_spring_gain</name>
+			<type>FFBApiHelicopter</type>
+			<value>0.0</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aircraft_is_spring_centered</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aircraft_is_spring_centered</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ffb_api_fly_through_deadzone</name>
@@ -8964,6 +9202,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>force_trim_button</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_button</name>
 			<type>GliderAircraft</type>
 			<value>0</value>
 			<sim>MSFS</sim>
@@ -8978,7 +9222,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>force_trim_button</name>
+			<type>FFBApiHelicopter</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_button</name>
 			<type>Helicopter</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_button</name>
+			<type>FFBApiHelicopter</type>
 			<value>0</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
@@ -9014,6 +9272,13 @@
 		<classdefaults_MSFS>
 			<name>force_trim_enabled</name>
 			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_enabled</name>
+			<type>FFBApiHelicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -9069,7 +9334,21 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>force_trim_reset_button</name>
+			<type>FFBApiHelicopter</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_reset_button</name>
 			<type>Helicopter</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_reset_button</name>
+			<type>FFBApiHelicopter</type>
 			<value>0</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
@@ -9200,6 +9479,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>jet_engine_rumble_intensity</name>
+			<type>FFBApiHelicopter</type>
+			<value>0.01</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>jet_engine_rumble_intensity</name>
 			<type>HPGHelicopter</type>
 			<value>0.01</value>
 			<sim>MSFS</sim>
@@ -9298,6 +9584,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>joystick_trim_follow_gain_physical_x</name>
+			<type>FFBApiHelicopter</type>
+			<value>1.0</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_gain_physical_x</name>
 			<type>HPGHelicopter</type>
 			<value>0.4</value>
 			<sim>MSFS</sim>
@@ -9341,6 +9634,13 @@
 		<classdefaults_MSFS>
 			<name>joystick_trim_follow_gain_physical_y</name>
 			<type>Helicopter</type>
+			<value>1.0</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_gain_physical_y</name>
+			<type>FFBApiHelicopter</type>
 			<value>1.0</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -9390,6 +9690,13 @@
 		<classdefaults_MSFS>
 			<name>joystick_trim_follow_gain_virtual_x</name>
 			<type>Helicopter</type>
+			<value>0.2</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_gain_virtual_x</name>
+			<type>FFBApiHelicopter</type>
 			<value>0.2</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -9439,6 +9746,13 @@
 		<classdefaults_MSFS>
 			<name>joystick_trim_follow_gain_virtual_y</name>
 			<type>Helicopter</type>
+			<value>0.2</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_gain_virtual_y</name>
+			<type>FFBApiHelicopter</type>
 			<value>0.2</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -9552,14 +9866,32 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>joystick_trim_follow_curve_y</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>joystick_trim_follow_use_curve_y</name>
 			<type>!Helicopter</type>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>joystick_trim_follow_use_curve_y</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>joystick_trim_follow_stick_position</name>
 			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>joystick_trim_follow_stick_position</name>
+			<type>!FFBApiHelicopter</type>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
@@ -9819,6 +10151,14 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>overspeed_shake_start</name>
+			<type>FFBApiHelicopter</type>
+			<value>120</value>
+			<unit>kt</unit>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>overspeed_shake_start</name>
 			<type>HPGHelicopter</type>
 			<value>155</value>
 			<unit>kt</unit>
@@ -9841,6 +10181,13 @@
 			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>pedal_force_trim_enabled</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>pedal_ft_reset_button</name>
 			<type>!HPGHelicopter</type>
 			<sim>MSFS</sim>
@@ -9856,6 +10203,13 @@
 		<classdefaults_MSFS>
 			<name>pedal_spring_gain</name>
 			<type>Helicopter</type>
+			<value>0.0</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>pedal_spring_gain</name>
+			<type>FFBApiHelicopter</type>
 			<value>0.0</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
@@ -9891,6 +10245,13 @@
 		<classdefaults_MSFS>
 			<name>pedal_spring_mode</name>
 			<type>Helicopter</type>
+			<value>NOSPRING</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>pedal_spring_mode</name>
+			<type>FFBApiHelicopter</type>
 			<value>NOSPRING</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
@@ -9969,6 +10330,13 @@
 		<classdefaults_MSFS>
 			<name>rotor_blade_count</name>
 			<type>Helicopter</type>
+			<value>2</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>rotor_blade_count</name>
+			<type>FFBApiHelicopter</type>
 			<value>2</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -10314,6 +10682,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>telemffb_controls_axes</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
 			<type>!HPGHelicopter</type>
 			<sim>MSFS</sim>
 			<device>trimwheel</device>
@@ -10345,6 +10719,12 @@
 		<classdefaults_MSFS>
 			<name>trim_following</name>
 			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>trim_following</name>
+			<type>!FFBApiHelicopter</type>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
@@ -10473,6 +10853,12 @@
 		<classdefaults_MSFS>
 			<name>trim_release_spring_gain</name>
 			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>trim_release_spring_gain</name>
+			<type>!FFBApiHelicopter</type>
 			<sim>MSFS</sim>
 			<device>collective</device>
 		</classdefaults_MSFS>
@@ -10841,6 +11227,13 @@
 			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>use_legacy_bindings</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>vne_override</name>
 			<type>GliderAircraft</type>
 			<unit>kt</unit>
@@ -10927,6 +11320,80 @@
 			<name>vrs_effect_intensity</name>
 			<type>TaogH500Helicopter</type>
 			<value>0.12</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>adv_spr_override_enabled</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>trim_following</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_buffeting_enabled</name>
+			<type>!FFBApiHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>overspeed_effect_enable</name>
+			<type>FFBApiHelicopter</type>
+			<value>True</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>overspeed_shake_intensity</name>
+			<type>FFBApiHelicopter</type>
+			<value>0.2</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vrs_effect_enable</name>
+			<type>FFBApiHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vrs_effect_intensity</name>
+			<type>FFBApiHelicopter</type>
+			<value>0.12</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vrs_threshold_speed</name>
+			<type>FFBApiHelicopter</type>
+			<value>20</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vrs_vs_max</name>
+			<type>FFBApiHelicopter</type>
+			<value>500</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vrs_vs_onset</name>
+			<type>FFBApiHelicopter</type>
+			<value>350</value>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
