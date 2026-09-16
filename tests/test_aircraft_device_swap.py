@@ -724,6 +724,61 @@ class TestMainThreadWatchdog:
         assert sum('Main thread stalled' in m for m in messages) == 2
         assert any('recovered' in m for m in messages)
 
+    def test_a_native_modal_loop_is_not_reported(self, rig, caplog, monkeypatch):
+        # A held title-bar button or a window drag parks the main thread
+        # inside Windows with no Python frame above app.exec(): the beat
+        # goes stale, but nothing of ours is stuck
+        import logging as _logging
+        import sys as _sys
+        import threading as _threading
+        import time as _time
+        watchdog = self._watchdog(rig)
+        watchdog.event_loop_frame = _sys._getframe()   # stands in for main() on app.exec()
+        monkeypatch.setattr(_sys, '_current_frames',
+                            lambda: {_threading.main_thread().ident: watchdog.event_loop_frame})
+        watchdog._beat = _time.monotonic() - 10
+        with caplog.at_level(_logging.ERROR):
+            watchdog._check()
+        assert not [r for r in caplog.records if 'Main thread stalled' in r.message]
+        assert watchdog._reported is False             # a real stall afterward still reports
+
+    def test_a_stall_above_the_event_loop_is_still_reported(self, rig, caplog, monkeypatch):
+        # the same stale beat with our own frame above main()'s is a stall
+        import logging as _logging
+        import sys as _sys
+        import threading as _threading
+        import time as _time
+        watchdog = self._watchdog(rig)
+        watchdog.event_loop_frame = _sys._getframe().f_back
+        monkeypatch.setattr(_sys, '_current_frames',
+                            lambda: {_threading.main_thread().ident: _sys._getframe()})
+        watchdog._beat = _time.monotonic() - 10
+        with caplog.at_level(_logging.ERROR):
+            watchdog._check()
+        assert [r for r in caplog.records if 'Main thread stalled' in r.message]
+
+    def test_the_stalled_main_thread_is_listed_first_and_named(self, rig, caplog):
+        import logging as _logging
+        import threading as _threading
+        import time as _time
+        watchdog = self._watchdog(rig)
+        # a thread carrying the watchdog's own name must not appear in the dump
+        stop = _threading.Event()
+        bystander = _threading.Thread(target=stop.wait, name=watchdog.THREAD_NAME, daemon=True)
+        bystander.start()
+        try:
+            watchdog._beat = _time.monotonic() - 10
+            with caplog.at_level(_logging.ERROR):
+                watchdog._check()
+        finally:
+            stop.set()
+            bystander.join()
+        report = next(r.message for r in caplog.records if 'Main thread stalled' in r.message)
+        headers = [ln for ln in report.splitlines() if ln.startswith('Thread ')]
+        main = _threading.main_thread()
+        assert headers[0].startswith(f"Thread {main.ident} {main.name}")
+        assert all(watchdog.THREAD_NAME not in h for h in headers)
+
     def test_a_healthy_heartbeat_stays_silent(self, rig, caplog):
         import logging as _logging
         import time as _time

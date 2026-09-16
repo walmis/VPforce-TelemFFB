@@ -781,19 +781,29 @@ class _MainThreadWatchdog:
     on the main event loop; a daemon thread watches it, and when the
     beat goes stale it dumps every thread's stack into the log at ERROR,
     once per stall.  Costs one timer tick and one sleeping thread.
+
+    Windows runs modal loops of its own - a held title-bar button, a
+    window drag, a native menu - during which it hands nothing to Qt, so
+    the heartbeat stops though nothing of ours is stuck.  Those leave the
+    main thread parked on ``app.exec()`` with no Python frame above it;
+    a stall in our code always has one.  ``event_loop_frame`` is main()'s
+    frame, set just before ``app.exec()``, and a stale beat with the main
+    thread sitting exactly there is not reported.
     """
 
     STALL_SECS = 3.0
+    THREAD_NAME = 'main-thread-watchdog'
 
     def __init__(self):
         import threading
         self._beat = time.monotonic()
+        self.event_loop_frame = None
         self._timer = QTimer()
         self._timer.timeout.connect(self._on_beat)
         self._timer.start(500)
         self._reported = False
         threading.Thread(target=self._watch, daemon=True,
-                         name='main-thread-watchdog').start()
+                         name=self.THREAD_NAME).start()
 
     def _on_beat(self):
         self._beat = time.monotonic()
@@ -810,15 +820,29 @@ class _MainThreadWatchdog:
 
     def _check(self):
         """One watch iteration: report a fresh stall, note a recovery."""
+        import threading
         age = time.monotonic() - self._beat
         if age >= self.STALL_SECS and not self._reported:
+            frames = sys._current_frames()
+            main_frame = frames.get(threading.main_thread().ident)
+            if main_frame is not None and main_frame is getattr(self, 'event_loop_frame', None):
+                return          # inside the OS, not inside our code
             self._reported = True
             try:
-                frames = sys._current_frames()
+                # The stalled thread first and labeled, every thread by
+                # name, and this thread left out: it is the one taking the
+                # dump and can never be the cause.
+                names = {t.ident: t.name for t in threading.enumerate()}
+                main_id = threading.main_thread().ident
+                order = ([main_id] if main_id in frames else []) + \
+                        [i for i in frames if i != main_id and names.get(i) != self.THREAD_NAME]
                 dump = []
-                for thread_id, frame in frames.items():
-                    stack = ''.join(traceback.format_stack(frame))
-                    dump.append(f'Thread {thread_id}:\n{stack}')
+                for thread_id in order:
+                    stack = ''.join(traceback.format_stack(frames[thread_id]))
+                    label = f"Thread {thread_id} {names.get(thread_id, '?')}"
+                    if thread_id == main_id:
+                        label += " - the stalled main thread"
+                    dump.append(f'{label}:\n{stack}')
                 logging.error(
                     f"Main thread stalled for {age:.1f}s - stacks of "
                     "all threads follow\n" + '\n'.join(dump))
@@ -1803,7 +1827,10 @@ def main():
     # ============================================================================
     # replaced by G.main_window.version_check_complete.connect(G.sim_listeners.start_all) above
 
-    # Enter Qt application event loop - application runs until user exits
+    # Enter Qt application event loop - application runs until user exits.
+    # The watchdog tells a native modal loop from a stall by whether the
+    # main thread is sitting exactly here.
+    G.main_thread_watchdog.event_loop_frame = sys._getframe()
     app.exec()
 
     # ============================================================================
