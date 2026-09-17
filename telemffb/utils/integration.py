@@ -14,18 +14,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import html
 import json
 import logging
 import os
 import re
 import shutil
 import subprocess
+import threading
+from collections import defaultdict
 
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
 from .filesystem import calculate_checksum, calculate_crc, get_resource_path
+from .misc import insert_dict_item
 
 
 __all__ = [
@@ -134,7 +138,7 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2", kore
     # file_path_k = os.path.join(path, "game\\data\\startup.cfg")
     if not os.path.exists(file_path):
         QMessageBox.warning(window, "TelemFFB IL-2 Config Check",
-                            f"Unable to find Il-2 configuration file at: <{path}>\n\nPlease verify the installed path and update the IL2 system settings")
+                            f"Unable to find Il-2 configuration file at: <{file_path}>\n\nPlease verify the installed path and update the IL2 system settings")
         return
     current_section = None
     ref_addr = '127.255.255.255'
