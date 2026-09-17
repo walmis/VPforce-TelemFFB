@@ -3,4 +3,5 @@ from ._math import *
 from .filesystem import *
 from .device import *
 from .settings import *
+from ._logging import *
 from ._utils import *
