@@ -2034,7 +2034,7 @@ class MainWindow(QMainWindow):
             if profile_name != 'Built-In':
                 self.offline_profile.addItem(profile_name)
 
-        if not self.offline_profile.count():
+        if not self.offline_profile.count() and ac_name:
             self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
             xmlutils.update_active_profile_entry(sim=self.offline_sim.currentText(), cls=cls, model=ac_name, new_profile="Auto User")
         self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
@@ -2071,7 +2071,7 @@ class MainWindow(QMainWindow):
         self.offline_profile.blockSignals(True)
         self.offline_profile.clear()
         self.offline_name.addItems([''])
-        filtered = [name for name in self.all_offline_models if text.lower() in name.lower()]
+        filtered = [name for name in self.all_offline_models if name and text.lower() in name.lower()]
         self.offline_name.addItems(filtered)
         if len(filtered) == 1:
             self.offline_name.setCurrentIndex(1)
