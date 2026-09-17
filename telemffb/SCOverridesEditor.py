@@ -189,8 +189,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
                 scale_item = QTableWidgetItem(str(override['scale']))
             else:
                 scale_item = QTableWidgetItem('')
-            source_item = QTableWidgetItem(
-                f"{override['source']} {override.get('scope', 'model')}")
+            # The hidden source column is what the selection handler reads
+            # to decide whether the row is the user's and may be deleted.
+            source_item = QTableWidgetItem(override['source'])
 
             # Shipped rows (defaults.xml, model- or class-scoped) are shown
             # grayed and cannot be selected: only user rows can be deleted
