@@ -887,6 +887,15 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
 
         return ec, ac
 
+    def apply_joystick_constant_forces(self, telem_data: BaseTelemetryData, elevator_droop_term, g_term):
+        """The joystick constant-force applier, for callers outside the class.
+
+        The effect preview's recipes sequence production steps rather than
+        copy their arithmetic (the droop term, then this applier), and a
+        ``_`` member is class-internal by convention, so this is the name
+        they call.  Same behavior as the internal method the live loop uses."""
+        return self._apply_joystick_constant_forces(telem_data, elevator_droop_term, g_term)
+
     def _apply_joystick_constant_forces(self, telem_data: BaseTelemetryData, _elevator_droop_term, _G_term):
         """Apply constant forces (droop, G-forces, lateral) to joystick."""
         cf_pitch = -_elevator_droop_term - _G_term

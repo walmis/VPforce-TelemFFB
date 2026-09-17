@@ -59,6 +59,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.SettingsLayout import SettingsLayout
+from telemffb.preview import PREVIEW_SPECS
 from telemffb.preview_controller import EffectPreviewController
 # from telemffb.UserModelDialog import UserModelDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
@@ -1495,7 +1496,6 @@ class MainWindow(QMainWindow):
         # Effect preview (hardware check for the preview runner): one
         # entry per shipped spec, played on the device with synthetic
         # telemetry and the settings tab's current model.
-        from telemffb.preview import PREVIEW_SPECS
         preview_menu = debug_menu.addMenu("Preview Effect")
         for name, spec in PREVIEW_SPECS.items():
             preview_action = QAction(f"{name}  ({spec.kind}, {spec.duration:g}s)", self)

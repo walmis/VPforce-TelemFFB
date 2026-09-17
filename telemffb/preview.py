@@ -566,7 +566,8 @@ STALL_BUFFET = PreviewSpec(
     # end is a fade rather than a cut
     schedule=((3.0, 0.0, 1.0), (4.0, 1.0, 1.0), (1.0, 1.0, 0.0)),
     tail=0.0,
-    # IL-2 overrides the method with its telemetry-native buffet
+    # not IL-2: its class reads the sim's own buffet fields through the same
+    # method name, so it has its own preview (IL2_BUFFET) with those fields
     sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
 )
 
@@ -1157,7 +1158,8 @@ RUNWAY_RUMBLE = PreviewSpec(
             'BMS': {'BumpIntensity': Jitter(center=0.5, amplitude=0.5)}},
     duration=4.0,
     constant_force=True,
-    # IL-2 overrides the method with its own native-telemetry rumble
+    # not IL-2: same method name, but behind the IL-2 shake master and its own
+    # intensity row, so it has its own preview (IL2_RUNWAY_RUMBLE)
     sims=('DCS', 'MSFS', 'XPLANE', 'BMS'),
 )
 
@@ -1301,7 +1303,7 @@ def _msfs_elevator_droop(ac, frame, **kwargs):
     if not ac.is_joystick():
         return
     term = ac.elevator_droop_term_for(g_force=frame.G or 1.0, _elev_dyn_pressure=0.0)
-    ac._apply_joystick_constant_forces(frame, term, 0.0)
+    ac.apply_joystick_constant_forces(frame, term, 0.0)
 
 
 MSFS_ELEVATOR_DROOP = PreviewSpec(
@@ -1369,7 +1371,7 @@ def _msfs_lateral_force(ac, frame, **kwargs):
     constant-force applier the live loop uses, with no droop or G term."""
     if not ac.is_joystick():
         return
-    ac._apply_joystick_constant_forces(frame, 0.0, 0.0)
+    ac.apply_joystick_constant_forces(frame, 0.0, 0.0)
 
 
 LATERAL_FORCE = PreviewSpec(
@@ -1455,8 +1457,7 @@ IL2_RUNWAY_RUMBLE = PreviewSpec(
     sims=('IL2',),
 )
 
-PREVIEW_SPECS: Dict[str, PreviewSpec] = {
-    spec.name: spec for spec in (
+_ALL_SPECS = (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
         AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET,
         SPEEDBRAKE_BUFFET, SPOILER_BUFFET,
@@ -1468,15 +1469,31 @@ PREVIEW_SPECS: Dict[str, PreviewSpec] = {
         ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP,
         NOSEWHEEL_SHIMMY, AOA_REDUCTION, LATERAL_FORCE,
         IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE)
-}
-assert len(PREVIEW_SPECS) == 42, "a spec name collided"
 
-# settings row -> the one preview whose button it hosts
-PREVIEWS_BY_ROW: Dict[str, PreviewSpec] = {}
-for _spec in PREVIEW_SPECS.values():
-    for _row in _spec.rows:
-        assert _row not in PREVIEWS_BY_ROW, f"row {_row} claimed by two previews"
-        PREVIEWS_BY_ROW[_row] = _spec
+
+
+def index_specs(specs) -> Tuple[Dict[str, PreviewSpec], Dict[str, PreviewSpec]]:
+    """``(by name, by settings row)`` for a set of specs.
+
+    A collision would silently drop a preview from the menu and the row
+    buttons, so it is an error - raised, not asserted, so that it survives
+    ``python -O``."""
+    by_name: Dict[str, PreviewSpec] = {}
+    by_row: Dict[str, PreviewSpec] = {}
+    for spec in specs:
+        if spec.name in by_name:
+            raise ValueError(f"preview name {spec.name!r} is used by two specs")
+        by_name[spec.name] = spec
+        for row in spec.rows:
+            if row in by_row:
+                raise ValueError(f"settings row {row!r} is claimed by two previews: "
+                                 f"{by_row[row].name!r} and {spec.name!r}")
+            by_row[row] = spec
+    return by_name, by_row
+
+
+# name -> spec, and settings row -> the one preview whose button it hosts
+PREVIEW_SPECS, PREVIEWS_BY_ROW = index_specs(_ALL_SPECS)
 
 
 def preview_for_row(setting_name: str) -> Optional[PreviewSpec]:

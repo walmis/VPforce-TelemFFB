@@ -20,7 +20,6 @@
 import html
 import inspect
 import json
-import html
 import logging
 import os
 import re

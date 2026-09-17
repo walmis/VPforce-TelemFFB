@@ -1411,6 +1411,52 @@ class TestRoundCounter:
         assert a[0] == b[0] == 100 and a == b
 
 
+class TestSpecIndex:
+    """The registry refuses a collision outright (and with a raise, so it
+    holds under ``python -O``): a shadowed spec would vanish from the menu
+    and the row buttons with nothing to say why."""
+
+    def _spec(self, name, rows):
+        return PreviewSpec(effect_id=None, name=name, method='m', kind='hold',
+                           fields={'*': {}}, rows=rows, reference='x')
+
+    def test_indexes_by_name_and_by_row(self):
+        from telemffb.preview import index_specs
+        a, b = self._spec('a', ('row_a', 'row_a2')), self._spec('b', ('row_b',))
+        by_name, by_row = index_specs((a, b))
+        assert by_name == {'a': a, 'b': b}
+        assert by_row == {'row_a': a, 'row_a2': a, 'row_b': b}
+
+    def test_a_name_used_twice_is_an_error(self):
+        from telemffb.preview import index_specs
+        with pytest.raises(ValueError, match="used by two specs"):
+            index_specs((self._spec('a', ('r1',)), self._spec('a', ('r2',))))
+
+    def test_a_row_claimed_twice_is_an_error_naming_both(self):
+        from telemffb.preview import index_specs
+        with pytest.raises(ValueError, match="'a' and 'b'"):
+            index_specs((self._spec('a', ('r1',)), self._spec('b', ('r1',))))
+
+    def test_the_shipped_catalog_indexes_cleanly(self):
+        from telemffb.preview import index_specs, _ALL_SPECS, PREVIEWS_BY_ROW
+        by_name, by_row = index_specs(_ALL_SPECS)
+        assert by_name == PREVIEW_SPECS and by_row == PREVIEWS_BY_ROW
+        assert len(by_name) == len(_ALL_SPECS) == 42
+
+
+class TestPublicConstantForceApplier(BaseTelemetryEffectTestCase):
+    def test_the_public_entry_is_the_internal_applier(self, monkeypatch):
+        """The preview's recipes call the public name; it must stay the
+        production applier and nothing else."""
+        ac = aircrafts_msfs_xp.Aircraft('preview')
+        seen = []
+        monkeypatch.setattr(ac, '_apply_joystick_constant_forces',
+                            lambda frame, droop, g: seen.append((frame, droop, g)) or 'ret')
+        frame = BaseTelemetryData()
+        assert ac.apply_joystick_constant_forces(frame, 0.25, 0.5) == 'ret'
+        assert seen == [(frame, 0.25, 0.5)]
+
+
 class TestSpecFrameRate(BaseTelemetryEffectTestCase):
     def test_the_gunfire_spec_sets_its_own_cadence(self):
         ac = aircrafts_dcs.Aircraft('preview')
