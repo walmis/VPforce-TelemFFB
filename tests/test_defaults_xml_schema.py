@@ -463,6 +463,16 @@ class TestScOverrides:
                 f"class row '{elem.findtext('name')}' names {cls}, "
                 f"not registered for {sim}")
 
+    def test_the_simconnect_fallback_names_registered_classes(self, defaults_root):
+        """An unmatched MSFS aircraft is given a class by its engine type, as
+        a ``"MSFS.<class>"`` hint.  A hint naming no registered class resolves
+        no class defaults and keys no class rows, and nothing else notices."""
+        src = (Path(__file__).parents[1] / "telemffb" / "telem" / "TelemManager.py").read_text(encoding="utf-8")
+        hinted = set(re.findall(r'get_aircraft_config\(aircraft_name, "MSFS\.(\w+)"\)', src))
+        registered = {e.findtext("class_name") for e in defaults_root.findall('.//classes[sim="MSFS"]')}
+        assert hinted, "the fallback block moved: update this test"
+        assert hinted <= registered, f"not registered for MSFS: {sorted(hinted - registered)}"
+
     def test_model_patterns_valid_regex(self, defaults_root):
         for elem in defaults_root.findall(".//sc_overrides"):
             pattern = elem.findtext("model", "")

@@ -1057,7 +1057,7 @@ class TelemManager(QObject, threading.Thread):
                     aircraftClass = module.GliderAircraft
                 elif sc_engine_type == 3:   # Heli
                     logging.warning("Aircraft definition not found, using SimConnect Data (Helo Type)")
-                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.HelicopterAircraft")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.Helicopter")
                     params.update(type_cfg)
                     aircraftClass = module.Helicopter
                 elif sc_engine_type == 5:   # Turboprop
