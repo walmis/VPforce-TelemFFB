@@ -203,21 +203,45 @@ class TelemManager(QObject, threading.Thread):
                 # A crashing aircraft hook must not abort the rest of the
                 # sim-exit cleanup (effect release, listener restart).
                 logging.error(f"Aircraft on_timeout failed for {src}: {e}", exc_info=True)
+            # Retire ahead of the sweep below, so a handler's own on_shutdown()
+            # still sees its effects rather than ones already freed under it.
+            self._retire_current_aircraft()
             # on_timeout() is *pause* semantics: with keep_forces_on_pause it
             # deliberately leaves the condition effects running so the stick
-            # does not go limp mid-session.  A sim exit ends the session, and
-            # currentAircraft is dropped immediately below, so without this
-            # those forces would stay on the device with nothing left to
-            # manage them.  Frees each effect individually - never a device
-            # reset, which would also wipe effects the sim itself created.
+            # does not go limp mid-session.  A sim exit ends the session and the
+            # handler has just been dropped, so without this those forces would
+            # stay on the device with nothing left to manage them.  Frees each
+            # effect individually - never a device reset, which would also wipe
+            # effects the sim itself created.
             freed = HapticEffect.destroy_all()
             if freed:
                 logging.info(f"Sim exit: freed {freed} effect(s) from the device")
-            self.currentAircraft = None
         self.currentAircraftName = None
         self.currentDataSource = None
         self._last_aircraft_info = None
         self.sim_exited.emit(src)
+
+    def _retire_current_aircraft(self):
+        """Drop the current aircraft handler, giving it a chance to release resources.
+
+        Every path that stops using a handler for good comes through here: sim exit, the
+        load of a different aircraft, and application quit.  on_timeout() is not enough
+        on its own - an aircraft change produces no timeout, so a handler that holds
+        external state (an aircraft-side mode flag, say) would otherwise never be told
+        it is finished.
+        """
+        if self.currentAircraft is None:
+            return
+        try:
+            self.currentAircraft.on_shutdown()
+        except Exception:
+            logging.exception("Error shutting down aircraft handler")
+        self.currentAircraft = None
+
+    def on_shutdown(self):
+        """Called on the application quit path, before the event loop stops."""
+        self._retire_current_aircraft()
+        self.currentAircraftName = None
 
     def set_simconnect(self, sc : SimConnectManager):
         self._simconnect = sc
@@ -567,6 +591,11 @@ class TelemManager(QObject, threading.Thread):
         data_source = aircraft_info.data_source
 
         logging.info(f"New aircraft loaded {aircraft_name}: resetting current aircraft config")
+
+        # An aircraft change produces no timeout, so the outgoing handler is retired
+        # explicitly here.  Without this a handler that sets state on the sim side has
+        # no point at which to clear it, and that state leaks into the next aircraft.
+        self._retire_current_aircraft()
         self.currentAircraftConfig = {}
 
         params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
@@ -843,6 +872,12 @@ class TelemManager(QObject, threading.Thread):
 
     def _recreate_aircraft_with_new_type(self, aircraft_info: AircraftInfo, params, cls_name):
         """Recreate aircraft instance when type changes."""
+        # The class changed under a live aircraft, so the outgoing handler is finished
+        # even though the aircraft itself has not changed and no timeout fired.  This is
+        # the path a user takes to opt *out* of a class, so it is exactly when a handler
+        # holding sim-side state has to clear it - otherwise that state is inherited by
+        # a class that knows nothing about it.  No-ops when currentAircraft is None.
+        self._retire_current_aircraft()
         Aircraft_Class = getattr(aircraft_info.module, cls_name, None)
         self.currentAircraft = Aircraft_Class(aircraft_info.name)
         self.currentAircraft.apply_settings(params)

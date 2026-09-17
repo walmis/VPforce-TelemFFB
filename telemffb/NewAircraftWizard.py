@@ -68,6 +68,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         "GliderAircraft": "Glider",
         "Helicopter": "Helicopter",
         "CowanSimHelicopter": "CowanSim Helicopter",
+        "FFBApiHelicopter": "Standard FFB API Helicopter",
         "FlyInsideHelicopter": "FlyInside Helicopter",
         "HPGHelicopter": "Hype Group Airbus Helicopter",
         "SASHelicopter": "SimFocus SAS Helicopter",
@@ -76,7 +77,14 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     }
     internal_class_names = {v: k for k, v in friendly_class_names.items()}  # Build reverse lookup table
 
-    mandatory_clone_types = ("HPGHelicopter", "SASHelicopter", "FlyInsideHelicopter", "TaogH500Helicopter", "XAW109Helicopter") # Aircraft types with special treatment that must be cloned from a default profile
+    # Aircraft types with special treatment that must be cloned from a default profile.
+    # The clone list is filtered to models of the chosen class (get_models -> read_models),
+    # so a class only belongs here once defaults.xml ships a <models> entry for it -
+    # otherwise the only candidate is the null entry and Finish can never be enabled.
+    # FFBApiHelicopter deliberately stays out: it carries no shipped model mapping (no
+    # released aircraft implements the spec yet) and its settings come from
+    # <classdefaults_MSFS>, so there is nothing a clone would supply.
+    mandatory_clone_types = ("HPGHelicopter", "SASHelicopter", "FlyInsideHelicopter", "TaogH500Helicopter", "XAW109Helicopter")
     mandatory_clone: bool=False
     aircraft_list: list=None
     class_list: list=None
