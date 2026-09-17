@@ -398,8 +398,8 @@ actuator to unclutch). Implement this as a single `self._has_trim(control)` guar
 the three code paths cannot drift apart.
 
 **Cyclic** (`msfs_update_heli_controls`, joystick instance):
-- Spring center `cpO_x`/`cpO_y` ← `ffbTrimCyclicRoll` / `ffbTrimCyclicPitch` scaled
-  ×4096. This is the trim actuator position — a clean, continuous reference, so it
+- Spring center `cpO_x`/`cpO_y` ← `ffbTrimCyclicRoll` / `ffbTrimCyclicPitch`, kept
+  normalized like every other helicopter path. This is the trim actuator position — a clean, continuous reference, so it
   replaces both the SEMA-slack integration (HPG) and the `ROTOR *_TRIM PCT` follow
   (generic). Smooth toward the target to avoid steps if the aircraft publishes coarse
   values.
@@ -470,10 +470,11 @@ standardized var names when the API is active.
 ### 4.4 Sign / unit conventions
 
 The proposal mandates: normalized −1..+1, `0` = neutral/mid-travel; positive =
-nose-up / roll-right / collective-up / right-pedal (yaw right). TelemFFB internally
-uses ±4096 fixed-point for spring center/coefficient/offset. Centralize the
-`normalized → ±4096` conversion (and the collective inversion) in one helper on the
-class so sign bugs live in exactly one place. Cross-check the collective sign against
+nose-up / roll-right / collective-up / right-pedal (yaw right). The device works in
+±4096 fixed-point, but that conversion belongs to the effect layer: `set_offset()` and
+`set_coefficient()` scale a float at the boundary, and `cpO_x` / `cpO_y` stay normalized
+−1..+1 as they do in every other helicopter class. Centralize the sign handling (and the
+collective inversion) in one helper on the class so sign bugs live in exactly one place. Cross-check the collective sign against
 the existing inverted convention table in HPG before wiring.
 
 ---
@@ -584,7 +585,7 @@ the existing inverted convention table in HPG before wiring.
 |---|---|
 | Aircraft isn't configured as `FFBApiHelicopter` | The class is never instantiated. No subscription, no read, no write — the strongest form of "never write any `L:FFB_*` var" (spec §4 step 1). |
 | Configured aircraft hasn't published `FFB_API_VERSION` yet | Stay inert and keep looking; behave like generic `Helicopter`. Never write **any** `L:FFB_*` var. After `FFB_API_DISCOVERY_WARN_MS` of silence, warn once that the class may be misconfigured — a soft check, not a latch. |
-| Two API aircraft loaded in succession | `L:FFB_*` survive the change, so the fresh instance can briefly read the previous aircraft's values. Discovery debounces: `(VERSION, FEATURES)` must hold for `FFB_API_DISCOVERY_STABLE_FRAMES` frames before latching (§10.1). |
+| Two API aircraft loaded in succession | `L:FFB_*` survive the change, so the fresh instance can briefly read the previous aircraft's values. Stale values hold still, so the debounce alone can latch them; a different pair that then holds for `FFB_API_DISCOVERY_STABLE_FRAMES` frames replaces the latched one (§10.1). |
 | `FFB_FEATURES` absent / `0` with `API_VERSION >= 1` | Legal. No control is trimmed: no trim spring anywhere, `_TRIM` and `_TR_ON` ignored. Hydraulics and fly-through still active. Log once. |
 | `FFB_FEATURES` has bits set above bit 2 | Unknown future capabilities — mask off and ignore; never treat an unknown bit as an error or as "no features". |
 | Read vars published while our control is *not* enabled | Ignore them (spec §3.4). Consuming `_TRIM` in normal mode would fight the aircraft's own trim, which is exactly what the mode gate prevents. |
@@ -698,11 +699,17 @@ re-litigated; each links to where it is implemented above.
    **Residual — stale reads between two API aircraft.** Loading one implementing
    helicopter after another is the case a class does *not* close: both are legitimately
    configured, and for a few frames the fresh instance can still read the previous
-   aircraft's values. Handled by debouncing discovery — `(FFB_API_VERSION, FFB_FEATURES)`
-   must read identically for `FFB_API_DISCOVERY_STABLE_FRAMES` consecutive frames before
-   it is latched, which spans the window. Latching (rather than reading the bits per
-   frame) is kept because the spec declares both values static per aircraft, and a
-   transient 0 during aircraft init must not momentarily retract a trim capability.
+   aircraft's values. Discovery debounces — `(FFB_API_VERSION, FFB_FEATURES)` must read
+   identically for `FFB_API_DISCOVERY_STABLE_FRAMES` consecutive frames before it is
+   latched — but that only filters a value in motion. The previous aircraft's values hold
+   perfectly still until the current one publishes, so they can outlast the debounce and
+   latch. The latch is therefore replaceable: the live pair stays watched, and a different
+   pair that settles by the same rule takes over, re-running the spring handshake since
+   the spring reference may move with the capability bits. Both values are static per
+   aircraft, so a settled change can only be the current aircraft speaking. The control
+   paths still consume the latched copy (never the live read), and a version below 1 or a
+   change that does not settle alters nothing, so a transient during aircraft init cannot
+   momentarily retract a trim capability.
 
    Rejected — **mixin on base `Helicopter`** (the original decision): misfire mode
    above. Its stated advantage, zero-config discovery, is real, and its cost estimate

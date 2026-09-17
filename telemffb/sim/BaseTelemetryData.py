@@ -1104,7 +1104,8 @@ class BaseTelemetryData:
     ffbApiVersion: Optional[float]
     """FFB LVAR API revision implemented by the aircraft.
     MSFS: L:FFB_API_VERSION — number.
-    Discovery variable: read once per aircraft load, never per frame.
+    Discovery variable: latched once it settles and consumed from the latch, never
+    per frame; a different value that settles later replaces the latch.
     0 or absent = not implemented; the rig stays in legacy mode and writes no
     L:FFB_* variable at all.
     Default when absent: None until subscribed, then 0.
@@ -1115,7 +1116,7 @@ class BaseTelemetryData:
     MSFS: L:FFB_FEATURES — number, decoded as (round(v) >> bit) & 1.
     Bit 0 = cyclic has trim, 1 = collective has trim, 2 = pedals has trim;
     bits 3+ reserved and must be ignored rather than treated as an error.
-    Discovery variable: read once per aircraft load.
+    Discovery variable: latched together with L:FFB_API_VERSION.
     Default when absent: 0 — meaning no control is trimmed, so no trim spring is
     applied anywhere.
     """
