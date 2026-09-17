@@ -18275,6 +18275,22 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>AS365 N2.*</model>
+		<value>FFBApiHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+		<notes>This aircraft uses the FFBApiHelicopter class, which drives the cyclic spring from the standardized L:FFB_* variables the aircraft publishes. It needs version 1.2.0 or later of the AS365 Dauphin / HH65 Dolphin package. That version publishes the API for the cyclic only: the collective and pedals get no trim reference from the aircraft, so the collective gets a damping force set by FFB API Collective Spring Gain, and the pedals have no spring until FFB API Pedal Spring Gain is raised. If you load a livery whose title does not automatically match this profile, create a profile for it and select the FFBApiHelicopter class: everything the class needs comes with the class. To opt out, set the class to Helicopter.</notes>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AS365 F/N.*</model>
+		<value>FFBApiHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+		<notes>This aircraft uses the FFBApiHelicopter class, which drives the cyclic spring from the standardized L:FFB_* variables the aircraft publishes. It needs version 1.2.0 or later of the AS365 Dauphin / HH65 Dolphin package. That version publishes the API for the cyclic only: the collective and pedals get no trim reference from the aircraft, so the collective gets a damping force set by FFB API Collective Spring Gain, and the pedals have no spring until FFB API Pedal Spring Gain is raised. If you load a livery whose title does not automatically match this profile, create a profile for it and select the FFBApiHelicopter class: everything the class needs comes with the class. To opt out, set the class to Helicopter.</notes>
+	</models>
+	<models>
 		<name>etl_effect_intensity</name>
 		<model>Asobo Cabri G2.*</model>
 		<value>0.25</value>
@@ -21221,6 +21237,22 @@
 		<value>L:pedal_lock</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>HH65A Dolphin.*</model>
+		<value>FFBApiHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+		<notes>This aircraft uses the FFBApiHelicopter class, which drives the cyclic spring from the standardized L:FFB_* variables the aircraft publishes. It needs version 1.2.0 or later of the AS365 Dauphin / HH65 Dolphin package. That version publishes the API for the cyclic only: the collective and pedals get no trim reference from the aircraft, so the collective gets a damping force set by FFB API Collective Spring Gain, and the pedals have no spring until FFB API Pedal Spring Gain is raised. If you load a livery whose title does not automatically match this profile, create a profile for it and select the FFBApiHelicopter class: everything the class needs comes with the class. To opt out, set the class to Helicopter.</notes>
+	</models>
+	<models>
+		<name>type</name>
+		<model>HH65B Dolphin.*</model>
+		<value>FFBApiHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+		<notes>This aircraft uses the FFBApiHelicopter class, which drives the cyclic spring from the standardized L:FFB_* variables the aircraft publishes. It needs version 1.2.0 or later of the AS365 Dauphin / HH65 Dolphin package. That version publishes the API for the cyclic only: the collective and pedals get no trim reference from the aircraft, so the collective gets a damping force set by FFB API Collective Spring Gain, and the pedals have no spring until FFB API Pedal Spring Gain is raised. If you load a livery whose title does not automatically match this profile, create a profile for it and select the FFBApiHelicopter class: everything the class needs comes with the class. To opt out, set the class to Helicopter.</notes>
 	</models>
 	<models>
 		<name>aileron_expo</name>

@@ -86,9 +86,8 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     # The clone list is filtered to models of the chosen class (get_models -> read_models),
     # so a class only belongs here once defaults.xml ships a <models> entry for it -
     # otherwise the only candidate is the null entry and Finish can never be enabled.
-    # FFBApiHelicopter deliberately stays out: it carries no shipped model mapping (no
-    # released aircraft implements the spec yet) and its settings come from
-    # <classdefaults_MSFS>, so there is nothing a clone would supply.
+    # FFBApiHelicopter stays out: its settings come from <classdefaults_MSFS> and it
+    # subscribes its own variables, so a clone would supply nothing the class lacks.
     mandatory_clone_types = ("HPGHelicopter", "FlyInsideHelicopter")
     mandatory_clone: bool=False
     aircraft_list: list=None
