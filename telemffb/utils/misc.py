@@ -13,21 +13,38 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
+
 import random
 import re
-import threading
-
 import socket
+import threading
 import time
 
-from PyQt6.QtCore import QCoreApplication, QSize, QObject, Qt, QMetaObject, pyqtSlot
+from PyQt6.QtCore import QCoreApplication, QMetaObject, QObject, Qt, QSize, pyqtSlot
 from PyQt6.QtGui import QGuiApplication, QPixmap
 
 from PyQt6 import QtCore
 
-import telemffb.globals as G
 from ._math import to_number
+
+
+__all__ = [
+    "schedule_on_main_thread",
+    "EffectTranslator",
+    "Destroyable",
+    "sanitize_dict",
+    "flatten_dict",
+    "insert_dict_item",
+    "get_random_within_range",
+    "PerformanceTracker",
+    "Dispenser",
+    "Teleplot",
+    "teleplot",
+    "ResultThread",
+    "threaded",
+    "HiDpiPixmap",
+]
+
 
 def schedule_on_main_thread(func):
     """
@@ -209,52 +226,6 @@ class Destroyable:
     def destroy(self):
         raise NotImplementedError
 
-
-# def set_reg(name, value):
-#     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-#     try:
-#         winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
-#         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
-
-#         if isinstance(value, bool):
-#             # Convert boolean to integer (1 for True, 0 for False)
-#             value = int(value)
-#         # Check if the value is an integer
-#         if isinstance(value, int):
-#             # For integers, use REG_DWORD
-#             reg_type = winreg.REG_DWORD
-#         elif isinstance(value, bytes):
-#             # For binary data, use REG_BINARY
-#             reg_type = winreg.REG_BINARY
-#         else:
-#             # For strings, use REG_SZ
-#             reg_type = winreg.REG_SZ
-
-#         winreg.SetValueEx(registry_key, name, 0, reg_type, value)
-#         winreg.CloseKey(registry_key)
-#         return True
-#     except WindowsError:
-#         return False
-
-
-# def get_reg(name):
-#     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-#     try:
-#         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
-
-#         # Query the value and its type
-#         value, reg_type = winreg.QueryValueEx(registry_key, name)
-
-#         # If the type is REG_DWORD, return the integer value
-#         if reg_type == winreg.REG_DWORD:
-#             return value
-#         elif reg_type == winreg.REG_BINARY:
-#             return value
-#         else:
-#             return str(value)  # Return as string for other types
-
-#     except WindowsError:
-#         return None
 
 def sanitize_dict(d):
     out = {}
