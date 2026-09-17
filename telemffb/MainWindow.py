@@ -1867,7 +1867,7 @@ class MainWindow(QMainWindow):
 
 
     @pyqtSlot(bool)
-    def toggle_offline_mode(self, state):
+    def toggle_offline_mode(self, state, broadcast=True):
         if state == G.settings_mgr.offline_mode:
             # if already in the same state, do nothing
             return
@@ -1927,13 +1927,18 @@ class MainWindow(QMainWindow):
             # Show the offline mode widgets, but only for master instance
             self.offline_config_area.setVisible(state)
 
-            # Send command to chile instance to replicate actions
-            G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
+            # Send command to child instances to replicate actions
+            if broadcast:
+                G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
     @pyqtSlot(str, str, str, str)
     def load_single_offline_model(self, sim, cls, model, profile, from_profile_manager=True):
 
-        self.toggle_offline_mode(True)
+        # Not broadcast: SHOW_OFFLINE_MODEL at the end of this method has each child
+        # run this same method, which takes it offline and applies the selection in
+        # one step.  An earlier TOGGLE OFFLINE would leave the children offline with
+        # nothing selected for as long as the combos below take to fill.
+        self.toggle_offline_mode(True, broadcast=False)
         for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
             cb.blockSignals(True)
             cb.clear()

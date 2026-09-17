@@ -605,6 +605,14 @@ class SettingsLayout(QGridLayout):
         # device is configured): holding the reading position - right for
         # every ordinary edit - would leave the new section silently
         # off-screen above.
+        if G.settings_mgr.offline_mode and not G.settings_mgr.offline_scope:
+            # Offline with nothing selected yet.  The state variables still describe
+            # the live aircraft, and a row has no scope to be written against, so
+            # there is nothing valid to build.  A child instance sits here between
+            # going offline and being told what the master selected, and a config
+            # change can ask for a rebuild in that gap.
+            self.clear_layout()
+            return
         scroll_anchor = None if reveal_top else self._capture_scroll_anchor()
         self.clear_layout(show_empty_notice=False)
         # Clear unit tracking when reloading layout
