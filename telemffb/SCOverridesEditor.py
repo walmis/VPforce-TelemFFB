@@ -18,7 +18,8 @@
 
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QAbstractItemView, QDialog, QTableWidgetItem, QMessageBox
+from PyQt6.QtGui import QPalette
+from PyQt6.QtWidgets import QAbstractItemView, QDialog, QHeaderView, QTableWidgetItem, QMessageBox
 
 from . import globals as G
 from . import xmlutils
@@ -164,21 +165,34 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         model.sort(0)  # Sort items alphabetically
 
 
+    TIER_TOOLTIPS = {
+        'Class': "Ships with the aircraft class. Every aircraft of this class gets it.",
+        'Default': "Ships with the built-in profile that matched this aircraft.",
+        'User': "Your own override for this aircraft.",
+    }
+
+    @staticmethod
+    def _tier(override) -> str:
+        """Class, Default or User - the tiers the Telem Ovd pill counts."""
+        if override.get('source') == 'user':
+            return 'User'
+        return 'Class' if override.get('scope') == 'class' else 'Default'
+
     def fill_table(self):
         self.tableWidget.blockSignals(True)
         self.tableWidget.clear()
         list_length = len(self.overrides) - 1
         # Set headers
-        headers = ['Property', 'Variable', 'Unit', 'Scale', 's']
+        headers = ['Property', 'Variable', 'Unit', 'Scale', 'Source']
         self.tableWidget.setHorizontalHeaderLabels(headers)
         row_index = 0
-        # Set width of the variable column
+        # The variable column takes whatever the others leave
         self.tableWidget.setColumnWidth(0, 140)
-        self.tableWidget.setColumnWidth(1, 300)
         self.tableWidget.setColumnWidth(2, 130)
-        self.tableWidget.setColumnWidth(3, 100)
-        self.tableWidget.setColumnWidth(4, 60)
-        self.tableWidget.setColumnHidden(4, True)
+        self.tableWidget.setColumnWidth(3, 90)
+        self.tableWidget.setColumnWidth(4, 70)
+        self.tableWidget.setColumnHidden(4, False)
+        self.tableWidget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
 
         # Populate the table
         for row, override in enumerate(self.overrides):
@@ -192,24 +206,30 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
                 scale_item = QTableWidgetItem(str(override['scale']))
             else:
                 scale_item = QTableWidgetItem('')
-            # The hidden source column is what the selection handler reads
-            # to decide whether the row is the user's and may be deleted.
-            source_item = QTableWidgetItem(override['source'])
+            # The Source column names the tier in the words the Telem Ovd pill
+            # uses.  The raw source rides along as item data: it is what the
+            # selection handler reads to decide whether the row may be deleted.
+            tier = self._tier(override)
+            source_item = QTableWidgetItem(tier)
+            source_item.setData(Qt.ItemDataRole.UserRole, override['source'])
+            source_item.setToolTip(self.TIER_TOOLTIPS[tier])
 
             # Shipped rows (defaults.xml, model- or class-scoped) are shown
             # grayed.  They stay selectable, since selecting one is how a user
             # starts an override of it; only user rows can be deleted.
             if override['source'] != 'user':
-                name_item.setForeground(Qt.GlobalColor.gray)
-                var_item.setForeground(Qt.GlobalColor.gray)
-                sc_unit_item.setForeground(Qt.GlobalColor.gray)
-                scale_item.setForeground(Qt.GlobalColor.gray)
+                # The palette's disabled text color, not a fixed gray: a fixed one
+                # sits too close to the dark theme's normal text to read as grayed.
+                shipped = self.palette().color(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text)
+                for item in (name_item, var_item, sc_unit_item, scale_item, source_item):
+                    item.setForeground(shipped)
 
             # Setting items non-editable
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             var_item.setFlags(var_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             scale_item.setFlags(scale_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            source_item.setFlags(source_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             # Setting items for the row
             self.tableWidget.setItem(row, 0, name_item)
@@ -247,7 +267,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.tb_scale.setText(self.tableWidget.item(current_row, 3).text())
             self.current_name = self.tableWidget.item(current_row, 0).text()
             # enable delete button for user rows
-            if self.tableWidget.item(current_row, 4).text() == 'user':
+            if self.tableWidget.item(current_row, 4).data(Qt.ItemDataRole.UserRole) == 'user':
                 self.pb_delete.setEnabled(True)
             else:
                 self.pb_delete.setEnabled(False)
