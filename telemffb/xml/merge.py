@@ -80,33 +80,35 @@ def merged_profile_names(sources, taken, label: str, same_string: bool = False) 
     return out
 
 
+def merge_sc_override_layers(*layers: list[ScOverrideRow]) -> list[ScOverrideRow]:
+    """Merge SC override layers by name; a later layer wins, new names append.
+
+    Rows keep the order of their first appearance.  The winning row's own
+    ``source`` and ``scope`` travel with it, so a consumer can still tell
+    where the value in force came from.  Pure function: the inputs are not
+    mutated.
+    """
+    merged: list[ScOverrideRow] = []
+    index: dict[str, int] = {}
+    for layer in layers:
+        for row in layer:
+            copy = dict(row)
+            pos = index.get(copy['name'])
+            if pos is None:
+                index[copy['name']] = len(merged)
+                merged.append(copy)
+            else:
+                merged[pos] = copy
+    return merged
+
+
 def update_sc_overrides_with_user(
     defaults_ovr: list[ScOverrideRow],
     user_ovr: list[ScOverrideRow],
 ) -> list[ScOverrideRow]:
     """Merge default + user SC overrides; user wins by name, new items appended."""
-    updated = defaults_ovr.copy()
-    for user_model in user_ovr:
-        found = False
-        for existing in updated:
-            if existing['name'] == user_model['name']:
-                existing['var'] = user_model['var']
-                existing['sc_unit'] = user_model['sc_unit']
-                existing['scale'] = user_model['scale']
-                existing['source'] = 'user'
-                existing['sim'] = user_model.get('sim', '')
-                found = True
-                break
-        if not found:
-            updated.append({
-                'name': user_model['name'],
-                'var': user_model['var'],
-                'sc_unit': user_model['sc_unit'],
-                'scale': user_model['scale'],
-                'source': 'user',
-                'sim': user_model.get('sim', ''),
-            })
-    return updated
+    users = [dict(row, source='user') for row in user_ovr]
+    return merge_sc_override_layers(defaults_ovr, users)
 
 
 def remove_dicts_by_names(

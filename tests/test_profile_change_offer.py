@@ -445,6 +445,22 @@ def test_the_preview_shows_what_the_builtin_brings_when_theirs_wins(store):
     assert (pv["in_effect"], pv["conflicts"]) == ("yours", 0)
 
 
+def test_a_class_row_both_sides_share_is_not_a_change_when_theirs_wins(store):
+    # theirs names the aircraft and shares the built-in's class, so the class's
+    # row is in effect today and still is after the merge
+    root = xmlutils._get_mgr()[0].defaults_root
+    row = ET.SubElement(root, "sc_overrides")
+    for tag, text in (("name", "ClassSrc"), ("class", "JetAircraft"), ("sim", SIM),
+                      ("var", "L:CLASS_SRC"), ("sc_unit", "number")):
+        ET.SubElement(row, tag).text = text
+    _added("737-600 PAX.*", ("aileron_expo", "0.9"))
+    pv = xmlutils.merge_preview(SIM, AC, "737-600 PAX.*", "737-600.*")
+    shared = _entry(pv, "ClassSrc", "override")
+    assert (shared["built_in"], shared["after"], shared["changes"]) == ("L:CLASS_SRC", "L:CLASS_SRC", False)
+    park = _entry(pv, "ParkBrake", "override")          # the built-in's own row is still a gain
+    assert park["changes"] is True
+
+
 def test_the_preview_shows_what_a_merge_restores_when_the_builtin_wins(store):
     # the built-in names the aircraft: theirs is broader and none of it applies;
     # a merge puts their values back on top and keeps the curated rest

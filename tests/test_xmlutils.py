@@ -150,6 +150,41 @@ MINIMAL_DEFAULTS = """\
     <sc_unit>RPM</sc_unit>
     <scale>1.0</scale>
   </sc_overrides>
+  <sc_overrides>
+    <name>OilPress</name>
+    <model>Cessna.*</model>
+    <sim>MSFS</sim>
+    <var>L:Model.OilPress</var>
+    <sc_unit>psi</sc_unit>
+  </sc_overrides>
+  <sc_overrides>
+    <name>OilPress</name>
+    <class>PropellerAircraft</class>
+    <sim>MSFS</sim>
+    <var>L:Class.OilPress</var>
+    <sc_unit>psi</sc_unit>
+  </sc_overrides>
+  <sc_overrides>
+    <name>EngRPM</name>
+    <class>PropellerAircraft</class>
+    <sim>MSFS</sim>
+    <var>L:Class.EngRPM</var>
+    <sc_unit>RPM</sc_unit>
+  </sc_overrides>
+  <sc_overrides>
+    <name>FuelFlow</name>
+    <class>PropellerAircraft</class>
+    <sim>MSFS</sim>
+    <var>L:Class.FuelFlow</var>
+    <sc_unit>gph</sc_unit>
+  </sc_overrides>
+  <sc_overrides>
+    <name>XpOnly</name>
+    <class>PropellerAircraft</class>
+    <sim>XPLANE</sim>
+    <var>sim/xp/only</var>
+    <sc_unit>float</sc_unit>
+  </sc_overrides>
 
   <validvalues_overrides>
     <name>spring_mode</name>
@@ -823,6 +858,106 @@ class TestScOverrides:
         result = xmlutils.update_sc_overrides_with_user(defaults_ovr, user_ovr)
         assert len(result) == 2
         assert result[1]["name"] == "NewVar"
+
+
+class TestClassScopedScOverrides:
+    """Rows selected by aircraft class, underneath the model rows.
+
+    The fixture ships class rows for PropellerAircraft (OilPress, EngRPM,
+    FuelFlow on MSFS; XpOnly on X-Plane), a shipped model row for
+    Cessna.* (OilPress) and a user model row for Cessna.* (EngRPM).
+    """
+
+    def _by_name(self, rows):
+        return {r["name"]: r for r in rows}
+
+    def test_without_a_class_only_model_rows_are_read(self, xml_tmpdir):
+        names = set(self._by_name(xmlutils.read_sc_overrides("Cessna 172")))
+        assert names == {"EngRPM", "OilPress"}
+
+    def test_class_rows_reach_an_aircraft_with_no_model_rows(self, xml_tmpdir):
+        """The case the layer exists for: an aircraft assigned to a class
+        in the wizard, with no profile of its own to clone."""
+        rows = self._by_name(xmlutils.read_sc_overrides(
+            "Piper Cub", sim="MSFS", cls="PropellerAircraft"))
+        assert set(rows) == {"OilPress", "EngRPM", "FuelFlow"}
+        assert rows["OilPress"]["var"] == "L:Class.OilPress"
+        assert rows["FuelFlow"]["source"] == "default"
+        assert rows["FuelFlow"]["scope"] == "class"
+
+    def test_a_shipped_model_row_beats_a_class_row(self, xml_tmpdir):
+        rows = self._by_name(xmlutils.read_sc_overrides(
+            "Cessna 172", sim="MSFS", cls="PropellerAircraft"))
+        assert rows["OilPress"]["var"] == "L:Model.OilPress"
+        assert rows["OilPress"]["scope"] == "model"
+        assert rows["OilPress"]["source"] == "default"
+
+    def test_a_user_model_row_beats_everything(self, xml_tmpdir):
+        rows = self._by_name(xmlutils.read_sc_overrides(
+            "Cessna 172", sim="MSFS", cls="PropellerAircraft"))
+        assert rows["EngRPM"]["var"] == "L:Custom.EngRPM"
+        assert rows["EngRPM"]["source"] == "user"
+        assert rows["EngRPM"]["scope"] == "model"
+
+    def test_with_no_sim_known_nothing_is_guessed(self, xml_tmpdir, monkeypatch):
+        """No caller sim and no current sim: the class layer is skipped
+        rather than read for a sim picked out of the air, and model rows
+        are read whatever sim they name, as before the class layer."""
+        monkeypatch.setattr(G, "settings_mgr", None, raising=False)
+        assert xmlutils.read_sc_overrides("Piper Cub", cls="PropellerAircraft") == []
+        names = set(self._by_name(xmlutils.read_sc_overrides("Cessna 172", cls="PropellerAircraft")))
+        assert names == {"EngRPM", "OilPress"}
+
+    def test_a_class_row_in_the_user_config_is_not_read(self, xml_tmpdir):
+        """There is no user class layer: telemetry sources are not something
+        a user configures per class, and nothing in the application writes
+        such a row.  One that reaches the user config by hand is ignored."""
+        from xml.etree import ElementTree as ET
+        user_root = xmlutils._get_mgr()[0].user_root
+        elem = ET.SubElement(user_root, "sc_overrides")
+        for tag, val in (("name", "OilPress"), ("class", "PropellerAircraft"),
+                         ("sim", "MSFS"), ("var", "L:UserClass.OilPress"),
+                         ("sc_unit", "psi")):
+            ET.SubElement(elem, tag).text = val
+        rows = self._by_name(xmlutils.read_sc_overrides(
+            "Cessna 172", sim="MSFS", cls="PropellerAircraft"))
+        assert rows["OilPress"]["var"] != "L:UserClass.OilPress"
+        assert rows["OilPress"]["source"] == "default"
+
+    def test_class_rows_are_filtered_by_sim(self, xml_tmpdir):
+        msfs = set(self._by_name(xmlutils.read_sc_overrides(
+            "Piper Cub", sim="MSFS", cls="PropellerAircraft")))
+        xp = set(self._by_name(xmlutils.read_sc_overrides(
+            "Piper Cub", sim="XPLANE", cls="PropellerAircraft")))
+        assert "XpOnly" not in msfs
+        assert xp == {"XpOnly"}
+
+    def test_a_row_naming_no_sim_applies_to_every_sim(self, xml_tmpdir):
+        """The shipped Cessna EngRPM row predates <sim> on model rows."""
+        rows = self._by_name(xmlutils.read_sc_overrides("Cessna 172", sim="XPLANE"))
+        assert "EngRPM" in rows
+
+    def test_another_class_gets_nothing(self, xml_tmpdir):
+        rows = xmlutils.read_sc_overrides("Piper Cub", sim="MSFS", cls="JetAircraft")
+        assert rows == []
+
+    def test_layer_merge_keeps_first_order_and_does_not_mutate(self, xml_tmpdir):
+        from telemffb.xml.merge import merge_sc_override_layers
+        a = [{"name": "A", "var": "1", "sc_unit": "", "scale": "", "source": "default"},
+             {"name": "B", "var": "1", "sc_unit": "", "scale": "", "source": "default"}]
+        b = [{"name": "B", "var": "2", "sc_unit": "", "scale": "", "source": "user"},
+             {"name": "C", "var": "2", "sc_unit": "", "scale": "", "source": "user"}]
+        merged = merge_sc_override_layers(a, b)
+        assert [r["name"] for r in merged] == ["A", "B", "C"]
+        assert merged[1]["var"] == "2" and merged[1]["source"] == "user"
+        assert a[1]["var"] == "1", "input layer was mutated"
+
+    def test_cloning_a_profile_copies_only_model_rows(self, xml_tmpdir):
+        xmlutils.clone_whole_model("MSFS", "Cessna.*", "Cessna Clone.*",
+                                   "Auto User", "Cloned")
+        cloned = {e.findtext("name") for e in xmlutils.get_sc_override("Cessna Clone.*")}
+        assert "EngRPM" in cloned and "OilPress" in cloned
+        assert "FuelFlow" not in cloned, "a class row was frozen into the clone"
 
 
 # ─────────────────────────────────────────────────────────────

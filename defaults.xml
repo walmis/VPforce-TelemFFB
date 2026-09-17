@@ -6275,12 +6275,36 @@
 		<datatype>bool</datatype>
 	</defaults>
 <sc_overrides>
-		<name>EngRPM</name>
-		<model>FlyInside B206.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
-		<sc_unit>Percent Over 100</sc_unit>
-	</sc_overrides>
+	<name>EngRPM</name>
+	<class>FlyInsideHelicopter</class>
+	<sim>MSFS</sim>
+	<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
+	<sc_unit>Percent Over 100</sc_unit>
+</sc_overrides>
+<sc_overrides>
+	<name>FI_VibX</name>
+	<class>FlyInsideHelicopter</class>
+	<sim>MSFS</sim>
+	<var>L:Aircraft.Vibrations.X</var>
+	<sc_unit>number</sc_unit>
+	<scale>5000</scale>
+</sc_overrides>
+<sc_overrides>
+	<name>FI_VibY</name>
+	<class>FlyInsideHelicopter</class>
+	<sim>MSFS</sim>
+	<var>L:Aircraft.Vibrations.Y</var>
+	<sc_unit>number</sc_unit>
+	<scale>5000</scale>
+</sc_overrides>
+<sc_overrides>
+	<name>FI_VibZ</name>
+	<class>FlyInsideHelicopter</class>
+	<sim>MSFS</sim>
+	<var>L:Aircraft.Vibrations.Z</var>
+	<sc_unit>number</sc_unit>
+	<scale>5000</scale>
+</sc_overrides>
 	<sc_overrides>
 		<name>RotorRPM</name>
 		<model>FlyInside B206.*</model>
@@ -6297,13 +6321,6 @@
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<name>EngRPM</name>
-		<model>FlyInside - B206</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
-		<sc_unit>Percent Over 100</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
 		<name>RotorRPM</name>
 		<model>FlyInside - B206</model>
 		<sim>MSFS</sim>
@@ -6317,85 +6334,6 @@
 		<sim>MSFS</sim>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibX</name>
-		<model>FlyInside B206.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.X</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibY</name>
-		<model>FlyInside B206.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.Y</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibZ</name>
-		<model>FlyInside B206.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.Z</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibX</name>
-		<model>FlyInside - B206</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.X</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibY</name>
-		<model>FlyInside - B206</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.Y</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibZ</name>
-		<model>FlyInside - B206</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.Z</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibX</name>
-		<model>FlyInside B47.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.X</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibY</name>
-		<model>FlyInside B47.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.Y</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>FI_VibZ</name>
-		<model>FlyInside B47.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Vibrations.Z</var>
-		<sc_unit>number</sc_unit>
-		<scale>5000</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>EngRPM</name>
-		<model>FlyInside B47.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
-		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>RotorRPM</name>
@@ -6453,24 +6391,45 @@
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAx</name>
-		<model>Airbus H145.*</model>
+		<class>HPGHelicopter</class>
 		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAy</name>
-		<model>Airbus H145.*</model>
+		<class>HPGHelicopter</class>
 		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgSEMAyaw</name>
-		<model>Airbus H145.*</model>
+		<class>HPGHelicopter</class>
 		<sim>MSFS</sim>
 		<var>L:DEBUG_SEMA_PCT_YAW</var>
 		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<name>hpgFeetOnPedals</name>
+		<class>HPGHelicopter</class>
+		<sim>MSFS</sim>
+		<var>L:FFB_FEET_ON_PEDALS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<name>hpgVRSDatum</name>
+		<class>HPGHelicopter</class>
+		<sim>MSFS</sim>
+		<var>L:DEBUG_VRS2_DATUM</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<name>hpgVRSIsInVRS</name>
+		<class>HPGHelicopter</class>
+		<sim>MSFS</sim>
+		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
+		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgAfcsMaster</name>
@@ -6508,13 +6467,6 @@
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<name>hpgFeetOnPedals</name>
-		<model>Airbus H145.*</model>
-		<sim>MSFS</sim>
-		<var>L:FFB_FEET_ON_PEDALS</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H145.*</model>
 		<sim>MSFS</sim>
@@ -6527,41 +6479,6 @@
 		<sim>MSFS</sim>
 		<var>L:H145_PERSIST_ATT_FOLLOWUP_MODE_V2</var>
 		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgVRSDatum</name>
-		<model>Airbus H145.*</model>
-		<sim>MSFS</sim>
-		<var>L:DEBUG_VRS2_DATUM</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgVRSIsInVRS</name>
-		<model>Airbus H145.*</model>
-		<sim>MSFS</sim>
-		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgSEMAx</name>
-		<model>Airbus H160.*</model>
-		<sim>MSFS</sim>
-		<var>L:DEBUG_SEMA_PCT_X</var>
-		<sc_unit>Percent Over 100</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgSEMAy</name>
-		<model>Airbus H160.*</model>
-		<sim>MSFS</sim>
-		<var>L:DEBUG_SEMA_PCT_Y</var>
-		<sc_unit>Percent Over 100</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgSEMAyaw</name>
-		<model>Airbus H160.*</model>
-		<sim>MSFS</sim>
-		<var>L:DEBUG_SEMA_PCT_YAW</var>
-		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>hpgAfcsMaster</name>
@@ -6599,13 +6516,6 @@
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<name>hpgFeetOnPedals</name>
-		<model>Airbus H160.*</model>
-		<sim>MSFS</sim>
-		<var>L:FFB_FEET_ON_PEDALS</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H160.*</model>
 		<sim>MSFS</sim>
@@ -6620,29 +6530,15 @@
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<name>hpgVRSDatum</name>
-		<model>Airbus H160.*</model>
-		<sim>MSFS</sim>
-		<var>L:DEBUG_VRS2_DATUM</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgVRSIsInVRS</name>
-		<model>Airbus H160.*</model>
-		<sim>MSFS</sim>
-		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
 		<name>SEMAx</name>
-		<model>Simfocus B407.*</model>
+		<class>SASHelicopter</class>
 		<sim>MSFS</sim>
 		<var>L:FFB_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>SEMAy</name>
-		<model>Simfocus B407.*</model>
+		<class>SASHelicopter</class>
 		<sim>MSFS</sim>
 		<var>L:FFB_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
@@ -6670,63 +6566,35 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500CyclicFriction</name>
-			<model>H500C.*</model>
+			<class>TaogH500Helicopter</class>
 			<sim>MSFS</sim>
 			<var>L:cyclic_friction</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500CollectiveFriction</name>
-			<model>H500C.*</model>
+			<class>TaogH500Helicopter</class>
 			<sim>MSFS</sim>
 			<var>L:collective_friction</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500TRDamaged</name>
-			<model>H500C.*</model>
+			<class>TaogH500Helicopter</class>
 			<sim>MSFS</sim>
 			<var>L:TR_damaged</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500PedalLock</name>
-			<model>H500C.*</model>
-			<sim>MSFS</sim>
-			<var>L:pedal_lock</var>
-			<sc_unit>bool</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>TaogH500CyclicFriction</name>
-			<model>OH6A.*</model>
-			<sim>MSFS</sim>
-			<var>L:cyclic_friction</var>
-			<sc_unit>bool</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>TaogH500CollectiveFriction</name>
-			<model>OH6A.*</model>
-			<sim>MSFS</sim>
-			<var>L:collective_friction</var>
-			<sc_unit>bool</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>TaogH500TRDamaged</name>
-			<model>OH6A.*</model>
-			<sim>MSFS</sim>
-			<var>L:TR_damaged</var>
-			<sc_unit>bool</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>TaogH500PedalLock</name>
-			<model>OH6A.*</model>
+			<class>TaogH500Helicopter</class>
 			<sim>MSFS</sim>
 			<var>L:pedal_lock</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_trim_thresh_hi</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_threshold_high</var>
 			<sc_unit>float</sc_unit>
@@ -6734,7 +6602,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_trim_thresh_lo</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_threshold_low</var>
 			<sc_unit>float</sc_unit>
@@ -6742,7 +6610,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_trim_zero</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_zero</var>
 			<sc_unit>float</sc_unit>
@@ -6750,7 +6618,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_trim_coarse</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_auto_coord_coarse</var>
 			<sc_unit>float</sc_unit>
@@ -6758,7 +6626,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_trim_fine</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_auto_coord_fine</var>
 			<sc_unit>float</sc_unit>
@@ -6766,7 +6634,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_sim_trim_left</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>sim/flight_controls/rudder_trim_left</var>
 			<sc_unit>float</sc_unit>
@@ -6774,7 +6642,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rud_sim_trim_right</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>sim/flight_controls/rudder_trim_right</var>
 			<sc_unit>float</sc_unit>
@@ -6782,7 +6650,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_aileron_trim_req</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/aileron_trim_req</var>
 			<sc_unit>float</sc_unit>
@@ -6790,7 +6658,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_elevator_trim_req</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/elevator_trim_req</var>
 			<sc_unit>float</sc_unit>
@@ -6798,7 +6666,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rudder_trim_req</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_req</var>
 			<sc_unit>float</sc_unit>
@@ -6806,7 +6674,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_hdg_on</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/cockpit/capsule/apms/hdg_on</var>
 			<sc_unit>int</sc_unit>
@@ -6814,7 +6682,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_cyc_force_trim_release_pressed</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/autopilot/cyc_force_trim_release_pressed</var>
 			<sc_unit>int</sc_unit>
@@ -6822,7 +6690,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_ped_force_trim_release_pressed</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/autopilot/ped_force_trim_release_pressed</var>
 			<sc_unit>int</sc_unit>
@@ -6830,7 +6698,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_col_force_trim_release_pressed</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/autopilot/col_force_trim_release_pressed</var>
 			<sc_unit>int</sc_unit>
@@ -6838,7 +6706,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_rudder_trim_rate</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/servo/rudder_trim_rate</var>
 			<sc_unit>float</sc_unit>
@@ -6846,7 +6714,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_aileron_trim_rate</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/servo/aileron_trim_rate</var>
 			<sc_unit>float</sc_unit>
@@ -6854,7 +6722,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_elevator_trim_rate</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/servo/elevator_trim_rate</var>
 			<sc_unit>float</sc_unit>
@@ -6862,7 +6730,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_collective_trim_rate</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>000/joy_collective_rate</var>
 			<sc_unit>float</sc_unit>
@@ -6870,7 +6738,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_collective_mode</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/autopilot/vvi_engaged</var>
 			<sc_unit>int</sc_unit>
@@ -6878,7 +6746,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_collective_ratio</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>000/joy_collective_ratio</var>
 			<sc_unit>float</sc_unit>
@@ -6886,7 +6754,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_collective_input_ratio</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>000/joy_collective_input_ratio</var>
 			<sc_unit>float</sc_unit>
@@ -6894,7 +6762,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_target_pitch</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/servo/pitch_ratio_target</var>
 			<sc_unit>float</sc_unit>
@@ -6902,7 +6770,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_target_roll</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/servo/roll_ratio_target</var>
 			<sc_unit>float</sc_unit>
@@ -6910,7 +6778,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_target_yaw</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/servo/rudder_ratio_target</var>
 			<sc_unit>float</sc_unit>
@@ -6918,7 +6786,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_yaw_damper</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/controls/rudder_trim_yaw_damper</var>
 			<sc_unit>float</sc_unit>
@@ -6926,7 +6794,7 @@
 		</sc_overrides>
 		<sc_overrides>
 			<name>AW109_target_collective</name>
-			<model>AW109SP</model>
+			<class>XAW109Helicopter</class>
 			<sim>XPLANE</sim>
 			<var>aw109/servo/collective_ratio_target</var>
 			<sc_unit>float</sc_unit>
@@ -17871,7 +17739,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -17879,7 +17747,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>etl_effect_intensity</name>
@@ -17932,7 +17800,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>etl_effect_intensity</name>
@@ -17985,7 +17853,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -18100,7 +17968,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 		</models>
 	<models>
 		<name>type</name>
@@ -18337,7 +18205,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The SDK variables this class reads are specific to each aircraft and only a clone carries them, so the New Aircraft Wizard requires the clone for this class.</notes>
 		</models>
 	<models>
 		<name>cyclic_spring_gain</name>
@@ -18389,7 +18257,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The SDK variables this class reads are specific to each aircraft and only a clone carries them, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_physical_x</name>
@@ -21003,7 +20871,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The rotor RPM source this class reads is specific to each aircraft and only a clone carries it, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -21123,7 +20991,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The rotor RPM source this class reads is specific to each aircraft and only a clone carries it, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
@@ -21159,7 +21027,7 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the FlyInsideHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The rotor RPM source this class reads is specific to each aircraft and only a clone carries it, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>max_aileron_coeff</name>
@@ -21294,7 +21162,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -21302,7 +21170,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -21317,7 +21185,7 @@
 		<value>TaogH500Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the TaogH500Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the TaogH500Helicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -21708,7 +21576,7 @@
 		<value>TaogH500Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the TaogH500Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom TaogH500Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the TaogH500Helicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -22183,7 +22051,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -22191,7 +22059,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The hydraulic switch source is specific to the R66 and a clone carries it; a new profile would need it added in the overrides editor.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -22235,7 +22103,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the CowanSimHelicopter class, and the custom simvar subscriptions required for this aircraft will not work. The force trim reset command is disabled by default because it conflicts with CowanSim's force trim implementation on this model.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the CowanSimHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings. The force trim reset command is disabled by default because it conflicts with CowanSim's force trim implementation on this model.</notes>
 	</models>
 	<models>
 		<name>force_trim_send_reset</name>
@@ -22375,7 +22243,7 @@
 		<value>SASHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom SASHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the SASHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom SASHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the SASHelicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.</notes>
 	</models>
 	<models>
 		<name>type</name>
@@ -22727,7 +22595,7 @@
 		<value>XAW109Helicopter</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom XAW109Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the XAW109Helicopter class, and the custom simvar subscriptions required for this aircraft will not work.&lt;br&gt;&lt;br&gt;The profile has axis control disabled because the aircraft does not honor the dataref write.  You will need to bind your controls in the sim to use this Aircraft.</notes>
+		<notes>This aircraft uses the custom XAW109Helicopter aircraft class. If you load a livery whose title does not automatically match this profile, create a profile for it and select the XAW109Helicopter class: the telemetry sources the class needs come with the class. Cloning this profile instead also carries over its tuned settings.&lt;br&gt;&lt;br&gt;The profile has axis control disabled because the aircraft does not honor the dataref write.  You will need to bind your controls in the sim to use this Aircraft.</notes>
 	</models>
 	<models>
 		<name>force_trim_enabled</name>

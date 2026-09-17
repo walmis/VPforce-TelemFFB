@@ -251,19 +251,55 @@ alone, or would leave a pattern that loses to the one the aircraft is being fork
 
 ## Section: `<sc_overrides>`
 
-SimConnect variable override entries. Each block maps a setting name + aircraft pattern to a
-specific SimConnect variable, L:var, or B: input event, allowing per-aircraft telemetry source customization.
+SimConnect variable override entries. Each block maps a telemetry name to a specific
+SimConnect variable, L:var, or B: input event, and is selected either by aircraft name
+(`model`) or by aircraft class (`class`). Class rows are how a special class carries the
+telemetry sources it needs: an aircraft assigned to the class in the New Aircraft Wizard gets
+them without cloning a shipped profile.
 
 ### Child Elements
 
 | Element | Description |
 |---------|-------------|
 | `name` | The setting identifier this override applies to. |
-| `model` | Python regex pattern matching the aircraft name. |
+| `model` | Python regex pattern matching the aircraft name. Exactly one of `model` or `class` is required. |
+| `class` | Aircraft class name (e.g., `HPGHelicopter`). The row applies to every aircraft resolved to that class, including one auto-detected onto a generic class. A class row must carry `sim`, because the class modules are shared between MSFS and X-Plane. |
+| `sim` | Simulator this row applies to. Required on class rows; optional on model rows, where an absent `sim` applies to every simulator. |
 | `var` | The SimConnect variable name, L:var (`L:VarName`), or input event (`B:VarName`, MSFS 2020 SU12 and later) to use as the data source. Input events are looked up on the loaded aircraft; a name the aircraft does not define is logged once and left unset. Their value is the event's own (a switch often reads 0 or 100), `sc_unit` is ignored for them, and `scale` still applies. |
 | `sc_unit` | SimConnect unit string (e.g., `"percent"`, `"feet per second"`). |
 | `scale` | Numeric scale factor applied to the raw SimConnect value. |
 | `sim` | Optional. The simulator the override belongs to (`MSFS` or `XPLANE`). A row without one belongs to any sim, which is how every row written before this element existed behaves; the overrides editor stamps the current sim on each row it writes or edits, so a user config migrates one edit at a time. Shipped rows all carry one, so an aircraft name that exists in both sims (`King Air C90.*` does) cannot pick up the other sim's variables. |
+
+### Resolution order
+
+Rows are merged by `name`, later layers winning:
+
+1. Shipped class rows (`defaults.xml`, `class`), for the class the aircraft resolved to
+2. Shipped model rows (`defaults.xml`, `model`) of the one pattern that named the aircraft
+3. User model rows (`userconfig.xml`, `model`) under that same pattern
+
+So a model row always outranks a class row of the same name, and a user row always outranks
+a shipped one. The model layers follow the same rule as every other setting: only the naming
+pattern's rows apply, never those of another pattern that also matches. There is no user class
+layer. Nothing in the application writes one, telemetry sources are not something a user
+configures per class, and a class row that reaches the user config by hand is ignored. Cloning
+a profile copies its model rows only; the clone reaches the class rows through its class. A clone made
+before class rows existed carries copies of them as model rows, which shadow the class rows by name;
+such a copy keeps its snapshot value, and deleting it in the overrides editor lets the class row show
+through. The
+overrides editor lists shipped rows of both scopes read-only and lets the user add or remove
+rows for the loaded aircraft only.
+
+The table serves two purposes, and which one a row serves decides where it may live. A row that
+subscribes additional data a special class reads (the HPG, SAS, Taog and AW109 variables) is
+class-safe by construction, since the class's own code defines the names. A row that replaces
+the source of a stock telemetry value for a generic effect belongs on the class only when the
+replacement variable and its scale are identical for every model in the class. FlyInside
+`EngRPM` passes that test; FlyInside `RotorRPM` fails it on scale, 3.95 on the B206 and 3.6 on
+the B47, and CowanSim `HydSwitch` fails it on name, `L:CSR66_Hyd_Switch` being an R66 variable.
+Those stay model rows, and a class that still depends on model rows for something its code
+reads stays in the wizard's `mandatory_clone_types`, which is why FlyInside and HPG still
+require a clone while SAS, Taog and AW109 no longer do.
 
 ---
 

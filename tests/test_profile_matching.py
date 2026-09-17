@@ -305,7 +305,12 @@ def test_every_shipped_override_belongs_to_a_type_row_in_its_sim():
              for m in root.findall("models") if m.findtext("name") == "type"}
     unstamped = [(o.findtext("model"), o.findtext("name"))
                  for o in root.findall("sc_overrides") if not (o.findtext("sim") or "").strip()]
+    # A row keyed by class is selected by class, not by a type row; the
+    # schema test covers those (registered class, and a sim).
     homeless = sorted({(o.findtext("sim"), o.findtext("model")) for o in root.findall("sc_overrides")
-                       if (o.findtext("sim"), o.findtext("model")) not in typed})
+                       if o.findtext("model") and (o.findtext("sim"), o.findtext("model")) not in typed})
+    keyless = [o.findtext("name") for o in root.findall("sc_overrides")
+               if not o.findtext("model") and not o.findtext("class")]
     assert unstamped == []
     assert homeless == []
+    assert keyless == []

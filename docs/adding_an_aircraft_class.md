@@ -162,13 +162,17 @@ friendly_class_names = {
 }
 ```
 
-The reverse lookup (`internal_class_names`) is built automatically. If the class relies on a
-shipped default profile that must be copied when a user first sets it up (as the specialised
-helicopters do), also add it to `mandatory_clone_types`:
+The reverse lookup (`internal_class_names`) is built automatically. If the class's code reads
+a telemetry source that is still keyed by model, so that an aircraft assigned the class without
+a clone would be missing it, also add it to `mandatory_clone_types`:
 
 ```python
-mandatory_clone_types = ("HPGHelicopter", "SASHelicopter", ...)
+mandatory_clone_types = ("HPGHelicopter", "FlyInsideHelicopter")
 ```
+
+HPG is there for the H145 and H160 SDK variables, whose names differ per aircraft; FlyInside for
+`RotorRPM`, whose scale differs per aircraft. A class whose sources are all class rows, as SAS,
+Taog and AW109 are, does not belong on the list.
 
 ## 5. Map aircraft to the class, and set class defaults
 
@@ -207,6 +211,25 @@ across sims) so the class survives profile cloning and inheritance:
 For class-specific dropdown option lists (e.g. a restricted set of spring modes), use
 `<validvalues_overrides>` keyed on `<class>`. To *hide* a setting from a class, add the class
 to that setting's `!`-exclusion list rather than removing the row.
+
+**c) Telemetry sources the class needs** (MSFS / X-Plane only) go in class-scoped
+`<sc_overrides>` rows, keyed on `<class>` and `<sim>`, not on a model pattern:
+
+```xml
+<sc_overrides>
+    <name>hpgSEMAx</name>
+    <class>HPGHelicopter</class>
+    <sim>MSFS</sim>
+    <var>L:DEBUG_SEMA_PCT_X</var>
+    <sc_unit>number</sc_unit>
+</sc_overrides>
+```
+
+Every aircraft resolved to the class subscribes these, so a user who assigns the class to an
+unmatched aircraft in the wizard gets the variables the class's code reads without cloning a
+shipped profile. Reserve model-scoped rows for variables whose names genuinely differ per
+aircraft; a class that still depends on such rows belongs in the wizard's
+`mandatory_clone_types`.
 
 ---
 
@@ -247,5 +270,6 @@ Two consequences worth internalising:
 - [ ] Added to `friendly_class_names` (and `mandatory_clone_types` if it needs a clone profile)
 - [ ] `type` model mapping(s) for the target aircraft — **mandatory for every sim except MSFS** (no auto-detect fallback)
 - [ ] `classdefaults_{sim}` entries, including the self-referential `type` default
+- [ ] Class-scoped `<sc_overrides>` rows for the telemetry the class reads (MSFS/XP); model rows only for per-aircraft variable names
 - [ ] `defaults.xml` still parses (`ET.parse`) and the schema test passes
 - [ ] Lifecycle-hook `super()` chaining verified (MSFS/XP is covered by `pytest tests/test_msfs_aircraft_mro.py`)
