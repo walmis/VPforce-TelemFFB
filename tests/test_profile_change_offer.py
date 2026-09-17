@@ -405,6 +405,7 @@ def test_a_config_change_applies_while_the_sim_is_paused(store, monkeypatch):
     mgr._events, mgr._data = [], None
     mgr._safe_call = lambda what, fn: fn()
     mgr._processing_lock = threading.Lock()   # run() gates processing on it
+    mgr.pause_state = False
 
     class Cond:
         def __enter__(self): return self
@@ -416,6 +417,14 @@ def test_a_config_change_applies_while_the_sim_is_paused(store, monkeypatch):
     monkeypatch.setattr(G, "system_settings", {"telemTimeout": 200}, raising=False)
     mgr.run()
     assert seen == [AC]
+
+    # while telemetry is paused the offline editor owns the aircraft context, so the
+    # live aircraft must not be re-resolved underneath it
+    seen.clear()
+    mgr.pause_state = True
+    mgr._run = True
+    mgr.run()
+    assert seen == []
 
 
 # ---- the comparison the dialog shows ---------------------------------------------------

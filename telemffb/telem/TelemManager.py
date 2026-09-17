@@ -1252,10 +1252,15 @@ class TelemManager(QObject, threading.Thread):
                     # A paused sim sends no frames, and a profile edit
                     # (the new-aircraft wizard included) must not wait
                     # for one: re-check the config against the last
-                    # frame's aircraft.
+                    # frame's aircraft.  Not while telemetry is paused: the
+                    # offline editor owns the settings manager's aircraft
+                    # context then, and resolving the live aircraft would
+                    # overwrite it, pointing the editor's reads and writes at
+                    # the wrong profile.  The change stays pending and is
+                    # picked up once telemetry resumes.
                     self._safe_call("on_timeout", self.on_timeout)
                     info = self._last_aircraft_info
-                    if info is not None and self.currentAircraft is not None:
+                    if info is not None and self.currentAircraft is not None and not self.pause_state:
                         self._safe_call("_handle_config_changes",
                                         lambda: self._handle_config_changes(info))
 
