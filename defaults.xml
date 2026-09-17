@@ -18205,7 +18205,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The SDK variables this class reads are specific to each aircraft and only a clone carries them, so the New Aircraft Wizard requires the clone for this class.</notes>
 		</models>
 	<models>
 		<name>cyclic_spring_gain</name>
@@ -18257,7 +18257,7 @@
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this default profile for the new livery rather than create a new profile. A newly created profile will not use the HPGHelicopter class, and the custom simvar subscriptions required for this aircraft will not work.</notes>
+		<notes>This aircraft uses the custom HPGHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The SDK variables this class reads are specific to each aircraft and only a clone carries them, so the New Aircraft Wizard requires the clone for this class.</notes>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_physical_x</name>
@@ -22059,7 +22059,7 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The hydraulic switch source is specific to the R66 and only a clone carries it.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The hydraulic switch source is specific to the R66 and a clone carries it; a new profile would need it added in the overrides editor.</notes>
 	</models>
 	<models>
 		<name>spring_mode</name>

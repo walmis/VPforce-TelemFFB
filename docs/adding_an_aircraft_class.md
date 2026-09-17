@@ -220,7 +220,7 @@ to that setting's `!`-exclusion list rather than removing the row.
     <name>hpgSEMAx</name>
     <class>HPGHelicopter</class>
     <sim>MSFS</sim>
-    <var>L:H145_SDK_AFCS_SEMA_X</var>
+    <var>L:DEBUG_SEMA_PCT_X</var>
     <sc_unit>number</sc_unit>
 </sc_overrides>
 ```
