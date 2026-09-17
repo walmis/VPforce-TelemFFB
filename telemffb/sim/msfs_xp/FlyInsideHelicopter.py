@@ -19,7 +19,7 @@
 from typing import override
 import telemffb.utils as utils
 from .Helicopter import Helicopter
-from telemffb.util.conversions import math
+from telemffb.utils.conversions import math
 
 import math
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData

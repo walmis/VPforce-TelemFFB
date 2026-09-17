@@ -36,13 +36,13 @@ from simconnect import *
 from ctypes import byref, cast, sizeof, c_double, c_void_p, create_string_buffer
 import itertools
 from telemffb.utils import dbprint
-from telemffb.util.TransformExpr import TransformExpr
+from telemffb.utils.TransformExpr import TransformExpr
 import time
 import threading
 import logging
 import os
 import telemffb.globals as G
-from telemffb.util.AxisJitter import AxisJitterMonitor, record_axis_command
+from telemffb.utils.AxisJitter import AxisJitterMonitor, record_axis_command
 from enum import IntEnum
 
 surface_types = {

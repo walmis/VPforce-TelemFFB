@@ -46,7 +46,7 @@ import random
 from .aircraft_base import AircraftBase
 import json
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
-from telemffb.util import conversions as conv
+from telemffb.utils import conversions as conv
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 perftracker = utils.PerformanceTracker()
 

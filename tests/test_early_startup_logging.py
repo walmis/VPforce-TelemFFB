@@ -16,7 +16,9 @@ import logging
 
 import pytest
 
-from telemffb import utils
+# The early-logging helpers (and the module globals they mutate) live in
+# utils._utils - monkeypatching must target that module, not the package.
+from telemffb.utils import _utils as utils
 
 
 @pytest.fixture(autouse=True)

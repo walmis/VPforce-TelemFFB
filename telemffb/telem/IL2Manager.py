@@ -43,7 +43,7 @@ import telemffb.globals as G
 
 from telemffb.utils import hexdump
 import json
-from telemffb.util import conversions as conv
+from telemffb.utils import conversions as conv
 
 # use centralized conversion constants
 knots = conv.kt2ms

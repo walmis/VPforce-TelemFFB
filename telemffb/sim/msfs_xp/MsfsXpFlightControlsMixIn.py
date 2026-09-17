@@ -10,8 +10,8 @@ import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFBWFlightControlsMixIn import MsfsXpFBWFlightControlsMixIn
-from telemffb.util.Vector import Vector, Vector2D
-from telemffb.util.conversions import P0, deg, ms2kt, rad, std_air_pressure, to_device_units, vsound
+from telemffb.utils.Vector import Vector, Vector2D
+from telemffb.utils.conversions import P0, deg, ms2kt, rad, std_air_pressure, to_device_units, vsound
 from telemffb.utils import clamp
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
@@ -351,7 +351,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         telem_data : dict
             Telemetry dictionary which will be updated with calculated values
             (for example 'SideSlip' and 'AoA').
-        incidence_vec : telemffb.util.Vector.Vector
+        incidence_vec : telemffb.utils.Vector.Vector
             A 3D vector representing the incidence (local airflow) reported by
             the simulator. The vector components must be accessible as
             `x`, `y`, `z` attributes.
@@ -395,7 +395,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         _airspeed : float
             The free-stream airspeed (m/s) previously computed for the
             telemetry sample.
-        incidence_vec : telemffb.util.Vector.Vector
+        incidence_vec : telemffb.utils.Vector.Vector
             The incidence vector used to compute local angle components.
 
         Returns

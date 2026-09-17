@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from telemffb.util.TurbulenceModulator import (
+from telemffb.utils.TurbulenceModulator import (
     TurbulenceForces,
     TurbulenceModulator,
     _LAT_TO_ROLL,
@@ -94,7 +94,7 @@ class TestHighPassFilter:
         # to total loop wall time - one scheduler stall mid-loop blew the
         # threshold. Stepping _REF_DT per frame tests the actual decay.
         t0 = 1000.0
-        with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mock_time:
             mock_time.perf_counter.return_value = t0
             modulator.update(0.0, 0.0, 0.0)  # prime
             # Step change, then hold constant across 200 fixed 60 Hz frames
@@ -121,7 +121,7 @@ class TestDtNormalisation:
         """At 2× the reference dt, effective alpha should be α^2."""
         _prime(modulator)
 
-        with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mock_time:
             t0 = 1000.0
             mock_time.perf_counter.return_value = t0 + 2 * _REF_DT
             modulator._prev_time = t0
@@ -136,7 +136,7 @@ class TestDtNormalisation:
         """At 0.5× the reference dt, effective alpha should be α^0.5."""
         _prime(modulator)
 
-        with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mock_time:
             t0 = 1000.0
             mock_time.perf_counter.return_value = t0 + 0.5 * _REF_DT
             modulator._prev_time = t0
@@ -156,7 +156,7 @@ class TestSensitivity:
         # smoothing), which made comparing two separate runs flaky.
         m = TurbulenceModulator()
         t0 = 1000.0
-        with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mock_time:
             mock_time.perf_counter.return_value = t0
             m.update(0.0, 0.0, 0.0)
             mock_time.perf_counter.return_value = t0 + _REF_DT
@@ -224,7 +224,7 @@ class TestPhysicsMapping:
         def pitch_for(vert, lon):
             m = TurbulenceModulator()
             t0 = 1000.0
-            with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+            with patch('telemffb.utils.TurbulenceModulator.time') as mock_time:
                 mock_time.perf_counter.return_value = t0
                 m.update(0.0, 0.0, 0.0)
                 mock_time.perf_counter.return_value = t0 + _REF_DT
@@ -248,19 +248,19 @@ class TestSymmetry:
 
     def _make_modulator_with_fixed_dt(self, t0=1000.0):
         m = TurbulenceModulator()
-        with patch('telemffb.util.TurbulenceModulator.time') as mock_time:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mock_time:
             mock_time.perf_counter.return_value = t0
             m.update(0.0, 0.0, 0.0)
         return m, t0
 
     def test_positive_vs_negative_lateral_same_roll_magnitude(self):
         m1, t0 = self._make_modulator_with_fixed_dt()
-        with patch('telemffb.util.TurbulenceModulator.time') as mt:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mt:
             mt.perf_counter.return_value = t0 + _REF_DT
             r1 = m1.update(5.0, 0.0, 0.0, intensity=1.0, sensitivity=0.5)
 
         m2, t0 = self._make_modulator_with_fixed_dt()
-        with patch('telemffb.util.TurbulenceModulator.time') as mt:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mt:
             mt.perf_counter.return_value = t0 + _REF_DT
             r2 = m2.update(-5.0, 0.0, 0.0, intensity=1.0, sensitivity=0.5)
 
@@ -268,12 +268,12 @@ class TestSymmetry:
 
     def test_positive_vs_negative_vertical_same_pitch_magnitude(self):
         m1, t0 = self._make_modulator_with_fixed_dt()
-        with patch('telemffb.util.TurbulenceModulator.time') as mt:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mt:
             mt.perf_counter.return_value = t0 + _REF_DT
             r1 = m1.update(0.0, 5.0, 0.0, intensity=1.0, sensitivity=0.5)
 
         m2, t0 = self._make_modulator_with_fixed_dt()
-        with patch('telemffb.util.TurbulenceModulator.time') as mt:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mt:
             mt.perf_counter.return_value = t0 + _REF_DT
             r2 = m2.update(0.0, -5.0, 0.0, intensity=1.0, sensitivity=0.5)
 
@@ -281,12 +281,12 @@ class TestSymmetry:
 
     def test_positive_vs_negative_lateral_same_yaw_magnitude(self):
         m1, t0 = self._make_modulator_with_fixed_dt()
-        with patch('telemffb.util.TurbulenceModulator.time') as mt:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mt:
             mt.perf_counter.return_value = t0 + _REF_DT
             r1 = m1.update(5.0, 0.0, 0.0, intensity=1.0, sensitivity=0.5)
 
         m2, t0 = self._make_modulator_with_fixed_dt()
-        with patch('telemffb.util.TurbulenceModulator.time') as mt:
+        with patch('telemffb.utils.TurbulenceModulator.time') as mt:
             mt.perf_counter.return_value = t0 + _REF_DT
             r2 = m2.update(-5.0, 0.0, 0.0, intensity=1.0, sensitivity=0.5)
 

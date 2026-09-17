@@ -11,7 +11,7 @@ import pytest
 from tests.framework.base import BaseTelemetryEffectTestCase
 from tests.framework.utils import TelemetryDataBuilder
 from telemffb.sim.base.BuffetingEffectMixIn import BuffetingEffectMixIn
-from telemffb.util.conversions import kt2ms
+from telemffb.utils.conversions import kt2ms
 
 
 class TestBuffetingEffect(BaseTelemetryEffectTestCase):

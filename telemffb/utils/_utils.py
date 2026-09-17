@@ -62,7 +62,7 @@ from enum import Enum, auto
 
 import telemffb.globals as G
 import telemffb.xmlutils as xmlutils
-from .util import conversions as conv
+from . import conversions as conv
 
 def check_min_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
@@ -126,10 +126,10 @@ def unsafe_install_location_reason(app_dir: str, locations: dict = None):
     the shared folder ITSELF (or a drive root, or anywhere under the temp
     directory) is refused.
     """
-    # ntpath, not os.path: the app runs on Windows, so these are Windows
-    # paths; ntpath IS os.path on Windows, while on other hosts it still
-    # normalizes and case-folds drive-qualified paths correctly
     def norm(p):
+        # ntpath, not os.path: the app runs on Windows, so these are Windows
+        # paths; ntpath IS os.path on Windows, while on other hosts it still
+        # normalizes and case-folds drive-qualified paths correctly
         return ntpath.normcase(ntpath.abspath(p)).rstrip('\\/')
 
     root = norm(app_dir)
@@ -4300,7 +4300,7 @@ def load_custom_userconfig(new_path=""):
 
 
 def upload_vpconf_profile(config_filepath, serial):
-    from .namedmutex import NamedMutex
+    from telemffb.namedmutex import NamedMutex
 
     # central gate: VPConfigurator profiles only apply to VPforce hardware
     # (covers aircraft-change, startup and exit pushes in one place)

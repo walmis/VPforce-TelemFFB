@@ -52,7 +52,7 @@ class TestMsfsXpFlightControlsAerodynamics(BaseTelemetryEffectTestCase):
         assert "IAS_kt" in telem
         assert "AccBody_ms" in telem
         assert abs(telem["TAS"] - 50.0) < 0.1
-        from telemffb.util import conversions as conv
+        from telemffb.utils import conversions as conv
         assert abs(telem["IAS_kt"] - 50.0 * conv.ms2kt) < 0.1  # ms2kt conversion
     
     def test_angle_calculations(self):

@@ -101,7 +101,9 @@ class TestResolvedLocationsAreUsed:
 
     @pytest.fixture
     def resolved(self, monkeypatch):
-        import telemffb.utils as utils
+        # _shared_shell_locations is looked up in the module that defines
+        # unsafe_install_location_reason (utils._utils), not the package.
+        from telemffb.utils import _utils as utils
         monkeypatch.setattr(utils, '_shared_shell_locations',
                             lambda: dict(self.RESOLVED))
 

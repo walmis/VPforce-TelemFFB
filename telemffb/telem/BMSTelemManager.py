@@ -48,7 +48,7 @@ from .BMSSharedMem import BMSSharedMemory, FlightData, FlightData2, IVibeData, L
 from .TelemParserBase import TelemParserBase
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb.util import conversions as conv
+from telemffb.utils import conversions as conv
 
 logger = logging.getLogger(__name__)
 

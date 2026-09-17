@@ -21,7 +21,7 @@ import logging
 import socket
 import threading
 from typing import Optional, Tuple, TYPE_CHECKING
-from telemffb.util.SharedMemReader import SharedMemoryReader
+from telemffb.utils.SharedMemReader import SharedMemoryReader
 from telemffb.utils import schedule_on_main_thread
 import telemffb.globals as G
 

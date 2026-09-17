@@ -1,7 +1,7 @@
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SAWTOOTHUP, EFFECT_SINE, EFFECT_SQUARE
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
-from telemffb.util.conversions import kt2ms
+from telemffb.utils.conversions import kt2ms
 
 import logging
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData

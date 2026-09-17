@@ -31,7 +31,7 @@ from telemffb.utils import get_gain_from_speed
 from telemffb.custom_widgets import SpringCurveWidget
 
 class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
-    from telemffb.util import conversions as conv
+    from telemffb.utils import conversions as conv
     UNIT_CONVERSIONS = {
         "kt": conv.ms2kt,
         "mph": conv.ms2mph,

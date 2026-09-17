@@ -176,7 +176,7 @@ The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficient
 
 - `FFBReport_SetCondition.set_coefficient()` / `.set_offset()` / `.set_saturation()` — a `float` argument is scaled by 4096 (rounded, clamped) internally; an `int` is passed through as device units.
 - `HapticEffect._conditional_effect` (damper/inertia/friction) and `HapticEffect.detent` — same sniffing via the `_to_device_units()` helper.
-- `cpOffset` is a raw `c_int16` field with **no** sniffing — a raw write needs explicit conversion (`to_device_units()` from `telemffb.util.conversions`). Prefer `spring.set_offset(value)` over a raw `cpOffset =` assignment.
+- `cpOffset` is a raw `c_int16` field with **no** sniffing — a raw write needs explicit conversion (`to_device_units()` from `telemffb.utils.conversions`). Prefer `spring.set_offset(value)` over a raw `cpOffset =` assignment.
 
 **Never** pre-scale a value before calling a setter: passing a device-unit float (e.g. `2048.0`) to `set_offset()` would be scaled again and clamped to 4096. If a value is already in device units, pass it as an `int`.
 

@@ -3,7 +3,7 @@ from typing import override
 
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.util.TurbulenceModulator import TurbulenceForces, TurbulenceModulator
+from telemffb.utils.TurbulenceModulator import TurbulenceForces, TurbulenceModulator
 
 
 class TurbulenceMixIn(AircraftEffectUtilsBase):
