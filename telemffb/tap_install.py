@@ -38,10 +38,11 @@ swap, filling a gap, taking the tap back out - is ``tap_reconcile``.
 """
 
 import logging
+import ntpath
 import os
 import re
 import shutil
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import sys
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Sequence, Tuple
@@ -212,8 +213,17 @@ class SimStatus:
 # discovery
 # --------------------------------------------------------------------------
 def _registry_values(hive, subkeys: Sequence[str], value_name: str) -> List[str]:
-    """Read one value from the first of several keys that has it."""
-    import winreg
+    """Read one value from the first of several keys that has it.
+
+    hive is the name of a winreg constant ('HKEY_CURRENT_USER',
+    'HKEY_LOCAL_MACHINE'), resolved here so callers never need winreg
+    themselves.  Off-Windows there is no registry, so nothing is found.
+    """
+    try:
+        import winreg
+    except ImportError:
+        return []
+    hive = getattr(winreg, hive)
     found = []
     for subkey in subkeys:
         try:
@@ -228,9 +238,8 @@ def _registry_values(hive, subkeys: Sequence[str], value_name: str) -> List[str]
 
 def dcs_registry_roots() -> List[str]:
     """DCS records its install path; OpenBeta first, as get_dcs_variant does."""
-    import winreg
     return _registry_values(
-        winreg.HKEY_CURRENT_USER,
+        'HKEY_CURRENT_USER',
         (r"Software\Eagle Dynamics\DCS World OpenBeta",
          r"Software\Eagle Dynamics\DCS World"),
         "Path")
@@ -313,7 +322,10 @@ def _root_from_dcs_log(path: str) -> Optional[str]:
 
 def bms_registry_roots() -> List[str]:
     """BMS records one key per installed version, newest name last."""
-    import winreg
+    try:
+        import winreg
+    except ImportError:
+        return []
     roots = []
     for hive_path in (r"SOFTWARE\WOW6432Node\Benchmark Sims",
                       r"SOFTWARE\Benchmark Sims"):
@@ -342,8 +354,7 @@ def steam_library_roots() -> List[str]:
     Steam records extra libraries in libraryfolders.vdf; a sim is as likely
     to be on a second drive as on the one Steam itself lives on.
     """
-    import winreg
-    steam_paths = _registry_values(winreg.HKEY_CURRENT_USER,
+    steam_paths = _registry_values('HKEY_CURRENT_USER',
                                    (r"Software\Valve\Steam",), "SteamPath")
     libraries = []
     for steam in steam_paths:
@@ -835,13 +846,16 @@ def config_label(path: str, root: Optional[str] = None) -> str:
     A sim can hold two that differ, and two links both reading
     "open dinput8.ini" say nothing about which is which.  Named by the
     directory the game launches from, which is what tells them apart.
+
+    ntpath (not os.path): these are always Windows install paths, and on
+    a POSIX host os.path cannot relate two drive-qualified paths.
     """
     if root:
         try:
-            return "open " + os.path.relpath(path, root)
+            return "open " + ntpath.relpath(path, root)
         except ValueError:
             pass
-    return "open " + os.path.basename(path)
+    return "open " + ntpath.basename(path)
 
 
 def config_link(path: str, label: str = "open dinput8.ini") -> str:
@@ -850,8 +864,16 @@ def config_link(path: str, label: str = "open dinput8.ini") -> str:
     Offered wherever we describe what a config contains or ask what to do
     with it: everything we say about someone's file is a summary, and the
     file itself is the only thing that settles an argument with it.
+
+    The path class must match the path's form: a drive-letter or UNC path
+    only yields a file URI through PureWindowsPath, no matter which
+    platform this runs on.
     """
-    return '<a href="{}">{}</a>'.format(Path(path).as_uri(), label)
+    if re.match(r"^[A-Za-z]:[\\/]", path) or path.startswith("\\\\"):
+        p = PureWindowsPath(path)
+    else:
+        p = Path(path)
+    return '<a href="{}">{}</a>'.format(p.as_uri(), label)
 
 
 def read_configs(status: SimStatus) -> List[Tuple[str, str]]:

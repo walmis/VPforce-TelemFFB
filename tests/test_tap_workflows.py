@@ -283,13 +283,19 @@ class World:
 
     # -------------------------------------------------------------- state
     def tree(self):
-        """Every file under the game root, as bytes."""
+        """Every file under the game root, as bytes.
+
+        Keys use backslashes on every host: the game is a Windows install,
+        so a tree key names a Windows tree position no matter where the
+        test runs.
+        """
         found = {}
         for folder, _, files in os.walk(self.root):
             for name in files:
                 path = os.path.join(folder, name)
                 with open(path, "rb") as handle:
-                    found[os.path.relpath(path, self.root)] = handle.read()
+                    key = os.path.relpath(path, self.root).replace(os.sep, "\\")
+                    found[key] = handle.read()
         return found
 
     def open(self):

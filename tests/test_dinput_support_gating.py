@@ -6,11 +6,14 @@ devices and explain nothing, which reads as "my device is missing".
 """
 import os
 import random
+import sys
 
 import pytest
 
 pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+IS_WINDOWS = sys.platform == "win32"
 
 from PyQt6 import QtTest, QtWidgets
 from PyQt6.QtCore import Qt
@@ -284,6 +287,7 @@ class TestBridgeDllLocation:
         for path in DIBridge.library_paths():
             assert os.path.isabs(path), f"{path} is not an absolute location"
 
+    @pytest.mark.skipif(not IS_WINDOWS, reason="requires the Windows registry (winreg)")
     def test_no_key_reads_as_not_installed(self, monkeypatch):
         """Absent is the normal state, not a fault: nobody has the installer
         during the beta, and OSError covers both a missing key and a missing
@@ -297,6 +301,7 @@ class TestBridgeDllLocation:
         # the reading itself, not the seam conftest stubs
         assert ffb_dinput._installed_dll_path() is None
 
+    @pytest.mark.skipif(not IS_WINDOWS, reason="requires the Windows registry (winreg)")
     def test_the_recorded_path_is_returned(self, monkeypatch):
         import winreg
         from telemffb.hw import ffb_dinput
@@ -310,6 +315,7 @@ class TestBridgeDllLocation:
                             lambda key, name: (wanted, 1))
         assert ffb_dinput._installed_dll_path() == wanted
 
+    @pytest.mark.skipif(not IS_WINDOWS, reason="requires the Windows registry (winreg)")
     def test_an_empty_value_is_not_a_location(self, monkeypatch):
         """A key present but blank - a half-finished install, or one the
         uninstaller emptied - must read as absent rather than as the
@@ -324,6 +330,7 @@ class TestBridgeDllLocation:
         monkeypatch.setattr(winreg, 'QueryValueEx', lambda key, name: ('   ', 1))
         assert ffb_dinput._installed_dll_path() is None
 
+    @pytest.mark.skipif(not IS_WINDOWS, reason="requires the Windows registry (winreg)")
     def test_it_reads_directlinks_own_key(self, monkeypatch):
         """The whole interface between TelemFFB and the DirectLink
         installer, pinned: hive, key and value name together.

@@ -43,7 +43,6 @@ import logging
 import math
 import time
 from typing import Optional, Dict, Any, List
-import pygetwindow as get_focus_window
 
 from .BMSSharedMem import BMSSharedMemory, FlightData, FlightData2, IVibeData, LightBits, LightBits2, LightBits3, HsiBits
 from .TelemParserBase import TelemParserBase

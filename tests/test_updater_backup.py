@@ -3,6 +3,7 @@ rollback on lock failure (a failed update must leave a launchable install),
 and the wait-for-app-exit gate."""
 import os
 import subprocess
+import sys
 import types
 
 import pytest
@@ -11,6 +12,13 @@ import updater
 from updater import UpdateWorker, _move_with_retry, _rollback_moves
 
 pytestmark = [pytest.mark.unit]
+
+#: POSIX does not honor an open handle as a lock - rename and unlink
+#: succeed on a held file - so the lock-failure paths below only exist
+#: where the OS creates them
+LOCK_TESTS = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="an open handle only blocks rename/delete on Windows")
 
 
 @pytest.fixture(autouse=True)
@@ -47,6 +55,7 @@ class TestMoveWithRetry:
         _move_with_retry(str(src), str(tmp_path / "b.txt"))
         assert not src.exists() and (tmp_path / "b.txt").exists()
 
+    @LOCK_TESTS
     def test_raises_after_retries_without_destroying_source(self, tmp_path):
         src = tmp_path / "locked.txt"
         src.write_text("1")
@@ -97,6 +106,7 @@ class TestBackupRollback:
         assert (backup / "assets" / "PyQt6" / "Qt6Core.dll").exists()
         assert not (app / "assets").exists()  # emptied tree removed
 
+    @LOCK_TESTS
     def test_runtime_held_base_library_is_preserved_not_moved(self, tmp_path, monkeypatch):
         # THE field failure: the updater's own bootloader holds
         # assets/base_library.zip open - rename denied through every retry,
@@ -123,6 +133,7 @@ class TestBackupRollback:
         assert (backup / "assets" / "base_library.zip").exists()  # backed up by copy
         assert (backup / "assets" / "PyQt6" / "Qt6Core.dll").exists()
 
+    @LOCK_TESTS
     def test_locked_file_aborts_and_restores_install(self, tmp_path):
         app = _make_install(tmp_path)
         w = self._worker(app)
@@ -138,6 +149,7 @@ class TestBackupRollback:
         assert (app / "config.ini").exists()
         assert locked.exists()
 
+    @LOCK_TESTS
     def test_locked_file_inside_dir_aborts_and_restores(self, tmp_path):
         # per-file fallback hits a file that stays locked: abort + full
         # restore, including files already renamed out of the tree

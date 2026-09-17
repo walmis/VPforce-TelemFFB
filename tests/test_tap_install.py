@@ -10,6 +10,7 @@ These build fake install trees rather than reading the machine, so they say
 the same thing on a developer's box and a build agent.
 """
 import os
+import sys
 
 import pytest
 
@@ -581,6 +582,8 @@ class TestSharedLogFolder:
         assert (game / WRAPPER_CONFIG).read_bytes().decode() == config
 
 
+@pytest.mark.skipif(sys.platform != "win32",
+                    reason="OSError carries no winerror outside Windows")
 class TestWriteRefusals:
     """Two different problems arrive as the same PermissionError: the
     game holding the file open (sharing violation) and the folder's ACL

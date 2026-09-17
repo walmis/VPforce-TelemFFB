@@ -30,6 +30,7 @@ Designer: the same handful repeats for every device, and which devices exist
 is only known at runtime.
 """
 
+import ntpath
 import os
 from dataclasses import dataclass
 from typing import Callable, List, Optional
@@ -105,7 +106,9 @@ class PathDisplay(QtWidgets.QLineEdit):
 
     def setPath(self, path):
         self._path = path or ""
-        name = os.path.basename(self._path) or self._path
+        # ntpath: profile paths are Windows paths in production, and on a
+        # POSIX host os.path.basename would return the whole string
+        name = ntpath.basename(self._path) or self._path
         if name != self.text():
             self.setText(name)
         self.setToolTip(self._path)

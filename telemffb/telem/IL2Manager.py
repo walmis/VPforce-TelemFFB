@@ -40,7 +40,6 @@ from dataclasses import dataclass
 from telemffb.telem.TelemParserBase import TelemParserBase
 import telemffb.utils as utils
 import telemffb.globals as G
-import pygetwindow as get_focus_window
 
 from telemffb.utils import hexdump
 import json

@@ -174,7 +174,8 @@ def _trace_enabled() -> bool:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\VPforce\TelemFFB") as key:
             value, _ = winreg.QueryValueEx(key, "dinput_trace")
         return truthy(value)
-    except OSError:
+    except (OSError, ImportError):
+        # ImportError: no winreg off Windows - same as an absent value.
         return False
 
 
@@ -204,7 +205,8 @@ def _installed_dll_path() -> Optional[str]:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
                             r"Software\DirectLink") as key:
             value, _ = winreg.QueryValueEx(key, "Path")
-    except OSError:
+    except (OSError, ImportError):
+        # ImportError: no winreg off Windows - same as an absent key.
         return None
     # A key present but blank - a half-finished install, or one an
     # uninstaller emptied - would otherwise join into the working directory

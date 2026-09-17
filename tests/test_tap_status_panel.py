@@ -211,7 +211,8 @@ class TestDetail:
             sim=il2, root=root, provenance="configured in TelemFFB",
             targets=[TargetStatus(directory=os.path.join(root, "bin", "game"),
                                   state=WrapperState.TAP, version="0.9.0.0")]))
-        assert os.path.join("bin", "game") in rendered(panel)
+        # a Windows install path renders in Windows form on any host
+        assert r"bin\game" in rendered(panel)
 
 
 class TestRedraw:

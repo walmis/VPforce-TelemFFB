@@ -29,7 +29,6 @@ import logging
 import os
 import re
 import shutil
-import winreg
 from typing import Optional
 
 from telemffb.utils import get_resource_path
@@ -127,11 +126,16 @@ def _find_store_installs() -> list:
 
 def _steam_library_paths() -> list:
     """Steam's own install dir (HKCU\\Software\\Valve\\Steam\\SteamPath), plus
-    every library folder listed in its steamapps\\libraryfolders.vdf."""
+    every library folder listed in its steamapps\\libraryfolders.vdf.
+
+    The registry read is the only Windows-only part: off-Windows there is
+    no winreg, which reads the same as an absent key - no libraries found.
+    """
     try:
+        import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
             steam_path, _ = winreg.QueryValueEx(key, "SteamPath")
-    except OSError:
+    except (OSError, ImportError):
         return []
 
     libraries = [steam_path]

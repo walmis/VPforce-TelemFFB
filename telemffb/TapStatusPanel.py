@@ -33,6 +33,7 @@ reinstall would re-ask about devices, and a config could not be changed
 without touching the wrapper.
 """
 
+import ntpath
 import os
 
 from PyQt6 import QtWidgets
@@ -353,9 +354,12 @@ class TapStatusPanel(QtWidgets.QWidget):
             if target.state == WrapperState.ABSENT and status.partially_installed:
                 attention = True
             # relative to the root, not just the last component: IL-2's
-            # target basename is "game", which names nothing on its own
+            # target basename is "game", which names nothing on its own.
+            # ntpath (not os.path): these are always Windows install
+            # paths, and on POSIX hosts os.path would refuse to relate
+            # two drive-qualified paths.
             try:
-                where = os.path.relpath(target.directory, status.root)
+                where = ntpath.relpath(target.directory, status.root)
             except ValueError:
                 where = target.directory
             grid.addWidget(self._label(where, "dim", target.directory), row, 0)
