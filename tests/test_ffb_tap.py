@@ -7,6 +7,7 @@ mapping - the same order-independent attach the wrapper's writer uses.
 import ctypes
 import mmap
 import os
+import sys
 
 import pytest
 
@@ -16,7 +17,16 @@ from telemffb.hw.ffb_tap import (
     FfbTapReader, TapShm, di_to_rhino, di_to_rhino_sat, read_game_spring,
 )
 
-pytestmark = [pytest.mark.unit]
+# the tap's shared memory is a Windows named mapping (mmap's tagname
+# keyword and the Local\ namespace do not exist off Windows), so the
+# attach/round-trip tests here can only run where the feature can
+IS_WINDOWS = sys.platform == "win32"
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.skipif(not IS_WINDOWS,
+                       reason="FFB tap shared memory is Windows-only"),
+]
 
 # a distinct name so tests never fight a real writer or viewer
 TEST_SHM = "Local\\FFBTap_v1_test"

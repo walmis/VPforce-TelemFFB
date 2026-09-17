@@ -19,8 +19,10 @@
 
 import ctypes
 import sys
-from ctypes import windll, wintypes
+from ctypes import wintypes
 from uuid import UUID
+
+IS_WINDOWS = sys.platform == "win32"
 
 class GUID(ctypes.Structure):   # [1]
     _fields_ = [
@@ -136,18 +138,23 @@ class UserHandle:   # [3]
     current = wintypes.HANDLE(0)
     common  = wintypes.HANDLE(-1)
 
-_CoTaskMemFree = windll.ole32.CoTaskMemFree     # [4]
-_CoTaskMemFree.restype= None
-_CoTaskMemFree.argtypes = [ctypes.c_void_p]
+if IS_WINDOWS:
+    from ctypes import windll
 
-_SHGetKnownFolderPath = windll.shell32.SHGetKnownFolderPath     # [5] [3]
-_SHGetKnownFolderPath.argtypes = [
-    ctypes.POINTER(GUID), wintypes.DWORD, wintypes.HANDLE, ctypes.POINTER(ctypes.c_wchar_p)
-] 
+    _CoTaskMemFree = windll.ole32.CoTaskMemFree     # [4]
+    _CoTaskMemFree.restype= None
+    _CoTaskMemFree.argtypes = [ctypes.c_void_p]
+
+    _SHGetKnownFolderPath = windll.shell32.SHGetKnownFolderPath     # [5] [3]
+    _SHGetKnownFolderPath.argtypes = [
+        ctypes.POINTER(GUID), wintypes.DWORD, wintypes.HANDLE, ctypes.POINTER(ctypes.c_wchar_p)
+    ]
 
 class PathNotFoundException(Exception): pass
 
 def get_path(folderid, user_handle=UserHandle.current):
+    if not IS_WINDOWS:
+        raise PathNotFoundException()
     fid = GUID(folderid) 
     pPath = ctypes.c_wchar_p()
     S_OK = 0

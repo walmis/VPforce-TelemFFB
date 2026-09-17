@@ -19,6 +19,7 @@ import html
 import inspect
 from datetime import datetime, timedelta
 import math
+import ntpath
 import os
 import random
 import re
@@ -125,13 +126,16 @@ def unsafe_install_location_reason(app_dir: str, locations: dict = None):
     the shared folder ITSELF (or a drive root, or anywhere under the temp
     directory) is refused.
     """
+    # ntpath, not os.path: the app runs on Windows, so these are Windows
+    # paths; ntpath IS os.path on Windows, while on other hosts it still
+    # normalizes and case-folds drive-qualified paths correctly
     def norm(p):
-        return os.path.normcase(os.path.abspath(p)).rstrip('\\/')
+        return ntpath.normcase(ntpath.abspath(p)).rstrip('\\/')
 
     root = norm(app_dir)
 
     # drive roots (C:\, D:\, ...)
-    drive, tail = os.path.splitdrive(root)
+    drive, tail = ntpath.splitdrive(root)
     if drive and not tail.strip('\\/'):
         return f"the root of drive {drive.upper()}\\"
 
@@ -145,7 +149,7 @@ def unsafe_install_location_reason(app_dir: str, locations: dict = None):
     # anywhere under the temp directory usually means the executable was
     # launched directly from inside the downloaded .zip
     tmp = norm(tempfile.gettempdir())
-    if root == tmp or root.startswith(tmp + os.sep):
+    if root == tmp or root.startswith(tmp + '\\'):
         return "a temporary folder (was it started from inside the .zip file?)"
 
     return None
@@ -1164,7 +1168,10 @@ def create_support_bundle(userconfig_rootpath):
 
 
 def read_all_system_settings():
-    import winreg
+    try:
+        import winreg
+    except ImportError:
+        return {}  # no registry off Windows
 
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
 
@@ -2785,7 +2792,10 @@ def get_dcs_variant():
     Returns:
         str | None
     """
-    import winreg
+    try:
+        import winreg
+    except ImportError:
+        return None  # no registry off Windows
 
     logging.info("DCS Variant Check: Starting variant discovery via registry and dcs_variant.txt")
 

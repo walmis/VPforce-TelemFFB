@@ -28,7 +28,6 @@ import subprocess
 import sys
 import time
 import traceback
-import winreg
 from collections import OrderedDict
 from datetime import datetime
 from typing import override
@@ -1224,6 +1223,11 @@ class MainWindow(QMainWindow):
             )
 
     def toggle_start_with_windows(self, set_enabled=None):
+        try:
+            import winreg
+        except ImportError:
+            return  # the "run at logon" key is a Windows registry key
+
         exe_path = sys.executable
         reg_key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         reg_key_name = "VPforce TelemFFB"

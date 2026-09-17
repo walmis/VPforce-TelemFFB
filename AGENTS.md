@@ -128,7 +128,7 @@ pytest --cov=telemffb          # With coverage
 - The `xmlutils` module globals are one-way (store → globals): to inject a fixture tree in tests, use `XmlStore` — setting `xu.auto_user_root` alone no longer affects reads/writes
 - `HapticEffect.device` is a **class attribute** — tests that construct devices must save/restore it
 - `telemffb.hw.hid` is a `MagicMock` in `sys.modules` — install yours with `sys.modules.setdefault('telemffb.hw.hid', MagicMock())` and patch the module **as `ffb_rhino` sees it** (`ffb_rhino_module.hid`), never via a fresh `import telemffb.hw.hid` (a sibling test may have swapped the `sys.modules` entry, so a fresh import can bind a different mock)
-- `main.py` is **Windows-only** (imports `winreg` via `MainWindow`) — tests that need it must guard with `skipif` or use static source checks
+- `main.py` is **Windows-only** (`MainWindow` → `SimTelemListener` → `IL2Manager` imports `pygetwindow`, which raises on import off Windows) — tests that need it must guard with `skipif` or use static source checks. (`winreg` itself is imported lazily in the functions that use it, so it never blocks a module import.)
 
 ---
 
