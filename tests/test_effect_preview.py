@@ -1978,7 +1978,7 @@ class TestElevatorDroopPreviews(BaseTelemetryEffectTestCase):
 
     @pytest.mark.parametrize("sim", ['MSFS', 'XPLANE'])
     def test_msfs_moment_plays_through_the_production_applier(self, sim):
-        from telemffb.util.Vector import Vector2D
+        from telemffb.utils.Vector import Vector2D
         ac = aircrafts_msfs_xp.Aircraft('preview')
         ac.elevator_droop_moment = 0.25
         ac.uncoordinated_turn_effect_enabled = False
