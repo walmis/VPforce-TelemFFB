@@ -3027,7 +3027,7 @@ class MainWindow(QMainWindow):
         XML is not re-read every frame."""
         sim = G.settings_mgr.current_sim
         aircraft = G.settings_mgr.current_aircraft_name
-        ctx = (sim, aircraft, G.settings_mgr.current_pattern)
+        ctx = (sim, aircraft, G.settings_mgr.current_pattern, G.settings_mgr.current_class)
         if not force and ctx == getattr(self, '_telem_ovd_shown', None):
             return
         self._telem_ovd_shown = ctx

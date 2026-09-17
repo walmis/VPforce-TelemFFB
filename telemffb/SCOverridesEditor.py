@@ -194,18 +194,13 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             source_item = QTableWidgetItem(override['source'])
 
             # Shipped rows (defaults.xml, model- or class-scoped) are shown
-            # grayed and cannot be selected: only user rows can be deleted
+            # grayed.  They stay selectable, since selecting one is how a user
+            # starts an override of it; only user rows can be deleted.
             if override['source'] != 'user':
                 name_item.setForeground(Qt.GlobalColor.gray)
                 var_item.setForeground(Qt.GlobalColor.gray)
                 sc_unit_item.setForeground(Qt.GlobalColor.gray)
                 scale_item.setForeground(Qt.GlobalColor.gray)
-
-                # Make entire row unselectable
-                for col in range(4):
-                    item = QTableWidgetItem()
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-                    self.tableWidget.setItem(row_index, col, item)
 
             # Setting items non-editable
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
