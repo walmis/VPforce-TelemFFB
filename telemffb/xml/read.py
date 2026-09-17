@@ -650,7 +650,12 @@ class ConfigResolver:
                      if p == curated_pattern})
         u_ov = {r['name']: r['var'] for p, r in self._read_models_sc_overrides('user', name, 'user', sim)
                 if p == user_pattern}
-        now_ov = {**c_ov, **u_ov} if same else (dict(u_ov) if theirs_wins else dict(c_ov))
+        # Where theirs wins, the aircraft flies its own class's rows today
+        # with the user's on top, so a class row both sides share is not
+        # something the merge changes.
+        mine_ov = {r['name']: r['var'] for r in self._read_class_sc_overrides(cls, sim)}
+        mine_ov.update(u_ov)
+        now_ov = {**c_ov, **u_ov} if same else (mine_ov if theirs_wins else dict(c_ov))
         after_ov = {**c_ov, **u_ov}
 
         entries = (rows('setting', now, after, u, c)
