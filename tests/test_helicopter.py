@@ -1406,6 +1406,50 @@ class TestHelicopterSimvarSync(BaseTelemetryEffectTestCase):
         ft_calls = [c for c in self.mock_simconnect.simvar_calls if "CUSTOM_FT_VAR" in c]
         assert len(ft_calls) >= 1
 
+    def test_force_trim_simvar_is_subscribed_when_the_profile_loads_with_it_enabled(self):
+        instance = self._make_pedals_instance()
+        instance.custom_ft_sw_var_enabled = True
+        instance.custom_ft_sw_var = "L:CUSTOM_FT_VAR"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+        instance.msfs_update_pedals(telem)
+
+        assert self.mock_simconnect.sv_dict["ForceTrimSW"]["var"] == "L:CUSTOM_FT_VAR"
+
+    def test_force_trim_simvar_is_not_added_again_while_nothing_changes(self):
+        instance = self._make_pedals_instance()
+        instance.custom_ft_sw_var_enabled = True
+        instance.custom_ft_sw_var = "L:CUSTOM_FT_VAR"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+        instance.msfs_update_pedals(telem)
+        count = self.mock_simconnect.add_simvar_count
+        instance.msfs_update_pedals(telem)
+
+        assert self.mock_simconnect.add_simvar_count == count
+
+    def test_force_trim_simvar_follows_an_edit_and_is_released_when_disabled(self):
+        instance = self._make_pedals_instance()
+        instance.custom_ft_sw_var_enabled = True
+        instance.custom_ft_sw_var = "L:CUSTOM_FT_VAR"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+        instance.msfs_update_pedals(telem)
+
+        instance.custom_ft_sw_var = "L:OTHER_FT_VAR"
+        instance.msfs_update_pedals(telem)
+        assert self.mock_simconnect.sv_dict["ForceTrimSW"]["var"] == "L:OTHER_FT_VAR"
+
+        instance.custom_ft_sw_var_enabled = False
+        instance.msfs_update_pedals(telem)
+        assert "ForceTrimSW" not in self.mock_simconnect.sv_dict
+
 
 @pytest.mark.unit
 @pytest.mark.helicopter

@@ -201,12 +201,7 @@ class TestFFBApiDiscovery(FFBApiTestBase):
             assert name in self.mock_simconnect.sv_dict, f"{name} not subscribed"
 
     def test_dropped_subscription_is_reinstated(self):
-        """A SimConnectManager resubscribe from anywhere else drops runtime-added vars.
-
-        temp_sim_vars is cleared by the subscribe cycle that consumes it, so the next
-        _resubscribe() rebuilds from the predefined list alone.  The per-frame check
-        is what brings them back.
-        """
+        """The per-frame check brings the variables back if they ever go missing."""
         instance = self.make_instance()
         self.arm(instance, self.make_telem())
         self.mock_simconnect.sv_dict.clear()

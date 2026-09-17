@@ -322,6 +322,13 @@ EV_STOPPED = 65497  # id for stopped event
 EV_SIMSTATE = 65496
 
 
+#: Owners of variables added at runtime, in the order they are applied: a later
+#: source wins a name both define, so a user's override row beats a module's own.
+RUNTIME_SOURCE_MODULE = "module"
+RUNTIME_SOURCE_OVERRIDE = "override"
+RUNTIME_SOURCE_ORDER = (RUNTIME_SOURCE_MODULE, RUNTIME_SOURCE_OVERRIDE)
+
+
 class SimConnectManager(threading.Thread):
     """
     Manages SimConnect communication with Microsoft Flight Simulator.
@@ -466,8 +473,10 @@ class SimConnectManager(threading.Thread):
         self._events_to_send = []
         self._simdatums_to_send = []
         self.subscribed_vars = []
-        self.temp_sim_vars = []
-        self.temp_sv_array_element = []
+        # source -> {name: SimVar}.  A "name:index" key addresses one element of a
+        # SimVarArray.  Filled from the telemetry thread, read by this one.
+        self._runtime_sim_vars = {}
+        self._runtime_lock = threading.Lock()
         self.resubscribe = False
         self.current_simvars = []
         self.current_var_tracker = []
@@ -499,14 +508,17 @@ class SimConnectManager(threading.Thread):
 
 
 
-    def add_simvar(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):
+    def add_simvar(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None,
+                   source=RUNTIME_SOURCE_MODULE):
         """
-        Add or override a simulation variable for the next subscription cycle.
-        
-        This method allows dynamic addition of new simulation variables or overriding
-        of existing ones. Variables are queued and will be applied on the next call
-        to _subscribe().
-        
+        Add or override a simulation variable for the loaded aircraft.
+
+        The variable joins every subscription built from now on, until it is removed,
+        replaced by a later add of the same name from the same source, or cleared with
+        the aircraft.  It must outlive the rebuild that first consumes it: subscriptions
+        are rebuilt whenever any caller asks, and a caller only ever re-adds its own
+        variables.  Call _resubscribe() to have it take effect.
+
         Args:
             name (str): Variable name. Use "name:index" format to override specific
                        array elements (e.g., "PropRPM:2" for second engine RPM)
@@ -516,22 +528,36 @@ class SimConnectManager(threading.Thread):
             datatype: SimConnect data type constant
             scale (float, optional): Scaling factor for the value
             mutator (callable, optional): Function to transform the value
+            source (str): Who owns the variable, so one owner can replace its set
+                       without touching another's.  Where two sources name the same
+                       variable, the later entry in RUNTIME_SOURCE_ORDER wins.
         """
+        sv = SimVar(name.split(":")[0], var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator)
         if ":" in name:
-            # We are replacing an element in a SimVarArray, create separate list
-            sv = SimVar(name.split(":")[0], var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator)
             sv.index = int(name.split(":")[1])
-            self.temp_sv_array_element.append(sv)
+        with self._runtime_lock:
+            self._runtime_sim_vars.setdefault(source, {})[name] = sv
 
-        else:
-            self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator))
-        
+    def remove_simvar(self, name, source=RUNTIME_SOURCE_MODULE):
+        """Drop one variable added with add_simvar(); the predefined variable of that
+        name, if there is one, applies again.  Call _resubscribe() afterwards."""
+        with self._runtime_lock:
+            self._runtime_sim_vars.get(source, {}).pop(name, None)
+
+    def clear_runtime_simvars(self, source=None):
+        """Drop every variable added with add_simvar(), or only one source's."""
+        with self._runtime_lock:
+            if source is None:
+                self._runtime_sim_vars.clear()
+            else:
+                self._runtime_sim_vars.pop(source, None)
+
     def substitute_simvars(self):
         """
         Build the final list of simulation variables by merging predefined and custom variables.
         
-        This method combines the predefined sim_vars list with any temporarily added variables
-        from add_simvar(), handling both individual variable overrides and SimVarArray element
+        This method combines the predefined sim_vars list with the variables added at runtime
+        through add_simvar(), handling both individual variable overrides and SimVarArray element
         overrides. It creates cloned copies of SimVarArrays when individual elements need to
         be modified to avoid affecting the original definitions.
         
@@ -540,12 +566,18 @@ class SimConnectManager(threading.Thread):
         """
         # build a combined list of the pre-defined simvars from __init__ and any new/updated simvars that have been set by a model
         master_list = list(self.sim_vars)
-        override_list = list(self.temp_sim_vars)
+        with self._runtime_lock:
+            sources = list(RUNTIME_SOURCE_ORDER) + [k for k in self._runtime_sim_vars if k not in RUNTIME_SOURCE_ORDER]
+            runtime = {}
+            for source in sources:
+                runtime.update(self._runtime_sim_vars.get(source, {}))
+        override_list = [sv for key, sv in runtime.items() if ":" not in key]
+        array_elements = [sv for key, sv in runtime.items() if ":" in key]
 
         master_dict = {simvar.name: simvar for simvar in master_list}
         override_dict = {simvar.name: simvar for simvar in override_list}
 
-        for sv_array_override in self.temp_sv_array_element:
+        for sv_array_override in array_elements:
             """clone each SimVarArray that we need to override so that we can modify its elements while leaving the 
             original in-tact.  Then add those simvars to the override dictionary for later processing
             """
@@ -559,10 +591,9 @@ class SimConnectManager(threading.Thread):
                 continue
             override_dict[sv_array_override.name] = sv_array.clone()  # create the cloned copy, add to override dictionary
 
-        while self.temp_sv_array_element:
+        for sv in array_elements:
             """Now iterate through any overrides for SimVarArrays.  For each overridden simvar, we find the matching
             array and replace the simvar index given in the config file"""
-            sv = self.temp_sv_array_element.pop(0)
             sv_array = override_dict.get(sv.name, None)  # Get cloned Array from override dictionary
             if sv_array is None:  # Check if  'name:idx' given in the config file is invalid and does not match an existing SimVarArray
                 logging.error(f"Error resubscribing to SimVarArray element for '{sv.name}':  SimVarArray does not exist")
@@ -583,8 +614,6 @@ class SimConnectManager(threading.Thread):
 
         resulting_list = list(master_dict.values())  # Convert the final dictionary back into a list
 
-        self.temp_sim_vars.clear()
-        self.temp_sv_array_element.clear()
         self.new_var_tracker.clear()
         self.sv_dict.clear()
 

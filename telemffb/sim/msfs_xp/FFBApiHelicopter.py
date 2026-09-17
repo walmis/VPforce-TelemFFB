@@ -275,10 +275,10 @@ class FFBApiHelicopter(Helicopter):
         """Subscribe the discovery and runtime read variables.
 
         Called every frame from :meth:`_ffb_api_on_telemetry` and guarded on ``sv_dict``,
-        because a SimConnectManager subscription added at runtime lives in
-        ``temp_sim_vars``, which is cleared by the subscribe cycle that consumes it - a
-        later ``_resubscribe()`` from anywhere rebuilds from the predefined list alone
-        and drops these vars.  Re-checking is how they come back.
+        so the steady state is a dict lookup.  SimConnectManager keeps a variable added
+        at runtime for as long as the aircraft is loaded, so the guard normally passes
+        after the first frame; it stays as the cheap way to notice if that ever stops
+        being true.
         """
         if not self._simconnect:
             return
@@ -615,8 +615,7 @@ class FFBApiHelicopter(Helicopter):
         # Per frame, not once at construction: an aircraft handler is built before
         # any telemetry is attached, so a constructor-time _sim_is_msfs() is still
         # False and a subscription made there never happens.  The sv_dict guard
-        # inside makes the steady-state call a dict lookup, and re-running it also
-        # re-instates the subscription if an unrelated _resubscribe() dropped it.
+        # inside makes the steady-state call a dict lookup.
         self._subscribe_ffb_api_simvars()
 
         self._ffb_api_latch_discovery(telem_data)

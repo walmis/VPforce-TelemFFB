@@ -401,7 +401,12 @@ class MockSimConnect:
         self.add_simvar_count += 1
         self.simvar_calls.append(f"add_simvar: {name} = {var} ({sc_unit})")
         self.sv_dict[name] = {"var": var, "unit": sc_unit}
-    
+
+    def remove_simvar(self, name: str):
+        """Mock removing a simvar."""
+        self.simvar_calls.append(f"remove_simvar: {name}")
+        self.sv_dict.pop(name, None)
+
     def _resubscribe(self):
         """Mock resubscribe."""
         self._resubscribe_count += 1

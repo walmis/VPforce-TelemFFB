@@ -265,7 +265,7 @@ def test_dropping_a_b_var_unsubscribes_it_and_removes_its_value():
     m._handle_recv(enumeration(m._b_enum_req, [("AUTOPILOT_Master", 0x1234, scdefs.INPUT_EVENT_TYPE_DOUBLE)]))
     m._handle_recv(subscribe_value(0x1234, 1.0))
     m.sc.clear()
-    m.temp_sim_vars.clear()
+    m.clear_runtime_simvars()
     m._subscribe()
     assert m.sc.named("UnsubscribeInputEvent") == [(0x1234,)]
     assert m._b_values == {} and m._b_vars == []

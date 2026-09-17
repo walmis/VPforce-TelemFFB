@@ -23,19 +23,32 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
     # end of user parameters
 
+    #: The custom force trim variable this handler has subscribed, None while the
+    #: predefined one applies.
+    _ft_sw_var_subscribed = None
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def _sync_force_trim_simvar(self):
-        """Subscribe the ForceTrimSW simvar once and re-subscribe only when the binding changes."""
-        if not self._sim_is_msfs():
+        """Keep ForceTrimSW subscribed to the variable the settings ask for.
+
+        Compared against what this handler has subscribed rather than against the
+        previous frame's setting: a profile that loads with the option already on
+        never changes it, and must still get its variable.  Turning the option off
+        hands ForceTrimSW back to the predefined variable.
+        """
+        if not self._sim_is_msfs() or not self._simconnect:
             return
-        # Always call anything_has_changed to initialize tracking state (avoid short-circuit).
-        var_changed = self.anything_has_changed('custom_ft_sw_var', self.custom_ft_sw_var)
-        enabled_changed = self.anything_has_changed('custom_ft_sw_var_enabled', self.custom_ft_sw_var_enabled)
-        if (self.custom_ft_sw_var_enabled and var_changed) or enabled_changed:
-            self._simconnect.add_simvar(name="ForceTrimSW", var=self.custom_ft_sw_var, sc_unit="enum")
-            self._simconnect._resubscribe()
+        wanted = (self.custom_ft_sw_var or None) if self.custom_ft_sw_var_enabled else None
+        if wanted == self._ft_sw_var_subscribed:
+            return
+        if wanted:
+            self._simconnect.add_simvar(name="ForceTrimSW", var=wanted, sc_unit="enum")
+        else:
+            self._simconnect.remove_simvar("ForceTrimSW")
+        self._simconnect._resubscribe()
+        self._ft_sw_var_subscribed = wanted
 
     def _force_trim_configured(self) -> bool:
         """True when force-trim mode is selected AND a release button is bound.

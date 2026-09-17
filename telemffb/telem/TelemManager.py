@@ -39,7 +39,7 @@ from telemffb import match_history
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.telem.SimConnectManager import SimConnectManager
+from telemffb.telem.SimConnectManager import SimConnectManager, RUNTIME_SOURCE_OVERRIDE
 from telemffb.utils import upload_vpconf_profile
 
 if TYPE_CHECKING:
@@ -346,6 +346,11 @@ class TelemManager(QObject, threading.Thread):
         external state (an aircraft-side mode flag, say) would otherwise never be told
         it is finished.
         """
+        # A handler's subscriptions end with it.  Cleared before the early return:
+        # the next handler subscribes from its constructor, so nothing may be left
+        # standing from whatever was loaded before.
+        if self._simconnect is not None:
+            self._simconnect.clear_runtime_simvars()
         if self.currentAircraft is None:
             return
         try:
@@ -871,8 +876,11 @@ class TelemManager(QObject, threading.Thread):
         if data_source == "MSFS" and aircraft_name:
             overrides = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
                                                    cls=self._current_class_name())
+            # Replaced as a set, so a row the user deleted is unsubscribed too.
+            self._simconnect.clear_runtime_simvars(RUNTIME_SOURCE_OVERRIDE)
             for sv in overrides:
-                self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'],
+                                            source=RUNTIME_SOURCE_OVERRIDE)
             self._simconnect._resubscribe()
 
     def _setup_xpplugin_overrides(self, aircraft_name, data_source):
