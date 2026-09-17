@@ -140,7 +140,7 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
     """
     from datetime import datetime
     import telemffb.winpaths as winpaths
-    from ._utils import get_dcs_variant
+    from .integration import get_dcs_variant
 
 
     # Get the system settings
@@ -627,7 +627,7 @@ class FetchLatestVersion(QThread):
 
 
     def run(self):
-        from ._utils import get_version
+        from .integration import get_version
         try:
             current_version = get_version()
             latest_version = None
