@@ -492,7 +492,7 @@ class SimConnectManager(threading.Thread):
         # redone for every aircraft.
         self._input_events = {}          # name without "B:" -> InputEvent, current aircraft
         self._b_vars = []                # SimVars whose var is a B: name
-        self._b_hash_to_var = {}         # subscribed hash -> SimVar
+        self._b_hash_to_vars = {}        # subscribed hash -> [SimVar]: several names may read one event
         self._b_values = {}              # SimVar.name -> latest value, merged into every frame
         self._b_pending_writes = {}      # name without "B:" -> value, waiting for a hash
         self._b_unresolved_logged = set()
@@ -805,7 +805,7 @@ class SimConnectManager(threading.Thread):
         """Forget every hash: after (re)connecting nothing is subscribed
         and the table may belong to another session."""
         self._input_events = {}
-        self._b_hash_to_var = {}
+        self._b_hash_to_vars = {}
         self._b_values = {}
         self._b_get_reqs = {}
         self._b_enum_req = None
@@ -840,28 +840,31 @@ class SimConnectManager(threading.Thread):
         self._request_input_event_enumeration()
 
     def _drop_input_event_subscriptions(self):
-        for h in list(self._b_hash_to_var):
+        for h in list(self._b_hash_to_vars):
             try:
                 self.sc.UnsubscribeInputEvent(h)
             except Exception as e:
                 logging.debug(f"UnsubscribeInputEvent({h}) failed: {e}")
-        self._b_hash_to_var = {}
+        self._b_hash_to_vars = {}
         self._b_get_reqs = {}
 
     def _sync_input_events(self, wanted):
         """Make the subscribed set match the wanted SimVars."""
         self._b_vars = list(wanted)
-        wanted_names = {sv.var[2:] for sv in self._b_vars}
         for name in [n for n, v in self._b_values.items()
                      if n not in {sv.name for sv in self._b_vars}]:
             self._b_values.pop(name, None)
-        for h, sv in list(self._b_hash_to_var.items()):
-            if sv.var[2:] not in wanted_names:
-                try:
-                    self.sc.UnsubscribeInputEvent(h)
-                except Exception as e:
-                    logging.debug(f"UnsubscribeInputEvent({h}) failed: {e}")
-                self._b_hash_to_var.pop(h)
+        wanted_keys = {(sv.name, sv.var) for sv in self._b_vars}
+        for h, bound in list(self._b_hash_to_vars.items()):
+            kept = [sv for sv in bound if (sv.name, sv.var) in wanted_keys]
+            if kept:
+                self._b_hash_to_vars[h] = kept
+                continue
+            try:
+                self.sc.UnsubscribeInputEvent(h)
+            except Exception as e:
+                logging.debug(f"UnsubscribeInputEvent({h}) failed: {e}")
+            self._b_hash_to_vars.pop(h)
         if not self._b_vars:
             # Nothing needs a B: variable, so nothing would normally ask the
             # aircraft what it has.  Ask anyway while axis capture is on:
@@ -978,14 +981,20 @@ class SimConnectManager(threading.Thread):
             if ev is None:
                 self._warn_unresolved(name)
                 continue
-            if ev.hash in self._b_hash_to_var:
+            bound = self._b_hash_to_vars.get(ev.hash)
+            if bound is None:
+                try:
+                    self.sc.SubscribeInputEvent(ev.hash)
+                except Exception as e:
+                    logging.warning(f"SubscribeInputEvent({sv.var}) failed: {e}")
+                    continue
+                bound = self._b_hash_to_vars[ev.hash] = []
+            if any(other is sv for other in bound):
                 continue
-            try:
-                self.sc.SubscribeInputEvent(ev.hash)
-            except Exception as e:
-                logging.warning(f"SubscribeInputEvent({sv.var}) failed: {e}")
-                continue
-            self._b_hash_to_var[ev.hash] = sv
+            # The sim reports an event once per hash, so every name reading it
+            # shares the one subscription.  A rebuilt SimVar of the same name
+            # takes the old one's place, since it may carry a new transform.
+            bound[:] = [other for other in bound if other.name != sv.name] + [sv]
             # subscriptions report changes only; fetch where it stands now
             req = next(self._b_req_iter)
             self._b_get_reqs[req] = sv
@@ -1140,8 +1149,7 @@ class SimConnectManager(threading.Thread):
         elif isinstance(recv, RECV_ENUMERATE_INPUT_EVENTS):
             self._on_input_events_enumerated(recv)
         elif isinstance(recv, RECV_SUBSCRIBE_INPUT_EVENT):
-            sv = self._b_hash_to_var.get(recv.Hash)
-            if sv is not None:
+            for sv in self._b_hash_to_vars.get(recv.Hash, ()):
                 self._store_input_event_value(sv, recv.value)
         elif isinstance(recv, RECV_GET_INPUT_EVENT):
             sv = self._b_get_reqs.pop(recv.dwRequestID, None)
