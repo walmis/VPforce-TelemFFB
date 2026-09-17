@@ -38,6 +38,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.pb_add.clicked.connect(self.add_button_clicked)
         self.pb_delete.clicked.connect(self.delete_button_clicked)
         self.pb_Refresh.clicked.connect(self.fill_fields)
+        # Connected once, here: fill_table runs on every add, delete and
+        # refresh, and a connection made there piles up with each call.
+        self.tableWidget.itemSelectionChanged.connect(self.on_table_item_changed)
 
         self.msfs_types = ["bool", "enum", "number", "Percent Over 100", "degrees", "meters/second"]
         self.xplane_types = ["int", "float"]
@@ -220,12 +223,6 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
 
         # Set selection behavior to select entire rows
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-
-        self.pb_delete.clicked.connect(self.delete_button_clicked)
-
-
-        # Connect currentItemChanged signal to handle row selection and data copying
-        self.tableWidget.itemSelectionChanged.connect(self.on_table_item_changed)
 
         # Display the table
         self.tableWidget.show()
