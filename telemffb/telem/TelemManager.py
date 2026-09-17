@@ -270,6 +270,7 @@ class TelemManager(QObject, threading.Thread):
         self._process_check_deadline: Optional[float] = None  # perf_counter() timestamp of the next scheduled process check; None when inactive
         self._device_swap_attempt = None  # (aircraft, devpath) already requested - one attempt per aircraft
         self._last_aircraft_info = None   # the last frame's aircraft, for a config reload while the sim is paused
+        self._shut_down = False           # set by on_shutdown(); frames after it are dropped
 
 
     def set_paused(self, pause_state: bool = False):
@@ -360,7 +361,13 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraft = None
 
     def on_shutdown(self):
-        """Called on the application quit path, before the event loop stops."""
+        """Called on the application quit path, before the event loop stops.
+
+        Frames keep arriving until the listeners stop.  With the handler retired the
+        next one would read as a newly loaded aircraft and build a fresh handler,
+        undoing the release the retired one just made, so they are dropped instead.
+        """
+        self._shut_down = True
         self._retire_current_aircraft()
         self.currentAircraftName = None
 
@@ -566,6 +573,8 @@ class TelemManager(QObject, threading.Thread):
 
     def process_data(self, data):
         """Main telemetry data processing pipeline."""
+        if self._shut_down:
+            return
         parsed_data = self._parse_telemetry_data(data)
         aircraft_info = self._extract_aircraft_info(parsed_data)
 

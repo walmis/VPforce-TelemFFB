@@ -1328,6 +1328,16 @@ class TestAircraftRetirement:
         aircraft.on_shutdown.assert_called_once_with()
         assert mgr.currentAircraft is None
 
+    def test_a_frame_after_shutdown_does_not_build_a_new_handler(self, mgr):
+        mgr.currentAircraft = MagicMock()
+        mgr.on_shutdown()
+
+        with patch.object(mgr, "_initialize_new_aircraft") as build:
+            mgr.process_data("N=Some Heli;src=MSFS")
+
+        build.assert_not_called()
+        assert mgr.currentAircraft is None
+
     def test_retire_is_idempotent(self, mgr):
         mgr.currentAircraft = None
         mgr._retire_current_aircraft()  # must not raise
