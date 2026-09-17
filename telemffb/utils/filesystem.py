@@ -198,13 +198,19 @@ def calculate_crc(file_path):
             crc.update(chunk)
     return crc.hexdigest()
 
+#: The telemffb package directory.  These helpers were written when this code lived in
+#: telemffb/utils.py, and their callers depend on paths relative to that location, so
+#: it is anchored here rather than on this file's own directory.
+_PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 def get_script_path():
     if getattr(sys, 'frozen', False):
         # we are running in a bundle
         script_dir = os.path.dirname(sys.executable)
     else:
         # we are running in a normal Python environment
-        script_dir = os.path.dirname(os.path.abspath(__file__))
+        script_dir = _PACKAGE_DIR
     return script_dir
 
 
@@ -216,8 +222,7 @@ def get_resource_path(relative_path, prefer_root=False, force=False):
         script_dir = os.path.dirname(sys.executable)
     else:
         # we are running in a normal Python environment
-        bundle_dir = os.path.dirname(os.path.abspath(__file__))
-        bundle_dir = os.path.abspath(os.path.join(bundle_dir, ".."))
+        bundle_dir = os.path.abspath(os.path.join(_PACKAGE_DIR, ".."))
         script_dir = bundle_dir
 
     if prefer_root:
@@ -259,7 +264,7 @@ def get_install_path():
     if getattr(sys, 'frozen', False):
         _install_path = os.path.dirname(sys.executable)
     else:
-        _install_path = os.path.dirname(os.path.abspath(__file__))
+        _install_path = _PACKAGE_DIR
     return _install_path
 
 
