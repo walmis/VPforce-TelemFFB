@@ -265,6 +265,9 @@ def get_install_path():
 
 def exit_application():
     # Perform any cleanup or save operations here
+    telem_manager = getattr(G, "telem_manager", None)
+    if telem_manager is not None:
+        telem_manager.on_shutdown()
     G.main_window.save_main_window_geometry()
     QCoreApplication.instance().quit()
 
