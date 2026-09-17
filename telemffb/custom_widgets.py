@@ -2675,7 +2675,7 @@ class CurveWidget(QWidget):
 
 
 class SpringCurveWidget(CurveWidget):
-    from telemffb.util import conversions as conv
+    from telemffb.utils import conversions as conv
     UNIT_CONVERSIONS = {
         "kt": conv.ms2kt,
         "mph": conv.ms2mph,

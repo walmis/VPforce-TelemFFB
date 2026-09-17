@@ -6,7 +6,7 @@ from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SQUARE, HapticEffect
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.util.conversions import FFB_UNITS
+from telemffb.utils.conversions import FFB_UNITS
 
 perftracker = utils.PerformanceTracker()
 

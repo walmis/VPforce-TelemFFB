@@ -21,7 +21,7 @@ from .Helicopter import Helicopter
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.util.conversions import kt2ms
+from telemffb.utils.conversions import kt2ms
 from telemffb.utils import clamp, PerformanceTracker
 # from .MsfsXpHeliControlsMixIn import MsfsXpHeliControlsMixIn
 

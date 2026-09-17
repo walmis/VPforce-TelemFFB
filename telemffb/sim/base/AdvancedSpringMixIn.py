@@ -9,7 +9,7 @@ from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.util.conversions import FFB_UNITS
+from telemffb.utils.conversions import FFB_UNITS
 
 perftracker = utils.PerformanceTracker()
 

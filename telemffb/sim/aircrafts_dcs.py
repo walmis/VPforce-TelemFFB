@@ -48,7 +48,7 @@ from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.SettingsManager import SpringModeEnum
 
-from telemffb.util.conversions import FFB_UNITS, kt2ms, kmh2ms, ms2kmh, deg
+from telemffb.utils.conversions import FFB_UNITS, kt2ms, kmh2ms, ms2kmh, deg
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 LPFs = utils.Dispenser(utils.LowPassFilter)

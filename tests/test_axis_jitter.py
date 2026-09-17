@@ -10,7 +10,7 @@ import math
 
 import pytest
 
-from telemffb.util.AxisJitter import AxisJitterMonitor
+from telemffb.utils.AxisJitter import AxisJitterMonitor
 
 pytestmark = [pytest.mark.unit]
 
@@ -664,19 +664,19 @@ class TestCommandInterception:
     """
 
     def setup_method(self):
-        from telemffb.util.AxisJitter import forget_axis_commands
+        from telemffb.utils.AxisJitter import forget_axis_commands
         forget_axis_commands()
 
     def _record(self, event, value):
-        from telemffb.util.AxisJitter import record_axis_command
+        from telemffb.utils.AxisJitter import record_axis_command
         record_axis_command(event, value)
 
     def _take(self, axis):
-        from telemffb.util.AxisJitter import take_axis_command
+        from telemffb.utils.AxisJitter import take_axis_command
         return take_axis_command(axis)[0]
 
     def _verified(self, axis):
-        from telemffb.util.AxisJitter import take_axis_command
+        from telemffb.utils.AxisJitter import take_axis_command
         return take_axis_command(axis)[1]
 
     def test_the_fixed_wing_axes_are_recognized(self):
@@ -727,7 +727,7 @@ class TestCommandInterception:
         axis at zero lag with mean error from 0.00003 to 0.00301 against
         a 0.005 threshold.  They convict like any fixed-wing axis; drop
         one back out of the verified set to silence it."""
-        from telemffb.util.AxisJitter import (AXIS_EVENTS,
+        from telemffb.utils.AxisJitter import (AXIS_EVENTS,
                                               VERIFIED_AXIS_EVENTS)
         for event in ('AXIS_CYCLIC_LONGITUDINAL_SET',
                       'AXIS_CYCLIC_LATERAL_SET',
@@ -761,7 +761,7 @@ class TestCommandInterception:
         assert self._take('elevator') is None
 
     def test_a_restart_drops_anything_uncollected(self):
-        from telemffb.util.AxisJitter import forget_axis_commands
+        from telemffb.utils.AxisJitter import forget_axis_commands
         self._record('AXIS_ELEVATOR_SET', -16384)
         forget_axis_commands()
         assert self._take('elevator') is None
@@ -832,11 +832,11 @@ class TestUnverifiedMappings:
     """
 
     def setup_method(self):
-        from telemffb.util.AxisJitter import forget_axis_commands
+        from telemffb.utils.AxisJitter import forget_axis_commands
         forget_axis_commands()
 
     def _verified(self, event):
-        from telemffb.util.AxisJitter import (record_axis_command,
+        from telemffb.utils.AxisJitter import (record_axis_command,
                                               take_axis_command, AXIS_EVENTS)
         record_axis_command(event, -8192)
         return take_axis_command(AXIS_EVENTS[event])[1]

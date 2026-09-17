@@ -176,13 +176,13 @@ The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficient
 
 - `FFBReport_SetCondition.set_coefficient()` / `.set_offset()` / `.set_saturation()` — a `float` argument is scaled by 4096 (rounded, clamped) internally; an `int` is passed through as device units.
 - `HapticEffect._conditional_effect` (damper/inertia/friction) and `HapticEffect.detent` — same sniffing via the `_to_device_units()` helper.
-- `cpOffset` is a raw `c_int16` field with **no** sniffing — a raw write needs explicit conversion (`to_device_units()` from `telemffb.util.conversions`). Prefer `spring.set_offset(value)` over a raw `cpOffset =` assignment.
+- `cpOffset` is a raw `c_int16` field with **no** sniffing — a raw write needs explicit conversion (`to_device_units()` from `telemffb.utils.conversions`). Prefer `spring.set_offset(value)` over a raw `cpOffset =` assignment.
 
 **Never** pre-scale a value before calling a setter: passing a device-unit float (e.g. `2048.0`) to `set_offset()` would be scaled again and clamped to 4096. If a value is already in device units, pass it as an `int`.
 
 `G.effects` is a `Dispenser` — accessing `G.effects["name"]` lazily creates the effect on first use, then returns the cached instance. Effect names must be unique within an aircraft instance.
 
-When you create a new effect, register its name in the effects translator: `effect_dict` in `telemffb/utils.py`. Each entry maps an effect-name pattern (regex supported, e.g. `"blade_slap.*"`) to `["Human Readable Name", "intensity_setting_name"]`. The translator supplies the readable name shown in the effects panel, and the setting-name half is how the UI links an active effect to its slider (green highlight and live % force display). An unregistered effect still works but appears under its raw internal name with no slider linkage.
+When you create a new effect, register its name in the effects translator: `effect_dict` in `telemffb/utils/misc.py` (`EffectTranslator.effect_dict`, available as `telemffb.utils.EffectTranslator.effect_dict`). Each entry maps an effect-name pattern (regex supported, e.g. `"blade_slap.*"`) to `["Human Readable Name", "intensity_setting_name"]`. The translator supplies the readable name shown in the effects panel, and the setting-name half is how the UI links an active effect to its slider (green highlight and live % force display). An unregistered effect still works but appears under its raw internal name with no slider linkage.
 
 ### Device Input Access
 `HapticEffect.device` is a **class attribute** holding the connected `FFBRhino` (or `None` when unplugged). In the telemetry hot path, never dereference it raw — a hot-unplug mid-frame raises `AttributeError` and kills the processing loop. Use the shared helpers on `AircraftEffectUtilsBase`:
@@ -221,7 +221,7 @@ This rule may only be broken to avoid circular imports — and even then, the ci
 | `telemffb/hw/ffb_sdl.py` | **DEPRECATED** SDL haptic backend (kept for posterity) |
 | `telemffb/xmlutils.py` | Legacy facade over `telemffb/xml/` (module-global API, one-way sync) |
 | `telemffb/xml/` (`store.py`, `read.py`, `write.py`, `merge.py`) | XML I/O, per-file locking, parsing, settings resolution |
-| `telemffb/utils.py` | Utilities: Dispenser, LowPassFilter, Dampener, SystemSettings, effects translator (`effect_dict`), etc. |
+| `telemffb/utils/` | Utility package — star-import façade (`__init__.py`), flat modules: `_math` (math/scaling/filters), `filesystem` (paths/zip/process), `device` (roles/identity/USB), `settings` (`SystemSettings`/registry/legacy migration), `_logging` (ANSI/OutLog/early-log/DedupHandler/LoggingFilter), `network` (HTTP/support bundle/version check), `integration` (IL-2/DCS/X-Plane/VPconf), `misc` (Dispenser, `EffectTranslator.effect_dict`, threads, Teleplot); plus class files `Vector`, `SharedMemReader`, `TransformExpr`, `TurbulenceModulator`, `AxisJitter`, `conversions`. `_math`/`_logging` are underscored (old monolith star-exported stdlib names of the same shape). |
 | `telemffb/telem/TelemManager.py` | Telemetry routing, aircraft instantiation, sim exit detection |
 | `telemffb/telem/SimTelemListener.py` | SimListenerManager + per-sim listener classes |
 | `telemffb/sim/aircraft_base.py` | MixIn composition + base aircraft behavior |
@@ -241,13 +241,13 @@ This rule may only be broken to avoid circular imports — and even then, the ci
 | `telemffb/CmdLineArgs.py` | CLI argument parser |
 | `styles.py` | Light/dark mode QSS stylesheets |
 
-Line counts are large (`xmlutils.py` ~2400, `utils.py` ~3600, `ffb_rhino.py` ~1800) — search within them rather than reading top to bottom.
+Line counts are large (`xmlutils.py` ~950, `ffb_rhino.py` ~1800) — search within them rather than reading top to bottom. The `telemffb/utils/` modules are all ≤ ~1150 lines each.
 
 ---
 
 ## When Making Changes
 
-1. **Adding new effects**: Create a MixIn in `telemffb/sim/base/` (generic) or `telemffb/sim/msfs_xp/` (sim-specific). Inherit from `AircraftEffectUtilsBase`. Add to `AircraftBase`'s MRO or the aircraft subclass. Use `@override`. Call `super()` in each hook. Register the effect name in `effect_dict` (`telemffb/utils.py`).
+1. **Adding new effects**: Create a MixIn in `telemffb/sim/base/` (generic) or `telemffb/sim/msfs_xp/` (sim-specific). Inherit from `AircraftEffectUtilsBase`. Add to `AircraftBase`'s MRO or the aircraft subclass. Use `@override`. Call `super()` in each hook. Register the effect name in `effect_dict` (`telemffb/utils/misc.py`).
 2. **New aircraft type**: Follow `docs/adding_an_aircraft_class.md` — one class per file under `msfs_xp/` (MSFS/X-Plane) or inline in the DCS/IL-2 module; register in `defaults.xml`; MSFS/X-Plane-only: telemetry remapping via `<sc_overrides>`.
 3. **UI changes**: PyQt6 components in `telemffb/*.py` (MainWindow, dialogs). Use existing QSS from `styles.py`, Fusion style conventions. All GUI updates from non-main threads via `utils.schedule_on_main_thread()`.
 4. **Config changes**: See `docs/defaults_xml_reference.md`. Update `defaults.xml` (new default values) and ensure the read path in `telemffb/xml/` handles the new keys. New enum settings go into `SettingsManager`'s class-level dicts. Writes go through the store's locked write path, then `update_roots()`.
@@ -283,7 +283,7 @@ effect.stop()  # Frees device resource
 
 1. **Don't use global variables as default args** — see Coding Guidelines → Globals
 2. **Never write the XML config files directly** — the multi-instance setup is protected by the per-file locks and atomic replace inside `XmlStore`; route writes through the store, then refresh the in-memory trees with `update_roots()` (they persist until called)
-3. **Every new effect name must be registered in the effects translator** (`effect_dict` in `telemffb/utils.py`) — see Coding Guidelines → Effects & HID Values
+3. **Every new effect name must be registered in the effects translator** (`effect_dict` in `telemffb/utils/misc.py`) — see Coding Guidelines → Effects & HID Values
 4. **Always check `G.master_instance` vs `G.child_instance`** when implementing features that differ per instance type
 5. **FFBRhino device communication is USB-latency sensitive** — batch HID updates when possible
 6. **GUI updates from worker threads** — use `utils.schedule_on_main_thread()` or Qt signals

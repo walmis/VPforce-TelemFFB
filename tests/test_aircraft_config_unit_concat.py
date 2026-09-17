@@ -32,7 +32,7 @@ pytestmark = [
     pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning"),
 ]
 
-KT2MS = 0.514444  # mirror of telemffb.util.conversions.kt2ms
+KT2MS = 0.514444  # mirror of telemffb.utils.conversions.kt2ms
 
 
 @pytest.fixture

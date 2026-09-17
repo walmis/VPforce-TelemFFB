@@ -25,10 +25,10 @@ import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect, EFFECT_SQUARE
 from telemffb.sim.aircraft_base import AircraftBase
-from telemffb.util.AxisJitter import (AXIS_EVENT_RANGE, AxisJitterMonitor,
+from telemffb.utils.AxisJitter import (AXIS_EVENT_RANGE, AxisJitterMonitor,
                                       take_axis_command)
-from telemffb.util.Vector import Vector
-from telemffb.util.conversions import rad
+from telemffb.utils.Vector import Vector
+from telemffb.utils.conversions import rad
 from telemffb.sim.msfs_xp.TurbulenceMixIn import TurbulenceMixIn
 # removed local 'overrides' helper in favor of typing.override
 

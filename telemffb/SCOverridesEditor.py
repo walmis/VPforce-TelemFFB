@@ -24,7 +24,7 @@ from . import globals as G
 from . import xmlutils
 from .telem.SimConnectManager import SimConnectManager
 from .ui.Ui_SCOverridesDialog import Ui_SCOverridesDialog
-from .util.TransformExpr import TransformExpr
+from .utils.TransformExpr import TransformExpr
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     overrides = []

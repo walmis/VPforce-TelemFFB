@@ -19,7 +19,7 @@
 from typing import override
 
 from telemffb.sim.msfs_xp.PropellerAircraft import PropellerAircraft
-from telemffb.util.conversions import kt2ms
+from telemffb.utils.conversions import kt2ms
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class TurbopropAircraft(PropellerAircraft):

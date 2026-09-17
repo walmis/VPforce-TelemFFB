@@ -75,7 +75,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import telemffb.globals as G
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.util.conversions import kt2ms
+from telemffb.utils.conversions import kt2ms
 
 SIMS = ("DCS", "MSFS", "XPLANE", "IL2", "BMS")
 KINDS = ("hold", "ramp", "edge")

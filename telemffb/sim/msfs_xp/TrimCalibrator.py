@@ -61,7 +61,7 @@ import time
 
 import telemffb.globals as G
 from telemffb.utils import PID, clamp, piecewise_linear
-from telemffb.util import conversions
+from telemffb.utils import conversions
 
 logger = logging.getLogger(__name__)
 

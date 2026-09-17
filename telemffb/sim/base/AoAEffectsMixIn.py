@@ -6,7 +6,7 @@ previously embedded in AircraftBase.
 import logging
 import math
 import telemffb.utils as utils
-from telemffb.util.conversions import kmh2ms
+from telemffb.utils.conversions import kmh2ms
 from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn

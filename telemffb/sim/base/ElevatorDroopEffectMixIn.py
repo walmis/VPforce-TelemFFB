@@ -1,7 +1,7 @@
 import logging
 
 import telemffb.utils as utils
-from telemffb.util.conversions import kt2ms
+from telemffb.utils.conversions import kt2ms
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 

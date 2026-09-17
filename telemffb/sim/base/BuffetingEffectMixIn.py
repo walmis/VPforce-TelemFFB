@@ -4,7 +4,7 @@ import time
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
-from telemffb.util.conversions import kt2ms
+from telemffb.utils.conversions import kt2ms
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class BuffetingEffectMixIn(AircraftEffectUtilsBase):
