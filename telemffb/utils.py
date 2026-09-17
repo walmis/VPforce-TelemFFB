@@ -425,6 +425,9 @@ class EffectTranslator:
         "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
         "etl.*": ["ETL Shaking", "etl_effect_intensity"],
         "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
+        "ffb_api_cyclic_spring": ["FFB API Cyclic Spring", "ffb_api_cyclic_spring_gain"],
+        "ffb_api_collective_spring": ["FFB API Collective Spring", "ffb_api_collective_spring_gain"],
+        "ffb_api_pedal_spring": ["FFB API Pedal Spring", "ffb_api_pedal_spring_gain"],
         "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
         "FI_vibration": ["FI Vibration", "FI_vibration_intensity"],
         "friction": ["Friction Override", "friction_force"],
@@ -4756,6 +4759,9 @@ def joystick_device_choices(settings):
 
 def exit_application():
     # Perform any cleanup or save operations here
+    telem_manager = getattr(G, "telem_manager", None)
+    if telem_manager is not None:
+        telem_manager.on_shutdown()
     G.main_window.save_main_window_geometry()
     QCoreApplication.instance().quit()
 
