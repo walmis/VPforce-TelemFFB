@@ -234,6 +234,7 @@ class AppStatusWidget(QWidget):
         self.offline_recall_ac = ''
         self.offline_recall_ptn = ''
         self.offline_recall_pro = ''
+        self.offline_recall_split = False
 
         # connect signal to slot (QueuedConnection by default across threads)
         self.request_set_active_vpconf.connect(self.set_active_vpconf)
@@ -469,6 +470,8 @@ class AppStatusWidget(QWidget):
         self.offline_recall_ac = ''
         self.offline_recall_ptn = ''
         self.offline_recall_pro = ''
+        self.btn_split_profile.setEnabled(self.offline_recall_split)
+        self.offline_recall_split = False
         self.message_stack.setCurrentIndex(0)
 
 
@@ -497,8 +500,12 @@ class AppStatusWidget(QWidget):
         self.offline = True
         self.sim_status_label.set_status(source, 'Offline')
         self.offline_recall_ac = self.cur_craft_label.text()
-        self.offline_recall_pro = self.cur_pattern_label.text()
+        self.offline_recall_ptn = self.cur_pattern_label.text()
         self.offline_recall_pro = self.active_profile_label.text()
+        # The split button forks the LOADED aircraft; the offline editor's selection
+        # is a match string, not an aircraft, so there is nothing for it to act on.
+        self.offline_recall_split = self.btn_split_profile.isEnabled()
+        self.btn_split_profile.setEnabled(False)
         self.cur_craft_label.setText('Offline')
         self.cur_pattern_label.setText('Offline')
         self.active_profile_label.setText('Offline')

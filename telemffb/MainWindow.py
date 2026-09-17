@@ -3016,7 +3016,7 @@ class MainWindow(QMainWindow):
         profile it matches now, so a livery or variant that rode a broader
         pattern gets a profile of its own."""
         sm = G.settings_mgr
-        if not sm.current_aircraft_name or not sm.current_pattern:
+        if sm.offline_mode or not sm.current_aircraft_name or not sm.current_pattern:
             return
         self.show_new_aircraft_wizard(
             manual=False, sim=sm.current_sim, name=sm.current_aircraft_name,
