@@ -129,6 +129,14 @@ class TelemManager(QObject, threading.Thread):
         self._cond = threading.Condition()
         self._data = None
         self._events = []
+        # Guards "a frame is being processed" (the gate device teardown waits
+        # on via frame_hold).  Deliberately separate from _cond: _cond is the
+        # queue lock, held only to wait and drain; _processing_lock is held
+        # across the actual (blocking, GIL-releasing) processing.  Keeping
+        # them apart means the queue lock is never held while another thread
+        # is blocked on it and we release/reacquire the GIL (log writes, HID
+        # I/O, psutil scans) - that combination is what wedged the manager.
+        self._processing_lock = threading.Lock()
         self._dropped_frames = 0
         self.last_frame_time = time.perf_counter()
         self.frame_times = []
@@ -152,14 +160,21 @@ class TelemManager(QObject, threading.Thread):
         self.pause_state = pause_state
 
     def frame_hold(self):
-        """The lock guarding frame processing.
+        """The lock excluding in-flight frame processing.
 
         Pausing only gates NEW frames; one already being processed (or
         buffered) keeps driving effects.  A device teardown pauses, then
         acquires this for the duration, so no frame ever writes to a
         half-switched device - the per-aircraft swap made that race a
-        near-certainty, since the request originates mid-frame."""
-        return self._cond
+        near-certainty, since the request originates mid-frame.
+
+        This is the _processing_lock the run() loop holds across
+        on_timeout/process_data/process_events - NOT the queue lock
+        (_cond).  The queue lock must never be held across that work:
+        a caller blocked on it (stop, the device switch) plus GIL
+        hand-offs during the processing deadlocked the whole manager
+        (the GIL hand-off hang), so the two concerns live on separate locks."""
+        return self._processing_lock
 
     def reset_sim_connected(self):
         """Called by SimListenerManager.allStarted when all sim listeners have been
@@ -400,9 +415,18 @@ class TelemManager(QObject, threading.Thread):
                 # we drop frames to keep latency to a minimum
                 logging.debug(f"Dropped frame (total {self._dropped_frames})")
 
-    def process_events(self):
-        while self._events:
-            ev = self._events.pop(0)
+    def process_events(self, events=None):
+        """Dispatch buffered Ev= events to the current aircraft.
+
+        ``events`` is the already-drained list handed over by the run()
+        loop (processed outside the queue lock).  When omitted, drains
+        self._events in place - the historical self-draining behaviour
+        for direct callers."""
+        if events is None:
+            events = self._events
+            self._events = []
+        while events:
+            ev = events.pop(0)
             ev = ev.split(";")
 
             if self.currentAircraft:
@@ -1058,6 +1082,14 @@ class TelemManager(QObject, threading.Thread):
 
         When data arrives after a timeout the timeout state is cleared and the
         process-check deadline is cancelled — telemetry has resumed normally.
+
+        Lock discipline: _cond (the queue lock) is held only to wait for work
+        and to atomically drain _data/_events.  The processing itself runs
+        under _processing_lock (the frame_hold gate), never while _cond is
+        held.  The processing releases and reacquires the GIL (log stream
+        writes, HID I/O, psutil scans); holding a lock that other threads
+        (stop, the device switch) are blocked on across those hand-offs
+        deadlocked the manager, so the two concerns use separate locks.
         """
         self.timeout_sec = int(G.system_settings.get('telemTimeout', 200))/1000.0
         logging.info(f"Telemetry timeout: {self.timeout_sec}")
@@ -1065,38 +1097,54 @@ class TelemManager(QObject, threading.Thread):
         while self._run:
             with self._cond:
                 if not self._events and not self._data:
-                    if not self._cond.wait(self.timeout_sec):
-                        self._safe_call("on_timeout", self.on_timeout)
-                        # A paused sim sends no frames, and a profile edit
-                        # (the new-aircraft wizard included) must not wait
-                        # for one: re-check the config against the last
-                        # frame's aircraft.
-                        info = self._last_aircraft_info
-                        if info is not None and self.currentAircraft is not None:
-                            self._safe_call("_handle_config_changes",
-                                            lambda: self._handle_config_changes(info))
+                    # Nothing pending: sleep until work arrives or the
+                    # telemetry timeout elapses.  wait() releases _cond, so
+                    # producers and frame_hold callers are never blocked by
+                    # an idle loop.
+                    wait_returned = self._cond.wait(self.timeout_sec)
+                else:
+                    wait_returned = True
+                # Atomically take everything pending.  submit_frame is the
+                # only other accessor of _data/_events and it always holds
+                # _cond, so this snapshot is safe to process outside.
+                data = self._data
+                self._data = None
+                events = self._events
+                self._events = []
 
-                        # Arm the process-check deadline on the first timeout.
-                        # The _PROCESS_CHECK_DELAY grace period lets us ignore brief
-                        # pauses (e.g. loading screens) before declaring a sim exit.
-                        if self.timed_out and self._process_check_deadline is None:
-                            self._process_check_deadline = (
-                                time.perf_counter() + self._PROCESS_CHECK_DELAY
-                            )
+            with self._processing_lock:
+                if not wait_returned:
+                    # A paused sim sends no frames, and a profile edit
+                    # (the new-aircraft wizard included) must not wait
+                    # for one: re-check the config against the last
+                    # frame's aircraft.
+                    self._safe_call("on_timeout", self.on_timeout)
+                    info = self._last_aircraft_info
+                    if info is not None and self.currentAircraft is not None:
+                        self._safe_call("_handle_config_changes",
+                                        lambda: self._handle_config_changes(info))
 
-                        # Fire a process check when the deadline is reached, then
-                        # reschedule for the next interval so we keep polling until
-                        # telemetry resumes or the sim process is gone.
-                        if (self._process_check_deadline is not None
-                                and time.perf_counter() >= self._process_check_deadline):
-                            self._process_check_deadline = (
-                                time.perf_counter() + self._PROCESS_CHECK_INTERVAL
-                            )
-                            self._safe_call("_check_sim_process", self._check_sim_process)
+                    # Arm the process-check deadline on the first timeout.
+                    # The _PROCESS_CHECK_DELAY grace period lets us ignore brief
+                    # pauses (e.g. loading screens) before declaring a sim exit.
+                    if self.timed_out and self._process_check_deadline is None:
+                        self._process_check_deadline = (
+                            time.perf_counter() + self._PROCESS_CHECK_DELAY
+                        )
 
-                        continue
+                    # Fire a process check when the deadline is reached, then
+                    # reschedule for the next interval so we keep polling until
+                    # telemetry resumes or the sim process is gone.
+                    if (self._process_check_deadline is not None
+                            and time.perf_counter() >= self._process_check_deadline):
+                        self._process_check_deadline = (
+                            time.perf_counter() + self._PROCESS_CHECK_INTERVAL
+                        )
+                        self._safe_call("_check_sim_process", self._check_sim_process)
 
-                if self._data:
+                    continue
+
+                if data:
                     if self.timed_out:
                         # Data has resumed after a timeout — clear timeout state and
                         # cancel the process-check so it doesn't fire spuriously.
@@ -1106,9 +1154,8 @@ class TelemManager(QObject, threading.Thread):
                         self._process_check_deadline = None  # sim resumed; cancel check
 
                     G.settings_mgr.timed_out = False
-                    data = self._data
-                    self._data = None
                     self._safe_call("process_data", lambda: self.process_data(data))
-                
-                if self._events:
-                    self._safe_call("process_events", self.process_events)
+
+                if events:
+                    self._safe_call("process_events",
+                                    lambda: self.process_events(events))

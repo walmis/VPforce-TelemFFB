@@ -7,6 +7,7 @@ user's pattern onto the built-in; the answer is remembered per pattern pair.
 """
 import json
 import os
+import threading
 import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock
 
@@ -403,6 +404,7 @@ def test_a_config_change_applies_while_the_sim_is_paused(store, monkeypatch):
     mgr._process_check_deadline = None
     mgr._events, mgr._data = [], None
     mgr._safe_call = lambda what, fn: fn()
+    mgr._processing_lock = threading.Lock()   # run() gates processing on it
 
     class Cond:
         def __enter__(self): return self
