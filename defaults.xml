@@ -6463,13 +6463,6 @@
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H145.*</model>
 		<sim>MSFS</sim>
-		<var>L:FFB_HANDS_ON_CYCLIC</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgHandsOnCyclic</name>
-		<model>Airbus H145.*</model>
-		<sim>MSFS</sim>
 		<var>L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
@@ -6506,13 +6499,6 @@
 		<model>Airbus H160.*</model>
 		<sim>MSFS</sim>
 		<var>L:H160_SDK_AFCS_MODE_COLLECTIVE</var>
-		<sc_unit>enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
-		<name>hpgHandsOnCyclic</name>
-		<model>Airbus H160.*</model>
-		<sim>MSFS</sim>
-		<var>L:FFB_HANDS_ON_CYCLIC</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>

@@ -473,6 +473,16 @@ class TestScOverrides:
         assert hinted, "the fallback block moved: update this test"
         assert hinted <= registered, f"not registered for MSFS: {sorted(hinted - registered)}"
 
+    def test_no_row_is_shadowed_by_another_of_the_same_name(self, defaults_root):
+        """Rows merge by name, the later one winning, so two rows with one
+        name under one key and sim leave the first subscribed to nothing."""
+        import collections
+        seen = collections.Counter(
+            (elem.findtext("model") or f"class={elem.findtext('class')}",
+             elem.findtext("sim") or "", elem.findtext("name"))
+            for elem in defaults_root.findall(".//sc_overrides"))
+        assert [k for k, n in seen.items() if n > 1] == []
+
     def test_model_patterns_valid_regex(self, defaults_root):
         for elem in defaults_root.findall(".//sc_overrides"):
             pattern = elem.findtext("model", "")
