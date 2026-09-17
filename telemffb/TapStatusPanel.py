@@ -33,6 +33,7 @@ reinstall would re-ask about devices, and a config could not be changed
 without touching the wrapper.
 """
 
+import logging
 import ntpath
 import os
 
