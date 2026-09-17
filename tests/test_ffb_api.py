@@ -201,12 +201,7 @@ class TestFFBApiDiscovery(FFBApiTestBase):
             assert name in self.mock_simconnect.sv_dict, f"{name} not subscribed"
 
     def test_dropped_subscription_is_reinstated(self):
-        """A SimConnectManager resubscribe from anywhere else drops runtime-added vars.
-
-        temp_sim_vars is cleared by the subscribe cycle that consumes it, so the next
-        _resubscribe() rebuilds from the predefined list alone.  The per-frame check
-        is what brings them back.
-        """
+        """The per-frame check brings the variables back if they ever go missing."""
         instance = self.make_instance()
         self.arm(instance, self.make_telem())
         self.mock_simconnect.sv_dict.clear()
@@ -230,15 +225,25 @@ class TestFFBApiDiscovery(FFBApiTestBase):
 
         assert instance._ffb_api_active(FFB_API_CYCLIC) is True
 
-    def test_features_are_latched_not_re_read(self):
-        """Discovery values are static (spec 3.1): a later change must not take effect."""
+    def test_a_brief_change_after_the_latch_is_ignored(self):
+        """The control paths read the latched copy, so a transient cannot retract a
+        capability mid-flight."""
         instance = self.make_instance()
         self.arm(instance, self.make_telem(version=1, features=BIT_CYCLIC))
         assert instance._ffb_api_has_trim(FFB_API_CYCLIC) is True
 
-        # Aircraft glitches the value mid-flight; the latched capability stands.
-        self.arm(instance, self.make_telem(version=1, features=0))
+        self.arm(instance, self.make_telem(version=1, features=0),
+                 frames=FFB_API_DISCOVERY_STABLE_FRAMES - 1)
         assert instance._ffb_api_has_trim(FFB_API_CYCLIC) is True
+        assert instance._ffb_api_features == BIT_CYCLIC
+
+    def test_a_version_drop_after_the_latch_is_ignored(self):
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem(version=1, features=BIT_CYCLIC))
+
+        self.arm(instance, self.make_telem(version=0, features=0),
+                 frames=FFB_API_DISCOVERY_STABLE_FRAMES * 3)
+        assert instance._ffb_api_latched is True
         assert instance._ffb_api_features == BIT_CYCLIC
 
     def test_features_relatched_after_timeout(self):
@@ -306,6 +311,43 @@ class TestFFBApiDiscoveryDebounce(FFBApiTestBase):
         self.arm(instance, telem, frames=1)
         assert instance._ffb_api_latched is True
         assert self.written_values("L:FFB_CYCLIC_ENABLED") == [1]
+
+    def test_a_stale_pair_that_latched_is_replaced_when_the_aircraft_publishes(self):
+        """The previous aircraft's values hold perfectly still, so they can outlast the
+        debounce and latch.  The current aircraft's own pair must still win."""
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem(version=1, features=BIT_CYCLIC))
+        assert instance._ffb_api_features == BIT_CYCLIC
+
+        fresh = self.make_telem(version=1, features=ALL_TRIM)
+        self.arm(instance, fresh, frames=FFB_API_DISCOVERY_STABLE_FRAMES - 1)
+        assert instance._ffb_api_features == BIT_CYCLIC
+
+        self.arm(instance, fresh, frames=1)
+        assert instance._ffb_api_features == ALL_TRIM
+        assert instance._ffb_api_has_trim(FFB_API_PEDALS) is True
+
+    def test_an_interrupted_change_restarts_the_count(self):
+        instance = self.make_instance()
+        latched = self.make_telem(version=1, features=BIT_CYCLIC)
+        fresh = self.make_telem(version=1, features=ALL_TRIM)
+        self.arm(instance, latched)
+
+        self.arm(instance, fresh, frames=FFB_API_DISCOVERY_STABLE_FRAMES - 1)
+        self.arm(instance, latched, frames=1)
+        self.arm(instance, fresh, frames=FFB_API_DISCOVERY_STABLE_FRAMES - 1)
+        assert instance._ffb_api_features == BIT_CYCLIC
+
+    def test_a_relatch_reruns_the_spring_handshake_and_keeps_the_control_enabled(self):
+        instance = self.make_instance()
+        self.arm(instance, self.make_telem(version=1, features=0))
+        instance._ffb_api_spring_init = 1
+
+        self.arm(instance, self.make_telem(version=1, features=ALL_TRIM))
+
+        assert instance._ffb_api_spring_init == 0
+        assert self.written_values("L:FFB_CYCLIC_ENABLED")[-1] == 1
+        assert 0 not in self.written_values("L:FFB_CYCLIC_ENABLED")
 
     def test_configured_but_silent_aircraft_warns_once(self):
         """A soft check: stay inert and keep looking, but say so."""
@@ -405,8 +447,8 @@ class TestFFBApiTrim(FFBApiTestBase):
         self.arm(instance, telem)
         instance.msfs_update_heli_controls(telem)
 
-        assert instance.cpO_x == round(0.25 * 4096)
-        assert instance.cpO_y == round(-0.5 * 4096)
+        assert instance.cpO_x == pytest.approx(0.25)
+        assert instance.cpO_y == pytest.approx(-0.5)
 
     def test_trim_is_consumed_raw(self):
         """Plan 10.4: no rig-side smoothing - a step lands on the spring immediately."""
@@ -418,7 +460,7 @@ class TestFFBApiTrim(FFBApiTestBase):
 
         telem["ffbTrimCyclicRoll"] = 0.8
         instance.msfs_update_heli_controls(telem)
-        assert instance.cpO_x == round(0.8 * 4096)
+        assert instance.cpO_x == pytest.approx(0.8)
 
     def test_trim_is_clamped_to_unit_range(self):
         instance = self.make_instance()
@@ -426,8 +468,8 @@ class TestFFBApiTrim(FFBApiTestBase):
         self.arm(instance, telem)
         instance.msfs_update_heli_controls(telem)
 
-        assert instance.cpO_x == 4096
-        assert instance.cpO_y == -4096
+        assert instance.cpO_x == 1.0
+        assert instance.cpO_y == -1.0
 
     def test_tr_on_softens_spring_and_follows_stick(self):
         instance = self.make_instance()
@@ -440,8 +482,8 @@ class TestFFBApiTrim(FFBApiTestBase):
         instance.msfs_update_heli_controls(telem)
 
         # Centre follows the stick, not the (stale) published trim.
-        assert instance.cpO_x == round(0.3 * 4096)
-        assert instance.cpO_y == round(-0.2 * 4096)
+        assert instance.cpO_x == pytest.approx(0.3)
+        assert instance.cpO_y == pytest.approx(-0.2)
 
     def test_tr_release_recentres_on_published_trim(self):
         """The spec guarantees _TRIM followed the stick under TR, so there is no snap."""
@@ -465,7 +507,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         self.arm(instance, telem)
         instance.msfs_update_collective(telem)
 
-        assert instance.cpO_y == round(-0.5 * 4096)
+        assert instance.cpO_y == pytest.approx(-0.5)
 
     def test_collective_inversion_is_configurable(self):
         instance = self.make_instance(device="collective")
@@ -474,7 +516,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         self.arm(instance, telem)
         instance.msfs_update_collective(telem)
 
-        assert instance.cpO_y == round(0.5 * 4096)
+        assert instance.cpO_y == pytest.approx(0.5)
 
     def test_pedal_trim_tracks_published_trim(self):
         instance = self.make_instance(device="pedals")
@@ -482,7 +524,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         self.arm(instance, telem)
         instance.msfs_update_pedals(telem)
 
-        assert instance.cpO_x == round(-0.4 * 4096)
+        assert instance.cpO_x == pytest.approx(-0.4)
 
     def test_untrimmed_collective_holds_position_at_the_trim_gain(self):
         """No trim bit is not "no spring": hold the lever, at the trim spring's gain."""
@@ -495,7 +537,7 @@ class TestFFBApiTrim(FFBApiTestBase):
         instance.msfs_update_collective(telem)
 
         # Centre is the lever, not the (ignored) published trim.
-        assert instance.cpO_y == round(0.4 * 4096)
+        assert instance.cpO_y == pytest.approx(0.4)
         assert instance.spring_y.positiveCoefficient == round(0.5 * 4096)
 
     def test_untrimmed_collective_springs_with_stock_settings(self):
@@ -851,7 +893,7 @@ class TestFFBApiControlPaths(FFBApiTestBase):
             instance.msfs_update_heli_controls(telem)
 
         assert called == []
-        assert instance.cpO_x == round(0.25 * 4096)
+        assert instance.cpO_x == pytest.approx(0.25)
 
     def test_collective_path_replaces_the_generic_one(self):
         instance = self.make_instance(device="collective")
@@ -864,7 +906,7 @@ class TestFFBApiControlPaths(FFBApiTestBase):
             instance.msfs_update_collective(telem)
 
         assert called == []
-        assert instance.cpO_y == round(-0.25 * 4096)
+        assert instance.cpO_y == pytest.approx(-0.25)
 
     def test_pedal_path_replaces_the_generic_one(self):
         instance = self.make_instance(device="pedals")
@@ -877,7 +919,7 @@ class TestFFBApiControlPaths(FFBApiTestBase):
             instance.msfs_update_pedals(telem)
 
         assert called == []
-        assert instance.cpO_x == round(0.25 * 4096)
+        assert instance.cpO_x == pytest.approx(0.25)
 
     @pytest.mark.parametrize("device,method", [
         ("joystick", "msfs_update_heli_controls"),
@@ -983,7 +1025,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
         self.arm(instance, telem)
         instance.msfs_update_heli_controls(telem)
 
-        assert instance.cpO_x == round(0.3 * 4096)
+        assert instance.cpO_x == pytest.approx(0.3)
 
 
 # ───────────────────────────────────────────────────────────────
@@ -1284,6 +1326,16 @@ class TestAircraftRetirement:
         mgr._retire_current_aircraft()
 
         aircraft.on_shutdown.assert_called_once_with()
+        assert mgr.currentAircraft is None
+
+    def test_a_frame_after_shutdown_does_not_build_a_new_handler(self, mgr):
+        mgr.currentAircraft = MagicMock()
+        mgr.on_shutdown()
+
+        with patch.object(mgr, "_initialize_new_aircraft") as build:
+            mgr.process_data("N=Some Heli;src=MSFS")
+
+        build.assert_not_called()
         assert mgr.currentAircraft is None
 
     def test_retire_is_idempotent(self, mgr):

@@ -343,7 +343,7 @@ def bms_registry_roots() -> List[str]:
             continue
         # a newer 4.38 sorts after 4.37, and the newest is the likely target
         for name in sorted(subkeys, reverse=True):
-            roots += _registry_values(winreg.HKEY_LOCAL_MACHINE,
+            roots += _registry_values('HKEY_LOCAL_MACHINE',
                                       (f"{hive_path}\\{name}",), "baseDir")
     return roots
 

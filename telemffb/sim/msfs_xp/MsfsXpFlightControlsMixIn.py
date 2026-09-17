@@ -551,6 +551,13 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
 
         return vne, Q_gain
 
+    def elevator_droop_term_for(self, g_force, _elev_dyn_pressure):
+        """The gravity-droop bias on the elevator: the profile's moment,
+        scaled by load factor and washed out as dynamic pressure builds.
+        Its own method so the effect preview can play it on its own
+        (stationary, 1 g) through the same applier the live loop uses."""
+        return self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
+
     def _calculate_control_coefficients(self, telem_data: BaseTelemetryData, _elev_dyn_pressure, _dyn_pressure, _rud_dyn_pressure, _slip_gain, g_force):
         """Calculate force coefficients for elevator, aileron and rudder.
 
@@ -583,7 +590,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
                      _rud_coeff           (debug: final rudder spring coefficient)
         """
         # Elevator droop effect
-        _elevator_droop_term = self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
+        _elevator_droop_term = self.elevator_droop_term_for(g_force, _elev_dyn_pressure)
         telem_data._elevator_droop_term = _elevator_droop_term
 
         # Calculate raw coefficients
@@ -879,6 +886,15 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         logging.debug(f"Ailer Coef: {ac}")
 
         return ec, ac
+
+    def apply_joystick_constant_forces(self, telem_data: BaseTelemetryData, elevator_droop_term, g_term):
+        """The joystick constant-force applier, for callers outside the class.
+
+        The effect preview's recipes sequence production steps rather than
+        copy their arithmetic (the droop term, then this applier), and a
+        ``_`` member is class-internal by convention, so this is the name
+        they call.  Same behavior as the internal method the live loop uses."""
+        return self._apply_joystick_constant_forces(telem_data, elevator_droop_term, g_term)
 
     def _apply_joystick_constant_forces(self, telem_data: BaseTelemetryData, _elevator_droop_term, _G_term):
         """Apply constant forces (droop, G-forces, lateral) to joystick."""

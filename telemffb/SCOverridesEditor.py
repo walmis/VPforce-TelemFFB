@@ -38,6 +38,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.pb_add.clicked.connect(self.add_button_clicked)
         self.pb_delete.clicked.connect(self.delete_button_clicked)
         self.pb_Refresh.clicked.connect(self.fill_fields)
+        # Connected once, here: fill_table runs on every add, delete and
+        # refresh, and a connection made there piles up with each call.
+        self.tableWidget.itemSelectionChanged.connect(self.on_table_item_changed)
 
         self.msfs_types = ["bool", "enum", "number", "Percent Over 100", "degrees", "meters/second"]
         self.xplane_types = ["int", "float"]
@@ -127,8 +130,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.lb_InfoLabel.setText('')
             self.fill_cb_name()
 
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
-                                                        sim=G.settings_mgr.current_sim)
+            self.overrides = xmlutils.read_sc_overrides(
+                G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                sim=G.settings_mgr.current_sim, cls=G.settings_mgr.current_class or None)
 
 
             if not any(self.overrides) :
@@ -188,20 +192,18 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
                 scale_item = QTableWidgetItem(str(override['scale']))
             else:
                 scale_item = QTableWidgetItem('')
+            # The hidden source column is what the selection handler reads
+            # to decide whether the row is the user's and may be deleted.
             source_item = QTableWidgetItem(override['source'])
 
-            # If source is 'defaults', make the text color grey
-            if override['source'] == 'defaults':
+            # Shipped rows (defaults.xml, model- or class-scoped) are shown
+            # grayed.  They stay selectable, since selecting one is how a user
+            # starts an override of it; only user rows can be deleted.
+            if override['source'] != 'user':
                 name_item.setForeground(Qt.GlobalColor.gray)
                 var_item.setForeground(Qt.GlobalColor.gray)
                 sc_unit_item.setForeground(Qt.GlobalColor.gray)
                 scale_item.setForeground(Qt.GlobalColor.gray)
-
-                # Make entire row unselectable
-                for col in range(4):
-                    item = QTableWidgetItem()
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-                    self.tableWidget.setItem(row_index, col, item)
 
             # Setting items non-editable
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -221,12 +223,6 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
 
         # Set selection behavior to select entire rows
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-
-        self.pb_delete.clicked.connect(self.delete_button_clicked)
-
-
-        # Connect currentItemChanged signal to handle row selection and data copying
-        self.tableWidget.itemSelectionChanged.connect(self.on_table_item_changed)
 
         # Display the table
         self.tableWidget.show()
@@ -303,8 +299,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.tb_scale.setStyleSheet("")
             self.tb_scale.setToolTip("")
 
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
-                                                        sim=G.settings_mgr.current_sim)
+            self.overrides = xmlutils.read_sc_overrides(
+                G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                sim=G.settings_mgr.current_sim, cls=G.settings_mgr.current_class or None)
             self.fill_table()
 
     def delete_button_clicked(self):
@@ -316,6 +313,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.pb_delete.setEnabled(False)
             xmlutils.erase_sc_override_from_xml(G.settings_mgr.current_pattern, name,
                                                 sim=G.settings_mgr.current_sim)
-            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
-                                                        sim=G.settings_mgr.current_sim)
+            self.overrides = xmlutils.read_sc_overrides(
+                G.settings_mgr.current_pattern, identity=G.settings_mgr.current_pattern,
+                sim=G.settings_mgr.current_sim, cls=G.settings_mgr.current_class or None)
             self.fill_table()

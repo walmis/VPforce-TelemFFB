@@ -119,7 +119,7 @@ def test_enumeration_subscribes_by_hash_and_reads_the_starting_value():
     assert m.sc.named("SubscribeInputEvent") == [(0x1234,)]
     gets = m.sc.named("GetInputEvent")
     assert len(gets) == 1 and gets[0][1] == 0x1234
-    assert m._b_hash_to_var[0x1234].name == "APMaster"
+    assert [sv.name for sv in m._b_hash_to_vars[0x1234]] == ["APMaster"]
     assert m._b_enum_req is None
 
 
@@ -208,7 +208,7 @@ def test_an_aircraft_change_drops_the_old_hashes_and_enumerates_again():
     m._note_aircraft_title("PMDG 737")
     assert m.sc.named("UnsubscribeInputEvent") == [(0x1234,)]
     assert len(m.sc.named("EnumerateInputEvents")) == 1
-    assert m._b_hash_to_var == {} and m._input_events == {}
+    assert m._b_hash_to_vars == {} and m._input_events == {}
     m._note_aircraft_title("PMDG 737")
     assert len(m.sc.named("EnumerateInputEvents")) == 1
 
@@ -256,8 +256,35 @@ def test_a_reconnect_forgets_the_table_and_starts_over():
     m._handle_recv(subscribe_value(0x1234, 1.0))
     m.sc.clear()
     m._reset_input_events()
-    assert m._input_events == {} and m._b_hash_to_var == {} and m._b_values == {}
+    assert m._input_events == {} and m._b_hash_to_vars == {} and m._b_values == {}
     assert len(m.sc.named("EnumerateInputEvents")) == 1
+
+
+def test_two_names_reading_one_event_both_get_its_value():
+    m = make_manager(("ForceTrimSW", "B:LIGHTING_NAV", "enum"), ("ControlsLock", "B:LIGHTING_NAV", "enum"))
+    m._handle_recv(enumeration(m._b_enum_req, [("LIGHTING_NAV", 0x1234, scdefs.INPUT_EVENT_TYPE_DOUBLE)]))
+    assert len(m.sc.named("SubscribeInputEvent")) == 1
+
+    m._handle_recv(subscribe_value(0x1234, 1.0))
+    assert m._b_values == {"ForceTrimSW": 1.0, "ControlsLock": 1.0}
+
+
+def test_an_event_stays_subscribed_until_the_last_name_lets_go():
+    m = make_manager(("ForceTrimSW", "B:LIGHTING_NAV", "enum"), ("ControlsLock", "B:LIGHTING_NAV", "enum"))
+    m._handle_recv(enumeration(m._b_enum_req, [("LIGHTING_NAV", 0x1234, scdefs.INPUT_EVENT_TYPE_DOUBLE)]))
+    m._handle_recv(subscribe_value(0x1234, 1.0))
+    m.sc.clear()
+
+    m.remove_simvar("ControlsLock")
+    m._subscribe()
+    assert m.sc.named("UnsubscribeInputEvent") == []
+    m._handle_recv(subscribe_value(0x1234, 0.0))
+    assert m._b_values == {"ForceTrimSW": 0.0}
+
+    m.remove_simvar("ForceTrimSW")
+    m._subscribe()
+    assert m.sc.named("UnsubscribeInputEvent") == [(0x1234,)]
+    assert m._b_values == {}
 
 
 def test_dropping_a_b_var_unsubscribes_it_and_removes_its_value():
@@ -265,7 +292,7 @@ def test_dropping_a_b_var_unsubscribes_it_and_removes_its_value():
     m._handle_recv(enumeration(m._b_enum_req, [("AUTOPILOT_Master", 0x1234, scdefs.INPUT_EVENT_TYPE_DOUBLE)]))
     m._handle_recv(subscribe_value(0x1234, 1.0))
     m.sc.clear()
-    m.temp_sim_vars.clear()
+    m.clear_runtime_simvars()
     m._subscribe()
     assert m.sc.named("UnsubscribeInputEvent") == [(0x1234,)]
     assert m._b_values == {} and m._b_vars == []

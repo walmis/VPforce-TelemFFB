@@ -608,7 +608,10 @@ class ConfigWriter:
             self.write_models_to_xml(sim, new_pattern, m['value'], m['name'],
                                      m.get('unit', ''), m.get('device', ''), new_profile)
 
-        # Clone SC overrides
+        # Clone SC overrides: the source pattern's own rows.  No class is
+        # passed, so class rows are not read: they reach the new pattern
+        # through its class, and copying them would freeze the class's
+        # sources into the clone.
         for ov in self._resolver.read_sc_overrides(old_pattern, identity=old_pattern, sim=sim):
             self.write_sc_override_to_xml(new_pattern, ov['var'], ov['name'],
                                           ov.get('sc_unit', ''), ov.get('scale', ''),

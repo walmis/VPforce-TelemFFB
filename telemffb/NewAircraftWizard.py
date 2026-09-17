@@ -77,14 +77,18 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     }
     internal_class_names = {v: k for k, v in friendly_class_names.items()}  # Build reverse lookup table
 
-    # Aircraft types with special treatment that must be cloned from a default profile.
+    # Classes whose code reads a source that is still keyed by model, so
+    # an aircraft assigned the class without a clone would be missing it:
+    # HPG for the H145/H160 SDK variables; FlyInside for RotorRPM, whose
+    # scale differs per aircraft, and for the B206's HydSys.  The list is
+    # per class, so it cannot single out one model: the CowanSim R66, whose
+    # hydraulic switch is a model row, is carried by its profile note.
     # The clone list is filtered to models of the chosen class (get_models -> read_models),
     # so a class only belongs here once defaults.xml ships a <models> entry for it -
     # otherwise the only candidate is the null entry and Finish can never be enabled.
-    # FFBApiHelicopter deliberately stays out: it carries no shipped model mapping (no
-    # released aircraft implements the spec yet) and its settings come from
-    # <classdefaults_MSFS>, so there is nothing a clone would supply.
-    mandatory_clone_types = ("HPGHelicopter", "SASHelicopter", "FlyInsideHelicopter", "TaogH500Helicopter", "XAW109Helicopter")
+    # FFBApiHelicopter stays out: its settings come from <classdefaults_MSFS> and it
+    # subscribes its own variables, so a clone would supply nothing the class lacks.
+    mandatory_clone_types = ("HPGHelicopter", "FlyInsideHelicopter")
     mandatory_clone: bool=False
     aircraft_list: list=None
     class_list: list=None

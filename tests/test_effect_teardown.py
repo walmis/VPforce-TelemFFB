@@ -144,6 +144,7 @@ class TestSimExitTeardown:
         mgr = TelemManager.__new__(TelemManager)
         mgr._sim_exit_signaled = False
         mgr._process_check_deadline = None
+        mgr._simconnect = None
         mgr.currentAircraftName = "TestAircraft"
 
         timeout_called = []

@@ -68,13 +68,20 @@ class ClassDefaultsEntry(TypedDict):
 
 
 class ScOverrideEntry(TypedDict):
-    """Row produced by read_sc_overrides / _read_models_sc_overrides."""
+    """Row produced by read_sc_overrides.
+
+    ``source`` is 'default' (defaults.xml) or 'user' (userconfig).
+    ``scope`` is 'class' for a row selected by aircraft class or 'model'
+    for one selected by aircraft-name pattern; a model row outranks a
+    class row of the same name, whatever their sources.
+    """
     name: str
     var: str
     sc_unit: str
     scale: str
     source: str
     sim: str            # '' on a row written before rows carried one: any sim
+    scope: str          # 'class' or 'model': which key selected the row
 
 
 class PrereqEntry(TypedDict):

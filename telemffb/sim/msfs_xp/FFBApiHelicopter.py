@@ -126,10 +126,13 @@ FFB_API_TR_FIELD = {
 FFB_API_ENABLED_HEARTBEAT_MS = 1000
 
 #: Consecutive frames ``(FFB_API_VERSION, FFB_FEATURES)`` must read identically before
-#: they are latched.  Loading one API helicopter after another is the case this exists
-#: for: ``L:FFB_*`` variables survive the aircraft change, so for a short window the
-#: fresh instance can read the *previous* aircraft's values.  Requiring the pair to hold
-#: still spans that window, after which what is read belongs to the current aircraft.
+#: they are latched, or before a pair differing from the latched one replaces it.
+#: ``L:FFB_*`` variables survive an aircraft change, so a fresh instance can read the
+#: *previous* aircraft's values until the current one publishes its own.  Those stale
+#: values hold perfectly still, so the debounce alone cannot tell them from real ones:
+#: it only filters a value in motion.  What corrects a stale latch is the re-latch - both
+#: values are static per aircraft, so a different pair that holds still can only be the
+#: current aircraft speaking.
 FFB_API_DISCOVERY_STABLE_FRAMES = 10
 
 #: Warn if a configured aircraft has not published a usable version within this long
@@ -272,10 +275,10 @@ class FFBApiHelicopter(Helicopter):
         """Subscribe the discovery and runtime read variables.
 
         Called every frame from :meth:`_ffb_api_on_telemetry` and guarded on ``sv_dict``,
-        because a SimConnectManager subscription added at runtime lives in
-        ``temp_sim_vars``, which is cleared by the subscribe cycle that consumes it - a
-        later ``_resubscribe()`` from anywhere rebuilds from the predefined list alone
-        and drops these vars.  Re-checking is how they come back.
+        so the steady state is a dict lookup.  SimConnectManager keeps a variable added
+        at runtime for as long as the aircraft is loaded, so the guard normally passes
+        after the first frame; it stays as the cheap way to notice if that ever stops
+        being true.
         """
         if not self._simconnect:
             return
@@ -288,20 +291,20 @@ class FFBApiHelicopter(Helicopter):
             self._simconnect._resubscribe()
 
     def _ffb_api_latch_discovery(self, telem_data: BaseTelemetryData):
-        """Latch API version and capability bits once per aircraft (spec 4, steps 1-2).
+        """Latch API version and capability bits for this aircraft (spec 4, steps 1-2).
 
-        Both values are static per aircraft, so they are read until they settle and then
-        never consumed again.  "Settle" means ``FFB_API_DISCOVERY_STABLE_FRAMES``
-        identical consecutive reads - see that constant for why the debounce is needed.
+        Both values are static per aircraft, so a pair is latched once it settles -
+        ``FFB_API_DISCOVERY_STABLE_FRAMES`` identical consecutive reads - and the control
+        paths consume the latched copy, never the live read.  The live read is still
+        watched: a different pair that settles replaces the latched one (see the constant
+        for why), while one that does not settle, or a version below 1, changes nothing,
+        so a transient during aircraft init cannot retract a capability.
 
         Telemetry:
             Read: ffbApiVersion - Optional[float]; L:FFB_API_VERSION.  None until the
                                   subscription lands; 0 = not published yet.
                   ffbFeatures   - Optional[float]; L:FFB_FEATURES bitfield.
         """
-        if self._ffb_api_latched:
-            return
-
         version = telem_data.get("ffbApiVersion", None)
         if version is None or int(round(version)) < 1:
             # Not published yet.  MSFS reads an LVAR the aircraft has not created as 0,
@@ -311,10 +314,16 @@ class FFBApiHelicopter(Helicopter):
             # a misconfiguration, and _ffb_api_warn_missing_version says so.
             self._ffb_api_pending_discovery = None
             self._ffb_api_pending_frames = 0
-            self._ffb_api_warn_missing_version()
+            if not self._ffb_api_latched:
+                self._ffb_api_warn_missing_version()
             return
 
         observed = (int(round(version)), int(round(telem_data.get("ffbFeatures", 0) or 0)))
+        if self._ffb_api_latched and observed == (self._ffb_api_version, self._ffb_api_features):
+            self._ffb_api_pending_discovery = None
+            self._ffb_api_pending_frames = 0
+            return
+
         if observed != self._ffb_api_pending_discovery:
             self._ffb_api_pending_discovery = observed
             self._ffb_api_pending_frames = 1
@@ -324,8 +333,16 @@ class FFBApiHelicopter(Helicopter):
         if self._ffb_api_pending_frames < FFB_API_DISCOVERY_STABLE_FRAMES:
             return
 
+        if self._ffb_api_latched:
+            # The spring reference may move with the capability bits (a control gaining
+            # trim stops centering at zero), so re-run the near-center handshake rather
+            # than engage a spring far from where the control sits.
+            self._ffb_api_spring_init = 0
         self._ffb_api_latched = True
         self._ffb_api_version, self._ffb_api_features = observed
+        self._ffb_api_pending_discovery = None
+        self._ffb_api_pending_frames = 0
+        self._ffb_api_warned_no_features = False
 
         logging.info(
             f"FFB API detected: version={self._ffb_api_version} "
@@ -598,8 +615,7 @@ class FFBApiHelicopter(Helicopter):
         # Per frame, not once at construction: an aircraft handler is built before
         # any telemetry is attached, so a constructor-time _sim_is_msfs() is still
         # False and a subscription made there never happens.  The sv_dict guard
-        # inside makes the steady-state call a dict lookup, and re-running it also
-        # re-instates the subscription if an unrelated _resubscribe() dropped it.
+        # inside makes the steady-state call a dict lookup.
         self._subscribe_ffb_api_simvars()
 
         self._ffb_api_latch_discovery(telem_data)
@@ -702,8 +718,8 @@ class FFBApiHelicopter(Helicopter):
             logging.debug("FFB API: cyclic trim re-clutched")
         self._ffb_api_tr_active = tr_on
 
-        self.cpO_x = round(clamp(center_x, -1.0, 1.0) * 4096)
-        self.cpO_y = round(clamp(center_y, -1.0, 1.0) * 4096)
+        self.cpO_x = float(clamp(center_x, -1.0, 1.0))
+        self.cpO_y = float(clamp(center_y, -1.0, 1.0))
         self.cyclic_center = [center_x, center_y]
 
         ready = self._ffb_api_spring_ready(phys_x, center_x) and self._ffb_api_spring_ready(phys_y, center_y)
@@ -766,7 +782,7 @@ class FFBApiHelicopter(Helicopter):
             center_y = self._ffb_api_trim(telem_data, "COLLECTIVE")
             gain = float(self.ffb_api_collective_spring_gain)
 
-        self.cpO_y = round(clamp(center_y, -1.0, 1.0) * 4096)
+        self.cpO_y = float(clamp(center_y, -1.0, 1.0))
         ready = self._ffb_api_spring_ready(phys_y, center_y)
 
         self.spring_y.set_coefficient(gain if ready else 0, True)  # int 0 = raw zero coefficient
@@ -814,7 +830,7 @@ class FFBApiHelicopter(Helicopter):
             center_x = self._ffb_api_trim(telem_data, "PEDALS")
             gain = float(self.ffb_api_pedal_spring_gain)
 
-        self.cpO_x = round(clamp(center_x, -1.0, 1.0) * 4096)
+        self.cpO_x = float(clamp(center_x, -1.0, 1.0))
         ready = self._ffb_api_spring_ready(phys_x, center_x)
 
         self.spring_x.set_coefficient(gain if ready else 0, True)  # int 0 = raw zero coefficient

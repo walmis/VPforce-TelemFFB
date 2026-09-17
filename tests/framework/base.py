@@ -154,11 +154,12 @@ class MockConditionEffect:
         self.effect_id += 1
 
     
-    def start(self, override=False):
+    def start(self, override=False, **kwargs):
         """Start the effect.
-        
+
         Args:
             override: Whether to override existing effects (ignored in mock)
+            **kwargs: the production ``force=`` the weapon effects pass (ignored)
         """
         self.started = True
         self.start_count += 1
@@ -204,11 +205,14 @@ class MockConditionEffect:
         self._y_coefficient = y_coeff
         return self
     
-    def constant(self, magnitude: float, direction: float = 0):
-        """Set constant force parameters."""
+    def constant(self, magnitude: float, direction: float = 0, *args, **kwargs):
+        """Set constant force parameters.  Extra positional arguments are a
+        DirectionModulator's constructor arguments (the wind effect passes
+        one), kept for inspection and otherwise ignored."""
         # Store as magnitude/direction (polar form)
         self._magnitude = magnitude
         self._direction = direction
+        self._constant_args = args
         return self
 
     def periodic(self, frequency=0, magnitude=0, direction=0, *args, **kwargs):
@@ -397,7 +401,12 @@ class MockSimConnect:
         self.add_simvar_count += 1
         self.simvar_calls.append(f"add_simvar: {name} = {var} ({sc_unit})")
         self.sv_dict[name] = {"var": var, "unit": sc_unit}
-    
+
+    def remove_simvar(self, name: str):
+        """Mock removing a simvar."""
+        self.simvar_calls.append(f"remove_simvar: {name}")
+        self.sv_dict.pop(name, None)
+
     def _resubscribe(self):
         """Mock resubscribe."""
         self._resubscribe_count += 1

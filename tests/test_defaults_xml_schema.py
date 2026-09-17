@@ -437,12 +437,57 @@ class TestScOverrides:
     def test_has_required_fields(self, defaults_root):
         for elem in defaults_root.findall(".//sc_overrides"):
             assert elem.findtext("name"), "<sc_overrides> missing <name>"
-            assert elem.findtext("model"), "<sc_overrides> missing <model>"
             assert elem.findtext("var"), "<sc_overrides> missing <var>"
+
+    def test_selected_by_model_or_class_never_both(self, defaults_root):
+        for elem in defaults_root.findall(".//sc_overrides"):
+            model, cls = elem.findtext("model"), elem.findtext("class")
+            assert bool(model) != bool(cls), (
+                f"<sc_overrides> '{elem.findtext('name')}' must carry exactly one "
+                f"of <model> or <class> (model={model!r}, class={cls!r})")
+
+    def test_class_rows_name_a_registered_class_and_sim(self, defaults_root):
+        """The class modules are shared between MSFS and X-Plane, so a
+        class row without a sim would fire in both."""
+        for elem in defaults_root.findall(".//sc_overrides"):
+            cls = elem.findtext("class")
+            if not cls:
+                continue
+            sim = elem.findtext("sim")
+            assert sim, f"class row '{elem.findtext('name')}' for {cls} has no <sim>"
+            registered = {
+                e.findtext("class_name")
+                for e in defaults_root.findall(f'.//classes[sim="{sim}"]')
+            }
+            assert cls in registered, (
+                f"class row '{elem.findtext('name')}' names {cls}, "
+                f"not registered for {sim}")
+
+    def test_the_simconnect_fallback_names_registered_classes(self, defaults_root):
+        """An unmatched MSFS aircraft is given a class by its engine type, as
+        a ``"MSFS.<class>"`` hint.  A hint naming no registered class resolves
+        no class defaults and keys no class rows, and nothing else notices."""
+        src = (Path(__file__).parents[1] / "telemffb" / "telem" / "TelemManager.py").read_text(encoding="utf-8")
+        hinted = set(re.findall(r'get_aircraft_config\(aircraft_name, "MSFS\.(\w+)"\)', src))
+        registered = {e.findtext("class_name") for e in defaults_root.findall('.//classes[sim="MSFS"]')}
+        assert hinted, "the fallback block moved: update this test"
+        assert hinted <= registered, f"not registered for MSFS: {sorted(hinted - registered)}"
+
+    def test_no_row_is_shadowed_by_another_of_the_same_name(self, defaults_root):
+        """Rows merge by name, the later one winning, so two rows with one
+        name under one key and sim leave the first subscribed to nothing."""
+        import collections
+        seen = collections.Counter(
+            (elem.findtext("model") or f"class={elem.findtext('class')}",
+             elem.findtext("sim") or "", elem.findtext("name"))
+            for elem in defaults_root.findall(".//sc_overrides"))
+        assert [k for k, n in seen.items() if n > 1] == []
 
     def test_model_patterns_valid_regex(self, defaults_root):
         for elem in defaults_root.findall(".//sc_overrides"):
             pattern = elem.findtext("model", "")
+            if not pattern:
+                continue
             try:
                 re.compile(pattern)
             except re.error as e:

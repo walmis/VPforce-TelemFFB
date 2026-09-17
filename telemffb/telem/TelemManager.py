@@ -39,7 +39,7 @@ from telemffb import match_history
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.telem.SimConnectManager import SimConnectManager
+from telemffb.telem.SimConnectManager import SimConnectManager, RUNTIME_SOURCE_OVERRIDE
 from telemffb.utils import upload_vpconf_profile
 
 if TYPE_CHECKING:
@@ -52,6 +52,122 @@ class AircraftInfo:
     module: object
     sc_aircraft_type: Optional[str] = None
     sc_engine_type: Optional[int] = None
+
+
+def aircraft_module_for_source(data_source):
+    """The aircraft module that implements a telemetry source.
+
+    Returns ``None`` for an unknown or missing source (a malformed packet)
+    so the caller can decide; MSFS and X-Plane share one module, as do DCS
+    and BMS.  Kept as a plain function so it can be reused by callers that
+    have no telemetry frame - the effect preview builds aircraft from a
+    sim name alone.
+    """
+    return {
+        "MSFS": aircrafts_msfs_xp,
+        "XPLANE": aircrafts_msfs_xp,
+        "IL2": aircrafts_il2,
+        "DCS": aircrafts_dcs,
+        "BMS": aircrafts_dcs,
+    }.get(data_source)
+
+
+def resolve_aircraft_config(the_sim, aircraft_name, input_modeltype='', device_type=None):
+    """Resolve an aircraft's full setting set into constructor parameters.
+
+    Pure: reads the XML cascade for ``the_sim``/``aircraft_name`` on
+    ``device_type`` (default: this instance's device) and returns
+    ``(params, cls_name, pattern, active_profile)``.  ``params`` is the
+    sanitized name -> value dict ready for ``apply_settings``; ``cls_name``
+    falls back to ``'Aircraft'`` when the model carries no class.
+
+    Nothing here touches ``G`` beyond reading the device type, so it is
+    safe to call with no sim running and without disturbing the settings
+    manager's notion of the current model - ``get_aircraft_config`` is the
+    live-telemetry wrapper that adds that state update.
+    """
+    if device_type is None:
+        device_type = G.device_type
+    params = {}
+    cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, device_type)
+    active_profile = xmlutils.get_active_profile_for_model(the_sim, cls_name, pattern)
+    if cls_name == '':
+        cls_name = 'Aircraft'
+    for setting in result:
+        k = setting['name']
+        v = setting['value']
+        u = setting['unit']
+        if v is None:
+            v = '0'
+        # Attach the unit only when there is a value to attach it to. An
+        # empty value (e.g. the shipped default for vne_override, which is
+        # the documented "leave blank to use sim data") must stay empty:
+        # concatenating a <unit> to it produced a bare unit string ("kt")
+        # that to_number() returns verbatim, so the value reached aircraft
+        # code as a string and crashed downstream arithmetic (`vne * ms2kt`).
+        vu = (v + u) if v else v
+        if setting['value'] != '-':
+            params[k] = vu
+            logging.debug(f"Got from Settings Manager: {k} : {vu}")
+        else:
+            logging.debug(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
+    params = utils.sanitize_dict(params)
+    return params, cls_name, pattern, active_profile
+
+
+def build_aircraft(data_source, aircraft_name, device_type=None, cls_name='',
+                   private_effects=True):
+    """Construct and configure an aircraft instance with no telemetry.
+
+    The same steps ``TelemManager`` takes when a new aircraft shows up in
+    the stream - resolve the settings, pick the class, instantiate, apply -
+    minus everything that belongs to a live session: no vpconf push, no
+    command runner, no Configurator overrides, no SimConnect or X-Plane
+    subscriptions, and no settings-manager state change.  Used by the
+    effect preview, which needs a configured aircraft to drive effect
+    methods against with synthetic frames.
+
+    ``cls_name`` is a pre-known class ("JetAircraft"): the offline editor
+    at CLASS scope has a class but no model, and the class-level cascade
+    (sim + class + user overrides of both) only applies when the resolver
+    is told the class.  A model that names its own class wins over it.
+
+    Otherwise class resolution is by the model's configured class only.
+    The SimConnect fallback (``resolve_aircraft_class_from_sc``) needs the
+    aircraft category from a telemetry frame, which does not exist here;
+    an MSFS model with no class configured comes back as the module's
+    generic ``Aircraft``.
+
+    ``private_effects`` (the default) gives the instance its own effect
+    dispenser.  ``AircraftBase.__init__`` clears the dispenser it sees
+    and the preview's cleanup destroys everything in it, so on the
+    shared ``G.effects`` a build would wipe a live aircraft's effects -
+    the springs a paused sim session keeps up, for one.  With a private
+    table the live aircraft is untouched, so a preview can run with a
+    sim loaded in the background (telemetry paused, as offline editing
+    leaves it).
+
+    Raises ``ValueError`` for an unknown ``data_source``.
+    """
+    module = aircraft_module_for_source(data_source)
+    if module is None:
+        raise ValueError(f"Unknown telemetry source {data_source!r}")
+    params, resolved_cls, _pattern, _profile = resolve_aircraft_config(
+        data_source, aircraft_name, cls_name or '', device_type)
+    aircraft_class = getattr(module, resolved_cls, None) or module.Aircraft
+    logging.info(f"Building {aircraft_name!r} (class {resolved_cls}) for preview: "
+                 f"{aircraft_class.__module__}.{aircraft_class.__name__}")
+    if private_effects:
+        # The dispenser has to be in place BEFORE __init__ runs, since
+        # __init__ clears whatever ``self.effects`` resolves to.
+        aircraft = aircraft_class.__new__(aircraft_class)
+        aircraft._effects = utils.Dispenser(HapticEffect)
+        aircraft.__init__(aircraft_name)
+    else:
+        aircraft = aircraft_class(aircraft_name)
+    aircraft.apply_settings(params)
+    return aircraft
+
 
 _config_mtime = 0
 _future_config_update_time = time.time()
@@ -154,6 +270,7 @@ class TelemManager(QObject, threading.Thread):
         self._process_check_deadline: Optional[float] = None  # perf_counter() timestamp of the next scheduled process check; None when inactive
         self._device_swap_attempt = None  # (aircraft, devpath) already requested - one attempt per aircraft
         self._last_aircraft_info = None   # the last frame's aircraft, for a config reload while the sim is paused
+        self._shut_down = False           # set by on_shutdown(); frames after it are dropped
 
 
     def set_paused(self, pause_state: bool = False):
@@ -230,6 +347,11 @@ class TelemManager(QObject, threading.Thread):
         external state (an aircraft-side mode flag, say) would otherwise never be told
         it is finished.
         """
+        # A handler's subscriptions end with it.  Cleared before the early return:
+        # the next handler subscribes from its constructor, so nothing may be left
+        # standing from whatever was loaded before.
+        if self._simconnect is not None:
+            self._simconnect.clear_runtime_simvars()
         if self.currentAircraft is None:
             return
         try:
@@ -239,7 +361,13 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraft = None
 
     def on_shutdown(self):
-        """Called on the application quit path, before the event loop stops."""
+        """Called on the application quit path, before the event loop stops.
+
+        Frames keep arriving until the listeners stop.  With the handler retired the
+        next one would read as a newly loaded aircraft and build a fresh handler,
+        undoing the release the retired one just made, so they are dropped instead.
+        """
+        self._shut_down = True
         self._retire_current_aircraft()
         self.currentAircraftName = None
 
@@ -270,48 +398,23 @@ class TelemManager(QObject, threading.Thread):
         return G.settings_mgr.active_profile
 
     def get_aircraft_config(self, aircraft_name, data_source) -> Tuple[dict, str]:
+        """Resolve settings for a live aircraft and record it as the
+        settings manager's current model.  ``data_source`` may carry a
+        pre-known class after a dot (``"MSFS.Helicopter"``), as the
+        SimConnect fallback passes it."""
         self.currentDataSource = data_source
         params = {}
         cls_name = "UNKNOWN"
         input_modeltype = ''
         try:
-            if data_source == "MSFS":
-                send_source = "MSFS"
-            else:
-                send_source = data_source
-
-            if '.' in send_source:
-                input = send_source.split('.')
-                sim_temp = input[0]
+            if '.' in data_source:
+                sim_temp, input_modeltype = data_source.split('.', 1)
                 the_sim = sim_temp.replace('2020', '')
-                input_modeltype = input[1]
             else:
-                the_sim = send_source
-            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.device_type)
-            active_profile = xmlutils.get_active_profile_for_model(the_sim, cls_name, pattern)
-            #globals.settings_mgr.current_pattern = pattern
-            if cls_name == '': 
-                cls_name = 'Aircraft'
-            for setting in result:
-                k = setting['name']
-                v = setting['value']
-                u = setting['unit']
-                if v is None:
-                    v = '0'
-                # Attach the unit only when there is a value to attach it to. An
-                # empty value (e.g. the shipped default for vne_override, which is
-                # the documented "leave blank to use sim data") must stay empty:
-                # concatenating a <unit> to it produced a bare unit string ("kt")
-                # that to_number() returns verbatim, so the value reached aircraft
-                # code as a string and crashed downstream arithmetic (`vne * ms2kt`).
-                vu = (v + u) if v else v
-                if setting['value'] != '-':
-                    params[k] = vu
-                    logging.debug(f"Got from Settings Manager: {k} : {vu}")
-                else:
-                    logging.debug(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
-                # print(f"SETTING:\n{setting}")
-            params = utils.sanitize_dict(params)
+                the_sim = data_source
+
+            params, cls_name, pattern, active_profile = resolve_aircraft_config(
+                the_sim, aircraft_name, input_modeltype, G.device_type)
 
             G.settings_mgr.update_state_vars(
                 current_sim=the_sim,
@@ -323,7 +426,6 @@ class TelemManager(QObject, threading.Thread):
 
             return params, cls_name
 
-            # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
         except Exception as e:
             logging.exception(f"Error getting settings from Settings Manager:{e}")
 
@@ -471,6 +573,8 @@ class TelemManager(QObject, threading.Thread):
 
     def process_data(self, data):
         """Main telemetry data processing pipeline."""
+        if self._shut_down:
+            return
         parsed_data = self._parse_telemetry_data(data)
         aircraft_info = self._extract_aircraft_info(parsed_data)
 
@@ -540,32 +644,15 @@ class TelemManager(QObject, threading.Thread):
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
 
-        # Defaults — used when data_source is None or unrecognised (e.g. malformed packet)
-        module = None
+        # module is None when data_source is missing or unrecognised (e.g.
+        # a malformed packet); the SimConnect category and engine type only
+        # exist for MSFS, where they drive the class fallback.
+        module = aircraft_module_for_source(data_source)
         sc_aircraft_type = None
         sc_engine_type = None
-
-        # Determine aircraft module based on data source
         if data_source == "MSFS":
-            module = aircrafts_msfs_xp
             sc_aircraft_type = telem_data.get("SimconnectCategory", None)
             sc_engine_type = telem_data.get("EngineType", 4)
-        elif data_source == "IL2":
-            module = aircrafts_il2
-            sc_aircraft_type = None
-            sc_engine_type = None
-        elif data_source == 'XPLANE':
-            module = aircrafts_msfs_xp
-            sc_aircraft_type = None
-            sc_engine_type = None
-        elif data_source == 'BMS':
-            module = aircrafts_dcs
-            sc_aircraft_type = None
-            sc_engine_type = None
-        elif data_source == 'DCS':
-            module = aircrafts_dcs
-            sc_aircraft_type = None
-            sc_engine_type = None
 
         return AircraftInfo(
             name=aircraft_name,
@@ -785,12 +872,24 @@ class TelemManager(QObject, threading.Thread):
                 self.gain_overrides_active = False
                 G.main_window.refresh_scope_status_indicators(force=True)
 
+    def _current_class_name(self) -> Optional[str]:
+        """The class the loaded aircraft actually resolved to - what its
+        class-scoped overrides are keyed on.  The stored ``type`` string is
+        not enough: an unmapped MSFS aircraft lands on a generic class by
+        engine type, and that class's rows must apply too."""
+        aircraft = getattr(self, 'currentAircraft', None)
+        return type(aircraft).__name__ if aircraft is not None else None
+
     def _setup_simconnect_overrides(self, aircraft_name, data_source):
         """Setup SimConnect variable overrides for MSFS aircraft."""
         if data_source == "MSFS" and aircraft_name:
-            overrides = xmlutils.read_sc_overrides(aircraft_name, sim=data_source)
+            overrides = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
+                                                   cls=self._current_class_name())
+            # Replaced as a set, so a row the user deleted is unsubscribed too.
+            self._simconnect.clear_runtime_simvars(RUNTIME_SOURCE_OVERRIDE)
             for sv in overrides:
-                self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'],
+                                            source=RUNTIME_SOURCE_OVERRIDE)
             self._simconnect._resubscribe()
 
     def _setup_xpplugin_overrides(self, aircraft_name, data_source):
@@ -798,7 +897,8 @@ class TelemManager(QObject, threading.Thread):
         if data_source == "XPLANE" and aircraft_name != '':
             if not getattr(self, "_socket", None):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-            d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source)
+            d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
+                                            cls=self._current_class_name())
             for sv in d1:
                 scale = self._xplane_conversion(sv['scale'], sv['name'])
                 sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={scale}"
@@ -974,7 +1074,7 @@ class TelemManager(QObject, threading.Thread):
                     aircraftClass = module.GliderAircraft
                 elif sc_engine_type == 3:   # Heli
                     logging.warning("Aircraft definition not found, using SimConnect Data (Helo Type)")
-                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.HelicopterAircraft")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.Helicopter")
                     params.update(type_cfg)
                     aircraftClass = module.Helicopter
                 elif sc_engine_type == 5:   # Turboprop
