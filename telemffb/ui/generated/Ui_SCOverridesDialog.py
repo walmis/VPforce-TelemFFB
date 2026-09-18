@@ -157,4 +157,4 @@ class Ui_SCOverridesDialog(object):
         item.setText(_translate("SCOverridesDialog", "Source"))
         self.pb_delete.setText(_translate("SCOverridesDialog", "Delete Selected"))
         self.bottomlabel.setText(_translate("SCOverridesDialog", "Overrides are for MSFS/X-Plane only."))
-from telemffb.custom_widgets import InfoLabel
+from telemffb.ui.widgets.custom_widgets import InfoLabel

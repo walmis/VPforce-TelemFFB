@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Dict, Literal, Optional, Any
 
 if TYPE_CHECKING:
     # from PyQt5.QtCore import QSettings
-    from .LogWindow import LogWindow
+    from .ui.widgets.LogWindow import LogWindow
     from .IPCNetworkThread import IPCNetworkThread
     from .utils import SystemSettings, ChildPopen
     from .SettingsManager import SettingsManager

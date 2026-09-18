@@ -20,7 +20,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-from telemffb.custom_widgets import FFBDeviceListModel
+from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
 from telemffb.SystemSettingsDialog import _same_hardware
 from telemffb.utils import (device_ident_key, device_ids_key,
                             recover_device_identity,

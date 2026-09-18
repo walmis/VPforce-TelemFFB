@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
-from telemffb.custom_widgets import (
+from telemffb.ui.widgets.custom_widgets import (
     IasTrendWidget, InfoLabel, NoWheelComboBox, TrimCurveWidget, svg_icon,
     vpf_purple,
 )

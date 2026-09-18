@@ -128,4 +128,4 @@ class Ui_ProfileImportDialog(object):
         self.cb_trimwheel.setText(_translate("ProfileImportDialog", "Trimwheel"))
         self.pb_Ok.setText(_translate("ProfileImportDialog", "OK"))
         self.pb_Cancel.setText(_translate("ProfileImportDialog", "Cancel"))
-from telemffb.custom_widgets import InfoLabel, StyledButton
+from telemffb.ui.widgets.custom_widgets import InfoLabel, StyledButton

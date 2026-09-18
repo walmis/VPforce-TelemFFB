@@ -16,7 +16,7 @@ from PyQt6 import QtWidgets
 from PyQt6.QtCore import Qt
 
 import telemffb.globals as G
-from telemffb.custom_widgets import FFBDeviceListModel
+from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
 
 
 

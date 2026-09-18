@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
+from .custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.AdvancedGDialog import AdvancedGDialog
@@ -39,8 +39,8 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile, device_pid_key, dbprint, HiDpiPixmap
 import telemffb.utils as utils
 import styles
-from . import globals as G
-from . import xmlutils
+from ... import globals as G
+from ... import xmlutils
 
 PREVIEW_BUTTON_SIZE = 20          # matches the -/+ step buttons
 PREVIEW_ACTIVE_HANDLE = "#17c411"  # the green the live loop paints active effects

@@ -37,7 +37,7 @@ from typing import Callable, List, Optional
 
 from PyQt6 import QtGui, QtWidgets
 
-from telemffb.custom_widgets import InfoLabel, LabeledToggle
+from telemffb.ui.widgets.custom_widgets import InfoLabel, LabeledToggle
 
 
 @dataclass(frozen=True)

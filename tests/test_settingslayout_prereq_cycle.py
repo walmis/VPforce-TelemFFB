@@ -35,7 +35,7 @@ pytest.importorskip("PyQt6")
 
 def _make_layout():
     """Build a SettingsLayout without running __init__ (which needs Qt parents)."""
-    from telemffb.SettingsLayout import SettingsLayout
+    from telemffb.ui.widgets.SettingsLayout import SettingsLayout
     obj = SettingsLayout.__new__(SettingsLayout)
     obj.expanded_items = set()
     return obj

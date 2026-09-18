@@ -46,7 +46,7 @@ from .utils import (
     validate_vpconf_profile, HiDpiPixmap,
 )
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
-from .custom_widgets import FFBDeviceListModel, LabeledToggle
+from .ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle
 
 def _as_bool(value):
     """A stored setting as a boolean.

@@ -210,4 +210,4 @@ class Ui_ProfileManagerDialog(object):
         self.rb_showCurrentAircraft.setText(_translate("ProfileManagerDialog", "Show Currently Loaded Aircraft Only"))
         self.pb_newAircraft.setText(_translate("ProfileManagerDialog", "New Aircraft Wizard"))
         self.pb_Exit.setText(_translate("ProfileManagerDialog", "Exit"))
-from telemffb.custom_widgets import StyledButton
+from telemffb.ui.widgets.custom_widgets import StyledButton

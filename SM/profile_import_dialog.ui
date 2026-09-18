@@ -228,12 +228,12 @@
   <customwidget>
    <class>StyledButton</class>
    <extends>QPushButton</extends>
-   <header location="global">telemffb.custom_widgets.h</header>
+   <header location="global">telemffb.ui.widgets.custom_widgets.h</header>
   </customwidget>
   <customwidget>
    <class>InfoLabel</class>
    <extends>QWidget</extends>
-   <header location="global">telemffb.custom_widgets.h</header>
+   <header location="global">telemffb.ui.widgets.custom_widgets.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

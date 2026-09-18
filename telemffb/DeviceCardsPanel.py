@@ -43,7 +43,7 @@ both work without theme-specific rules here.
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
-from telemffb.custom_widgets import LabeledToggle, Toggle
+from telemffb.ui.widgets.custom_widgets import LabeledToggle, Toggle
 from PyQt6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QPushButton, QRadioButton, QSizePolicy, QToolButton,

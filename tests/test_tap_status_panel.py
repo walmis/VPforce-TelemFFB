@@ -749,7 +749,7 @@ class TestFixOnlyInstall:
         """The FFB-Fix toggle, or None.  A LabeledToggle like every other
         switch in the dialog, so it is found by type and read by its
         label's text."""
-        from telemffb.custom_widgets import LabeledToggle
+        from telemffb.ui.widgets.custom_widgets import LabeledToggle
         for widget in panel.findChildren(LabeledToggle):
             if "FFB-Fix only" in widget.label.text_label.text():
                 return widget
@@ -904,7 +904,7 @@ class TestFixOnlyIsRefusedForADirectInputStick:
         assert True not in chosen, "the dialog was told to store the mode"
 
     def _toggle(self, panel):
-        from telemffb.custom_widgets import LabeledToggle
+        from telemffb.ui.widgets.custom_widgets import LabeledToggle
         for widget in panel.findChildren(LabeledToggle):
             if "FFB-Fix only" in widget.label.text_label.text():
                 return widget

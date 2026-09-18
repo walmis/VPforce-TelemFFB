@@ -43,7 +43,7 @@ def _pump(app, n=3):
 def _build(app, rows=40, row_h=30, viewport=(400, 300)):
     """A real QScrollArea + grid of namelabel_ rows, with the actual methods under
     test bound onto the live grid layout."""
-    from telemffb.SettingsLayout import SettingsLayout
+    from telemffb.ui.widgets.SettingsLayout import SettingsLayout
     area = QtWidgets.QScrollArea()
     area.setWidgetResizable(True)
     area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
@@ -137,7 +137,7 @@ def test_missing_anchor_is_graceful_noop(qapp):
 
 
 def test_capture_returns_none_without_scroll_area(qapp):
-    from telemffb.SettingsLayout import SettingsLayout
+    from telemffb.ui.widgets.SettingsLayout import SettingsLayout
     grid = QtWidgets.QGridLayout()
     for m in ("_settings_scroll_area", "_capture_scroll_anchor"):
         setattr(grid, m, types.MethodType(getattr(SettingsLayout, m), grid))

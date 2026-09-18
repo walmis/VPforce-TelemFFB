@@ -41,7 +41,7 @@ from PyQt6 import QtWidgets
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPalette
 
-from telemffb.custom_widgets import InfoLabel, LabeledToggle
+from telemffb.ui.widgets.custom_widgets import InfoLabel, LabeledToggle
 from telemffb.TapDeviceDialog import TapDeviceDialog
 from telemffb import tap_install
 from telemffb.tap_config import (already_blocked, already_ordered,

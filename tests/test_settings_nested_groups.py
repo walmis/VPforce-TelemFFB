@@ -29,7 +29,7 @@ DEFAULTS_XML = Path(__file__).resolve().parent.parent / "defaults.xml"
 
 def _make_layout():
     """Build a SettingsLayout without running __init__ (which needs Qt parents)."""
-    from telemffb.SettingsLayout import SettingsLayout
+    from telemffb.ui.widgets.SettingsLayout import SettingsLayout
     obj = SettingsLayout.__new__(SettingsLayout)
     obj.expanded_items = []      # instance attr shadows the class-level list
     return obj

@@ -73,7 +73,7 @@ import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
-from telemffb.LogWindow import LogWindow
+from telemffb.ui.widgets.LogWindow import LogWindow
 from telemffb.MainWindow import MainWindow
 from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager

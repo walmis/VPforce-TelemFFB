@@ -328,7 +328,7 @@ class TestSimStatusLeavesTheProfileComboAlone:
     it being applied."""
 
     def _widget(self, monkeypatch):
-        from telemffb.custom_widgets import AppStatusWidget
+        from telemffb.ui.widgets.custom_widgets import AppStatusWidget
         monkeypatch.setattr(G, 'useDarkMode', False, raising=False)
         w = AppStatusWidget(master_instance=True)
         w.set_profile_state(False)
@@ -402,9 +402,9 @@ class TestSettingsFormWithoutProfile:
         sm.update_state_vars(current_sim='MSFS', current_class='Helicopter',
                              current_aircraft_name='Mystery Rotorcraft', current_pattern='')
         monkeypatch.setattr(G, 'settings_mgr', sm, raising=False)
-        from telemffb.SettingsLayout import SettingsLayout
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
 
-        from telemffb.custom_widgets import NoKeyScrollArea
+        from telemffb.ui.widgets.custom_widgets import NoKeyScrollArea
 
         def build(pattern):
             sm.current_pattern = pattern

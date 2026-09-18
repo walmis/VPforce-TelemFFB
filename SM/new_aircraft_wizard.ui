@@ -602,7 +602,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
   <customwidget>
    <class>StyledButton</class>
    <extends>QPushButton</extends>
-   <header location="global">telemffb.custom_widgets.h</header>
+   <header location="global">telemffb.ui.widgets.custom_widgets.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

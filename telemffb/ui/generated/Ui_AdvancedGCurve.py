@@ -279,4 +279,4 @@ class Ui_AdvancedGForceDialog(object):
         self.pb_revert.setText(_translate("AdvancedGForceDialog", "Revert"))
         self.pb_apply.setText(_translate("AdvancedGForceDialog", "Apply"))
         self.pb_saveclose.setText(_translate("AdvancedGForceDialog", "Save/Close"))
-from telemffb.custom_widgets import GForceCurveWidget, InfoLabel, LabeledToggle, StyledButton, Toggle
+from telemffb.ui.widgets.custom_widgets import GForceCurveWidget, InfoLabel, LabeledToggle, StyledButton, Toggle
