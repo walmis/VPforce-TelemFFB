@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
+from telemffb.ui.theme.tokens import ACTIVE_GREEN
 from telemffb.ui.widgets.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.AdvancedSpringDialog import AdvancedSpringDialog
@@ -44,7 +45,7 @@ from telemffb import globals as G
 from telemffb import xmlutils
 
 PREVIEW_BUTTON_SIZE = 20          # matches the -/+ step buttons
-PREVIEW_ACTIVE_HANDLE = "#17c411"  # the green the live loop paints active effects
+PREVIEW_ACTIVE_HANDLE = ACTIVE_GREEN  # the green the live loop paints active effects
 
 
 def preview_tooltip_html(paragraphs):

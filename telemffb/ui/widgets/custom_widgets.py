@@ -39,10 +39,11 @@ from PyQt6.QtCore import QAbstractListModel, QModelIndex
 import numpy as np
 
 import telemffb.globals as G
+from telemffb.ui.theme.tokens import PURPLE
 from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
 import styles
 
-vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
+vpf_purple = PURPLE   # rgb(171, 55, 200) - kept as an alias so importers don't break
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
 

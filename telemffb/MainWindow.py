@@ -51,6 +51,7 @@ import telemffb.xmlutils as xmlutils
 from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
+from telemffb.ui.theme.tokens import ACTIVE_GREEN
 from telemffb.ui.widgets.custom_widgets import InstanceStatusRow, NoKeyScrollArea, \
     SimStatusLabel, DetachedTabWindow, ExceptionStatusWidget
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
@@ -2221,7 +2222,7 @@ class MainWindow(QMainWindow):
             # or not active_settings changed - a small cached list, not
             # findChildren(), per SettingsLayout._rebuild_slider_caches().
             if self.tab_widget.currentIndex() == 1:
-                qcolor_green = QColor("#17c411")
+                qcolor_green = QColor(ACTIVE_GREEN)
                 qcolor_grey = QColor("grey")
                 for my_slider, live_key in self.settings_layout.live_key_sliders:
                     pct = min(data.get(live_key, 0), 1.0)
