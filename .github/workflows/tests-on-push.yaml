@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       # A native death (a PyQt qFatal, an access violation) ends the
       # run with no test failure and no traceback.  The step shell

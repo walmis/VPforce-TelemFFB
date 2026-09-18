@@ -13,6 +13,4 @@ akima
 bottle
 stackprinter
 
-# Testing dependencies
-pytest>=7.0.0
-pytest-cov>=4.0.0
+# Development and test dependencies live in requirements-dev.txt

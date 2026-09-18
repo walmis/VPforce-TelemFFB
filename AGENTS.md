@@ -117,10 +117,12 @@ Config hierarchy: SIM → CLASS → MODEL → PROFILE (profile is an optional ov
 
 ### Running Tests
 ```bash
-pytest                          # Run all tests
-pytest tests/test_*.py -v      # Verbose output
-pytest --cov=telemffb          # With coverage
+pytest -n auto                  # Run all tests in parallel (pytest-xdist, one worker per CPU core)
+pytest tests/test_*.py -n auto  # A subset, still parallel
+pytest --cov=telemffb -n auto   # Coverage, still parallel (pytest-cov merges the workers' data)
 ```
+- **Always run the full suite with `-n auto`** (pytest-xdist): ~100 s serial → ~20 s on a 32-core machine, identical results. Never run the full suite serial.
+- Dev environment: `pip install -r requirements-dev.txt` (pulls in the runtime `requirements.txt` plus `pytest`, `pytest-cov`, `pytest-xdist`).
 - Test framework in `tests/framework/`: `MockFFBDevice` (`connected` / `set_connected()` for higher-level tests), `MockInputData`, `MockConditionEffect`, `MockHapticEffect`, `MockEffectDispenser`, `MockSimConnect`, `MockDampener`, `MockSpringCondition`, `BaseTelemetryEffectTestCase` (base class with full setup/teardown)
 - `conftest.py` — autouse fixture resets `G.effects` and `G.master_buttons`
 - Markers: `unit`, `integration`, `msfs`, `xplane`, `joystick`, `pedals`, `collective`, `helicopter`, `slow`
@@ -302,7 +304,7 @@ effect.stop()  # Frees device resource
 ## Dependencies & External Integrations
 
 **Runtime** (`requirements.txt`): `pyqt6==6.9.1`, `pysimconnect` (custom fork at github.com/walmis/pysimconnect — rolling `master.zip`), `libusb1`, `numpy==2.3.0`, `akima`, `psutil`, `stransi`, `pygetwindow`, `configobj`.
-**Testing** (`requirements.txt`): `pytest`, `pytest-cov` — strict markers and warnings-as-errors configured in `pytest.ini`.
+**Development/Testing** (`requirements-dev.txt`, which pulls in the runtime `requirements.txt` via `-r`): `pytest`, `pytest-cov`, `pytest-xdist` (for the `-n auto` parallel runs) — strict markers and warnings-as-errors configured in `pytest.ini`.
 **Bundled binaries**: `dll/hidapi.dll`, `simconnect/simconnect.dll`, `xplane-plugin/` (auto-installed).
 
 ---
