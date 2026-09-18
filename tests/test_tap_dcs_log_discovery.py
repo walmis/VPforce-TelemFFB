@@ -256,7 +256,7 @@ class TestManualPath:
         from PyQt6 import QtWidgets
 
         from telemffb.tap_install import SIMS
-        from telemffb.ui.Ui_SystemDialog import Ui_SystemDialog
+        from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
 
         ui = Ui_SystemDialog()
         ui.setupUi(QtWidgets.QDialog())

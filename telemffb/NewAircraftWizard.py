@@ -26,7 +26,7 @@ from . import globals as G
 from . import utils
 from . import xmlutils
 from .xml import match as xmatch
-from .ui.Ui_NewAircraftWizard import Ui_NewAircraftWizard
+from .ui.generated.Ui_NewAircraftWizard import Ui_NewAircraftWizard
 
 class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     """

@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, 
 
 import telemffb.globals as G
 from telemffb import utils
-from telemffb.ui.Ui_ProfileManagerDialog import Ui_ProfileManagerDialog
+from telemffb.ui.generated.Ui_ProfileManagerDialog import Ui_ProfileManagerDialog
 from telemffb.ProfileImportDialog import ProfileImportDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
 from telemffb.utils import dbprint

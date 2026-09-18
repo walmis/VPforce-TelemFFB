@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import QAbstractItemView, QDialog, QHeaderView, QTableWidge
 from . import globals as G
 from . import xmlutils
 from .telem.SimConnectManager import SimConnectManager
-from .ui.Ui_SCOverridesDialog import Ui_SCOverridesDialog
+from .ui.generated.Ui_SCOverridesDialog import Ui_SCOverridesDialog
 from .utils.TransformExpr import TransformExpr
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):

@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox
 import inspect
 
 import telemffb.globals as G
-from telemffb.ui.Ui_ConfiguratorDialog import Ui_ConfiguratorDialog
+from telemffb.ui.generated.Ui_ConfiguratorDialog import Ui_ConfiguratorDialog
 from telemffb.utils import dbprint
 from .hw.ffb_rhino import (FFB_GAIN_CONSTANT, FFB_GAIN_DAMPER,
                            FFB_GAIN_FRICTION, FFB_GAIN_INERTIA,

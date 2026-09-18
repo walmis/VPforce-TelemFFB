@@ -1,1 +1,1 @@
-pyuic6 advanced_g_curve.ui -o ../telemffb/ui/Ui_AdvancedGCurve.py
+pyuic6 advanced_g_curve.ui -o ../telemffb/ui/generated/Ui_AdvancedGCurve.py

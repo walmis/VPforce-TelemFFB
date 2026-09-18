@@ -34,7 +34,7 @@ from . import globals as G
 from . import msfs_panel_install
 from . import utils
 from .app_events import events as app_events
-from .ui.Ui_SystemDialog import Ui_SystemDialog
+from .ui.generated.Ui_SystemDialog import Ui_SystemDialog
 from .TapStatusPanel import TapStatusPanel
 from .tap_install import SIMS_BY_KEY, matches_signature, sim_status
 from .InstanceSettingsPanel import (

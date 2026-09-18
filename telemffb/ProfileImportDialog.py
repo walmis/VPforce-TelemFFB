@@ -21,7 +21,7 @@ from PyQt6.QtGui import QColor, QPalette, QFontMetrics, QBrush
 from PyQt6.QtWidgets import QDialog, QTableWidgetItem, QComboBox, QAbstractItemView, QHeaderView
 import telemffb.globals as G
 from telemffb import xmlutils
-from telemffb.ui.Ui_ProfileImportDialog import Ui_ProfileImportDialog
+from telemffb.ui.generated.Ui_ProfileImportDialog import Ui_ProfileImportDialog
 
 class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
     """

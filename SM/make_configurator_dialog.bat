@@ -1,1 +1,1 @@
-pyuic6 configurator.ui -o ../telemffb/ui/Ui_ConfiguratorDialog.py
+pyuic6 configurator.ui -o ../telemffb/ui/generated/Ui_ConfiguratorDialog.py

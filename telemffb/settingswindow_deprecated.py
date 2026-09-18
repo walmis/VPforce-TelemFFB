@@ -38,7 +38,7 @@ import telemffb.utils as utils
 import telemffb.globals as G
 from . import xmlutils
 # from .UserModelDialog import UserModelDialog
-from .ui.Ui_SettingsWindow import Ui_SettingsWindow
+from .ui.generated.Ui_SettingsWindow import Ui_SettingsWindow
 
 """
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

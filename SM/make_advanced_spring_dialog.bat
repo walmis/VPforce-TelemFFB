@@ -1,1 +1,1 @@
-pyuic6 advanced_spring.ui -o ../telemffb/ui/Ui_AdvancedSpring.py
+pyuic6 advanced_spring.ui -o ../telemffb/ui/generated/Ui_AdvancedSpring.py
