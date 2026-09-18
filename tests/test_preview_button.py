@@ -98,10 +98,10 @@ def _render(qapp, tmp_path, *, offline, blockers=(), running=None, running_slot=
                 SettingsManager._tap_mode_offered(G.settings_mgr)),
             TAP_SIM_KEYS=SettingsManager.TAP_SIM_KEYS)
         from telemffb import xmlutils
-        import telemffb.SettingsLayout as SLmod
+        import telemffb.ui.widgets.SettingsLayout as SLmod
         SLmod.HapticEffect = lambda *a, **k: types.SimpleNamespace()
-        from telemffb.SettingsLayout import SettingsLayout
-        from telemffb.custom_widgets import NoKeyScrollArea
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
+        from telemffb.ui.widgets.custom_widgets import NoKeyScrollArea
         xmlutils.update_vars('joystick', G.userconfig_path, G.defaults_path)
         xmlutils.update_roots()
         cls, pat, data = xmlutils.read_single_model(sim, model, '', 'joystick')
@@ -173,7 +173,7 @@ def test_no_buttons_or_pads_outside_offline_mode(qapp, tmp_path):
 
 def test_rows_without_a_preview_get_a_matching_pad(qapp, tmp_path):
     """Every slider row is the same length: a button or a same-size pad."""
-    from telemffb.SettingsLayout import PREVIEW_BUTTON_SIZE
+    from telemffb.ui.widgets.SettingsLayout import PREVIEW_BUTTON_SIZE
     # a propeller model: its form mixes preview rows (rumble, buffet...)
     # with plain sliders (expo, droop moment) - the F-16's visible sliders
     # all happen to host previews now
@@ -193,9 +193,9 @@ def test_rows_without_a_preview_get_a_matching_pad(qapp, tmp_path):
 
 
 def test_playing_preview_paints_its_rows_handles_green(qapp, tmp_path):
-    from telemffb.custom_widgets import vpf_purple
+    from telemffb.ui.widgets.custom_widgets import vpf_purple
     from telemffb.preview import JET_ENGINE_RUMBLE, AFTERBURNER
-    from telemffb.SettingsLayout import lock_preview_rows, PREVIEW_ACTIVE_HANDLE
+    from telemffb.ui.widgets.SettingsLayout import lock_preview_rows, PREVIEW_ACTIVE_HANDLE
     r = _render(qapp, tmp_path, offline=True)
     jet, ab = 'jet_engine_rumble_intensity', 'afterburner_effect_intensity'
     if jet not in r.sliders or ab not in r.sliders:
@@ -215,7 +215,7 @@ def test_playing_rows_are_held_and_released(qapp, tmp_path):
     button (present but hidden on a clean row) are all disabled - and the
     lock lets go of every one of them when the run ends."""
     from telemffb.preview import JET_ENGINE_RUMBLE, AFTERBURNER
-    from telemffb.SettingsLayout import lock_preview_rows
+    from telemffb.ui.widgets.SettingsLayout import lock_preview_rows
     r = _render(qapp, tmp_path, offline=True)
     jet, ab = 'jet_engine_rumble_intensity', 'afterburner_effect_intensity'
     row, other = r.row_widgets(jet), r.row_widgets(ab)
@@ -234,7 +234,7 @@ def test_release_leaves_a_row_disabled_for_its_own_reasons_alone(qapp, tmp_path)
     """A row disabled before the run (its toggle off, say) is not
     re-enabled by the release: the lock only lets go of what it took."""
     from telemffb.preview import JET_ENGINE_RUMBLE
-    from telemffb.SettingsLayout import lock_preview_rows
+    from telemffb.ui.widgets.SettingsLayout import lock_preview_rows
     r = _render(qapp, tmp_path, offline=True)
     row = r.row_widgets('jet_engine_rumble_intensity')
     if 'slider' not in row or 'plus' not in row:
@@ -251,7 +251,7 @@ def test_a_rebuild_mid_run_comes_back_held(qapp, tmp_path):
     a fresh build while a preview plays draws its rows held and its
     button a stop, from the main window's state alone."""
     from telemffb.preview import PREVIEWS_BY_ROW
-    from telemffb.SettingsLayout import PREVIEW_ACTIVE_HANDLE
+    from telemffb.ui.widgets.SettingsLayout import PREVIEW_ACTIVE_HANDLE
     name = 'jet_engine_rumble_intensity'
     r = _render(qapp, tmp_path, offline=True, running=PREVIEWS_BY_ROW[name])
     row = r.row_widgets(name)

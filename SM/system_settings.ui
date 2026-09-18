@@ -1354,7 +1354,7 @@ Headless:</string>
   <customwidget>
    <class>LabeledToggle</class>
    <extends>QCheckBox</extends>
-   <header>telemffb.custom_widgets</header>
+   <header>telemffb.ui.widgets.custom_widgets</header>
   </customwidget>
  </customwidgets>
  <tabstops>

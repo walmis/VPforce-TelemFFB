@@ -78,7 +78,7 @@ class TestDeviceNaming:
         """Deriving these any other way reads nothing for the trim wheel,
         silently - its profiles would validate against no product ID."""
         written = set(re.findall(r"'(pid[A-Za-z]+)':",
-                                 source('telemffb/SystemSettingsDialog.py')))
+                                 source('telemffb/ui/dialogs/SystemSettingsDialog.py')))
         for role in ('joystick', 'pedals', 'collective', 'trimwheel'):
             assert device_pid_key(role) in written, role
 
@@ -125,4 +125,4 @@ class TestTheIpcMessage:
 
 class TestDialogNoLongerBendsForChildren:
     def test_no_child_mode_stripping_remains(self):
-        assert 'G.child_instance' not in source('telemffb/SystemSettingsDialog.py')
+        assert 'G.child_instance' not in source('telemffb/ui/dialogs/SystemSettingsDialog.py')

@@ -341,7 +341,7 @@ class TestDevicelistRow:
 
     def _layout(self, app, monkeypatch):
         from PyQt6 import QtWidgets
-        from telemffb.SettingsLayout import SettingsLayout
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_sim='MSFS', current_class='PropellerAircraft',
             current_pattern='C172', timed_out=False, offline_mode=False),

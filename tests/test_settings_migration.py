@@ -162,7 +162,7 @@ class TestFirstOpenOfTheNewDialog:
 
     def test_a_load_and_save_round_trip_preserves_every_device(self, settings,
                                                                monkeypatch):
-        from telemffb.InstanceSettingsPanel import ALL_FIELDS, InstanceSettingsPanel
+        from telemffb.ui.panels.InstanceSettingsPanel import ALL_FIELDS, InstanceSettingsPanel
         from PyQt6 import QtWidgets
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
         settings.migrate_instance_scoped_globals()

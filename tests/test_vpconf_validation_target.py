@@ -140,7 +140,7 @@ class TestDialogReadsTheRightPid:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         yield dlg
         dlg.deleteLater()
@@ -157,7 +157,7 @@ class TestDialogReadsTheRightPid:
     def test_the_picked_device_wins_over_the_stored_value(self, dialog):
         """Setting up a device means picking it and then choosing its
         profile, in that order, before anything is saved."""
-        from telemffb.custom_widgets import FFBDeviceListModel
+        from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
         combo = dialog.cb_select_p
         combo.setModel(FFBDeviceListModel([FakeDevice(0x20ab, "DIY")]))
         combo.setCurrentIndex(1)                    # row 0 is "(None)"
@@ -167,7 +167,7 @@ class TestDialogReadsTheRightPid:
             self, dialog):
         """The old PID box carried a digits-only validator, so a device on
         PID 20ab could be displayed but never entered by hand."""
-        from telemffb.custom_widgets import FFBDeviceListModel
+        from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
         combo = dialog.cb_select_p
         combo.setModel(FFBDeviceListModel([FakeDevice(0x20ab, "DIY")]))
         combo.setCurrentIndex(1)
@@ -205,7 +205,7 @@ class TestLaunchOptionsFollowTheDevice:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         dlg.cb_al_enable.setChecked(True)
         dlg.toggle_al_widgets()
@@ -214,7 +214,7 @@ class TestLaunchOptionsFollowTheDevice:
         app.processEvents()
 
     def _assign(self, dialog, combo_name, device):
-        from telemffb.custom_widgets import FFBDeviceListModel
+        from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
         combo = getattr(dialog, combo_name)
         combo.setModel(FFBDeviceListModel([device]))
         combo.setCurrentIndex(1)                 # row 0 is "(None)"
@@ -299,7 +299,7 @@ class TestTheMasterRowHasNoLaunchOptions:
     @pytest.fixture
     def dialog(self, monkeypatch):
         from PyQt6 import QtWidgets
-        from telemffb.custom_widgets import FFBDeviceListModel
+        from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
         class FakeSettings(dict):
@@ -320,7 +320,7 @@ class TestTheMasterRowHasNoLaunchOptions:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         # stand in for connected hardware, as populateUSBSelectors would
         for combo, pid, ident in ((dlg.cb_select_j, 0x2054, 'Monster'),
@@ -371,7 +371,7 @@ class TestTheMasterRowHasNoLaunchOptions:
         assert dialog.cb_headless_p.isChecked()
 
     def test_an_unassigned_device_cannot_become_master(self, dialog, monkeypatch):
-        from telemffb.custom_widgets import FFBDeviceListModel
+        from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
         dialog.cb_select_t.setModel(FFBDeviceListModel([]))
         dialog.toggle_device_launch_widgets()
         assert not dialog.rb_master_t.isEnabled()

@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog, QFile
 import inspect
 
 import telemffb.globals as G
-from telemffb.ui.Ui_AdvancedGCurve import Ui_AdvancedGForceDialog
+from telemffb.ui.generated.Ui_AdvancedGCurve import Ui_AdvancedGForceDialog
 from telemffb.utils import get_gain_from_speed, get_gain_from_gs
 
 

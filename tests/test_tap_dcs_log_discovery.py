@@ -256,7 +256,7 @@ class TestManualPath:
         from PyQt6 import QtWidgets
 
         from telemffb.tap_install import SIMS
-        from telemffb.ui.Ui_SystemDialog import Ui_SystemDialog
+        from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
 
         ui = Ui_SystemDialog()
         ui.setupUi(QtWidgets.QDialog())
@@ -366,7 +366,7 @@ class TestRejectedPath:
     def test_the_panel_flags_it(self, app, tmp_path):
         """Drawn in the attention color rather than as another dim line:
         it is the one thing on the panel the user can act on."""
-        from telemffb.TapStatusPanel import TapStatusPanel
+        from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
         from telemffb.tap_install import SimStatus
 
         nonsense = str(tmp_path / "nonsense")
@@ -381,7 +381,7 @@ class TestRejectedPath:
             "the path itself is reachable, however long it is"
 
     def test_the_panel_says_nothing_when_the_path_works(self, app, tmp_path):
-        from telemffb.TapStatusPanel import TapStatusPanel
+        from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
         from telemffb.tap_install import SimStatus
 
         panel = TapStatusPanel(SimStatus(sim=SIMS_BY_KEY['DCS'], root=None,
@@ -419,7 +419,7 @@ class TestIL2SharedPathFields:
 
     @staticmethod
     def enablement(sim_on, auto_on, tap_on):
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog as D
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog as D
 
         class Box:
             def __init__(self, on): self.on = on
@@ -456,7 +456,7 @@ class TestIL2SharedPathFields:
         assert not any(self.enablement(False, True, True).values())
 
     def test_il2_has_no_path_row_of_its_own_in_the_tap_section(self):
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog as D
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog as D
         assert set(D.TAP_PATH_WIDGETS) == {'DCS', 'BMS'}
 
 
@@ -472,7 +472,7 @@ class TestPathEntryValidation:
     def holder(sim_key, accepted='', monkeypatch=None):
         from PyQt6 import QtWidgets as W
 
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog as D
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog as D
         from telemffb.tap_install import SIMS_BY_KEY
 
         warned = []
@@ -492,7 +492,7 @@ class TestPathEntryValidation:
         holder.warned = warned
         setattr(holder, SIMS_BY_KEY[sim_key].settings_key, W.QLineEdit(accepted))
         monkeypatch.setattr(
-            'telemffb.SystemSettingsDialog.QMessageBox.warning',
+            'telemffb.ui.dialogs.SystemSettingsDialog.QMessageBox.warning',
             lambda *a, **k: warned.append(a))
         return holder
 
@@ -584,7 +584,7 @@ class TestIL2PathEntryValidation:
 
     @staticmethod
     def holder():
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog as D
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog as D
 
         class Holder:
             IL2_STARTUP_CFG = D.IL2_STARTUP_CFG
@@ -632,6 +632,6 @@ class TestIL2PathEntryValidation:
         chosen cannot be rejected later at Save."""
         import inspect
 
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog as D
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog as D
         for method in (D.validate_il2_path, D.select_il2_directory):
             assert '_il2_path_holds_the_game' in inspect.getsource(method)

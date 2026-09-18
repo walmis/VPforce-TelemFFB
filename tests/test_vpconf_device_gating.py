@@ -16,7 +16,7 @@ from PyQt6 import QtWidgets
 from PyQt6.QtCore import Qt
 
 import telemffb.globals as G
-from telemffb.custom_widgets import FFBDeviceListModel
+from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
 
 
 
@@ -62,7 +62,7 @@ def dialog(monkeypatch):
                         ('device_usbpid', '2054'), ('device_capabilities', None),
                         ('device_di_guid', None), ('is_exe', False)):
         monkeypatch.setattr(G, name, value, raising=False)
-    from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     dlg = SystemSettingsDialog()
     yield dlg
     dlg.deleteLater()

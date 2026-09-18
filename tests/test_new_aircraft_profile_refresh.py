@@ -128,7 +128,7 @@ class TestAnsweringTheOfferClearsOnlyThatOffer:
 
     def _answer(self, monkeypatch, during_dialog):
         from telemffb.MainWindow import MainWindow
-        from telemffb.ProfileOfferDialog import ProfileOfferDialog
+        from telemffb.ui.dialogs.ProfileOfferDialog import ProfileOfferDialog
         from telemffb import match_history
         answered = {'sim': 'MSFS', 'user': '737.*', 'curated': '737-600.*'}
         sm = SimpleNamespace(profile_change=answered, offline_mode=True)
@@ -166,7 +166,7 @@ class TestSuggestedMatchDefault:
     profile to one paint job."""
 
     def _pick(self, name, clone_from=None):
-        from telemffb.NewAircraftWizard import NewAircraftWizard
+        from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
         words = name.split()
         patterns = [' '.join(words[:i]) + ".*" for i in range(len(words), 0, -1)]
         wiz = SimpleNamespace(clone_from=clone_from,
@@ -199,7 +199,7 @@ class TestForkSuggestions:
     never names the aircraft and the button looks like it did nothing."""
 
     def _wizard(self, clone_from):
-        from telemffb.NewAircraftWizard import NewAircraftWizard
+        from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
         return SimpleNamespace(
             clone_from=clone_from,
             _out_ranks_the_source=lambda p, n: NewAircraftWizard._out_ranks_the_source(
@@ -328,7 +328,7 @@ class TestSimStatusLeavesTheProfileComboAlone:
     it being applied."""
 
     def _widget(self, monkeypatch):
-        from telemffb.custom_widgets import AppStatusWidget
+        from telemffb.ui.widgets.custom_widgets import AppStatusWidget
         monkeypatch.setattr(G, 'useDarkMode', False, raising=False)
         w = AppStatusWidget(master_instance=True)
         w.set_profile_state(False)
@@ -402,9 +402,9 @@ class TestSettingsFormWithoutProfile:
         sm.update_state_vars(current_sim='MSFS', current_class='Helicopter',
                              current_aircraft_name='Mystery Rotorcraft', current_pattern='')
         monkeypatch.setattr(G, 'settings_mgr', sm, raising=False)
-        from telemffb.SettingsLayout import SettingsLayout
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
 
-        from telemffb.custom_widgets import NoKeyScrollArea
+        from telemffb.ui.widgets.custom_widgets import NoKeyScrollArea
 
         def build(pattern):
             sm.current_pattern = pattern

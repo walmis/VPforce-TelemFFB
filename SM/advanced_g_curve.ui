@@ -567,28 +567,28 @@
   <customwidget>
    <class>LabeledToggle</class>
    <extends>QCheckBox</extends>
-   <header>telemffb.custom_widgets</header>
+   <header>telemffb.ui.widgets.custom_widgets</header>
   </customwidget>
   <customwidget>
    <class>StyledButton</class>
    <extends>QPushButton</extends>
-   <header location="global">telemffb.custom_widgets.h</header>
+   <header location="global">telemffb.ui.widgets.custom_widgets.h</header>
   </customwidget>
   <customwidget>
    <class>Toggle</class>
    <extends>QCheckBox</extends>
-   <header location="global">telemffb.custom_widgets.h</header>
+   <header location="global">telemffb.ui.widgets.custom_widgets.h</header>
   </customwidget>
   <customwidget>
    <class>GForceCurveWidget</class>
    <extends>QWidget</extends>
-   <header location="global">telemffb.custom_widgets.h</header>
+   <header location="global">telemffb.ui.widgets.custom_widgets.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>InfoLabel</class>
    <extends>QWidget</extends>
-   <header location="global">telemffb.custom_widgets.h</header>
+   <header location="global">telemffb.ui.widgets.custom_widgets.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

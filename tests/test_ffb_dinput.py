@@ -625,7 +625,7 @@ class TestCapabilityGating:
         except Exception as e:
             pytest.skip(f"cannot create QApplication: {e}")
 
-        from telemffb.ConfiguratorDialog import ConfiguratorDialog
+        from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
         saved = self._swap_device(device)
         try:
             dialog = ConfiguratorDialog(None)
@@ -1124,7 +1124,7 @@ class TestLiveAxisMapReapply:
     def test_the_save_reaches_master_and_children(self, monkeypatch):
         import telemffb.globals as G
         from telemffb.hw.ffb_rhino import HapticEffect
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
 
         class Spy:
             flagged = False

@@ -52,7 +52,7 @@ def dialog(monkeypatch):
                         ('device_usbpid', '2055'), ('device_capabilities', None),
                         ('device_di_guid', None), ('is_exe', False)):
         monkeypatch.setattr(G, name, value, raising=False)
-    from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     dlg = SystemSettingsDialog()
     yield dlg, settings
     dlg.deleteLater()
@@ -105,7 +105,7 @@ class TestSavingEachDevice:
                             ('device_usbpid', '2055'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
 
         assert dlg.instance_panels[('system', 'joystick')].widgets['logLevel'].currentText() == 'DEBUG'
@@ -128,7 +128,7 @@ class TestOwnRoleAlwaysPresent:
                             ('device_usbpid', '2055'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         assert ('system', 'collective') in dlg.instance_panels
         dlg.deleteLater()

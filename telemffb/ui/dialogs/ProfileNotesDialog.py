@@ -22,8 +22,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox,
                              QPlainTextEdit, QPushButton)
 
-from . import globals as G
-from . import xmlutils
+from telemffb import globals as G
+from telemffb import xmlutils
 
 
 class ProfileNotesDialog(QDialog):

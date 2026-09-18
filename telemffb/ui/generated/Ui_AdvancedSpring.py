@@ -312,4 +312,4 @@ class Ui_AdvancedSpringDialog(object):
         self.tog_live_view.setText(_translate("AdvancedSpringDialog", "Live View"))
         self.pb_import.setText(_translate("AdvancedSpringDialog", "Import"))
         self.pb_export.setText(_translate("AdvancedSpringDialog", "Export"))
-from telemffb.custom_widgets import LabeledToggle, SpringCurveWidget, StyledButton, Toggle
+from telemffb.ui.widgets.custom_widgets import LabeledToggle, SpringCurveWidget, StyledButton, Toggle

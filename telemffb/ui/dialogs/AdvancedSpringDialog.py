@@ -26,9 +26,9 @@ import inspect
 
 import telemffb.globals as G
 from telemffb import utils
-from telemffb.ui.Ui_AdvancedSpring import Ui_AdvancedSpringDialog
+from telemffb.ui.generated.Ui_AdvancedSpring import Ui_AdvancedSpringDialog
 from telemffb.utils import get_gain_from_speed
-from telemffb.custom_widgets import SpringCurveWidget
+from telemffb.ui.widgets.custom_widgets import SpringCurveWidget
 
 class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
     from telemffb.utils import conversions as conv

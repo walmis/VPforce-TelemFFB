@@ -20,7 +20,7 @@ from PyQt6.QtCore import QAbstractAnimation, QRectF, Qt
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication
 
-from telemffb.custom_widgets import Toggle, vpf_purple
+from telemffb.ui.widgets.custom_widgets import Toggle, vpf_purple
 
 pytestmark = [pytest.mark.unit]
 

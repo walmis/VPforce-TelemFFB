@@ -66,10 +66,10 @@ def rendered(qapp, tmp_path):
                 SettingsManager._tap_mode_offered(G.settings_mgr)),
             TAP_SIM_KEYS=SettingsManager.TAP_SIM_KEYS)
         from telemffb import xmlutils
-        import telemffb.SettingsLayout as SLmod
+        import telemffb.ui.widgets.SettingsLayout as SLmod
         SLmod.HapticEffect = lambda *a, **k: types.SimpleNamespace()
-        from telemffb.SettingsLayout import SettingsLayout
-        from telemffb.custom_widgets import NoKeyScrollArea
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
+        from telemffb.ui.widgets.custom_widgets import NoKeyScrollArea
         xmlutils.update_vars('joystick', G.userconfig_path, G.defaults_path)
         xmlutils.update_roots()
         cls, pat, data = xmlutils.read_single_model('MSFS', 'Cessna 172', 'joystick')

@@ -45,28 +45,28 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
 
 import telemffb.globals as G
 from telemffb import match_history
-from telemffb.ProfileOfferDialog import ProfileOfferDialog
+from telemffb.ui.dialogs.ProfileOfferDialog import ProfileOfferDialog
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
-from telemffb.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
+from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
+from telemffb.ui.widgets.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
     SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
-from telemffb.DevicePanel import DeviceIconPanel, device_status_state
-from telemffb.ExceptionTracker import ExceptionViewerDialog
+from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
+from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.SCOverridesEditor import SCOverridesEditor
-from telemffb.ProfileNotesDialog import ProfileNotesDialog
-from telemffb.SettingsLayout import SettingsLayout
+from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
+from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
+from telemffb.ui.widgets.SettingsLayout import SettingsLayout
 from telemffb.preview import PREVIEW_SPECS
 from telemffb.preview_controller import EffectPreviewController
-# from telemffb.UserModelDialog import UserModelDialog
-from telemffb.NewAircraftWizard import NewAircraftWizard
+# from telemffb.ui.dialogs.UserModelDialog import UserModelDialog
+from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
 from telemffb.telem.SimTelemListener import SimTelemListener
-from telemffb.SystemSettingsDialog import SystemSettingsDialog
-from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
-from telemffb.ProfileManager import ProfileManagerDialog, NewProfileDialog
+from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
+from telemffb.ui.dialogs.ProfileManager import ProfileManagerDialog, NewProfileDialog
 from telemffb.utils import exit_application, HiDpiPixmap
 
 class MainWindow(QMainWindow):
@@ -2269,7 +2269,7 @@ class MainWindow(QMainWindow):
     def open_tap_monitor(self):
         """One monitor, re-raised rather than duplicated: two pollers
         on the same mapping would only double the wakeups."""
-        from telemffb.TapMonitorDialog import TapMonitorDialog
+        from telemffb.ui.dialogs.TapMonitorDialog import TapMonitorDialog
         dlg = getattr(self, '_tap_monitor', None)
         if dlg is not None and dlg.isVisible():
             dlg.raise_()
@@ -2293,7 +2293,7 @@ class MainWindow(QMainWindow):
         # nowhere (scope fall-through) — the dialog would show a misleading
         # limbo state. Refuse with directions instead.
         if getattr(G.settings_mgr, "offline_mode", False):
-            from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+            from telemffb.ui.dialogs.TrimCalibrationDialog import TrimCalibrationDialog
             if not TrimCalibrationDialog._offline_target_valid():
                 QMessageBox.information(
                     self, "Elevator Trim Calibration",
@@ -2315,7 +2315,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Elevator Trim Calibration", msg)
             return
 
-        from telemffb.TrimCalibrationDialog import TrimCalibrationDialog
+        from telemffb.ui.dialogs.TrimCalibrationDialog import TrimCalibrationDialog
         if getattr(self, 'trim_cal_dialog', None) is None:
             # The dialog destroys itself on close (stale-display safety); the
             # destroyed signal clears this reference so the next open builds

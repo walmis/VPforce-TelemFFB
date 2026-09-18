@@ -19,7 +19,7 @@ def app():
 
 
 from telemffb.hw import ffb_tap
-from telemffb import TapMonitorDialog as tm
+from telemffb.ui.dialogs import TapMonitorDialog as tm
 from tests.test_ffb_tap import add_effect, make_shm
 
 

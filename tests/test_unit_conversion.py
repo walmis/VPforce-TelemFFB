@@ -42,7 +42,7 @@ class TestSettingsLayoutWrapper:
 
     @staticmethod
     def _convert(*args):
-        from telemffb.SettingsLayout import SettingsLayout
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
         return SettingsLayout.convert_unit_value(*args)
 
     def test_tenths_precision_with_stable_round_trips(self):

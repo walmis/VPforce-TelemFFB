@@ -21,11 +21,11 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import QAbstractItemView, QDialog, QHeaderView, QTableWidgetItem, QMessageBox
 
-from . import globals as G
-from . import xmlutils
-from .telem.SimConnectManager import SimConnectManager
-from .ui.Ui_SCOverridesDialog import Ui_SCOverridesDialog
-from .utils.TransformExpr import TransformExpr
+from telemffb import globals as G
+from telemffb import xmlutils
+from telemffb.telem.SimConnectManager import SimConnectManager
+from telemffb.ui.generated.Ui_SCOverridesDialog import Ui_SCOverridesDialog
+from telemffb.utils.TransformExpr import TransformExpr
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     overrides = []

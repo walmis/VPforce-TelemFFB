@@ -20,8 +20,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-from telemffb.custom_widgets import FFBDeviceListModel
-from telemffb.SystemSettingsDialog import _same_hardware
+from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
+from telemffb.ui.dialogs.SystemSettingsDialog import _same_hardware
 from telemffb.utils import (device_ident_key, device_ids_key,
                             recover_device_identity,
                             usb_ids_from_devpath)
@@ -82,7 +82,7 @@ class TestIdentIsRemembered:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         yield dlg
         dlg.deleteLater()
@@ -163,7 +163,7 @@ class TestReportedIdsAreStored:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         yield dlg
         dlg.deleteLater()
@@ -270,7 +270,7 @@ class TestFillingInWhatWasNeverStored:
                             ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dialog = SystemSettingsDialog()
         pedals = self.Device(0x2052, "VPforce Pedals", self.PEDAL_PATH.encode())
         dialog.cb_select_p.setModel(FFBDeviceListModel([pedals]))
@@ -383,7 +383,7 @@ class TestTheSameHardwareTwice:
         # the conflict box is built inline and exec'd; a stubbed exec leaves
         # no clicked button, which the dialog reads as "cancel"
         monkeypatch.setattr(QtWidgets.QMessageBox, 'exec', lambda self: 0)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dialog = SystemSettingsDialog()
         dialog.cb_select_j.setModel(FFBDeviceListModel([self.rhino()]))
         dialog.cb_select_p.setModel(FFBDeviceListModel([self.rhino_as_dinput()]))

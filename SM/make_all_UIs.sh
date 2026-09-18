@@ -1,3 +1,6 @@
+#!/bin/sh
+# Regenerates all pyuic6 output files into telemffb/ui/generated/.
+# Run from the SM/ directory, e.g.  cd SM && ./make_all_UIs.sh
 pyuic6 system_settings_new.ui -o ../telemffb/ui/generated/Ui_SystemDialog.py
 pyuic6 teleplot.ui -o ../telemffb/ui/generated/Ui_TeleplotDialog.py
 pyuic6 settingswindow.ui -o ../telemffb/ui/generated/Ui_SettingsWindow.py

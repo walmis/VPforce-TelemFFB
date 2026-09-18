@@ -359,4 +359,4 @@ class Ui_NewAircraftWizard(object):
         self.label_10.setText(_translate("NewAircraftWizard", "Profile Name:"))
         self.tb_profileName.setText(_translate("NewAircraftWizard", "Auto User"))
         self.lbl_profileNameError.setText(_translate("NewAircraftWizard", "Error Label"))
-from telemffb.custom_widgets import StyledButton
+from telemffb.ui.widgets.custom_widgets import StyledButton

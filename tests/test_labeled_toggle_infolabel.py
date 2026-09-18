@@ -14,7 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-from telemffb.custom_widgets import InfoLabel, LabeledToggle
+from telemffb.ui.widgets.custom_widgets import InfoLabel, LabeledToggle
 
 pytestmark = [pytest.mark.unit]
 
@@ -72,7 +72,7 @@ class TestTheHandleFollowsTheState:
     DirectInput toggle after the missing-DLL revert)."""
 
     def test_setting_it_off_moves_the_handle(self, app):
-        from telemffb.custom_widgets import Toggle
+        from telemffb.ui.widgets.custom_widgets import Toggle
         toggle = Toggle()
         toggle.setChecked(True)
         assert toggle.handle_position == 1.0
@@ -83,7 +83,7 @@ class TestTheHandleFollowsTheState:
         """How the settings dialog reverts the DirectInput toggle: the
         stateChanged slot never runs, so the handle has to be moved by
         setChecked itself."""
-        from telemffb.custom_widgets import Toggle
+        from telemffb.ui.widgets.custom_widgets import Toggle
         toggle = Toggle()
         toggle.setChecked(True)
         toggle.blockSignals(True)
@@ -96,7 +96,7 @@ class TestTheHandleFollowsTheState:
         """The real sequence: the click slides the handle on, a modal
         runs while it does, and the handler then reverts."""
         from PyQt6 import QtCore
-        from telemffb.custom_widgets import LabeledToggle
+        from telemffb.ui.widgets.custom_widgets import LabeledToggle
         widget = LabeledToggle(label="Enable DirectInput Devices")
         inner = widget.toggle
 
@@ -126,7 +126,7 @@ class TestARefusalCanBeRepeated:
     """
 
     def _refusing(self):
-        from telemffb.custom_widgets import LabeledToggle
+        from telemffb.ui.widgets.custom_widgets import LabeledToggle
         widget = LabeledToggle(label="Enable DirectInput Devices")
         seen = []
 
@@ -152,7 +152,7 @@ class TestARefusalCanBeRepeated:
     def test_an_ordinary_set_is_not_deferred(self, app):
         """Only the re-entrant case waits; everything else stays immediate,
         because callers read the state straight back."""
-        from telemffb.custom_widgets import Toggle
+        from telemffb.ui.widgets.custom_widgets import Toggle
         toggle = Toggle()
         toggle.setChecked(True)
         assert toggle.isChecked() is True

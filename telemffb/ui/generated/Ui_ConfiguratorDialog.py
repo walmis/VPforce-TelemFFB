@@ -289,4 +289,4 @@ class Ui_ConfiguratorDialog(object):
         self.pb_Cancel.setText(_translate("ConfiguratorDialog", "Cancel"))
         self.pb_Finish.setText(_translate("ConfiguratorDialog", "Save and Close"))
         self.label.setText(_translate("ConfiguratorDialog", "<html><head/><body><p><span style=\" font-weight:700;\">Caution:</span> When \'Live Updates\' is enabled, adjusting these values will update the gain sliders as set in VPforce Configurator <span style=\" font-weight:600; font-style:italic;\">* in real-time *</span><br/><br/>Use caution when adjusting sliders</p></body></html>"))
-from telemffb.custom_widgets import DelayTimerSlider, LabeledToggle
+from telemffb.ui.widgets.custom_widgets import DelayTimerSlider, LabeledToggle

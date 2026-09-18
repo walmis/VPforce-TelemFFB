@@ -30,16 +30,16 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-import telemffb.SystemSettingsDialog as dialog_module
-import telemffb.TapStatusPanel as panel_module
+import telemffb.ui.dialogs.SystemSettingsDialog as dialog_module
+import telemffb.ui.panels.TapStatusPanel as panel_module
 from telemffb import tap_install
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
-from telemffb.SystemSettingsDialog import (CLEANUP_CANCELLED, CLEANUP_LEAVE,
+from telemffb.ui.dialogs.SystemSettingsDialog import (CLEANUP_CANCELLED, CLEANUP_LEAVE,
                                            CLEANUP_REMOVE, SystemSettingsDialog)
 from telemffb.tap_config import read
 from telemffb.tap_install import (GENERATED_MARKER, SIMS_BY_KEY, TapDevice,
                                   WrapperState, generate_config, sim_status)
-from telemffb.TapDeviceDialog import TapDeviceDialog
+from telemffb.ui.dialogs.TapDeviceDialog import TapDeviceDialog
 
 pytestmark = [
     pytest.mark.unit,
