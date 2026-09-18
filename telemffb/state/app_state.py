@@ -56,7 +56,7 @@ setter every frame without either flooding Qt or hand-rolling its own
 
 import threading
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -148,6 +148,9 @@ class AppState(QObject):
     #: The currently-active Notices, sorted by priority (lowest first) -
     #: see Notice.
     prompts_changed = pyqtSignal(tuple)
+    #: The setting names (EffectTranslator's second field) of every effect
+    #: currently started, e.g. ('max_elevator_coeff',) - see set_active_settings.
+    active_settings_changed = pyqtSignal(tuple)
 
     def __init__(self):
         super().__init__()
@@ -164,6 +167,7 @@ class AppState(QObject):
         # notice_id -> Notice, for whatever prompts are currently active.
         self._prompts: Dict[str, Notice] = {}
         self._last_prompts_shown: Optional[Tuple[Notice, ...]] = None
+        self._active_settings: Tuple[str, ...] = ()
 
     # ---- identity (set once at startup) --------------------------------
 
@@ -314,3 +318,29 @@ class AppState(QObject):
                 return
             self._last_prompts_shown = shown
         self.prompts_changed.emit(shown)
+
+    # ---- active settings (settings-tab slider highlighting) --------------
+
+    def set_active_settings(self, settings: Sequence[str]) -> None:
+        """The setting names of every effect currently started - the same
+        list ``on_update_telemetry`` sends a child's master over IPC.
+
+        Dedupes by set membership, not order or count: two calls naming the
+        same settings are the same view for the sliders (each slider only
+        cares whether its own setting is present), so a producer that
+        rebuilds the list fresh every frame - iterating a dict in whatever
+        order it currently has - never trips the dedup key on order alone
+        and floods ``active_settings_changed`` for no visible change.
+        """
+        value = tuple(settings)
+        with self._lock:
+            if frozenset(value) == frozenset(self._active_settings):
+                return
+            self._active_settings = value
+        self.active_settings_changed.emit(value)
+
+    def current_active_settings(self) -> Tuple[str, ...]:
+        """The active settings right now - a subscriber calls this right
+        after connecting to paint the initial state correctly."""
+        with self._lock:
+            return self._active_settings

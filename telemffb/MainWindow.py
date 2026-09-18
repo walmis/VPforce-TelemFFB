@@ -51,8 +51,8 @@ import telemffb.xmlutils as xmlutils
 from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.ui.widgets.custom_widgets import InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
-    SimStatusLabel, vpf_purple, DetachedTabWindow, ExceptionStatusWidget
+from telemffb.ui.widgets.custom_widgets import InstanceStatusRow, NoKeyScrollArea, \
+    SimStatusLabel, DetachedTabWindow, ExceptionStatusWidget
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
 from telemffb.ui.panels.PromptStack import PromptStack
 from telemffb.ui.panels.OfflineEditorPanel import OfflineEditorPanel
@@ -607,6 +607,7 @@ class MainWindow(QMainWindow):
         """ Add settings layout to the tab widget """
 
         settings_widget.setLayout(self.settings_layout)
+        self.settings_layout.bind(G.app_state)
         self.settings_area.setWidget(settings_widget)
         self.tab_widget.addTab(self.settings_area, "Settings")
 
@@ -1992,6 +1993,10 @@ class MainWindow(QMainWindow):
                 self.resize(int(w), int(h))
             except Exception:
                 pass
+            # active_settings_changed skips painting while this tab is
+            # hidden (see SettingsLayout._on_active_settings_changed) - catch
+            # up on whatever changed while the user was elsewhere.
+            self.settings_layout.repaint_active_settings()
 
         elif index == 2:  # Hide Tab
             self.current_tab_index = 2
@@ -2203,44 +2208,24 @@ class MainWindow(QMainWindow):
                 if child_effects:
                     G.ipc_instance.send_ipc_effects(active_effects, active_settings)
 
-            window_mode = self.tab_widget.currentIndex()
-            # update slider colors
-            qcolor_green = QColor("#17c411")
-            qcolor_grey = QColor("grey")
-            if window_mode == 1:
-                sliders = self.findChildren(NoWheelSlider)
-                for my_slider in sliders:
-                    slidername = my_slider.objectName().replace('sld_', '')
+            # Drives the settings-tab slider highlighting (green = active).
+            # AppState dedupes and only repaints the (cached, non-live-key)
+            # sliders when this actually changes - see
+            # SettingsLayout._on_active_settings_changed/repaint_active_settings.
+            G.app_state.set_active_settings(active_settings)
+
+            # The live-key number sliders (coeff % handles) still need a
+            # per-frame color+label update straight from telemetry, whether
+            # or not active_settings changed - a small cached list, not
+            # findChildren(), per SettingsLayout._rebuild_slider_caches().
+            if self.tab_widget.currentIndex() == 1:
+                qcolor_green = QColor("#17c411")
+                qcolor_grey = QColor("grey")
+                for my_slider, live_key in self.settings_layout.live_key_sliders:
+                    pct = min(data.get(live_key, 0), 1.0)
+                    new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
                     my_slider.blockSignals(True)
-
-                    for a_s in active_settings:
-                        if a_s in slidername:
-                            my_slider.setHandleColor("#17c411")
-                            break
-                        else:
-                            my_slider.setHandleColor(vpf_purple)
-                    my_slider.blockSignals(False)
-
-                n_sliders = self.findChildren(NoWheelNumberSlider)
-                for my_slider in n_sliders:
-                    """This section updates the labels which are on the "NoWheelNumberSlider elements that reflect
-                    the current value of the coeff % values"""
-                    slidername = my_slider.objectName().replace('sld_', '')
-                    my_slider.blockSignals(True)
-
-                    live_key = self.N_SLIDER_LIVE_KEYS.get(slidername)
-                    if live_key is not None:
-                        pct = min(data.get(live_key, 0), 1.0)
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
-                        my_slider.blockSignals(False)
-                        continue
-                    for a_s in active_settings:
-                        if a_s in slidername:
-                            my_slider.setHandleColor("#17c411")
-                            break
-                        else:
-                            my_slider.setHandleColor(vpf_purple)
+                    my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
                     my_slider.blockSignals(False)
 
             is_paused = max(data.get('SimPaused', 0), data.get('Parked', 0))

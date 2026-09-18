@@ -204,6 +204,70 @@ class TestTelemManagerForwarding:
         assert mgr.gain_overrides_active is True
 
 
+class TestActiveSettings:
+    """AppState.set_active_settings/current_active_settings - drives the
+    settings-tab slider highlighting (SettingsLayout), replacing the
+    per-frame findChildren(NoWheelSlider) walk MainWindow.on_update_telemetry
+    used to do."""
+
+    def test_defaults_to_empty(self, state):
+        assert state.current_active_settings() == ()
+
+    def test_set_value_is_read_back(self, state):
+        state.set_active_settings(['max_elevator_coeff', 'wind_effect_gain'])
+        assert state.current_active_settings() == ('max_elevator_coeff', 'wind_effect_gain')
+
+    def test_setting_the_same_members_again_does_not_emit(self, state):
+        state.set_active_settings(['a', 'b'])
+        calls = _capture(state.active_settings_changed)
+        state.set_active_settings(['a', 'b'])
+        assert calls == []
+
+    def test_same_members_in_a_different_order_does_not_emit(self, state):
+        """Dedup is by set membership, not list order - a producer rebuilding
+        the list every frame by iterating a dict must not flood the signal
+        just because dict iteration order shuffled with no visible change."""
+        state.set_active_settings(['a', 'b'])
+        calls = _capture(state.active_settings_changed)
+        state.set_active_settings(['b', 'a'])
+        assert calls == []
+
+    def test_adding_a_member_emits_the_new_value(self, state):
+        state.set_active_settings(['a'])
+        calls = _capture(state.active_settings_changed)
+        state.set_active_settings(['a', 'b'])
+        assert calls == [(('a', 'b'),)]
+
+    def test_removing_a_member_emits(self, state):
+        state.set_active_settings(['a', 'b'])
+        calls = _capture(state.active_settings_changed)
+        state.set_active_settings(['a'])
+        assert calls == [(('a',),)]
+
+    def test_clearing_to_empty_emits_once(self, state):
+        state.set_active_settings(['a'])
+        calls = _capture(state.active_settings_changed)
+        state.set_active_settings([])
+        assert calls == [((),)]
+        state.set_active_settings([])
+        assert calls == [((),)]  # still empty: no re-emit
+
+    def test_setter_from_a_background_thread(self, state, app):
+        calls = _capture(state.active_settings_changed)
+
+        def worker():
+            state.set_active_settings(['tap_effect_constant_gain'])
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(timeout=5)
+        assert not t.is_alive()
+        app.processEvents()
+
+        assert len(calls) == 1
+        assert state.current_active_settings() == ('tap_effect_constant_gain',)
+
+
 def _notice(notice_id, priority):
     """A minimally-distinct Notice for id/priority-focused tests."""
     return Notice(notice_id=notice_id, priority=priority, html=f'<a>{notice_id}</a>',
