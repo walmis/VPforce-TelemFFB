@@ -6529,20 +6529,6 @@
 		<var>L:FFB_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
-	<sc_overrides>
-		<name>ForceTrimSW</name>
-		<model>UH-1H.*</model>
-		<sim>MSFS</sim>
-		<var>L:switchForceTrim</var>
-		<sc_unit>bool</sc_unit>
-	</sc_overrides>
-		<sc_overrides>
-		<name>ForceTrimSW</name>
-		<model>205-A1B.*</model>
-		<sim>MSFS</sim>
-		<var>L:switchForceTrim</var>
-		<sc_unit>bool</sc_unit>
-	</sc_overrides>
 		<sc_overrides>
 			<name>HydSwitch</name>
 			<model>R66(?! Turbine).*</model>
