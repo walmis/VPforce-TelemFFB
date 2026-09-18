@@ -31,7 +31,7 @@ jobs:
       - name: Run pytest
         shell: pwsh
         run: |
-          pytest
+          pytest -n auto
           $code = $LASTEXITCODE
           Write-Host ("pytest exit code: {0} (0x{1:X8})" -f $code, ($code -band 0xFFFFFFFF))
           exit $code
