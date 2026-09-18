@@ -243,11 +243,11 @@ class TestSplitButtonState:
         from telemffb.MainWindow import MainWindow
         calls = []
         win = SimpleNamespace(
-            status_container=SimpleNamespace(
+            header_panel=SimpleNamespace(status_container=SimpleNamespace(
                 cur_craft_label=MagicMock(), cur_pattern_label=MagicMock(),
                 active_profile_label=MagicMock(),
                 set_split_state=lambda v: calls.append(v),
-                set_profile_state=lambda v: calls.append(v)),
+                set_profile_state=lambda v: calls.append(v))),
             refresh_profile_notes_button=lambda: None)
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_aircraft_name="C172SP Classic Cargo", current_pattern=current_pattern,
@@ -280,8 +280,8 @@ class TestNotesButtonState:
         calls = []
         win = SimpleNamespace(
             refresh_telem_override_pill=lambda: None,
-            status_container=SimpleNamespace(
-                set_notes_state=lambda enabled, has_notes: calls.append(enabled)))
+            header_panel=SimpleNamespace(status_container=SimpleNamespace(
+                set_notes_state=lambda enabled, has_notes: calls.append(enabled))))
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_sim=sim, current_aircraft_name=aircraft,
             current_pattern=pattern, active_profile="Built-In"), raising=False)
@@ -316,8 +316,8 @@ class TestProfileComboState:
         from PyQt6.QtWidgets import QComboBox
         from telemffb.MainWindow import MainWindow
         combo = QComboBox()
-        win = SimpleNamespace(status_container=SimpleNamespace(
-            cb_selectProfileCombo=combo, set_profile_state=combo.setEnabled))
+        win = SimpleNamespace(header_panel=SimpleNamespace(status_container=SimpleNamespace(
+            cb_selectProfileCombo=combo, set_profile_state=combo.setEnabled)))
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_sim="MSFS", current_class="PropellerAircraft",
             current_pattern=pattern), raising=False)
