@@ -783,10 +783,10 @@ parity) is not started and remains optional.
 | [aircrafts_msfs_xp.py](../telemffb/sim/aircrafts_msfs_xp.py) | Re-export, so the class name resolves. |
 | [AircraftEffectUtilsBase.py](../telemffb/sim/base/AircraftEffectUtilsBase.py) | New generic `on_shutdown()` lifecycle hook (the only shared-code addition). |
 | [TelemManager.py](../telemffb/telem/TelemManager.py) | `_retire_current_aircraft()` / `on_shutdown()`; the outgoing handler is now retired on aircraft change as well as on sim exit and quit. |
-| [NewAircraftWizard.py](../telemffb/NewAircraftWizard.py) | Friendly class name. |
+| [NewAircraftWizard.py](../telemffb/ui/dialogs/NewAircraftWizard.py) | Friendly class name. |
 | [BaseTelemetryData.py](../telemffb/sim/BaseTelemetryData.py) | 13 new documented fields. |
 | [defaults.xml](../defaults.xml) | Class registration (`<classes>`, `type` `validvalues`, self-referential `type` default) and 8 user parameters under an "FFB API" grouping, scoped to the class via `<classdefaults_MSFS>`. |
-| [utils.py](../telemffb/utils.py) | `exit_application()` calls the generic `TelemManager.on_shutdown()`; three `ffb_api_*` spring names registered in `EffectTranslator.effect_dict`. |
+| [utils/filesystem.py](../telemffb/utils/filesystem.py) | `exit_application()` calls the generic `TelemManager.on_shutdown()`; three `ffb_api_*` spring names registered in `EffectTranslator.effect_dict` (`utils/misc.py`). |
 | [tests/test_ffb_api.py](../tests/test_ffb_api.py) | 124 tests. |
 
 **Unchanged:** `Helicopter.py` and `MsfsXpHeliControlsMixIn.py` carry no FFB API code at

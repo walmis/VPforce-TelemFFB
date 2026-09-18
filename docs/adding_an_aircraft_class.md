@@ -49,7 +49,7 @@ below show the MSFS/X-Plane module; substitute the module for your sim from the 
 | 1 | Define the class | The sim's class module (subpackage file for MSFS/XP; inline for DCS/BMS/IL-2) |
 | 2 | Ensure it's in the module namespace | Import into `aircrafts_msfs_xp.py` (MSFS/XP only; inline classes are automatic) |
 | 3 | Register it as selectable | `<classes>` block in `defaults.xml` |
-| 4 | Give it a friendly UI name | `NewAircraftWizard.py` |
+| 4 | Give it a friendly UI name | `telemffb/ui/dialogs/NewAircraftWizard.py` |
 | 5 | Map aircraft → class + class defaults | `<models>` / `<classdefaults_{sim}>` in `defaults.xml` |
 
 ---
@@ -153,7 +153,7 @@ is mapped to it, but the user can't pick it manually.
 
 ## 4. Give it a friendly display name
 
-In `telemffb/sim/NewAircraftWizard.py`, add the class to `friendly_class_names`:
+In `telemffb/ui/dialogs/NewAircraftWizard.py`, add the class to `friendly_class_names`:
 
 ```python
 friendly_class_names = {

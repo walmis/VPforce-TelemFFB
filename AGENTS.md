@@ -30,7 +30,7 @@ main.py (orchestrator - 16-phase startup)
 ├── FFBRhino / HapticEffect - Direct USB HID device communication (hidapi)
 ├── IPCNetworkThread (UDP sockets) - Multi-instance coordination
 ├── SettingsManager - XML config read/write, profile management, offline mode
-└── ExceptionTracker - Captures errors, provides viewer dialog + reporting API
+└── ExceptionTracker - Captures errors, provides reporting API (Qt viewer dialog in ui/dialogs/)
 ```
 
 ### Startup Flow (main.py phases)
@@ -150,6 +150,25 @@ def foo(val=None):
 ### Structure
 One class per file. Large classes belong in their own module under `telemffb/sim/base/` or `telemffb/sim/msfs_xp/`. Prefix private members with `_` to signal they're internal to the class (`self._my_var`) — cross-module code only uses the public API.
 
+**Keep the filesystem structure logical — organize by domain, not by kind.** The `telemffb/` root holds only true application-level modules (entry-point plumbing, global state, facades, cross-cutting services); everything else lives in the subpackage of its domain:
+
+| Subpackage | Domain |
+|---|---|
+| `telemffb/ui/` | All Qt code — `generated/` (pyuic output, never hand-edited), `dialogs/`, `panels/`, `widgets/` |
+| `telemffb/sim/` | Aircraft effects — `base/` MixIns, `msfs_xp/` classes, per-sim aircraft modules |
+| `telemffb/telem/` | Telemetry routing + per-sim listeners |
+| `telemffb/tap/` | DirectInput telemetry tap (config parsing, sim discovery/install, reconcile) |
+| `telemffb/preview/` | Effect preview (spec catalog + runner, settings-window controller) |
+| `telemffb/hw/` | USB HID / FFB hardware |
+| `telemffb/utils/` | Utilities (star-import façade over category modules) |
+| `telemffb/xml/` | XML I/O internals behind the `xmlutils` façade |
+
+Rules when adding or moving code:
+- A new module goes into the subpackage of its domain — never a new module at the `telemffb/` root. If no subpackage fits, create one instead of adding another root module.
+- Subpackage `__init__.py` files are **docstring-only** (no imports, no re-exports) — imports stay explicit and lazy, which avoids order-dependent import cycles.
+- Imports: files in `ui/`, `tap/`, `preview/` use absolute imports (`from telemffb.ui.dialogs.X import X`); `utils/` and `xml/` keep their one-level sibling relatives.
+- When a subpackage outgrows one domain (≈10+ modules of a second concern), split it into sub-subpackages rather than letting it sprawl.
+
 ### MixIns
 Aircraft effects are built from MixIns that inherit from `AircraftEffectUtilsBase`. When overriding hooks, always chain up:
 
@@ -172,13 +191,19 @@ In the telemetry hot path, never let an exception propagate — it kills the pro
 `TelemManager` runs in its own thread. Never touch Qt widgets from background threads — route everything through `utils.schedule_on_main_thread(lambda: ...)`, or use PyQt signals.
 
 ### Effects & HID Values
-The Rhino firmware uses a fixed-point range of **-4096 to 4096** for coefficients, offsets, saturation, and magnitude. **All intermediate math in the FFB pipeline stays in normalized −1..1**; the ×4096 conversion happens only at the final boundary, inside the type-sniffing setters:
+**Work exclusively in normalized units when touching effect values.** The application-level FFB pipeline computes, stores, and passes values as floats in normalized ranges; the Rhino firmware's fixed-point units (magnitude/saturation **0..4096**, coefficient/offset **−4096..4096**) are the *device* boundary only. Do **not** write, store, or return device-unit values anywhere in application code (MixIns, aircraft classes, effect helpers) — compute in normalized space and let the setters do the one and only ×4096 conversion.
+
+Normalized ranges by quantity:
+- `magnitude`, `saturation` — **0.0..1.0** (0 = none, 1.0 = full scale)
+- `coefficient`, `offset` — **−1.0..1.0** (signed, 0 = neutral)
+
+The type-sniffing setters perform the conversion at the final boundary:
 
 - `FFBReport_SetCondition.set_coefficient()` / `.set_offset()` / `.set_saturation()` — a `float` argument is scaled by 4096 (rounded, clamped) internally; an `int` is passed through as device units.
 - `HapticEffect._conditional_effect` (damper/inertia/friction) and `HapticEffect.detent` — same sniffing via the `_to_device_units()` helper.
 - `cpOffset` is a raw `c_int16` field with **no** sniffing — a raw write needs explicit conversion (`to_device_units()` from `telemffb.utils.conversions`). Prefer `spring.set_offset(value)` over a raw `cpOffset =` assignment.
 
-**Never** pre-scale a value before calling a setter: passing a device-unit float (e.g. `2048.0`) to `set_offset()` would be scaled again and clamped to 4096. If a value is already in device units, pass it as an `int`.
+**Never** pre-scale a value before calling a setter: passing a device-unit float (e.g. `2048.0`) to `set_offset()` would be scaled again and clamped to 4096. If a value is already in device units, pass it as an `int`. When in doubt, pass a normalized `float` — it is the convention, and the setters accept it.
 
 `G.effects` is a `Dispenser` — accessing `G.effects["name"]` lazily creates the effect on first use, then returns the cached instance. Effect names must be unique within an aircraft instance.
 
@@ -221,7 +246,7 @@ This rule may only be broken to avoid circular imports — and even then, the ci
 | `telemffb/hw/ffb_sdl.py` | **DEPRECATED** SDL haptic backend (kept for posterity) |
 | `telemffb/xmlutils.py` | Legacy facade over `telemffb/xml/` (module-global API, one-way sync) |
 | `telemffb/xml/` (`store.py`, `read.py`, `write.py`, `merge.py`) | XML I/O, per-file locking, parsing, settings resolution |
-| `telemffb/utils/` | Utility package — star-import façade (`__init__.py`), flat modules: `_math` (math/scaling/filters), `filesystem` (paths/zip/process), `device` (roles/identity/USB), `settings` (`SystemSettings`/registry/legacy migration), `_logging` (ANSI/OutLog/early-log/DedupHandler/LoggingFilter), `network` (HTTP/support bundle/version check), `integration` (IL-2/DCS/X-Plane/VPconf), `misc` (Dispenser, `EffectTranslator.effect_dict`, threads, Teleplot); plus class files `Vector`, `SharedMemReader`, `TransformExpr`, `TurbulenceModulator`, `AxisJitter`, `conversions`. `_math`/`_logging` are underscored (old monolith star-exported stdlib names of the same shape). |
+| `telemffb/utils/` | Utility package — star-import façade (`__init__.py`), flat modules: `_math` (math/scaling/filters), `filesystem` (paths/zip/process), `device` (roles/identity/USB), `settings` (`SystemSettings`/registry/legacy migration), `_logging` (ANSI/OutLog/early-log/DedupHandler/LoggingFilter), `network` (HTTP/support bundle/version check), `integration` (IL-2/DCS/X-Plane/VPconf), `misc` (Dispenser, `EffectTranslator.effect_dict`, threads, Teleplot); plus own-path modules `Vector`, `SharedMemReader`, `TransformExpr`, `TurbulenceModulator`, `AxisJitter`, `conversions`, `msfs_panel_install` (MSFS panel installer), `winpaths` (Windows shell-folder paths). `_math`/`_logging` are underscored (old monolith star-exported stdlib names of the same shape). |
 | `telemffb/telem/TelemManager.py` | Telemetry routing, aircraft instantiation, sim exit detection |
 | `telemffb/telem/SimTelemListener.py` | SimListenerManager + per-sim listener classes |
 | `telemffb/sim/aircraft_base.py` | MixIn composition + base aircraft behavior |
@@ -235,8 +260,11 @@ This rule may only be broken to avoid circular imports — and even then, the ci
 | `telemffb/sim/msfs_xp/MsfsXpFlightControlsMixIn.py` | Non-FBW stick forces |
 | `telemffb/SettingsManager.py` | XML config manager, profiles, offline mode |
 | `telemffb/IPCNetworkThread.py` | UDP IPC between master/child instances |
-| `telemffb/MainWindow.py` | Main PyQt6 window, settings layout, status indicators |
-| `telemffb/ExceptionTracker.py` | Error capture, logging handler, viewer dialog |
+| `telemffb/MainWindow.py` | Main PyQt6 window (stays at root); hosts the settings UI and status indicators |
+| `telemffb/ui/` | All Qt code: `generated/` (pyuic output — never hand-edit; regenerate with the `SM/` scripts), `dialogs/` (19 dialogs), `panels/` (4), `widgets/` (`SettingsLayout`, `LogWindow`, `LogTailWindow`, `FrameTimeWidget`, `custom_widgets`) |
+| `telemffb/tap/` | DirectInput telemetry tap: `tap_config` (read/amend `dinput8.ini`), `tap_install` (sim discovery/install), `tap_reconcile` (keep the ini in step with the configured devices) |
+| `telemffb/preview/` | Effect preview: `engine` (spec catalog + runner) and `controller` (settings-window integration) |
+| `telemffb/ExceptionTracker.py` | Error capture, logging handler, reporting API (Qt viewer dialog: `ui/dialogs/ExceptionViewerDialog.py`) |
 | `telemffb/namedmutex.py` | Win32 named mutex (ctypes) |
 | `telemffb/CmdLineArgs.py` | CLI argument parser |
 | `styles.py` | Light/dark mode QSS stylesheets |
@@ -249,7 +277,7 @@ Line counts are large (`xmlutils.py` ~950, `ffb_rhino.py` ~1800) — search with
 
 1. **Adding new effects**: Create a MixIn in `telemffb/sim/base/` (generic) or `telemffb/sim/msfs_xp/` (sim-specific). Inherit from `AircraftEffectUtilsBase`. Add to `AircraftBase`'s MRO or the aircraft subclass. Use `@override`. Call `super()` in each hook. Register the effect name in `effect_dict` (`telemffb/utils/misc.py`).
 2. **New aircraft type**: Follow `docs/adding_an_aircraft_class.md` — one class per file under `msfs_xp/` (MSFS/X-Plane) or inline in the DCS/IL-2 module; register in `defaults.xml`; MSFS/X-Plane-only: telemetry remapping via `<sc_overrides>`.
-3. **UI changes**: PyQt6 components in `telemffb/*.py` (MainWindow, dialogs). Use existing QSS from `styles.py`, Fusion style conventions. All GUI updates from non-main threads via `utils.schedule_on_main_thread()`.
+3. **UI changes**: Qt code lives in `telemffb/ui/` — new files go into `dialogs/`, `panels/`, or `widgets/` (never the package root); `MainWindow.py` itself stays at root. `ui/generated/` is pyuic output — never hand-edit it, regenerate from the `.ui` sources with the `SM/` scripts. Use existing QSS from `styles.py`, Fusion style conventions. All GUI updates from non-main threads via `utils.schedule_on_main_thread()`.
 4. **Config changes**: See `docs/defaults_xml_reference.md`. Update `defaults.xml` (new default values) and ensure the read path in `telemffb/xml/` handles the new keys. New enum settings go into `SettingsManager`'s class-level dicts. Writes go through the store's locked write path, then `update_roots()`.
 5. **Testing new features**: Add tests to `tests/`. Use `BaseTelemetryEffectTestCase` from `tests/framework/base.py`. Mark with the appropriate pytest markers. Run `pytest` before committing.
 6. **New telemetry fields**: Add a typed attribute + docstring (sims, source, units) to `BaseTelemetryData`; populate in the sim-specific listener/parser.
@@ -294,6 +322,7 @@ effect.stop()  # Frees device resource
 11. **`ffb_sdl.py` is deprecated** — do not use, kept for historical reference only
 12. **Never `assert` on runtime state in production paths** (device liveness included) — asserts are stripped under `python -O` and would silently kill the calling thread; use explicit checks instead
 13. **Never dereference `HapticEffect.device` raw in the telemetry hot path** — a hot-unplug mid-frame raises `AttributeError` and kills the processing loop. Guard with `self._device_feeding()` first, or use the `_get_device_*()` helpers which return safe defaults. See Coding Guidelines → Device Input Access
+14. **Never store or pass device-unit (0..4096 / −4096..4096) effect values in application code** — work in normalized units (magnitude/saturation `0.0..1.0`, coefficient/offset `−1.0..1.0`) and let the type-sniffing setters perform the single ×4096 conversion at the device boundary. Pre-scaling a `float` before a setter double-scales it and clamps to 4096. See Coding Guidelines → Effects & HID Values
 
 ---
 

@@ -6,7 +6,7 @@ conditional visibility rules. It also contains aircraft-model-specific default o
 SimConnect variable mappings.
 
 The file is consumed primarily by `telemffb/xmlutils.py`. The UI is built from the resolved
-setting dicts by `telemffb/SettingsLayout.py`. Enum option lists referenced in the file are
+setting dicts by `telemffb/ui/widgets/SettingsLayout.py`. Enum option lists referenced in the file are
 defined as class-level dicts in `telemffb/SettingsManager.py`.
 
 > **Recommended editor:** Due to the file's repetitive structure and large size, it is best
@@ -658,7 +658,7 @@ debug_only = true
 
 - `debug_only=true` — the entry is dropped entirely while parsing `defaults.xml`
   (`read_xml_file()` in `xmlutils.py`) unless `G.system_settings.get('debug', False)` is true.
-  When debug mode is off, the setting never reaches `SettingsLayout.py` — it behaves as if it
+  When debug mode is off, the setting never reaches `telemffb/ui/widgets/SettingsLayout.py` — it behaves as if it
   doesn't exist in the XML at all, rather than being shown disabled.
 - Omitted (or anything other than `true`) — the setting is evaluated normally, with no
   dependency on debug mode.
