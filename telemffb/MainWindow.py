@@ -35,9 +35,9 @@ from typing import override
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
-                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut, QFontDatabase, QFont)
+                         QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase, QFont)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
-                             QComboBox, QFrame, QGridLayout, QGroupBox,
+                             QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget, QSizePolicy, QSystemTrayIcon, QMenu,
@@ -55,6 +55,7 @@ from telemffb.ui.widgets.custom_widgets import ClickLogo, InstanceStatusRow, NoK
     SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, MiniDevicePanel, device_status_state
 from telemffb.ui.panels.PromptStack import PromptStack
+from telemffb.ui.panels.OfflineEditorPanel import OfflineEditorPanel
 from telemffb.state.app_state import Notice, NEW_CRAFT_PRIORITY, PROFILE_CHANGE_PRIORITY, TRIM_CAL_PRIORITY
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
@@ -121,7 +122,6 @@ class MainWindow(QMainWindow):
         self._version_check_resolved = False
         self._version_check_dialog = None
         self.profile_mgr_dialog = None
-        self.all_offline_models = []
 
 
         """ Add font used for settngs area group labels """
@@ -581,180 +581,14 @@ class MainWindow(QMainWindow):
         right_column_layout.addWidget(self.prompt_stack)
 
 
-        """ Create offline config control area QWidget """
+        """ Create the offline editor panel (sim/class/aircraft/profile
+        selectors used to edit config without a live sim connected) and add
+        it to the right column.  See telemffb/ui/panels/OfflineEditorPanel.py
+        - the panel starts hidden and is shown/hidden by toggle_offline_mode
+        below. """
 
-        self.offline_config_area = QWidget()
-        self.offline_config_area.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
-        offline_config_layout = QVBoxLayout()  # vertical layout to hold both rows
-        # No default top margin, so the Offline Editor Setup frame's top
-        # edge lines up with the Active Devices frame beside it.
-        offline_config_layout.setContentsMargins(0, 0, 0, 0)
-
-
-        # First row layout (existing widgets)
-        # --- Create the Offline Editor GroupBox ---
-        self.offline_groupbox = QGroupBox("Offline Editor Setup")
-        self.offline_groupbox.setStyleSheet("""
-            QGroupBox {
-            
-                font-weight: bold;
-                border: 1px solid gray;
-                border-radius: 5px;
-                margin-top: 6px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 3px 0 3px;
-            }
-        """)
-
-        offline_layout = QVBoxLayout(self.offline_groupbox)
-        offline_layout.setContentsMargins(10, 18, 10, 10)
-        offline_layout.setSpacing(10)
-
-
-        """ Create Offline controls layout """
-
-        offline_grid_layout = QGridLayout()
-
-        # --- Labels ---
-        offline_sim_lbl = QLabel('Sim:')
-        offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        offline_class_lbl = QLabel('Class:')
-        offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        offline_name_lbl = QLabel('Aircraft Name:')
-        offline_name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        offline_profile_lbl = QLabel('Profile:')
-        offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        # Create filter box
-        self.offline_name_filter = QLineEdit()
-        self.offline_name_filter.setPlaceholderText("Filter")
-        self.offline_name_filter.setEnabled(False)
-        self.offline_name_filter.textChanged.connect(self.filter_offline_name_list)
-
-        """ Add label widgets to layout """
-
-        offline_grid_layout.addWidget(offline_sim_lbl, 0, 0)
-        offline_grid_layout.addWidget(offline_class_lbl, 0, 1)
-        offline_grid_layout.addWidget(offline_name_lbl, 0, 2)
-        offline_grid_layout.addWidget(self.offline_name_filter, 0, 3)
-        offline_grid_layout.addWidget(offline_profile_lbl, 0, 4)
-
-
-        """ Create Offline controls combo boxes """
-
-        # --- ComboBoxes ---
-        self.offline_sim = QComboBox()
-        self.offline_sim.addItems([''] + xmlutils.get_sims())
-        self.offline_sim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_sim.setMinimumContentsLength(10)
-        self.offline_sim.setEditable(False)
-        self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
-
-        self.offline_class = QComboBox()
-        self.offline_class.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_class.setMinimumContentsLength(15)
-        self.offline_class.setEditable(False)
-        self.offline_class.currentTextChanged.connect(self.offline_class_changed)
-
-        self.offline_name = QComboBox()
-        self.offline_name.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_name.setMinimumContentsLength(20)
-        self.offline_name.setEditable(False)
-        self.offline_name.currentTextChanged.connect(self.offline_aircraft_changed)
-
-        self.offline_profile = QComboBox()
-        self.offline_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_profile.setMinimumContentsLength(15)
-        self.offline_profile.setEditable(False)
-        self.offline_profile.currentTextChanged.connect(self.offline_profile_changed)
-
-
-        """ Add offline combo box controls to layout """
-
-        offline_grid_layout.addWidget(self.offline_sim, 1, 0)
-        offline_grid_layout.addWidget(self.offline_class, 1, 1)
-        offline_grid_layout.addWidget(self.offline_name, 1, 2, 1, 2)
-        offline_grid_layout.addWidget(self.offline_profile, 1, 4)
-
-        # --- Column stretch ratios (1:2:4:2) ---
-        offline_grid_layout.setColumnStretch(0, 1)
-        offline_grid_layout.setColumnStretch(1, 2)
-        offline_grid_layout.setColumnStretch(2, 4)
-        offline_grid_layout.setColumnStretch(4, 2)
-
-        offline_layout.addLayout(offline_grid_layout)
-
-
-        """ Add layout for labels/buttons on bottom row of offline config area """
-
-        bottom_row = QHBoxLayout()
-
-
-        """ Create offline scope label """
-
-        offline_scope = QLabel("<b>Offline Scope:   </b>")
-        self.offline_scope_label = QLabel('None')
-
-
-        """
-        Create 'back to profile manager' button.  Only shows when edit is
-        activated via profile manager
-        """
-
-        self.back_to_profile_mgr_button = QPushButton('Back to Profile Manager')
-        self.back_to_profile_mgr_button.setVisible(False)
-        self.back_to_profile_mgr_button.clicked.connect(self.back_to_profile_mgr)
-
-
-        """ Create offline mode exit button """
-
-        self.exit_offline_button = QPushButton()
-        self.exit_offline_button.setText('Exit Offline Mode')
-        self.exit_offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
-
-
-        """ Add labels/buttons to bottom row layout """
-
-        bottom_row.addWidget(offline_scope, alignment=Qt.AlignmentFlag.AlignLeft)
-        bottom_row.addWidget(self.offline_scope_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        bottom_row.addStretch()
-        bottom_row.addWidget(self.back_to_profile_mgr_button, alignment=Qt.AlignmentFlag.AlignRight)
-        bottom_row.addWidget(self.exit_offline_button, alignment=Qt.AlignmentFlag.AlignRight)
-
-
-        """ Add bottom row to layout """
-
-        offline_layout.addLayout(bottom_row)
-
-
-        """ Add items to layout """
-
-        offline_config_layout.addWidget(self.offline_groupbox)
-        offline_config_layout.addLayout(offline_grid_layout)
-        offline_config_layout.addLayout(bottom_row)
-
-
-        """ Add layout to QWidget """
-
-        self.offline_config_area.setLayout(offline_config_layout)
-
-
-        """ Hide Offline config area (gets shown when it is enabled) """
-
-        self.offline_config_area.hide()
-
-
-        """ Add offline panel to the right column """
-
-        right_column_layout.addWidget(self.offline_config_area)
+        self.offline_editor = OfflineEditorPanel(parent=self, mainwindow=self)
+        right_column_layout.addWidget(self.offline_editor)
 
 
         """ Create tab widget where monitor/settings/hide will live """
@@ -1872,50 +1706,12 @@ class MainWindow(QMainWindow):
         self.status_container.request_set_active_vpconf.emit(vpconf, any_vpconf)
         self.status_container.request_set_active_configurator.emit(ovd, any_ovd)
 
-    def resize_offline_combos(self):
-        """
-            Dynamically resizes the minimum width of all offline mode combo boxes
-            based on the widest item in each. Adds 50 pixels padding to ensure space.
-
-            This ensures no items are truncated in display and helps with layout alignment.
-            """
-        for combo in [self.offline_sim, self.offline_class, self.offline_name, self.offline_profile]:
-            metrics = QFontMetrics(combo.font())
-            max_width = 0
-
-            for i in range(combo.count()):
-                text = combo.itemText(i)
-                width = metrics.horizontalAdvance(text)
-                max_width = max(max_width, width)
-
-            # Add 2 pixels for spacing and set minimum width
-            combo.setMinimumWidth(max_width + 50)
-
-        self.settings_layout.reload_caller()
-
     def show_profile_manager(self):
         xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
         self.profile_mgr_dialog = ProfileManagerDialog(self)
         self.profile_mgr_dialog.raise_()
         self.profile_mgr_dialog.activateWindow()
         self.profile_mgr_dialog.show()
-
-    def exit_offline_mode(self):
-        self.toggle_offline_mode(False)
-        if self.profile_mgr_dialog:
-            self.profile_mgr_dialog.close()
-
-
-    def back_to_profile_mgr(self):
-        self.back_to_profile_mgr_button.setVisible(False)
-        try:
-            # in case it somehow got closed
-            self.profile_mgr_dialog.show()
-        except:
-            QMessageBox.warning(self, "Profile Manager", "IDK WHY THIS ERROR HAPPENED")
-            pass
-        self.toggle_offline_mode(False)
-
 
     @pyqtSlot(bool)
     def toggle_offline_mode(self, state, broadcast=True):
@@ -1952,31 +1748,15 @@ class MainWindow(QMainWindow):
             self._profile_notes_shown = None
             self.status_container.set_notes_state(False)
 
-            # Block signals so we don't trigger text change on .clear() calls
-            self.offline_name.blockSignals(True)
-            self.offline_class.blockSignals(True)
-            self.offline_name.blockSignals(True)
-
-            # clear contents of combo boxes so they can be repopulated
-            self.offline_name.clear()
-            self.offline_class.clear()
-            self.offline_sim.clear()
-
-            # unblock signals
-            self.offline_name.blockSignals(False)
-            self.offline_class.blockSignals(False)
-            self.offline_name.blockSignals(False)
-
-            # build sim list
-            sims = [''] + xmlutils.get_sims()
-            self.offline_sim.addItems(sims)
+            # Clear/repopulate the offline editor's combo boxes.
+            self.offline_editor.reset_for_entry()
 
             # force the settings tab to be active
             self.tab_widget.setCurrentIndex(1)
 
         if G.master_instance:
             # Show the offline mode widgets, but only for master instance
-            self.offline_config_area.setVisible(state)
+            self.offline_editor.setVisible(state)
 
             # Send command to child instances to replicate actions
             if broadcast:
@@ -1984,211 +1764,10 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str, str, str, str)
     def load_single_offline_model(self, sim, cls, model, profile, from_profile_manager=True):
-
-        # Not broadcast: SHOW_OFFLINE_MODEL at the end of this method has each child
-        # run this same method, which takes it offline and applies the selection in
-        # one step.  An earlier TOGGLE OFFLINE would leave the children offline with
-        # nothing selected for as long as the combos below take to fill.
-        self.toggle_offline_mode(True, broadcast=False)
-        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
-            cb.blockSignals(True)
-            cb.clear()
-            cb.addItem('')
-
-        sim_list = xmlutils.get_sims()
-        for s in sim_list:
-            self.offline_sim.addItem(s)
-        self.offline_sim.setCurrentText(sim)
-
-        cls_list = xmlutils.get_classes_for_sim(sim)
-        for c in cls_list:
-            self.offline_class.addItem(c)
-        self.offline_class.setCurrentText(cls)
-
-        model_list = xmlutils.read_models(sim, cls)
-        self.all_offline_models = model_list
-        self.filter_offline_name_list(self.offline_name_filter.text())
-        self.offline_name.setCurrentText(model)
-
-        profile_list = xmlutils.get_available_profiles(sim, cls, model)
-        self.offline_profile.clear()
-        for p in profile_list:
-            if p != 'Built-In':
-                self.offline_profile.addItem(p)
-        if not self.offline_profile.count() and model:
-            # Built-In cannot be edited: with no user profile the editor works on
-            # Auto User, which the first change creates (as offline_aircraft_changed)
-            self.offline_profile.addItem('Auto User')
-        self.offline_profile.setCurrentText(profile)
-        self.offline_profile_changed(self.offline_profile.currentText())
-
-        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
-            cb.blockSignals(False)
-
-        if model:
-            G.settings_mgr.offline_scope = 'MODEL'
-        else:
-            # an aircraft with class-level settings only: edit those
-            G.settings_mgr.offline_scope = 'CLASS'
-            self.offline_scope_label.setText(f"Editing Class Defaults ({cls})")
-
-        self.force_sim_aircraft()
-        if G.master_instance:
-            self.back_to_profile_mgr_button.setVisible(from_profile_manager)
-            args = [sim, cls, model, profile]
-            G.ipc_instance.send_broadcast_message(f"SHOW_OFFLINE_MODEL:{json.dumps(args)} ")
-            self.resize_offline_combos()
-
-
-
-    def update_offline_labeling(self):
-        pass
-
-    def offline_sim_changed(self, sim=None):
-        """
-            Triggered when the offline 'Sim' combo box changes.
-
-            Updates all related combo boxes (class, aircraft, profile),
-            sets the configuration scope, and broadcasts the change
-            if in master mode.
-
-            Args:
-                sim (str, optional): The selected simulation name. If None or empty,
-                                     resets the offline editing UI.
-            """
-        self.offline_name.blockSignals(True)
-        self.offline_name_filter.blockSignals(True)
-        self.offline_class.blockSignals(True)
-        self.offline_name.clear()
-        self.offline_name_filter.clear()
-        self.offline_class.clear()
-        self.offline_name.blockSignals(False)
-        self.offline_name_filter.blockSignals(False)
-        self.offline_class.blockSignals(False)
-        if sim is None or sim == '':
-            # if sim combobox is cleared, reset everything and clear the layout
-            self.offline_class.clear()  # clear class field
-            self.offline_name.clear()
-            self.offline_profile.clear()
-            self.settings_layout.clear_layout()
-            self.offline_scope_label.setText(f"None")
-            self.offline_name_filter.setEnabled(False)
-            return
-        self.offline_name_filter.setEnabled(True)
-        self.offline_class.clear()  #clear class field
-        self.offline_class.addItem('')
-        self.offline_name.clear()
-        #self.offline_name.setMaximumWidth(200)
-        self.offline_profile.clear()
-        classes = xmlutils.get_classes_for_sim(sim)  # get classes based on chosen sim
-
-        for class_name in classes:
-            self.offline_class.addItem(class_name)  #populate class combobox based on results
-
-        self.offline_name.clear()  #clear aircraft selection combobox
-
-        model_list = xmlutils.read_models(sim)
-        self.all_offline_models = model_list
-        self.filter_offline_name_list(self.offline_name_filter.text())
-
-        if G.master_instance:
-            # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.offline_sim.currentText()}")
-
-        G.settings_mgr.offline_scope = 'SIM'  # set config scope to SIM
-        self.offline_scope_label.setText(f"Editing SIM Defaults ({sim})")
-
-        self.resize_offline_combos()
-        self.force_sim_aircraft() # load settings based on sim
-
-    def offline_class_changed(self, class_name):
-        self.offline_name_filter.blockSignals(True)
-        self.offline_name_filter.clear()
-        self.offline_name_filter.blockSignals(False)
-        model_list = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
-        self.all_offline_models = model_list
-        self.offline_name.clear()  # clear the aircraft selection combobox
-        self.offline_profile.clear()
-        self.filter_offline_name_list(self.offline_name_filter.text())
-
-        if G.master_instance:
-            # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"OFFLINE_CLASS:{self.offline_class.currentText()}")
-        if class_name == '':
-            # reset back to sim mode if class field is cleared
-            self.offline_sim_changed(self.offline_sim.currentText())
-        else:
-            G.settings_mgr.offline_scope = 'CLASS' # set config scope to CLASS
-            self.offline_scope_label.setText(f"Editing Class Defaults ({class_name})")
-
-        self.resize_offline_combos()
-        self.force_sim_aircraft() # load settings based on class and currently selected sim
-
-    def offline_aircraft_changed(self, ac_name=None):
-        cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.offline_sim.currentText()) # get class based on selected aircraft
-        profiles = xmlutils.get_available_profiles(self.offline_sim.currentText(), self.offline_class.currentText(), ac_name)
-        self.offline_profile.setEnabled(True)
-        self.offline_profile.clear()
-
-        for profile_name in profiles:
-            if profile_name != 'Built-In':
-                self.offline_profile.addItem(profile_name)
-
-        if not self.offline_profile.count() and ac_name:
-            self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
-            xmlutils.update_active_profile_entry(sim=self.offline_sim.currentText(), cls=cls, model=ac_name, new_profile="Auto User")
-        self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
-        self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
-        self.offline_class.blockSignals(False)  # unblock signals
-
-        if ac_name == '':
-            self.offline_class_changed(self.offline_class.currentText())
-        else:
-            G.settings_mgr.offline_scope = 'MODEL'
-            self.offline_scope_label.setText(f"Editing Aircraft ({ac_name} - {self.offline_profile.currentText()})")
-
-        if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
-
-        self.resize_offline_combos()
-        self.force_sim_aircraft()
-
-    def offline_profile_changed(self, profile):
-        # self.update_craft_text_block(profile=profile)
-        if not profile:
-            return
-        G.settings_mgr.offline_scope = 'MODEL'
-        self.resize_offline_combos()
-        self.force_sim_aircraft()
-        if G.master_instance:
-            # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"OFFLINE_PROFILE:{profile}")
-        self.offline_scope_label.setText(f"Editing Aircraft ({self.offline_name.currentText()} - {profile})")
-
-    def filter_offline_name_list(self, text):
-        self.offline_name.blockSignals(True)
-        self.offline_name.clear()
-        self.offline_profile.blockSignals(True)
-        self.offline_profile.clear()
-        self.offline_name.addItems([''])
-        filtered = [name for name in self.all_offline_models if name and text.lower() in name.lower()]
-        self.offline_name.addItems(filtered)
-        if len(filtered) == 1:
-            self.offline_name.setCurrentIndex(1)
-            # Manually trigger the downstream handler
-            self.offline_aircraft_changed(filtered[0])
-        self.offline_name.blockSignals(False)
-        self.offline_profile.blockSignals(False)
-
-    def force_sim_aircraft(self):
-        G.settings_mgr.current_sim = self.offline_sim.currentText()
-        G.settings_mgr.current_class = self.offline_class.currentText()
-        G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
-        G.settings_mgr.active_profile = self.offline_profile.currentText()
-        self.settings_layout.reload_caller()
-        # reload_caller resolves current_pattern; refresh the notes button for
-        # the newly selected offline scope (no telemetry loop runs it here)
-        self.refresh_profile_notes_button()
+        """Thin passthrough kept on MainWindow: IPCNetworkThread.show_offline_model_signal
+        and ProfileManagerDialog both call this by name.  See
+        telemffb.ui.panels.OfflineEditorPanel.load_single_offline_model."""
+        self.offline_editor.load_single_offline_model(sim, cls, model, profile, from_profile_manager)
 
 
     def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None, clone_from=None):

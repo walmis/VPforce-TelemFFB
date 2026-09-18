@@ -1305,10 +1305,10 @@ def _setup_ipc_and_connections():
     # master saved a new device selection for this instance's role: switch live
     G.ipc_instance.reacquire_device_signal.connect(switch_to_device)
     G.ipc_instance.toggle_offline_mode_signal.connect(G.main_window.toggle_offline_mode)
-    G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_sim.setCurrentText)
-    G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_class.setCurrentText)
-    G.ipc_instance.set_offline_ac_signal.connect(G.main_window.offline_name.setCurrentText)
-    G.ipc_instance.set_offline_profile_signal.connect(G.main_window.offline_profile.setCurrentText)
+    G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_editor.mirror_sim)
+    G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_editor.mirror_class)
+    G.ipc_instance.set_offline_ac_signal.connect(G.main_window.offline_editor.mirror_aircraft)
+    G.ipc_instance.set_offline_profile_signal.connect(G.main_window.offline_editor.mirror_profile)
     G.ipc_instance.show_offline_model_signal.connect(G.main_window.load_single_offline_model)
     # effect preview on a child's device: children run it, the master is told
     G.ipc_instance.preview_signal.connect(G.main_window.preview.start_child)
