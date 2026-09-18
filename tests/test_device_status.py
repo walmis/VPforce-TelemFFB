@@ -45,7 +45,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
 
-from telemffb.DevicePanel import DeviceIconPanel, device_status_state
+from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
 
 
 @pytest.fixture(scope="module")

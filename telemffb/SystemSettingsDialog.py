@@ -35,9 +35,9 @@ from . import msfs_panel_install
 from . import utils
 from .app_events import events as app_events
 from .ui.generated.Ui_SystemDialog import Ui_SystemDialog
-from .TapStatusPanel import TapStatusPanel
+from .ui.panels.TapStatusPanel import TapStatusPanel
 from .tap_install import SIMS_BY_KEY, matches_signature, sim_status
-from .InstanceSettingsPanel import (
+from .ui.panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 from .utils import (
@@ -239,7 +239,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # bind_to() re-creates every legacy widget name (cb_select_j,
         # rb_master_p, ...) as dialog attributes so the rest of this file -
         # and the test harness - work unchanged.
-        from .DeviceCardsPanel import DeviceCardsPanel
+        from .ui.panels.DeviceCardsPanel import DeviceCardsPanel
         self.device_cards = DeviceCardsPanel(self)
         self.deviceCardsHostLayout.addWidget(self.device_cards)
         self.device_cards.bind_to(self)

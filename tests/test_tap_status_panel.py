@@ -17,7 +17,7 @@ from PyQt6 import QtWidgets
 
 from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
                                   TargetStatus, WrapperState)
-from telemffb.TapStatusPanel import TapStatusPanel
+from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
 
 pytestmark = [pytest.mark.unit]
 
@@ -306,7 +306,7 @@ class TestButtons:
     def test_acting_asks_the_dialog_to_rescan(self, app, monkeypatch):
         """The panel reports what it did; the truth comes from re-reading
         the folders."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)))
         monkeypatch.setattr(module, 'ask_for_devices', lambda *a, **k: ([], [], [], []))
         monkeypatch.setattr(module, 'install', lambda s, config=None, overwrite_foreign=False: [])
@@ -318,7 +318,7 @@ class TestButtons:
     def test_a_partial_failure_names_what_did_work(self, app, monkeypatch):
         """With two targets one can succeed while a running game locks the
         other; "failed" alone would hide that half the job is done."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         from telemffb.tap_install import TargetOutcome
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT),
                                       target("bin-mt", WrapperState.ABSENT)))
@@ -340,7 +340,7 @@ class TestButtons:
     def test_success_says_nothing(self, app, monkeypatch):
         """The panel redraws to show the new state; a dialog on top of that
         is noise."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         from telemffb.tap_install import TargetOutcome
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)))
         monkeypatch.setattr(module, 'ask_for_devices', lambda *a, **k: ([], [], [], []))
@@ -360,7 +360,7 @@ class TestAskingBeforeWriting:
         return {b.text(): b for b in panel.findChildren(QtWidgets.QPushButton)}
 
     def test_a_sim_with_no_config_is_asked_about(self, app, monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)))
         asked, written = [], []
         monkeypatch.setattr(module, 'ask_for_devices',
@@ -373,7 +373,7 @@ class TestAskingBeforeWriting:
     def test_an_existing_config_is_left_alone_without_asking(self, app,
                                                              monkeypatch):
         """Reinstalling the wrapper is not a request to rewrite the rules."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(
             target("bin", WrapperState.TAP, has_config=True)))
         asked, written = [], []
@@ -387,7 +387,7 @@ class TestAskingBeforeWriting:
     def test_cancelling_installs_nothing_at_all(self, app, monkeypatch):
         """Backing out of the question backs out of the install - not an
         install with no rules, which looks identical and behaves differently."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)))
         ran = []
         monkeypatch.setattr(module, 'ask_for_devices', lambda *a, **k: None)
@@ -415,7 +415,7 @@ class TestConfiguringSeparately:
 
     def test_an_existing_config_is_amended_rather_than_replaced(self, app,
                                                                 monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         from telemffb.tap_install import TapDevice
         panel = TapStatusPanel(status(
             target("bin", WrapperState.TAP, has_config=True)))
@@ -433,7 +433,7 @@ class TestConfiguringSeparately:
         assert "FFFF:2054=tap" in written[0]
 
     def test_cancelling_writes_nothing(self, app, monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(
             target("bin", WrapperState.TAP, has_config=True)))
         written = []
@@ -464,7 +464,7 @@ class TestOverwritingSomebodyElsesDll:
                 done.append(overwrite_foreign) or [])
 
     def test_the_user_is_asked_first(self, app, monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(target("bin", WrapperState.FOREIGN)))
         calls, done = [], []
         self._stub(monkeypatch, module, True, calls, done)
@@ -472,7 +472,7 @@ class TestOverwritingSomebodyElsesDll:
         assert calls and done == [True]
 
     def test_declining_installs_nothing(self, app, monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(target("bin", WrapperState.FOREIGN)))
         calls, done = [], []
         self._stub(monkeypatch, module, False, calls, done)
@@ -481,7 +481,7 @@ class TestOverwritingSomebodyElsesDll:
 
     def test_the_directory_is_named_so_they_know_what_is_at_risk(self, app,
                                                                  monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(target("bin", WrapperState.FOREIGN)))
         calls, done = [], []
         self._stub(monkeypatch, module, True, calls, done)
@@ -492,7 +492,7 @@ class TestOverwritingSomebodyElsesDll:
                                                              monkeypatch):
         """A question with an obvious answer trains people to click through
         the ones that matter."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)))
         calls, done = [], []
         self._stub(monkeypatch, module, True, calls, done)
@@ -527,7 +527,7 @@ class TestItAsksAboutTheDeviceOnScreen:
 
     def test_the_unsaved_selection_is_what_gets_asked_about(self, app,
                                                             monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         from telemffb.tap_install import TapDevice
 
         selected = [TapDevice("joystick", 0xFFFF, 0x2054, "Monster")]
@@ -615,7 +615,7 @@ class TestConfiguringTwoFilesAtOnce:
 
     def test_each_file_is_written_from_its_own_contents(self, app,
                                                         monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         from telemffb.tap_install import TapDevice
         rhino = TapDevice("joystick", 0xFFFF, 0x2054, "Rhino")
         written = self.wire(monkeypatch, module, ([rhino], [], [], []))
@@ -630,7 +630,7 @@ class TestConfiguringTwoFilesAtOnce:
     def test_a_retirement_is_applied_by_name_not_by_line(self, app,
                                                          monkeypatch):
         """Line numbers only mean anything in the file they came from."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         from telemffb.tap_config import read
         from telemffb.tap_install import TapDevice
         new = TapDevice("joystick", 0x045E, 0x001B, "SideWinder")
@@ -658,7 +658,7 @@ class TestLegacyWrapperOnThePanel:
         assert any("Install upgrades it in place" in t for t in text)
 
     def _prompts(self, monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         calls = []
         monkeypatch.setattr(module, 'confirm_legacy_upgrade',
                             lambda *a, **k: calls.append('legacy') or False)
@@ -802,7 +802,7 @@ class TestFixOnlyInstall:
     def test_a_fresh_install_in_fix_mode_asks_nothing_and_taps_nothing(
             self, app, monkeypatch):
         """The mode decides every rule, so there is no device question."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         from telemffb.tap_config import read
         asked, written = [], []
         monkeypatch.setattr(module, 'ask_for_devices',
@@ -822,7 +822,7 @@ class TestFixOnlyInstall:
                                                        monkeypatch):
         """The toggle is intent; the file is fact.  When they differ the
         panel says so rather than letting the toggle imply otherwise."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         monkeypatch.setattr(module, 'installed_mode',
                             lambda status: module.MODE_TAP)
         panel = self._panel(target("bin", WrapperState.TAP, has_config=True),
@@ -832,7 +832,7 @@ class TestFixOnlyInstall:
         assert "Configure Devices" in line[0]
 
     def test_no_such_line_when_they_agree(self, app, monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         monkeypatch.setattr(module, 'installed_mode',
                             lambda status: module.MODE_FIX_ONLY)
         panel = self._panel(target("bin", WrapperState.TAP, has_config=True),
@@ -842,7 +842,7 @@ class TestFixOnlyInstall:
     def test_that_case_still_says_what_is_installed(self, app, monkeypatch):
         """Silent about rewriting, not silent about the state: the line
         points at Configure Devices instead of Reinstall."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         monkeypatch.setattr(module, 'installed_mode',
                             lambda status: module.MODE_FIX_ONLY)
         panel = self._panel(target("bin", WrapperState.TAP, has_config=True),
@@ -873,7 +873,7 @@ class TestFixOnlyIsRefusedForADirectInputStick:
 
     @pytest.fixture
     def refusals(self, monkeypatch):
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         seen = []
         monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
                             staticmethod(lambda *a, **k: seen.append(a[2])))
@@ -925,7 +925,7 @@ class TestFixOnlyIsRefusedForADirectInputStick:
     def test_the_tap_is_unaffected(self, app, monkeypatch):
         """Only the mode is refused.  With it off, a DirectInput stick is
         the case the tap exists for."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         seen = []
         monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
                             staticmethod(lambda *a, **k: seen.append(a)))
@@ -938,7 +938,7 @@ class TestFixOnlyIsRefusedForADirectInputStick:
 
     def test_a_natively_driven_stick_is_left_alone(self, app, monkeypatch):
         """VPforce hardware is what the mode is for."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         seen = []
         monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
                             staticmethod(lambda *a, **k: seen.append(a)))
@@ -952,7 +952,7 @@ class TestFixOnlyIsRefusedForADirectInputStick:
     def test_directinput_pedals_do_not_block_it(self, app, monkeypatch):
         """Only the joystick decides.  DCS renders nothing to pedals, so a
         DirectInput pedal set loses nothing the mode was going to give it."""
-        import telemffb.TapStatusPanel as module
+        import telemffb.ui.panels.TapStatusPanel as module
         seen = []
         monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
                             staticmethod(lambda *a, **k: seen.append(a)))

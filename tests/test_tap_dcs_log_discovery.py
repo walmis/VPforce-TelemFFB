@@ -366,7 +366,7 @@ class TestRejectedPath:
     def test_the_panel_flags_it(self, app, tmp_path):
         """Drawn in the attention color rather than as another dim line:
         it is the one thing on the panel the user can act on."""
-        from telemffb.TapStatusPanel import TapStatusPanel
+        from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
         from telemffb.tap_install import SimStatus
 
         nonsense = str(tmp_path / "nonsense")
@@ -381,7 +381,7 @@ class TestRejectedPath:
             "the path itself is reachable, however long it is"
 
     def test_the_panel_says_nothing_when_the_path_works(self, app, tmp_path):
-        from telemffb.TapStatusPanel import TapStatusPanel
+        from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
         from telemffb.tap_install import SimStatus
 
         panel = TapStatusPanel(SimStatus(sim=SIMS_BY_KEY['DCS'], root=None,

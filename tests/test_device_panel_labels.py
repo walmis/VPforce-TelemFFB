@@ -62,7 +62,7 @@ class TestDevicePanelLabel:
 
 class TestWidgetLabelAndFlash:
     def _widget(self, app):
-        from telemffb.DevicePanel import DeviceIconWidget
+        from telemffb.ui.panels.DevicePanel import DeviceIconWidget
         return DeviceIconWidget('joystick', 'no_such_icon.png')
 
     def test_label_set_and_fallback(self, app):
@@ -125,7 +125,7 @@ class TestWidgetLabelAndFlash:
         """The active joystick device's icon choice (stick vs yoke) shows
         on the panel and reports change for the flash."""
         import resources  # noqa: F401  registers :/image/... including the yoke
-        from telemffb.DevicePanel import DeviceIconPanel
+        from telemffb.ui.panels.DevicePanel import DeviceIconPanel
         panel = DeviceIconPanel()
         panel.set_devices(['joystick'])
         assert panel.set_device_icon('joystick', ':/image/icon_yoke.png') is True
@@ -141,7 +141,7 @@ class TestWidgetLabelAndFlash:
         assert device_panel_icon('joystick', FakeSettings()) == ''
 
     def test_panel_reports_label_change(self, app):
-        from telemffb.DevicePanel import DeviceIconPanel
+        from telemffb.ui.panels.DevicePanel import DeviceIconPanel
         panel = DeviceIconPanel()
         panel.set_devices(['joystick'])
         assert panel.set_device_label('joystick', 'Monster') is True

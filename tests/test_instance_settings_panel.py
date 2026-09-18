@@ -16,7 +16,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-from telemffb.InstanceSettingsPanel import (
+from telemffb.ui.panels.InstanceSettingsPanel import (
     ALL_FIELDS, STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 

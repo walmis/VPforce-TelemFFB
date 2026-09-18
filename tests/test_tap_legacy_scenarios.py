@@ -19,12 +19,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-import telemffb.TapStatusPanel as panel_module
+import telemffb.ui.panels.TapStatusPanel as panel_module
 from telemffb import tap_install, tap_reconcile
 from telemffb.tap_config import BOM, already_blocked, amend, read
 from telemffb.tap_install import (SIMS_BY_KEY, TapDevice, WrapperState,
                                   read_configs, sim_status, write_one_config)
-from telemffb.TapStatusPanel import TapStatusPanel
+from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
 
 pytestmark = [pytest.mark.unit]
 

@@ -31,7 +31,7 @@ from PyQt6 import QtWidgets
 
 import telemffb.globals as G
 import telemffb.SystemSettingsDialog as dialog_module
-import telemffb.TapStatusPanel as panel_module
+import telemffb.ui.panels.TapStatusPanel as panel_module
 from telemffb import tap_install
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from telemffb.SystemSettingsDialog import (CLEANUP_CANCELLED, CLEANUP_LEAVE,

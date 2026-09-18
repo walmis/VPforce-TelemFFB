@@ -53,7 +53,7 @@ from telemffb.app_events import events as app_events
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.widgets.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
     SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
-from telemffb.DevicePanel import DeviceIconPanel, device_status_state
+from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
 from telemffb.ExceptionTracker import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor

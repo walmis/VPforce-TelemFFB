@@ -46,7 +46,7 @@ from telemffb.tap_install import (SimStatus, TargetOutcome, TargetStatus,
                                   fix_only_config, generate_config, install,
                                   read_config, write_one_config)
 from telemffb.tap_reconcile import all_status, sim_is_enabled, tap_is_enabled
-from telemffb.TapStatusPanel import CANCELLED, ask_for_devices
+from telemffb.ui.panels.TapStatusPanel import CANCELLED, ask_for_devices
 
 
 @dataclass
