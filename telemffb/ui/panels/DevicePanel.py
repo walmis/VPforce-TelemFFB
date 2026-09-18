@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 import os
 
 from telemffb import utils
+import telemffb.globals as G
 
 ICON_SIZE = QSize(72, 72)
 
@@ -28,7 +29,11 @@ STATUS_COLORS = {
     "warning": QColor(204, 153, 0, 220),   # amber
     "error": QColor(204, 51, 51, 255),     # red
     "hover": QColor(120, 120, 120, 180),   # soft gray for hover
-    "selected": QColor(0, 120, 215, 200)   # blue for active
+    "selected": QColor(0, 120, 215, 200),  # blue for active
+    # Unconfigured device slot: muted mid-gray, tuned lighter than body
+    # text so it reads as disabled against a light background without
+    # vanishing into it.
+    "ghost": QColor(180, 180, 180, 220),
 }
 
 STATUS_COLORS_DARK = {
@@ -37,8 +42,19 @@ STATUS_COLORS_DARK = {
     "warning": QColor(255, 204, 0, 200),
     "error": QColor(255, 77, 77, 255),
     "hover": QColor(180, 180, 180, 100),    # lighter gray in dark mode
-    "selected": QColor(0, 120, 215, 200)
+    "selected": QColor(0, 120, 215, 200),
+    # Unconfigured device slot: darker than the dark-mode "hover" gray, so
+    # it visibly recedes against a near-black background rather than
+    # reading as merely "hovered".
+    "ghost": QColor(110, 110, 110, 200),
 }
+
+
+def _status_colors() -> dict:
+    """The status color palette for the active theme. Call at paint time
+    (not cache the dict) since useDarkMode is fixed at startup but this
+    keeps the lookup honest if that ever changes."""
+    return STATUS_COLORS_DARK if G.useDarkMode else STATUS_COLORS
 
 def device_status_state() -> str:
     """Derive the device panel state from the live device object.
@@ -69,7 +85,8 @@ class DeviceIconWidget(QWidget):
 
     def __init__(self, device_name, icon_path, parent=None):
         super().__init__(parent)
-        self.status_color = STATUS_COLORS['normal']  # Default
+        self.status_color = _status_colors()['normal']  # Default
+        self.configured = True
         self.device_name = device_name
         self.icon_path = icon_path
         self.active = False
@@ -214,25 +231,45 @@ class DeviceIconWidget(QWidget):
         self._fade_text(self.hover)  # Maintain hover logic too
         self.update()
 
+    def set_configured(self, configured: bool):
+        """Unconfigured devices (no hardware assigned to this role) render
+        as a static ghost-gray icon and ignore hover/click - there is
+        nothing to switch the config scope to."""
+        self.configured = configured
+        if not configured:
+            self.hover = False
+            self.active = False
+            self._fade_text(False)
+            self.set_status_color('ghost')
+        self.update()
+
     def enterEvent(self, event: QEnterEvent):
+        if not self.configured:
+            return
         self.hover = True
         self._fade_text(True)
         self.update()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
+        if not self.configured:
+            return
         self.hover = False
         self._fade_text(False)
         self.update()
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):
+        if not self.configured:
+            return
         self.pressed = True
         self.icon_label.move(self.icon_label.x() + 2, self.icon_label.y() + 2)
         self.update()
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if not self.configured:
+            return
         self.pressed = False
         self.icon_label.move(self.icon_label.x() - 2, self.icon_label.y() - 2)
         self.clicked.emit(self.device_name)
@@ -248,14 +285,15 @@ class DeviceIconWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Color setup
+        colors = _status_colors()
         if self.active:
-            pen_color = STATUS_COLORS["ok"]
+            pen_color = QColor(colors["ok"])
             pen_color.setAlpha(int(200 * self.border_opacity))
         elif self.border_anim:
-            pen_color = QColor(STATUS_COLORS["error"])
+            pen_color = QColor(colors["error"])
             pen_color.setAlpha(int(200 * self.border_opacity))
         else:
-            pen_color = STATUS_COLORS["hover"]
+            pen_color = colors["hover"]
 
         pen = painter.pen()
         pen.setColor(pen_color)
@@ -303,8 +341,9 @@ class DeviceIconWidget(QWidget):
         return tinted
 
     def set_status_color(self, color):
+        colors = _status_colors()
         if isinstance(color, str):
-            color = STATUS_COLORS.get(color.lower(), STATUS_COLORS["normal"])
+            color = colors.get(color.lower(), colors["normal"])
 
         self.status_color = color
         tinted = self._tint_pixmap(self._original_pixmap, self.status_color)
@@ -317,7 +356,7 @@ class DeviceIconWidget(QWidget):
             f"color: rgba({r}, {g}, {b}, {alpha_f:.2f});"
         )
 
-        if color == STATUS_COLORS["error"]:
+        if self.configured and color == colors["error"]:
             self._start_border_pulse()
         else:
             self._stop_border_pulse()
@@ -383,7 +422,17 @@ class DeviceIconPanel(QWidget):
     def get_device_names(self) -> list[str]:
         return list(self.icons.keys())
 
-    def set_devices(self, device_list):
+    def set_devices(self, device_list, configured=None):
+        """``configured``, when given, is the set of device names that
+        should start as real (non-ghost) devices - every other role is
+        built already ghosted. Passing it here (rather than calling
+        set_device_configured() in a follow-up loop) matters: this method
+        emits ``changed`` as soon as the widgets exist, and a listener
+        (MainWindow._sync_devices_display) reacts to that immediately - if
+        every widget still looked "configured" by DeviceIconWidget's
+        default until a later call fixed it up, that listener would
+        briefly show the full frame for what should stay a single ghosted
+        device."""
         # Clear old
         for w in self.icons.values():
             self.layout.removeWidget(w)
@@ -397,6 +446,8 @@ class DeviceIconPanel(QWidget):
                 continue
             icon_path =  DEVICE_ICONS[device.lower()]
             widget = DeviceIconWidget(device.lower(), icon_path)
+            if configured is not None and device.lower() not in configured:
+                widget.set_configured(False)
             widget.clicked.connect(self.handle_icon_click)
             self.layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignHCenter)
             self.icons[device.lower()] = widget
@@ -426,6 +477,12 @@ class DeviceIconPanel(QWidget):
                 return name
         return None
 
+    def set_device_configured(self, device_name: str, configured: bool):
+        widget = self.icons.get(device_name.lower())
+        if widget:
+            widget.set_configured(configured)
+            self.changed.emit()
+
     def set_device_status(self, device_name: str, status: str):
         # utils.dbprint("red", f"Setting status for >{device_name}< to {status}")
 
@@ -441,7 +498,7 @@ class DeviceIconPanel(QWidget):
         if status == 'NOT_FOUND':
             status = 'error'
         widget = self.icons.get(device_name.lower())
-        if widget:
+        if widget and widget.configured:
             widget.set_status_color(status)
             tooltip = {
                 'ACTIVE': 'Device connected',
@@ -529,8 +586,9 @@ class MiniDeviceChip(QWidget):
         self.device_name = device_name
         self._clickable = False
         self._active = False
+        self._configured = True
         self._original_pixmap = None
-        self._status_color = STATUS_COLORS["normal"]
+        self._status_color = _status_colors()["normal"]
         self._label_text = device_name.capitalize()
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
@@ -562,9 +620,19 @@ class MiniDeviceChip(QWidget):
         self._active = active
         self.update()
 
+    def set_configured(self, configured: bool):
+        """Unconfigured devices render as a static ghost-gray icon and
+        ignore clicks - there is nothing to switch the config scope to."""
+        self._configured = configured
+        if not configured:
+            self.set_active(False)
+            self.set_clickable(False)
+            self.set_status_color('ghost')
+
     def set_status_color(self, color):
+        colors = _status_colors()
         if isinstance(color, str):
-            color = STATUS_COLORS.get(color.lower(), STATUS_COLORS["normal"])
+            color = colors.get(color.lower(), colors["normal"])
         self._status_color = color
         self._repaint()
 
@@ -581,6 +649,7 @@ class MiniDeviceChip(QWidget):
             self.icon_label.setPixmap(tinted)
 
     def set_clickable(self, clickable: bool):
+        clickable = clickable and self._configured
         self._clickable = clickable
         if clickable:
             self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -610,7 +679,7 @@ class MiniDeviceChip(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         pen = painter.pen()
-        pen.setColor(STATUS_COLORS["ok"])
+        pen.setColor(_status_colors()["ok"])
         pen.setWidth(2)
         painter.setPen(pen)
 
@@ -677,9 +746,14 @@ class MiniDevicePanel(QWidget):
         for name, chip in self.chips.items():
             chip.set_active(name == device_name)
 
-    def set_device_status(self, device_name: str, color):
+    def set_device_configured(self, device_name: str, configured: bool):
         chip = self.chips.get(device_name.lower())
         if chip:
+            chip.set_configured(configured)
+
+    def set_device_status(self, device_name: str, color):
+        chip = self.chips.get(device_name.lower())
+        if chip and chip._configured:
             chip.set_status_color(color)
 
     def set_device_label(self, device_name: str, text: str):

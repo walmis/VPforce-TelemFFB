@@ -489,6 +489,12 @@ class MainWindow(QMainWindow):
         self.device_groupbox.hide()
 
         if not G.master_instance:
+            # A child instance only ever drives its own device - showing
+            # the other three roles (which it has no visibility into) as
+            # ghost icons would be misleading, and briefly flashes an
+            # odd-looking little window on startup for any child whose
+            # own window isn't suppressed (e.g. trimwheel, which has no
+            # startHeadless/startMin default). Master-only.
             self.device_panel.set_devices([G.device_type])
             self.device_panel.set_device_status(G.device_type, device_status_state())
             self.device_panel.set_active_device(G.device_type)
@@ -1440,12 +1446,27 @@ class MainWindow(QMainWindow):
             if changed:
                 self.device_panel.flash_device(role)
 
+    def _device_display_order(self):
+        """Every device role, always - not just the ones this instance is
+        actually driving. Order: this instance's own device first, then
+        the rest of what it considers configured (itself plus any child
+        instances it launched) in joystick/pedals/collective/trimwheel
+        order, then the unconfigured roles in that same order.
+
+        Returns (ordered_roles, configured_role_set)."""
+        configured = {G.device_type} | set(G.launched_instances)
+        rest = [r for r in utils.DEVICE_ROLES if r != G.device_type]
+        configured_rest = [r for r in rest if r in configured]
+        unconfigured_rest = [r for r in rest if r not in configured]
+        order = [G.device_type] + configured_rest + unconfigured_rest
+        return order, configured
+
     def _sync_mini_device_panel(self):
         """Mirror the full Active Devices panel's device list, active
-        device, and each device's icon/label/status onto the compact mini
-        row - connected to DeviceIconPanel.changed so every mutation path
-        (device list, active device, status, label, icon) stays in sync
-        automatically without its own call site here."""
+        device, and each device's icon/label/status/configured state onto
+        the compact mini row - connected to DeviceIconPanel.changed so
+        every mutation path stays in sync automatically without its own
+        call site here."""
         names = self.device_panel.get_device_names()
         if self.device_mini_panel.get_device_names() != names:
             self.device_mini_panel.set_devices(names)
@@ -1454,24 +1475,29 @@ class MainWindow(QMainWindow):
             widget = self.device_panel.icons[name]
             self.device_mini_panel.set_device_icon(name, widget.icon_path)
             self.device_mini_panel.set_device_label(name, widget.text_label.text())
-            self.device_mini_panel.set_device_status(name, widget.status_color)
+            self.device_mini_panel.set_device_configured(name, widget.configured)
+            if widget.configured:
+                self.device_mini_panel.set_device_status(name, widget.status_color)
         self._sync_devices_display()
 
     def _sync_devices_display(self):
         """Reconcile the Active Devices frame and the compact mini device
         row under the logo with: how many devices this instance's panel
-        has, the persisted Show/Hide Devices preference (meaningful only
-        with multiple devices), and whether the Hide tab is active.
+        has *configured* (all four roles are always shown, but
+        unconfigured ones are inert ghost icons and don't count here), the
+        persisted Show/Hide Devices preference (meaningful only with
+        multiple configured devices), and whether the Hide tab is active.
 
-        One device: the frame never shows and the mini row's single chip
-        is not clickable, there being nothing to switch to. Multiple
-        devices: the frame follows the saved preference (default shown),
+        One configured device: the frame never shows and the mini row's
+        chips are not clickable, there being nothing to switch to.
+        Multiple: the frame follows the saved preference (default shown),
         and the mini row - shown only when the frame is not - has
-        clickable chips, one per device, so status colors stay visible in
-        this small a space and clicking one switches straight to it.
-        Either way, the Hide tab collapses both. """
+        clickable chips (for configured devices only), so status colors
+        stay visible in this small a space and clicking one switches
+        straight to it. Either way, the Hide tab collapses both. """
         names = self.device_panel.get_device_names()
-        multiple = len(names) > 1
+        configured_names = [n for n in names if self.device_panel.icons[n].configured]
+        multiple = len(configured_names) > 1
         tab_widget = getattr(self, 'tab_widget', None)
         on_hide_tab = tab_widget is not None and tab_widget.currentIndex() == 2
         show_frame = multiple and bool(G.system_settings.get('showDevicesFrame', True)) and not on_hide_tab
@@ -1694,19 +1720,18 @@ class MainWindow(QMainWindow):
         #     self.instance_status_row.trimwheel_status_icon.show()
         self.add_instance_log_menu()
         self.add_system_tray()
-        d_list = [G.device_type]
-        for d in G.launched_instances:
-            d_list.append(d)
-        self.device_panel.set_devices(d_list)
+        order, configured = self._device_display_order()
+        self.device_panel.set_devices(order, configured=configured)
         self.device_panel.set_device_status(G.device_type, device_status_state())
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)
         self.refresh_device_labels()
 
         """ Window menu: Show Device Frame, only meaningful with more than
-        one device on this instance's own panel """
+        one CONFIGURED device on this instance's own panel - all four are
+        always shown, but the rest may just be inert ghost icons """
 
-        if len(d_list) > 1:
+        if len(configured) > 1:
             if not hasattr(self, 'window_menu'):
                 self.window_menu = self.menu.addMenu('Window')
             elif self.window_menu.actions():

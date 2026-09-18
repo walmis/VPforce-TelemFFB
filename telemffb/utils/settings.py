@@ -124,9 +124,11 @@ class SystemSettings(QSettings):
     startMinJoystick: bool
     startMinPedals: bool
     startMinCollective: bool
+    startMinTrimwheel: bool
     startHeadlessJoystick: bool
     startHeadlessPedals: bool
     startHeadlessCollective: bool
+    startHeadlessTrimwheel: bool
     debug: bool
 
     default_inst = {
@@ -189,11 +191,13 @@ class SystemSettings(QSettings):
         'startMinJoystick': False,
         'startMinPedals': False,
         'startMinCollective': False,
+        'startMinTrimwheel': False,
         # children default to headless: they exist to drive their device
         # and everything is configured from the master
         'startHeadlessJoystick': True,
         'startHeadlessPedals': True,
         'startHeadlessCollective': True,
+        'startHeadlessTrimwheel': True,
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
     }
 

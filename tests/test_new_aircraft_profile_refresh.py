@@ -90,6 +90,7 @@ class TestWizardFinishedHook:
             new_craft_button=MagicMock(),
             _new_craft_anim=MagicMock(),
             profile_change_button=MagicMock(),
+            _sync_new_craft_container=MagicMock(),
             settings_layout=SimpleNamespace(
                 reload_layout=lambda *_: calls.append('reload')))
         return MainWindow.new_ac_wizard_finished, win, calls
@@ -144,6 +145,7 @@ class TestAnsweringTheOfferClearsOnlyThatOffer:
 
         win = SimpleNamespace(
             profile_change_button=MagicMock(),
+            _sync_new_craft_container=MagicMock(),
             settings_layout=SimpleNamespace(reload_layout=lambda *_: None),
             _ask_profile_change=lambda change: ask(None, change))
         MainWindow._on_profile_change_link(win, '#')
