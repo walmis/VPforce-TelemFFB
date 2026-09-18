@@ -300,15 +300,20 @@ class IPCNetworkThread(QObject, threading.Thread):
                 telem_effects_dict = json.loads(payload)
                 self._ipc_telem_effects.update(telem_effects_dict)
                 # print(f"GOT EFFECTS:{self._ipc_telem_effects}")
+                self._report_child_status(telem_effects_dict)
 
             except json.JSONDecodeError:
                 pass
         elif msg.startswith("STATUS:"):
             payload = msg.removeprefix("STATUS:")
             try:
-                self._ipc_telem_effects.update(json.loads(payload))
-                # Queued to the main thread; refreshes the scope status display
-                # if the reported device is the active scope.
+                status_dict = json.loads(payload)
+                self._ipc_telem_effects.update(status_dict)
+                self._report_child_status(status_dict)
+                # Queued to the main thread; kept for any other consumer
+                # that wants to react to "a child's status arrived" as an
+                # event - the scope-status indicators no longer need it,
+                # AppState is updated directly by _report_child_status above.
                 self.child_status_signal.emit()
             except json.JSONDecodeError:
                 pass
@@ -383,6 +388,35 @@ class IPCNetworkThread(QObject, threading.Thread):
             self.preview_done_signal.emit(dev, name)
         else:
             logging.info(f"GOT GENERIC MESSAGE: {msg}")
+
+    def _report_child_status(self, payload: dict) -> None:
+        """Forward any ``{dev}_vpconf_profile`` / ``{dev}_gain_ovd_active``
+        keys in an IPC payload to AppState - both the STATUS keepalive
+        (send_ipc_status) and the effects payload (send_ipc_effects) carry
+        them. Runs on this IPC thread; AppState is its own lock so this is
+        safe cross-thread.
+
+        Master-only in practice: a child never receives these messages
+        (children only send them to the master), but the guard mirrors the
+        historical read-side check (the old refresh only looked at
+        ``_ipc_telem_effects`` when ``G.master_instance``).
+        """
+        app_state = getattr(G, 'app_state', None)
+        if not (self._master and app_state):
+            return
+        devices = set()
+        for key in payload:
+            if key.endswith('_vpconf_profile'):
+                devices.add(key[:-len('_vpconf_profile')])
+            elif key.endswith('_gain_ovd_active'):
+                devices.add(key[:-len('_gain_ovd_active')])
+        for dev in devices:
+            vkey, okey = f'{dev}_vpconf_profile', f'{dev}_gain_ovd_active'
+            app_state.set_child_status(
+                dev,
+                vpconf=payload[vkey] if vkey in payload else None,
+                gain_ovd_active=payload[okey] if okey in payload else None,
+            )
 
     def send_ipc_telem(self, telem):
         self.send_message(f"telem:{json.dumps(telem)}")

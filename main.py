@@ -79,6 +79,7 @@ from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.telem.TelemManager import TelemManager
+from telemffb.state.app_state import AppState
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             upload_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
@@ -1283,7 +1284,10 @@ def _setup_ipc_and_connections():
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
     G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
     G.ipc_instance.child_exception_signal.connect(G.main_window.on_child_exception)
-    G.ipc_instance.child_status_signal.connect(G.main_window.refresh_scope_status_indicators)
+    # child_status_signal is no longer connected here: the IPC thread now
+    # reports a child's vpconf/gain-override state straight to AppState
+    # (IPCNetworkThread._report_child_status), which repaints the scope
+    # status indicators itself when the derived view actually changes.
     G.ipc_instance.exit_signal.connect(exit_application)
     G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
     G.ipc_instance.show_signal.connect(G.main_window.show)
@@ -1742,6 +1746,13 @@ def main():
     # ============================================================================
     # PHASE 10: Core Component Initialization
     # ============================================================================
+    # App-state model: created before anything that writes to it (the
+    # telemetry manager and the main window both do, from their own
+    # threads). Identity is fixed for the lifetime of this instance.
+    G.app_state = AppState()
+    G.app_state.set_own_device_type(G.device_type)
+    G.app_state.set_master(G.master_instance)
+
     # Initialize telemetry manager for handling sim data
     G.telem_manager = TelemManager()
     # queued explicitly: the request comes from the telemetry thread and

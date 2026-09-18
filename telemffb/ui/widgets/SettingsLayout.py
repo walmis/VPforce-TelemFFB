@@ -2149,10 +2149,9 @@ class SettingsLayout(QGridLayout):
             G.gain_override_dialog.revert_gains()
             G.gain_override_dialog.reset_to_vpconf()
             # Keep the canonical flag in sync (children report it to the
-            # master over IPC) and refresh scope-aware rather than directly.
+            # master over IPC); the property forwards it to AppState.
             if G.telem_manager is not None:
                 G.telem_manager.gain_overrides_active = False
-            G.main_window.refresh_scope_status_indicators(force=True)
 
     def update_advanced_g_effect(self, g_effect_curves: str):
         self.trigger_form_reload = True

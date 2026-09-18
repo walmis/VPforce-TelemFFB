@@ -130,6 +130,7 @@ class MainWindow(QMainWindow):
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
         G.current_device_config_scope = G.device_type
+        G.app_state.set_scope(G.device_type)
         self.current_tab_index = 0
 
         if G.system_settings.get('saveLastTab', 0):
@@ -514,6 +515,20 @@ class MainWindow(QMainWindow):
         self.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.status_container.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
         self.status_container.sim_status_label.set_waiting()
+
+        # AppState owns the vpconf-profile / gain-override indicators now;
+        # this just relays its derived, deduplicated state onto the widget's
+        # own (queued, cross-thread-safe) request signals. Sync once up
+        # front so the initial paint reflects whatever AppState already
+        # holds (e.g. G.device_type set as the scope above), independent of
+        # setter call order at startup - nothing re-emits just because a
+        # new subscriber connected.
+        G.app_state.scope_status_changed.connect(self._on_scope_status_changed)
+        _initial_scope_status = G.app_state.current_status()
+        self._on_scope_status_changed(
+            _initial_scope_status.scope, _initial_scope_status.vpconf,
+            _initial_scope_status.any_vpconf, _initial_scope_status.ovd,
+            _initial_scope_status.any_ovd)
 
         def on_sims_changed(sim: SimTelemListener):
             self.status_container.update_enabled_sims(sim.name, sim.started)
@@ -1909,41 +1924,21 @@ class MainWindow(QMainWindow):
 
         if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
-        self.refresh_scope_status_indicators(force=True)
+        G.app_state.set_scope(G.current_device_config_scope)
         self.settings_layout.reload_caller()
 
-    def refresh_scope_status_indicators(self, force=False):
-        """Update the vpconf-profile and gain-override indicators to reflect
-        the device currently selected as the config scope.
+    def _on_scope_status_changed(self, scope, vpconf, any_vpconf, ovd, any_ovd):
+        """AppState.scope_status_changed relay: update the vpconf-profile
+        and gain-override indicators to reflect the device currently
+        selected as the config scope.
 
-        The master shows its own state while scoped to its own device, and the
-        state reported over IPC (effects payload / keepalive STATUS message)
-        while scoped to a child; child instances always show their own state.
-        Safe to call from any thread — the display update goes through the
-        widget's queued request signals — and repeat values are deduplicated
-        so the pulse animation only fires when something actually changed.
+        AppState already derives and deduplicates this (the master shows
+        its own state while scoped to its own device, and the state
+        reported over IPC while scoped to a child; child instances always
+        show their own state) - this only forwards to the widget's own
+        (queued, cross-thread-safe) request signals, so the pulse
+        animation still only fires when something actually changed.
         """
-        scope = G.current_device_config_scope or G.device_type
-        own_vpconf = G.current_vpconf_profile or ''
-        own_ovd = bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False
-        # Snapshot the IPC-reported dict: it is mutated by the IPC thread and
-        # this method may run on the telemetry thread.
-        fx = dict(G.ipc_instance._ipc_telem_effects) if (G.master_instance and G.ipc_instance) else {}
-        if scope == G.device_type or not G.master_instance:
-            vpconf, ovd = own_vpconf, own_ovd
-        else:
-            vpconf = fx.get(f'{scope}_vpconf_profile', '') or ''
-            ovd = bool(fx.get(f'{scope}_gain_ovd_active', False))
-        # A row is only present at all while at least one device (master or
-        # child) is using the feature; devices without a value then show a
-        # "(None)" placeholder so the panel geometry is identical across
-        # scopes. Users not using the feature don't lose the UI space.
-        any_vpconf = bool(own_vpconf) or any(v for k, v in fx.items() if k.endswith('_vpconf_profile'))
-        any_ovd = own_ovd or any(v for k, v in fx.items() if k.endswith('_gain_ovd_active'))
-        shown = (scope, vpconf, ovd, any_vpconf, any_ovd)
-        if not force and shown == getattr(self, '_scope_status_shown', None):
-            return
-        self._scope_status_shown = shown
         self.status_container.request_set_active_vpconf.emit(vpconf, any_vpconf)
         self.status_container.request_set_active_configurator.emit(ovd, any_ovd)
 
@@ -2955,9 +2950,12 @@ class MainWindow(QMainWindow):
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)
 
-            # Keep the scoped device-status indicators current (deduped; only
-            # repaints when the scoped device's reported state changes).
-            self.refresh_scope_status_indicators()
+            # The scoped device-status indicators (vpconf profile / gain
+            # override) are no longer polled here - AppState is updated
+            # directly wherever the underlying state changes (this
+            # instance's own vpconf/gain-override writers, and the IPC
+            # thread for a child's reported state) and repaints only when
+            # its derived view actually changes.
 
             if G.child_instance:
                 child_effects = str(G.effects.dict.keys())
