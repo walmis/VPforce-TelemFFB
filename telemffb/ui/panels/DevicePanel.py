@@ -515,9 +515,10 @@ class DeviceIconPanel(QWidget):
 
 class MiniDeviceChip(QWidget):
     """One small clickable icon in the compact device row - half-scale,
-    tinted to its own status color like the full-size icons, with its
-    name shown only while it is the active device. Clicking it switches
-    straight to that device (no cycling)."""
+    tinted to its own status color like the full-size icons. Clicking it
+    switches straight to that device (no cycling). The device's name is
+    not shown - just the row of status-colored icons - but is still
+    available as the hover tooltip."""
 
     clicked = pyqtSignal(str)
 
@@ -527,25 +528,22 @@ class MiniDeviceChip(QWidget):
         super().__init__(parent)
         self.device_name = device_name
         self._clickable = False
+        self._active = False
         self._original_pixmap = None
         self._status_color = STATUS_COLORS["normal"]
+        self._label_text = device_name.capitalize()
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 2, 4, 2)
-        layout.setSpacing(6)
+        layout.setSpacing(0)
 
         self.icon_label = QLabel(self)
         self.icon_label.setFixedSize(self._ICON_SIZE)
         self.icon_label.setScaledContents(True)
 
-        self.name_label = QLabel(self)
-        self.name_label.setFont(QFont("Top Secret", 12))
-        self.name_label.setVisible(False)
-
         layout.addWidget(self.icon_label)
-        layout.addWidget(self.name_label)
 
         self.set_icon(icon_path)
 
@@ -557,13 +555,12 @@ class MiniDeviceChip(QWidget):
         self._repaint()
 
     def set_label(self, text: str):
-        self.name_label.setText(text or self.device_name.capitalize())
+        """Not shown - kept only for the hover tooltip (set_clickable)."""
+        self._label_text = text or self.device_name.capitalize()
 
     def set_active(self, active: bool):
-        """Only the active device's name is shown - with everything else
-        icon-only, every device's status color stays visible in this
-        small a space, and the active one is still obvious."""
-        self.name_label.setVisible(active)
+        self._active = active
+        self.update()
 
     def set_status_color(self, color):
         if isinstance(color, str):
@@ -582,15 +579,12 @@ class MiniDeviceChip(QWidget):
             painter.fillRect(tinted.rect(), self._status_color)
             painter.end()
             self.icon_label.setPixmap(tinted)
-        c = self._status_color
-        self.name_label.setStyleSheet(
-            f"color: rgba({c.red()}, {c.green()}, {c.blue()}, {c.alpha()});")
 
     def set_clickable(self, clickable: bool):
         self._clickable = clickable
         if clickable:
             self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            self.setToolTip(f'Switch to {self.name_label.text() or self.device_name.capitalize()}')
+            self.setToolTip(f'Switch to {self._label_text}')
             self.setStyleSheet(
                 "MiniDeviceChip { border-radius: 4px; }"
                 "MiniDeviceChip:hover { background-color: rgba(128, 128, 128, 60); }")
@@ -604,14 +598,53 @@ class MiniDeviceChip(QWidget):
             self.clicked.emit(self.device_name)
         super().mouseReleaseEvent(event)
 
+    def paintEvent(self, event):
+        """The same four-corner-bracket highlight as the full-size icons
+        (DeviceIconWidget.paintEvent), scaled down to match this half-size
+        icon, so the active device is still obvious in the compact row."""
+        super().paintEvent(event)  # WA_StyledBackground: paints the hover tint
+        if not self._active:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        pen = painter.pen()
+        pen.setColor(STATUS_COLORS["ok"])
+        pen.setWidth(2)
+        painter.setPen(pen)
+
+        rect = self.icon_label.geometry().adjusted(-2, 0, 2, 2)
+        radius = 5
+
+        path_top_left = QPainterPath()
+        path_top_left.arcMoveTo(rect.left(), rect.top(), radius * 2, radius * 2, 180)
+        path_top_left.arcTo(rect.left(), rect.top(), radius * 2, radius * 2, 180, -90)
+        painter.drawPath(path_top_left)
+
+        path_top_right = QPainterPath()
+        path_top_right.arcMoveTo(rect.right() - 2 * radius, rect.top(), radius * 2, radius * 2, 90)
+        path_top_right.arcTo(rect.right() - 2 * radius, rect.top(), radius * 2, radius * 2, 90, -90)
+        painter.drawPath(path_top_right)
+
+        path_bot_left = QPainterPath()
+        path_bot_left.arcMoveTo(rect.left(), rect.bottom() - 2 * radius, radius * 2, radius * 2, 180)
+        path_bot_left.arcTo(rect.left(), rect.bottom() - 2 * radius, radius * 2, radius * 2, 180, 90)
+        painter.drawPath(path_bot_left)
+
+        path_bot_right = QPainterPath()
+        path_bot_right.arcMoveTo(rect.right() - 2 * radius, rect.bottom() - 2 * radius, radius * 2, radius * 2, 270)
+        path_bot_right.arcTo(rect.right() - 2 * radius, rect.bottom() - 2 * radius, radius * 2, radius * 2, 270, 90)
+        painter.drawPath(path_bot_right)
+
 
 class MiniDevicePanel(QWidget):
     """Compact row of small per-device icons, standing in for the Active
     Devices frame when that frame is hidden (by user preference with
     multiple devices, or always with just one device). Every device's
-    status color is visible at once; only the active device shows its
-    name. Clicking an icon switches straight to that device - with one
-    device there is nothing to switch to, so clicking is disabled."""
+    status color is visible at once. Clicking an icon switches straight
+    to that device - with one device there is nothing to switch to, so
+    clicking is disabled."""
 
     DeviceClicked = pyqtSignal(str)
 

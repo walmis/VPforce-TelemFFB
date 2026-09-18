@@ -450,7 +450,9 @@ class MainWindow(QMainWindow):
 
         t_logo = QLabel()
         t_pixmap = HiDpiPixmap(G.vpf_logo)
-        t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
+        logo_width = 200
+        logo_height = round(t_pixmap.height() * logo_width / t_pixmap.width())
+        t_pixmap = t_pixmap._scaled(logo_width, logo_height)
         t_logo.setPixmap(t_pixmap)
 
         self.device_mini_panel = MiniDevicePanel()
