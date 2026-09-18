@@ -25,7 +25,7 @@ from PyQt6.QtCore import QRegularExpression, Qt
 from PyQt6.QtGui import QIntValidator, QRegularExpressionValidator
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QListWidget, QMessageBox, QPushButton, QVBoxLayout
 
-from ..generated.Ui_TeleplotDialog import Ui_TeleplotDialog
+from telemffb.ui.generated.Ui_TeleplotDialog import Ui_TeleplotDialog
 
 class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
 
