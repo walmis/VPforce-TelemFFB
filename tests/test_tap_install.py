@@ -14,8 +14,8 @@ import sys
 
 import pytest
 
-from telemffb import tap_install
-from telemffb.tap_install import (
+from telemffb.tap import tap_install
+from telemffb.tap.tap_install import (
     SIMS_BY_KEY, SimStatus, TapSim, TargetStatus, WRAPPER_CONFIG,
     WRAPPER_NAME, WrapperState, generate_config, install, outdated_targets,
     resolve_root, sim_status, tap_log_dir, target_dirs, wrapper_state,
@@ -478,7 +478,7 @@ class TestUpdateMechanics:
         game, status = self._sim(tmp_path, TAP_BYTES + b" STALE")
         bundled = tmp_path / "bundled.dll"
         bundled.write_bytes(TAP_BYTES + b" FRESH")
-        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+        monkeypatch.setattr('telemffb.tap.tap_install.bundled_wrapper',
                             lambda: str(bundled))
         outcomes = install(status)
         assert [(o.ok, o.action) for o in outcomes] == [(True, 'updated')]
@@ -488,12 +488,12 @@ class TestUpdateMechanics:
 
     def test_outdated_flag_raises_and_clears(self, tmp_path, monkeypatch):
         game, status = self._sim(tmp_path)
-        monkeypatch.setattr('telemffb.tap_install.bundled_version',
+        monkeypatch.setattr('telemffb.tap.tap_install.bundled_version',
                             lambda: '0.9.1.0')
         # installed build has no readable version -> superseded
         assert outdated_targets(status)
         # after an update the installed version matches the bundled one
-        monkeypatch.setattr('telemffb.tap_install.file_version',
+        monkeypatch.setattr('telemffb.tap.tap_install.file_version',
                             lambda path: '0.9.1.0')
         refreshed = SimStatus(
             sim=status.sim, root=status.root, provenance="test",
@@ -533,7 +533,7 @@ class TestSharedLogFolder:
         (game / WRAPPER_CONFIG).write_bytes(config.encode())
         bundled = tmp_path / "bundled.dll"
         bundled.write_bytes(TAP_BYTES)
-        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+        monkeypatch.setattr('telemffb.tap.tap_install.bundled_wrapper',
                             lambda: str(bundled))
         status = SimStatus(
             sim=SIMS_BY_KEY['DCS'], root=str(tmp_path / "DCS World"),
@@ -597,7 +597,7 @@ class TestWriteRefusals:
         (game / WRAPPER_NAME).write_bytes(TAP_BYTES)
         bundled = tmp_path / "bundled.dll"
         bundled.write_bytes(TAP_BYTES)
-        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+        monkeypatch.setattr('telemffb.tap.tap_install.bundled_wrapper',
                             lambda: str(bundled))
         return SimStatus(
             sim=SIMS_BY_KEY['DCS'], root=str(tmp_path / "DCS World"),
@@ -632,7 +632,7 @@ class TestWriteRefusals:
 
     def test_removal_distinguishes_the_same_two_cases(
             self, tmp_path, monkeypatch):
-        from telemffb.tap_install import remove
+        from telemffb.tap.tap_install import remove
         status = self._sim(tmp_path, monkeypatch)
         def denied(path):
             raise PermissionError(13, "refused", None, 5)
@@ -670,7 +670,7 @@ class TestLegacyWrapperIdentity:
         (game / WRAPPER_NAME).write_bytes(LEGACY_BYTES)
         bundled = tmp_path / "bundled.dll"
         bundled.write_bytes(TAP_BYTES)
-        monkeypatch.setattr('telemffb.tap_install.bundled_wrapper',
+        monkeypatch.setattr('telemffb.tap.tap_install.bundled_wrapper',
                             lambda: str(bundled))
         return game, SimStatus(
             sim=SIMS_BY_KEY['DCS'], root=str(tmp_path / "DCS World"),

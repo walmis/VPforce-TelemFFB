@@ -96,8 +96,8 @@ class SettingsManager(QObject):
 
     def _tap_mode_offered(self):
         try:
-            from telemffb.tap_install import SIMS_BY_KEY
-            from telemffb.tap_reconcile import tap_is_enabled
+            from telemffb.tap.tap_install import SIMS_BY_KEY
+            from telemffb.tap.tap_reconcile import tap_is_enabled
             return any(
                 tap_is_enabled(SIMS_BY_KEY[key], G.system_settings)
                 for key in self.TAP_SIM_KEYS.get(self.current_sim, ()))

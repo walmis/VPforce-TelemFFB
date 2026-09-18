@@ -15,7 +15,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TargetStatus,
+from telemffb.tap.tap_install import (SIMS_BY_KEY, SimStatus, TargetStatus,
                                   WrapperState)
 from telemffb.ui.dialogs import TapUpdateDialog as mod
 

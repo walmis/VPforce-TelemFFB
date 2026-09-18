@@ -47,7 +47,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Sequence, Tuple
 
-from telemffb.tap_config import Rule
+from telemffb.tap.tap_config import Rule
 from telemffb.utils import (DEVICE_ROLES, device_ident_key,
                             device_ids_key, il2_korea_game_root,
                             parse_usb_ids, usb_ids_from_devpath)
@@ -633,7 +633,7 @@ def installed_mode(status: SimStatus) -> Optional[str]:
     configs = read_configs(status)
     if not configs:
         return None
-    from telemffb.tap_config import read
+    from telemffb.tap.tap_config import read
     for _directory, text in configs:
         if any(rule.is_tap for rule in read(text).rules):
             return MODE_TAP

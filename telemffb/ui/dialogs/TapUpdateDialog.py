@@ -37,9 +37,9 @@ from typing import List, Tuple
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-from telemffb.tap_install import (SimStatus, bundled_version, install,
+from telemffb.tap.tap_install import (SimStatus, bundled_version, install,
                                   outdated_targets)
-from telemffb.tap_reconcile import all_status, tap_is_enabled
+from telemffb.tap.tap_reconcile import all_status, tap_is_enabled
 
 
 def pending_wrapper_updates(settings) -> List[Tuple[SimStatus, list]]:

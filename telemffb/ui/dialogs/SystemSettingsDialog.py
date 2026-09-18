@@ -31,12 +31,12 @@ from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDial
                              QMessageBox, QPushButton, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout, QWidget)
 
 from telemffb import globals as G
-from telemffb import msfs_panel_install
+from telemffb.tap import msfs_panel_install
 from telemffb import utils
 from telemffb.app_events import events as app_events
 from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
 from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
-from telemffb.tap_install import SIMS_BY_KEY, matches_signature, sim_status
+from telemffb.tap.tap_install import SIMS_BY_KEY, matches_signature, sim_status
 from telemffb.ui.panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
@@ -1603,7 +1603,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         would offer them the device they just replaced, and make them save
         and reopen the dialog to get an answer that is already on screen.
         """
-        from telemffb.tap_install import configured_devices
+        from telemffb.tap.tap_install import configured_devices
 
         return configured_devices(self.tap_settings_view())
 
@@ -1650,8 +1650,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         devices alike: a user who has just corrected either should see the
         effect before saving it.
         """
-        from telemffb.tap_config import read, stale_tap_rules
-        from telemffb.tap_install import read_config
+        from telemffb.tap.tap_config import read, stale_tap_rules
+        from telemffb.tap.tap_install import read_config
 
         sim = SIMS_BY_KEY[sim_key]
         configured = None
@@ -1671,7 +1671,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if any(t.has_config for t in status.targets):
             config = read_config(status)
             if config is not None:
-                from telemffb.tap_install import devices_a_sim_drives
+                from telemffb.tap.tap_install import devices_a_sim_drives
                 status.stale_rules = stale_tap_rules(
                     read(config),
                     devices_a_sim_drives(sim, self.tap_devices()))
@@ -2589,7 +2589,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         decline.  A "No" button here would have had exactly one effect:
         leaving a config that names hardware no longer in the slot.
         """
-        from telemffb.tap_reconcile import device_changes, pending_reconcile
+        from telemffb.tap.tap_reconcile import device_changes, pending_reconcile
 
         changes = device_changes(before, after)
         signature = self._change_signature(changes)
@@ -2700,7 +2700,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         change implies.  Nothing in a game folder should disappear because
         of a switch the user then backed out of.
         """
-        from telemffb.tap_reconcile import plan_tap_cleanup
+        from telemffb.tap.tap_reconcile import plan_tap_cleanup
 
         if sim_key in self._tap_cleanup_asked:
             return
@@ -2759,7 +2759,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         and someone deciding whether to delete it should be able to read the
         file itself without cancelling out of the question first.
         """
-        from telemffb.tap_install import (config_label, config_link,
+        from telemffb.tap.tap_install import (config_label, config_link,
                                           config_paths)
 
         doing = "".join(f"<li>{html.escape(line)}</li>"
@@ -2784,7 +2784,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         means asking again afterwards - which is nothing worse than the
         question reappearing where the user left it.
         """
-        from telemffb.tap_reconcile import cleanup_preview
+        from telemffb.tap.tap_reconcile import cleanup_preview
         from telemffb.ui.dialogs.TapDiffDialog import TapDiffDialog
 
         while True:
@@ -2847,7 +2847,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         answered: turning it back off and on again before saving must not
         leave a deletion queued against a sim that is switched on.
         """
-        from telemffb.tap_reconcile import apply_tap_cleanup, plan_tap_cleanup
+        from telemffb.tap.tap_reconcile import apply_tap_cleanup, plan_tap_cleanup
 
         wanted = [key for key in self._tap_cleanup_agreed
                   if key in self.tap_enable_boxes
@@ -2881,7 +2881,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         tap is not installed at all, the notice says where to do that; a
         rule cannot be added to a wrapper that is not there.
         """
-        from telemffb.tap_reconcile import missing_tap_rules
+        from telemffb.tap.tap_reconcile import missing_tap_rules
 
         closed = self._gaps_a_reconcile_will_close()
         gaps = [g for g in missing_tap_rules(self.tap_devices(),
@@ -2923,7 +2923,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """(sim key, device ids) a reconcile the user has been told about
         will write a rule for at save - so a gap there is already being
         closed."""
-        from telemffb.tap_reconcile import device_changes, pending_reconcile
+        from telemffb.tap.tap_reconcile import device_changes, pending_reconcile
 
         if self._tap_baseline is None:
             return set()
@@ -2943,7 +2943,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         closed is no longer reported and is not written twice.  A gap the
         user was never shown - one that opened after the last change, say by
         installing the wrapper - is shown now, before it is written."""
-        from telemffb.tap_reconcile import apply_tap_rules, missing_tap_rules
+        from telemffb.tap.tap_reconcile import apply_tap_rules, missing_tap_rules
 
         gaps = [g for g in missing_tap_rules(self.tap_devices(),
                                              self.tap_settings(),
@@ -3037,7 +3037,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         than having their configs repointed at a device selection they then
         abandoned.
         """
-        from telemffb.tap_reconcile import (apply_reconcile, device_changes,
+        from telemffb.tap.tap_reconcile import (apply_reconcile, device_changes,
                                           pending_reconcile)
 
         changes = device_changes(before, after)

@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from telemffb.tap_install import (TapDevice, WRAPPER_CONFIG, configured_devices,
+from telemffb.tap.tap_install import (TapDevice, WRAPPER_CONFIG, configured_devices,
                                   generate_config)
 
 pytestmark = [pytest.mark.unit]
@@ -129,8 +129,8 @@ class FakeSettings(dict):
 
 class TestInstallWritesIt(object):
     def test_the_config_lands_beside_the_wrapper(self, tmp_path, monkeypatch):
-        from telemffb import tap_install
-        from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TargetStatus,
+        from telemffb.tap import tap_install
+        from telemffb.tap.tap_install import (SIMS_BY_KEY, SimStatus, TargetStatus,
                                           WrapperState, install)
 
         wrapper = tmp_path / "src" / "dinput8.dll"
@@ -151,8 +151,8 @@ class TestInstallWritesIt(object):
     def test_an_existing_config_is_never_replaced(self, tmp_path, monkeypatch):
         """It is the user's file - hand-written, or written earlier and since
         tuned. Installing the wrapper is not consent to discard it."""
-        from telemffb import tap_install
-        from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TargetStatus,
+        from telemffb.tap import tap_install
+        from telemffb.tap.tap_install import (SIMS_BY_KEY, SimStatus, TargetStatus,
                                           WrapperState, install)
 
         wrapper = tmp_path / "src" / "dinput8.dll"
@@ -227,7 +227,7 @@ class TestDeviceOrderPolicy:
     position hands the game's forces to a blocked device."""
 
     def test_only_the_joystick_is_ordered(self):
-        from telemffb.tap_install import order_entries
+        from telemffb.tap.tap_install import order_entries
         joystick = RHINO
         collective = TapDevice("collective", 0xFFFF, 0x2051, "Collective")
         entries = order_entries([collective, joystick])
@@ -235,7 +235,7 @@ class TestDeviceOrderPolicy:
         assert entries[0].startswith("1=FFFF:2054")
 
     def test_no_joystick_means_no_ordering(self):
-        from telemffb.tap_install import order_entries
+        from telemffb.tap.tap_install import order_entries
         pedals = TapDevice("pedals", 0xFFFF, 0x2052, "Pedals")
         assert order_entries([pedals]) == []
 
@@ -243,7 +243,7 @@ class TestDeviceOrderPolicy:
         collective = TapDevice("collective", 0xFFFF, 0x2051, "Collective")
         text = generate_config([RHINO, collective],
                                ordered=[collective, RHINO])
-        from telemffb.tap_config import read
+        from telemffb.tap.tap_config import read
         entries = [(e.position, e.match) for e in read(text).order]
         assert entries == [("1", "FFFF:2054")]
 
@@ -251,8 +251,8 @@ class TestDeviceOrderPolicy:
         """The field case, 2026-08-29: a collective left at rank 1 by
         earlier testing, the joystick appended at 2 - DCS would hand its
         forces to the blocked collective and render nothing."""
-        from telemffb.tap_config import amend, read
-        from telemffb.tap_install import order_entries
+        from telemffb.tap.tap_config import amend, read
+        from telemffb.tap.tap_install import order_entries
         polluted = "\r\n".join([
             "[FFBDevices]",
             "FFFF:2054=tap",

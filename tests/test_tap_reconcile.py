@@ -12,12 +12,12 @@ silent.
 """
 import pytest
 
-from telemffb import tap_reconcile
-from telemffb.tap_config import read, stale_tap_rules
+from telemffb.tap import tap_reconcile
+from telemffb.tap.tap_config import read, stale_tap_rules
 from telemffb.utils import DEVICE_ROLES
-from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
+from telemffb.tap.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
                                   TargetStatus, WrapperState)
-from telemffb.tap_reconcile import (DeviceChange, ReconcileItem, TapGap,
+from telemffb.tap.tap_reconcile import (DeviceChange, ReconcileItem, TapGap,
                                     apply_reconcile, device_changes,
                                     pending_reconcile, sim_is_enabled)
 
@@ -757,8 +757,8 @@ class TestARuleOutlivesItsRole:
               "FFFF:2051=tap    ; Collective (collective)\r\n")
 
     def test_a_device_now_in_a_role_dcs_ignores_is_stale(self):
-        from telemffb.tap_config import read, stale_tap_rules
-        from telemffb.tap_install import devices_a_sim_drives
+        from telemffb.tap.tap_config import read, stale_tap_rules
+        from telemffb.tap.tap_install import devices_a_sim_drives
         dcs = SIMS_BY_KEY['DCS']
         configured = [self.JOY, self.COLLECTIVE]
         stale = stale_tap_rules(read(self.CONFIG),
@@ -766,8 +766,8 @@ class TestARuleOutlivesItsRole:
         assert [r.key for r in stale] == ['FFFF:2051']
 
     def test_the_joystick_rule_stays_current(self):
-        from telemffb.tap_config import read, stale_tap_rules
-        from telemffb.tap_install import devices_a_sim_drives
+        from telemffb.tap.tap_config import read, stale_tap_rules
+        from telemffb.tap.tap_install import devices_a_sim_drives
         dcs = SIMS_BY_KEY['DCS']
         stale = stale_tap_rules(read(self.CONFIG),
                                 devices_a_sim_drives(dcs, [self.JOY]))
@@ -776,8 +776,8 @@ class TestARuleOutlivesItsRole:
     def test_korea_keeps_its_pedal_rule(self):
         """The scoping is per sim, not a blanket joystick-only rule:
         IL-2 Korea renders to pedals, so a pedal rule is current there."""
-        from telemffb.tap_config import read, stale_tap_rules
-        from telemffb.tap_install import devices_a_sim_drives
+        from telemffb.tap.tap_config import read, stale_tap_rules
+        from telemffb.tap.tap_install import devices_a_sim_drives
         pedals = TapDevice("pedals", 0xFFFF, 0x2052, "Pedals")
         config = "[FFBDevices]\r\nFFFF:2052=tap    ; Pedals (pedals)\r\n"
         korea = SIMS_BY_KEY['IL2_K']
@@ -821,7 +821,7 @@ class TestAFilledGapIsNotShadowed:
         """The point of the retirement, stated as the wrapper sees it."""
         text = self._applied(monkeypatch,
                              "[FFBDevices]\r\nSideWinder=block\r\n")
-        from telemffb.tap_config import rule_matches
+        from telemffb.tap.tap_config import rule_matches
         first = next(r for r in read(text).rules
                      if rule_matches(r, (0x045E, 0x001B), 'SideWinder'))
         assert first.is_tap

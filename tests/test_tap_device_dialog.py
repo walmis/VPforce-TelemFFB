@@ -15,7 +15,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6 import QtWidgets
 
 from telemffb.ui.dialogs.TapDeviceDialog import TapDeviceDialog
-from telemffb.tap_install import SIMS_BY_KEY, TapDevice
+from telemffb.tap.tap_install import SIMS_BY_KEY, TapDevice
 
 pytestmark = [pytest.mark.unit]
 
@@ -340,10 +340,10 @@ class TestConfirmingIsOnlyOfferedWhenItWouldDoSomething:
                "\n[DeviceOrder]\n1=FFFF:2054    ; VPforce Rhino (joystick)\n")
 
     def preview_of(self, existing):
-        from telemffb.tap_config import (already_blocked, already_ordered,
+        from telemffb.tap.tap_config import (already_blocked, already_ordered,
                                          already_tapped, amend, lines_for,
                                          retired_identities)
-        from telemffb.tap_install import block_line, order_line, rule_line
+        from telemffb.tap.tap_install import block_line, order_line, rule_line
 
         def preview(chosen, retire, ordered, blocked):
             names = retired_identities(existing, retire)
@@ -354,7 +354,7 @@ class TestConfirmingIsOnlyOfferedWhenItWouldDoSomething:
             rules += [block_line(d) for d in blocked
                       if not already_blocked(existing, (d.vid, d.pid),
                                              d.ident, lines)]
-            from telemffb.tap_install import order_entries
+            from telemffb.tap.tap_install import order_entries
             return [("dinput8.ini", existing,
                      amend(existing, rules,
                            lines, order=order_entries(ordered)))]

@@ -15,8 +15,8 @@ import time
 import pytest
 from PyQt6 import QtWidgets
 
-from telemffb import tap_install
-from telemffb.tap_install import SIMS_BY_KEY, resolve_root
+from telemffb.tap import tap_install
+from telemffb.tap.tap_install import SIMS_BY_KEY, resolve_root
 
 pytestmark = [pytest.mark.unit]
 
@@ -255,7 +255,7 @@ class TestManualPath:
         back to whatever was last saved."""
         from PyQt6 import QtWidgets
 
-        from telemffb.tap_install import SIMS
+        from telemffb.tap.tap_install import SIMS
         from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
 
         ui = Ui_SystemDialog()
@@ -268,7 +268,7 @@ class TestManualPath:
     def test_every_path_setting_has_a_default(self):
         """A key the dialog writes and nothing declares reads back as None
         on a machine that has never saved settings."""
-        from telemffb.tap_install import SIMS
+        from telemffb.tap.tap_install import SIMS
         from telemffb.utils import SystemSettings
 
         for sim in SIMS:
@@ -367,7 +367,7 @@ class TestRejectedPath:
         """Drawn in the attention color rather than as another dim line:
         it is the one thing on the panel the user can act on."""
         from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
-        from telemffb.tap_install import SimStatus
+        from telemffb.tap.tap_install import SimStatus
 
         nonsense = str(tmp_path / "nonsense")
         panel = TapStatusPanel(SimStatus(sim=SIMS_BY_KEY['DCS'], root=None,
@@ -382,7 +382,7 @@ class TestRejectedPath:
 
     def test_the_panel_says_nothing_when_the_path_works(self, app, tmp_path):
         from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
-        from telemffb.tap_install import SimStatus
+        from telemffb.tap.tap_install import SimStatus
 
         panel = TapStatusPanel(SimStatus(sim=SIMS_BY_KEY['DCS'], root=None,
                                          provenance="not found"))
@@ -401,7 +401,7 @@ class TestRejectedPath:
         assert SIMS_BY_KEY['IL2'].root_contents == ('bin',)
 
     def test_a_root_that_holds_one_folder_twice_names_it_once(self):
-        from telemffb.tap_install import TapSim
+        from telemffb.tap.tap_install import TapSim
         sim = TapSim(key='X', name='X', exe_relpaths=('bin/a.exe', 'bin/b.exe'))
         assert sim.root_contents == ('bin',)
 
@@ -473,7 +473,7 @@ class TestPathEntryValidation:
         from PyQt6 import QtWidgets as W
 
         from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog as D
-        from telemffb.tap_install import SIMS_BY_KEY
+        from telemffb.tap.tap_install import SIMS_BY_KEY
 
         warned = []
 
@@ -497,7 +497,7 @@ class TestPathEntryValidation:
         return holder
 
     def field(self, holder, sim_key):
-        from telemffb.tap_install import SIMS_BY_KEY
+        from telemffb.tap.tap_install import SIMS_BY_KEY
         return getattr(holder, SIMS_BY_KEY[sim_key].settings_key)
 
     def test_a_real_root_is_accepted(self, app, tmp_path, monkeypatch):

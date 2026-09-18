@@ -43,9 +43,9 @@ from typing import List, Optional, Sequence
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QPalette
 
-from telemffb.tap_config import (blocking_rules, order_matches, read,
+from telemffb.tap.tap_config import (blocking_rules, order_matches, read,
                                  shadowing_rules, stale_tap_rules)
-from telemffb.tap_install import devices_a_sim_drives
+from telemffb.tap.tap_install import devices_a_sim_drives
 from telemffb.utils import device_display_name
 
 INDENT = 22
