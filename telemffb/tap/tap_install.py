@@ -943,7 +943,7 @@ def bundled_wrapper() -> Optional[str]:
     if getattr(sys, "frozen", False):
         roots = [getattr(sys, "_MEIPASS", ""), os.path.dirname(sys.executable)]
     else:
-        roots = [os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))]
+        roots = [os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))]
     for root in roots:
         if not root:
             continue
