@@ -39,7 +39,7 @@ from PyQt6.QtCore import QAbstractListModel, QModelIndex
 import numpy as np
 
 import telemffb.globals as G
-from telemffb.ui.theme.tokens import PURPLE
+from telemffb.ui.theme.tokens import PURPLE, ACTIVE_GREEN
 from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
 import styles
 
@@ -1138,6 +1138,15 @@ class NoWheelSlider(QSlider):
     def setHandleColor(self, color):
         self.handle_color = color
         self.update_styles()
+
+    def setActive(self, active: bool):
+        """Two-state handle color toggle (idle purple / live-effect green).
+
+        paintEvent() draws the groove and handle itself from handle_color,
+        so no stylesheet is involved: just store the color and repaint.
+        """
+        self.handle_color = ACTIVE_GREEN if active else PURPLE
+        self.update()
 
     def setHandleHeight(self, height):
         self.handle_height = height

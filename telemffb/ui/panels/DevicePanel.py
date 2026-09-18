@@ -13,6 +13,7 @@ import os
 
 from telemffb import utils
 import telemffb.globals as G
+from telemffb.ui.theme.props import set_state_prop
 
 ICON_SIZE = QSize(72, 72)
 
@@ -651,16 +652,16 @@ class MiniDeviceChip(QWidget):
     def set_clickable(self, clickable: bool):
         clickable = clickable and self._configured
         self._clickable = clickable
+        # The hover tint (MiniDeviceChip[clickable="true"]:hover in
+        # styles.py) is QSS-selected on this property instead of swapping
+        # a per-widget stylesheet in and out.
+        set_state_prop(self, "clickable", clickable)
         if clickable:
             self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             self.setToolTip(f'Switch to {self._label_text}')
-            self.setStyleSheet(
-                "MiniDeviceChip { border-radius: 4px; }"
-                "MiniDeviceChip:hover { background-color: rgba(128, 128, 128, 60); }")
         else:
             self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
             self.setToolTip('')
-            self.setStyleSheet('')
 
     def mouseReleaseEvent(self, event):
         if self._clickable and self.rect().contains(event.pos()):

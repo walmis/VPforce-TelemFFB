@@ -204,6 +204,14 @@ QLabel#StatusLabel:!hover {
     background-color: transparent;
 }
 
+MiniDeviceChip[clickable="true"] {
+    border-radius: 4px;
+}
+
+MiniDeviceChip[clickable="true"]:hover {
+    background-color: rgba(128, 128, 128, 60);
+}
+
 QGroupBox {
     font-weight: bold;
     border: 1px solid gray;
