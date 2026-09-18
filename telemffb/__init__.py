@@ -16,8 +16,4 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
-
-#from .ButtonPressThread import ButtonPressThread
-#from .ui.widgets.LogTailWindow import LogTailWindow
-#from .ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+"""VPforce TelemFFB — force-feedback telemetry for flight simulators (VPforce Rhino, DIY pedals, collective, trim wheel)."""
