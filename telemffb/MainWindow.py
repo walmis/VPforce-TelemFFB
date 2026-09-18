@@ -1480,6 +1480,7 @@ class MainWindow(QMainWindow):
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
+            G.app_state.set_active_settings(())  # drop live-telemetry highlighting
             self.refresh_offline_editor_button()      # hidden while the editor is open
             self.header_panel.status_container.set_offline("None")
             # clear the layout in case an aircraft was previously loaded live
@@ -2130,6 +2131,9 @@ class MainWindow(QMainWindow):
 
     def on_telemetry_timeout(self):
         self.monitor_panel.clear_effects()
+        # No frames means no running effects; don't leave the last live
+        # frame's slider highlighting up (on_update_telemetry won't clear it).
+        G.app_state.set_active_settings(())
         if not self.error_state:
             # Only set icon to pause if error condition is not present when pausing
             self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
@@ -2142,6 +2146,7 @@ class MainWindow(QMainWindow):
         next sim connects."""
         logging.info(f"Application Status: clearing display after {src} exit")
         self.monitor_panel.clear_effects()
+        G.app_state.set_active_settings(())
         self.header_panel.status_container.reset_sim_state(src)
         # reset_sim_state disabled the notes button; drop the dedupe context
         # so the next aircraft load re-evaluates it even if identical.

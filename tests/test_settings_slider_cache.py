@@ -76,3 +76,29 @@ def test_rebuild_after_clear_skips_pending_deletion_sliders(qapp):
     cached = set(layout._active_setting_sliders) | {s for s, _ in layout.live_key_sliders}
     assert cached == set(new.values())
     assert not cached & set(old.values())
+
+
+def test_paint_clears_to_idle_when_nothing_is_active(qapp):
+    """Highlighting from the last live frame must clear once effects stop
+    (e.g. telemetry times out before entering the offline/preview editor)."""
+    from telemffb.ui.theme.tokens import ACTIVE_GREEN, PURPLE
+    host, layout = _stand_in_layout()
+    w = _add_rows(layout)
+    SettingsLayout._rebuild_slider_caches(layout)
+    SettingsLayout._paint_active_settings(layout, ('spring_gain',))
+    assert w['sld_spring_gain'].handle_color == ACTIVE_GREEN
+    SettingsLayout._paint_active_settings(layout, ())
+    assert w['sld_spring_gain'].handle_color == PURPLE
+
+
+def test_paint_leaves_preview_held_rows_green(qapp):
+    from telemffb.ui.widgets.SettingsLayout import _PREVIEW_HELD
+    from telemffb.ui.theme.tokens import ACTIVE_GREEN
+    host, layout = _stand_in_layout()
+    w = _add_rows(layout)
+    SettingsLayout._rebuild_slider_caches(layout)
+    held = w['sld_spring_gain']
+    held.setActive(True)
+    held.setProperty(_PREVIEW_HELD, True)
+    SettingsLayout._paint_active_settings(layout, ())
+    assert held.handle_color == ACTIVE_GREEN

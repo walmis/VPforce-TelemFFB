@@ -80,7 +80,7 @@ def lock_preview_rows(root, spec, locked, slot=None):
     for row in spec.rows:
         for prefix in ('sld_', 'dsld_', 'dfsld_'):
             for slider in root.findChildren(NoWheelSlider, f"{prefix}{row}"):
-                slider.setHandleColor(PREVIEW_ACTIVE_HANDLE if locked else vpf_purple)
+                slider.setActive(locked)
                 _hold(slider, locked)
         for cls, prefix in ((QPushButton, 'sldm_'), (QPushButton, 'sldp_'), (QPushButton, 'eb_'),
                             (QLineEdit, 'vle_'), (NoWheelComboBox, 'ud_')):
@@ -922,22 +922,18 @@ class SettingsLayout(QGridLayout):
         self._paint_active_settings(app_state.current_active_settings())
 
     def _paint_active_settings(self, active_settings):
-        """Green (PREVIEW_ACTIVE_HANDLE) if any active setting name is a
-        substring of the slider's stripped object name, else purple.
-
-        Left untouched when ``active_settings`` is empty: the old
-        for/else loop this replaces never executed its body in that case
-        either (an empty list is not iterated), so a slider kept whatever
-        color it last had rather than resetting to purple - preserved here
-        rather than "fixed", since that would be a visible behavior change.
+        """Green if any active setting name is a substring of the slider's
+        stripped object name, else purple - including when nothing is
+        active, so highlighting clears once effects stop. Rows a playing
+        preview holds (lock_preview_rows) keep the preview's green.
         """
-        if not active_settings:
-            return
         for slider in self._active_setting_sliders:
+            if slider.property(_PREVIEW_HELD):
+                continue
             name = slider.objectName().replace('sld_', '')
             matched = any(a_s in name for a_s in active_settings)
             slider.blockSignals(True)
-            slider.setHandleColor(PREVIEW_ACTIVE_HANDLE if matched else vpf_purple)
+            slider.setActive(matched)
             slider.blockSignals(False)
 
     def _clear_sub_layout(self, layout):
