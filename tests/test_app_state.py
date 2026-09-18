@@ -21,7 +21,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
 
-from telemffb.state.app_state import AppState, ScopeStatus
+from telemffb.state.app_state import (AppState, Notice, ScopeStatus,
+                                      NEW_CRAFT_PRIORITY, PROFILE_CHANGE_PRIORITY,
+                                      TRIM_CAL_PRIORITY)
 
 pytestmark = pytest.mark.unit
 
@@ -200,3 +202,110 @@ class TestTelemManagerForwarding:
         mgr = TelemManager.__new__(TelemManager)
         mgr.gain_overrides_active = True
         assert mgr.gain_overrides_active is True
+
+
+def _notice(notice_id, priority):
+    """A minimally-distinct Notice for id/priority-focused tests."""
+    return Notice(notice_id=notice_id, priority=priority, html=f'<a>{notice_id}</a>',
+                  style=notice_id, pulse=False)
+
+
+class TestPromptStackDerivation:
+    """AppState.set_prompt / current_prompts - the model behind PromptStack.
+    Step 2a moved MainWindow's three hand-rolled QLabel pills (new-craft,
+    trim-cal-discovery, profile-change) onto this."""
+
+    def test_no_prompts_by_default(self, state):
+        assert state.current_prompts() == ()
+
+    def test_a_shown_prompt_is_returned(self, state):
+        n = _notice('new_craft', NEW_CRAFT_PRIORITY)
+        state.set_prompt('new_craft', n)
+        assert state.current_prompts() == (n,)
+
+    def test_clearing_with_none_hides_it(self, state):
+        state.set_prompt('new_craft', _notice('new_craft', NEW_CRAFT_PRIORITY))
+        state.set_prompt('new_craft', None)
+        assert state.current_prompts() == ()
+
+    def test_clearing_an_id_that_was_never_shown_is_a_no_op(self, state):
+        calls = _capture(state.prompts_changed)
+        state.set_prompt('trim_cal', None)
+        assert calls == []
+        assert state.current_prompts() == ()
+
+    def test_setting_under_an_id_replaces_what_was_there(self, state):
+        state.set_prompt('new_craft', _notice('new_craft', NEW_CRAFT_PRIORITY))
+        replacement = Notice(notice_id='new_craft', priority=NEW_CRAFT_PRIORITY,
+                             html='<a>different aircraft</a>', style='new_craft', pulse=True)
+        state.set_prompt('new_craft', replacement)
+        assert state.current_prompts() == (replacement,)
+
+
+class TestPromptStackPriorityOrder:
+    """The stack orders by priority (lowest first) - the same top-to-bottom
+    order MainWindow's new_craft_layout laid the three old pills out in:
+    new-craft, then profile-change, then trim-cal."""
+
+    def test_all_three_sort_lowest_priority_first(self, state):
+        trim = _notice('trim_cal', TRIM_CAL_PRIORITY)
+        new_craft = _notice('new_craft', NEW_CRAFT_PRIORITY)
+        profile = _notice('profile_change', PROFILE_CHANGE_PRIORITY)
+        # set in a deliberately scrambled order - the result must not
+        # depend on call order, only on priority.
+        state.set_prompt('trim_cal', trim)
+        state.set_prompt('profile_change', profile)
+        state.set_prompt('new_craft', new_craft)
+        assert state.current_prompts() == (new_craft, profile, trim)
+
+    def test_hiding_the_top_priority_promotes_the_next(self, state):
+        state.set_prompt('new_craft', _notice('new_craft', NEW_CRAFT_PRIORITY))
+        trim = _notice('trim_cal', TRIM_CAL_PRIORITY)
+        state.set_prompt('trim_cal', trim)
+        state.set_prompt('new_craft', None)
+        assert state.current_prompts() == (trim,)
+
+
+class TestPromptStackDedup:
+    def test_setting_an_identical_notice_again_does_not_emit(self, state):
+        n = _notice('trim_cal', TRIM_CAL_PRIORITY)
+        state.set_prompt('trim_cal', n)
+        calls = _capture(state.prompts_changed)
+        state.set_prompt('trim_cal', _notice('trim_cal', TRIM_CAL_PRIORITY))  # equal by value
+        assert calls == []
+
+    def test_a_change_to_an_inactive_id_does_not_affect_the_active_one(self, state):
+        """Setting one id doesn't touch another - a per-frame producer for
+        one prompt should never be able to perturb a sibling's dedup key."""
+        state.set_prompt('new_craft', _notice('new_craft', NEW_CRAFT_PRIORITY))
+        calls = _capture(state.prompts_changed)
+        state.set_prompt('trim_cal', None)  # already absent: no-op
+        assert calls == []
+
+    def test_emits_once_per_actual_change(self, state):
+        calls = _capture(state.prompts_changed)
+        state.set_prompt('new_craft', _notice('new_craft', NEW_CRAFT_PRIORITY))
+        assert len(calls) == 1
+        state.set_prompt('new_craft', _notice('new_craft', NEW_CRAFT_PRIORITY))
+        assert len(calls) == 1                     # identical: no re-emit
+        state.set_prompt('new_craft', None)
+        assert len(calls) == 2
+
+    def test_setter_from_a_background_thread(self, state, app):
+        """Mirrors TestThreadOriginSetter for the scope-status setters:
+        set_prompt is called from whichever thread notices the condition -
+        exercise the lock from a real thread, not just call it inline."""
+        calls = _capture(state.prompts_changed)
+        n = _notice('trim_cal', TRIM_CAL_PRIORITY)
+
+        def worker():
+            state.set_prompt('trim_cal', n)
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(timeout=5)
+        assert not t.is_alive()
+        app.processEvents()
+
+        assert len(calls) == 1
+        assert state.current_prompts() == (n,)

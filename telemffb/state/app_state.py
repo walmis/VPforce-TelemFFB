@@ -41,11 +41,22 @@ an ad-hoc payload a consumer has to interpret. The two are complementary,
 not layered - ``AppState`` does not publish through ``app_events``, though
 a later step may have it *consume* an app-wide event (``device_config_changed``)
 as one of its inputs.
+
+Step 2a added the prompt stack (``Notice`` / ``set_prompt`` /
+``prompts_changed``): the new-aircraft, trim-calibration-discovery and
+matching-profile "pill" prompts MainWindow used to show as three
+hand-rolled QLabels, each polled via ``isVisible()`` to decide what to do
+next. Producers now declare intent with ``set_prompt(notice_id, Notice(...)
+or None)`` and the ``telemffb.ui.panels.PromptStack`` widget renders
+whatever is currently active, ordered by priority - the same dedup
+discipline as the scope-status indicators, so a producer can call its
+setter every frame without either flooding Qt or hand-rolling its own
+"did this actually change" tracking.
 """
 
 import threading
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -66,6 +77,34 @@ class ScopeStatus:
     any_ovd: bool
 
 
+@dataclass(frozen=True)
+class Notice:
+    """One entry in the prompt stack - a pill-shaped notice PromptStack
+    renders as a ``NoticeCard``.
+
+    ``notice_id`` is the producer's stable key (``set_prompt`` replaces or
+    clears whatever was last shown under it). ``priority`` orders the
+    stack when more than one notice is active at once - lower shows
+    first - matching the fixed top-to-bottom order the three hand-rolled
+    pills used to be laid out in. ``style`` names the look
+    (``telemffb.ui.widgets.NoticeCard`` has the three styles); ``pulse``
+    is whether it breathes or sits static.
+    """
+    notice_id: str
+    priority: int
+    html: str
+    style: str
+    pulse: bool
+
+
+#: Priority values for the three prompts this step carries, in the same
+#: top-to-bottom order MainWindow's new_craft_layout laid the old pills
+#: out in (new-craft, then profile-change, then trim-cal).
+NEW_CRAFT_PRIORITY = 0
+PROFILE_CHANGE_PRIORITY = 10
+TRIM_CAL_PRIORITY = 20
+
+
 class AppState(QObject):
     """Single source of truth for the "scope status" indicators, and the
     seed of a broader app-state model.
@@ -84,23 +123,31 @@ class AppState(QObject):
     - ``set_child_status`` - master only: what a child last reported over
       IPC (the STATUS keepalive and the effects payload both carry these
       two keys), called from the IPC thread.
+    - ``set_prompt`` - any of the three prompt producers (all main-thread
+      today: the telemetry-received and aircraft-updated signals are
+      auto-queued there), showing or clearing one entry of the prompt
+      stack.
 
     All of the above lives behind ``_lock``, since it is written from more
-    than one thread. ``scope_status_changed`` is emitted only when the
-    derived view actually differs from the last value shown, so callers
-    never need a ``force=True`` escape hatch to defeat a stale dedup key -
-    setting something to the value it already has never emits.
+    than one thread. ``scope_status_changed`` and ``prompts_changed`` are
+    each emitted only when the derived view actually differs from the last
+    value shown, so callers never need a ``force=True`` escape hatch to
+    defeat a stale dedup key - setting something to the value it already
+    has never emits.
 
-    ``scope_status_changed`` is safe to connect to a slot on a widget
-    living on the main thread regardless of which thread emits it: PyQt
-    queues the delivery automatically because the connection type is
-    resolved from the *receiver's* thread affinity, not the emitter's -
-    the same mechanism ``AppStatusWidget.request_set_active_vpconf`` (a
-    plain signal re-emitted at the widget) already relies on.
+    Both signals are safe to connect to a slot on a widget living on the
+    main thread regardless of which thread emits them: PyQt queues the
+    delivery automatically because the connection type is resolved from
+    the *receiver's* thread affinity, not the emitter's - the same
+    mechanism ``AppStatusWidget.request_set_active_vpconf`` (a plain
+    signal re-emitted at the widget) already relies on.
     """
 
     #: (scope, vpconf, any_vpconf, ovd, any_ovd) - see ScopeStatus.
     scope_status_changed = pyqtSignal(str, str, bool, bool, bool)
+    #: The currently-active Notices, sorted by priority (lowest first) -
+    #: see Notice.
+    prompts_changed = pyqtSignal(tuple)
 
     def __init__(self):
         super().__init__()
@@ -114,6 +161,9 @@ class AppState(QObject):
         # - what each child last reported over IPC.
         self._child_status: Dict[str, Dict[str, object]] = {}
         self._last_shown: Optional[tuple] = None
+        # notice_id -> Notice, for whatever prompts are currently active.
+        self._prompts: Dict[str, Notice] = {}
+        self._last_prompts_shown: Optional[Tuple[Notice, ...]] = None
 
     # ---- identity (set once at startup) --------------------------------
 
@@ -225,3 +275,42 @@ class AppState(QObject):
                 return
             self._last_shown = shown
         self.scope_status_changed.emit(*shown)
+
+    # ---- prompt stack (new-craft / trim-cal / profile-change notices) ---
+
+    def set_prompt(self, notice_id: str, notice: Optional[Notice]) -> None:
+        """Show ``notice`` under ``notice_id``, replacing whatever was
+        shown under that id before, or clear it when ``notice`` is
+        ``None``.
+
+        Safe to call every frame with an unchanged ``notice`` - equal to
+        equal (dataclass equality), it is a no-op and ``prompts_changed``
+        does not re-fire, the same dedup discipline as the scope-status
+        setters. A producer therefore does not need to track "did I
+        already show this" itself; it just declares what should be
+        showing right now.
+        """
+        with self._lock:
+            if notice is None:
+                if self._prompts.pop(notice_id, None) is None:
+                    return
+            else:
+                if self._prompts.get(notice_id) == notice:
+                    return
+                self._prompts[notice_id] = notice
+        self._emit_prompts()
+
+    def current_prompts(self) -> Tuple[Notice, ...]:
+        """The active Notices, sorted by priority (lowest first) - computed
+        fresh, not gated by the dedup key, so a subscriber calls this right
+        after connecting to paint the initial state correctly."""
+        with self._lock:
+            return tuple(sorted(self._prompts.values(), key=lambda n: n.priority))
+
+    def _emit_prompts(self) -> None:
+        shown = self.current_prompts()
+        with self._lock:
+            if shown == self._last_prompts_shown:
+                return
+            self._last_prompts_shown = shown
+        self.prompts_changed.emit(shown)

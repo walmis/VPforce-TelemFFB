@@ -54,6 +54,8 @@ from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.widgets.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
     SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, MiniDevicePanel, device_status_state
+from telemffb.ui.panels.PromptStack import PromptStack
+from telemffb.state.app_state import Notice, NEW_CRAFT_PRIORITY, PROFILE_CHANGE_PRIORITY, TRIM_CAL_PRIORITY
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
@@ -100,6 +102,14 @@ class MainWindow(QMainWindow):
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_notifications = {}
         self.new_craft_notification_sent = False
+        # The new-craft prompt's text/click-target lock: like the old
+        # QLabel's isVisible() check, the aircraft it names is captured
+        # once when the prompt first appears and does not follow the
+        # telemetry if a *different* unmatched aircraft shows up before it
+        # is dismissed (see PromptStack / _update_new_craft_prompt).
+        self._new_craft_prompt_active = False
+        self._new_craft_target = None  # (sim, cls, name) captured at that point
+        self._profile_change_prompt_active = False  # for the same one-shot-toast gating
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
         self._error_last_seen = 0.0 # monotonic time an 'error' key was last seen; the clear path holds ERROR_CLEAR_HOLD_S past it (child errors arrive over IPC on whichever frames catch them)
         self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
@@ -110,7 +120,6 @@ class MainWindow(QMainWindow):
         self._update_available = None
         self._version_check_resolved = False
         self._version_check_dialog = None
-        self.show_new_craft_button = False
         self.profile_mgr_dialog = None
         self.all_offline_models = []
 
@@ -555,100 +564,21 @@ class MainWindow(QMainWindow):
         layout.addLayout(logo_status_layout)
 
 
-        """ Create new craft button - pops when unknown aircraft is detected.
-        Wrapped in a container so it collapses to 0 height (rather than the
-        addSpacing() gaps below still reserving space) once none of its
-        three prompts are showing - otherwise that reserved space pushes
+        """ Create the prompt stack - the new-aircraft, trim-calibration-
+        discovery and matching-profile-offer "pill" prompts. It collapses
+        to 0 height once none of the three are active, so it does not push
         the Offline Editor Setup frame below out of alignment with the
-        Active Devices frame beside it. """
+        Active Devices frame beside it. See telemffb/ui/panels/PromptStack.py
+        and telemffb/state/app_state.py (Notice / AppState.set_prompt) -
+        producers declare what should be showing, PromptStack renders it. """
 
-        self.new_craft_container = QWidget()
-        new_craft_layout = QVBoxLayout(self.new_craft_container)
-        new_craft_layout.setContentsMargins(0, 0, 0, 0)
-        # Pill-and-pulse prompts are QLabels with an embedded link, not
-        # QPushButtons: rich text allows partial emphasis (bold aircraft
-        # name, medium-weight fixed words) which buttons cannot render.
-        # The link spans the whole text, so the entire pill is clickable
-        # and Qt supplies the hand cursor.
-        self.new_craft_button = QLabel()
-        self.new_craft_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        # Red fill breathing dim<->bright, white text/border, content-sized
-        # and centered (the old full-width slab was routinely missed
-        # despite its size). The animation runs only while visible.
-        self._new_craft_anim = QtCore.QVariantAnimation(self)
-        self._new_craft_anim.setStartValue(0.0)
-        self._new_craft_anim.setKeyValueAt(0.5, 1.0)
-        self._new_craft_anim.setEndValue(0.0)
-        self._new_craft_anim.setDuration(2600)
-        self._new_craft_anim.setLoopCount(-1)
-        self._new_craft_anim.valueChanged.connect(self._style_new_craft_button)
-        self._style_new_craft_button(0.0)
-        new_craft_layout.addWidget(self.new_craft_button,
-                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-        new_craft_layout.addSpacing(7)
+        self.prompt_stack = PromptStack()
+        self.prompt_stack.activated.connect(self._on_prompt_activated)
+        self.prompt_stack.bind(G.app_state)
 
-        # Trim-calibration discovery prompt: shares the new-craft button's
-        # space (the two are mutually exclusive — no matched profile means
-        # nowhere to save a calibration). The calibration settings live
-        # three prereqs deep under Axis Control; this puts the feature in
-        # front of the user when an aircraft loads without one. Styled as an
-        # outlined notice card — content-sized and centered — so it pops
-        # without impersonating the solid new-craft action button.
-        self.trim_cal_prompt_button = QLabel()
-        self.trim_cal_prompt_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        self.trim_cal_prompt_button.setText(
-            "<a href='#trimcal' style='color:black; text-decoration:none;'>"
-            "<span style='font-weight:500;'>No Trim Calibration Found for this "
-            "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
-            " to Set Up Realistic Trim</span></a>")
-        self.trim_cal_prompt_button.linkActivated.connect(
-            lambda _: self.open_trim_calibration_dialog())
-        # Slow breathing pulse (fill + border alpha) while visible — started
-        # and stopped with visibility so it costs nothing when hidden.
-        self._trim_prompt_anim = QtCore.QVariantAnimation(self)
-        self._trim_prompt_anim.setStartValue(0.0)
-        self._trim_prompt_anim.setKeyValueAt(0.5, 1.0)
-        self._trim_prompt_anim.setEndValue(0.0)
-        self._trim_prompt_anim.setDuration(2600)
-        self._trim_prompt_anim.setLoopCount(-1)
-        self._trim_prompt_anim.valueChanged.connect(self._style_trim_cal_prompt)
-        self._style_trim_cal_prompt(0.0)
-        # Profile-changed offer: the pattern naming the loaded aircraft is
-        # not the one recorded at its last load (a more specific curated
-        # profile shipped, or the user made one), so the user's
-        # rows under the old pattern no longer edit this aircraft. Copy
-        # them across on request; either link clears the offer.
-        self.profile_change_button = QLabel()
-        self.profile_change_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        self.profile_change_button.linkActivated.connect(self._on_profile_change_link)
-        # Teal, and static where its two neighbours breathe: red is the
-        # new-aircraft prompt, mustard the trim one and the Paused badge,
-        # blue the device selection, purple the brand.  This is an offer,
-        # not something wrong, so it should not pulse for attention.
-        self.profile_change_button.setStyleSheet("""QLabel {
-                            background-color: rgb(0, 121, 107);
-                            border: 3px solid white;
-                            border-radius: 17px;
-                            color: white;
-                            padding: 8px 18px;
-                        }
-                        QLabel:hover {
-                            background-color: #26a69a;
-                        }""")
-        self.profile_change_button.hide()
-        new_craft_layout.addWidget(self.profile_change_button,
-                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-        new_craft_layout.addSpacing(7)
+        """ Add the prompt stack to the main layout """
 
-        new_craft_layout.addWidget(self.trim_cal_prompt_button,
-                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-
-        """ Add new craft button to main layout """
-
-        right_column_layout.addWidget(self.new_craft_container)
-        self.new_craft_button.hide()
-        self.trim_cal_prompt_button.hide()
-        self.new_craft_container.hide()
+        right_column_layout.addWidget(self.prompt_stack)
 
 
         """ Create offline config control area QWidget """
@@ -2266,12 +2196,7 @@ class MainWindow(QMainWindow):
         wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls,
                                    clone_from=clone_from)
         wizard.accepted.connect(self.new_ac_wizard_finished)
-        if wizard.exec():
-            try:
-                # make sure no other calls are connected to avoid stacking lambda calls if user cancels and doesn't add new aircraft
-                self.new_craft_button.linkActivated.disconnect()
-            except TypeError:
-                pass  # No handler connected yet
+        wizard.exec()
 
     @override
     def closeEvent(self, event):
@@ -2466,18 +2391,19 @@ class MainWindow(QMainWindow):
     def _update_profile_change_prompt(self):
         change = getattr(G.settings_mgr, 'profile_change', None)
         if not change or not G.master_instance:
-            self.profile_change_button.hide()
-            self._sync_new_craft_container()
+            G.app_state.set_prompt('profile_change', None)
+            self._profile_change_prompt_active = False
             return
         # One line, like the trim prompt beside it: the detail and the choice
         # need more room than a pill has, so they live in the dialog it opens.
-        self.profile_change_button.setText(
-            "<a href='#open' style='color:white; text-decoration:none;'>"
-            "<span style='font-weight:500;'>Multiple matching profiles detected — </span>"
-            "<b>Click Here</b><span style='font-weight:500;'> to resolve</span></a>")
-        if not self.profile_change_button.isVisible():
-            self.profile_change_button.show()
-            self._sync_new_craft_container()
+        G.app_state.set_prompt('profile_change', Notice(
+            notice_id='profile_change', priority=PROFILE_CHANGE_PRIORITY,
+            style='profile_change', pulse=False,
+            html="<a href='#open' style='color:white; text-decoration:none;'>"
+                 "<span style='font-weight:500;'>Multiple matching profiles detected — </span>"
+                 "<b>Click Here</b><span style='font-weight:500;'> to resolve</span></a>"))
+        if not self._profile_change_prompt_active:
+            self._profile_change_prompt_active = True
             # Only worth a toast when the window cannot be seen, and it says
             # what is true: nothing has been decided and nothing is asked for.
             if self.isHidden() or self.isMinimized():
@@ -2490,8 +2416,8 @@ class MainWindow(QMainWindow):
     def _on_profile_change_link(self, href):
         change = getattr(G.settings_mgr, 'profile_change', None)
         if not change:
-            self.profile_change_button.hide()
-            self._sync_new_craft_container()
+            G.app_state.set_prompt('profile_change', None)
+            self._profile_change_prompt_active = False
             return
         choice = self._ask_profile_change(change)
         if choice == ProfileOfferDialog.LATER:
@@ -2502,8 +2428,8 @@ class MainWindow(QMainWindow):
         # aircraft's offer, and that one must stay for its own prompt.
         if G.settings_mgr.profile_change is change:
             G.settings_mgr.profile_change = None
-        self.profile_change_button.hide()
-        self._sync_new_craft_container()
+        G.app_state.set_prompt('profile_change', None)
+        self._profile_change_prompt_active = False
         sim, user, curated = change['sim'], change['user'], change['curated']
         shipped = change.get('shipped', '')
         try:
@@ -3046,19 +2972,22 @@ class MainWindow(QMainWindow):
                 new_sim = data.get('src', None)
                 new_aircraft = data.get('N', None)
                 new_class = G.settings_mgr.current_class
-                self.trim_cal_prompt_button.hide()  # profile creation first
-                self._sync_new_craft_container()
+                G.app_state.set_prompt('trim_cal', None)  # profile creation first
                 if G.master_instance:
-                    if not self.new_craft_button.isVisible():
-                        self.new_craft_button.setText(
-                            "<a href='#newcraft' style='color:white; text-decoration:none;'>"
-                            "<span style='font-weight:500;'>No Profile Found for </span>"
-                            f"<b>{html.escape(str(new_aircraft or ''))}</b>"
-                            "<span style='font-weight:500;'> — Click Here to Create a New Profile</span></a>")
-                        self.new_craft_button.linkActivated.connect(lambda _: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
-                        self.new_craft_button.show()
-                        self._sync_new_craft_container()
-                        self._new_craft_anim.start()
+                    target = (new_sim, new_class, new_aircraft)
+                    if not self._new_craft_prompt_active or target != self._new_craft_target:
+                        # Rebuilt only when the unmatched aircraft changes, so
+                        # the text and click target always follow the current
+                        # one without per-frame Notice construction.
+                        self._new_craft_target = target
+                        G.app_state.set_prompt('new_craft', Notice(
+                            notice_id='new_craft', priority=NEW_CRAFT_PRIORITY,
+                            style='new_craft', pulse=True,
+                            html="<a href='#newcraft' style='color:white; text-decoration:none;'>"
+                                 "<span style='font-weight:500;'>No Profile Found for </span>"
+                                 f"<b>{html.escape(str(new_aircraft or ''))}</b>"
+                                 "<span style='font-weight:500;'> — Click Here to Create a New Profile</span></a>"))
+                        self._new_craft_prompt_active = True
 
                     if not data.get('STOP', False):
                         if not self.new_craft_notification_sent:
@@ -3074,10 +3003,10 @@ class MainWindow(QMainWindow):
 
 
             else:
-                if self.new_craft_button.isVisible():
-                    self.new_craft_button.hide()
-                    self._sync_new_craft_container()
-                    self._new_craft_anim.stop()
+                if self._new_craft_prompt_active:
+                    G.app_state.set_prompt('new_craft', None)
+                    self._new_craft_prompt_active = False
+                    self._new_craft_target = None
                 self.new_craft_notification_sent = False
                 self._update_trim_cal_prompt()
 
@@ -3244,9 +3173,9 @@ class MainWindow(QMainWindow):
         dlg.show()
 
     def new_ac_wizard_finished(self):
-        self.new_craft_button.setVisible(False)
-        self._sync_new_craft_container()
-        self._new_craft_anim.stop()
+        G.app_state.set_prompt('new_craft', None)
+        self._new_craft_prompt_active = False
+        self._new_craft_target = None
         # The wizard just wrote the type row and the profile mapping. The
         # telemetry loop only re-resolves the active profile when a frame
         # notices the config change; a setting changed before that frame
@@ -3260,8 +3189,7 @@ class MainWindow(QMainWindow):
         # the new match, so neither the next reload nor the next start
         # offers again.
         G.settings_mgr.profile_change = None
-        self.profile_change_button.hide()
-        self._sync_new_craft_container()
+        G.app_state.set_prompt('profile_change', None)
         self.settings_layout.reload_layout(None)
 
     def _update_trim_cal_prompt(self):
@@ -3286,63 +3214,27 @@ class MainWindow(QMainWindow):
                 and ac is not None
                 and getattr(ac, "_trim_cal_available", False)
                 and getattr(ac, "_trim_curve_y_fam", None) is None)
-        if show != self.trim_cal_prompt_button.isVisible():
-            self.trim_cal_prompt_button.setVisible(show)
-            if show:
-                self._trim_prompt_anim.start()
-            else:
-                self._trim_prompt_anim.stop()
-        self._sync_new_craft_container()
+        G.app_state.set_prompt('trim_cal', Notice(
+            notice_id='trim_cal', priority=TRIM_CAL_PRIORITY, style='trim_cal', pulse=True,
+            html="<a href='#trimcal' style='color:black; text-decoration:none;'>"
+                 "<span style='font-weight:500;'>No Trim Calibration Found for this "
+                 "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
+                 " to Set Up Realistic Trim</span></a>") if show else None)
 
-    def _sync_new_craft_container(self):
-        """Show/hide the new-craft-prompt row's container based on whether
-        any of its three prompts wants to be showing. Checked with
-        isVisibleTo() rather than isVisible(): the latter also folds in the
-        container's OWN current visibility, which would make this
-        self-referential (the container can only become visible if it
-        already is) once it starts out hidden."""
-        any_visible = (
-            self.new_craft_button.isVisibleTo(self.new_craft_container)
-            or self.trim_cal_prompt_button.isVisibleTo(self.new_craft_container)
-            or self.profile_change_button.isVisibleTo(self.new_craft_container)
-        )
-        self.new_craft_container.setVisible(any_visible)
-
-    def _style_new_craft_button(self, v):
-        """One pulse frame for the new-aircraft prompt: a red pill breathing
-        dim<->bright, white text and border (weights come from the rich
-        text — bold aircraft name, medium fixed words)."""
-        r = int(150 + (225 - 150) * v)
-        g = int(28 + (45 - 28) * v)
-        b = int(28 + (45 - 28) * v)
-        self.new_craft_button.setStyleSheet(f"""QLabel {{
-                            background-color: rgb({r}, {g}, {b});
-                            border: 3px solid white;
-                            border-radius: 17px;
-                            color: white;
-                            padding: 8px 18px;
-                        }}
-                        QLabel:hover {{
-                            background-color: #ef5350;
-                        }}""")
-
-    def _style_trim_cal_prompt(self, v):
-        """One pulse frame for the discovery prompt: a mustard pill (same
-        family as the Paused status badge) breathing between dim and bright,
-        solid fill so the black text keeps contrast throughout."""
-        r = int(130 + (242 - 130) * v)
-        g = int(100 + (180 - 100) * v)
-        b = int(12 + (34 - 12) * v)
-        self.trim_cal_prompt_button.setStyleSheet(f"""QLabel {{
-                            background-color: rgb({r}, {g}, {b});
-                            border: 3px solid black;
-                            border-radius: 17px;
-                            color: black;
-                            padding: 8px 18px;
-                        }}
-                        QLabel:hover {{
-                            background-color: #f5bc28;
-                        }}""")
+    def _on_prompt_activated(self, notice_id: str):
+        """PromptStack.activated relay: what a click on each of the three
+        prompts does. Kept here rather than in the panel because every one
+        of them opens a MainWindow-owned dialog or reaches into
+        G.telem_manager - the panel only knows what is showing, not what
+        clicking it means."""
+        if notice_id == 'new_craft':
+            if self._new_craft_target is not None:
+                sim, cls, name = self._new_craft_target
+                self.show_new_aircraft_wizard(manual=False, sim=sim, cls=cls, name=name)
+        elif notice_id == 'trim_cal':
+            self.open_trim_calibration_dialog()
+        elif notice_id == 'profile_change':
+            self._on_profile_change_link(None)
 
 
     def perform_update(self, auto=True):
