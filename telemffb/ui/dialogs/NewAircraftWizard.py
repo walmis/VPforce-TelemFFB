@@ -22,11 +22,11 @@ from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator, QFont
 from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyle, QComboBox
 
-from . import globals as G
-from . import utils
-from . import xmlutils
-from .xml import match as xmatch
-from .ui.generated.Ui_NewAircraftWizard import Ui_NewAircraftWizard
+from ... import globals as G
+from ... import utils
+from ... import xmlutils
+from ...xml import match as xmatch
+from ..generated.Ui_NewAircraftWizard import Ui_NewAircraftWizard
 
 class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     """

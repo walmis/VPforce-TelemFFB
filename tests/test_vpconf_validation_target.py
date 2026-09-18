@@ -140,7 +140,7 @@ class TestDialogReadsTheRightPid:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         yield dlg
         dlg.deleteLater()
@@ -205,7 +205,7 @@ class TestLaunchOptionsFollowTheDevice:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         dlg.cb_al_enable.setChecked(True)
         dlg.toggle_al_widgets()
@@ -320,7 +320,7 @@ class TestTheMasterRowHasNoLaunchOptions:
                             ('device_usbpid', '2054'), ('device_capabilities', None),
                             ('device_di_guid', None), ('is_exe', False)):
             monkeypatch.setattr(G, name, value, raising=False)
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         dlg = SystemSettingsDialog()
         # stand in for connected hardware, as populateUSBSelectors would
         for combo, pid, ident in ((dlg.cb_select_j, 0x2054, 'Monster'),

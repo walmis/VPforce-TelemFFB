@@ -17,7 +17,7 @@ from PyQt6 import QtWidgets
 
 from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TargetStatus,
                                   WrapperState)
-from telemffb import TapUpdateDialog as mod
+from telemffb.ui.dialogs import TapUpdateDialog as mod
 
 pytestmark = [pytest.mark.unit]
 

@@ -19,7 +19,7 @@ from PyQt6 import QtWidgets
 
 from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
                                   TargetStatus, WrapperState)
-from telemffb import TapRepairDialog as mod
+from telemffb.ui.dialogs import TapRepairDialog as mod
 
 pytestmark = [pytest.mark.unit]
 

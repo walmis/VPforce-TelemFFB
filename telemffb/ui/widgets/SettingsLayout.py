@@ -32,9 +32,9 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from .custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
-from telemffb.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
-from telemffb.AdvancedGDialog import AdvancedGDialog
+from ..dialogs.ConfiguratorDialog import ConfiguratorDialog
+from ..dialogs.AdvancedSpringDialog import AdvancedSpringDialog
+from ..dialogs.AdvancedGDialog import AdvancedGDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile, device_pid_key, dbprint, HiDpiPixmap
 import telemffb.utils as utils

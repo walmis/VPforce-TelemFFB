@@ -217,7 +217,7 @@ class TapDeviceDialog(QtWidgets.QDialog):
         """Enable OK only where confirming would change a file."""
         if self._preview is None or self._ok is None:
             return
-        from telemffb.TapDiffDialog import aligned_diff, changed
+        from telemffb.ui.dialogs.TapDiffDialog import aligned_diff, changed
 
         panes = self._preview(self.chosen(), self.retire_lines(),
                               self.ordered(), self.blocked())
@@ -233,7 +233,7 @@ class TapDeviceDialog(QtWidgets.QDialog):
         Computed on the click, not when the dialog opened: the whole point
         is to show the consequence of the choices actually made.
         """
-        from telemffb.TapDiffDialog import TapDiffDialog
+        from telemffb.ui.dialogs.TapDiffDialog import TapDiffDialog
 
         panes = self._preview(self.chosen(), self.retire_lines(),
                               self.ordered(), self.blocked())

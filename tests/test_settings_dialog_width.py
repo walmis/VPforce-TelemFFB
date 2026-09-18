@@ -48,7 +48,7 @@ def dialog(monkeypatch):
                         ('device_usbpid', '2055'), ('device_capabilities', None),
                         ('device_di_guid', None), ('is_exe', False)):
         monkeypatch.setattr(G, name, value, raising=False)
-    from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     dlg = SystemSettingsDialog()
     dlg.ensurePolished()
     yield dlg

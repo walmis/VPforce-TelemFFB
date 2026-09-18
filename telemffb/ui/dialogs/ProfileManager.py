@@ -31,8 +31,8 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, 
 import telemffb.globals as G
 from telemffb import utils
 from telemffb.ui.generated.Ui_ProfileManagerDialog import Ui_ProfileManagerDialog
-from telemffb.ProfileImportDialog import ProfileImportDialog
-from telemffb.NewAircraftWizard import NewAircraftWizard
+from telemffb.ui.dialogs.ProfileImportDialog import ProfileImportDialog
+from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
 from telemffb.utils import dbprint
 import xml.etree.ElementTree as ET
 import telemffb.xmlutils as xmlutils

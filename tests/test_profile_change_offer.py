@@ -15,7 +15,7 @@ import pytest
 
 import telemffb.globals as G
 from telemffb import match_history, xmlutils
-from telemffb.ProfileOfferDialog import offers_decline
+from telemffb.ui.dialogs.ProfileOfferDialog import offers_decline
 
 pytestmark = [pytest.mark.unit]
 

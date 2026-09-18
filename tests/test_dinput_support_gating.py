@@ -61,7 +61,7 @@ def dialog(monkeypatch):
                         ('device_usbpid', '2054'), ('device_capabilities', None),
                         ('device_di_guid', None), ('is_exe', False)):
         monkeypatch.setattr(G, name, value, raising=False)
-    from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     # bridge_status loads the real bridge DLL - never from a test
     from telemffb.hw.ffb_dinput import BridgeStatus
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_status',

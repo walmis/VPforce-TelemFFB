@@ -456,7 +456,7 @@ def do_verify():
         print("  no pattern names it: the new-aircraft wizard fires")
         words = AC.split()
         pats = [' '.join(words[:i]) + ".*" for i in range(len(words), 0, -1)]
-        from telemffb.NewAircraftWizard import NewAircraftWizard
+        from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
         stub = type("S", (), {"clone_from": None,
                               "_MIN_SUGGESTED_WORDS": NewAircraftWizard._MIN_SUGGESTED_WORDS})()
         i = NewAircraftWizard._default_suggestion(stub, pats, AC)
@@ -490,7 +490,7 @@ def do_verify():
             print(f"  PILL           : none - this pair was already answered ({answered})")
         else:
             keep = col["winner"] == "curated" and not col["same_claim"]
-            from telemffb.ProfileOfferDialog import offers_decline
+            from telemffb.ui.dialogs.ProfileOfferDialog import offers_decline
             if not offers_decline(col):
                 answers = "none - their rows reach nothing, so Merge and Not now only"
             elif col["winner"] == "user":

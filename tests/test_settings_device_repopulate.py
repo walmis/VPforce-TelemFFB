@@ -42,7 +42,7 @@ def _make_dialog(monkeypatch, settings):
                         ('device_usbpid', '2055'), ('device_capabilities', None),
                         ('device_di_guid', None)):
         monkeypatch.setattr(G, name, value, raising=False)
-    from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     # never the real hardware layer: DirectInput enumeration loads the
     # bridge DLL and walks the machine's actual devices, which blocks
     # while a running TelemFFB holds one exclusively
@@ -86,7 +86,7 @@ def test_dialog_opens_with_directinput_already_enabled(monkeypatch):
     nothing selected the restore loop skips the PID sync entirely.
     """
     device = _FakeDevice()
-    monkeypatch.setattr('telemffb.SystemSettingsDialog.FFBRhino.enumerate',
+    monkeypatch.setattr('telemffb.ui.dialogs.SystemSettingsDialog.FFBRhino.enumerate',
                         staticmethod(lambda *a, **k: [device]), raising=False)
     app, dlg = _make_dialog(monkeypatch, _Settings({
         'devpath_joystick': device.path.decode(), 'devpath_pedals': '',
@@ -114,11 +114,11 @@ def dialog(monkeypatch):
                         ('device_di_guid', None)):
         monkeypatch.setattr(G, name, value, raising=False)
 
-    from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     # stub the hardware layer for the same reason as _make_dialog above -
     # and FFBRhino.enumerate too, which otherwise lists the developer's
     # actual VPforce devices
-    monkeypatch.setattr('telemffb.SystemSettingsDialog.FFBRhino.enumerate',
+    monkeypatch.setattr('telemffb.ui.dialogs.SystemSettingsDialog.FFBRhino.enumerate',
                         staticmethod(lambda *a, **k: []), raising=False)
     monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
                         staticmethod(lambda enabled=None: []))
@@ -200,7 +200,7 @@ class TestDirectInputRolesListed:
     backend can drive them."""
 
     def _dialog(self, monkeypatch):
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         app, dlg = _make_dialog(monkeypatch, _Settings({
             'devpath_joystick': '', 'devpath_pedals': '',
             'devpath_collective': '', 'devpath_trimwheel': '',
@@ -233,7 +233,7 @@ class TestAxisChooser:
     joystick never has one - X/Y untouched, always."""
 
     def _dialog(self, monkeypatch, axes=('X', 'RZ'), extra=None):
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         base = {'devpath_joystick': '', 'devpath_pedals': '',
                 'devpath_collective': '', 'devpath_trimwheel': '',
                 'enableDirectInput': True}

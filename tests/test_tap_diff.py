@@ -13,7 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-from telemffb.TapDiffDialog import TapDiffDialog, aligned_diff, changed
+from telemffb.ui.dialogs.TapDiffDialog import TapDiffDialog, aligned_diff, changed
 
 pytestmark = [pytest.mark.unit]
 

@@ -77,7 +77,7 @@ from telemffb.ui.widgets.LogWindow import LogWindow
 from telemffb.MainWindow import MainWindow
 from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
-from telemffb.ConfiguratorDialog import ConfiguratorDialog
+from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             upload_vpconf_profile)
@@ -1806,12 +1806,12 @@ def main():
     # to bring whatever survived up to the bundled build.
     if G.master_instance:
         try:
-            from telemffb.TapRepairDialog import offer_wrapper_repairs
+            from telemffb.ui.dialogs.TapRepairDialog import offer_wrapper_repairs
             offer_wrapper_repairs(G.main_window)
         except Exception:
             logging.exception("DirectInput tap: startup repair offer failed")
         try:
-            from telemffb.TapUpdateDialog import offer_wrapper_updates
+            from telemffb.ui.dialogs.TapUpdateDialog import offer_wrapper_updates
             offer_wrapper_updates(G.main_window)
         except Exception:
             logging.exception("DirectInput tap: startup update offer failed")

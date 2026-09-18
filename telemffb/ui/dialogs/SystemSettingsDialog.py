@@ -30,23 +30,23 @@ from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardI
 from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QHBoxLayout, QLabel,
                              QMessageBox, QPushButton, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout, QWidget)
 
-from . import globals as G
-from . import msfs_panel_install
-from . import utils
-from .app_events import events as app_events
-from .ui.generated.Ui_SystemDialog import Ui_SystemDialog
-from .ui.panels.TapStatusPanel import TapStatusPanel
-from .tap_install import SIMS_BY_KEY, matches_signature, sim_status
-from .ui.panels.InstanceSettingsPanel import (
+from ... import globals as G
+from ... import msfs_panel_install
+from ... import utils
+from ...app_events import events as app_events
+from ..generated.Ui_SystemDialog import Ui_SystemDialog
+from ..panels.TapStatusPanel import TapStatusPanel
+from ...tap_install import SIMS_BY_KEY, matches_signature, sim_status
+from ..panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
-from .utils import (
+from ...utils import (
     device_display_name, device_ident_key, device_ids_key, device_pid_key,
     directinput_selection_devices, format_usb_ids, recover_device_identity,
     validate_vpconf_profile, HiDpiPixmap,
 )
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
-from .ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle
+from ..widgets.custom_widgets import FFBDeviceListModel, LabeledToggle
 
 def _as_bool(value):
     """A stored setting as a boolean.
@@ -239,7 +239,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # bind_to() re-creates every legacy widget name (cb_select_j,
         # rb_master_p, ...) as dialog attributes so the rest of this file -
         # and the test harness - work unchanged.
-        from .ui.panels.DeviceCardsPanel import DeviceCardsPanel
+        from ..panels.DeviceCardsPanel import DeviceCardsPanel
         self.device_cards = DeviceCardsPanel(self)
         self.deviceCardsHostLayout.addWidget(self.device_cards)
         self.device_cards.bind_to(self)
@@ -2785,7 +2785,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         question reappearing where the user left it.
         """
         from telemffb.tap_reconcile import cleanup_preview
-        from telemffb.TapDiffDialog import TapDiffDialog
+        from .TapDiffDialog import TapDiffDialog
 
         while True:
             box = QMessageBox(self)

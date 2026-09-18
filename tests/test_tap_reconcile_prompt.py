@@ -20,7 +20,7 @@ from PyQt6 import QtWidgets
 
 import telemffb.globals as G
 from telemffb.tap_config import Rule
-from telemffb.SystemSettingsDialog import (CLEANUP_CANCELLED,
+from telemffb.ui.dialogs.SystemSettingsDialog import (CLEANUP_CANCELLED,
                                           CLEANUP_LEAVE,
                                           CLEANUP_REMOVE)
 from telemffb.tap_install import SIMS_BY_KEY, SimStatus, TapDevice
@@ -41,7 +41,7 @@ def app():
 def dialog(app, monkeypatch):
     """A settings dialog with just enough around it to call the hook."""
     monkeypatch.setattr(G, 'system_settings', {}, raising=False)
-    from telemffb.SystemSettingsDialog import SystemSettingsDialog
+    from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     instance = SystemSettingsDialog.__new__(SystemSettingsDialog)
     # PyQt raises from __getattr__ on an instance whose __init__ never ran,
     # so anything the code under test reads has to be present
@@ -64,7 +64,7 @@ def an_item():
 def spy(monkeypatch):
     """Watch what the hook asks and what it applies."""
     from telemffb import tap_reconcile
-    import telemffb.SystemSettingsDialog as module
+    import telemffb.ui.dialogs.SystemSettingsDialog as module
 
     state = {"asked": [], "applied": [], "items": [an_item()]}
     monkeypatch.setattr(tap_reconcile, 'pending_reconcile',
@@ -305,7 +305,7 @@ class TestOptingASimBackOut:
 
     @pytest.fixture
     def cleanup(self, dialog, monkeypatch):
-        import telemffb.SystemSettingsDialog as module
+        import telemffb.ui.dialogs.SystemSettingsDialog as module
         from telemffb.tap_install import SimStatus
         from telemffb.tap_reconcile import TapCleanup
 
@@ -395,7 +395,7 @@ class TestTurningASimOff:
 
     @pytest.fixture
     def cleanup(self, dialog, monkeypatch):
-        import telemffb.SystemSettingsDialog as module
+        import telemffb.ui.dialogs.SystemSettingsDialog as module
         import telemffb.tap_reconcile as ti
         from telemffb.tap_install import SimStatus
         from telemffb.tap_reconcile import TapCleanup
@@ -478,7 +478,7 @@ class TestDismissingTheQuestion:
 
     @pytest.fixture
     def cancelled(self, dialog, monkeypatch):
-        import telemffb.SystemSettingsDialog as module
+        import telemffb.ui.dialogs.SystemSettingsDialog as module
         import telemffb.tap_reconcile as ti
         from telemffb.tap_install import SimStatus
         from telemffb.tap_reconcile import TapCleanup
@@ -523,7 +523,7 @@ class TestDismissingTheQuestion:
                                          monkeypatch):
         """"Leave it" keeps the switch where the user just put it - they
         meant to turn it off, they just kept the files."""
-        import telemffb.SystemSettingsDialog as module
+        import telemffb.ui.dialogs.SystemSettingsDialog as module
         monkeypatch.setattr(module.SystemSettingsDialog, '_ask_with_preview',
                             lambda self, message, plan: CLEANUP_LEAVE)
         dialog._offer_tap_cleanup("DCS")
@@ -546,7 +546,7 @@ class TestCancellingLeavesAConsistentPage:
             self.visible = value
 
     def test_the_panel_comes_back_with_the_switch(self, dialog, monkeypatch):
-        import telemffb.SystemSettingsDialog as module
+        import telemffb.ui.dialogs.SystemSettingsDialog as module
         monkeypatch.setattr(module.SystemSettingsDialog, '_tap_status',
                             lambda self, key: None)
         panel = self.Panel()
@@ -557,7 +557,7 @@ class TestCancellingLeavesAConsistentPage:
 
     def test_and_stays_hidden_when_the_switch_is_off(self, dialog,
                                                      monkeypatch):
-        import telemffb.SystemSettingsDialog as module
+        import telemffb.ui.dialogs.SystemSettingsDialog as module
         monkeypatch.setattr(module.SystemSettingsDialog, '_tap_status',
                             lambda self, key: None)
         panel = self.Panel()
@@ -584,7 +584,7 @@ class TestHowTheQuestionReads:
                              was_ident="Monster")
 
     def summary(self, *items):
-        from telemffb.SystemSettingsDialog import SystemSettingsDialog
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
         return SystemSettingsDialog._reconcile_summary(list(items))
 
     def test_the_change_is_stated_once_and_the_sims_listed(self):

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from telemffb.MainWindow import MainWindow
     from subprocess import Popen
     from telemffb.CmdLineArgs import CmdLineArgs
-    from telemffb.ConfiguratorDialog import ConfiguratorDialog
+    from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
     from telemffb.hw.ffb_rhino import DeviceInfo, HapticEffect
     from telemffb.utils import Dispenser
     from telemffb.ExceptionTracker import ExceptionTracker

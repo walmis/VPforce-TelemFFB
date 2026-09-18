@@ -14,7 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-from telemffb.TapDeviceDialog import TapDeviceDialog
+from telemffb.ui.dialogs.TapDeviceDialog import TapDeviceDialog
 from telemffb.tap_install import SIMS_BY_KEY, TapDevice
 
 pytestmark = [pytest.mark.unit]

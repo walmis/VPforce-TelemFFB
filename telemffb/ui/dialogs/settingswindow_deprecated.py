@@ -36,9 +36,9 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
 
 import telemffb.utils as utils
 import telemffb.globals as G
-from . import xmlutils
+from ... import xmlutils
 # from .UserModelDialog import UserModelDialog
-from .ui.generated.Ui_SettingsWindow import Ui_SettingsWindow
+from ..generated.Ui_SettingsWindow import Ui_SettingsWindow
 
 """
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
