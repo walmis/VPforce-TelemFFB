@@ -139,7 +139,7 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
             entry so support can map the bundle to a user at a glance
     """
     from datetime import datetime
-    import telemffb.winpaths as winpaths
+    import telemffb.utils.winpaths as winpaths
     from .integration import get_dcs_variant
 
 

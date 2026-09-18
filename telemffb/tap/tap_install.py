@@ -268,7 +268,7 @@ def dcs_log_roots() -> List[str]:
     the most recent session.  Ordering only decides which root is
     offered first; each is still checked for the executable.
     """
-    import telemffb.winpaths as winpaths
+    import telemffb.utils.winpaths as winpaths
     try:
         saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
     except Exception:

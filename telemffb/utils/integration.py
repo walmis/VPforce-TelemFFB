@@ -502,7 +502,7 @@ def _check_dcrealistic_autostart(export_data, export_lua_path, window):
             )
 
 def _prepare_dcs_export_context():
-    import telemffb.winpaths as winpaths
+    import telemffb.utils.winpaths as winpaths
 
     """Resolve shared paths and targets for DCS export integration."""
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)

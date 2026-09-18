@@ -56,7 +56,7 @@ def make_tree(root, relpaths):
 @pytest.fixture
 def saved_games(tmp_path, monkeypatch):
     """A Saved Games folder of our own, wherever the real one is."""
-    import telemffb.winpaths as winpaths
+    import telemffb.utils.winpaths as winpaths
     root = tmp_path / "SavedGames"
     root.mkdir()
     monkeypatch.setattr(winpaths, 'get_path', lambda *a, **k: str(root))
