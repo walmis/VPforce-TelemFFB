@@ -279,9 +279,9 @@ class AppStatusWidget(QWidget):
         # values can't shrink it.
         grid.setColumnMinimumWidth(1, 280)
 
-        outer_layout.addWidget(self.sim_status_group)
+        outer_layout.addWidget(self.sim_status_group, stretch=1)
         outer_layout.addWidget(column_divider)
-        outer_layout.addWidget(self.app_status_group)
+        outer_layout.addWidget(self.app_status_group, stretch=1)
 
         sim_row = 0
         row = 0

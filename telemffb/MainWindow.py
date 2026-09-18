@@ -1087,7 +1087,9 @@ class MainWindow(QMainWindow):
         and the mini row - shown only when the frame is not - has
         clickable chips (for configured devices only), so status colors
         stay visible in this small a space and clicking one switches
-        straight to it. Either way, the Hide tab collapses both. """
+        straight to it. The Hide tab always collapses the frame (its
+        minimum height would stop the window from shrinking) and shows
+        the mini row in its place. """
         names = self.device_panel.get_device_names()
         configured_names = [n for n in names if self.device_panel.icons[n].configured]
         multiple = len(configured_names) > 1
@@ -1095,7 +1097,7 @@ class MainWindow(QMainWindow):
         on_hide_tab = tab_widget is not None and tab_widget.currentIndex() == 2
         show_frame = multiple and bool(G.system_settings.get('showDevicesFrame', True)) and not on_hide_tab
         self.device_groupbox.setVisible(show_frame)
-        self.header_panel.device_mini_panel.setVisible(bool(names) and not show_frame and not on_hide_tab)
+        self.header_panel.device_mini_panel.setVisible(bool(names) and not show_frame)
         self.header_panel.device_mini_panel.set_clickable(multiple)
 
     def _set_devices_frame_preference(self, visible: bool):

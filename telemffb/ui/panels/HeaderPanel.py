@@ -108,8 +108,7 @@ class HeaderPanel(QWidget):
 
         layout.addLayout(logo_column_layout)
         layout.setAlignment(logo_column_layout, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(status_group, alignment=Qt.AlignmentFlag.AlignTop)
-        layout.addStretch(1)
+        layout.addWidget(status_group, stretch=1, alignment=Qt.AlignmentFlag.AlignTop)
 
     def bind(self, state: AppState) -> None:
         """Subscribe to ``state.scope_status_changed`` and paint its current
