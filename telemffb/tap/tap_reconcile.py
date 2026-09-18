@@ -44,10 +44,10 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Tuple
 
-from telemffb.tap_config import (OrderEntry, Rule, amend, order_matches,
+from telemffb.tap.tap_config import (OrderEntry, Rule, amend, order_matches,
                                  read, rule_matches, shadowing_rules,
                                  stale_tap_rules)
-from telemffb.tap_install import (GENERATED_MARKER, SIMS, WRAPPER_CONFIG,
+from telemffb.tap.tap_install import (GENERATED_MARKER, SIMS, WRAPPER_CONFIG,
                                   devices_a_sim_drives,
                                   SimStatus, TapDevice, TapSim, TargetOutcome,
                                   WrapperState, open_config, config_label,

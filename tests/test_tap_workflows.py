@@ -32,12 +32,12 @@ from PyQt6 import QtWidgets
 import telemffb.globals as G
 import telemffb.ui.dialogs.SystemSettingsDialog as dialog_module
 import telemffb.ui.panels.TapStatusPanel as panel_module
-from telemffb import tap_install
+from telemffb.tap import tap_install
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from telemffb.ui.dialogs.SystemSettingsDialog import (CLEANUP_CANCELLED, CLEANUP_LEAVE,
                                            CLEANUP_REMOVE, SystemSettingsDialog)
-from telemffb.tap_config import read
-from telemffb.tap_install import (GENERATED_MARKER, SIMS_BY_KEY, TapDevice,
+from telemffb.tap.tap_config import read
+from telemffb.tap.tap_install import (GENERATED_MARKER, SIMS_BY_KEY, TapDevice,
                                   WrapperState, generate_config, sim_status)
 from telemffb.ui.dialogs.TapDeviceDialog import TapDeviceDialog
 

@@ -41,11 +41,11 @@ from typing import List, Optional, Sequence, Tuple
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-from telemffb.tap_install import (SimStatus, TargetOutcome, TargetStatus,
+from telemffb.tap.tap_install import (SimStatus, TargetOutcome, TargetStatus,
                                   WrapperState, configured_devices,
                                   fix_only_config, generate_config, install,
                                   read_config, write_one_config)
-from telemffb.tap_reconcile import all_status, sim_is_enabled, tap_is_enabled
+from telemffb.tap.tap_reconcile import all_status, sim_is_enabled, tap_is_enabled
 from telemffb.ui.panels.TapStatusPanel import CANCELLED, ask_for_devices
 
 

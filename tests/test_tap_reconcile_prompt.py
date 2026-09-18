@@ -19,12 +19,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-from telemffb.tap_config import Rule
+from telemffb.tap.tap_config import Rule
 from telemffb.ui.dialogs.SystemSettingsDialog import (CLEANUP_CANCELLED,
                                           CLEANUP_LEAVE,
                                           CLEANUP_REMOVE)
-from telemffb.tap_install import SIMS_BY_KEY, SimStatus, TapDevice
-from telemffb.tap_reconcile import ReconcileItem, TapGap
+from telemffb.tap.tap_install import SIMS_BY_KEY, SimStatus, TapDevice
+from telemffb.tap.tap_reconcile import ReconcileItem, TapGap
 
 pytestmark = [pytest.mark.unit]
 
@@ -63,7 +63,7 @@ def an_item():
 @pytest.fixture
 def spy(monkeypatch):
     """Watch what the hook asks and what it applies."""
-    from telemffb import tap_reconcile
+    from telemffb.tap import tap_reconcile
     import telemffb.ui.dialogs.SystemSettingsDialog as module
 
     state = {"asked": [], "applied": [], "items": [an_item()]}
@@ -257,7 +257,7 @@ class TestSettingsThatPredateStoredIds:
         assert device.usable and device.key == "FFFF:2054"
 
     def test_so_a_swap_away_from_it_is_seen(self, legacy):
-        from telemffb.tap_reconcile import device_changes
+        from telemffb.tap.tap_reconcile import device_changes
         baseline = legacy.tap_settings_view()
         legacy._pending_devpaths = {"devpath_joystick": "{OTHER}",
                                     "devids_joystick": "045E:001B"}
@@ -306,8 +306,8 @@ class TestOptingASimBackOut:
     @pytest.fixture
     def cleanup(self, dialog, monkeypatch):
         import telemffb.ui.dialogs.SystemSettingsDialog as module
-        from telemffb.tap_install import SimStatus
-        from telemffb.tap_reconcile import TapCleanup
+        from telemffb.tap.tap_install import SimStatus
+        from telemffb.tap.tap_reconcile import TapCleanup
 
         plan = TapCleanup(status=SimStatus(sim=SIMS_BY_KEY["DCS"], root="r",
                                            provenance="t"),
@@ -317,7 +317,7 @@ class TestOptingASimBackOut:
 
         monkeypatch.setattr(module.SystemSettingsDialog, '_tap_status',
                             lambda self, key: plan.status)
-        import telemffb.tap_reconcile as ti
+        import telemffb.tap.tap_reconcile as ti
         monkeypatch.setattr(ti, 'plan_tap_cleanup', lambda s: state["plan"])
         monkeypatch.setattr(ti, 'apply_tap_cleanup',
                             lambda plans: state["applied"].append(plans) or [])
@@ -371,8 +371,8 @@ class TestOptingASimBackOut:
         assert len(cleanup["asked"]) == 1
 
     def test_nothing_installed_asks_nothing(self, dialog, cleanup):
-        from telemffb.tap_install import SimStatus
-        from telemffb.tap_reconcile import TapCleanup
+        from telemffb.tap.tap_install import SimStatus
+        from telemffb.tap.tap_reconcile import TapCleanup
         cleanup["plan"] = TapCleanup(
             status=SimStatus(sim=SIMS_BY_KEY["DCS"], root="r", provenance="t"))
         dialog._offer_tap_cleanup("DCS")
@@ -396,9 +396,9 @@ class TestTurningASimOff:
     @pytest.fixture
     def cleanup(self, dialog, monkeypatch):
         import telemffb.ui.dialogs.SystemSettingsDialog as module
-        import telemffb.tap_reconcile as ti
-        from telemffb.tap_install import SimStatus
-        from telemffb.tap_reconcile import TapCleanup
+        import telemffb.tap.tap_reconcile as ti
+        from telemffb.tap.tap_install import SimStatus
+        from telemffb.tap.tap_reconcile import TapCleanup
 
         state = {"asked": [], "keys": [], "answer": CLEANUP_REMOVE}
 
@@ -460,8 +460,8 @@ class TestTurningASimOff:
     def test_a_sim_with_nothing_installed_is_not_mentioned(self, dialog,
                                                            cleanup,
                                                            monkeypatch):
-        import telemffb.tap_reconcile as ti
-        from telemffb.tap_reconcile import TapCleanup
+        import telemffb.tap.tap_reconcile as ti
+        from telemffb.tap.tap_reconcile import TapCleanup
         monkeypatch.setattr(ti, 'plan_tap_cleanup',
                             lambda status: TapCleanup(status=status))
         dialog._on_sim_enabled(0, 'enableDCS')
@@ -479,9 +479,9 @@ class TestDismissingTheQuestion:
     @pytest.fixture
     def cancelled(self, dialog, monkeypatch):
         import telemffb.ui.dialogs.SystemSettingsDialog as module
-        import telemffb.tap_reconcile as ti
-        from telemffb.tap_install import SimStatus
-        from telemffb.tap_reconcile import TapCleanup
+        import telemffb.tap.tap_reconcile as ti
+        from telemffb.tap.tap_install import SimStatus
+        from telemffb.tap.tap_reconcile import TapCleanup
 
         plan = TapCleanup(status=SimStatus(sim=SIMS_BY_KEY["DCS"], root="r",
                                            provenance="t"),
@@ -618,7 +618,7 @@ class TestADeviceThatCannotBeDrivenIsMentionedOnce:
     WARTHOG = TapDevice("joystick", 0x044F, 0xB10A, "Warthog", directinput=True)
 
     def gap_for(self, monkeypatch, device):
-        from telemffb import tap_reconcile
+        from telemffb.tap import tap_reconcile
         status = SimStatus(sim=SIMS_BY_KEY["DCS"], root="r", provenance="t")
         gap = TapGap(status=status, device=device, directory=r"C:\DCS\bin",
                      config="[FFBDevices]\n")
@@ -644,7 +644,7 @@ class TestADeviceThatCannotBeDrivenIsMentionedOnce:
             self, dialog, spy, monkeypatch):
         """The staged reconcile already gives the new device its rule there;
         saying so again in other words is the second dialog nobody wanted."""
-        from telemffb.tap_reconcile import device_changes
+        from telemffb.tap.tap_reconcile import device_changes
         dialog._tap_baseline = {"devpath_joystick": OLD_PATH,
                                 "devids_joystick": "FFFF:2054"}
         dialog._pending_devpaths = {"devpath_joystick": NEW_PATH,

@@ -15,7 +15,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6 import QtWidgets
 
-from telemffb.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
+from telemffb.tap.tap_install import (SIMS_BY_KEY, SimStatus, TapDevice,
                                   TargetStatus, WrapperState)
 from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
 
@@ -57,7 +57,7 @@ def bundled(monkeypatch):
     """Pin the version TelemFFB ships.  Version rows compare against it,
     and reading the real bundled DLL would make these tests change
     meaning every time the wrapper is rebuilt."""
-    from telemffb import tap_install
+    from telemffb.tap import tap_install
     monkeypatch.setattr(tap_install, 'bundled_version', lambda: "0.9.0.0")
     return "0.9.0.0"
 
@@ -79,7 +79,7 @@ def target(name, state, version=None, has_config=False):
 
 def ok(directory):
     """What write_one_config really returns; _run reads .ok off it."""
-    from telemffb.tap_install import TargetOutcome
+    from telemffb.tap.tap_install import TargetOutcome
     return TargetOutcome(directory, True, "configured")
 
 
@@ -319,7 +319,7 @@ class TestButtons:
         """With two targets one can succeed while a running game locks the
         other; "failed" alone would hide that half the job is done."""
         import telemffb.ui.panels.TapStatusPanel as module
-        from telemffb.tap_install import TargetOutcome
+        from telemffb.tap.tap_install import TargetOutcome
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT),
                                       target("bin-mt", WrapperState.ABSENT)))
         monkeypatch.setattr(module, 'ask_for_devices', lambda *a, **k: ([], [], [], []))
@@ -341,7 +341,7 @@ class TestButtons:
         """The panel redraws to show the new state; a dialog on top of that
         is noise."""
         import telemffb.ui.panels.TapStatusPanel as module
-        from telemffb.tap_install import TargetOutcome
+        from telemffb.tap.tap_install import TargetOutcome
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)))
         monkeypatch.setattr(module, 'ask_for_devices', lambda *a, **k: ([], [], [], []))
         monkeypatch.setattr(module, 'install', lambda s, config=None, overwrite_foreign=False: [
@@ -416,7 +416,7 @@ class TestConfiguringSeparately:
     def test_an_existing_config_is_amended_rather_than_replaced(self, app,
                                                                 monkeypatch):
         import telemffb.ui.panels.TapStatusPanel as module
-        from telemffb.tap_install import TapDevice
+        from telemffb.tap.tap_install import TapDevice
         panel = TapStatusPanel(status(
             target("bin", WrapperState.TAP, has_config=True)))
         rhino = TapDevice("joystick", 0xFFFF, 0x2054, "VPforce Rhino")
@@ -506,7 +506,7 @@ class TestDriftIsVisible:
     the only place that would ever say so."""
 
     def test_a_stale_rule_is_called_out(self, app):
-        from telemffb.tap_config import Rule
+        from telemffb.tap.tap_config import Rule
         st = status(target("bin", WrapperState.TAP, has_config=True))
         st.stale_rules = [Rule("FFFF:2054", "tap", 1, ids=(0xFFFF, 0x2054))]
         shown = " ".join(rendered(TapStatusPanel(st)))
@@ -528,7 +528,7 @@ class TestItAsksAboutTheDeviceOnScreen:
     def test_the_unsaved_selection_is_what_gets_asked_about(self, app,
                                                             monkeypatch):
         import telemffb.ui.panels.TapStatusPanel as module
-        from telemffb.tap_install import TapDevice
+        from telemffb.tap.tap_install import TapDevice
 
         selected = [TapDevice("joystick", 0xFFFF, 0x2054, "Monster")]
         panel = TapStatusPanel(status(target("bin", WrapperState.ABSENT)),
@@ -616,7 +616,7 @@ class TestConfiguringTwoFilesAtOnce:
     def test_each_file_is_written_from_its_own_contents(self, app,
                                                         monkeypatch):
         import telemffb.ui.panels.TapStatusPanel as module
-        from telemffb.tap_install import TapDevice
+        from telemffb.tap.tap_install import TapDevice
         rhino = TapDevice("joystick", 0xFFFF, 0x2054, "Rhino")
         written = self.wire(monkeypatch, module, ([rhino], [], [], []))
         panel = self.panel()   # bound: a temporary is collected mid-click
@@ -631,8 +631,8 @@ class TestConfiguringTwoFilesAtOnce:
                                                          monkeypatch):
         """Line numbers only mean anything in the file they came from."""
         import telemffb.ui.panels.TapStatusPanel as module
-        from telemffb.tap_config import read
-        from telemffb.tap_install import TapDevice
+        from telemffb.tap.tap_config import read
+        from telemffb.tap.tap_install import TapDevice
         new = TapDevice("joystick", 0x045E, 0x001B, "SideWinder")
         # line 1 of OURS is the tap rule the dialog offered to replace
         written = self.wire(monkeypatch, module, ([new], [1], [], []))
@@ -706,14 +706,14 @@ class TestFixOnlyInstall:
         assert "Install FFB Fix Only" not in self.buttons(panel)
 
     def test_the_config_taps_nothing(self):
-        from telemffb.tap_config import read
-        from telemffb.tap_install import fix_only_config
+        from telemffb.tap.tap_config import read
+        from telemffb.tap.tap_install import fix_only_config
         text = fix_only_config(DCS, DEVICES)
         assert not [r for r in read(text).rules if r.is_tap]
 
     def test_it_blocks_what_the_sim_will_not_drive(self):
-        from telemffb.tap_config import read
-        from telemffb.tap_install import fix_only_config
+        from telemffb.tap.tap_config import read
+        from telemffb.tap.tap_install import fix_only_config
         blocks = {r.key for r in read(fix_only_config(DCS, DEVICES)).rules
                   if r.value == 'block'}
         assert 'FFFF:2052' in blocks           # pedals
@@ -721,8 +721,8 @@ class TestFixOnlyInstall:
         assert 'FFFF:2054' not in blocks       # the joystick is the point
 
     def test_the_joystick_is_ordered_first(self):
-        from telemffb.tap_config import read
-        from telemffb.tap_install import fix_only_config
+        from telemffb.tap.tap_config import read
+        from telemffb.tap.tap_install import fix_only_config
         entries = [(e.position, e.match)
                    for e in read(fix_only_config(DCS, DEVICES)).order]
         assert entries == [("1", "FFFF:2054")]
@@ -730,8 +730,8 @@ class TestFixOnlyInstall:
     def test_korea_would_not_block_its_pedals(self):
         """The blocks fall out of the capability table, so a sim that
         does drive pedals keeps them - no special case."""
-        from telemffb.tap_config import read
-        from telemffb.tap_install import fix_only_config
+        from telemffb.tap.tap_config import read
+        from telemffb.tap.tap_install import fix_only_config
         korea = SIMS_BY_KEY['IL2_K']
         blocks = {r.key for r in read(fix_only_config(korea, DEVICES)).rules
                   if r.value == 'block'}
@@ -803,7 +803,7 @@ class TestFixOnlyInstall:
             self, app, monkeypatch):
         """The mode decides every rule, so there is no device question."""
         import telemffb.ui.panels.TapStatusPanel as module
-        from telemffb.tap_config import read
+        from telemffb.tap.tap_config import read
         asked, written = [], []
         monkeypatch.setattr(module, 'ask_for_devices',
                             lambda *a, **k: asked.append(True) or ([], [], [], []))

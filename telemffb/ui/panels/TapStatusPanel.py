@@ -43,12 +43,12 @@ from PyQt6.QtGui import QPalette
 
 from telemffb.ui.widgets.custom_widgets import InfoLabel, LabeledToggle
 from telemffb.ui.dialogs.TapDeviceDialog import TapDeviceDialog
-from telemffb import tap_install
-from telemffb.tap_config import (already_blocked, already_ordered,
+from telemffb.tap import tap_install
+from telemffb.tap.tap_config import (already_blocked, already_ordered,
                                  already_tapped, amend, lines_for,
                                  read as read_config_text,
                                  retired_identities)
-from telemffb.tap_install import (MODE_FIX_ONLY, MODE_TAP, SimStatus,
+from telemffb.tap.tap_install import (MODE_FIX_ONLY, MODE_TAP, SimStatus,
                                   VJOY_RULE, WRAPPER_CONFIG,
                                   WRAPPER_NAME, WrapperState, block_line,
                                   config_label,

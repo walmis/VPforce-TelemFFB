@@ -78,7 +78,7 @@ def no_real_hardware(monkeypatch):
             # paths write to whatever root they are handed.  Stubbed at the
             # one registry read they all share, so the discovery logic above
             # it is still the code under test.
-            ('telemffb.tap_install', '_registry_values', lambda *a, **k: [])):
+            ('telemffb.tap.tap_install', '_registry_values', lambda *a, **k: [])):
         try:
             module = importlib.import_module(module_name)
         except Exception:

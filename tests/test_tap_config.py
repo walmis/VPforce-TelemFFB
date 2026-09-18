@@ -12,7 +12,7 @@ no reason to open.
 """
 import pytest
 
-from telemffb.tap_config import (BOM, ConfigFacts, Rule, already_blocked,
+from telemffb.tap.tap_config import (BOM, ConfigFacts, Rule, already_blocked,
                                  already_tapped, amend, read,
                                  rule_matches, shadowing_rules)
 
@@ -378,7 +378,7 @@ class TestTheVPforcePrefix:
         assert rule_matches(rule, RHINO, "Monster")
 
     def test_and_the_same_for_order_entries(self):
-        from telemffb.tap_config import OrderEntry, order_matches
+        from telemffb.tap.tap_config import OrderEntry, order_matches
         entry = OrderEntry("1", "Rhino FFB Monster", 0)
         assert order_matches(entry, RHINO, "Monster")
 
