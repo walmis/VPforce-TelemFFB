@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu,
+                             QToolButton, QVBoxLayout, QWidget, QSizePolicy, QSystemTrayIcon, QMenu,
                              QDialog, QStatusBar, QSplitter)
 
 import telemffb.globals as G
@@ -53,7 +53,7 @@ from telemffb.app_events import events as app_events
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.widgets.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
     SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
-from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
+from telemffb.ui.panels.DevicePanel import DeviceIconPanel, MiniDevicePanel, device_status_state
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
@@ -424,27 +424,67 @@ class MainWindow(QMainWindow):
 
         # Set the layout of the menu frame as the main layout
 
-        logo_status_layout = QGridLayout()
+        """ The logo/status row runs full width, above the device/tabs
+        split below it. The split itself - a left column (Active Devices)
+        and a right column (offline editor, tabs) - is wired together at
+        the end of __init__, once every right-column piece has been built,
+        so Active Devices starts even with the top of the tabs/offline
+        editor rather than the top of the window. """
+
+        content_hbox = QHBoxLayout()
+        content_hbox.setContentsMargins(0, 0, 0, 0)
+        content_hbox.setSpacing(10)
+        right_column_layout = QVBoxLayout()
+
+        logo_status_layout = QHBoxLayout()
+        logo_status_layout.setContentsMargins(10, 10, 10, 10)
+        logo_status_layout.setSpacing(10)
 
 
-        """ Create Main App Logo Label """
+        """ Create Main App Logo Label, with the compact device row (small
+        per-device icons, only the active one showing its name) beneath
+        it - stands in for the Active Devices frame whenever that frame
+        is hidden, in what would otherwise be empty space between the
+        logo and the devices/tabs row below. See _sync_devices_display()
+        and _sync_mini_device_panel(). """
 
         t_logo = QLabel()
         t_pixmap = HiDpiPixmap(G.vpf_logo)
         t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
         t_logo.setPixmap(t_pixmap)
 
+        self.device_mini_panel = MiniDevicePanel()
+        self.device_mini_panel.DeviceClicked.connect(self.change_config_scope)
 
-        """ Create Device Panel """
+        logo_column_layout = QVBoxLayout()
+        logo_column_layout.setContentsMargins(0, 0, 0, 0)
+        logo_column_layout.setSpacing(6)
+        logo_column_layout.addWidget(t_logo, alignment=Qt.AlignmentFlag.AlignLeft)
+        logo_column_layout.addWidget(self.device_mini_panel, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        device_groupbox = QGroupBox("Active Devices")
 
-        device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        """ Create Device Panel - pinned to the left edge of the window.
+        Hidden while the Hide tab is active, or by user preference when
+        there are multiple devices, or always when there is only one (see
+        _sync_devices_display() / switch_window_view()). """
+
+        self.device_groupbox = QGroupBox("Active Devices")
+
+        self.device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         device_groupbox_layout = QVBoxLayout()
-        device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
         self.device_panel = DeviceIconPanel()
+        # Keeps the mini device row in step with the full panel - device
+        # list, active device, and every device's icon/label/status -
+        # however it was changed.
+        self.device_panel.changed.connect(self._sync_mini_device_panel)
         device_groupbox_layout.addWidget(self.device_panel)
-        device_groupbox.setLayout(device_groupbox_layout)
+        self.device_groupbox.setLayout(device_groupbox_layout)
+        # Stays hidden until _sync_devices_display() runs with a populated
+        # device panel (master instances populate it later, in
+        # setup_master_instance()) - otherwise an empty frame flashes
+        # before then.
+        self.device_groupbox.hide()
 
         if not G.master_instance:
             self.device_panel.set_devices([G.device_type])
@@ -453,7 +493,8 @@ class MainWindow(QMainWindow):
             self.refresh_device_labels()
 
 
-        """ Create Status Panel """
+        """ Create Status Panel - a single Application Status box with the
+        sim-status and application-status fields as two columns inside it """
 
         self.status_container = AppStatusWidget(master_instance=G.master_instance, parent=self)
         status_group = QGroupBox("Application Status")
@@ -477,43 +518,30 @@ class MainWindow(QMainWindow):
         G.sim_listeners.simStopped.connect(on_sims_changed)
 
 
-        """ Add spacer items to fill first row and 2nd column with 10x10 empty space """
+        """ Logo and the status boxes share the top row of the right column """
 
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 0, 1, 1)
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 1, 1, 1)
-
-
-        """ Add Logo to the top left cell """
-
-        logo_status_layout.addWidget(t_logo, 1, 0, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        logo_status_layout.addLayout(logo_column_layout)
+        logo_status_layout.setAlignment(logo_column_layout, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        logo_status_layout.addWidget(status_group, alignment=Qt.AlignmentFlag.AlignTop)
+        logo_status_layout.addStretch(1)
 
 
-        """ Add spacer in row 2 """
-
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 2, 0, 1, 1)
-
-
-        """ Add device panel to row 3 column 0 """
-
-        logo_status_layout.addWidget(device_groupbox, 3, 0,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-
-        """ Add Status widget to column 2, span 3 rows """
-
-        logo_status_layout.addWidget(status_group, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 4, 0, 1, 1)
-
-        logo_status_layout.setColumnStretch(0, 1)
-        logo_status_layout.setColumnStretch(1, 1)
-
-
-        """ Add upper grid layout to main layout """
+        """ Add the logo/status row to the main layout, full width - above
+        where the left column (Active Devices) and right column split """
 
         layout.addLayout(logo_status_layout)
 
 
-        """ Create new craft button - pops when unknown aircraft is detected """
+        """ Create new craft button - pops when unknown aircraft is detected.
+        Wrapped in a container so it collapses to 0 height (rather than the
+        addSpacing() gaps below still reserving space) once none of its
+        three prompts are showing - otherwise that reserved space pushes
+        the Offline Editor Setup frame below out of alignment with the
+        Active Devices frame beside it. """
 
-        new_craft_layout = QVBoxLayout()
+        self.new_craft_container = QWidget()
+        new_craft_layout = QVBoxLayout(self.new_craft_container)
+        new_craft_layout.setContentsMargins(0, 0, 0, 0)
         # Pill-and-pulse prompts are QLabels with an embedded link, not
         # QPushButtons: rich text allows partial emphasis (bold aircraft
         # name, medium-weight fixed words) which buttons cannot render.
@@ -594,9 +622,10 @@ class MainWindow(QMainWindow):
 
         """ Add new craft button to main layout """
 
-        layout.addLayout(new_craft_layout)
+        right_column_layout.addWidget(self.new_craft_container)
         self.new_craft_button.hide()
         self.trim_cal_prompt_button.hide()
+        self.new_craft_container.hide()
 
 
         """ Create offline config control area QWidget """
@@ -606,6 +635,9 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
         offline_config_layout = QVBoxLayout()  # vertical layout to hold both rows
+        # No default top margin, so the Offline Editor Setup frame's top
+        # edge lines up with the Active Devices frame beside it.
+        offline_config_layout.setContentsMargins(0, 0, 0, 0)
 
 
         # First row layout (existing widgets)
@@ -767,9 +799,9 @@ class MainWindow(QMainWindow):
         self.offline_config_area.hide()
 
 
-        """ Add offline panel to main layout """
+        """ Add offline panel to the right column """
 
-        layout.addWidget(self.offline_config_area)
+        right_column_layout.addWidget(self.offline_config_area)
 
 
         """ Create tab widget where monitor/settings/hide will live """
@@ -790,10 +822,16 @@ class MainWindow(QMainWindow):
         self.offline_editor_button.clicked.connect(self.enter_offline_for_live_aircraft)
         self.tab_widget.setCornerWidget(self.offline_editor_button, Qt.Corner.TopRightCorner)
 
-        """ Add the tab widget to the main layout """
+        """ Add the tab widget to the right column """
 
-        layout.addWidget(self.tab_widget, stretch=1)
-        layout.setSpacing(0)
+        right_column_layout.addWidget(self.tab_widget, stretch=1)
+        right_column_layout.setSpacing(0)
+
+        """ Wire the left (Active Devices) and right columns together """
+
+        content_hbox.addWidget(self.device_groupbox, alignment=Qt.AlignmentFlag.AlignTop)
+        content_hbox.addLayout(right_column_layout, 1)
+        layout.addLayout(content_hbox, stretch=1)
 
 
         """ Create the monitor tab telemetry display panel """
@@ -1400,6 +1438,49 @@ class MainWindow(QMainWindow):
             if changed:
                 self.device_panel.flash_device(role)
 
+    def _sync_mini_device_panel(self):
+        """Mirror the full Active Devices panel's device list, active
+        device, and each device's icon/label/status onto the compact mini
+        row - connected to DeviceIconPanel.changed so every mutation path
+        (device list, active device, status, label, icon) stays in sync
+        automatically without its own call site here."""
+        names = self.device_panel.get_device_names()
+        if self.device_mini_panel.get_device_names() != names:
+            self.device_mini_panel.set_devices(names)
+        self.device_mini_panel.set_active_device(self.device_panel.get_active_device())
+        for name in names:
+            widget = self.device_panel.icons[name]
+            self.device_mini_panel.set_device_icon(name, widget.icon_path)
+            self.device_mini_panel.set_device_label(name, widget.text_label.text())
+            self.device_mini_panel.set_device_status(name, widget.status_color)
+        self._sync_devices_display()
+
+    def _sync_devices_display(self):
+        """Reconcile the Active Devices frame and the compact mini device
+        row under the logo with: how many devices this instance's panel
+        has, the persisted Show/Hide Devices preference (meaningful only
+        with multiple devices), and whether the Hide tab is active.
+
+        One device: the frame never shows and the mini row's single chip
+        is not clickable, there being nothing to switch to. Multiple
+        devices: the frame follows the saved preference (default shown),
+        and the mini row - shown only when the frame is not - has
+        clickable chips, one per device, so status colors stay visible in
+        this small a space and clicking one switches straight to it.
+        Either way, the Hide tab collapses both. """
+        names = self.device_panel.get_device_names()
+        multiple = len(names) > 1
+        tab_widget = getattr(self, 'tab_widget', None)
+        on_hide_tab = tab_widget is not None and tab_widget.currentIndex() == 2
+        show_frame = multiple and bool(G.system_settings.get('showDevicesFrame', True)) and not on_hide_tab
+        self.device_groupbox.setVisible(show_frame)
+        self.device_mini_panel.setVisible(bool(names) and not show_frame and not on_hide_tab)
+        self.device_mini_panel.set_clickable(multiple)
+
+    def _set_devices_frame_preference(self, visible: bool):
+        G.system_settings.setValue('showDevicesFrame', visible)
+        self._sync_devices_display()
+
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
         G.telem_manager.currentAircraftName = None
@@ -1619,6 +1700,24 @@ class MainWindow(QMainWindow):
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)
         self.refresh_device_labels()
+
+        """ Window menu: Show Device Frame, only meaningful with more than
+        one device on this instance's own panel """
+
+        if len(d_list) > 1:
+            if not hasattr(self, 'window_menu'):
+                self.window_menu = self.menu.addMenu('Window')
+            elif self.window_menu.actions():
+                self.window_menu.addSeparator()
+            self.show_devices_frame_action = QAction('Show Device Frame', self)
+            self.show_devices_frame_action.setCheckable(True)
+            self.show_devices_frame_action.setChecked(bool(G.system_settings.get('showDevicesFrame', True)))
+            def do_toggle_devices_frame():
+                self._set_devices_frame_preference(self.show_devices_frame_action.isChecked())
+            self.show_devices_frame_action.triggered.connect(do_toggle_devices_frame)
+            self.window_menu.addAction(self.show_devices_frame_action)
+
+        self._sync_devices_display()
 
 
     def show_device_logo(self):
@@ -2346,6 +2445,7 @@ class MainWindow(QMainWindow):
         change = getattr(G.settings_mgr, 'profile_change', None)
         if not change or not G.master_instance:
             self.profile_change_button.hide()
+            self._sync_new_craft_container()
             return
         # One line, like the trim prompt beside it: the detail and the choice
         # need more room than a pill has, so they live in the dialog it opens.
@@ -2355,6 +2455,7 @@ class MainWindow(QMainWindow):
             "<b>Click Here</b><span style='font-weight:500;'> to resolve</span></a>")
         if not self.profile_change_button.isVisible():
             self.profile_change_button.show()
+            self._sync_new_craft_container()
             # Only worth a toast when the window cannot be seen, and it says
             # what is true: nothing has been decided and nothing is asked for.
             if self.isHidden() or self.isMinimized():
@@ -2368,6 +2469,7 @@ class MainWindow(QMainWindow):
         change = getattr(G.settings_mgr, 'profile_change', None)
         if not change:
             self.profile_change_button.hide()
+            self._sync_new_craft_container()
             return
         choice = self._ask_profile_change(change)
         if choice == ProfileOfferDialog.LATER:
@@ -2379,6 +2481,7 @@ class MainWindow(QMainWindow):
         if G.settings_mgr.profile_change is change:
             G.settings_mgr.profile_change = None
         self.profile_change_button.hide()
+        self._sync_new_craft_container()
         sim, user, curated = change['sim'], change['user'], change['curated']
         shipped = change.get('shipped', '')
         try:
@@ -2602,6 +2705,11 @@ class MainWindow(QMainWindow):
         # Get window geometry and store as the geometry for the previous index for later recall
         self.tab_sizes[str(previous_index)]['height'] = self.height()
         self.tab_sizes[str(previous_index)]['width'] = self.width()
+
+        # Active Devices (and its mini-indicator stand-in) must get out of
+        # the way on the Hide tab, or their own minimum height would stop
+        # the window from collapsing to a compact view.
+        self._sync_devices_display()
 
         if index == 0:  # Monitor Tab
             self.current_tab_index = 0
@@ -2914,6 +3022,7 @@ class MainWindow(QMainWindow):
                 new_aircraft = data.get('N', None)
                 new_class = G.settings_mgr.current_class
                 self.trim_cal_prompt_button.hide()  # profile creation first
+                self._sync_new_craft_container()
                 if G.master_instance:
                     if not self.new_craft_button.isVisible():
                         self.new_craft_button.setText(
@@ -2923,6 +3032,7 @@ class MainWindow(QMainWindow):
                             "<span style='font-weight:500;'> — Click Here to Create a New Profile</span></a>")
                         self.new_craft_button.linkActivated.connect(lambda _: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
                         self.new_craft_button.show()
+                        self._sync_new_craft_container()
                         self._new_craft_anim.start()
 
                     if not data.get('STOP', False):
@@ -2941,6 +3051,7 @@ class MainWindow(QMainWindow):
             else:
                 if self.new_craft_button.isVisible():
                     self.new_craft_button.hide()
+                    self._sync_new_craft_container()
                     self._new_craft_anim.stop()
                 self.new_craft_notification_sent = False
                 self._update_trim_cal_prompt()
@@ -3109,6 +3220,7 @@ class MainWindow(QMainWindow):
 
     def new_ac_wizard_finished(self):
         self.new_craft_button.setVisible(False)
+        self._sync_new_craft_container()
         self._new_craft_anim.stop()
         # The wizard just wrote the type row and the profile mapping. The
         # telemetry loop only re-resolves the active profile when a frame
@@ -3124,6 +3236,7 @@ class MainWindow(QMainWindow):
         # offers again.
         G.settings_mgr.profile_change = None
         self.profile_change_button.hide()
+        self._sync_new_craft_container()
         self.settings_layout.reload_layout(None)
 
     def _update_trim_cal_prompt(self):
@@ -3154,6 +3267,21 @@ class MainWindow(QMainWindow):
                 self._trim_prompt_anim.start()
             else:
                 self._trim_prompt_anim.stop()
+        self._sync_new_craft_container()
+
+    def _sync_new_craft_container(self):
+        """Show/hide the new-craft-prompt row's container based on whether
+        any of its three prompts wants to be showing. Checked with
+        isVisibleTo() rather than isVisible(): the latter also folds in the
+        container's OWN current visibility, which would make this
+        self-referential (the container can only become visible if it
+        already is) once it starts out hidden."""
+        any_visible = (
+            self.new_craft_button.isVisibleTo(self.new_craft_container)
+            or self.trim_cal_prompt_button.isVisibleTo(self.new_craft_container)
+            or self.profile_change_button.isVisibleTo(self.new_craft_container)
+        )
+        self.new_craft_container.setVisible(any_visible)
 
     def _style_new_craft_button(self, v):
         """One pulse frame for the new-aircraft prompt: a red pill breathing

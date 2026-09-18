@@ -246,9 +246,31 @@ class AppStatusWidget(QWidget):
         self.request_flag_error.connect(self.flag_error)
         self.request_clear_error.connect(self.clear_error)
 
-        grid = QGridLayout(self)
+        # A single "Application Status" box (titled by whoever hosts this
+        # widget), with sim-connection state (what the flight sim is doing)
+        # and profile/override state (what TelemFFB is doing about it) as
+        # two plain columns inside it rather than two separate boxes.
+        outer_layout = QHBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(10)
+        outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.sim_status_group = QWidget()
+        sim_grid = QGridLayout(self.sim_status_group)
+        sim_grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        sim_grid.setContentsMargins(0, 0, 0, 0)
+        sim_grid.setVerticalSpacing(10)
+        sim_grid.setHorizontalSpacing(10)
+        sim_grid.setColumnMinimumWidth(1, 200)
+
+        column_divider = QFrame()
+        column_divider.setFrameShape(QFrame.Shape.VLine)
+        column_divider.setFrameShadow(QFrame.Shadow.Sunken)
+
+        self.app_status_group = QWidget()
+        grid = QGridLayout(self.app_status_group)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        grid.setContentsMargins(10, 10, 10, 10)
+        grid.setContentsMargins(0, 0, 0, 0)
         grid.setVerticalSpacing(10)
         grid.setHorizontalSpacing(10)
         # Pin the value column so the panel width is constant regardless of
@@ -257,6 +279,11 @@ class AppStatusWidget(QWidget):
         # values can't shrink it.
         grid.setColumnMinimumWidth(1, 280)
 
+        outer_layout.addWidget(self.sim_status_group)
+        outer_layout.addWidget(column_divider)
+        outer_layout.addWidget(self.app_status_group)
+
+        sim_row = 0
         row = 0
         label_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         value_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
@@ -375,15 +402,15 @@ class AppStatusWidget(QWidget):
         self.message_stack.setCurrentIndex(0)
 
         # Layout content
-        grid.addWidget(sim_status_header, row, 0, alignment=label_align)
-        grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
-        row += 1
+        sim_grid.addWidget(sim_status_header, sim_row, 0, alignment=label_align)
+        sim_grid.addWidget(self.sim_status_label, sim_row, 1, alignment=value_align)
+        sim_row += 1
 
-        grid.addWidget(make_item_label("Current Aircraft"), row, 0, alignment=label_align)
-        grid.addWidget(self.cur_craft_label, row, 1, alignment=value_align)
-        row += 1
+        sim_grid.addWidget(make_item_label("Current Aircraft"), sim_row, 0, alignment=label_align)
+        sim_grid.addWidget(self.cur_craft_label, sim_row, 1, alignment=value_align)
+        sim_row += 1
 
-        grid.addWidget(make_item_label("Matched Model"), row, 0, alignment=label_align)
+        sim_grid.addWidget(make_item_label("Matched Model"), sim_row, 0, alignment=label_align)
         pattern_row_layout = QHBoxLayout()
         pattern_row_layout.setContentsMargins(0, 0, 0, 0)
         pattern_row_layout.setSpacing(6)
@@ -405,8 +432,8 @@ class AppStatusWidget(QWidget):
         pattern_row_layout.addStretch(1)
         pattern_row_widget = QWidget()
         pattern_row_widget.setLayout(pattern_row_layout)
-        grid.addWidget(pattern_row_widget, row, 1, alignment=value_align)
-        row += 1
+        sim_grid.addWidget(pattern_row_widget, sim_row, 1, alignment=value_align)
+        sim_row += 1
 
         self.cb_selectProfileCombo = QComboBox()
         self.cb_selectProfileCombo.addItems(['Select...'])

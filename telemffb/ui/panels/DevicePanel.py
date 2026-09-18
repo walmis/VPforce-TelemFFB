@@ -4,7 +4,7 @@ import sys
 
 
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer, QPropertyAnimation, QRect, QEasingCurve, pyqtProperty
-from PyQt6.QtGui import QPixmap, QEnterEvent, QPainter, QColor, QFont, QPainterPath
+from PyQt6.QtGui import QPixmap, QEnterEvent, QPainter, QColor, QFont, QPainterPath, QCursor
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout,
     QHBoxLayout, QMainWindow, QSizePolicy, QGraphicsOpacityEffect
@@ -367,13 +367,18 @@ class DeviceIconWidget(QWidget):
 
 class DeviceIconPanel(QWidget):
     DeviceClicked = pyqtSignal(str)
+    #: Fires whenever the device list, the active device, or any device's
+    #: status/label/icon may have changed, so a mirror of this panel (e.g.
+    #: MiniDevicePanel) can resync without every call site having to know
+    #: about it.
+    changed = pyqtSignal()
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.icons = {}
-        self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(5, 10, 5, 1)
-        self.layout.setSpacing(5)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(5, 10, 5, 10)
+        self.layout.setSpacing(10)
 
     def get_device_names(self) -> list[str]:
         return list(self.icons.keys())
@@ -393,16 +398,18 @@ class DeviceIconPanel(QWidget):
             icon_path =  DEVICE_ICONS[device.lower()]
             widget = DeviceIconWidget(device.lower(), icon_path)
             widget.clicked.connect(self.handle_icon_click)
-            self.layout.addWidget(widget)
+            self.layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignHCenter)
             self.icons[device.lower()] = widget
             icon_count += 1
 
-        # Enforce minimum size based on icon width + spacing
-        icon_width = 100
+        # Enforce minimum size based on icon height + spacing (icons stack
+        # vertically now that the panel lives along the window's left edge)
+        icon_height = ICON_SIZE.height() + 6 + 20  # icon + inter-spacing + text label
         spacing = self.layout.spacing()
-        margins = self.layout.contentsMargins().left() + self.layout.contentsMargins().right()
-        min_width = icon_count * icon_width + (icon_count - 1) * spacing + margins
-        self.setMinimumWidth(min_width)
+        margins = self.layout.contentsMargins().top() + self.layout.contentsMargins().bottom()
+        min_height = icon_count * icon_height + max(0, icon_count - 1) * spacing + margins
+        self.setMinimumHeight(min_height)
+        self.changed.emit()
 
     def handle_icon_click(self, device_name):
         self.set_active_device(device_name)
@@ -411,6 +418,13 @@ class DeviceIconPanel(QWidget):
     def set_active_device(self, device_name):
         for name, widget in self.icons.items():
             widget.set_active(name == device_name)
+        self.changed.emit()
+
+    def get_active_device(self) -> str | None:
+        for name, widget in self.icons.items():
+            if widget.active:
+                return name
+        return None
 
     def set_device_status(self, device_name: str, status: str):
         # utils.dbprint("red", f"Setting status for >{device_name}< to {status}")
@@ -437,6 +451,7 @@ class DeviceIconPanel(QWidget):
             }.get(dev_status)
             if tooltip:
                 widget.setToolTip(tooltip)
+            self.changed.emit()
 
     def set_device_label(self, device_name: str, text: str):
         """The text under a role's icon: the hardware holding the role.
@@ -472,6 +487,7 @@ class DeviceIconPanel(QWidget):
         changed = widget.text_label.text() != (
             text or widget.device_name.capitalize())
         widget.set_label(text)
+        self.changed.emit()
         return changed
 
     def flash_device(self, device_name: str):
@@ -485,8 +501,10 @@ class DeviceIconPanel(QWidget):
         widget = self.icons.get(device_name.lower())
         if widget is None:
             return False
-        return widget.set_icon(
+        result = widget.set_icon(
             icon_path or DEVICE_ICONS.get(device_name.lower(), ''))
+        self.changed.emit()
+        return result
 
     def update_device_status_icon(self, device_name, new_icon_path):
         if device_name.lower() in self.icons:
@@ -494,6 +512,156 @@ class DeviceIconPanel(QWidget):
             pixmap = QPixmap(new_icon_path).scaled(ICON_SIZE, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             widget.icon_label.setPixmap(pixmap)
 
+
+class MiniDeviceChip(QWidget):
+    """One small clickable icon in the compact device row - half-scale,
+    tinted to its own status color like the full-size icons, with its
+    name shown only while it is the active device. Clicking it switches
+    straight to that device (no cycling)."""
+
+    clicked = pyqtSignal(str)
+
+    _ICON_SIZE = QSize(ICON_SIZE.width() // 2, ICON_SIZE.height() // 2)
+
+    def __init__(self, device_name: str, icon_path: str, parent=None):
+        super().__init__(parent)
+        self.device_name = device_name
+        self._clickable = False
+        self._original_pixmap = None
+        self._status_color = STATUS_COLORS["normal"]
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(6)
+
+        self.icon_label = QLabel(self)
+        self.icon_label.setFixedSize(self._ICON_SIZE)
+        self.icon_label.setScaledContents(True)
+
+        self.name_label = QLabel(self)
+        self.name_label.setFont(QFont("Top Secret", 12))
+        self.name_label.setVisible(False)
+
+        layout.addWidget(self.icon_label)
+        layout.addWidget(self.name_label)
+
+        self.set_icon(icon_path)
+
+    def set_icon(self, icon_path: str):
+        pm = QPixmap(icon_path)
+        self._original_pixmap = pm.scaled(
+            self._ICON_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation) if not pm.isNull() else None
+        self._repaint()
+
+    def set_label(self, text: str):
+        self.name_label.setText(text or self.device_name.capitalize())
+
+    def set_active(self, active: bool):
+        """Only the active device's name is shown - with everything else
+        icon-only, every device's status color stays visible in this
+        small a space, and the active one is still obvious."""
+        self.name_label.setVisible(active)
+
+    def set_status_color(self, color):
+        if isinstance(color, str):
+            color = STATUS_COLORS.get(color.lower(), STATUS_COLORS["normal"])
+        self._status_color = color
+        self._repaint()
+
+    def _repaint(self):
+        if self._original_pixmap is not None:
+            tinted = QPixmap(self._original_pixmap.size())
+            tinted.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(tinted)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+            painter.drawPixmap(0, 0, self._original_pixmap)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(tinted.rect(), self._status_color)
+            painter.end()
+            self.icon_label.setPixmap(tinted)
+        c = self._status_color
+        self.name_label.setStyleSheet(
+            f"color: rgba({c.red()}, {c.green()}, {c.blue()}, {c.alpha()});")
+
+    def set_clickable(self, clickable: bool):
+        self._clickable = clickable
+        if clickable:
+            self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            self.setToolTip(f'Switch to {self.name_label.text() or self.device_name.capitalize()}')
+            self.setStyleSheet(
+                "MiniDeviceChip { border-radius: 4px; }"
+                "MiniDeviceChip:hover { background-color: rgba(128, 128, 128, 60); }")
+        else:
+            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            self.setToolTip('')
+            self.setStyleSheet('')
+
+    def mouseReleaseEvent(self, event):
+        if self._clickable and self.rect().contains(event.pos()):
+            self.clicked.emit(self.device_name)
+        super().mouseReleaseEvent(event)
+
+
+class MiniDevicePanel(QWidget):
+    """Compact row of small per-device icons, standing in for the Active
+    Devices frame when that frame is hidden (by user preference with
+    multiple devices, or always with just one device). Every device's
+    status color is visible at once; only the active device shows its
+    name. Clicking an icon switches straight to that device - with one
+    device there is nothing to switch to, so clicking is disabled."""
+
+    DeviceClicked = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.chips: dict[str, MiniDeviceChip] = {}
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 4, 0, 4)
+        self.layout.setSpacing(4)
+        self.hide()
+
+    def get_device_names(self) -> list[str]:
+        return list(self.chips.keys())
+
+    def set_devices(self, device_list):
+        for w in self.chips.values():
+            self.layout.removeWidget(w)
+            w.deleteLater()
+        self.chips.clear()
+        for device in device_list:
+            name = device.lower()
+            if name not in DEVICE_ICONS:
+                continue
+            chip = MiniDeviceChip(name, DEVICE_ICONS[name])
+            chip.clicked.connect(self.DeviceClicked.emit)
+            self.layout.addWidget(chip)
+            self.chips[name] = chip
+
+    def set_active_device(self, device_name: str):
+        for name, chip in self.chips.items():
+            chip.set_active(name == device_name)
+
+    def set_device_status(self, device_name: str, color):
+        chip = self.chips.get(device_name.lower())
+        if chip:
+            chip.set_status_color(color)
+
+    def set_device_label(self, device_name: str, text: str):
+        chip = self.chips.get(device_name.lower())
+        if chip:
+            chip.set_label(text)
+
+    def set_device_icon(self, device_name: str, icon_path: str):
+        chip = self.chips.get(device_name.lower())
+        if chip:
+            chip.set_icon(icon_path or DEVICE_ICONS.get(device_name.lower(), ''))
+
+    def set_clickable(self, clickable: bool):
+        for chip in self.chips.values():
+            chip.set_clickable(clickable)
 
 
 if __name__ == "__main__":
