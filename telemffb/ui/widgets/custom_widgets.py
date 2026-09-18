@@ -274,11 +274,13 @@ class AppStatusWidget(QWidget):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setVerticalSpacing(10)
         grid.setHorizontalSpacing(10)
-        # Pin the value column so the panel width is constant regardless of
-        # content: every value widget's width is capped below this (elided
-        # labels / chip budgets), so nothing can grow the column and shorter
-        # values can't shrink it.
+        # Floor the value column so shorter values can't shrink the panel;
+        # every value widget's width is capped (elided labels / chip
+        # budgets), so content alone never grows it. The stretch hands the
+        # column the half's spare width as the window widens, which the
+        # expanding profile combo takes up.
         grid.setColumnMinimumWidth(1, 280)
+        grid.setColumnStretch(1, 1)
 
         outer_layout.addWidget(self.sim_status_group, stretch=1)
         outer_layout.addWidget(column_divider)
@@ -438,11 +440,17 @@ class AppStatusWidget(QWidget):
 
         self.cb_selectProfileCombo = QComboBox()
         self.cb_selectProfileCombo.addItems(['Select...'])
+        # Items arrive after first show, so the default AdjustToContentsOnFirstShow
+        # would size the box to "Select..." only. Guarantee room for names like
+        # "User Default" and let the row give it the column's spare width.
+        self.cb_selectProfileCombo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.cb_selectProfileCombo.setMinimumContentsLength(14)
+        self.cb_selectProfileCombo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         profile_row_layout = QHBoxLayout()
         profile_row_layout.setContentsMargins(0, 0, 0, 0)
         profile_row_layout.setSpacing(6)
-        profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.btn_profile_notes = QtWidgets.QToolButton()
         # currentColor SVG rendered at explicit colors: muted glyph when no
         # notes exist, full-contrast (white on dark / black on light) when
@@ -461,11 +469,8 @@ class AppStatusWidget(QWidget):
         self.btn_profile_notes.clicked.connect(self.profile_notes_clicked.emit)
 
         profile_row_layout.addWidget(self.active_profile_label)
-        profile_row_layout.addWidget(self.cb_selectProfileCombo)
+        profile_row_layout.addWidget(self.cb_selectProfileCombo, 1)
         profile_row_layout.addWidget(self.btn_profile_notes)
-        # Absorb the value column's spare width so the combo keeps its natural
-        # size instead of stretching to fill the (fixed-width) cell.
-        profile_row_layout.addStretch(1)
 
         grid.addWidget(make_item_label("Active Profile"), row, 0, alignment=label_align)
         grid.addLayout(profile_row_layout, row, 1)
