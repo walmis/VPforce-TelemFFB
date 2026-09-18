@@ -18,8 +18,8 @@ pytest.importorskip("PyQt6")
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-import telemffb.preview_controller as pc
-from telemffb.preview import JET_ENGINE_RUMBLE, AFTERBURNER, TOUCHDOWN, PREVIEW_SPECS
+import telemffb.preview.controller as pc
+from telemffb.preview.engine import JET_ENGINE_RUMBLE, AFTERBURNER, TOUCHDOWN, PREVIEW_SPECS
 
 
 @pytest.fixture(scope="module")

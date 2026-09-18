@@ -59,8 +59,8 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
-from telemffb.preview import PREVIEW_SPECS
-from telemffb.preview_controller import EffectPreviewController
+from telemffb.preview.engine import PREVIEW_SPECS
+from telemffb.preview.controller import EffectPreviewController
 # from telemffb.ui.dialogs.UserModelDialog import UserModelDialog
 from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
 from telemffb.telem.SimTelemListener import SimTelemListener

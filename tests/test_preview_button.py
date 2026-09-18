@@ -194,7 +194,7 @@ def test_rows_without_a_preview_get_a_matching_pad(qapp, tmp_path):
 
 def test_playing_preview_paints_its_rows_handles_green(qapp, tmp_path):
     from telemffb.ui.widgets.custom_widgets import vpf_purple
-    from telemffb.preview import JET_ENGINE_RUMBLE, AFTERBURNER
+    from telemffb.preview.engine import JET_ENGINE_RUMBLE, AFTERBURNER
     from telemffb.ui.widgets.SettingsLayout import lock_preview_rows, PREVIEW_ACTIVE_HANDLE
     r = _render(qapp, tmp_path, offline=True)
     jet, ab = 'jet_engine_rumble_intensity', 'afterburner_effect_intensity'
@@ -214,7 +214,7 @@ def test_playing_rows_are_held_and_released(qapp, tmp_path):
     row cannot be edited - slider, -/+ steppers, value entry and the erase
     button (present but hidden on a clean row) are all disabled - and the
     lock lets go of every one of them when the run ends."""
-    from telemffb.preview import JET_ENGINE_RUMBLE, AFTERBURNER
+    from telemffb.preview.engine import JET_ENGINE_RUMBLE, AFTERBURNER
     from telemffb.ui.widgets.SettingsLayout import lock_preview_rows
     r = _render(qapp, tmp_path, offline=True)
     jet, ab = 'jet_engine_rumble_intensity', 'afterburner_effect_intensity'
@@ -233,7 +233,7 @@ def test_playing_rows_are_held_and_released(qapp, tmp_path):
 def test_release_leaves_a_row_disabled_for_its_own_reasons_alone(qapp, tmp_path):
     """A row disabled before the run (its toggle off, say) is not
     re-enabled by the release: the lock only lets go of what it took."""
-    from telemffb.preview import JET_ENGINE_RUMBLE
+    from telemffb.preview.engine import JET_ENGINE_RUMBLE
     from telemffb.ui.widgets.SettingsLayout import lock_preview_rows
     r = _render(qapp, tmp_path, offline=True)
     row = r.row_widgets('jet_engine_rumble_intensity')
@@ -250,7 +250,7 @@ def test_a_rebuild_mid_run_comes_back_held(qapp, tmp_path):
     """The form is rebuilt from scratch on an erase or an expander click;
     a fresh build while a preview plays draws its rows held and its
     button a stop, from the main window's state alone."""
-    from telemffb.preview import PREVIEWS_BY_ROW
+    from telemffb.preview.engine import PREVIEWS_BY_ROW
     from telemffb.ui.widgets.SettingsLayout import PREVIEW_ACTIVE_HANDLE
     name = 'jet_engine_rumble_intensity'
     r = _render(qapp, tmp_path, offline=True, running=PREVIEWS_BY_ROW[name])
@@ -264,7 +264,7 @@ def test_a_rebuild_mid_run_comes_back_held(qapp, tmp_path):
 
 
 def test_buttons_only_on_rows_that_host_a_preview(qapp, tmp_path):
-    from telemffb.preview import PREVIEWS_BY_ROW
+    from telemffb.preview.engine import PREVIEWS_BY_ROW
     r = _render(qapp, tmp_path, offline=True)
     if 'jet_engine_rumble_intensity' not in r.sliders:
         pytest.skip("jet rumble intensity row not rendered for this model")
@@ -276,7 +276,7 @@ def test_buttons_only_on_rows_that_host_a_preview(qapp, tmp_path):
 
 
 def test_enabled_button_toggles_the_main_windows_preview(qapp, tmp_path):
-    from telemffb.preview import PREVIEWS_BY_ROW
+    from telemffb.preview.engine import PREVIEWS_BY_ROW
     r = _render(qapp, tmp_path, offline=True)
     name = 'jet_engine_rumble_intensity'
     if name not in r.buttons:
@@ -294,7 +294,7 @@ def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp
     """stall buffet intensity is offered on every device, touchdown on the
     joystick only: with joystick and pedals running the first gets a
     play-all naming both, the second gets a pad in that slot."""
-    from telemffb.preview import PREVIEWS_BY_ROW
+    from telemffb.preview.engine import PREVIEWS_BY_ROW
     r = _render(qapp, tmp_path, offline=True, sim='MSFS', model='Cessna 172',
                 running_devices=('joystick', 'pedals'))
     buffet, touch = 'buffeting_intensity', 'touchdown_effect_max_force'
@@ -311,7 +311,7 @@ def test_play_all_only_where_two_or_more_running_devices_offer_the_row(qapp, tmp
 
 
 def test_the_stop_glyph_goes_on_the_button_that_started_it(qapp, tmp_path):
-    from telemffb.preview import PREVIEWS_BY_ROW
+    from telemffb.preview.engine import PREVIEWS_BY_ROW
     buffet = 'buffeting_intensity'
     for slot, stop, plain in (('pv', 'buttons', 'all_buttons'), ('pvall', 'all_buttons', 'buttons')):
         r = _render(qapp, tmp_path, offline=True, sim='MSFS', model='Cessna 172',
@@ -341,7 +341,7 @@ def test_blocked_button_is_disabled_with_the_reason(qapp, tmp_path):
 
 
 def test_the_playing_rows_button_reads_as_stop(qapp, tmp_path):
-    from telemffb.preview import PREVIEWS_BY_ROW
+    from telemffb.preview.engine import PREVIEWS_BY_ROW
     name = 'jet_engine_rumble_intensity'
     r = _render(qapp, tmp_path, offline=True, running=PREVIEWS_BY_ROW[name])
     if name not in r.buttons:

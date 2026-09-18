@@ -917,7 +917,7 @@ class SettingsLayout(QGridLayout):
         """
         if not G.settings_mgr.offline_mode:
             return
-        from telemffb.preview import preview_for_row
+        from telemffb.preview.engine import preview_for_row
         # the two preview slots sit tight together, apart from the row's
         # own -/slider/+ spacing
         slots = QHBoxLayout()

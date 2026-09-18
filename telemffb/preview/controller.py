@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.preview import (PREVIEW_SPECS, PreviewRunner, TimedPreview,
+from telemffb.preview.engine import (PREVIEW_SPECS, PreviewRunner, TimedPreview,
                               preview_blockers, resolve_preview_target)
 from telemffb.ui.widgets.SettingsLayout import lock_preview_rows
 from telemffb.telem import TelemManager

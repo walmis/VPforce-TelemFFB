@@ -25,7 +25,7 @@ import telemffb.globals as G
 import telemffb.xmlutils as xmlutils
 from telemffb.sim import aircrafts_dcs, aircrafts_msfs_xp, aircrafts_il2
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
-from telemffb.preview import (
+from telemffb.preview.engine import (
     Attr, PreviewSpec, PreviewRunner, TimedPreview, preview_blockers, resolve_preview_target,
     JET_ENGINE_RUMBLE, JET_IDLE_PCT, GEAR_MOTION, PROP_ENGINE_RUMBLE, STALL_BUFFET, ETL,
     AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET, SPEEDBRAKE_BUFFET,
@@ -1300,7 +1300,7 @@ class TestIl2WeaponPreviews(EdgePreviewCase):
         derives rate and recoil from the round's mass and velocity, so
         the three slots come up with the production function's numbers
         for those rounds, in order, one start each."""
-        from telemffb.preview import _IL2_GUN_ROUNDS
+        from telemffb.preview.engine import _IL2_GUN_ROUNDS
         ac = self._aircraft(dynamic=True)
         runner = PreviewRunner(ac, IL2_GUNFIRE, 'IL2', frame_rate=10.0)
         assert ac.il2_shake_master is True and ac.il2_dynamic_gunfire_mode is True
@@ -1421,24 +1421,24 @@ class TestSpecIndex:
                            fields={'*': {}}, rows=rows, reference='x')
 
     def test_indexes_by_name_and_by_row(self):
-        from telemffb.preview import index_specs
+        from telemffb.preview.engine import index_specs
         a, b = self._spec('a', ('row_a', 'row_a2')), self._spec('b', ('row_b',))
         by_name, by_row = index_specs((a, b))
         assert by_name == {'a': a, 'b': b}
         assert by_row == {'row_a': a, 'row_a2': a, 'row_b': b}
 
     def test_a_name_used_twice_is_an_error(self):
-        from telemffb.preview import index_specs
+        from telemffb.preview.engine import index_specs
         with pytest.raises(ValueError, match="used by two specs"):
             index_specs((self._spec('a', ('r1',)), self._spec('a', ('r2',))))
 
     def test_a_row_claimed_twice_is_an_error_naming_both(self):
-        from telemffb.preview import index_specs
+        from telemffb.preview.engine import index_specs
         with pytest.raises(ValueError, match="'a' and 'b'"):
             index_specs((self._spec('a', ('r1',)), self._spec('b', ('r1',))))
 
     def test_the_shipped_catalog_indexes_cleanly(self):
-        from telemffb.preview import index_specs, _ALL_SPECS, PREVIEWS_BY_ROW
+        from telemffb.preview.engine import index_specs, _ALL_SPECS, PREVIEWS_BY_ROW
         by_name, by_row = index_specs(_ALL_SPECS)
         assert by_name == PREVIEW_SPECS and by_row == PREVIEWS_BY_ROW
         assert len(by_name) == len(_ALL_SPECS) == 42
@@ -1466,7 +1466,7 @@ class TestSpecFrameRate(BaseTelemetryEffectTestCase):
         assert PreviewRunner(ac, GUNFIRE, 'DCS', frame_rate=10.0).frame_rate == 10.0   # explicit wins
 
     def test_specs_without_one_keep_the_default(self):
-        from telemffb.preview import FRAME_RATE_HZ
+        from telemffb.preview.engine import FRAME_RATE_HZ
         assert JET_ENGINE_RUMBLE.frame_rate is None
         assert PreviewRunner(aircrafts_dcs.Aircraft('preview'), JET_ENGINE_RUMBLE, 'DCS').frame_rate == FRAME_RATE_HZ
 
@@ -1505,7 +1505,7 @@ class TestRandomHits:
 class TestDamageEdgePreview(EdgePreviewCase):
     def _seeded(self, monkeypatch, seed):
         import random
-        import telemffb.preview as preview
+        import telemffb.preview.engine as preview
         monkeypatch.setattr(preview._DAMAGE_HITS, 'rng', random.Random(seed))
 
     def test_dcs_hits_land_at_irregular_moments_within_the_intensity_band(self, monkeypatch):
@@ -1781,7 +1781,7 @@ class TestDecelerationPreview(BaseTelemetryEffectTestCase):
         # the stimulus wobble is random per run; pin it so the frame the
         # assertion reads is repeatable (the runtime draw is unseeded)
         import random
-        import telemffb.preview as preview
+        import telemffb.preview.engine as preview
         monkeypatch.setattr(preview._DECEL_WOBBLE, 'rng', random.Random(3))
         ac = cls('preview')
         ac.deceleration_effect_enable = False

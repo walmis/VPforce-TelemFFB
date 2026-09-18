@@ -5,7 +5,7 @@ can feel "what does this effect feel like at the strength I have set" without a 
 In the settings form (offline editing) it is the `▶` button after the `-`/`+` pair on an
 intensity slider; in the Debug menu (Alt+D → Preview Effect) it is one entry per preview.
 
-Everything lives in [`telemffb/preview.py`](../telemffb/preview.py). A preview is a
+Everything lives in [`telemffb/preview/engine.py`](../telemffb/preview/engine.py). A preview is a
 `PreviewSpec` in the catalog at the bottom of that file. Adding one is a data entry plus a
 test — no XML, no UI work. The button appears on the rows the spec names as soon as the spec
 is registered.
@@ -238,7 +238,7 @@ Nothing to do per spec, but worth knowing. The master's settings form hosts the 
 for every device's rows (the config scope switches between joystick, pedals, collective),
 while the effect must play on the instance that owns the device. When the scope is not the
 master's own device, `EffectPreviewController.toggle` (the window's `preview` attribute, in
-`telemffb/preview_controller.py`) sends `PREVIEW:<device>:<name>` to the children over IPC;
+`telemffb/preview/controller.py`) sends `PREVIEW:<device>:<name>` to the children over IPC;
 the owner's controller runs the same `start` on its own device (no
 confirmation there — the master already asked, and the child's window is hidden) and reports
 `PREVIEW DONE:<device>:<name>` back, at which point the master resets the button and slider
