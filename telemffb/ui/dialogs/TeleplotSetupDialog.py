@@ -58,7 +58,6 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
         self.pb_Cancel.clicked.connect(self.close)
         self.pb_clear.clicked.connect(self.clear_form)
         self.pb_Select.clicked.connect(self.select_active_telemetry)
-        self.telem_data = parent.lbl_telem_data.text()
         self.tb_port.textChanged.connect(self.setsendflag)
         self.tb_vars.textChanged.connect(self.setsendflag)
         self.tb_port.setText(str(self.telem_port))
@@ -107,11 +106,7 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
             self.list_widget.clear()
             self.list_widget.addItems(self.get_active_keys())
         def get_active_keys(self):
-            text = self.parent.parent.lbl_telem_data.text()
-            keys = [line.split(':')[0].strip() for line in text.split('\n') if line.strip()]
-            if keys[0] == 'Waiting for data...':
-                keys = ['Sim not running']
-            return keys
+            return self.parent.parent.monitor_panel.telemetry_keys()
         def selectedKeys(self):
             return [item.text() for item in self.list_widget.selectedItems()]
 

@@ -25,7 +25,7 @@ from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
     QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout, QSizePolicy, \
-    QGraphicsColorizeEffect
+    QGraphicsColorizeEffect, QTableView, QAbstractItemView
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
@@ -871,6 +871,50 @@ class NoKeyScrollArea(QScrollArea):
 
     def addSlider(self, slider):
         self.sliders.append(slider)
+
+
+class CopyableTableView(QTableView):
+    """A read-only QTableView whose Ctrl+C copies the selected cells to the
+    clipboard as tab/newline-separated text.
+
+    Stands in for a selectable-text QLabel (``Qt.TextInteractionFlag.
+    TextSelectableByMouse``) on a table of key/value rows - MonitorPanel's
+    telemetry and active-effects tables used to be such a QLabel, and this
+    keeps "select some lines and copy them" working with a real model
+    behind the display instead of one formatted block of text.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setWordWrap(False)
+        self.verticalHeader().setVisible(False)
+
+    def keyPressEvent(self, event):
+        if event.matches(QtGui.QKeySequence.StandardKey.Copy):
+            self._copy_selection()
+            return
+        super().keyPressEvent(event)
+
+    def _copy_selection(self):
+        indexes = self.selectionModel().selectedIndexes() if self.selectionModel() else []
+        if not indexes:
+            return
+        indexes.sort(key=lambda idx: (idx.row(), idx.column()))
+        lines = []
+        row = None
+        cells = []
+        for idx in indexes:
+            if row is not None and idx.row() != row:
+                lines.append('\t'.join(cells))
+                cells = []
+            row = idx.row()
+            cells.append(str(idx.data() or ''))
+        if cells:
+            lines.append('\t'.join(cells))
+        QGuiApplication.clipboard().setText('\n'.join(lines))
 
 
 class SliderWithLabel(QWidget):

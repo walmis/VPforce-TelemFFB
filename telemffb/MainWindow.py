@@ -37,11 +37,11 @@ from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSignal, pyqtSlo
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
                          QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase, QFont)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
-                             QFrame, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
-                             QPushButton, QScrollArea, QTabWidget,
+                             QFrame, QGroupBox,
+                             QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+                             QPushButton, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget, QSizePolicy, QSystemTrayIcon, QMenu,
-                             QDialog, QStatusBar, QSplitter)
+                             QDialog, QStatusBar)
 
 import telemffb.globals as G
 from telemffb import match_history
@@ -56,6 +56,7 @@ from telemffb.ui.widgets.custom_widgets import ClickLogo, InstanceStatusRow, NoK
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, MiniDevicePanel, device_status_state
 from telemffb.ui.panels.PromptStack import PromptStack
 from telemffb.ui.panels.OfflineEditorPanel import OfflineEditorPanel
+from telemffb.ui.panels.MonitorPanel import MonitorPanel
 from telemffb.state.app_state import Notice, NEW_CRAFT_PRIORITY, PROFILE_CHANGE_PRIORITY, TRIM_CAL_PRIORITY
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
@@ -116,7 +117,6 @@ class MainWindow(QMainWindow):
         self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
         self.telemetry_timed_out = True
         self.last_telemetry_refresh = utils.millis()
-        self.show_simvars = False
         self.latest_version = None
         self._update_available = None
         self._version_check_resolved = False
@@ -541,7 +541,7 @@ class MainWindow(QMainWindow):
 
         def on_sims_changed(sim: SimTelemListener):
             self.status_container.update_enabled_sims(sim.name, sim.started)
-            self.refresh_telem_status()
+            self.monitor_panel.refresh_waiting_status()
 
 
         """ Connect sim listeners to sim change function """
@@ -621,132 +621,15 @@ class MainWindow(QMainWindow):
         layout.addLayout(content_hbox, stretch=1)
 
 
-        """ Create the monitor tab telemetry display panel """
+        """ Create the monitor tab: telemetry + active-effects display """
 
-        self.monitor_widget = QWidget()
-        self.telem_area = QScrollArea()
-        monitor_area_layout = QGridLayout()
-        self.telem_area.setWidgetResizable(True)
-        self.telem_area.setMinimumHeight(100)
-
-
-        """ Create the active effects display panel """
-
-        self.effects_area = QScrollArea()
-        self.effects_area.setWidgetResizable(True)
-        self.effects_area.setMinimumHeight(100)
-
-        # self.effects_area.setMaximumWidth(200)
-
-
-        """ Create the Telemetry Label widget and set its properties """
-
-        self.lbl_telem_data = QLabel()
-
-        self.refresh_telem_status()
-
-        self.lbl_telem_data.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.lbl_telem_data.setWordWrap(False)
-        self.lbl_telem_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.lbl_telem_data.setStyleSheet("""
-            padding: 2px;
-            font-family: Cascadia Mono;
-        """)
-
-
-        """ Set the QLabel widget as the widget inside the scroll area """
-
-        self.telem_area.setWidget(self.lbl_telem_data)
-
-        self.lbl_effects_data = QLabel("            ")  # Empty space placeholder so splitter weights work
-        self.effects_area.setWidget(self.lbl_effects_data)
-        self.lbl_effects_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.lbl_effects_data.setStyleSheet("""
-            padding: 2px;
-            font-family: Cascadia Mono;
-        """)
-
-        """ Create Monitor Page detach toolbar"""
-
-        self.monitor_detach_tb = QtWidgets.QToolBar(self.monitor_widget)
-        self.monitor_detach_tb.setObjectName("monitorInlineToolbar")
-        self.monitor_detach_tb.setMovable(False)
-        self.monitor_detach_tb.setFloatable(False)
-        self.monitor_detach_tb.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self.monitor_detach_tb.setIconSize(QtCore.QSize(16, 16))
-        self.monitor_detach_tb.setStyleSheet("QToolBar { border: 0; background: transparent; }")
-
-        self.monitor_detach_act = self.monitor_detach_tb.addAction("Detach")
-        self.monitor_detach_act.setToolTip('Detach the Monitor Tab from the main window\ninto a separate window.')
-        self.monitor_detach_act.triggered.connect(lambda: self.detach_tab(0))
-
-        btn = self.monitor_detach_tb.widgetForAction(self.monitor_detach_act)
-        if isinstance(btn, QtWidgets.QToolButton):
-            btn.setAutoRaise(False)
-            btn.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-            btn.setStyleSheet("""
-                QToolButton {
-                    border: 1px solid palette(mid);
-                    border-radius: 4px;
-                    padding: 3px 9px;
-                    background: palette(button);
-                    color: palette(button-text);
-                }
-                QToolButton:hover { background: palette(midlight); }
-                QToolButton:pressed {
-                    background: palette(dark);
-                    color: palette(highlight);
-                }
-                QToolButton:disabled { color: palette(mid); border-color: palette(mid); }
-            """)
-
-        telem_header_widget = QWidget()
-        telem_header_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        telem_header_layout = QHBoxLayout(telem_header_widget)
-        telem_header_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.telem_lbl = QLabel('Telemetry:')
-        self.telem_filter = QLineEdit()
-        self.telem_filter.setToolTip("Comma Separated, Case Insensitive list of telemetry items to show (e.g. 'aoa, ias, rpm')")
-
-
-        """ Add placeholder for the filter """
-
-        self.telem_filter.setPlaceholderText("Filter")
-        self.telem_filter.setMaximumWidth(100)
-
-
-        """ Add telemetry label and filter placeholder to the layout """
-        telem_header_layout.addWidget(self.monitor_detach_tb)
-        telem_header_layout.addWidget(self.telem_lbl)
-        telem_header_layout.addWidget(self.telem_filter)
-        telem_header_layout.addStretch()  # Push everything to the left
-
-
-        """ Add Active effects header label """
-
-        self.effect_lbl = QLabel('Active Effects:')
+        self.monitor_panel = MonitorPanel(parent=self.tab_widget, mainwindow=self)
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
-
-
-        """ Add headers and labels to the monitor layout """
-
-        monitor_area_layout.addWidget(telem_header_widget, 0, 0)
-        monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.telem_area)
-        splitter.addWidget(self.effects_area)
-        splitter.setStretchFactor(0, 2)  # Wider telemetry
-        splitter.setStretchFactor(1, 3)  # Narrow effects
-        monitor_area_layout.addWidget(splitter, 1, 0, 1, 2)  # Span both columns
-
-        self.monitor_widget.setLayout(monitor_area_layout)
-
+            self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
 
         """ Add the monitor tab object to the tab widget"""
 
-        self.tab_widget.addTab(self.monitor_widget, "Monitor")
+        self.tab_widget.addTab(self.monitor_panel, "Monitor")
 
         self._install_detachable_tabs()
 
@@ -873,7 +756,7 @@ class MainWindow(QMainWindow):
         detach_shortcut.activated.connect(self._detach_monitor_via_shortcut)
 
     def _detach_monitor_via_shortcut(self):
-        idx = self.tab_widget.indexOf(self.monitor_widget)
+        idx = self.tab_widget.indexOf(self.monitor_panel)
         if idx != -1:
             self.detach_tab(idx)
 
@@ -905,7 +788,7 @@ class MainWindow(QMainWindow):
 
     def detach_tab(self, index: int):
         if index == 0:  # Monitor Tab
-            self.monitor_detach_tb.setVisible(False)
+            self.monitor_panel.set_detach_toolbar_visible(False)
         title = self.tab_widget.tabText(index)
         if hasattr(self, "_detached_tabs") and title in self._detached_tabs:
             return
@@ -931,7 +814,7 @@ class MainWindow(QMainWindow):
             return
 
         if title == 'Monitor':
-            self.monitor_detach_tb.setVisible(True)
+            self.monitor_panel.set_detach_toolbar_visible(True)
 
         win: DetachedTabWindow = entry["win"]
         original_index: int = entry["index"]
@@ -1115,30 +998,6 @@ class MainWindow(QMainWindow):
 
     def test_function(self):
         self.set_scrollbar(400)
-
-    def refresh_telem_status(self):
-        dcs_enabled = G.system_settings.get('enableDCS')
-        il2_enabled = G.system_settings.get('enableIL2')
-        msfs_enabled = G.system_settings.get('enableMSFS')
-        xplane_enabled = G.system_settings.get('enableXPLANE')
-        bms_enabled = G.system_settings.get('enableBMS')
-
-        # Convert True/False to "enabled" or "disabled"
-        dcs_status = "Enabled" if dcs_enabled else "Disabled"
-        il2_status = "Enabled" if il2_enabled else "Disabled"
-        msfs_status = "Enabled" if msfs_enabled else "Disabled"
-        xplane_status = "Enabled" if xplane_enabled else "Disabled"
-        bms_status = "Enabled" if bms_enabled else "Disabled"
-
-        self.lbl_telem_data.setText(
-            f"Waiting for data...\n\n"
-            f"DCS     : {dcs_status}\n"
-            f"IL2     : {il2_status}\n"
-            f"MSFS    : {msfs_status}\n"
-            f"X-Plane : {xplane_status}\n"
-            f"BMS     : {bms_status}\n\n"
-            "Enable or Disable in System -> System Settings"
-        )
 
     def refresh_firmware_label(self):
         if not HapticEffect.device:
@@ -1346,8 +1205,8 @@ class MainWindow(QMainWindow):
 
         show_simvar_action = QAction("Show simvar in telem window", self)
         def do_toggle_simvar_telemetry():
-            self.show_simvars = not self.show_simvars
-            show_simvar_action.setChecked(self.show_simvars)
+            self.monitor_panel.set_show_simvars(not self.monitor_panel.show_simvars)
+            show_simvar_action.setChecked(self.monitor_panel.show_simvars)
 
         show_simvar_action.triggered.connect(do_toggle_simvar_telemetry)
         show_simvar_action.setCheckable(True)
@@ -1687,7 +1546,7 @@ class MainWindow(QMainWindow):
         #self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
+            self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
         G.app_state.set_scope(G.current_device_config_scope)
         self.settings_layout.reload_caller()
 
@@ -2383,7 +2242,7 @@ class MainWindow(QMainWindow):
             self.settings_layout.reload_caller()
 
     def on_telemetry_timeout(self):
-        self.lbl_effects_data.setText("")
+        self.monitor_panel.clear_effects()
         if not self.error_state:
             # Only set icon to pause if error condition is not present when pausing
             self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
@@ -2395,7 +2254,7 @@ class MainWindow(QMainWindow):
         so stale aircraft info and the 'Paused' badge are cleared before the
         next sim connects."""
         logging.info(f"Application Status: clearing display after {src} exit")
-        self.lbl_effects_data.setText("")
+        self.monitor_panel.clear_effects()
         self.status_container.reset_sim_state(src)
         # reset_sim_state disabled the notes button; drop the dedupe context
         # so the next aircraft load re-evaluates it even if identical.
@@ -2432,9 +2291,7 @@ class MainWindow(QMainWindow):
 
         try:
 
-            telem_items = ""
-            # Parse filter once per update
-            telem_items = self.get_telem_items(data, telem_items)
+            self.monitor_panel.update_telemetry(data)
 
             active_effects = ""
             active_settings = []
@@ -2596,48 +2453,10 @@ class MainWindow(QMainWindow):
 
             self.update_craft_text_block(pattern=shown_pattern, profile=active_profile)
 
-            update_telem_vars = False
-            # if the debug teleplot setup window is active, set a flag that will cause the
-            # telemetry label on the monitor tab to update even if the monitor tab
-            # is not active
-            if hasattr(self, "teleplot_dialog"):
-                if self.teleplot_dialog.isVisible:
-                    update_telem_vars = True
-
-            # if window_mode == 0 or update_telem_vars:
-            self.lbl_telem_data.setText(telem_items)
-            self.lbl_effects_data.setText(active_effects)
+            self.monitor_panel.update_effects(active_effects)
 
         except Exception:
             logging.exception("Exception")
-
-    def get_telem_items(self, data, telem_items):
-        raw = (self.telem_filter.text() or "")
-        tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
-        for k, v in data.items():
-
-            # check for msfs and debug mode (alt-d pressed), change to simvar name
-            if self.show_simvars:
-                if data["src"] == "MSFS":
-                    s = G.telem_manager.simconnect.get_var_name(k)
-                    # s = simvarnames.get_var_name(k)
-                    if s is not None:
-                        k = s
-
-            # Apply simple OR filtering against the key only
-            if tokens:
-                k_cf = str(k).lower()
-                if not any(tok in k_cf for tok in tokens):
-                    continue
-
-            if isinstance(v, float):
-                telem_items += f"{k}: {v:.3f}\n"
-            else:
-                if isinstance(v, list):
-                    v = "[" + ", ".join(
-                        [f"{x:.3f}" if isinstance(x, float) else str(x) if x is not None else "None" for x in v]) + "]"
-                telem_items += f"{k}: {v}\n"
-        return telem_items
 
     def update_craft_text_block(self, craft=None, pattern=None, profile=None):
         if craft is None:
