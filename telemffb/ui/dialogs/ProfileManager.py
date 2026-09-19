@@ -34,6 +34,7 @@ from telemffb.ui.generated.Ui_ProfileManagerDialog import Ui_ProfileManagerDialo
 from telemffb.ui.dialogs.ProfileImportDialog import ProfileImportDialog
 from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
 from telemffb.utils import dbprint
+from telemffb.ui.theme.tokens import current_tokens, ERROR_RED, WARNING_LABEL_FG, WARNING_LABEL_BG
 import xml.etree.ElementTree as ET
 import telemffb.xmlutils as xmlutils
 import time
@@ -1339,14 +1340,8 @@ class NewProfileDialog(QDialog):
 
         # Inline error label (initially hidden)
         self.error_label = QLabel()
-        if G.useDarkMode:
-            fg = "#FFE3E3"  # soft light red/pink (good contrast on dark)
-            bg = "rgba(255, 99, 99, 0.16)"  # faint red tint
-            bd = "#FF6B6B"  # border a bit brighter
-        else:
-            fg = "#B00020"  # material-ish error red
-            bg = "rgba(176, 0, 32, 0.10)"  # faint tint
-            bd = "rgba(176, 0, 32, 0.35)"
+        t = current_tokens()
+        fg, bg, bd = t.error_banner_fg, t.error_banner_bg, t.error_banner_border
 
         self.error_label.setStyleSheet(f"""
                 QLabel {{
@@ -1448,14 +1443,8 @@ class RenameProfileDialog(QDialog):
         err_retain.setRetainSizeWhenHidden(True)
         self.err.setSizePolicy(err_retain)
         self.err.hide()
-        if G.useDarkMode:
-            fg = "#FFE3E3"  # soft light red/pink (good contrast on dark)
-            bg = "rgba(255, 99, 99, 0.16)"  # faint red tint
-            bd = "#FF6B6B"  # border a bit brighter
-        else:
-            fg = "#B00020"  # material-ish error red
-            bg = "rgba(176, 0, 32, 0.10)"  # faint tint
-            bd = "rgba(176, 0, 32, 0.35)"
+        t = current_tokens()
+        fg, bg, bd = t.error_banner_fg, t.error_banner_bg, t.error_banner_border
 
         self.err.setStyleSheet(f"""
                 QLabel {{
@@ -1540,15 +1529,15 @@ class ExportOptionsDialog(QDialog):
             warning_label = QLabel(
                 "The following default profiles cannot be exported and will be excluded:"
             )
-            warning_label.setStyleSheet("""
-                QLabel {
+            warning_label.setStyleSheet(f"""
+                QLabel {{
                 padding-left: 10px;
                 padding-top: 2px;
-                color: #dddddd; /* Softer red for dark mode */
-                background-color: rgba(255, 50, 50, 30); /* Light red background tint */
-                border: 1px solid #c33;
+                color: {WARNING_LABEL_FG}; /* Softer red for dark mode */
+                background-color: {WARNING_LABEL_BG}; /* Light red background tint */
+                border: 1px solid {ERROR_RED};
                 border-radius: 4px;
-            }
+            }}
             """)
             layout.addWidget(warning_label)
 

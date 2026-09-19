@@ -349,3 +349,34 @@ def test_the_playing_rows_button_reads_as_stop(qapp, tmp_path):
     assert r.buttons[name].text() == '■'
     others = [b for n, b in r.buttons.items() if n != name]
     assert all(b.text() == '▶' for b in others)
+
+
+def test_a_specs_note_gets_its_own_tooltip_paragraph(qapp, tmp_path, monkeypatch):
+    import copy
+    from telemffb.preview.engine import PREVIEWS_BY_ROW
+    name = 'jet_engine_rumble_intensity'
+    # copied rather than dataclasses.replace()d: that re-runs the spec's
+    # validation, which is not what is under test here
+    spec = copy.copy(PREVIEWS_BY_ROW[name])
+    object.__setattr__(spec, 'note', 'Check <this> & that in the sim.')
+    monkeypatch.setitem(PREVIEWS_BY_ROW, name, spec)
+    r = _render(qapp, tmp_path, offline=True)
+    if name not in r.buttons:
+        pytest.skip("row not rendered for this model")
+    tip = r.buttons[name].toolTip()
+    assert '<b>Note:</b> Check &lt;this&gt; &amp; that in the sim.' in tip   # escaped, not markup
+    assert tip.index('Note:') < tip.index('Click again to stop')
+    assert all('Note:' not in b.toolTip() for n, b in r.buttons.items() if n != name)
+
+
+def test_setting_names_are_never_clipped_below_their_text_height(qapp, tmp_path):
+    """Once the form overflows its scroll area every row sits at its
+    minimum height, so a fixed 20 px minimum clipped two-line names."""
+    from telemffb.ui.widgets.custom_widgets import InfoLabel
+    r = _render(qapp, tmp_path, offline=True)
+    labels = [w for w in r.content.findChildren(InfoLabel)
+              if w.objectName().startswith('namelabel_')]
+    assert labels
+    assert any(w.minimumSizeHint().height() > 20 for w in labels), "no multi-line name rendered"
+    for w in labels:
+        assert w.minimumHeight() >= w.minimumSizeHint().height(), w.objectName()

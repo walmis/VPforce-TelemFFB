@@ -14,7 +14,6 @@ back and the importer trips over). Two layers now close it:
   regardless (covered in tests/test_xmlutils.py).
 """
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -87,35 +86,44 @@ class TestWizardFinishedHook:
         from telemffb.MainWindow import MainWindow
         calls = []
         win = SimpleNamespace(
-            new_craft_button=MagicMock(),
-            _new_craft_anim=MagicMock(),
-            profile_change_button=MagicMock(),
+            _new_craft_prompt_active=True,
+            _new_craft_target=('MSFS', 'Helicopter', 'BELL UH-1H'),
             settings_layout=SimpleNamespace(
                 reload_layout=lambda *_: calls.append('reload')))
         return MainWindow.new_ac_wizard_finished, win, calls
 
     def test_refreshes_the_profile_before_reloading_the_form(self, monkeypatch):
+        from telemffb.state.app_state import AppState
         hook, win, calls = self._window()
         tm = SimpleNamespace(refresh_aircraft_profile=lambda: calls.append('refresh'))
         monkeypatch.setattr(G, 'telem_manager', tm, raising=False)
-        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=False), raising=False)
+        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=False, profile_change=None),
+                            raising=False)
+        monkeypatch.setattr(G, 'app_state', AppState(), raising=False)
         hook(win)
         assert calls == ['refresh', 'reload']                  # order matters
-        win.new_craft_button.setVisible.assert_called_once_with(False)
-        win._new_craft_anim.stop.assert_called_once()
+        assert win._new_craft_prompt_active is False
+        assert win._new_craft_target is None
+        assert G.app_state.current_prompts() == ()
 
     def test_offline_editor_does_not_touch_the_live_profile(self, monkeypatch):
+        from telemffb.state.app_state import AppState
         hook, win, calls = self._window()
         tm = SimpleNamespace(refresh_aircraft_profile=lambda: calls.append('refresh'))
         monkeypatch.setattr(G, 'telem_manager', tm, raising=False)
-        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=True), raising=False)
+        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=True, profile_change=None),
+                            raising=False)
+        monkeypatch.setattr(G, 'app_state', AppState(), raising=False)
         hook(win)
         assert calls == ['reload']
 
     def test_no_telemetry_manager_yet(self, monkeypatch):
+        from telemffb.state.app_state import AppState
         hook, win, calls = self._window()
         monkeypatch.setattr(G, 'telem_manager', None, raising=False)
-        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=False), raising=False)
+        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(offline_mode=False, profile_change=None),
+                            raising=False)
+        monkeypatch.setattr(G, 'app_state', AppState(), raising=False)
         hook(win)
         assert calls == ['reload']
 
@@ -128,12 +136,14 @@ class TestAnsweringTheOfferClearsOnlyThatOffer:
 
     def _answer(self, monkeypatch, during_dialog):
         from telemffb.MainWindow import MainWindow
+        from telemffb.state.app_state import AppState
         from telemffb.ui.dialogs.ProfileOfferDialog import ProfileOfferDialog
         from telemffb import match_history
         answered = {'sim': 'MSFS', 'user': '737.*', 'curated': '737-600.*'}
         sm = SimpleNamespace(profile_change=answered, offline_mode=True)
         monkeypatch.setattr(G, 'settings_mgr', sm, raising=False)
         monkeypatch.setattr(G, 'telem_manager', None, raising=False)
+        monkeypatch.setattr(G, 'app_state', AppState(), raising=False)
         resolved = []
         monkeypatch.setattr(match_history, 'resolve',
                             lambda *a, **k: resolved.append(a[:4]))
@@ -143,7 +153,7 @@ class TestAnsweringTheOfferClearsOnlyThatOffer:
             return ProfileOfferDialog.DECLINE
 
         win = SimpleNamespace(
-            profile_change_button=MagicMock(),
+            _profile_change_prompt_active=True,
             settings_layout=SimpleNamespace(reload_layout=lambda *_: None),
             _ask_profile_change=lambda change: ask(None, change))
         MainWindow._on_profile_change_link(win, '#')
@@ -232,9 +242,8 @@ class TestSplitButtonState:
         from telemffb.MainWindow import MainWindow
         calls = []
         win = SimpleNamespace(
-            status_container=SimpleNamespace(
-                cur_craft_label=MagicMock(), cur_pattern_label=MagicMock(),
-                active_profile_label=MagicMock(),
+            header_panel=SimpleNamespace(
+                set_craft_info=lambda craft, pattern, profile: None,
                 set_split_state=lambda v: calls.append(v),
                 set_profile_state=lambda v: calls.append(v)),
             refresh_profile_notes_button=lambda: None)
@@ -269,7 +278,7 @@ class TestNotesButtonState:
         calls = []
         win = SimpleNamespace(
             refresh_telem_override_pill=lambda: None,
-            status_container=SimpleNamespace(
+            header_panel=SimpleNamespace(
                 set_notes_state=lambda enabled, has_notes: calls.append(enabled)))
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_sim=sim, current_aircraft_name=aircraft,
@@ -302,16 +311,20 @@ class TestProfileComboState:
     matched there are none to pick between and none to add to."""
 
     def _combo(self, monkeypatch, pattern, items):
-        from PyQt6.QtWidgets import QComboBox
         from telemffb.MainWindow import MainWindow
-        combo = QComboBox()
-        win = SimpleNamespace(status_container=SimpleNamespace(
-            cb_selectProfileCombo=combo, set_profile_state=combo.setEnabled))
+        from telemffb.ui.widgets.custom_widgets import AppStatusWidget
+        # Kept alive on self: with no Python reference held past this method,
+        # PyQt would tear the widget (and its child combo) down underneath
+        # the caller's assertions.
+        self._status = AppStatusWidget(master_instance=True)
+        win = SimpleNamespace(header_panel=SimpleNamespace(
+            set_profile_state=self._status.set_profile_state,
+            set_profile_choices=self._status.set_profile_choices))
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_sim="MSFS", current_class="PropellerAircraft",
             current_pattern=pattern), raising=False)
         MainWindow.populate_profile_combo(win, items)
-        return combo
+        return self._status.cb_selectProfileCombo
 
     def test_disabled_when_nothing_matched(self, qt_app, monkeypatch):
         assert self._combo(monkeypatch, "", []).isEnabled() is False

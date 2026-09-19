@@ -268,7 +268,7 @@ class TelemManager(QObject, threading.Thread):
         self.timeout_sec = 0.2
         self._ipc_telem_data = {}
         self._simconnect : Optional[SimConnectManager] = None
-        self.gain_overrides_active = False
+        self._gain_overrides_active = False
         self.stop_state = False
         self.pause_state = False
         self._vpconf_deferred_frame = None   # single-slot buffer for a frame arriving during the startup vpconf push
@@ -309,6 +309,19 @@ class TelemManager(QObject, threading.Thread):
         self.timed_out = False
         self._sim_exit_signaled = False
         self._process_check_deadline = None
+
+    @property
+    def gain_overrides_active(self) -> bool:
+        return self._gain_overrides_active
+
+    @gain_overrides_active.setter
+    def gain_overrides_active(self, active: bool) -> None:
+        """Every write is forwarded to AppState, so the scope status
+        indicators can never disagree with this flag."""
+        self._gain_overrides_active = bool(active)
+        app_state = getattr(G, 'app_state', None)
+        if app_state is not None:
+            app_state.set_own_gain_overrides_active(self._gain_overrides_active)
 
     def notify_sim_exited(self, src: str):
         """Called by any sim transport when it detects a clean exit.
@@ -869,16 +882,13 @@ class TelemManager(QObject, threading.Thread):
                 G.current_configurator_gains = state
                 any_true = any(sub.get('enabled', False) for sub in state.values())
                 self.gain_overrides_active = any_true
-                G.main_window.refresh_scope_status_indicators(force=True)
             else:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.refresh_scope_status_indicators(force=True)
         else:
             if self.gain_overrides_active:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.refresh_scope_status_indicators(force=True)
 
     def _current_class_name(self) -> Optional[str]:
         """The class the loaded aircraft actually resolved to - what its
@@ -972,11 +982,9 @@ class TelemManager(QObject, threading.Thread):
                 G.current_configurator_gains = state
                 any_true = any(sub.get('enabled', False) for sub in state.values())
                 self.gain_overrides_active = any_true
-                G.main_window.refresh_scope_status_indicators(force=True)
             else:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
-                G.main_window.refresh_scope_status_indicators(force=True)
 
     def _recreate_aircraft_with_new_type(self, aircraft_info: AircraftInfo, params, cls_name):
         """Recreate aircraft instance when type changes."""

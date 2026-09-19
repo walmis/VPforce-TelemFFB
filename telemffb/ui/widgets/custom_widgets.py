@@ -25,7 +25,7 @@ from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
     QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout, QSizePolicy, \
-    QGraphicsColorizeEffect
+    QGraphicsColorizeEffect, QTableView, QAbstractItemView
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
@@ -39,11 +39,11 @@ from PyQt6.QtCore import QAbstractListModel, QModelIndex
 import numpy as np
 
 import telemffb.globals as G
+from telemffb.ui.theme.tokens import PURPLE, ACTIVE_GREEN
 from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
 import styles
 
-vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
-t_purple = QColor(f"#44{vpf_purple[-6:]}")
+vpf_purple = PURPLE   # rgb(171, 55, 200) - kept as an alias so importers don't break
 
 
 class FFBDeviceListModel(QAbstractListModel):
@@ -220,6 +220,9 @@ class ElidedLabel(QLabel):
 
 
 class AppStatusWidget(QWidget):
+    SELECT_LABEL = 'Select...'
+    ADD_NEW_LABEL = 'Add New...'
+
     request_set_active_vpconf = pyqtSignal(str, bool)
     request_set_active_configurator = pyqtSignal(bool, bool)
     request_set_telem_overrides = pyqtSignal(str, str)
@@ -227,6 +230,7 @@ class AppStatusWidget(QWidget):
     request_clear_error = pyqtSignal()
     profile_notes_clicked = pyqtSignal()
     split_profile_clicked = pyqtSignal()
+    profile_chosen = pyqtSignal(str)
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -246,17 +250,46 @@ class AppStatusWidget(QWidget):
         self.request_flag_error.connect(self.flag_error)
         self.request_clear_error.connect(self.clear_error)
 
-        grid = QGridLayout(self)
+        # A single "Application Status" box (titled by whoever hosts this
+        # widget), with sim-connection state (what the flight sim is doing)
+        # and profile/override state (what TelemFFB is doing about it) as
+        # two plain columns inside it rather than two separate boxes.
+        outer_layout = QHBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(10)
+        outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.sim_status_group = QWidget()
+        sim_grid = QGridLayout(self.sim_status_group)
+        sim_grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        sim_grid.setContentsMargins(0, 0, 0, 0)
+        sim_grid.setVerticalSpacing(10)
+        sim_grid.setHorizontalSpacing(10)
+        sim_grid.setColumnMinimumWidth(1, 200)
+
+        column_divider = QFrame()
+        column_divider.setFrameShape(QFrame.Shape.VLine)
+        column_divider.setFrameShadow(QFrame.Shadow.Sunken)
+
+        self.app_status_group = QWidget()
+        grid = QGridLayout(self.app_status_group)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        grid.setContentsMargins(10, 10, 10, 10)
+        grid.setContentsMargins(0, 0, 0, 0)
         grid.setVerticalSpacing(10)
         grid.setHorizontalSpacing(10)
-        # Pin the value column so the panel width is constant regardless of
-        # content: every value widget's width is capped below this (elided
-        # labels / chip budgets), so nothing can grow the column and shorter
-        # values can't shrink it.
+        # Floor the value column so shorter values can't shrink the panel;
+        # every value widget's width is capped (elided labels / chip
+        # budgets), so content alone never grows it. The stretch hands the
+        # column the half's spare width as the window widens, which the
+        # expanding profile combo takes up.
         grid.setColumnMinimumWidth(1, 280)
+        grid.setColumnStretch(1, 1)
 
+        outer_layout.addWidget(self.sim_status_group, stretch=1)
+        outer_layout.addWidget(column_divider)
+        outer_layout.addWidget(self.app_status_group, stretch=1)
+
+        sim_row = 0
         row = 0
         label_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         value_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
@@ -375,15 +408,15 @@ class AppStatusWidget(QWidget):
         self.message_stack.setCurrentIndex(0)
 
         # Layout content
-        grid.addWidget(sim_status_header, row, 0, alignment=label_align)
-        grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
-        row += 1
+        sim_grid.addWidget(sim_status_header, sim_row, 0, alignment=label_align)
+        sim_grid.addWidget(self.sim_status_label, sim_row, 1, alignment=value_align)
+        sim_row += 1
 
-        grid.addWidget(make_item_label("Current Aircraft"), row, 0, alignment=label_align)
-        grid.addWidget(self.cur_craft_label, row, 1, alignment=value_align)
-        row += 1
+        sim_grid.addWidget(make_item_label("Current Aircraft"), sim_row, 0, alignment=label_align)
+        sim_grid.addWidget(self.cur_craft_label, sim_row, 1, alignment=value_align)
+        sim_row += 1
 
-        grid.addWidget(make_item_label("Matched Model"), row, 0, alignment=label_align)
+        sim_grid.addWidget(make_item_label("Matched Model"), sim_row, 0, alignment=label_align)
         pattern_row_layout = QHBoxLayout()
         pattern_row_layout.setContentsMargins(0, 0, 0, 0)
         pattern_row_layout.setSpacing(6)
@@ -405,16 +438,23 @@ class AppStatusWidget(QWidget):
         pattern_row_layout.addStretch(1)
         pattern_row_widget = QWidget()
         pattern_row_widget.setLayout(pattern_row_layout)
-        grid.addWidget(pattern_row_widget, row, 1, alignment=value_align)
-        row += 1
+        sim_grid.addWidget(pattern_row_widget, sim_row, 1, alignment=value_align)
+        sim_row += 1
 
         self.cb_selectProfileCombo = QComboBox()
         self.cb_selectProfileCombo.addItems(['Select...'])
+        # Items arrive after first show, so the default AdjustToContentsOnFirstShow
+        # would size the box to "Select..." only. Guarantee room for names like
+        # "User Default" and let the row give it the column's spare width.
+        self.cb_selectProfileCombo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.cb_selectProfileCombo.setMinimumContentsLength(14)
+        self.cb_selectProfileCombo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.cb_selectProfileCombo.currentIndexChanged.connect(self._on_profile_combo_changed)
 
         profile_row_layout = QHBoxLayout()
         profile_row_layout.setContentsMargins(0, 0, 0, 0)
         profile_row_layout.setSpacing(6)
-        profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.btn_profile_notes = QtWidgets.QToolButton()
         # currentColor SVG rendered at explicit colors: muted glyph when no
         # notes exist, full-contrast (white on dark / black on light) when
@@ -433,11 +473,8 @@ class AppStatusWidget(QWidget):
         self.btn_profile_notes.clicked.connect(self.profile_notes_clicked.emit)
 
         profile_row_layout.addWidget(self.active_profile_label)
-        profile_row_layout.addWidget(self.cb_selectProfileCombo)
+        profile_row_layout.addWidget(self.cb_selectProfileCombo, 1)
         profile_row_layout.addWidget(self.btn_profile_notes)
-        # Absorb the value column's spare width so the combo keeps its natural
-        # size instead of stretching to fill the (fixed-width) cell.
-        profile_row_layout.addStretch(1)
 
         grid.addWidget(make_item_label("Active Profile"), row, 0, alignment=label_align)
         grid.addLayout(profile_row_layout, row, 1)
@@ -548,6 +585,43 @@ class AppStatusWidget(QWidget):
 
     def set_profile_name(self, profile_name):
         self.active_profile_label.setText(profile_name)
+
+    def set_craft_info(self, craft, pattern, profile):
+        """Update the current-aircraft, matched-pattern and active-profile
+        value labels together (ElidedLabel.setText already handles eliding
+        and the full-text tooltip, so there is nothing extra to do here)."""
+        self.cur_craft_label.setText(craft)
+        self.cur_pattern_label.setText(pattern)
+        self.active_profile_label.setText(profile)
+
+    def set_profile_choices(self, profiles):
+        """Repopulate the profile combo: the placeholder, each of
+        ``profiles``, then an italicized "Add New..." entry. Always resets
+        to the placeholder itself. Repopulating never fires
+        ``profile_chosen`` - blockSignals covers clear/add/reset-index."""
+        self.cb_selectProfileCombo.blockSignals(True)
+        self.cb_selectProfileCombo.clear()
+        self.cb_selectProfileCombo.addItem(self.SELECT_LABEL)
+        for item in profiles:
+            self.cb_selectProfileCombo.addItem(item)
+        self.cb_selectProfileCombo.addItem(self.ADD_NEW_LABEL)
+        index = self.cb_selectProfileCombo.findText(self.ADD_NEW_LABEL)
+        if index >= 0:
+            font = QFont()
+            font.setItalic(True)
+            self.cb_selectProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
+        self.cb_selectProfileCombo.setCurrentIndex(0)
+        self.cb_selectProfileCombo.blockSignals(False)
+
+    def _on_profile_combo_changed(self, index):
+        # Index 0 is the "Select..." placeholder - nothing chosen.
+        if index <= 0:
+            return
+        profile_name = self.cb_selectProfileCombo.itemText(index)
+        self.cb_selectProfileCombo.blockSignals(True)
+        self.cb_selectProfileCombo.setCurrentIndex(0)
+        self.cb_selectProfileCombo.blockSignals(False)
+        self.profile_chosen.emit(profile_name)
 
     def reset_sim_state(self, src: str):
         """Reset all status labels to their initial (no-sim) default values."""
@@ -846,6 +920,50 @@ class NoKeyScrollArea(QScrollArea):
         self.sliders.append(slider)
 
 
+class CopyableTableView(QTableView):
+    """A read-only QTableView whose Ctrl+C copies the selected cells to the
+    clipboard as tab/newline-separated text.
+
+    Stands in for a selectable-text QLabel (``Qt.TextInteractionFlag.
+    TextSelectableByMouse``) on a table of key/value rows - MonitorPanel's
+    telemetry and active-effects tables used to be such a QLabel, and this
+    keeps "select some lines and copy them" working with a real model
+    behind the display instead of one formatted block of text.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setWordWrap(False)
+        self.verticalHeader().setVisible(False)
+
+    def keyPressEvent(self, event):
+        if event.matches(QtGui.QKeySequence.StandardKey.Copy):
+            self._copy_selection()
+            return
+        super().keyPressEvent(event)
+
+    def _copy_selection(self):
+        indexes = self.selectionModel().selectedIndexes() if self.selectionModel() else []
+        if not indexes:
+            return
+        indexes.sort(key=lambda idx: (idx.row(), idx.column()))
+        lines = []
+        row = None
+        cells = []
+        for idx in indexes:
+            if row is not None and idx.row() != row:
+                lines.append('\t'.join(cells))
+                cells = []
+            row = idx.row()
+            cells.append(str(idx.data() or ''))
+        if cells:
+            lines.append('\t'.join(cells))
+        QGuiApplication.clipboard().setText('\n'.join(lines))
+
+
 class SliderWithLabel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -897,17 +1015,15 @@ class NoWheelSlider(QSlider):
 
         super(NoWheelSlider, self).__init__(*args, **kwargs)
         # Default colors
-        self.groove_color = "#bbb"
         self.handle_color = vpf_purple
         self.handle_height = 20
         self.handle_width = 16
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         # Apply styles
-        self.update_styles()
+        self._apply_handle_geometry_style()
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
-        self.is_mouse_over = False
         self._delay = 300  # Delay in milliseconds
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -1026,20 +1142,25 @@ class NoWheelSlider(QSlider):
         else:
             event.ignore()
 
-    def update_styles(self):
-        # Generate CSS based on color and size properties
+    def _apply_handle_geometry_style(self):
+        """Colors and the handle itself are drawn entirely by paintEvent from
+        handle_color, so no stylesheet is needed for those. But QSlider's own
+        (un-overridden) mousePressEvent/mouseMoveEvent hit-test drags against
+        QStyle::subControlRect(SC_SliderHandle) - and once a widget carries
+        any stylesheet touching QSlider::handle, Qt computes that rect from
+        this CSS box instead of the native style. paintEvent already ignores
+        the rect's own position/size (it sets width/height from handle_width/
+        handle_height directly), so this size-only sheet exists purely to
+        keep the invisible drag hit-box the same size as what's drawn -
+        without it, dragging would hit-test against the native (smaller)
+        Fusion handle while a bigger handle is painted on screen. Only
+        called on init and when handle_width/handle_height actually change,
+        never from setHandleColor, which is called every telemetry tick.
+        """
         css = f"""
             QSlider::handle:horizontal {{
-                background: qradialgradient(
-                    cx: 0.3, cy: 0.5, fx: 0.3, fy: 0.35, radius: 0.8,
-                    stop: 0.0 #ffffff,
-                    stop: 0.3 {self.handle_color},
-                    stop: 1.0 {QColor(self.handle_color).darker().name()}
-                );
-                border: 1px solid #565a5e;
                 width: {int(self.handle_width)}px;  /* Adjusted handle width */
                 height: {int(self.handle_height)}px;  /* Adjusted handle height */
-                border-radius: {int(self.handle_height / 4 )}px;  /* Adjusted border radius */
                 margin-top: -{int(self.handle_height / 4 )}px;  /* Negative margin to overlap with groove */
                 margin-bottom: -{int(self.handle_height / 4 )}px;  /* Negative margin to overlap with groove */
                 margin-left: -1px;  /* Adjusted left margin */
@@ -1054,17 +1175,27 @@ class NoWheelSlider(QSlider):
     def decrease_single_step(self):
         self.setValue(self.value() - self.singleStep())
 
-    def setGrooveColor(self, color):
-        self.groove_color = color
-        self.update_styles()
-
     def setHandleColor(self, color):
+        if self.handle_color == color:
+            return
         self.handle_color = color
-        self.update_styles()
+        self.update()
+
+    def setActive(self, active: bool):
+        """Two-state handle color toggle (idle purple / live-effect green).
+
+        paintEvent() draws the groove and handle itself from handle_color,
+        so no stylesheet is involved: just store the color and repaint.
+        """
+        self.handle_color = ACTIVE_GREEN if active else PURPLE
+        self.update()
 
     def setHandleHeight(self, height):
+        if self.handle_height == height:
+            return
         self.handle_height = height
-        self.update_styles()
+        self._apply_handle_geometry_style()
+        self.update()
 
     def enterEvent(self, event):
         self.setFocus()
@@ -1080,12 +1211,13 @@ class NoWheelNumberSlider(NoWheelSlider):
         super(NoWheelNumberSlider, self).__init__(*args, **kwargs)
         self.handle_width = 32  # Different handle width for NoWheelNumberSlider
         self.value_text = ""  # Add an attribute to store the text to be shown in the handle
-        self.update_styles()
+        self._apply_handle_geometry_style()
 
     def setHandleColor(self, color, text=""):
+        if self.handle_color == color and self.value_text == text:
+            return
         self.handle_color = color
         self.value_text = text
-        self.update_styles()
         self.update()  # Ensure the slider is repainted to show the new text
 
     def paintEvent(self, event):
@@ -1250,7 +1382,7 @@ class InfoLabel(QWidget):
         # icon_img = os.path.join(script_dir, "image/information.png")
         icon_img = ":/image/information.png"
         self.pixmap = HiDpiPixmap(icon_img)
-        self.icon_label.setPixmap(self.pixmap._scaled(12, 12, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))  # Adjust the height as needed
+        self.icon_label.setPixmap(self.pixmap.scaled_logical(12, 12, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))  # Adjust the height as needed
         self.icon_label.setVisible(False)
 
         # Layout to align the text label and icon

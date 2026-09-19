@@ -31,11 +31,13 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.ui.widgets.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
+from telemffb.ui.theme.tokens import ACTIVE_GREEN
+from telemffb.ui.widgets.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, Toggle, EraseButton, NoWheelComboBox)
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.ui.dialogs.AdvancedGDialog import AdvancedGDialog
 from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.state.app_state import AppState
 from telemffb.utils import validate_vpconf_profile, device_pid_key, dbprint, HiDpiPixmap
 import telemffb.utils as utils
 import styles
@@ -43,7 +45,7 @@ from telemffb import globals as G
 from telemffb import xmlutils
 
 PREVIEW_BUTTON_SIZE = 20          # matches the -/+ step buttons
-PREVIEW_ACTIVE_HANDLE = "#17c411"  # the green the live loop paints active effects
+PREVIEW_ACTIVE_HANDLE = ACTIVE_GREEN  # the green the live loop paints active effects
 
 
 def preview_tooltip_html(paragraphs):
@@ -78,7 +80,7 @@ def lock_preview_rows(root, spec, locked, slot=None):
     for row in spec.rows:
         for prefix in ('sld_', 'dsld_', 'dfsld_'):
             for slider in root.findChildren(NoWheelSlider, f"{prefix}{row}"):
-                slider.setHandleColor(PREVIEW_ACTIVE_HANDLE if locked else vpf_purple)
+                slider.setActive(locked)
                 _hold(slider, locked)
         for cls, prefix in ((QPushButton, 'sldm_'), (QPushButton, 'sldp_'), (QPushButton, 'eb_'),
                             (QLineEdit, 'vle_'), (NoWheelComboBox, 'ud_')):
@@ -130,6 +132,11 @@ class SettingsLayout(QGridLayout):
         self.parent_expander_dict = {}
         self.revert_targets = {}  # per-setting: value the setting resolves to without the user override
         self.unit_previous_values = {}  # Track previous unit for conversion; build_rows below reads it
+        # Slider caches _rebuild_slider_caches() (re)populates on every layout
+        # rebuild - on_update_telemetry's recolor pass reads these instead of
+        # walking findChildren() every ~50ms. See bind()/repaint_active_settings().
+        self._active_setting_sliders = []          # NoWheelSlider, excluding live-key number sliders
+        self.live_key_sliders = []                 # [(NoWheelNumberSlider, live_telemetry_key), ...]
         result = None
         if G.settings_mgr.current_sim != 'nothing':
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
@@ -583,6 +590,8 @@ class SettingsLayout(QGridLayout):
 
         # print (f"{i} rows with {self.count()} widgets")
 
+        self._rebuild_slider_caches()
+
     def reload_caller(self, reveal_top=False):
         # caller_frame = inspect.currentframe().f_back
         # caller_name = caller_frame.f_code.co_name
@@ -811,6 +820,11 @@ class SettingsLayout(QGridLayout):
         self.setColumnStretch(self.ENTRY_COL, 10)
 
     def clear_layout(self, show_empty_notice=True):
+        # The sliders these cache are about to be deleteLater()'d - drop the
+        # references now rather than risk a later repaint touching a
+        # dangling widget. build_rows() (if it runs next) repopulates them.
+        self._active_setting_sliders = []
+        self.live_key_sliders = []
         layout = self.layout()
         if layout is not None:
             while layout.count():
@@ -828,6 +842,97 @@ class SettingsLayout(QGridLayout):
         # passes False because it decides rows-vs-notice itself.
         if show_empty_notice:
             self._build_empty_notice()
+
+    def _rebuild_slider_caches(self):
+        """(Re)populate the two caches on_update_telemetry's recolor pass
+        reads, replacing the findChildren(NoWheelSlider)/findChildren(
+        NoWheelNumberSlider) walk that used to run every ~50ms telemetry
+        tick. Called once per layout rebuild instead, right after the rows
+        exist - a single findChildren() pass here is cheap; the same pass
+        every frame was not.
+
+        NoWheelNumberSlider is itself a NoWheelSlider, so a live-key number
+        slider goes only into ``live_key_sliders`` - the old code painted
+        those from both loops, the second (live-telemetry) one always
+        winning, so folding them into one bucket each reproduces the same
+        final paint without doing it twice.
+        """
+        live_keys = getattr(self.mainwindow, 'N_SLIDER_LIVE_KEYS', {})
+        active_setting_sliders = []
+        live_key_sliders = []
+        # Walk the layout tree, not findChildren(): clear_layout() only
+        # deleteLater()s the old rows, so until the event loop runs they are
+        # still children of the parent widget and would be cached alongside
+        # the fresh ones - then touched after deletion. takeAt() has already
+        # removed them from the layout, so the tree holds only live widgets.
+        for slider in self._iter_layout_widgets(self):
+            if not isinstance(slider, NoWheelSlider):
+                continue
+            name = slider.objectName().replace('sld_', '')
+            if isinstance(slider, NoWheelNumberSlider):
+                live_key = live_keys.get(name)
+                if live_key is not None:
+                    live_key_sliders.append((slider, live_key))
+                    continue
+            active_setting_sliders.append(slider)
+        self._active_setting_sliders = active_setting_sliders
+        self.live_key_sliders = live_key_sliders
+        # Fresh widgets default to the idle color; paint them from whatever
+        # AppState currently holds instead of waiting for it to next change.
+        self.repaint_active_settings()
+
+    @staticmethod
+    def _iter_layout_widgets(layout):
+        for idx in range(layout.count()):
+            item = layout.itemAt(idx)
+            widget = item.widget()
+            if widget is not None:
+                yield widget
+            elif item.layout() is not None:
+                yield from SettingsLayout._iter_layout_widgets(item.layout())
+
+    # ---- active-settings slider highlighting (AppState-driven) -----------
+
+    def bind(self, state: AppState) -> None:
+        """Subscribe to AppState's active-settings-changed signal and apply
+        its current value immediately - mirrors PromptStack.bind()/
+        HeaderPanel.bind()."""
+        state.active_settings_changed.connect(self._on_active_settings_changed)
+        self._rebuild_slider_caches()  # also repaints
+
+    def _on_active_settings_changed(self, active_settings):
+        # Painting while the Settings tab isn't showing is wasted work; the
+        # tab-switch handler calls repaint_active_settings() to catch up
+        # whatever changed while it was hidden.
+        if self.mainwindow is None or self.mainwindow.tab_widget.currentIndex() != 1:
+            return
+        self._paint_active_settings(active_settings)
+
+    def repaint_active_settings(self):
+        """Repaint the setting sliders from AppState's current value. Called
+        after a layout rebuild replaces the slider widgets, and when the
+        Settings tab becomes visible again (see _on_active_settings_changed).
+
+        Tolerates a not-yet-set G.app_state (e.g. a test building a form in
+        isolation) the same way TelemManager.gain_overrides_active does.
+        """
+        app_state = getattr(G, 'app_state', None)
+        if app_state is None:
+            return
+        self._paint_active_settings(app_state.current_active_settings())
+
+    def _paint_active_settings(self, active_settings):
+        """Green if any active setting name is a substring of the slider's
+        stripped object name, else purple - including when nothing is
+        active, so highlighting clears once effects stop. Rows a playing
+        preview holds (lock_preview_rows) keep the preview's green.
+        """
+        for slider in self._active_setting_sliders:
+            if slider.property(_PREVIEW_HELD):
+                continue
+            name = slider.objectName().replace('sld_', '')
+            matched = any(a_s in name for a_s in active_settings)
+            slider.setActive(matched)
 
     def _clear_sub_layout(self, layout):
         while layout.count():
@@ -2149,10 +2254,9 @@ class SettingsLayout(QGridLayout):
             G.gain_override_dialog.revert_gains()
             G.gain_override_dialog.reset_to_vpconf()
             # Keep the canonical flag in sync (children report it to the
-            # master over IPC) and refresh scope-aware rather than directly.
+            # master over IPC); the property forwards it to AppState.
             if G.telem_manager is not None:
                 G.telem_manager.gain_overrides_active = False
-            G.main_window.refresh_scope_status_indicators(force=True)
 
     def update_advanced_g_effect(self, g_effect_curves: str):
         self.trigger_form_reload = True

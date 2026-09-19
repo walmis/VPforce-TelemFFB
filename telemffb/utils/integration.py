@@ -1111,12 +1111,15 @@ def upload_vpconf_profile(config_filepath, serial):
             return
 
         logging.info(f"upload_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
+        # The only write site of G.current_vpconf_profile: any new one must
+        # also call G.app_state.set_own_vpconf() or the indicator goes stale.
         G.current_vpconf_profile = config_filepath
-        # Scope-aware: only updates the indicator if this device is the
-        # selected config scope (a master scoped to a child keeps showing the
-        # child's reported state; ours shows when the user switches back).
-        if G.main_window is not None:
-            G.main_window.refresh_scope_status_indicators(force=True)
+        # AppState derives the scope-aware indicator itself (a master
+        # scoped to a child keeps showing the child's reported state; ours
+        # shows when the user switches back) and only repaints on a real
+        # change.
+        if getattr(G, 'app_state', None) is not None:
+            G.app_state.set_own_vpconf(config_filepath)
 
         def exec():
             # Use NamedMutex to ensure only one instance of the configurator is executed at a time

@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from telemffb.ExceptionTracker import ExceptionTracker
     from .hw.ffb_rhino import DeviceInfo
     from telemffb.hw.ffb_rhino import FFBReport_Get_Gains_Feature_Data
+    from telemffb.state.app_state import AppState
 
 DeviceTypeLiteral = Literal["joystick", "pedals", "collective", "trimwheel"]
 
@@ -177,6 +178,11 @@ child_buttons: Dict[str, int] = {}
 system_settings : 'SystemSettings'
 telem_manager : 'TelemManager'
 sim_listeners : 'SimListenerManager'
+
+app_state : 'AppState'
+"""Single source of truth for state the UI used to hold itself (widgets
+subscribe to its signals instead of background code reaching into
+MainWindow). See telemffb/state/app_state.py."""
 
 # Triggers and flags
 force_reload_aircraft_trigger: bool = False

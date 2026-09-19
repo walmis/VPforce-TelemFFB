@@ -24,24 +24,22 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 import sys
-import time
 import traceback
 from collections import OrderedDict
 from datetime import datetime
 from typing import override
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, QUrl, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
-                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut, QFontDatabase, QFont)
+                         QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
-                             QComboBox, QFrame, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
-                             QPushButton, QScrollArea, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu,
-                             QDialog, QStatusBar, QSplitter)
+                             QFrame, QGroupBox,
+                             QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+                             QPushButton, QTabWidget,
+                             QToolButton, QVBoxLayout, QWidget, QSizePolicy,
+                             QDialog, QStatusBar)
 
 import telemffb.globals as G
 from telemffb import match_history
@@ -51,9 +49,16 @@ import telemffb.xmlutils as xmlutils
 from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.ui.widgets.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
-    SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
+from telemffb.ui.theme.tokens import ACTIVE_GREEN
+from telemffb.ui.widgets.custom_widgets import AppStatusWidget, InstanceStatusRow, NoKeyScrollArea, \
+    SimStatusLabel, DetachedTabWindow, ExceptionStatusWidget
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
+from telemffb.ui.panels.PromptStack import PromptStack
+from telemffb.ui.panels.OfflineEditorPanel import OfflineEditorPanel
+from telemffb.ui.panels.MonitorPanel import MonitorPanel
+from telemffb.ui.panels.HeaderPanel import HeaderPanel
+from telemffb.state.app_state import Notice, NEW_CRAFT_PRIORITY, PROFILE_CHANGE_PRIORITY, TRIM_CAL_PRIORITY
+from telemffb.state.sim_status import SimStatusTracker
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
@@ -67,11 +72,12 @@ from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.ui.dialogs.ProfileManager import ProfileManagerDialog, NewProfileDialog
-from telemffb.utils import exit_application, HiDpiPixmap
+from telemffb.utils import exit_application
+from telemffb.ui.menus import MainMenu
+from telemffb.ui.tray import TrayController
+from telemffb.ui.updates import UpdateChecker
 
 class MainWindow(QMainWindow):
-    version_check_complete = pyqtSignal()
-
     #: Number-sliders whose handle shows a live force readout: setting name
     #: -> the telemetry key its aircraft code publishes (fraction 0..1 of
     #: the relevant full scale, so 100% on the handle means clipping/max).
@@ -88,31 +94,26 @@ class MainWindow(QMainWindow):
         'tap_effect_inertia_gain': '_pct_tap_inertia',
         'tap_effect_friction_gain': '_pct_tap_friction',
     }
-    #: How long the error status is held after the LAST error-bearing
-    #: frame before it clears.  Wall-clock on purpose: child-instance
-    #: errors reach the master over IPC on whichever frames catch them,
-    #: and a frame-counted debounce shrinks with sim frame rate.
-    ERROR_CLEAR_HOLD_S = 3.0
-
     def __init__(self):
         super().__init__()
         self.preview = EffectPreviewController(self)   # effect previews, see preview_controller
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_notifications = {}
+        self.tray = TrayController(self)
+        self.updates = UpdateChecker(self)
         self.new_craft_notification_sent = False
-        self.error_state = False # True='error' key found in telem_data, False=clean telem_data
-        self._error_last_seen = 0.0 # monotonic time an 'error' key was last seen; the clear path holds ERROR_CLEAR_HOLD_S past it (child errors arrive over IPC on whichever frames catch them)
-        self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
-        self.telemetry_timed_out = True
+        # The new-craft prompt's click target: the (sim, cls, name) the
+        # prompt currently names.  Re-captured (and the prompt rebuilt)
+        # whenever a *different* unmatched aircraft arrives, so the text
+        # and the click always follow the current one; unchanged frames
+        # construct nothing (see on_update_telemetry and PromptStack).
+        self._new_craft_prompt_active = False
+        self._new_craft_target = None  # (sim, cls, name) the prompt names
+        self._profile_change_prompt_active = False  # for the same one-shot-toast gating
+        # Error-onset/hold/clear state machine + timed-out flag - reports
+        # to G.app_state.set_sim_status; HeaderPanel/TrayController.bind()
+        # apply it. See telemffb/state/sim_status.py.
+        self.sim_status = SimStatusTracker(G.app_state, G.exception_tracker)
         self.last_telemetry_refresh = utils.millis()
-        self.show_simvars = False
-        self.latest_version = None
-        self._update_available = None
-        self._version_check_resolved = False
-        self._version_check_dialog = None
-        self.show_new_craft_button = False
         self.profile_mgr_dialog = None
-        self.all_offline_models = []
 
 
         """ Add font used for settngs area group labels """
@@ -130,6 +131,7 @@ class MainWindow(QMainWindow):
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
         G.current_device_config_scope = G.device_type
+        G.app_state.set_scope(G.device_type)
         self.current_tab_index = 0
 
         if G.system_settings.get('saveLastTab', 0):
@@ -188,231 +190,12 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         notes_row_layout = QHBoxLayout()
 
+        """ Build the menu bar - System/Profiles/Utilities/Window/Log/
+        Help menus and (Alt+D / debug key) the Debug menu. See
+        telemffb/ui/menus.py """
 
-        """ Create the menu bar """
-
-        menubar = self.menuBar()
-        self.menu = menubar
-        assert self.menu is not None
-        # Set the background color of the menu bar
-        # "#ab37c8" is VPForce purple
-
-
-        """ Add the "System" menu and its sub-option """
-
-        system_menu = self.menu.addMenu('&System')
-
-        if G.master_instance:
-            # Settings for every device live in the master's dialog; a child
-            # has none of its own to show.
-            system_settings_action = QAction('System Settings', self)
-            system_settings_action.triggered.connect(self.open_system_settings_dialog)
-            system_menu.addAction(system_settings_action)
-
-        cfg_log_folder_action = QAction('Open Config/Log Directory', self)
-        def do_open_cfg_dir():
-            modifiers = QApplication.keyboardModifiers()
-            if (modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier) and getattr(sys, 'frozen', False):
-                os.startfile(getattr(sys, "_MEIPASS"), 'open')
-            else:
-                os.startfile(G.userconfig_rootpath, 'open')
-        cfg_log_folder_action.triggered.connect(do_open_cfg_dir)
-        system_menu.addAction(cfg_log_folder_action)
-
-        reset_geometry = QAction('Reset Window Size/Position', self)
-
-        def do_reset_window_size():
-            match G.device_type:
-                case 'joystick':
-                    x_pos = 150
-                    y_pos = 130
-                case 'pedals':
-                    x_pos = 100
-                    y_pos = 100
-                case 'collective':
-                    x_pos = 50
-                    y_pos = 70
-                case 'trimwheel':
-                    x_pos = 40
-                    y_pos = 30
-            self.setGeometry(x_pos, y_pos, 530, 700)
-
-        reset_geometry.triggered.connect(do_reset_window_size)
-        system_menu.addAction(reset_geometry)
-
-        # Quitting a child ends that instance; only the master takes the
-        # whole application down with it.
-        exit_app_action = QAction(
-            'Quit TelemFFB' if G.master_instance else
-            f'Quit the {utils.device_display_name(G.device_type)} Instance',
-            self)
-        exit_app_action.triggered.connect(exit_application)
-        system_menu.addAction(exit_app_action)
-
-        if G.master_instance:
-            """
-            Create profiles menu - only for Master Instance
-            """
-            self.profiles_menu = self.menu.addMenu('Profiles')
-
-            self.profile_manager_action = QAction('Profile Manager...', self)
-            self.profile_manager_action.triggered.connect(self.show_profile_manager)
-            self.profiles_menu.addAction(self.profile_manager_action)
-
-            self.offline_config_action = QAction(r'Offline Editor/Effect Preview', self)
-            self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
-            self.profiles_menu.addAction(self.offline_config_action)
-
-            self.profiles_menu.setToolTipsVisible(True)
-            self.forget_offers_action = QAction('Reset Dismissed Profile Prompts', self)
-            self.forget_offers_action.setToolTip(
-                "TelemFFB will ask again about each aircraft you answered with 'Keep mine' "
-                "or 'Don't ask again', the next time the aircraft loads.")
-            self.forget_offers_action.triggered.connect(self.forget_profile_offers)
-            self.profiles_menu.addAction(self.forget_offers_action)
-            # Nothing dismissed means nothing to bring back; checked as the menu
-            # opens rather than tracked, since prompts are answered elsewhere.
-            self.profiles_menu.aboutToShow.connect(
-                lambda: self.forget_offers_action.setEnabled(match_history.has_declines()))
-
-
-        """ Create the "Utilities" menu """
-
-        utilities_menu = self.menu.addMenu('Utilities')
-
-        # Add the "Reset" action to the "Utilities" menu
-        reset_action = QAction('Reset All Effects', self)
-        reset_action.triggered.connect(self.reset_all_effects)
-        utilities_menu.addAction(reset_action)
-
-        self.update_action = QAction('Install Latest TelemFFB', self)
-        self.update_action.triggered.connect(self.update_from_menu)
-        if not G.release_version:
-            utilities_menu.addAction(self.update_action)
-        self.update_action.setDisabled(True)
-
-        download_action = QAction('Download Other Versions', self)
-        download_action.triggered.connect(lambda: self.open_url(dl_url))
-        utilities_menu.addAction(download_action)
-
-        self.reset_user_config_action = QAction('Reset User Config', self)
-        self.reset_user_config_action.triggered.connect(self.reset_user_config)
-        utilities_menu.addAction(self.reset_user_config_action)
-
-        def launch_vpconf():
-            try:
-                utils.launch_vpconf()
-            except Exception as e:
-                logging.error(f"Error launching VPforce Configurator: {e}")
-                QMessageBox.critical(self, "Error", f"Error launching VPforce Configurator: {e}")
-        self.vpconf_action = QAction("Launch VPforce Configurator", self)
-        self.vpconf_action.triggered.connect(launch_vpconf)
-        utilities_menu.addAction(self.vpconf_action)
-
-        reload_action = QAction('Force Reload Aircraft (Ctrl+Shift+R)', self)
-        reload_action.triggered.connect(self.force_reload_aircraft)
-        utilities_menu.addAction(reload_action)
-
-        sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
-
-        def do_open_sc_override_dialog():
-            dialog = SCOverridesEditor(self)
-            # Overrides save immediately in the editor; refresh the status
-            # pill once the dialog closes so it reflects any changes.
-            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
-            dialog.raise_()
-            dialog.activateWindow()
-            dialog.show()
-
-        # dialog.exec_()
-        sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
-        utilities_menu.addAction(sc_overrides_action)
-
-
-        trim_cal_action = QAction('Elevator Trim Calibration...', self)
-        trim_cal_action.triggered.connect(self.open_trim_calibration_dialog)
-        utilities_menu.addAction(trim_cal_action)
-
-        # A window on the tap's shared-memory mirror: whether a game is
-        # publishing, which devices the wrapper captured, and what every
-        # effect slot is being told - with a timestamped change log to
-        # save and send in.  The remote-troubleshooting answer to "no
-        # forces in DCS".
-        tap_monitor_action = QAction('DirectInput Tap Monitor...', self)
-        tap_monitor_action.triggered.connect(self.open_tap_monitor)
-        utilities_menu.addAction(tap_monitor_action)
-
-        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
-            """
-            Add Window menu to manage child instances if it is a master instance
-            """
-            self.window_menu = self.menu.addMenu('Window')
-
-            def do_toggle_child_windows(toggle):
-                if toggle == 'show':
-                    G.ipc_instance.send_broadcast_message("SHOW WINDOW")
-                elif toggle == 'hide':
-                    G.ipc_instance.send_broadcast_message("HIDE WINDOW")
-
-            self.show_children_action = QAction('Show Child Instance Windows')
-            self.show_children_action.triggered.connect(lambda: do_toggle_child_windows('show'))
-            self.window_menu.addAction(self.show_children_action)
-            self.hide_children_action = QAction('Hide Child Instance Windows')
-            self.hide_children_action.triggered.connect(lambda: do_toggle_child_windows('hide'))
-            self.window_menu.addAction(self.hide_children_action)
-
-        if G.child_instance:
-            """
-            Add Child instance window menu
-            """
-            self.window_menu = self.menu.addMenu('Window')
-            self.hide_window_action = QAction('Hide Window')
-            def do_hide_window():
-                try:
-                    self.hide()
-                except Exception as e:
-                    logging.error(f"EXCEPTION: {e}")
-            self.hide_window_action.triggered.connect(do_hide_window)
-            self.window_menu.addAction(self.hide_window_action)
-
-
-        """ Add Log Menu """
-
-        self.log_menu = self.menu.addMenu('Log')
-        self.log_window_action = QAction("Open Console Log", self)
-
-        def do_toggle_log_window():
-            if G.log_window.isVisible():
-                G.log_window.hide()
-            else:
-                G.log_window.move(self.x()+50, self.y()+100)
-                G.log_window.show()
-
-        self.log_window_action.triggered.connect(do_toggle_log_window)
-        self.log_menu.addAction(self.log_window_action)
-
-
-        """ Add Help Menu """
-
-        help_menu = self.menu.addMenu('Help')
-
-        notes_action = QAction('Release Notes', self)
-        def do_open_file(url):
-            try:
-                file_url = QUrl.fromLocalFile(url)
-                QDesktopServices.openUrl(file_url)
-            except Exception as e:
-                logging.error(f"There was an error opening the file: {str(e)}")
-        notes_action.triggered.connect(lambda : do_open_file(notes_url))
-        help_menu.addAction(notes_action)
-
-        docs_action = QAction('Documentation', self)
-        docs_action.triggered.connect(lambda: self.open_url(doc_url))
-        help_menu.addAction(docs_action)
-
-        self.support_action = QAction("Create support bundle", self)
-        self.support_action.triggered.connect(lambda: utils.create_support_bundle(G.userconfig_rootpath))
-        help_menu.addAction(self.support_action)
+        self.main_menu = MainMenu(self)
+        self.main_menu.build()
 
         # Create a line beneath the menu bar
         line = QFrame()
@@ -424,51 +207,76 @@ class MainWindow(QMainWindow):
 
         # Set the layout of the menu frame as the main layout
 
-        logo_status_layout = QGridLayout()
+        """ The header (logo, compact mini device row, and Application
+        Status box - see telemffb/ui/panels/HeaderPanel.py) runs full
+        width, above the device/tabs split below it. The split itself - a
+        left column (Active Devices) and a right column (offline editor,
+        tabs) - is wired together at the end of __init__, once every
+        right-column piece has been built, so Active Devices starts even
+        with the top of the tabs/offline editor rather than the top of the
+        window. """
+
+        content_hbox = QHBoxLayout()
+        content_hbox.setContentsMargins(0, 0, 0, 0)
+        content_hbox.setSpacing(10)
+        right_column_layout = QVBoxLayout()
+
+        """ Create the header - logo, compact mini device row (stands in
+        for the Active Devices frame whenever that frame is hidden, see
+        _sync_devices_display() / _sync_mini_device_panel() below) and the
+        Application Status box. The panel owns construction and the
+        AppState-driven vpconf/gain-override indicators (bind()); the
+        signal connections below are the ones that need MainWindow's own
+        methods/dialogs. """
+
+        self.header_panel = HeaderPanel(parent=self)
+        self.header_panel.device_mini_panel.DeviceClicked.connect(self.change_config_scope)
+        self.header_panel.profile_chosen.connect(self.on_profile_change)
+        self.header_panel.profile_notes_clicked.connect(self.open_profile_notes_dialog)
+        self.header_panel.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
+        self.header_panel.bind(G.app_state)
+        self.tray.bind(G.app_state)
 
 
-        """ Create Main App Logo Label """
+        """ Create Device Panel - pinned to the left edge of the window.
+        Hidden while the Hide tab is active, or by user preference when
+        there are multiple devices, or always when there is only one (see
+        _sync_devices_display() / switch_window_view()). """
 
-        t_logo = QLabel()
-        t_pixmap = HiDpiPixmap(G.vpf_logo)
-        t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
-        t_logo.setPixmap(t_pixmap)
+        self.device_groupbox = QGroupBox("Active Devices")
 
-
-        """ Create Device Panel """
-
-        device_groupbox = QGroupBox("Active Devices")
-
-        device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self.device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         device_groupbox_layout = QVBoxLayout()
-        device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
         self.device_panel = DeviceIconPanel()
+        # Keeps the mini device row in step with the full panel - device
+        # list, active device, and every device's icon/label/status -
+        # however it was changed.
+        self.device_panel.changed.connect(self._sync_mini_device_panel)
         device_groupbox_layout.addWidget(self.device_panel)
-        device_groupbox.setLayout(device_groupbox_layout)
+        self.device_groupbox.setLayout(device_groupbox_layout)
+        # Stays hidden until _sync_devices_display() runs with a populated
+        # device panel (master instances populate it later, in
+        # setup_master_instance()) - otherwise an empty frame flashes
+        # before then.
+        self.device_groupbox.hide()
 
         if not G.master_instance:
+            # A child instance only ever drives its own device - showing
+            # the other three roles (which it has no visibility into) as
+            # ghost icons would be misleading, and briefly flashes an
+            # odd-looking little window on startup for any child whose
+            # own window isn't suppressed (e.g. trimwheel, which has no
+            # startHeadless/startMin default). Master-only.
             self.device_panel.set_devices([G.device_type])
             self.device_panel.set_device_status(G.device_type, device_status_state())
             self.device_panel.set_active_device(G.device_type)
             self.refresh_device_labels()
 
 
-        """ Create Status Panel """
-
-        self.status_container = AppStatusWidget(master_instance=G.master_instance, parent=self)
-        status_group = QGroupBox("Application Status")
-        status_layout = QVBoxLayout(status_group)
-        status_layout.setContentsMargins(10, 18, 10, 8)
-        status_layout.addWidget(self.status_container)
-
-        self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
-        self.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
-        self.status_container.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
-        self.status_container.sim_status_label.set_waiting()
-
         def on_sims_changed(sim: SimTelemListener):
-            self.status_container.update_enabled_sims(sim.name, sim.started)
-            self.refresh_telem_status()
+            self.header_panel.update_enabled_sims(sim.name, sim.started)
+            self.monitor_panel.refresh_waiting_status()
 
 
         """ Connect sim listeners to sim change function """
@@ -477,299 +285,37 @@ class MainWindow(QMainWindow):
         G.sim_listeners.simStopped.connect(on_sims_changed)
 
 
-        """ Add spacer items to fill first row and 2nd column with 10x10 empty space """
+        """ Add the header to the main layout, full width - above where the
+        left column (Active Devices) and right column split """
 
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 0, 1, 1)
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 1, 1, 1)
+        layout.addWidget(self.header_panel)
 
 
-        """ Add Logo to the top left cell """
+        """ Create the prompt stack - the new-aircraft, trim-calibration-
+        discovery and matching-profile-offer "pill" prompts. It collapses
+        to 0 height once none of the three are active, so it does not push
+        the Offline Editor Setup frame below out of alignment with the
+        Active Devices frame beside it. See telemffb/ui/panels/PromptStack.py
+        and telemffb/state/app_state.py (Notice / AppState.set_prompt) -
+        producers declare what should be showing, PromptStack renders it. """
 
-        logo_status_layout.addWidget(t_logo, 1, 0, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.prompt_stack = PromptStack()
+        self.prompt_stack.activated.connect(self._on_prompt_activated)
+        self.prompt_stack.bind(G.app_state)
 
+        """ Add the prompt stack to the main layout """
 
-        """ Add spacer in row 2 """
+        right_column_layout.addWidget(self.prompt_stack)
 
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 2, 0, 1, 1)
 
+        """ Create the offline editor panel (sim/class/aircraft/profile
+        selectors used to edit config without a live sim connected) and add
+        it to the right column.  See telemffb/ui/panels/OfflineEditorPanel.py
+        - the panel starts hidden and is shown/hidden by toggle_offline_mode
+        below. """
 
-        """ Add device panel to row 3 column 0 """
-
-        logo_status_layout.addWidget(device_groupbox, 3, 0,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-
-        """ Add Status widget to column 2, span 3 rows """
-
-        logo_status_layout.addWidget(status_group, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
-        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 4, 0, 1, 1)
-
-        logo_status_layout.setColumnStretch(0, 1)
-        logo_status_layout.setColumnStretch(1, 1)
-
-
-        """ Add upper grid layout to main layout """
-
-        layout.addLayout(logo_status_layout)
-
-
-        """ Create new craft button - pops when unknown aircraft is detected """
-
-        new_craft_layout = QVBoxLayout()
-        # Pill-and-pulse prompts are QLabels with an embedded link, not
-        # QPushButtons: rich text allows partial emphasis (bold aircraft
-        # name, medium-weight fixed words) which buttons cannot render.
-        # The link spans the whole text, so the entire pill is clickable
-        # and Qt supplies the hand cursor.
-        self.new_craft_button = QLabel()
-        self.new_craft_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        # Red fill breathing dim<->bright, white text/border, content-sized
-        # and centered (the old full-width slab was routinely missed
-        # despite its size). The animation runs only while visible.
-        self._new_craft_anim = QtCore.QVariantAnimation(self)
-        self._new_craft_anim.setStartValue(0.0)
-        self._new_craft_anim.setKeyValueAt(0.5, 1.0)
-        self._new_craft_anim.setEndValue(0.0)
-        self._new_craft_anim.setDuration(2600)
-        self._new_craft_anim.setLoopCount(-1)
-        self._new_craft_anim.valueChanged.connect(self._style_new_craft_button)
-        self._style_new_craft_button(0.0)
-        new_craft_layout.addWidget(self.new_craft_button,
-                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-        new_craft_layout.addSpacing(7)
-
-        # Trim-calibration discovery prompt: shares the new-craft button's
-        # space (the two are mutually exclusive — no matched profile means
-        # nowhere to save a calibration). The calibration settings live
-        # three prereqs deep under Axis Control; this puts the feature in
-        # front of the user when an aircraft loads without one. Styled as an
-        # outlined notice card — content-sized and centered — so it pops
-        # without impersonating the solid new-craft action button.
-        self.trim_cal_prompt_button = QLabel()
-        self.trim_cal_prompt_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        self.trim_cal_prompt_button.setText(
-            "<a href='#trimcal' style='color:black; text-decoration:none;'>"
-            "<span style='font-weight:500;'>No Trim Calibration Found for this "
-            "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
-            " to Set Up Realistic Trim</span></a>")
-        self.trim_cal_prompt_button.linkActivated.connect(
-            lambda _: self.open_trim_calibration_dialog())
-        # Slow breathing pulse (fill + border alpha) while visible — started
-        # and stopped with visibility so it costs nothing when hidden.
-        self._trim_prompt_anim = QtCore.QVariantAnimation(self)
-        self._trim_prompt_anim.setStartValue(0.0)
-        self._trim_prompt_anim.setKeyValueAt(0.5, 1.0)
-        self._trim_prompt_anim.setEndValue(0.0)
-        self._trim_prompt_anim.setDuration(2600)
-        self._trim_prompt_anim.setLoopCount(-1)
-        self._trim_prompt_anim.valueChanged.connect(self._style_trim_cal_prompt)
-        self._style_trim_cal_prompt(0.0)
-        # Profile-changed offer: the pattern naming the loaded aircraft is
-        # not the one recorded at its last load (a more specific curated
-        # profile shipped, or the user made one), so the user's
-        # rows under the old pattern no longer edit this aircraft. Copy
-        # them across on request; either link clears the offer.
-        self.profile_change_button = QLabel()
-        self.profile_change_button.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        self.profile_change_button.linkActivated.connect(self._on_profile_change_link)
-        # Teal, and static where its two neighbours breathe: red is the
-        # new-aircraft prompt, mustard the trim one and the Paused badge,
-        # blue the device selection, purple the brand.  This is an offer,
-        # not something wrong, so it should not pulse for attention.
-        self.profile_change_button.setStyleSheet("""QLabel {
-                            background-color: rgb(0, 121, 107);
-                            border: 3px solid white;
-                            border-radius: 17px;
-                            color: white;
-                            padding: 8px 18px;
-                        }
-                        QLabel:hover {
-                            background-color: #26a69a;
-                        }""")
-        self.profile_change_button.hide()
-        new_craft_layout.addWidget(self.profile_change_button,
-                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-        new_craft_layout.addSpacing(7)
-
-        new_craft_layout.addWidget(self.trim_cal_prompt_button,
-                                   alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-
-        """ Add new craft button to main layout """
-
-        layout.addLayout(new_craft_layout)
-        self.new_craft_button.hide()
-        self.trim_cal_prompt_button.hide()
-
-
-        """ Create offline config control area QWidget """
-
-        self.offline_config_area = QWidget()
-        self.offline_config_area.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
-        offline_config_layout = QVBoxLayout()  # vertical layout to hold both rows
-
-
-        # First row layout (existing widgets)
-        # --- Create the Offline Editor GroupBox ---
-        self.offline_groupbox = QGroupBox("Offline Editor Setup")
-        self.offline_groupbox.setStyleSheet("""
-            QGroupBox {
-            
-                font-weight: bold;
-                border: 1px solid gray;
-                border-radius: 5px;
-                margin-top: 6px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 3px 0 3px;
-            }
-        """)
-
-        offline_layout = QVBoxLayout(self.offline_groupbox)
-        offline_layout.setContentsMargins(10, 18, 10, 10)
-        offline_layout.setSpacing(10)
-
-
-        """ Create Offline controls layout """
-
-        offline_grid_layout = QGridLayout()
-
-        # --- Labels ---
-        offline_sim_lbl = QLabel('Sim:')
-        offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        offline_class_lbl = QLabel('Class:')
-        offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        offline_name_lbl = QLabel('Aircraft Name:')
-        offline_name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        offline_profile_lbl = QLabel('Profile:')
-        offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        # Create filter box
-        self.offline_name_filter = QLineEdit()
-        self.offline_name_filter.setPlaceholderText("Filter")
-        self.offline_name_filter.setEnabled(False)
-        self.offline_name_filter.textChanged.connect(self.filter_offline_name_list)
-
-        """ Add label widgets to layout """
-
-        offline_grid_layout.addWidget(offline_sim_lbl, 0, 0)
-        offline_grid_layout.addWidget(offline_class_lbl, 0, 1)
-        offline_grid_layout.addWidget(offline_name_lbl, 0, 2)
-        offline_grid_layout.addWidget(self.offline_name_filter, 0, 3)
-        offline_grid_layout.addWidget(offline_profile_lbl, 0, 4)
-
-
-        """ Create Offline controls combo boxes """
-
-        # --- ComboBoxes ---
-        self.offline_sim = QComboBox()
-        self.offline_sim.addItems([''] + xmlutils.get_sims())
-        self.offline_sim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_sim.setMinimumContentsLength(10)
-        self.offline_sim.setEditable(False)
-        self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
-
-        self.offline_class = QComboBox()
-        self.offline_class.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_class.setMinimumContentsLength(15)
-        self.offline_class.setEditable(False)
-        self.offline_class.currentTextChanged.connect(self.offline_class_changed)
-
-        self.offline_name = QComboBox()
-        self.offline_name.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_name.setMinimumContentsLength(20)
-        self.offline_name.setEditable(False)
-        self.offline_name.currentTextChanged.connect(self.offline_aircraft_changed)
-
-        self.offline_profile = QComboBox()
-        self.offline_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_profile.setMinimumContentsLength(15)
-        self.offline_profile.setEditable(False)
-        self.offline_profile.currentTextChanged.connect(self.offline_profile_changed)
-
-
-        """ Add offline combo box controls to layout """
-
-        offline_grid_layout.addWidget(self.offline_sim, 1, 0)
-        offline_grid_layout.addWidget(self.offline_class, 1, 1)
-        offline_grid_layout.addWidget(self.offline_name, 1, 2, 1, 2)
-        offline_grid_layout.addWidget(self.offline_profile, 1, 4)
-
-        # --- Column stretch ratios (1:2:4:2) ---
-        offline_grid_layout.setColumnStretch(0, 1)
-        offline_grid_layout.setColumnStretch(1, 2)
-        offline_grid_layout.setColumnStretch(2, 4)
-        offline_grid_layout.setColumnStretch(4, 2)
-
-        offline_layout.addLayout(offline_grid_layout)
-
-
-        """ Add layout for labels/buttons on bottom row of offline config area """
-
-        bottom_row = QHBoxLayout()
-
-
-        """ Create offline scope label """
-
-        offline_scope = QLabel("<b>Offline Scope:   </b>")
-        self.offline_scope_label = QLabel('None')
-
-
-        """
-        Create 'back to profile manager' button.  Only shows when edit is
-        activated via profile manager
-        """
-
-        self.back_to_profile_mgr_button = QPushButton('Back to Profile Manager')
-        self.back_to_profile_mgr_button.setVisible(False)
-        self.back_to_profile_mgr_button.clicked.connect(self.back_to_profile_mgr)
-
-
-        """ Create offline mode exit button """
-
-        self.exit_offline_button = QPushButton()
-        self.exit_offline_button.setText('Exit Offline Mode')
-        self.exit_offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
-
-
-        """ Add labels/buttons to bottom row layout """
-
-        bottom_row.addWidget(offline_scope, alignment=Qt.AlignmentFlag.AlignLeft)
-        bottom_row.addWidget(self.offline_scope_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        bottom_row.addStretch()
-        bottom_row.addWidget(self.back_to_profile_mgr_button, alignment=Qt.AlignmentFlag.AlignRight)
-        bottom_row.addWidget(self.exit_offline_button, alignment=Qt.AlignmentFlag.AlignRight)
-
-
-        """ Add bottom row to layout """
-
-        offline_layout.addLayout(bottom_row)
-
-
-        """ Add items to layout """
-
-        offline_config_layout.addWidget(self.offline_groupbox)
-        offline_config_layout.addLayout(offline_grid_layout)
-        offline_config_layout.addLayout(bottom_row)
-
-
-        """ Add layout to QWidget """
-
-        self.offline_config_area.setLayout(offline_config_layout)
-
-
-        """ Hide Offline config area (gets shown when it is enabled) """
-
-        self.offline_config_area.hide()
-
-
-        """ Add offline panel to main layout """
-
-        layout.addWidget(self.offline_config_area)
+        self.offline_editor = OfflineEditorPanel(parent=self, mainwindow=self)
+        right_column_layout.addWidget(self.offline_editor)
 
 
         """ Create tab widget where monitor/settings/hide will live """
@@ -790,138 +336,27 @@ class MainWindow(QMainWindow):
         self.offline_editor_button.clicked.connect(self.enter_offline_for_live_aircraft)
         self.tab_widget.setCornerWidget(self.offline_editor_button, Qt.Corner.TopRightCorner)
 
-        """ Add the tab widget to the main layout """
+        """ Add the tab widget to the right column """
 
-        layout.addWidget(self.tab_widget, stretch=1)
-        layout.setSpacing(0)
+        right_column_layout.addWidget(self.tab_widget, stretch=1)
+        right_column_layout.setSpacing(0)
 
+        """ Wire the left (Active Devices) and right columns together """
 
-        """ Create the monitor tab telemetry display panel """
-
-        self.monitor_widget = QWidget()
-        self.telem_area = QScrollArea()
-        monitor_area_layout = QGridLayout()
-        self.telem_area.setWidgetResizable(True)
-        self.telem_area.setMinimumHeight(100)
+        content_hbox.addWidget(self.device_groupbox, alignment=Qt.AlignmentFlag.AlignTop)
+        content_hbox.addLayout(right_column_layout, 1)
+        layout.addLayout(content_hbox, stretch=1)
 
 
-        """ Create the active effects display panel """
+        """ Create the monitor tab: telemetry + active-effects display """
 
-        self.effects_area = QScrollArea()
-        self.effects_area.setWidgetResizable(True)
-        self.effects_area.setMinimumHeight(100)
-
-        # self.effects_area.setMaximumWidth(200)
-
-
-        """ Create the Telemetry Label widget and set its properties """
-
-        self.lbl_telem_data = QLabel()
-
-        self.refresh_telem_status()
-
-        self.lbl_telem_data.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.lbl_telem_data.setWordWrap(False)
-        self.lbl_telem_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.lbl_telem_data.setStyleSheet("""
-            padding: 2px;
-            font-family: Cascadia Mono;
-        """)
-
-
-        """ Set the QLabel widget as the widget inside the scroll area """
-
-        self.telem_area.setWidget(self.lbl_telem_data)
-
-        self.lbl_effects_data = QLabel("            ")  # Empty space placeholder so splitter weights work
-        self.effects_area.setWidget(self.lbl_effects_data)
-        self.lbl_effects_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.lbl_effects_data.setStyleSheet("""
-            padding: 2px;
-            font-family: Cascadia Mono;
-        """)
-
-        """ Create Monitor Page detach toolbar"""
-
-        self.monitor_detach_tb = QtWidgets.QToolBar(self.monitor_widget)
-        self.monitor_detach_tb.setObjectName("monitorInlineToolbar")
-        self.monitor_detach_tb.setMovable(False)
-        self.monitor_detach_tb.setFloatable(False)
-        self.monitor_detach_tb.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self.monitor_detach_tb.setIconSize(QtCore.QSize(16, 16))
-        self.monitor_detach_tb.setStyleSheet("QToolBar { border: 0; background: transparent; }")
-
-        self.monitor_detach_act = self.monitor_detach_tb.addAction("Detach")
-        self.monitor_detach_act.setToolTip('Detach the Monitor Tab from the main window\ninto a separate window.')
-        self.monitor_detach_act.triggered.connect(lambda: self.detach_tab(0))
-
-        btn = self.monitor_detach_tb.widgetForAction(self.monitor_detach_act)
-        if isinstance(btn, QtWidgets.QToolButton):
-            btn.setAutoRaise(False)
-            btn.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-            btn.setStyleSheet("""
-                QToolButton {
-                    border: 1px solid palette(mid);
-                    border-radius: 4px;
-                    padding: 3px 9px;
-                    background: palette(button);
-                    color: palette(button-text);
-                }
-                QToolButton:hover { background: palette(midlight); }
-                QToolButton:pressed {
-                    background: palette(dark);
-                    color: palette(highlight);
-                }
-                QToolButton:disabled { color: palette(mid); border-color: palette(mid); }
-            """)
-
-        telem_header_widget = QWidget()
-        telem_header_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        telem_header_layout = QHBoxLayout(telem_header_widget)
-        telem_header_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.telem_lbl = QLabel('Telemetry:')
-        self.telem_filter = QLineEdit()
-        self.telem_filter.setToolTip("Comma Separated, Case Insensitive list of telemetry items to show (e.g. 'aoa, ias, rpm')")
-
-
-        """ Add placeholder for the filter """
-
-        self.telem_filter.setPlaceholderText("Filter")
-        self.telem_filter.setMaximumWidth(100)
-
-
-        """ Add telemetry label and filter placeholder to the layout """
-        telem_header_layout.addWidget(self.monitor_detach_tb)
-        telem_header_layout.addWidget(self.telem_lbl)
-        telem_header_layout.addWidget(self.telem_filter)
-        telem_header_layout.addStretch()  # Push everything to the left
-
-
-        """ Add Active effects header label """
-
-        self.effect_lbl = QLabel('Active Effects:')
+        self.monitor_panel = MonitorPanel(parent=self.tab_widget, mainwindow=self)
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
-
-
-        """ Add headers and labels to the monitor layout """
-
-        monitor_area_layout.addWidget(telem_header_widget, 0, 0)
-        monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.telem_area)
-        splitter.addWidget(self.effects_area)
-        splitter.setStretchFactor(0, 2)  # Wider telemetry
-        splitter.setStretchFactor(1, 3)  # Narrow effects
-        monitor_area_layout.addWidget(splitter, 1, 0, 1, 2)  # Span both columns
-
-        self.monitor_widget.setLayout(monitor_area_layout)
-
+            self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
 
         """ Add the monitor tab object to the tab widget"""
 
-        self.tab_widget.addTab(self.monitor_widget, "Monitor")
+        self.tab_widget.addTab(self.monitor_panel, "Monitor")
 
         self._install_detachable_tabs()
 
@@ -945,6 +380,7 @@ class MainWindow(QMainWindow):
         """ Add settings layout to the tab widget """
 
         settings_widget.setLayout(self.settings_layout)
+        self.settings_layout.bind(G.app_state)
         self.settings_area.setWidget(settings_widget)
         self.tab_widget.addTab(self.settings_area, "Settings")
 
@@ -1017,7 +453,7 @@ class MainWindow(QMainWindow):
         """ Add Debug Menu to the menu bar - control visibility with Alt+D shortcut or via debug key in registry """
 
         debug_shortcut = QShortcut(QKeySequence('Alt+D'), self)
-        debug_shortcut.activated.connect(self.add_debug_menu)
+        debug_shortcut.activated.connect(self.main_menu.add_debug_menu)
 
         reload_shortcut = QShortcut(QKeySequence('Ctrl+Shift+R'), self)
         reload_shortcut.activated.connect(self.force_reload_aircraft)
@@ -1029,7 +465,7 @@ class MainWindow(QMainWindow):
 
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
-            self.add_debug_menu()
+            self.main_menu.add_debug_menu()
 
         """  Create configurator gain dialog for use during TelemFFB session and store object in globals """
 
@@ -1048,7 +484,7 @@ class MainWindow(QMainWindow):
         detach_shortcut.activated.connect(self._detach_monitor_via_shortcut)
 
     def _detach_monitor_via_shortcut(self):
-        idx = self.tab_widget.indexOf(self.monitor_widget)
+        idx = self.tab_widget.indexOf(self.monitor_panel)
         if idx != -1:
             self.detach_tab(idx)
 
@@ -1080,7 +516,7 @@ class MainWindow(QMainWindow):
 
     def detach_tab(self, index: int):
         if index == 0:  # Monitor Tab
-            self.monitor_detach_tb.setVisible(False)
+            self.monitor_panel.set_detach_toolbar_visible(False)
         title = self.tab_widget.tabText(index)
         if hasattr(self, "_detached_tabs") and title in self._detached_tabs:
             return
@@ -1106,7 +542,7 @@ class MainWindow(QMainWindow):
             return
 
         if title == 'Monitor':
-            self.monitor_detach_tb.setVisible(True)
+            self.monitor_panel.set_detach_toolbar_visible(True)
 
         win: DetachedTabWindow = entry["win"]
         original_index: int = entry["index"]
@@ -1135,108 +571,6 @@ class MainWindow(QMainWindow):
                     G.ipc_instance.send_broadcast_message(f"MASTER_BUTTONS:{G.active_buttons}")
                 else:
                     G.ipc_instance.send_message(f"BUTTONS:{G.device_type}_{G.active_buttons}")
-
-    def add_system_tray(self):
-        self.tray_icon.setIcon(QIcon(":/image/vpforceicon.png"))
-        self.tray_icon.setToolTip("VPforce TelemFFB")
-
-        # Create the tray menu
-        tray_menu = QMenu()
-        show_action = QAction("Show Window", self)
-
-        def do_show_main_window(trigger):
-            if isinstance(trigger, QSystemTrayIcon.ActivationReason):
-                if trigger == QSystemTrayIcon.ActivationReason.DoubleClick:
-                    self.showNormal()  # Restore the window to its normal state if minimized
-                    self.show()
-                    self.raise_()
-                    self.activateWindow()
-            elif isinstance(trigger, str) and trigger == "show":
-                self.showNormal()  # Restore the window to its normal state if minimized
-                self.show()
-                self.raise_()
-                self.activateWindow()
-            if G.is_exe:
-                start_with_windows_action.setChecked(self.toggle_start_with_windows())
-            start_minimized_action.setChecked(G.system_settings.get('startToTray', False))
-            send_to_tray_action.setChecked(G.system_settings.get('closeToTray', False))
-
-        self.tray_icon.activated.connect(do_show_main_window)
-        show_action.triggered.connect(lambda: do_show_main_window('show'))
-
-        tray_menu.addAction(show_action)
-
-        # Create the "Options" menu
-        options_menu = QMenu("Options", self)
-
-        # Setup Start With Windows menu option
-        if G.is_exe:
-            start_with_windows_action = QAction("Start With Windows", self)
-            start_with_windows_action.setCheckable(True)
-            start_with_windows_action.setChecked(G.system_settings.get('startWithWindows', False))
-
-            def do_toggle_set_start_with_windows(checked):
-                self.toggle_start_with_windows(checked)
-
-            start_with_windows_action.triggered.connect(lambda checked: do_toggle_set_start_with_windows(checked))
-
-            options_menu.addAction(start_with_windows_action)
-
-        # Setup Start Minimized menu option
-        start_minimized_action = QAction("Start in Tray", self)
-        start_minimized_action.setCheckable(True)
-        start_minimized_action.setChecked(G.system_settings.get('startToTray', False))
-
-        def do_toggle_set_start_minimized(checked):
-            G.system_settings.setValue('startToTray', checked)
-
-        start_minimized_action.triggered.connect(lambda checked: do_toggle_set_start_minimized(checked))
-
-        options_menu.addAction(start_minimized_action)
-
-        # Setup Send to Tray menu option
-        send_to_tray_action = QAction("Closing App Sends to Tray", self)
-        send_to_tray_action.setCheckable(True)
-        send_to_tray_action.setChecked(G.system_settings.get('closeToTray', False))
-
-        def do_toggle_set_send_to_tray(checked):
-            G.system_settings.setValue('closeToTray', checked)
-
-        send_to_tray_action.triggered.connect(lambda checked: do_toggle_set_send_to_tray(checked))
-
-        options_menu.addAction(send_to_tray_action)
-
-        tray_menu.addMenu(options_menu)
-
-        # Create the "Instances" menu
-        if G.launched_instances:
-            show_menu = QMenu("Instances", self)
-            show_child_window_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
-                if d in G.launched_instances:
-                    def do_show_child_window(child=d):
-                        G.ipc_instance.send_broadcast_message(f'SHOW WINDOW:{child}')
-
-                    show_child_window_action[d] = QAction(f'Show {d.capitalize()} Instance', self)
-                    show_child_window_action[d].triggered.connect(lambda _, child=d: do_show_child_window(child))
-                    show_menu.addAction(show_child_window_action[d])
-            tray_menu.addMenu(show_menu)
-
-        quit_action = QAction("Quit TelemFFB", self)
-        quit_action.triggered.connect(exit_application)
-        tray_menu.addAction(quit_action)
-
-        self.tray_icon.setContextMenu(tray_menu)
-        # Show the tray icon
-        self.tray_icon.show()
-        if self.isHidden():
-            #  don't show, send message to tray icon that will pop to notify user that TelemFFB is running in Tray
-            icon = QIcon(":/image/vpforceicon.png")
-            self.pop_tray_notification(
-                None,
-                "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to show or right click to set options in the context menu",
-                5
-            )
 
     def toggle_start_with_windows(self, set_enabled=None):
         try:
@@ -1273,47 +607,8 @@ class MainWindow(QMainWindow):
                 winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, exe_path)
                 winreg.CloseKey(reg_key)
 
-    def add_instance_log_menu(self):
-        self.log_menu.addAction(self.log_window_action)
-        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
-            self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
-
-            self.log_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
-                if d in G.launched_instances:
-                    def do_show_child_log(child=d):
-                        G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
-
-                    self.log_action[d] = QAction(f'{d} Log'.capitalize())
-                    self.log_action[d].triggered.connect(lambda _, child=d: do_show_child_log(child))
-                    self.child_log_menu.addAction(self.log_action[d])
-
     def test_function(self):
         self.set_scrollbar(400)
-
-    def refresh_telem_status(self):
-        dcs_enabled = G.system_settings.get('enableDCS')
-        il2_enabled = G.system_settings.get('enableIL2')
-        msfs_enabled = G.system_settings.get('enableMSFS')
-        xplane_enabled = G.system_settings.get('enableXPLANE')
-        bms_enabled = G.system_settings.get('enableBMS')
-
-        # Convert True/False to "enabled" or "disabled"
-        dcs_status = "Enabled" if dcs_enabled else "Disabled"
-        il2_status = "Enabled" if il2_enabled else "Disabled"
-        msfs_status = "Enabled" if msfs_enabled else "Disabled"
-        xplane_status = "Enabled" if xplane_enabled else "Disabled"
-        bms_status = "Enabled" if bms_enabled else "Disabled"
-
-        self.lbl_telem_data.setText(
-            f"Waiting for data...\n\n"
-            f"DCS     : {dcs_status}\n"
-            f"IL2     : {il2_status}\n"
-            f"MSFS    : {msfs_status}\n"
-            f"X-Plane : {xplane_status}\n"
-            f"BMS     : {bms_status}\n\n"
-            "Enable or Disable in System -> System Settings"
-        )
 
     def refresh_firmware_label(self):
         if not HapticEffect.device:
@@ -1328,16 +623,10 @@ class MainWindow(QMainWindow):
             self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
 
     def refresh_configurator_gating(self):
-        # the action is part of the Debug menu, which only exists with the
-        # debug registry key (or Alt+D) - on a normal install there is
-        # nothing to gate
-        action = getattr(self, 'configurator_settings_action', None)
-        if action is None:
-            return
         caps = getattr(HapticEffect.device, 'caps', None)
         no_gains = caps is not None and not caps.has_gains
-        action.setEnabled(not no_gains)
-        action.setToolTip(
+        self.main_menu.set_configurator_action_enabled(
+            not no_gains,
             'Not supported on this device (no Configurator gains)'
             if no_gains else '')
 
@@ -1400,6 +689,71 @@ class MainWindow(QMainWindow):
             if changed:
                 self.device_panel.flash_device(role)
 
+    def _device_display_order(self):
+        """Every device role, always - not just the ones this instance is
+        actually driving. Order: this instance's own device first, then
+        the rest of what it considers configured (itself plus any child
+        instances it launched) in joystick/pedals/collective/trimwheel
+        order, then the unconfigured roles in that same order.
+
+        Returns (ordered_roles, configured_role_set)."""
+        configured = {G.device_type} | set(G.launched_instances)
+        rest = [r for r in utils.DEVICE_ROLES if r != G.device_type]
+        configured_rest = [r for r in rest if r in configured]
+        unconfigured_rest = [r for r in rest if r not in configured]
+        order = [G.device_type] + configured_rest + unconfigured_rest
+        return order, configured
+
+    def _sync_mini_device_panel(self):
+        """Mirror the full Active Devices panel's device list, active
+        device, and each device's icon/label/status/configured state onto
+        the compact mini row - connected to DeviceIconPanel.changed so
+        every mutation path stays in sync automatically without its own
+        call site here."""
+        names = self.device_panel.get_device_names()
+        if self.header_panel.device_mini_panel.get_device_names() != names:
+            self.header_panel.device_mini_panel.set_devices(names)
+        self.header_panel.device_mini_panel.set_active_device(self.device_panel.get_active_device())
+        for name in names:
+            widget = self.device_panel.icons[name]
+            self.header_panel.device_mini_panel.set_device_icon(name, widget.icon_path)
+            self.header_panel.device_mini_panel.set_device_label(name, widget.text_label.text())
+            self.header_panel.device_mini_panel.set_device_configured(name, widget.configured)
+            if widget.configured:
+                self.header_panel.device_mini_panel.set_device_status(name, widget.status_color)
+        self._sync_devices_display()
+
+    def _sync_devices_display(self):
+        """Reconcile the Active Devices frame and the compact mini device
+        row under the logo with: how many devices this instance's panel
+        has *configured* (all four roles are always shown, but
+        unconfigured ones are inert ghost icons and don't count here), the
+        persisted Show/Hide Devices preference (meaningful only with
+        multiple configured devices), and whether the Hide tab is active.
+
+        One configured device: the frame never shows and the mini row's
+        chips are not clickable, there being nothing to switch to.
+        Multiple: the frame follows the saved preference (default shown),
+        and the mini row - shown only when the frame is not - has
+        clickable chips (for configured devices only), so status colors
+        stay visible in this small a space and clicking one switches
+        straight to it. The Hide tab always collapses the frame (its
+        minimum height would stop the window from shrinking) and shows
+        the mini row in its place. """
+        names = self.device_panel.get_device_names()
+        configured_names = [n for n in names if self.device_panel.icons[n].configured]
+        multiple = len(configured_names) > 1
+        tab_widget = getattr(self, 'tab_widget', None)
+        on_hide_tab = tab_widget is not None and tab_widget.currentIndex() == 2
+        show_frame = multiple and bool(G.system_settings.get('showDevicesFrame', True)) and not on_hide_tab
+        self.device_groupbox.setVisible(show_frame)
+        self.header_panel.device_mini_panel.setVisible(bool(names) and not show_frame)
+        self.header_panel.device_mini_panel.set_clickable(multiple)
+
+    def _set_devices_frame_preference(self, visible: bool):
+        G.system_settings.setValue('showDevicesFrame', visible)
+        self._sync_devices_display()
+
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
         G.telem_manager.currentAircraftName = None
@@ -1440,107 +794,6 @@ class MainWindow(QMainWindow):
         """Update the exception count in the status bar."""
         count = G.exception_tracker.get_count()
         self.exception_status_widget.set_count(count)
-
-    def add_debug_menu(self):
-        # debug mode
-        for action in self.menu.actions():
-            if action.text() == "Debug":
-                return
-        debug_menu = self.menu.addMenu("Debug")
-
-        teleplot_action = QAction("Teleplot Setup", self)
-        def do_open_teleplot_setup_dialog():
-            self.teleplot_dialog = TeleplotSetupDialog(self)
-            self.teleplot_dialog.cb_send.setChecked(utils.teleplot.enabled)
-            self.teleplot_dialog.exec()
-        teleplot_action.triggered.connect(do_open_teleplot_setup_dialog)
-        debug_menu.addAction(teleplot_action)
-
-        show_simvar_action = QAction("Show simvar in telem window", self)
-        def do_toggle_simvar_telemetry():
-            self.show_simvars = not self.show_simvars
-            show_simvar_action.setChecked(self.show_simvars)
-
-        show_simvar_action.triggered.connect(do_toggle_simvar_telemetry)
-        show_simvar_action.setCheckable(True)
-        debug_menu.addAction(show_simvar_action)
-
-        show_order_action = QAction("Show settings order numbering", self)
-        def do_toggle_order_numbering():
-            SettingsLayout.show_order_debug = not  SettingsLayout.show_order_debug
-            show_order_action.setChecked(SettingsLayout.show_order_debug)
-
-        show_order_action.triggered.connect(do_toggle_order_numbering)
-        show_order_action.setCheckable(True)
-        debug_menu.addAction(show_order_action)
-
-        show_replaced = QAction("Show settings source", self)
-        def do_toggle_replaced():
-            SettingsLayout.show_replaced = not SettingsLayout.show_replaced
-            show_replaced.setChecked(SettingsLayout.show_replaced)
-
-        show_replaced.triggered.connect(do_toggle_replaced)
-        show_replaced.setCheckable(True)
-        debug_menu.addAction(show_replaced)
-
-
-        show_settingname_action = QAction("Show settings internal name", self)
-        def do_toggle_settingsnames():
-            SettingsLayout.show_settings_names = not  SettingsLayout.show_settings_names
-            show_settingname_action.setChecked(SettingsLayout.show_settings_names)
-
-        show_settingname_action.triggered.connect(do_toggle_settingsnames)
-        show_settingname_action.setCheckable(True)
-        debug_menu.addAction(show_settingname_action)
-
-        # Effect preview (hardware check for the preview runner): one
-        # entry per shipped spec, played on the device with synthetic
-        # telemetry and the settings tab's current model.
-        preview_menu = debug_menu.addMenu("Preview Effect")
-        for name, spec in PREVIEW_SPECS.items():
-            preview_action = QAction(f"{name}  ({spec.kind}, {spec.duration:g}s)", self)
-            preview_action.triggered.connect(
-                lambda checked=False, s=spec: self.preview.start(s))
-            preview_menu.addAction(preview_action)
-        stop_preview_action = QAction("Stop preview", self)
-        stop_preview_action.triggered.connect(self.preview.stop)
-        preview_menu.addAction(stop_preview_action)
-
-        configurator_settings_action = QAction('Configurator Gain Override', self)
-        def do_open_configurator_dialog():
-            dialog = ConfiguratorDialog(self)
-            dialog.raise_()
-            dialog.activateWindow()
-            dialog.show()
-        configurator_settings_action.triggered.connect(do_open_configurator_dialog)
-        self.configurator_settings_action = configurator_settings_action
-        self.refresh_configurator_gating()
-        debug_menu.addAction(configurator_settings_action)
-
-        sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
-        def do_open_sc_override_dialog():
-            dialog = SCOverridesEditor(self)
-            # Overrides save immediately in the editor; refresh the status
-            # pill once the dialog closes so it reflects any changes.
-            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
-            dialog.raise_()
-            dialog.activateWindow()
-            dialog.show()
-        # dialog.exec_()
-        sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
-        debug_menu.addAction(sc_overrides_action)
-
-        test_update = QAction('Test updater', self)
-        def do_test_update():
-            self._update_available = True
-            self.perform_update()
-        test_update.triggered.connect(do_test_update)
-        debug_menu.addAction(test_update)
-
-        if G.master_instance:
-            custom_userconfig_action = QAction("Load Custom User Config", self)
-            custom_userconfig_action.triggered.connect(lambda: utils.load_custom_userconfig())
-            debug_menu.addAction(custom_userconfig_action)
 
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
@@ -1592,10 +845,6 @@ class MainWindow(QMainWindow):
 
 
     def setup_master_instance(self):
-        # self.show_device_logo()
-        # self.enable_device_logo_click(True)
-
-        #self.devicetype_label.hide()
         current_title = self.windowTitle()
         if len(G.launched_instances):
             current_title = f"** MASTER INSTANCE ** {current_title}"
@@ -1609,153 +858,25 @@ class MainWindow(QMainWindow):
         #     self.instance_status_row.collective_status_icon.show()
         # if 'trimwheel' in G.launched_instances:
         #     self.instance_status_row.trimwheel_status_icon.show()
-        self.add_instance_log_menu()
-        self.add_system_tray()
-        d_list = [G.device_type]
-        for d in G.launched_instances:
-            d_list.append(d)
-        self.device_panel.set_devices(d_list)
+        self.main_menu.add_instance_log_menu()
+        self.tray.build()
+        order, configured = self._device_display_order()
+        self.device_panel.set_devices(order, configured=configured)
         self.device_panel.set_device_status(G.device_type, device_status_state())
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)
         self.refresh_device_labels()
 
+        """ Window menu: Show Device Frame, only meaningful with more than
+        one CONFIGURED device on this instance's own panel - all four are
+        always shown, but the rest may just be inert ghost icons """
 
-    def show_device_logo(self):
-        self.devicetype_label.show()
+        if len(configured) > 1:
+            self.main_menu.add_show_devices_frame_action(
+                bool(G.system_settings.get('showDevicesFrame', True)),
+                self._set_devices_frame_preference)
 
-    def enable_device_logo_click(self, state):
-        hover_color = "#444444" if G.useDarkMode else "#DCDCDC"
-        self.devicetype_label.setClickable(state)
-        self.devicetype_label.setStyleSheet(
-            f"""
-               QLabel {{
-                   border-radius: 4px;
-               }}
-               QLabel:hover {{
-                   background-color: {hover_color};
-               }}
-               """
-        )
-
-    def device_logo_click_event(self):
-        # print("External function executed on label click")
-        # print(G.current_device_config_scope)
-        def check_instance(name):
-            return name in G.launched_instances or G.device_type == name
-        if G.current_device_config_scope == 'joystick':
-            if check_instance("pedals"):
-                self.change_config_scope(2)
-            elif check_instance("collective"):
-                self.change_config_scope(3)
-            elif check_instance("trimwheel"):
-                self.change_config_scope(4)
-        elif G.current_device_config_scope == 'pedals':
-            if check_instance("collective"):
-                self.change_config_scope(3)
-            elif check_instance("trimwheel"):
-                self.change_config_scope(4)
-            elif check_instance("joystick"):
-                self.change_config_scope(1)
-        elif G.current_device_config_scope == 'collective':
-            if check_instance("trimwheel"):
-                self.change_config_scope(4)
-            elif check_instance("joystick"):
-                self.change_config_scope(1)
-            elif check_instance("pedals"):
-                self.change_config_scope(2)
-        elif G.current_device_config_scope == 'trimwheel':
-            if check_instance("joystick"):
-                self.change_config_scope(1)
-            elif check_instance("pedals"):
-                self.change_config_scope(2)
-            elif check_instance("collective"):
-                self.change_config_scope(3)
-
-    def on_version_check_cancelled(self):
-        """Called when the user clicks Skip on the version check progress dialog."""
-        if self._version_check_dialog is not None:
-            self._version_check_dialog = None
-        # Disconnect thread callbacks so a late result doesn't double-resolve.
-        for worker in utils.FetchLatestVersion.workers:
-            try:
-                worker.version_result_signal.disconnect(self.update_version_result)
-                worker.error_signal.disconnect(self.on_version_check_error)
-            except Exception:
-                pass
-        self._emit_version_check_complete()
-
-    def update_version_result(self, vers, url):
-        # Disconnect the canceled handler before perform_update runs its own
-        # QMessageBox inner event loops — QProgressDialog.closeEvent emits canceled,
-        # and any modal dialog processing can trigger it spuriously.
-        if self._version_check_dialog is not None:
-            try:
-                self._version_check_dialog.canceled.disconnect(self.on_version_check_cancelled)
-            except Exception:
-                pass
-
-        self.latest_version = vers
-
-        is_exe = getattr(sys, 'frozen', False)
-
-        if vers == "uptodate":
-            status_text = "Up To Date"
-            self.update_action.setDisabled(True)
-            self.version_label.setText(f'Version Status: {status_text}')
-        elif vers == "error":
-            status_text = "UNKNOWN"
-            self.version_label.setText(f'Version Status: {status_text}')
-        elif vers == 'dev':
-            if is_exe:
-                self.version_label.setText('Version Status: <b>Development Build</b>')
-            else:
-                self.version_label.setText('Version Status: <b>Development - Clean source</b>')
-
-        elif vers == 'needsupdate':
-            self.version_label.setText('Version Status: <b>Out of Date Source - Git pull needed</b>')
-
-        elif vers == 'dirty':
-            self.version_label.setText('Version Status: <b>Development - Modified Source</b>')
-
-        else:
-            self._update_available = True
-            logging.info(f"<<<<Update available - new version={vers}>>>>")
-
-            status_text = (f"New version <a href='{url}'><b>{vers}</b></a> is available! "
-                           f"(<a href='{G.release_notes_url}'>release notes</a>)")
-            self.update_action.setDisabled(False)
-            self.update_action.setText("Install Latest TelemFFB")
-            self.version_label.setToolTip(url)
-            self.version_label.setText(f'Version Status: {status_text}')
-
-        # If the user accepts the update, perform_update launches the updater and
-        # schedules app exit — sim listeners don't need to start in that case.
-        # For every other outcome (up to date, dev, error, declined) emit the signal.
-        if not self.perform_update(auto=True):
-            self._emit_version_check_complete()
-
-        # Hide (not close) the dialog so closeEvent/canceled are not emitted.
-        if self._version_check_dialog is not None:
-            self._version_check_dialog.hide()
-            self._version_check_dialog = None
-
-    def on_version_check_error(self, error_message):
-        if self._version_check_dialog is not None:
-            try:
-                self._version_check_dialog.canceled.disconnect(self.on_version_check_cancelled)
-            except Exception:
-                pass
-            self._version_check_dialog.hide()
-            self._version_check_dialog = None
-        logging.error("Error checking for version update: %s", error_message)
-        self._emit_version_check_complete()
-
-    def _emit_version_check_complete(self):
-        """Emit version_check_complete exactly once, regardless of how many paths resolve."""
-        if not self._version_check_resolved:
-            self._version_check_resolved = True
-            self.version_check_complete.emit()
+        self._sync_devices_display()
 
     def change_config_scope(self, _arg):
         if isinstance(_arg, str):
@@ -1777,69 +898,9 @@ class MainWindow(QMainWindow):
         G.current_device_config_scope = types[arg]
         self.device_panel.set_active_device(types[arg])
 
-        # pixmap = HiDpiPixmap(utils.get_device_logo(G.current_device_config_scope))
-        # self.devicetype_label.setPixmap(pixmap)
-        #self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
-
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: <b>{G.current_device_config_scope.title()}</b>')
-        self.refresh_scope_status_indicators(force=True)
-        self.settings_layout.reload_caller()
-
-    def refresh_scope_status_indicators(self, force=False):
-        """Update the vpconf-profile and gain-override indicators to reflect
-        the device currently selected as the config scope.
-
-        The master shows its own state while scoped to its own device, and the
-        state reported over IPC (effects payload / keepalive STATUS message)
-        while scoped to a child; child instances always show their own state.
-        Safe to call from any thread — the display update goes through the
-        widget's queued request signals — and repeat values are deduplicated
-        so the pulse animation only fires when something actually changed.
-        """
-        scope = G.current_device_config_scope or G.device_type
-        own_vpconf = G.current_vpconf_profile or ''
-        own_ovd = bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False
-        # Snapshot the IPC-reported dict: it is mutated by the IPC thread and
-        # this method may run on the telemetry thread.
-        fx = dict(G.ipc_instance._ipc_telem_effects) if (G.master_instance and G.ipc_instance) else {}
-        if scope == G.device_type or not G.master_instance:
-            vpconf, ovd = own_vpconf, own_ovd
-        else:
-            vpconf = fx.get(f'{scope}_vpconf_profile', '') or ''
-            ovd = bool(fx.get(f'{scope}_gain_ovd_active', False))
-        # A row is only present at all while at least one device (master or
-        # child) is using the feature; devices without a value then show a
-        # "(None)" placeholder so the panel geometry is identical across
-        # scopes. Users not using the feature don't lose the UI space.
-        any_vpconf = bool(own_vpconf) or any(v for k, v in fx.items() if k.endswith('_vpconf_profile'))
-        any_ovd = own_ovd or any(v for k, v in fx.items() if k.endswith('_gain_ovd_active'))
-        shown = (scope, vpconf, ovd, any_vpconf, any_ovd)
-        if not force and shown == getattr(self, '_scope_status_shown', None):
-            return
-        self._scope_status_shown = shown
-        self.status_container.request_set_active_vpconf.emit(vpconf, any_vpconf)
-        self.status_container.request_set_active_configurator.emit(ovd, any_ovd)
-
-    def resize_offline_combos(self):
-        """
-            Dynamically resizes the minimum width of all offline mode combo boxes
-            based on the widest item in each. Adds 50 pixels padding to ensure space.
-
-            This ensures no items are truncated in display and helps with layout alignment.
-            """
-        for combo in [self.offline_sim, self.offline_class, self.offline_name, self.offline_profile]:
-            metrics = QFontMetrics(combo.font())
-            max_width = 0
-
-            for i in range(combo.count()):
-                text = combo.itemText(i)
-                width = metrics.horizontalAdvance(text)
-                max_width = max(max_width, width)
-
-            # Add 2 pixels for spacing and set minimum width
-            combo.setMinimumWidth(max_width + 50)
-
+            self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
+        G.app_state.set_scope(G.current_device_config_scope)
         self.settings_layout.reload_caller()
 
     def show_profile_manager(self):
@@ -1848,23 +909,6 @@ class MainWindow(QMainWindow):
         self.profile_mgr_dialog.raise_()
         self.profile_mgr_dialog.activateWindow()
         self.profile_mgr_dialog.show()
-
-    def exit_offline_mode(self):
-        self.toggle_offline_mode(False)
-        if self.profile_mgr_dialog:
-            self.profile_mgr_dialog.close()
-
-
-    def back_to_profile_mgr(self):
-        self.back_to_profile_mgr_button.setVisible(False)
-        try:
-            # in case it somehow got closed
-            self.profile_mgr_dialog.show()
-        except:
-            QMessageBox.warning(self, "Profile Manager", "IDK WHY THIS ERROR HAPPENED")
-            pass
-        self.toggle_offline_mode(False)
-
 
     @pyqtSlot(bool)
     def toggle_offline_mode(self, state, broadcast=True):
@@ -1880,7 +924,8 @@ class MainWindow(QMainWindow):
             G.main_window.settings_layout.clear_layout()
 
             # reset the craft area text to default
-            self.status_container.reset()
+            self.header_panel.reset()
+            G.app_state.reset_sim_status()
             self.settings_layout.reload_caller()
             # go_online restored the pre-offline context; re-evaluate the
             # notes button against it (dedupe dropped so a re-load of the
@@ -1891,41 +936,27 @@ class MainWindow(QMainWindow):
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
+            G.app_state.set_active_settings(())  # drop live-telemetry highlighting
             self.refresh_offline_editor_button()      # hidden while the editor is open
-            self.status_container.set_offline("None")
+            self.header_panel.set_offline("None")
+            G.app_state.reset_sim_status()
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
 
             # Nothing is selected in the offline editor yet; disable the notes
             # button until force_sim_aircraft establishes an offline scope
             self._profile_notes_shown = None
-            self.status_container.set_notes_state(False)
+            self.header_panel.set_notes_state(False)
 
-            # Block signals so we don't trigger text change on .clear() calls
-            self.offline_name.blockSignals(True)
-            self.offline_class.blockSignals(True)
-            self.offline_name.blockSignals(True)
-
-            # clear contents of combo boxes so they can be repopulated
-            self.offline_name.clear()
-            self.offline_class.clear()
-            self.offline_sim.clear()
-
-            # unblock signals
-            self.offline_name.blockSignals(False)
-            self.offline_class.blockSignals(False)
-            self.offline_name.blockSignals(False)
-
-            # build sim list
-            sims = [''] + xmlutils.get_sims()
-            self.offline_sim.addItems(sims)
+            # Clear/repopulate the offline editor's combo boxes.
+            self.offline_editor.reset_for_entry()
 
             # force the settings tab to be active
             self.tab_widget.setCurrentIndex(1)
 
         if G.master_instance:
             # Show the offline mode widgets, but only for master instance
-            self.offline_config_area.setVisible(state)
+            self.offline_editor.setVisible(state)
 
             # Send command to child instances to replicate actions
             if broadcast:
@@ -1933,211 +964,10 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str, str, str, str)
     def load_single_offline_model(self, sim, cls, model, profile, from_profile_manager=True):
-
-        # Not broadcast: SHOW_OFFLINE_MODEL at the end of this method has each child
-        # run this same method, which takes it offline and applies the selection in
-        # one step.  An earlier TOGGLE OFFLINE would leave the children offline with
-        # nothing selected for as long as the combos below take to fill.
-        self.toggle_offline_mode(True, broadcast=False)
-        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
-            cb.blockSignals(True)
-            cb.clear()
-            cb.addItem('')
-
-        sim_list = xmlutils.get_sims()
-        for s in sim_list:
-            self.offline_sim.addItem(s)
-        self.offline_sim.setCurrentText(sim)
-
-        cls_list = xmlutils.get_classes_for_sim(sim)
-        for c in cls_list:
-            self.offline_class.addItem(c)
-        self.offline_class.setCurrentText(cls)
-
-        model_list = xmlutils.read_models(sim, cls)
-        self.all_offline_models = model_list
-        self.filter_offline_name_list(self.offline_name_filter.text())
-        self.offline_name.setCurrentText(model)
-
-        profile_list = xmlutils.get_available_profiles(sim, cls, model)
-        self.offline_profile.clear()
-        for p in profile_list:
-            if p != 'Built-In':
-                self.offline_profile.addItem(p)
-        if not self.offline_profile.count() and model:
-            # Built-In cannot be edited: with no user profile the editor works on
-            # Auto User, which the first change creates (as offline_aircraft_changed)
-            self.offline_profile.addItem('Auto User')
-        self.offline_profile.setCurrentText(profile)
-        self.offline_profile_changed(self.offline_profile.currentText())
-
-        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
-            cb.blockSignals(False)
-
-        if model:
-            G.settings_mgr.offline_scope = 'MODEL'
-        else:
-            # an aircraft with class-level settings only: edit those
-            G.settings_mgr.offline_scope = 'CLASS'
-            self.offline_scope_label.setText(f"Editing Class Defaults ({cls})")
-
-        self.force_sim_aircraft()
-        if G.master_instance:
-            self.back_to_profile_mgr_button.setVisible(from_profile_manager)
-            args = [sim, cls, model, profile]
-            G.ipc_instance.send_broadcast_message(f"SHOW_OFFLINE_MODEL:{json.dumps(args)} ")
-            self.resize_offline_combos()
-
-
-
-    def update_offline_labeling(self):
-        pass
-
-    def offline_sim_changed(self, sim=None):
-        """
-            Triggered when the offline 'Sim' combo box changes.
-
-            Updates all related combo boxes (class, aircraft, profile),
-            sets the configuration scope, and broadcasts the change
-            if in master mode.
-
-            Args:
-                sim (str, optional): The selected simulation name. If None or empty,
-                                     resets the offline editing UI.
-            """
-        self.offline_name.blockSignals(True)
-        self.offline_name_filter.blockSignals(True)
-        self.offline_class.blockSignals(True)
-        self.offline_name.clear()
-        self.offline_name_filter.clear()
-        self.offline_class.clear()
-        self.offline_name.blockSignals(False)
-        self.offline_name_filter.blockSignals(False)
-        self.offline_class.blockSignals(False)
-        if sim is None or sim == '':
-            # if sim combobox is cleared, reset everything and clear the layout
-            self.offline_class.clear()  # clear class field
-            self.offline_name.clear()
-            self.offline_profile.clear()
-            self.settings_layout.clear_layout()
-            self.offline_scope_label.setText(f"None")
-            self.offline_name_filter.setEnabled(False)
-            return
-        self.offline_name_filter.setEnabled(True)
-        self.offline_class.clear()  #clear class field
-        self.offline_class.addItem('')
-        self.offline_name.clear()
-        #self.offline_name.setMaximumWidth(200)
-        self.offline_profile.clear()
-        classes = xmlutils.get_classes_for_sim(sim)  # get classes based on chosen sim
-
-        for class_name in classes:
-            self.offline_class.addItem(class_name)  #populate class combobox based on results
-
-        self.offline_name.clear()  #clear aircraft selection combobox
-
-        model_list = xmlutils.read_models(sim)
-        self.all_offline_models = model_list
-        self.filter_offline_name_list(self.offline_name_filter.text())
-
-        if G.master_instance:
-            # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.offline_sim.currentText()}")
-
-        G.settings_mgr.offline_scope = 'SIM'  # set config scope to SIM
-        self.offline_scope_label.setText(f"Editing SIM Defaults ({sim})")
-
-        self.resize_offline_combos()
-        self.force_sim_aircraft() # load settings based on sim
-
-    def offline_class_changed(self, class_name):
-        self.offline_name_filter.blockSignals(True)
-        self.offline_name_filter.clear()
-        self.offline_name_filter.blockSignals(False)
-        model_list = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
-        self.all_offline_models = model_list
-        self.offline_name.clear()  # clear the aircraft selection combobox
-        self.offline_profile.clear()
-        self.filter_offline_name_list(self.offline_name_filter.text())
-
-        if G.master_instance:
-            # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"OFFLINE_CLASS:{self.offline_class.currentText()}")
-        if class_name == '':
-            # reset back to sim mode if class field is cleared
-            self.offline_sim_changed(self.offline_sim.currentText())
-        else:
-            G.settings_mgr.offline_scope = 'CLASS' # set config scope to CLASS
-            self.offline_scope_label.setText(f"Editing Class Defaults ({class_name})")
-
-        self.resize_offline_combos()
-        self.force_sim_aircraft() # load settings based on class and currently selected sim
-
-    def offline_aircraft_changed(self, ac_name=None):
-        cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.offline_sim.currentText()) # get class based on selected aircraft
-        profiles = xmlutils.get_available_profiles(self.offline_sim.currentText(), self.offline_class.currentText(), ac_name)
-        self.offline_profile.setEnabled(True)
-        self.offline_profile.clear()
-
-        for profile_name in profiles:
-            if profile_name != 'Built-In':
-                self.offline_profile.addItem(profile_name)
-
-        if not self.offline_profile.count() and ac_name:
-            self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
-            xmlutils.update_active_profile_entry(sim=self.offline_sim.currentText(), cls=cls, model=ac_name, new_profile="Auto User")
-        self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
-        self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
-        self.offline_class.blockSignals(False)  # unblock signals
-
-        if ac_name == '':
-            self.offline_class_changed(self.offline_class.currentText())
-        else:
-            G.settings_mgr.offline_scope = 'MODEL'
-            self.offline_scope_label.setText(f"Editing Aircraft ({ac_name} - {self.offline_profile.currentText()})")
-
-        if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
-
-        self.resize_offline_combos()
-        self.force_sim_aircraft()
-
-    def offline_profile_changed(self, profile):
-        # self.update_craft_text_block(profile=profile)
-        if not profile:
-            return
-        G.settings_mgr.offline_scope = 'MODEL'
-        self.resize_offline_combos()
-        self.force_sim_aircraft()
-        if G.master_instance:
-            # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"OFFLINE_PROFILE:{profile}")
-        self.offline_scope_label.setText(f"Editing Aircraft ({self.offline_name.currentText()} - {profile})")
-
-    def filter_offline_name_list(self, text):
-        self.offline_name.blockSignals(True)
-        self.offline_name.clear()
-        self.offline_profile.blockSignals(True)
-        self.offline_profile.clear()
-        self.offline_name.addItems([''])
-        filtered = [name for name in self.all_offline_models if name and text.lower() in name.lower()]
-        self.offline_name.addItems(filtered)
-        if len(filtered) == 1:
-            self.offline_name.setCurrentIndex(1)
-            # Manually trigger the downstream handler
-            self.offline_aircraft_changed(filtered[0])
-        self.offline_name.blockSignals(False)
-        self.offline_profile.blockSignals(False)
-
-    def force_sim_aircraft(self):
-        G.settings_mgr.current_sim = self.offline_sim.currentText()
-        G.settings_mgr.current_class = self.offline_class.currentText()
-        G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
-        G.settings_mgr.active_profile = self.offline_profile.currentText()
-        self.settings_layout.reload_caller()
-        # reload_caller resolves current_pattern; refresh the notes button for
-        # the newly selected offline scope (no telemetry loop runs it here)
-        self.refresh_profile_notes_button()
+        """Thin passthrough kept on MainWindow: IPCNetworkThread.show_offline_model_signal
+        and ProfileManagerDialog both call this by name.  See
+        telemffb.ui.panels.OfflineEditorPanel.load_single_offline_model."""
+        self.offline_editor.load_single_offline_model(sim, cls, model, profile, from_profile_manager)
 
 
     def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None, clone_from=None):
@@ -2145,12 +975,7 @@ class MainWindow(QMainWindow):
         wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls,
                                    clone_from=clone_from)
         wizard.accepted.connect(self.new_ac_wizard_finished)
-        if wizard.exec():
-            try:
-                # make sure no other calls are connected to avoid stacking lambda calls if user cancels and doesn't add new aircraft
-                self.new_craft_button.linkActivated.disconnect()
-            except TypeError:
-                pass  # No handler connected yet
+        wizard.exec()
 
     @override
     def closeEvent(self, event):
@@ -2162,7 +987,7 @@ class MainWindow(QMainWindow):
             if G.system_settings.get('closeToTray', False):
                 self.hide()
                 event.ignore()
-                self.pop_tray_notification(
+                self.tray.show_notification(
                     None,
                     "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to re-show or right click to set options in the context menu",
                     5
@@ -2345,20 +1170,23 @@ class MainWindow(QMainWindow):
     def _update_profile_change_prompt(self):
         change = getattr(G.settings_mgr, 'profile_change', None)
         if not change or not G.master_instance:
-            self.profile_change_button.hide()
+            G.app_state.set_prompt('profile_change', None)
+            self._profile_change_prompt_active = False
             return
         # One line, like the trim prompt beside it: the detail and the choice
         # need more room than a pill has, so they live in the dialog it opens.
-        self.profile_change_button.setText(
-            "<a href='#open' style='color:white; text-decoration:none;'>"
-            "<span style='font-weight:500;'>Multiple matching profiles detected — </span>"
-            "<b>Click Here</b><span style='font-weight:500;'> to resolve</span></a>")
-        if not self.profile_change_button.isVisible():
-            self.profile_change_button.show()
+        G.app_state.set_prompt('profile_change', Notice(
+            notice_id='profile_change', priority=PROFILE_CHANGE_PRIORITY,
+            style='profile_change', pulse=False,
+            html="<a href='#open' style='color:white; text-decoration:none;'>"
+                 "<span style='font-weight:500;'>Multiple matching profiles detected — </span>"
+                 "<b>Click Here</b><span style='font-weight:500;'> to resolve</span></a>"))
+        if not self._profile_change_prompt_active:
+            self._profile_change_prompt_active = True
             # Only worth a toast when the window cannot be seen, and it says
             # what is true: nothing has been decided and nothing is asked for.
             if self.isHidden() or self.isMinimized():
-                self.pop_tray_notification(
+                self.tray.show_notification(
                     "Multiple matching profiles",
                     f"{change['aircraft']}: your {change['user']} and the built-in "
                     f"{change['curated']} both match.\nOpen TelemFFB to resolve.",
@@ -2367,7 +1195,8 @@ class MainWindow(QMainWindow):
     def _on_profile_change_link(self, href):
         change = getattr(G.settings_mgr, 'profile_change', None)
         if not change:
-            self.profile_change_button.hide()
+            G.app_state.set_prompt('profile_change', None)
+            self._profile_change_prompt_active = False
             return
         choice = self._ask_profile_change(change)
         if choice == ProfileOfferDialog.LATER:
@@ -2378,7 +1207,8 @@ class MainWindow(QMainWindow):
         # aircraft's offer, and that one must stay for its own prompt.
         if G.settings_mgr.profile_change is change:
             G.settings_mgr.profile_change = None
-        self.profile_change_button.hide()
+        G.app_state.set_prompt('profile_change', None)
+        self._profile_change_prompt_active = False
         sim, user, curated = change['sim'], change['user'], change['curated']
         shipped = change.get('shipped', '')
         try:
@@ -2506,92 +1336,17 @@ class MainWindow(QMainWindow):
 
 
 
-    def update_from_menu(self):
-        if self.perform_update(auto=False):
-            QCoreApplication.instance().quit()
-
-    def pop_tray_notification(self, title, message, renew_period):
-            current_time = time.time()
-            notification_key = (title, message)
-
-            # Check if the notification was shown within the specified period
-            if notification_key in self.tray_notifications:
-                last_shown_time = self.tray_notifications[notification_key]
-                if current_time - last_shown_time < renew_period:
-                    # Notification was shown recently, do not show again
-                    return
-            # Show the notification
-            icon = QIcon(":/image/vpforceicon.png")
-            self.tray_icon.showMessage(title, message, icon)
-            # Update the last shown time
-            self.tray_notifications[notification_key] = current_time
-            self.tray_icon.messageClicked.connect(self.show)
-
-
     def update_sim_indicators(self, source, paused=False, error=False, message=None):
-        """Runs on every telemetry frame
-        """
-        if source is None:
-            return
-
-        # Called only on state transitions (error onset / clear / timeout), so
-        # this is not on the per-frame hot path — traces which state the App
-        # Status area is being driven to.
-        logging.info(f"App status indicator -> {'error' if error else 'paused' if paused else 'running'} (src={source})")
-
-        if error:
-            self.status_container.set_error(source)
-            # The in-window error notification must show on child instances too
-            # (they are headless but the widget retains state until the user
-            # opens the window). Only the tray icon/popup below stay master-only,
-            # since children have no system tray.
-            self.status_container.request_flag_error.emit(message)
-        elif paused:
-            self.status_container.set_paused(source)
-        else:
-            self.status_container.set_running(source)
-
-
-        if G.master_instance:
-            if error:
-                # error is true and was previously false.  Set sys tray attributes and pop notification
-
-                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
-                self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-
-                # The popup's job is initial attention; the tray icon and
-                # tooltip carry the persistent state.  A short renew period
-                # made a persistent error a metronome - the same message
-                # popped every couple of seconds for as long as it held.
-                self.pop_tray_notification("Error", message,
-                                           renew_period=300)
-
-
-            elif paused:
-                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_paused.png'))
-                self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Paused ")
-
-            elif not paused:
-                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_run.png'))
-                self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
-                # re-show the "current aircraft" label once error cleared
+        """External entry point (e.g. DcsIpcThread's Ev=Start) that pushes
+        a status straight to AppState, bypassing the error-onset/hold/clear
+        state machine - see SimStatusTracker.push_status, which this now
+        just forwards to. HeaderPanel/TrayController.bind() apply the
+        result to the status container and tray."""
+        self.sim_status.push_status(source, paused=paused, error=error, message=message)
 
     def on_first_sim_frame(self, src):
-        """Handle first_frame_received: clear the initial 'Waiting' state by
-        flipping the status to Running.
-
-        Guarded against error_state: process_data emits telemetryReceived
-        before first_frame_received, so when the very first frame is the one
-        that raises a config error (common at startup), on_update_telemetry has
-        already set the error indicator by the time this runs. Without this
-        guard the unconditional flip to Running clobbers that error and, since
-        error_state stays set, it is never re-asserted. The paused-in-menus
-        case is unaffected (error_state is False there: Running here, then the
-        telemetry timeout flips it to Paused).
-        """
-        if self.error_state:
-            return
-        self.update_sim_indicators(src, paused=False)
+        """Handle first_frame_received: see SimStatusTracker.on_first_frame."""
+        self.sim_status.on_first_frame(src)
 
 
 
@@ -2602,6 +1357,11 @@ class MainWindow(QMainWindow):
         # Get window geometry and store as the geometry for the previous index for later recall
         self.tab_sizes[str(previous_index)]['height'] = self.height()
         self.tab_sizes[str(previous_index)]['width'] = self.width()
+
+        # Active Devices (and its mini-indicator stand-in) must get out of
+        # the way on the Hide tab, or their own minimum height would stop
+        # the window from collapsing to a compact view.
+        self._sync_devices_display()
 
         if index == 0:  # Monitor Tab
             self.current_tab_index = 0
@@ -2619,6 +1379,10 @@ class MainWindow(QMainWindow):
                 self.resize(int(w), int(h))
             except Exception:
                 pass
+            # active_settings_changed skips painting while this tab is
+            # hidden (see SettingsLayout._on_active_settings_changed) - catch
+            # up on whatever changed while the user was elsewhere.
+            self.settings_layout.repaint_active_settings()
 
         elif index == 2:  # Hide Tab
             self.current_tab_index = 2
@@ -2649,60 +1413,35 @@ class MainWindow(QMainWindow):
         Args:
             new_items (list[str]): List of profiles to populate.
         """
-        SELECT_LABEL = 'Select...'
-        ADD_NEW_LABEL = "Add New..."
         # Profiles belong to the pattern that names the aircraft, so with
         # nothing matched there are none to pick between and none to add to.
-        self.status_container.set_profile_state(bool(G.settings_mgr.current_pattern))
+        self.header_panel.set_profile_state(bool(G.settings_mgr.current_pattern))
         if new_items is None:
             new_items = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
-        self.status_container.cb_selectProfileCombo.blockSignals(True)
-        self.status_container.cb_selectProfileCombo.clear()
+        self.header_panel.set_profile_choices(new_items)
 
-        self.status_container.cb_selectProfileCombo.addItem(SELECT_LABEL)
-        for item in new_items:
-                self.status_container.cb_selectProfileCombo.addItem(item)
-
-        self.status_container.cb_selectProfileCombo.addItem(ADD_NEW_LABEL)
-        index = self.status_container.cb_selectProfileCombo.findText(ADD_NEW_LABEL)
-        if index >= 0:
-            font = QFont()
-            font.setItalic(True)
-            self.status_container.cb_selectProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
-
-        self.status_container.cb_selectProfileCombo.setCurrentIndex(0)
-        self.status_container.cb_selectProfileCombo.blockSignals(False)
-
-    def on_profile_change(self, index):
+    def on_profile_change(self, profile_name: str):
         # utils.debug_caller_args("red")
         """
         Call to xmlutils to update the profile mapping for the aircraft when the user changes the profile
         If the "add new" option is selected, pop a dialog asking for the new profile name.  If the user chooses
         the "make active' option, make a further call to make the new profile the active one
         Args:
-            index: The selected index in the combobox.
+            profile_name: The chosen profile name (the combo has already reset itself to the placeholder).
 
         Returns: Nothing
 
         """
         if not G.master_instance:
             return
-        if index == 0:
-            return
-
-        profile_name = self.status_container.cb_selectProfileCombo.itemText(index)
-
-        self.status_container.cb_selectProfileCombo.blockSignals(True)
-        self.status_container.cb_selectProfileCombo.setCurrentIndex(0)
-        self.status_container.cb_selectProfileCombo.blockSignals(False)
 
         sim = G.settings_mgr.current_sim
         cls = G.settings_mgr.current_class
         pattern = G.settings_mgr.current_pattern
 
         cur_txt = xmlutils.get_active_profile_for_model(sim, cls, pattern)
-        if profile_name == 'Add New...':
+        if profile_name == AppStatusWidget.ADD_NEW_LABEL:
             ## Quickly block signals and set it back to "Select".. then kick off new profile dialog
 
 
@@ -2748,11 +1487,11 @@ class MainWindow(QMainWindow):
             self.settings_layout.reload_caller()
 
     def on_telemetry_timeout(self):
-        self.lbl_effects_data.setText("")
-        if not self.error_state:
-            # Only set icon to pause if error condition is not present when pausing
-            self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
-        self.telemetry_timed_out = True
+        self.monitor_panel.clear_effects()
+        # No frames means no running effects; don't leave the last live
+        # frame's slider highlighting up (on_update_telemetry won't clear it).
+        G.app_state.set_active_settings(())
+        self.sim_status.on_timeout(G.telem_manager.getTelemValue('src'))
 
     def on_sim_exited(self, src: str):
         """Called when a sim sends a clean exit notification (STATUS=EXIT).
@@ -2760,13 +1499,14 @@ class MainWindow(QMainWindow):
         so stale aircraft info and the 'Paused' badge are cleared before the
         next sim connects."""
         logging.info(f"Application Status: clearing display after {src} exit")
-        self.lbl_effects_data.setText("")
-        self.status_container.reset_sim_state(src)
+        self.monitor_panel.clear_effects()
+        G.app_state.set_active_settings(())
+        self.header_panel.reset_sim_state(src)
         # reset_sim_state disabled the notes button; drop the dedupe context
         # so the next aircraft load re-evaluates it even if identical.
         self._profile_notes_shown = None
         self.settings_layout.clear_layout()
-        self.telemetry_timed_out = False
+        self.sim_status.on_sim_exited()
         self.refresh_offline_editor_button()      # nothing loaded to edit any more
 
     def on_update_telemetry(self, datadict: dict):
@@ -2797,9 +1537,7 @@ class MainWindow(QMainWindow):
 
         try:
 
-            telem_items = ""
-            # Parse filter once per update
-            telem_items = self.get_telem_items(data, telem_items)
+            self.monitor_panel.update_telemetry(data)
 
             active_effects = ""
             active_settings = []
@@ -2820,89 +1558,40 @@ class MainWindow(QMainWindow):
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)
 
-            # Keep the scoped device-status indicators current (deduped; only
-            # repaints when the scoped device's reported state changes).
-            self.refresh_scope_status_indicators()
+            # The scoped device-status indicators (vpconf profile / gain
+            # override) are no longer polled here - AppState is updated
+            # directly wherever the underlying state changes (this
+            # instance's own vpconf/gain-override writers, and the IPC
+            # thread for a child's reported state) and repaints only when
+            # its derived view actually changes.
 
             if G.child_instance:
                 child_effects = str(G.effects.dict.keys())
                 if child_effects:
                     G.ipc_instance.send_ipc_effects(active_effects, active_settings)
 
-            window_mode = self.tab_widget.currentIndex()
-            # update slider colors
-            qcolor_green = QColor("#17c411")
-            qcolor_grey = QColor("grey")
-            if window_mode == 1:
-                sliders = self.findChildren(NoWheelSlider)
-                for my_slider in sliders:
-                    slidername = my_slider.objectName().replace('sld_', '')
-                    my_slider.blockSignals(True)
+            # Drives the settings-tab slider highlighting (green = active).
+            # AppState dedupes and only repaints the (cached, non-live-key)
+            # sliders when this actually changes - see
+            # SettingsLayout._on_active_settings_changed/repaint_active_settings.
+            G.app_state.set_active_settings(active_settings)
 
-                    for a_s in active_settings:
-                        if a_s in slidername:
-                            my_slider.setHandleColor("#17c411")
-                            break
-                        else:
-                            my_slider.setHandleColor(vpf_purple)
+            # The live-key number sliders (coeff % handles) still need a
+            # per-frame color+label update straight from telemetry, whether
+            # or not active_settings changed - a small cached list, not
+            # findChildren(), per SettingsLayout._rebuild_slider_caches().
+            if self.tab_widget.currentIndex() == 1:
+                qcolor_green = QColor(ACTIVE_GREEN)
+                qcolor_grey = QColor("grey")
+                for my_slider, live_key in self.settings_layout.live_key_sliders:
+                    pct = min(data.get(live_key, 0), 1.0)
+                    new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
+                    my_slider.blockSignals(True)
+                    my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
                     my_slider.blockSignals(False)
 
-                n_sliders = self.findChildren(NoWheelNumberSlider)
-                for my_slider in n_sliders:
-                    """This section updates the labels which are on the "NoWheelNumberSlider elements that reflect
-                    the current value of the coeff % values"""
-                    slidername = my_slider.objectName().replace('sld_', '')
-                    my_slider.blockSignals(True)
-
-                    live_key = self.N_SLIDER_LIVE_KEYS.get(slidername)
-                    if live_key is not None:
-                        pct = min(data.get(live_key, 0), 1.0)
-                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
-                        my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
-                        my_slider.blockSignals(False)
-                        continue
-                    for a_s in active_settings:
-                        if a_s in slidername:
-                            my_slider.setHandleColor("#17c411")
-                            break
-                        else:
-                            my_slider.setHandleColor(vpf_purple)
-                    my_slider.blockSignals(False)
-
-            is_paused = max(data.get('SimPaused', 0), data.get('Parked', 0))
-            error_cond = data.get('error', None)
-
-            if error_cond is None:  # no 'error' key in telemetry
-                if self.telemetry_timed_out or self.error_state:  # only set status to run if previously debug_timed out or error status was true
-                    # Hold the error state for a wall-clock window after the
-                    # last sighting: a child instance's error arrives over
-                    # IPC on whichever master frames happen to catch it, so
-                    # error-free frames BETWEEN sightings are routine.  The
-                    # old debounce counted 5 frames, a window that shrank
-                    # with sim frame rate (~30ms at 150fps) - thread timing
-                    # alone could flap clear->onset, and every re-onset
-                    # popped the tray notification again.
-                    if time.monotonic() - self._error_last_seen >= self.ERROR_CLEAR_HOLD_S:
-                        if self.error_state:
-                            logging.info("App status error cleared by an error-free frame (hold window elapsed)")
-                        self.update_sim_indicators(data.get('src'), paused=False)
-                        self.error_state = False
-                        self.telemetry_timed_out = False
-                        self.status_container.request_clear_error.emit()
-                        # The condition was rectified: drop the flag_error
-                        # records this session logged into the exception
-                        # tracker so it agrees with the (cleared) app status
-                        for msg in self.flagged_error_msgs:
-                            G.exception_tracker.remove_matching(msg)
-                        self.flagged_error_msgs.clear()
-            elif error_cond is not None:
-
-                self._error_last_seen = time.monotonic()
-                if not self.error_state:  # only set error status once when there is error cond but state is not yet true
-                    self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
-                    logging.error(error_cond)
-                    self.flagged_error_msgs.add(error_cond)
-                    self.error_state = True
+            # Error onset/hold/clear - see SimStatusTracker.on_frame.
+            self.sim_status.on_frame(data)
 
 
 
@@ -2913,22 +1602,27 @@ class MainWindow(QMainWindow):
                 new_sim = data.get('src', None)
                 new_aircraft = data.get('N', None)
                 new_class = G.settings_mgr.current_class
-                self.trim_cal_prompt_button.hide()  # profile creation first
+                G.app_state.set_prompt('trim_cal', None)  # profile creation first
                 if G.master_instance:
-                    if not self.new_craft_button.isVisible():
-                        self.new_craft_button.setText(
-                            "<a href='#newcraft' style='color:white; text-decoration:none;'>"
-                            "<span style='font-weight:500;'>No Profile Found for </span>"
-                            f"<b>{html.escape(str(new_aircraft or ''))}</b>"
-                            "<span style='font-weight:500;'> — Click Here to Create a New Profile</span></a>")
-                        self.new_craft_button.linkActivated.connect(lambda _: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
-                        self.new_craft_button.show()
-                        self._new_craft_anim.start()
+                    target = (new_sim, new_class, new_aircraft)
+                    if not self._new_craft_prompt_active or target != self._new_craft_target:
+                        # Rebuilt only when the unmatched aircraft changes, so
+                        # the text and click target always follow the current
+                        # one without per-frame Notice construction.
+                        self._new_craft_target = target
+                        G.app_state.set_prompt('new_craft', Notice(
+                            notice_id='new_craft', priority=NEW_CRAFT_PRIORITY,
+                            style='new_craft', pulse=True,
+                            html="<a href='#newcraft' style='color:white; text-decoration:none;'>"
+                                 "<span style='font-weight:500;'>No Profile Found for </span>"
+                                 f"<b>{html.escape(str(new_aircraft or ''))}</b>"
+                                 "<span style='font-weight:500;'> — Click Here to Create a New Profile</span></a>"))
+                        self._new_craft_prompt_active = True
 
                     if not data.get('STOP', False):
                         if not self.new_craft_notification_sent:
 
-                            self.pop_tray_notification(
+                            self.tray.show_notification(
                                 "** New Aircraft Found **",
                                 f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
                                 10,
@@ -2939,61 +1633,24 @@ class MainWindow(QMainWindow):
 
 
             else:
-                if self.new_craft_button.isVisible():
-                    self.new_craft_button.hide()
-                    self._new_craft_anim.stop()
+                if self._new_craft_prompt_active:
+                    G.app_state.set_prompt('new_craft', None)
+                    self._new_craft_prompt_active = False
+                    self._new_craft_target = None
                 self.new_craft_notification_sent = False
                 self._update_trim_cal_prompt()
 
             # Update the status labels and profile selection box
-            self.status_container.set_fullname(data.get('N', ''))
+            self.header_panel.set_fullname(data.get('N', ''))
             ap = G.settings_mgr.active_profile
             active_profile = xmlutils.get_active_profile_for_model(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
             self.update_craft_text_block(pattern=shown_pattern, profile=active_profile)
 
-            update_telem_vars = False
-            # if the debug teleplot setup window is active, set a flag that will cause the
-            # telemetry label on the monitor tab to update even if the monitor tab
-            # is not active
-            if hasattr(self, "teleplot_dialog"):
-                if self.teleplot_dialog.isVisible:
-                    update_telem_vars = True
-
-            # if window_mode == 0 or update_telem_vars:
-            self.lbl_telem_data.setText(telem_items)
-            self.lbl_effects_data.setText(active_effects)
+            self.monitor_panel.update_effects(active_effects)
 
         except Exception:
             logging.exception("Exception")
-
-    def get_telem_items(self, data, telem_items):
-        raw = (self.telem_filter.text() or "")
-        tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
-        for k, v in data.items():
-
-            # check for msfs and debug mode (alt-d pressed), change to simvar name
-            if self.show_simvars:
-                if data["src"] == "MSFS":
-                    s = G.telem_manager.simconnect.get_var_name(k)
-                    # s = simvarnames.get_var_name(k)
-                    if s is not None:
-                        k = s
-
-            # Apply simple OR filtering against the key only
-            if tokens:
-                k_cf = str(k).lower()
-                if not any(tok in k_cf for tok in tokens):
-                    continue
-
-            if isinstance(v, float):
-                telem_items += f"{k}: {v:.3f}\n"
-            else:
-                if isinstance(v, list):
-                    v = "[" + ", ".join(
-                        [f"{x:.3f}" if isinstance(x, float) else str(x) if x is not None else "None" for x in v]) + "]"
-                telem_items += f"{k}: {v}\n"
-        return telem_items
 
     def update_craft_text_block(self, craft=None, pattern=None, profile=None):
         if craft is None:
@@ -3002,17 +1659,15 @@ class MainWindow(QMainWindow):
             pattern = G.settings_mgr.current_pattern
         if profile is None:
             profile = G.settings_mgr.active_profile
-        self.status_container.cur_craft_label.setText(craft)
-        self.status_container.cur_pattern_label.setText(pattern)
-        self.status_container.active_profile_label.setText(profile)
+        self.header_panel.set_craft_info(craft, pattern, profile)
         # The resolved pattern, not the label: with nothing matched the label
         # reads "Using defaults", which is neither something to fork off nor
         # something with profiles to pick between.
         named = (bool(craft) and bool(G.settings_mgr.current_pattern) and G.master_instance
                  and G.settings_mgr.current_sim not in ('', 'nothing')
                  and not G.settings_mgr.offline_mode)
-        self.status_container.set_split_state(named)
-        self.status_container.set_profile_state(named)
+        self.header_panel.set_split_state(named)
+        self.header_panel.set_profile_state(named)
         self.refresh_profile_notes_button()
 
     def split_loaded_aircraft_profile(self):
@@ -3064,7 +1719,7 @@ class MainWindow(QMainWindow):
                 tip = ('Active SimConnect/Dataref overrides for this aircraft\n'
                        '(Utilities → SimConnect/Dataref Overrides Editor):\n\n'
                        + '\n'.join(lines))
-        self.status_container.request_set_telem_overrides.emit(text, tip)
+        self.header_panel.request_set_telem_overrides.emit(text, tip)
 
     def refresh_profile_notes_button(self):
         """Update the profile-notes button (enabled + notes-exist tint) for
@@ -3094,7 +1749,7 @@ class MainWindow(QMainWindow):
                 xmlutils.read_default_model_notes(sim, aircraft, prefer_pattern=pattern)
                 or xmlutils.read_user_default_model_notes(sim, pattern)
                 or xmlutils.read_user_model_notes(sim, pattern, target))
-        self.status_container.set_notes_state(enabled, has_notes)
+        self.header_panel.set_notes_state(enabled, has_notes)
 
     def open_profile_notes_dialog(self):
         dlg = ProfileNotesDialog(self)
@@ -3108,8 +1763,9 @@ class MainWindow(QMainWindow):
         dlg.show()
 
     def new_ac_wizard_finished(self):
-        self.new_craft_button.setVisible(False)
-        self._new_craft_anim.stop()
+        G.app_state.set_prompt('new_craft', None)
+        self._new_craft_prompt_active = False
+        self._new_craft_target = None
         # The wizard just wrote the type row and the profile mapping. The
         # telemetry loop only re-resolves the active profile when a frame
         # notices the config change; a setting changed before that frame
@@ -3123,7 +1779,7 @@ class MainWindow(QMainWindow):
         # the new match, so neither the next reload nor the next start
         # offers again.
         G.settings_mgr.profile_change = None
-        self.profile_change_button.hide()
+        G.app_state.set_prompt('profile_change', None)
         self.settings_layout.reload_layout(None)
 
     def _update_trim_cal_prompt(self):
@@ -3148,108 +1804,25 @@ class MainWindow(QMainWindow):
                 and ac is not None
                 and getattr(ac, "_trim_cal_available", False)
                 and getattr(ac, "_trim_curve_y_fam", None) is None)
-        if show != self.trim_cal_prompt_button.isVisible():
-            self.trim_cal_prompt_button.setVisible(show)
-            if show:
-                self._trim_prompt_anim.start()
-            else:
-                self._trim_prompt_anim.stop()
+        G.app_state.set_prompt('trim_cal', Notice(
+            notice_id='trim_cal', priority=TRIM_CAL_PRIORITY, style='trim_cal', pulse=True,
+            html="<a href='#trimcal' style='color:black; text-decoration:none;'>"
+                 "<span style='font-weight:500;'>No Trim Calibration Found for this "
+                 "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
+                 " to Set Up Realistic Trim</span></a>") if show else None)
 
-    def _style_new_craft_button(self, v):
-        """One pulse frame for the new-aircraft prompt: a red pill breathing
-        dim<->bright, white text and border (weights come from the rich
-        text — bold aircraft name, medium fixed words)."""
-        r = int(150 + (225 - 150) * v)
-        g = int(28 + (45 - 28) * v)
-        b = int(28 + (45 - 28) * v)
-        self.new_craft_button.setStyleSheet(f"""QLabel {{
-                            background-color: rgb({r}, {g}, {b});
-                            border: 3px solid white;
-                            border-radius: 17px;
-                            color: white;
-                            padding: 8px 18px;
-                        }}
-                        QLabel:hover {{
-                            background-color: #ef5350;
-                        }}""")
-
-    def _style_trim_cal_prompt(self, v):
-        """One pulse frame for the discovery prompt: a mustard pill (same
-        family as the Paused status badge) breathing between dim and bright,
-        solid fill so the black text keeps contrast throughout."""
-        r = int(130 + (242 - 130) * v)
-        g = int(100 + (180 - 100) * v)
-        b = int(12 + (34 - 12) * v)
-        self.trim_cal_prompt_button.setStyleSheet(f"""QLabel {{
-                            background-color: rgb({r}, {g}, {b});
-                            border: 3px solid black;
-                            border-radius: 17px;
-                            color: black;
-                            padding: 8px 18px;
-                        }}
-                        QLabel:hover {{
-                            background-color: #f5bc28;
-                        }}""")
-
-
-    def perform_update(self, auto=True):
-        if G.release_version:
-            return False
-
-        ignore_auto_updates = G.system_settings.get('ignoreUpdate', False)
-        if not auto:
-            ignore_auto_updates = False
-        update_ans = QMessageBox.StandardButton.No
-        proceed_ans = QMessageBox.StandardButton.Cancel
-        try:
-            updater_execution_path = os.path.join(utils.get_script_path(), 'updater.exe')
-            if os.path.exists(updater_execution_path):
-                os.remove(updater_execution_path)
-        except Exception as e:
-            logging.error(f'Error in perform_update: {e}')
-
-        is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
-        # is_exe = True
-        if G.child_instance: return False
-        if ignore_auto_updates: return False
-        if not is_exe: return False
-
-        if self._update_available:
-            update_ans = QMessageBox.StandardButton.Yes
-            if auto:
-                # Rich text so the release-notes link is clickable; clicking
-                # it opens the browser without closing the dialog.
-                update_ans = QMessageBox.information(self, "Update Available!!",
-                                                     f"A new version of TelemFFB is available (<b>{self.latest_version}</b>).<br><br>"
-                                                     f"<a href='{G.release_notes_url}'>View the release notes</a> to see what's new.<br><br>"
-                                                     f"Would you like to automatically download and install it now?<br><br>"
-                                                     f"You may also update later from the Utilities menu, or the "
-                                                     f"next time TelemFFB starts.<br><br>"
-                                                     f"~~ Note ~~ If you no longer wish to see this message on startup, "
-                                                     f"you may enable `ignore_auto_updates` in your user config. "
-                                                     f"You will still be able to update via the Utilities menu",
-                                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
-
-            if update_ans == QMessageBox.StandardButton.Yes:
-                proceed_ans = QMessageBox.information(self, "TelemFFB Updater",
-                                                      f"TelemFFB will now exit and launch the updater.\n\nPress OK to continue",
-                                                      QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel)
-
-            if proceed_ans == QMessageBox.StandardButton.Ok:
-                updater_execution_path = os.path.join(utils.get_script_path(), 'updater.exe')
-                shutil.copy(sys.argv[0], updater_execution_path)
-
-                # Copy the updater executable with forced overwrite
-
-                call = [updater_execution_path, "--current_version", utils.get_version()] + sys.argv[1:]
-                subprocess.Popen(call, cwd=utils.get_install_path())
-                if auto:
-                    for child_widget in self.findChildren(QMessageBox):
-                        child_widget.reject()
-                    QTimer.singleShot(250, exit_application)
-                return True
-
-        return False
-
-
+    def _on_prompt_activated(self, notice_id: str):
+        """PromptStack.activated relay: what a click on each of the three
+        prompts does. Kept here rather than in the panel because every one
+        of them opens a MainWindow-owned dialog or reaches into
+        G.telem_manager - the panel only knows what is showing, not what
+        clicking it means."""
+        if notice_id == 'new_craft':
+            if self._new_craft_target is not None:
+                sim, cls, name = self._new_craft_target
+                self.show_new_aircraft_wizard(manual=False, sim=sim, cls=cls, name=name)
+        elif notice_id == 'trim_cal':
+            self.open_trim_calibration_dialog()
+        elif notice_id == 'profile_change':
+            self._on_profile_change_link(None)
 

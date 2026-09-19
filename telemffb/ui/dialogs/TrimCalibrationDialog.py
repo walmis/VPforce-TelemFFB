@@ -46,6 +46,11 @@ from telemffb.ui.widgets.custom_widgets import (
     vpf_purple,
 )
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState, TrimCalibrator
+from telemffb.ui.theme.tokens import (
+    BORDER_GRAY, DISABLED_GRAY, DIVIDER_GRAY, ERROR_RED, INFO_BLUE, OK_GREEN,
+    PURPLE_HOVER_FILL, WARNING_AMBER, WARNING_BANNER_BG, WARNING_TEXT_AMBER,
+    DANGER_BANNER_BG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,10 +104,10 @@ class TrimCalibrationDialog(QDialog):
         "ASSIST_HOLD": 2,
         "SPEED_SETTLE": 3, "SWEEP": 3, "SOLVE": 3, "RESTORE": 3,
     }
-    COL_AUTO = "#2a7fd4"
-    COL_ACTION = "#e6a817"
-    COL_OK = "#33aa33"
-    COL_BAD = "#cc3333"
+    COL_AUTO = INFO_BLUE
+    COL_ACTION = WARNING_AMBER
+    COL_OK = OK_GREEN
+    COL_BAD = ERROR_RED
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -153,7 +158,7 @@ class TrimCalibrationDialog(QDialog):
         self.warn_tf.setWordWrap(True)
         self.warn_tf.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.warn_tf.setStyleSheet(
-            "QLabel { background-color:#b36b00; color:white; font-weight:bold;"
+            f"QLabel {{ background-color:{WARNING_BANNER_BG}; color:white; font-weight:bold;"
             " font-size:11pt; border-radius:6px; padding:6px; }"
         )
         self.warn_tf.setVisible(False)
@@ -169,7 +174,7 @@ class TrimCalibrationDialog(QDialog):
         # a hover highlight — a plain bold label reads as a heading, not a
         # control (field feedback). Shared with the Result disclosure.
         disclosure_style = (
-            "QToolButton { border: none; font-weight: bold; color: #2a7fd4;"
+            f"QToolButton {{ border: none; font-weight: bold; color: {INFO_BLUE};"
             " padding: 2px 4px; }"
             "QToolButton:hover { background-color: rgba(42, 127, 212, 38);"
             " border-radius: 4px; }")
@@ -405,7 +410,7 @@ class TrimCalibrationDialog(QDialog):
         def _hline():
             ln = QFrame()
             ln.setFrameShape(QFrame.Shape.HLine)
-            ln.setStyleSheet("color: #555555;")
+            ln.setStyleSheet(f"color: {DIVIDER_GRAY};")
             return ln
 
         # Row order (user-designed): suggested speeds, the separated flight
@@ -523,7 +528,7 @@ class TrimCalibrationDialog(QDialog):
             c = QLabel()
             c.setTextFormat(Qt.TextFormat.RichText)
             c.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-            c.setStyleSheet("QLabel { border: 1px solid #777777;"
+            c.setStyleSheet(f"QLabel {{ border: 1px solid {BORDER_GRAY};"
                             " border-radius: 3px; padding: 4px 6px; }")
             c.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             self._tracker_cells.append(c)
@@ -537,7 +542,7 @@ class TrimCalibrationDialog(QDialog):
         self.banner = QLabel("⚠  TelemFFB is controlling your aircraft — stay ready to take over")
         self.banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.banner.setStyleSheet(
-            "QLabel { background-color:#cc3300; color:white; font-weight:bold;"
+            f"QLabel {{ background-color:{DANGER_BANNER_BG}; color:white; font-weight:bold;"
             " border-radius:6px; padding:5px; }"
         )
         self.banner.setVisible(False)
@@ -590,7 +595,7 @@ class TrimCalibrationDialog(QDialog):
         _flat = ("QToolButton { border: none; padding: 2px 6px; }"
                  "QToolButton:hover { background-color: rgba(42, 127, 212, 38);"
                  " border-radius: 4px; }"
-                 "QToolButton:disabled { color: #808080; }")
+                 f"QToolButton:disabled {{ color: {DISABLED_GRAY}; }}")
 
         def _tool_btn(text=None, icon=None, tooltip=None):
             b = QToolButton()
@@ -609,9 +614,9 @@ class TrimCalibrationDialog(QDialog):
         # at a larger size in VPForce purple, translucent-purple hover pill.
         _arrow = (f"QToolButton {{ border: none; padding: 0px 6px;"
                   f" color: {vpf_purple}; font-size: 13pt; font-weight: bold; }}"
-                  f"QToolButton:hover {{ background-color: #44ab37c8;"
+                  f"QToolButton:hover {{ background-color: {PURPLE_HOVER_FILL};"
                   f" border-radius: 4px; }}"
-                  "QToolButton:disabled { color: #808080; }")
+                  f"QToolButton:disabled {{ color: {DISABLED_GRAY}; }}")
 
         fam_row = QHBoxLayout()
         fam_row.addWidget(QLabel("Stored speeds:"))
@@ -705,7 +710,7 @@ class TrimCalibrationDialog(QDialog):
         self.lbl_virtual.setWordWrap(True)
         self.lbl_note = QLabel("")
         self.lbl_note.setWordWrap(True)
-        self.lbl_note.setStyleSheet("QLabel { color:#cc7a00; }")
+        self.lbl_note.setStyleSheet(f"QLabel {{ color:{WARNING_TEXT_AMBER}; }}")
         rlay.addWidget(self.lbl_virtual)
         rlay.addWidget(self.lbl_linearity)
         rlay.addWidget(self.lbl_note)
@@ -1658,7 +1663,7 @@ class TrimCalibrationDialog(QDialog):
             drift = (ias - ias_ref) / ias_ref
             if abs(drift) >= 0.05:
                 ias_txt += f" ({drift * 100:+.0f}%)"
-                color = "#cc3333" if abs(drift) >= 0.10 else "#cc7a00"
+                color = ERROR_RED if abs(drift) >= 0.10 else WARNING_TEXT_AMBER
                 ias_style = f"QLabel {{ color:{color}; font-weight:bold; }}"
         self.lbl_ias.setText(ias_txt)
         self.lbl_ias.setStyleSheet(ias_style)
@@ -2011,7 +2016,7 @@ class TrimCalibrationDialog(QDialog):
         self.btn_save.setEnabled(False)
 
     def _set_ready(self, ok, message):
-        self._set_light("#33aa33" if ok else "#cc3333", message)
+        self._set_light(OK_GREEN if ok else ERROR_RED, message)
 
     def _set_light(self, color, message):
         self.lbl_ready.setText(

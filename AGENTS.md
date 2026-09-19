@@ -78,7 +78,7 @@ Full walkthrough of creating a new class (module placement, sc_overrides, regist
 ```python
 import telemffb.globals as G
 ```
-Key attributes (the full list, annotation-only, is in the file — they have no runtime value until `main.py` startup phases set them; tests use `monkeypatch.setattr(G, ..., raising=False)`): `G.device_type` (`"joystick"` / `"pedals"` / `"collective"` / `"trimwheel"`), `G.master_instance` / `G.child_instance`, `G.effects` (global `HapticEffect` dispenser), `G.telem_manager`, `G.sim_listeners`, `G.main_window`, `G.settings_mgr`, `G.system_settings`, `G.ipc_instance`, `G.log_window`, `G.exception_tracker`, `G.device_info` / `G.device_devpath` / `G.device_usbpid` / `G.device_firmware_version` / `G.device_connection_status`, `G.userconfig_path` / `G.defaults_path` / `G.userconfig_rootpath`, `G.args`, `G.launched_instances`, `G.instance_dev_dict`, `G.active_buttons` / `G.master_buttons` / `G.child_buttons`, `G.startup_configurator_gains` / `G.vpconf_configurator_gains` / `G.current_configurator_gains`, `G.gain_override_dialog`, `G.useDarkMode`, `G.dev_build` / `G.release_version` / `G.is_exe`, `G.force_reload_aircraft_trigger`, `G.il2_ffb_device_ordinal`, `G.vpconf_init_pending`, `G.current_vpconf_profile`.
+Key attributes (the full list, annotation-only, is in the file — they have no runtime value until `main.py` startup phases set them; tests use `monkeypatch.setattr(G, ..., raising=False)`): `G.device_type` (`"joystick"` / `"pedals"` / `"collective"` / `"trimwheel"`), `G.master_instance` / `G.child_instance`, `G.effects` (global `HapticEffect` dispenser), `G.telem_manager`, `G.sim_listeners`, `G.main_window`, `G.settings_mgr`, `G.system_settings`, `G.ipc_instance`, `G.log_window`, `G.exception_tracker`, `G.device_info` / `G.device_devpath` / `G.device_usbpid` / `G.device_firmware_version` / `G.device_connection_status`, `G.userconfig_path` / `G.defaults_path` / `G.userconfig_rootpath`, `G.args`, `G.launched_instances`, `G.instance_dev_dict`, `G.active_buttons` / `G.master_buttons` / `G.child_buttons`, `G.startup_configurator_gains` / `G.vpconf_configurator_gains` / `G.current_configurator_gains`, `G.gain_override_dialog`, `G.useDarkMode`, `G.dev_build` / `G.release_version` / `G.is_exe`, `G.force_reload_aircraft_trigger`, `G.il2_ffb_device_ordinal`, `G.vpconf_init_pending`, `G.current_vpconf_profile`, `G.app_state` (the app-state model widgets subscribe to; see `telemffb/state/app_state.py`).
 
 ### Configuration System (XML-based)
 Two parallel XML files:
@@ -164,6 +164,7 @@ One class per file. Large classes belong in their own module under `telemffb/sim
 | `telemffb/hw/` | USB HID / FFB hardware |
 | `telemffb/utils/` | Utilities (star-import façade over category modules) |
 | `telemffb/xml/` | XML I/O internals behind the `xmlutils` façade |
+| `telemffb/state/` | App-state model (`AppState`) widgets subscribe to, as opposed to `app_events`'s fire-and-forget pub/sub |
 
 Rules when adding or moving code:
 - A new module goes into the subpackage of its domain — never a new module at the `telemffb/` root. If no subpackage fits, create one instead of adding another root module.

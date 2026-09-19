@@ -466,7 +466,11 @@ class HiDpiPixmap(QPixmap):
 
         self.setDevicePixelRatio(ratio)
 
-    def _scaled(self, width, height, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation):
+    def scaled_logical(self, width, height, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation):
+        """Scale to ``width`` x ``height`` in logical (device-independent)
+        pixels, keeping this pixmap's device pixel ratio so it stays sharp
+        on HiDPI screens.  Unlike ``QPixmap.scaled()``, which it deliberately
+        does not override, the size is not in device pixels."""
         ratio = self.devicePixelRatio()
         scaled_pixmap = super().scaled(int(width * ratio), int(height * ratio), aspectRatioMode, transformMode)
         scaled_pixmap.setDevicePixelRatio(ratio)
