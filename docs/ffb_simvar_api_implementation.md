@@ -806,7 +806,22 @@ Two things specifically need a real rig plus a reference aircraft:
   the others are assumptions. They are user parameters precisely so a sign error is a
   config fix, not a code change — all conversion goes through
   `_ffb_api_to_device_sign`.
-- **Spring engagement feel.** `_ffb_api_spring_ready` reuses the existing
-  `_initialize_*_if_needed` handshake (hold the spring off until the control is within
-  0.1 of the trim reference). Whether that threshold feels right under a live
-  auto-trim is untested.
+- **Recapture after a load or a pause.** `_ffb_api_recapture` is the API path's
+  version of the `_initialize_*_if_needed` handshake. No axis is sent until the control
+  is back within tolerance of the published trim reference (0.15 on the cyclic, both
+  axes; 0.1 on the collective and pedals), so a displaced control never reaches the
+  aircraft as a step input. Until then the spring is at full gain with its center
+  started at the control and walked to the reference over 0.75 s
+  (`telemffb.utils.CenterWalk`), which brings the control back at a set rate rather
+  than with the force of its whole displacement; a control already within tolerance
+  is not walked. A control with no trim system has no published reference, so it is
+  brought back to its rest position on the ground (the collective full down, the
+  cyclic and pedals centered) and in the air to where it was held before the pause,
+  which is the value the sim still has (`_ffb_api_resume_point`). The spring is at
+  least half strength during a recapture (`FFB_API_RECAPTURE_MIN_GAIN`), since a
+  control's own gain can be zero. A pause drops the latch, and the control overrides send nothing while
+  it settles again (`_ffb_api_discovering`). Fly-through detection waits for the
+  recapture as well, publishing 0 until then: a control that has not been brought
+  back yet says nothing about the pilot. With axis control off there is nothing to
+  withhold and the spring behaves the same. Whether the tolerances and the walk time
+  feel right under a live auto-trim is untested.

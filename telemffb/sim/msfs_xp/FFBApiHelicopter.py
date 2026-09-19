@@ -55,6 +55,7 @@ from telemffb.SettingsManager import SpringModeEnum
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.Helicopter import Helicopter
 from telemffb.utils import clamp
+from telemffb.utils.CenterWalk import CenterWalk
 
 # --- Controls and axes (spec 3.1 / 3.3) ------------------------------------- #
 
@@ -135,6 +136,11 @@ FFB_API_ENABLED_HEARTBEAT_MS = 1000
 #: current aircraft speaking.
 FFB_API_DISCOVERY_STABLE_FRAMES = 10
 
+#: Least spring gain while a control is being recaptured.  The control's own gain
+#: can be low or zero (the pedals ship at 0), and the spring is what brings the
+#: control back before its axis is sent again.
+FFB_API_RECAPTURE_MIN_GAIN = 0.5
+
 #: Warn if a configured aircraft has not published a usable version within this long
 #: (ms) of telemetry.  Not a gate - it stays inert and keeps looking.
 FFB_API_DISCOVERY_WARN_MS = 15000
@@ -191,6 +197,8 @@ class FFBApiHelicopter(Helicopter):
     # end user parameters
 
     def __init__(self, name, **kwargs):
+        self._ffb_api_walk = CenterWalk()
+        self._ffb_api_last_position = None   # outlives _ffb_api_reset, which a pause runs
         self._ffb_api_reset()
         super().__init__(name, **kwargs)
         # spring_mode is excluded for this class (the API owns the springs, and every
@@ -265,7 +273,7 @@ class FFBApiHelicopter(Helicopter):
         self._ffb_api_first_seen_ms = None
         self._ffb_api_enabled_state = None
         self._ffb_api_enabled_last_write_ms = 0
-        self._ffb_api_spring_init = 0
+        self._ffb_api_restart_recapture()
         self._ffb_api_tr_active = False
         self._ffb_api_fly_through_state = {}
         self._ffb_api_warned_no_features = False
@@ -335,9 +343,9 @@ class FFBApiHelicopter(Helicopter):
 
         if self._ffb_api_latched:
             # The spring reference may move with the capability bits (a control gaining
-            # trim stops centering at zero), so re-run the near-center handshake rather
-            # than engage a spring far from where the control sits.
-            self._ffb_api_spring_init = 0
+            # trim stops centering at zero), so the control is recaptured again before
+            # any axis is sent from the new reference.
+            self._ffb_api_restart_recapture()
         self._ffb_api_latched = True
         self._ffb_api_version, self._ffb_api_features = observed
         self._ffb_api_pending_discovery = None
@@ -490,7 +498,7 @@ class FFBApiHelicopter(Helicopter):
             return
         self._ffb_api_write_lvar(f"L:FFB_{control}_ENABLED", 0)
         self._ffb_api_enabled_state = False
-        self._ffb_api_spring_init = 0
+        self._ffb_api_restart_recapture()
         logging.info(f"FFB API: {control} released (ENABLED=0)")
 
     def _ffb_api_release(self):
@@ -642,19 +650,63 @@ class FFBApiHelicopter(Helicopter):
     # therefore coerced to float explicitly below, so a config value that arrives as
     # ``1`` cannot silently mean "raw coefficient 1" (i.e. no spring at all).
 
-    def _ffb_api_spring_ready(self, phys, center_norm) -> bool:
-        """Gate spring engagement until the physical axis is near the trim reference.
+    def _ffb_api_restart_recapture(self):
+        self._ffb_api_spring_init = 0
+        self._ffb_api_walk.reset()
+        self._ffb_api_fly_through_state = {}
 
-        Mirrors the existing ``_initialize_*_if_needed`` handshake: engaging a spring
-        whose center is far from where the control physically sits would yank it.
+    def _ffb_api_recapture(self, *axes, tolerance=0.1):
+        """Bring a displaced control back to the trim reference before its axis is sent.
+
+        ``axes`` are ``(physical, reference)`` pairs.  Returns ``(recaptured, centers)``:
+        the spring centers to use this frame, and whether every axis is within
+        ``tolerance`` of its reference.  The same handshake as the generic
+        ``_initialize_*_if_needed``: after a load or a pause the control can sit
+        anywhere, and sending that position would be a step input to the aircraft, so
+        the caller sends no axis until ``recaptured``.  Until then the center starts at
+        the control and walks to the reference, which moves the control back at a set
+        rate rather than with the force of its whole displacement.  With axis control
+        off there is nothing to withhold and the spring behaves the same.  Fly-through
+        detection waits for ``recaptured`` too: a control that is away from its
+        reference because it has not been brought back yet says nothing about the pilot.
         """
-        if self._ffb_api_spring_init:
-            return True
-        if center_norm - 0.1 < phys < center_norm + 0.1:
-            self._ffb_api_spring_init = 1
-            logging.info("FFB API: spring initialized")
-            return True
-        return False
+        references = tuple(reference for _, reference in axes)
+        if not self._ffb_api_spring_init:
+            if all(abs(phys - reference) < tolerance for phys, reference in axes):
+                self._ffb_api_spring_init = 1
+                self._ffb_api_walk.reset()
+                logging.info("FFB API: control recaptured")
+            else:
+                return False, self._ffb_api_walk.step(tuple(phys for phys, _ in axes), references)
+        return True, references
+
+    def _ffb_api_resume_point(self, telem_data: BaseTelemetryData, rest, phys):
+        """Where a control with no trim system is brought back to before its axis is sent.
+
+        On the ground, its rest position (``rest``: the collective full down, the
+        others centered).  In the air, the position it was last held at before a
+        pause - the value the sim still has - or, after a fresh load with no such
+        position, where it sits now.  A control with trim is brought back to the
+        published reference instead, and never asks.
+
+        Telemetry:
+            Read: SimOnGround - int (0 or 1)
+        """
+        if telem_data.get("SimOnGround", 1):
+            return tuple(rest)
+        if self._ffb_api_last_position is not None and len(self._ffb_api_last_position) == len(phys):
+            return self._ffb_api_last_position
+        return tuple(phys)
+
+    def _ffb_api_discovering(self) -> bool:
+        """True while a published API version is settling towards a latch.
+
+        A pause drops the latch, so for the frames it takes to settle again the generic
+        path would run, and on this class that path sends the raw axis with no
+        handshake.  The control overrides sit those frames out.  An aircraft that
+        publishes no version is never in this state and gets the generic path.
+        """
+        return not self._ffb_api_latched and self._ffb_api_pending_discovery is not None
 
     @override
     def _update_cyclic_trim(self, telem_data: BaseTelemetryData):
@@ -688,7 +740,8 @@ class FFBApiHelicopter(Helicopter):
                      StickXY_offset      ([float, float]; spring center)
         """
         if not self._ffb_api_active(FFB_API_CYCLIC):
-            super().msfs_update_heli_controls(telem_data)
+            if not self._ffb_api_discovering():
+                super().msfs_update_heli_controls(telem_data)
             return
 
         phys_x, phys_y = self._get_device_raw_axes()
@@ -718,14 +771,21 @@ class FFBApiHelicopter(Helicopter):
             logging.debug("FFB API: cyclic trim re-clutched")
         self._ffb_api_tr_active = tr_on
 
+        if not has_trim and not self._ffb_api_spring_init:
+            center_x, center_y = self._ffb_api_resume_point(telem_data, (0.0, 0.0), (phys_x, phys_y))
+        recaptured, (center_x, center_y) = self._ffb_api_recapture(
+            (phys_x, center_x), (phys_y, center_y), tolerance=0.15)
+        if recaptured:
+            self._ffb_api_last_position = (phys_x, phys_y)
+        else:
+            gain = max(gain, FFB_API_RECAPTURE_MIN_GAIN)
+
         self.cpO_x = float(clamp(center_x, -1.0, 1.0))
         self.cpO_y = float(clamp(center_y, -1.0, 1.0))
         self.cyclic_center = [center_x, center_y]
 
-        ready = self._ffb_api_spring_ready(phys_x, center_x) and self._ffb_api_spring_ready(phys_y, center_y)
-
-        self.spring_x.set_coefficient(gain if ready else 0, True)  # int 0 = raw zero coefficient
-        self.spring_y.set_coefficient(gain if ready else 0, True)  # int 0 = raw zero coefficient
+        self.spring_x.set_coefficient(gain, True)
+        self.spring_y.set_coefficient(gain, True)
         self.spring_x.set_offset(self.cpO_x)
         self.spring_y.set_offset(self.cpO_y)
         self._spring_handle.name = "ffb_api_cyclic_spring"
@@ -738,15 +798,16 @@ class FFBApiHelicopter(Helicopter):
         telem_data.StickXY_offset = self.cyclic_center
 
         self._ffb_api_write_fly_through(telem_data, FFB_API_CYCLIC, {
-            "CYCLIC_ROLL": self._ffb_api_detect_fly_through("CYCLIC_ROLL", phys_x, center_x),
-            "CYCLIC_PITCH": self._ffb_api_detect_fly_through("CYCLIC_PITCH", phys_y, center_y),
+            "CYCLIC_ROLL": recaptured and self._ffb_api_detect_fly_through("CYCLIC_ROLL", phys_x, center_x),
+            "CYCLIC_PITCH": recaptured and self._ffb_api_detect_fly_through("CYCLIC_PITCH", phys_y, center_y),
         })
 
         # Axis ownership is unchanged by the API (plan 10.2): if the user has TelemFFB
         # sending axes, keep doing so - but raw, with no trim contribution, since trim
         # lives in the spring center and must not be applied twice.
         self.last_device_x, self.last_device_y = phys_x, phys_y
-        self._send_cyclic_axis_output(telem_data, force_trim_active=False)
+        if recaptured:
+            self._send_cyclic_axis_output(telem_data, force_trim_active=False)
 
     @override
     def msfs_update_collective(self, telem_data: BaseTelemetryData):
@@ -757,7 +818,8 @@ class FFBApiHelicopter(Helicopter):
             Written: phys_y            (float, -1..1)
         """
         if not self._ffb_api_active(FFB_API_COLLECTIVE):
-            super().msfs_update_collective(telem_data)
+            if not self._ffb_api_discovering():
+                super().msfs_update_collective(telem_data)
             return
 
         _, phys_y = self._get_device_raw_axes()
@@ -782,10 +844,16 @@ class FFBApiHelicopter(Helicopter):
             center_y = self._ffb_api_trim(telem_data, "COLLECTIVE")
             gain = float(self.ffb_api_collective_spring_gain)
 
+        if not has_trim and not self._ffb_api_spring_init:
+            (center_y,) = self._ffb_api_resume_point(telem_data, (1.0,), (phys_y,))
+        recaptured, (center_y,) = self._ffb_api_recapture((phys_y, center_y))
+        if recaptured:
+            self._ffb_api_last_position = (phys_y,)
+        else:
+            gain = max(gain, FFB_API_RECAPTURE_MIN_GAIN)
         self.cpO_y = float(clamp(center_y, -1.0, 1.0))
-        ready = self._ffb_api_spring_ready(phys_y, center_y)
 
-        self.spring_y.set_coefficient(gain if ready else 0, True)  # int 0 = raw zero coefficient
+        self.spring_y.set_coefficient(gain, True)
         self.spring_y.set_offset(self.cpO_y)
         self._spring_handle.name = "ffb_api_collective_spring"
         self._spring_handle.setCondition(self.spring_y)
@@ -793,13 +861,13 @@ class FFBApiHelicopter(Helicopter):
             self._spring_handle.start()
 
         self._ffb_api_write_fly_through(telem_data, FFB_API_COLLECTIVE, {
-            "COLLECTIVE": self._ffb_api_detect_fly_through("COLLECTIVE", phys_y, center_y),
+            "COLLECTIVE": recaptured and self._ffb_api_detect_fly_through("COLLECTIVE", phys_y, center_y),
         })
 
         self.last_collective_y = phys_y
-        if self.telemffb_controls_axes and not self.local_disable_axis_control:
+        self.collective_init = int(recaptured)
+        if recaptured and self.telemffb_controls_axes and not self.local_disable_axis_control:
             y_var, y_range = self._get_msfs_collective_axis_config()
-            self.collective_init = 1
             self._send_collective_outputs(telem_data, phys_y, y_var, y_range)
 
     @override
@@ -811,7 +879,8 @@ class FFBApiHelicopter(Helicopter):
             Written: phys_x        (float, -1..1)
         """
         if not self._ffb_api_active(FFB_API_PEDALS):
-            super().msfs_update_pedals(telem_data)
+            if not self._ffb_api_discovering():
+                super().msfs_update_pedals(telem_data)
             return
 
         phys_x, _ = self._get_device_raw_axes()
@@ -830,10 +899,16 @@ class FFBApiHelicopter(Helicopter):
             center_x = self._ffb_api_trim(telem_data, "PEDALS")
             gain = float(self.ffb_api_pedal_spring_gain)
 
+        if not has_trim and not self._ffb_api_spring_init:
+            (center_x,) = self._ffb_api_resume_point(telem_data, (0.0,), (phys_x,))
+        recaptured, (center_x,) = self._ffb_api_recapture((phys_x, center_x))
+        if recaptured:
+            self._ffb_api_last_position = (phys_x,)
+        else:
+            gain = max(gain, FFB_API_RECAPTURE_MIN_GAIN)
         self.cpO_x = float(clamp(center_x, -1.0, 1.0))
-        ready = self._ffb_api_spring_ready(phys_x, center_x)
 
-        self.spring_x.set_coefficient(gain if ready else 0, True)  # int 0 = raw zero coefficient
+        self.spring_x.set_coefficient(gain, True)
         self.spring_x.set_offset(self.cpO_x)
         self._spring_handle.name = "ffb_api_pedal_spring"
         self._spring_handle.setCondition(self.spring_x)
@@ -841,12 +916,12 @@ class FFBApiHelicopter(Helicopter):
             self._spring_handle.start()
 
         self._ffb_api_write_fly_through(telem_data, FFB_API_PEDALS, {
-            "PEDALS": self._ffb_api_detect_fly_through("PEDALS", phys_x, center_x),
+            "PEDALS": recaptured and self._ffb_api_detect_fly_through("PEDALS", phys_x, center_x),
         })
 
         self.last_pedal_x = phys_x
-        if self.telemffb_controls_axes and not self.local_disable_axis_control:
+        self.pedals_init = int(recaptured)
+        if recaptured and self.telemffb_controls_axes and not self.local_disable_axis_control:
             x_scale = clamp(self.rudder_x_axis_scale, 0.0, 1.0)
             x_var, x_range = self._get_msfs_pedal_axis_config()
-            self.pedals_init = 1
             self._send_pedal_outputs(telem_data, phys_x, x_scale, x_var, x_range)
