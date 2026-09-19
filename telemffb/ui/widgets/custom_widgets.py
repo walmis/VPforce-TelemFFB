@@ -44,7 +44,6 @@ from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
 import styles
 
 vpf_purple = PURPLE   # rgb(171, 55, 200) - kept as an alias so importers don't break
-t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
 
 class FFBDeviceListModel(QAbstractListModel):
@@ -974,7 +973,6 @@ class NoWheelSlider(QSlider):
 
         super(NoWheelSlider, self).__init__(*args, **kwargs)
         # Default colors
-        self.groove_color = "#bbb"
         self.handle_color = vpf_purple
         self.handle_height = 20
         self.handle_width = 16
@@ -1135,12 +1133,6 @@ class NoWheelSlider(QSlider):
 
     def decrease_single_step(self):
         self.setValue(self.value() - self.singleStep())
-
-    def setGrooveColor(self, color):
-        # groove_color is unused by paintEvent (the groove is painted from
-        # the palette) and never appears in the geometry stylesheet, so
-        # storing it is all there is to do here.
-        self.groove_color = color
 
     def setHandleColor(self, color):
         if self.handle_color == color:

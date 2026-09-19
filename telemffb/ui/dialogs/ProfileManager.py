@@ -34,7 +34,7 @@ from telemffb.ui.generated.Ui_ProfileManagerDialog import Ui_ProfileManagerDialo
 from telemffb.ui.dialogs.ProfileImportDialog import ProfileImportDialog
 from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
 from telemffb.utils import dbprint
-from telemffb.ui.theme.tokens import current_tokens, ERROR_RED, WARNING_LABEL_FG
+from telemffb.ui.theme.tokens import current_tokens, ERROR_RED, WARNING_LABEL_FG, WARNING_LABEL_BG
 import xml.etree.ElementTree as ET
 import telemffb.xmlutils as xmlutils
 import time
@@ -1534,7 +1534,7 @@ class ExportOptionsDialog(QDialog):
                 padding-left: 10px;
                 padding-top: 2px;
                 color: {WARNING_LABEL_FG}; /* Softer red for dark mode */
-                background-color: rgba(255, 50, 50, 30); /* Light red background tint */
+                background-color: {WARNING_LABEL_BG}; /* Light red background tint */
                 border: 1px solid {ERROR_RED};
                 border-radius: 4px;
             }}

@@ -27,7 +27,7 @@ from telemffb import utils
 from telemffb import xmlutils
 from telemffb.xml import match as xmatch
 from telemffb.ui.generated.Ui_NewAircraftWizard import Ui_NewAircraftWizard
-from telemffb.ui.theme.tokens import current_tokens
+from telemffb.ui.theme.tokens import current_tokens, FIELD_REQUIRED_BG, FIELD_MATCH_BG, FIELD_NO_MATCH_BG
 
 class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     """
@@ -296,7 +296,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                     self.generate_regex_patterns(self.auto_name)
 
                 if self.mandatory_clone:
-                    color = "rgba(255, 85, 85, 0.3)" if self.cb_clone.currentText() == '' else ""
+                    color = FIELD_REQUIRED_BG if self.cb_clone.currentText() == '' else ""
                     self.cb_clone.setStyleSheet(f"background-color: {color};")
 
                 self.pb_next.setEnabled(False)
@@ -428,7 +428,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             valid_match = False
         if self.mandatory_clone:
             if self.cb_clone.currentText() == '':
-                self.cb_clone.setStyleSheet('background-color: rgba(255, 85, 85, 0.3);')
+                self.cb_clone.setStyleSheet(f'background-color: {FIELD_REQUIRED_BG};')
                 mandatory_satisfied = False
             else:
                 self.cb_clone.setStyleSheet('')
@@ -477,7 +477,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                   f"aircraft already uses, so it would never take over the match")
 
         # Set background color
-        color = "rgba(0, 128, 0, 0.2)" if is_match else "rgba(255, 0, 0, 0.2)"
+        color = FIELD_MATCH_BG if is_match else FIELD_NO_MATCH_BG
         self.tb_manual_match_string.setToolTip(tt) if not is_match else self.tb_manual_match_string.setToolTip('')
         self.tb_manual_match_string.setStyleSheet(f"background-color: {color};")
         self.current_match_string = match_str

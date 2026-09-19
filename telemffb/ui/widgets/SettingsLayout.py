@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from telemffb.ui.theme.tokens import ACTIVE_GREEN
-from telemffb.ui.widgets.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
+from telemffb.ui.widgets.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, Toggle, EraseButton, NoWheelComboBox)
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.ui.dialogs.AdvancedGDialog import AdvancedGDialog

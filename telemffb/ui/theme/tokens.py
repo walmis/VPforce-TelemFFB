@@ -48,6 +48,11 @@ ROW_MATCH_GRAY = "#888888"       # "already matches" table-row text
 ROW_SKIP_FG_GRAY = "#a0a0a0"     # skipped-row text, same in both modes
 WARNING_LABEL_FG = "#dddddd"     # excluded-defaults warning label text
 PURPLE_HOVER_FILL = "#44" + PURPLE[1:]  # PURPLE at ~27% alpha, translucent hover pill
+# Translucent input-validation fills (behind a field's own text).
+FIELD_REQUIRED_BG = "rgba(255, 85, 85, 0.3)"  # mandatory field left empty
+FIELD_MATCH_BG = "rgba(0, 128, 0, 0.2)"       # pattern matches
+FIELD_NO_MATCH_BG = "rgba(255, 0, 0, 0.2)"    # pattern does not match
+WARNING_LABEL_BG = "rgba(255, 50, 50, 30)"    # excluded-defaults warning label tint
 
 # Keyed off the widget's own palette lightness rather than G.useDarkMode
 # (see SystemSettingsDialog._with_download_link / _attention_color), so

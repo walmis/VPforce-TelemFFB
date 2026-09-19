@@ -3,7 +3,6 @@
 # Run from the SM/ directory, e.g.  cd SM && ./make_all_UIs.sh
 pyuic6 system_settings_new.ui -o ../telemffb/ui/generated/Ui_SystemDialog.py
 pyuic6 teleplot.ui -o ../telemffb/ui/generated/Ui_TeleplotDialog.py
-pyuic6 settingswindow.ui -o ../telemffb/ui/generated/Ui_SettingsWindow.py
 pyuic6 new_aircraft_wizard.ui -o ../telemffb/ui/generated/Ui_NewAircraftWizard.py
 pyuic6 sc_overrides.ui -o ../telemffb/ui/generated/Ui_SCOverridesDialog.py
 pyuic6 configurator.ui -o ../telemffb/ui/generated/Ui_ConfiguratorDialog.py
