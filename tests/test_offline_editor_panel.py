@@ -200,6 +200,15 @@ class TestResetForEntry:
         assert panel.offline_class.count() == 0
         assert panel.offline_name.count() == 0
 
+    def test_a_stale_profile_does_not_survive_re_entry(self, panel):
+        """With no sim selected, clearing offline_sim emits nothing, so only
+        reset_for_entry itself can clear a profile left from last time."""
+        panel.offline_profile.addItem('Stale Profile')
+        assert panel.offline_sim.currentText() == ''
+        panel.reset_for_entry()
+        assert panel.offline_profile.count() == 0
+        assert not panel.offline_profile.signalsBlocked()
+
 
 class TestFilterNameList:
     def test_a_single_match_auto_selects_and_drills_down(self, panel, fake_settings_mgr):
@@ -240,6 +249,25 @@ class TestLoadSingleOfflineModel:
         assert panel.offline_name.currentText() == 'F-16C'
         assert panel.offline_profile.currentText() == 'Auto User'
         assert fake_settings_mgr.offline_scope == 'MODEL'
+
+    def test_no_user_profile_selects_and_activates_auto_user(self, panel, fake_xml,
+                                                             fake_settings_mgr, monkeypatch):
+        """Built-In cannot be edited: with no user profile the editor works on
+        Auto User, so edits are not written as rows no profile owns."""
+        monkeypatch.setattr(fake_xml, 'get_available_profiles',
+                            lambda sim, cls, model: ['Built-In'])
+        panel.load_single_offline_model('DCS', 'JetAircraft', 'F-16C', '')
+        assert [panel.offline_profile.itemText(i)
+                for i in range(panel.offline_profile.count())] == ['Auto User']
+        assert panel.offline_profile.currentText() == 'Auto User'
+        assert fake_settings_mgr.active_profile == 'Auto User'
+        assert panel.offline_scope_label.text() == "Editing Aircraft (F-16C - Auto User)"
+
+    def test_a_class_only_aircraft_gets_no_auto_user(self, panel, fake_xml, monkeypatch):
+        monkeypatch.setattr(fake_xml, 'get_available_profiles',
+                            lambda sim, cls, model: ['Built-In'])
+        panel.load_single_offline_model('DCS', 'PropellerAircraft', '', '')
+        assert panel.offline_profile.findText('Auto User') == -1
 
     def test_a_class_only_aircraft_edits_class_defaults(self, panel, fake_settings_mgr):
         panel.load_single_offline_model('DCS', 'PropellerAircraft', '', '')

@@ -262,17 +262,21 @@ class OfflineEditorPanel(QWidget):
         # Block signals so we don't trigger text change on .clear() calls
         self.offline_name.blockSignals(True)
         self.offline_class.blockSignals(True)
-        self.offline_name.blockSignals(True)
+        self.offline_profile.blockSignals(True)
 
-        # clear contents of combo boxes so they can be repopulated
+        # clear contents of combo boxes so they can be repopulated.  The
+        # profile is cleared here too: offline_sim.clear() only reaches
+        # offline_sim_changed('') (which would clear it) when a sim was
+        # selected, so a stale profile would otherwise survive re-entry
         self.offline_name.clear()
         self.offline_class.clear()
+        self.offline_profile.clear()
         self.offline_sim.clear()
 
         # unblock signals
         self.offline_name.blockSignals(False)
         self.offline_class.blockSignals(False)
-        self.offline_name.blockSignals(False)
+        self.offline_profile.blockSignals(False)
 
         # build sim list
         sims = [''] + xmlutils.get_sims()
