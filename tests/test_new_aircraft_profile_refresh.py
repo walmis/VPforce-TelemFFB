@@ -14,7 +14,6 @@ back and the importer trips over). Two layers now close it:
   regardless (covered in tests/test_xmlutils.py).
 """
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -243,11 +242,10 @@ class TestSplitButtonState:
         from telemffb.MainWindow import MainWindow
         calls = []
         win = SimpleNamespace(
-            header_panel=SimpleNamespace(status_container=SimpleNamespace(
-                cur_craft_label=MagicMock(), cur_pattern_label=MagicMock(),
-                active_profile_label=MagicMock(),
+            header_panel=SimpleNamespace(
+                set_craft_info=lambda craft, pattern, profile: None,
                 set_split_state=lambda v: calls.append(v),
-                set_profile_state=lambda v: calls.append(v))),
+                set_profile_state=lambda v: calls.append(v)),
             refresh_profile_notes_button=lambda: None)
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_aircraft_name="C172SP Classic Cargo", current_pattern=current_pattern,
@@ -280,8 +278,8 @@ class TestNotesButtonState:
         calls = []
         win = SimpleNamespace(
             refresh_telem_override_pill=lambda: None,
-            header_panel=SimpleNamespace(status_container=SimpleNamespace(
-                set_notes_state=lambda enabled, has_notes: calls.append(enabled))))
+            header_panel=SimpleNamespace(
+                set_notes_state=lambda enabled, has_notes: calls.append(enabled)))
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_sim=sim, current_aircraft_name=aircraft,
             current_pattern=pattern, active_profile="Built-In"), raising=False)
@@ -313,16 +311,20 @@ class TestProfileComboState:
     matched there are none to pick between and none to add to."""
 
     def _combo(self, monkeypatch, pattern, items):
-        from PyQt6.QtWidgets import QComboBox
         from telemffb.MainWindow import MainWindow
-        combo = QComboBox()
-        win = SimpleNamespace(header_panel=SimpleNamespace(status_container=SimpleNamespace(
-            cb_selectProfileCombo=combo, set_profile_state=combo.setEnabled)))
+        from telemffb.ui.widgets.custom_widgets import AppStatusWidget
+        # Kept alive on self: with no Python reference held past this method,
+        # PyQt would tear the widget (and its child combo) down underneath
+        # the caller's assertions.
+        self._status = AppStatusWidget(master_instance=True)
+        win = SimpleNamespace(header_panel=SimpleNamespace(
+            set_profile_state=self._status.set_profile_state,
+            set_profile_choices=self._status.set_profile_choices))
         monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
             current_sim="MSFS", current_class="PropellerAircraft",
             current_pattern=pattern), raising=False)
         MainWindow.populate_profile_combo(win, items)
-        return combo
+        return self._status.cb_selectProfileCombo
 
     def test_disabled_when_nothing_matched(self, qt_app, monkeypatch):
         assert self._combo(monkeypatch, "", []).isEnabled() is False

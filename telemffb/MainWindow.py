@@ -33,7 +33,7 @@ from typing import override
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt, QUrl, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
-                         QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase, QFont)
+                         QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QFrame, QGroupBox,
                              QHBoxLayout, QLabel, QMainWindow, QMessageBox,
@@ -50,7 +50,7 @@ from telemffb.app_events import events as app_events
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.theme.tokens import ACTIVE_GREEN
-from telemffb.ui.widgets.custom_widgets import InstanceStatusRow, NoKeyScrollArea, \
+from telemffb.ui.widgets.custom_widgets import AppStatusWidget, InstanceStatusRow, NoKeyScrollArea, \
     SimStatusLabel, DetachedTabWindow, ExceptionStatusWidget
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, device_status_state
 from telemffb.ui.panels.PromptStack import PromptStack
@@ -231,9 +231,9 @@ class MainWindow(QMainWindow):
 
         self.header_panel = HeaderPanel(parent=self)
         self.header_panel.device_mini_panel.DeviceClicked.connect(self.change_config_scope)
-        self.header_panel.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
-        self.header_panel.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
-        self.header_panel.status_container.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
+        self.header_panel.profile_chosen.connect(self.on_profile_change)
+        self.header_panel.profile_notes_clicked.connect(self.open_profile_notes_dialog)
+        self.header_panel.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
         self.header_panel.bind(G.app_state)
         self.tray.bind(G.app_state)
 
@@ -275,7 +275,7 @@ class MainWindow(QMainWindow):
 
 
         def on_sims_changed(sim: SimTelemListener):
-            self.header_panel.status_container.update_enabled_sims(sim.name, sim.started)
+            self.header_panel.update_enabled_sims(sim.name, sim.started)
             self.monitor_panel.refresh_waiting_status()
 
 
@@ -953,7 +953,7 @@ class MainWindow(QMainWindow):
             G.main_window.settings_layout.clear_layout()
 
             # reset the craft area text to default
-            self.header_panel.status_container.reset()
+            self.header_panel.reset()
             G.app_state.reset_sim_status()
             self.settings_layout.reload_caller()
             # go_online restored the pre-offline context; re-evaluate the
@@ -967,7 +967,7 @@ class MainWindow(QMainWindow):
             G.settings_mgr.go_offline()
             G.app_state.set_active_settings(())  # drop live-telemetry highlighting
             self.refresh_offline_editor_button()      # hidden while the editor is open
-            self.header_panel.status_container.set_offline("None")
+            self.header_panel.set_offline("None")
             G.app_state.reset_sim_status()
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
@@ -975,7 +975,7 @@ class MainWindow(QMainWindow):
             # Nothing is selected in the offline editor yet; disable the notes
             # button until force_sim_aircraft establishes an offline scope
             self._profile_notes_shown = None
-            self.header_panel.status_container.set_notes_state(False)
+            self.header_panel.set_notes_state(False)
 
             # Clear/repopulate the offline editor's combo boxes.
             self.offline_editor.reset_for_entry()
@@ -1442,60 +1442,35 @@ class MainWindow(QMainWindow):
         Args:
             new_items (list[str]): List of profiles to populate.
         """
-        SELECT_LABEL = 'Select...'
-        ADD_NEW_LABEL = "Add New..."
         # Profiles belong to the pattern that names the aircraft, so with
         # nothing matched there are none to pick between and none to add to.
-        self.header_panel.status_container.set_profile_state(bool(G.settings_mgr.current_pattern))
+        self.header_panel.set_profile_state(bool(G.settings_mgr.current_pattern))
         if new_items is None:
             new_items = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
-        self.header_panel.status_container.cb_selectProfileCombo.blockSignals(True)
-        self.header_panel.status_container.cb_selectProfileCombo.clear()
+        self.header_panel.set_profile_choices(new_items)
 
-        self.header_panel.status_container.cb_selectProfileCombo.addItem(SELECT_LABEL)
-        for item in new_items:
-                self.header_panel.status_container.cb_selectProfileCombo.addItem(item)
-
-        self.header_panel.status_container.cb_selectProfileCombo.addItem(ADD_NEW_LABEL)
-        index = self.header_panel.status_container.cb_selectProfileCombo.findText(ADD_NEW_LABEL)
-        if index >= 0:
-            font = QFont()
-            font.setItalic(True)
-            self.header_panel.status_container.cb_selectProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
-
-        self.header_panel.status_container.cb_selectProfileCombo.setCurrentIndex(0)
-        self.header_panel.status_container.cb_selectProfileCombo.blockSignals(False)
-
-    def on_profile_change(self, index):
+    def on_profile_change(self, profile_name: str):
         # utils.debug_caller_args("red")
         """
         Call to xmlutils to update the profile mapping for the aircraft when the user changes the profile
         If the "add new" option is selected, pop a dialog asking for the new profile name.  If the user chooses
         the "make active' option, make a further call to make the new profile the active one
         Args:
-            index: The selected index in the combobox.
+            profile_name: The chosen profile name (the combo has already reset itself to the placeholder).
 
         Returns: Nothing
 
         """
         if not G.master_instance:
             return
-        if index == 0:
-            return
-
-        profile_name = self.header_panel.status_container.cb_selectProfileCombo.itemText(index)
-
-        self.header_panel.status_container.cb_selectProfileCombo.blockSignals(True)
-        self.header_panel.status_container.cb_selectProfileCombo.setCurrentIndex(0)
-        self.header_panel.status_container.cb_selectProfileCombo.blockSignals(False)
 
         sim = G.settings_mgr.current_sim
         cls = G.settings_mgr.current_class
         pattern = G.settings_mgr.current_pattern
 
         cur_txt = xmlutils.get_active_profile_for_model(sim, cls, pattern)
-        if profile_name == 'Add New...':
+        if profile_name == AppStatusWidget.ADD_NEW_LABEL:
             ## Quickly block signals and set it back to "Select".. then kick off new profile dialog
 
 
@@ -1555,7 +1530,7 @@ class MainWindow(QMainWindow):
         logging.info(f"Application Status: clearing display after {src} exit")
         self.monitor_panel.clear_effects()
         G.app_state.set_active_settings(())
-        self.header_panel.status_container.reset_sim_state(src)
+        self.header_panel.reset_sim_state(src)
         # reset_sim_state disabled the notes button; drop the dedupe context
         # so the next aircraft load re-evaluates it even if identical.
         self._profile_notes_shown = None
@@ -1695,7 +1670,7 @@ class MainWindow(QMainWindow):
                 self._update_trim_cal_prompt()
 
             # Update the status labels and profile selection box
-            self.header_panel.status_container.set_fullname(data.get('N', ''))
+            self.header_panel.set_fullname(data.get('N', ''))
             ap = G.settings_mgr.active_profile
             active_profile = xmlutils.get_active_profile_for_model(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
@@ -1713,17 +1688,15 @@ class MainWindow(QMainWindow):
             pattern = G.settings_mgr.current_pattern
         if profile is None:
             profile = G.settings_mgr.active_profile
-        self.header_panel.status_container.cur_craft_label.setText(craft)
-        self.header_panel.status_container.cur_pattern_label.setText(pattern)
-        self.header_panel.status_container.active_profile_label.setText(profile)
+        self.header_panel.set_craft_info(craft, pattern, profile)
         # The resolved pattern, not the label: with nothing matched the label
         # reads "Using defaults", which is neither something to fork off nor
         # something with profiles to pick between.
         named = (bool(craft) and bool(G.settings_mgr.current_pattern) and G.master_instance
                  and G.settings_mgr.current_sim not in ('', 'nothing')
                  and not G.settings_mgr.offline_mode)
-        self.header_panel.status_container.set_split_state(named)
-        self.header_panel.status_container.set_profile_state(named)
+        self.header_panel.set_split_state(named)
+        self.header_panel.set_profile_state(named)
         self.refresh_profile_notes_button()
 
     def split_loaded_aircraft_profile(self):
@@ -1775,7 +1748,7 @@ class MainWindow(QMainWindow):
                 tip = ('Active SimConnect/Dataref overrides for this aircraft\n'
                        '(Utilities → SimConnect/Dataref Overrides Editor):\n\n'
                        + '\n'.join(lines))
-        self.header_panel.status_container.request_set_telem_overrides.emit(text, tip)
+        self.header_panel.request_set_telem_overrides.emit(text, tip)
 
     def refresh_profile_notes_button(self):
         """Update the profile-notes button (enabled + notes-exist tint) for
@@ -1805,7 +1778,7 @@ class MainWindow(QMainWindow):
                 xmlutils.read_default_model_notes(sim, aircraft, prefer_pattern=pattern)
                 or xmlutils.read_user_default_model_notes(sim, pattern)
                 or xmlutils.read_user_model_notes(sim, pattern, target))
-        self.header_panel.status_container.set_notes_state(enabled, has_notes)
+        self.header_panel.set_notes_state(enabled, has_notes)
 
     def open_profile_notes_dialog(self):
         dlg = ProfileNotesDialog(self)

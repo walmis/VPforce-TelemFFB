@@ -220,6 +220,9 @@ class ElidedLabel(QLabel):
 
 
 class AppStatusWidget(QWidget):
+    SELECT_LABEL = 'Select...'
+    ADD_NEW_LABEL = 'Add New...'
+
     request_set_active_vpconf = pyqtSignal(str, bool)
     request_set_active_configurator = pyqtSignal(bool, bool)
     request_set_telem_overrides = pyqtSignal(str, str)
@@ -227,6 +230,7 @@ class AppStatusWidget(QWidget):
     request_clear_error = pyqtSignal()
     profile_notes_clicked = pyqtSignal()
     split_profile_clicked = pyqtSignal()
+    profile_chosen = pyqtSignal(str)
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -446,6 +450,7 @@ class AppStatusWidget(QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cb_selectProfileCombo.setMinimumContentsLength(14)
         self.cb_selectProfileCombo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.cb_selectProfileCombo.currentIndexChanged.connect(self._on_profile_combo_changed)
 
         profile_row_layout = QHBoxLayout()
         profile_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -580,6 +585,43 @@ class AppStatusWidget(QWidget):
 
     def set_profile_name(self, profile_name):
         self.active_profile_label.setText(profile_name)
+
+    def set_craft_info(self, craft, pattern, profile):
+        """Update the current-aircraft, matched-pattern and active-profile
+        value labels together (ElidedLabel.setText already handles eliding
+        and the full-text tooltip, so there is nothing extra to do here)."""
+        self.cur_craft_label.setText(craft)
+        self.cur_pattern_label.setText(pattern)
+        self.active_profile_label.setText(profile)
+
+    def set_profile_choices(self, profiles):
+        """Repopulate the profile combo: the placeholder, each of
+        ``profiles``, then an italicized "Add New..." entry. Always resets
+        to the placeholder itself. Repopulating never fires
+        ``profile_chosen`` - blockSignals covers clear/add/reset-index."""
+        self.cb_selectProfileCombo.blockSignals(True)
+        self.cb_selectProfileCombo.clear()
+        self.cb_selectProfileCombo.addItem(self.SELECT_LABEL)
+        for item in profiles:
+            self.cb_selectProfileCombo.addItem(item)
+        self.cb_selectProfileCombo.addItem(self.ADD_NEW_LABEL)
+        index = self.cb_selectProfileCombo.findText(self.ADD_NEW_LABEL)
+        if index >= 0:
+            font = QFont()
+            font.setItalic(True)
+            self.cb_selectProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
+        self.cb_selectProfileCombo.setCurrentIndex(0)
+        self.cb_selectProfileCombo.blockSignals(False)
+
+    def _on_profile_combo_changed(self, index):
+        # Index 0 is the "Select..." placeholder - nothing chosen.
+        if index <= 0:
+            return
+        profile_name = self.cb_selectProfileCombo.itemText(index)
+        self.cb_selectProfileCombo.blockSignals(True)
+        self.cb_selectProfileCombo.setCurrentIndex(0)
+        self.cb_selectProfileCombo.blockSignals(False)
+        self.profile_chosen.emit(profile_name)
 
     def reset_sim_state(self, src: str):
         """Reset all status labels to their initial (no-sim) default values."""

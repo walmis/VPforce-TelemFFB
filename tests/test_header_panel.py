@@ -149,6 +149,55 @@ class TestHeaderPanelBind:
         assert panel.status_container.active_vpconf_label.text() == 'child'
 
 
+class TestHeaderPanelProfileCombo:
+    """set_profile_choices/profile_chosen replace MainWindow's old direct
+    manipulation of status_container.cb_selectProfileCombo - see
+    AppStatusWidget.set_profile_choices/_on_profile_combo_changed."""
+
+    def test_set_profile_choices_populates_placeholder_and_add_new(self, fake_logo, monkeypatch):
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        panel = HeaderPanel()
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        combo = panel.status_container.cb_selectProfileCombo
+        assert [combo.itemText(i) for i in range(combo.count())] == \
+            ['Select...', 'Built-In', 'Auto User', 'Add New...']
+        assert combo.currentIndex() == 0
+
+    def test_set_profile_choices_does_not_emit_profile_chosen(self, fake_logo, monkeypatch):
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        panel = HeaderPanel()
+        chosen = []
+        panel.profile_chosen.connect(chosen.append)
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        assert chosen == []
+
+    def test_picking_a_profile_emits_its_name_and_resets_to_placeholder(self, fake_logo, monkeypatch):
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        panel = HeaderPanel()
+        chosen = []
+        panel.profile_chosen.connect(chosen.append)
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        combo = panel.status_container.cb_selectProfileCombo
+
+        combo.setCurrentIndex(2)  # 'Auto User'
+
+        assert chosen == ['Auto User']
+        assert combo.currentIndex() == 0
+
+    def test_picking_the_placeholder_itself_does_not_emit(self, fake_logo, monkeypatch):
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        panel = HeaderPanel()
+        chosen = []
+        panel.profile_chosen.connect(chosen.append)
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        combo = panel.status_container.cb_selectProfileCombo
+
+        combo.setCurrentIndex(1)
+        combo.setCurrentIndex(0)  # back to 'Select...'
+
+        assert chosen == ['Built-In']
+
+
 class TestHeaderPanelSimStatusBind:
     """bind() also replaces MainWindow's old update_sim_indicators +
     explicit request_clear_error call: AppState.sim_status_changed ->

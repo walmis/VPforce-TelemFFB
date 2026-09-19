@@ -27,7 +27,7 @@ its ``_on_scope_status_changed`` relay that kept the vpconf-profile and
 gain-override indicators in step with ``AppState.scope_status_changed`` -
 see ``bind()``, which replaces that relay one-for-one.
 
-Two things this panel deliberately does NOT own, because they reach outside
+One thing this panel deliberately does NOT own, because it reaches outside
 the header:
 
 - Mirroring this panel's mini device row against the full Active Devices
@@ -38,17 +38,13 @@ the header:
   reaching this panel's mini row through the public ``device_mini_panel``
   attribute, exactly as they already reach the full panel through
   ``self.device_panel``.
-- Wiring ``device_mini_panel.DeviceClicked`` (scope switching) and three of
-  ``AppStatusWidget``'s signals (profile-combo change, profile-notes click,
-  split-profile click) to MainWindow's own methods/dialogs - those
-  connections are made by whoever constructs this panel, right after
-  construction, the same way MainWindow wires ``device_panel.DeviceClicked``
-  itself.
 
-``AppStatusWidget`` is already a complete, self-contained widget with its
-own public methods and signals; this panel does not wrap them in a second
-API - callers reach the instance through the public ``status_container``
-attribute, same as before extraction.
+``AppStatusWidget`` (``status_container``) is an implementation detail of
+this panel. Outside code (MainWindow, ``DcsIpcThread``) goes through
+HeaderPanel's own plain methods and re-exported signals below instead of
+reaching into ``status_container`` directly - ``device_mini_panel.
+DeviceClicked`` (scope switching) is still wired by whoever constructs this
+panel, the same way MainWindow wires ``device_panel.DeviceClicked`` itself.
 """
 
 import logging
@@ -111,9 +107,54 @@ class HeaderPanel(QWidget):
         status_layout.addWidget(self.status_container)
         self.status_container.sim_status_label.set_waiting()
 
+        # Re-exported signals: same bound-signal objects as status_container's
+        # own, so connecting/emitting through HeaderPanel is identical to
+        # going through status_container directly (including the queued
+        # cross-thread delivery request_set_telem_overrides already has).
+        self.profile_chosen = self.status_container.profile_chosen
+        self.profile_notes_clicked = self.status_container.profile_notes_clicked
+        self.split_profile_clicked = self.status_container.split_profile_clicked
+        self.request_set_telem_overrides = self.status_container.request_set_telem_overrides
+
         layout.addLayout(logo_column_layout)
         layout.setAlignment(logo_column_layout, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(status_group, stretch=1, alignment=Qt.AlignmentFlag.AlignTop)
+
+    # -- Plain pass-throughs to status_container, so callers never reach
+    # into the implementation widget directly. --
+
+    def set_profile_choices(self, profiles):
+        self.status_container.set_profile_choices(profiles)
+
+    def set_craft_info(self, craft, pattern, profile):
+        self.status_container.set_craft_info(craft, pattern, profile)
+
+    def set_profile_state(self, enabled):
+        self.status_container.set_profile_state(enabled)
+
+    def set_notes_state(self, enabled, has_notes=False):
+        self.status_container.set_notes_state(enabled, has_notes)
+
+    def set_split_state(self, enabled):
+        self.status_container.set_split_state(enabled)
+
+    def set_offline(self, source):
+        self.status_container.set_offline(source)
+
+    def set_waiting(self, source):
+        self.status_container.set_waiting(source)
+
+    def set_fullname(self, full_name):
+        self.status_container.set_fullname(full_name)
+
+    def reset_sim_state(self, src):
+        self.status_container.reset_sim_state(src)
+
+    def reset(self):
+        self.status_container.reset()
+
+    def update_enabled_sims(self, sim, state):
+        self.status_container.update_enabled_sims(sim, state)
 
     def bind(self, state: AppState) -> None:
         """Subscribe to ``state.scope_status_changed`` and
