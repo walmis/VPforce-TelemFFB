@@ -47,6 +47,9 @@ from telemffb.utils import (
 )
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle
+from telemffb.ui.theme.tokens import (
+    ATTENTION_AMBER_DARK, ATTENTION_AMBER_LIGHT, LINK_BLUE_DARK, LINK_BLUE_LIGHT,
+)
 
 def _as_bool(value):
     """A stored setting as a boolean.
@@ -150,7 +153,7 @@ def _with_download_link(text):
     # the theme in use, which leaves the stylesheet alone.
     app = QtWidgets.QApplication.instance()
     window = app.palette().color(QtGui.QPalette.ColorRole.Window) if app else None
-    color = '#8ab4f8' if window is not None and window.lightness() < 128 else '#1a5fb4'
+    color = LINK_BLUE_DARK if window is not None and window.lightness() < 128 else LINK_BLUE_LIGHT
     link = (f'<a href="{html.escape(url, quote=True)}" style="color: {color}">'
             f'{html.escape(url)}</a>')
     return html.escape(text).replace('\n', '<br>').replace(html.escape(url), link)
@@ -1865,8 +1868,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """An amber that reads on either theme (the palette has no
         'warning' role, and a fixed one washes out on one of them)."""
         window = self.palette().color(QtGui.QPalette.ColorRole.Window)
-        return (QtGui.QColor(0xE6, 0xA8, 0x23) if window.lightness() < 128
-                else QtGui.QColor(0xA8, 0x66, 0x00))
+        return (QtGui.QColor(ATTENTION_AMBER_DARK) if window.lightness() < 128
+                else QtGui.QColor(ATTENTION_AMBER_LIGHT))
 
     def toggle_dinput_support(self):
         """Re-list devices so [DI] entries appear or disappear immediately.

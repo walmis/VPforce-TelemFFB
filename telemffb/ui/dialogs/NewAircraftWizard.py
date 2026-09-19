@@ -27,6 +27,7 @@ from telemffb import utils
 from telemffb import xmlutils
 from telemffb.xml import match as xmatch
 from telemffb.ui.generated.Ui_NewAircraftWizard import Ui_NewAircraftWizard
+from telemffb.ui.theme.tokens import current_tokens
 
 class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     """
@@ -212,7 +213,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                       f"not take the aircraft off it.")
         note.setTextFormat(QtCore.Qt.TextFormat.RichText)
         note.setWordWrap(True)
-        note.setStyleSheet("color: #a0a0a0;" if G.useDarkMode else "color: #5a5a5a;")
+        note.setStyleSheet(f"color: {current_tokens().muted_text_color};")
         self.verticalLayout_2.insertWidget(at, note)
         self.rb_fork_inherit.setChecked(True)
         # a class that must be cloned from a curated profile cannot start empty

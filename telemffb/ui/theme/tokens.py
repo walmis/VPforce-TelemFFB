@@ -31,6 +31,32 @@ PURPLE = "#ab37c8"          # rgb(171, 55, 200) - the VPforce/TelemFFB accent
 PURPLE_HOVER = "#c473d9"    # accent, lightened for hover/link states
 ACTIVE_GREEN = "#17c411"    # the green the live loop paints active effects
 
+# Mode-independent semantic status colors, reused across dialogs that don't
+# otherwise vary by G.useDarkMode (guided-flow trackers, validity borders,
+# inline warnings).
+ERROR_RED = "#cc3333"
+OK_GREEN = "#33aa33"
+WARNING_AMBER = "#e6a817"
+INFO_BLUE = "#2a7fd4"
+WARNING_BANNER_BG = "#b36b00"    # opaque amber banner background
+DANGER_BANNER_BG = "#cc3300"     # opaque red-orange banner background
+WARNING_TEXT_AMBER = "#cc7a00"   # inline warning text/value color
+DIVIDER_GRAY = "#555555"
+BORDER_GRAY = "#777777"
+DISABLED_GRAY = "#808080"
+ROW_MATCH_GRAY = "#888888"       # "already matches" table-row text
+ROW_SKIP_FG_GRAY = "#a0a0a0"     # skipped-row text, same in both modes
+WARNING_LABEL_FG = "#dddddd"     # excluded-defaults warning label text
+PURPLE_HOVER_FILL = "#44" + PURPLE[1:]  # PURPLE at ~27% alpha, translucent hover pill
+
+# Keyed off the widget's own palette lightness rather than G.useDarkMode
+# (see SystemSettingsDialog._with_download_link / _attention_color), so
+# these stay standalone constants instead of ThemeTokens fields.
+LINK_BLUE_DARK = "#8ab4f8"
+LINK_BLUE_LIGHT = "#1a5fb4"
+ATTENTION_AMBER_DARK = "#e6a823"
+ATTENTION_AMBER_LIGHT = "#a86600"
+
 
 @dataclass(frozen=True)
 class ThemeTokens:
@@ -95,6 +121,24 @@ class ThemeTokens:
 
     # QCheckBox:disabled - dark only, empty string in light.
     checkbox_disabled_block: str
+
+    # Secondary/hint label text (NewAircraftWizard notes, etc.).
+    muted_text_color: str
+
+    # Foreground for colored status badges/rows (table-cell highlights,
+    # inline error banners) - dark text needs white, light text needs black.
+    badge_fg: str
+
+    # ProfileManager inline error label (new/rename profile dialogs).
+    error_banner_fg: str
+    error_banner_bg: str
+    error_banner_border: str
+
+    # ProfileImportDialog table-row highlight backgrounds.
+    row_conflict_bg: str   # name/override already in use
+    row_invalid_bg: str    # override references a removed/renamed default
+    row_ok_bg: str          # rename resolved, no remaining conflict
+    row_skip_bg: str        # row excluded from the import
 
 
 DARK = ThemeTokens(
@@ -169,6 +213,15 @@ QMenu::item:disabled {
     checkbox_disabled_block="""QCheckBox:disabled {
   color: rgb(155, 155, 155);  /* lighter grey for better visibility */
 }""",
+    muted_text_color="#a0a0a0",
+    badge_fg="white",
+    error_banner_fg="#FFE3E3",       # soft light red/pink (good contrast on dark)
+    error_banner_bg="rgba(255, 99, 99, 0.16)",   # faint red tint
+    error_banner_border="#FF6B6B",   # border a bit brighter
+    row_conflict_bg="#5c2b2b",
+    row_invalid_bg="#554400",
+    row_ok_bg="#2d4b2d",
+    row_skip_bg="#3a3a3a",
 )
 
 LIGHT = ThemeTokens(
@@ -205,4 +258,19 @@ QMenu::item:selected {
     background-color: #ab37c8;
 }""",
     checkbox_disabled_block="",
+    muted_text_color="#5a5a5a",
+    badge_fg="black",
+    error_banner_fg="#B00020",       # material-ish error red
+    error_banner_bg="rgba(176, 0, 32, 0.10)",    # faint tint
+    error_banner_border="rgba(176, 0, 32, 0.35)",
+    row_conflict_bg="#ffd6d6",
+    row_invalid_bg="#ffffcc",
+    row_ok_bg="#ccffcc",
+    row_skip_bg="#e0e0e0",
 )
+
+
+def current_tokens() -> ThemeTokens:
+    """DARK or LIGHT, keyed on the same flag the rest of the UI reads."""
+    import telemffb.globals as G
+    return DARK if G.useDarkMode else LIGHT
