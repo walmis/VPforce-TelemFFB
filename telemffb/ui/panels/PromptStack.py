@@ -41,8 +41,9 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from telemffb.state.app_state import AppState, Notice
-from telemffb.ui.widgets.NoticeCard import (NEW_CRAFT_STYLE, PROFILE_CHANGE_STYLE,
-                                            TRIM_CAL_STYLE, NoticeCard)
+from telemffb.ui.widgets.NoticeCard import NoticeCard
+from telemffb.ui.widgets.NoticeStyle import (NEW_CRAFT_STYLE, PROFILE_CHANGE_STYLE,
+                                             TRIM_CAL_STYLE)
 
 #: Notice.style -> the NoticeCard look it renders with.
 _STYLES = {
@@ -84,6 +85,10 @@ class PromptStack(QWidget):
             if notice_id not in active_ids:
                 card = self._cards.pop(notice_id)
                 self._layout.removeWidget(card)
+                # Stop the pulse first: deleteLater() only takes effect on the
+                # next event-loop pass, and the animation keeps calling
+                # setStyleSheet() on the card until then
+                card.clear()
                 card.deleteLater()
         # Rebuilt in full each time: this only runs on an actual change to
         # what is shown (AppState dedupes), never on a telemetry frame, so

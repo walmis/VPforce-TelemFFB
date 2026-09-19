@@ -100,13 +100,13 @@ class MainWindow(QMainWindow):
         self.tray = TrayController(self)
         self.updates = UpdateChecker(self)
         self.new_craft_notification_sent = False
-        # The new-craft prompt's text/click-target lock: like the old
-        # QLabel's isVisible() check, the aircraft it names is captured
-        # once when the prompt first appears and does not follow the
-        # telemetry if a *different* unmatched aircraft shows up before it
-        # is dismissed (see PromptStack / _update_new_craft_prompt).
+        # The new-craft prompt's click target: the (sim, cls, name) the
+        # prompt currently names.  Re-captured (and the prompt rebuilt)
+        # whenever a *different* unmatched aircraft arrives, so the text
+        # and the click always follow the current one; unchanged frames
+        # construct nothing (see on_update_telemetry and PromptStack).
         self._new_craft_prompt_active = False
-        self._new_craft_target = None  # (sim, cls, name) captured at that point
+        self._new_craft_target = None  # (sim, cls, name) the prompt names
         self._profile_change_prompt_active = False  # for the same one-shot-toast gating
         # Error-onset/hold/clear state machine + timed-out flag - reports
         # to G.app_state.set_sim_status; HeaderPanel/TrayController.bind()

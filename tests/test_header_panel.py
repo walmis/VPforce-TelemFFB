@@ -2,11 +2,11 @@
 header: the VPforce logo, the compact mini device row, and the Application
 Status box.
 
-Extracted from MainWindow's inline construction of the logo QLabel, the
-MiniDevicePanel instance and the AppStatusWidget instance, plus its
-``_on_scope_status_changed`` relay (now ``HeaderPanel.bind`` /
-``_on_scope_status_changed``) that keeps the vpconf-profile and
-gain-override indicators in step with AppState.
+Extracted from MainWindow's inline construction of the logo QLabel and
+the AppStatusWidget instance, and its ``refresh_scope_status_indicators()``
+push (now ``HeaderPanel.bind`` / ``_on_scope_status_changed``) of the
+vpconf-profile and gain-override indicators, which follow AppState.  The
+MiniDevicePanel row is new with HeaderPanel.
 
 No real MainWindow here: the only thing HeaderPanel needs from the outside
 is ``G.vpf_logo`` resolving to a loadable image - in the app this is a Qt
@@ -101,7 +101,7 @@ class TestHeaderPanelConstruction:
 
 
 class TestHeaderPanelBind:
-    """bind() replaces MainWindow's old _on_scope_status_changed relay:
+    """bind() replaces MainWindow's old refresh_scope_status_indicators push:
     AppState.scope_status_changed -> the AppStatusWidget's own (queued)
     request signals."""
 

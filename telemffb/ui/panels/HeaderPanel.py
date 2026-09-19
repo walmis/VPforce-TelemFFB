@@ -20,12 +20,13 @@
 mini device row beneath it, and the Application Status box - sharing one
 full-width row above the Active Devices / tabs split below it.
 
-Replaces MainWindow's inline construction of the logo ``QLabel``, the
-``MiniDevicePanel`` instance (``telemffb.ui.panels.DevicePanel``) and the
-``AppStatusWidget`` instance (``telemffb.ui.widgets.custom_widgets``), plus
-its ``_on_scope_status_changed`` relay that kept the vpconf-profile and
-gain-override indicators in step with ``AppState.scope_status_changed`` -
-see ``bind()``, which replaces that relay one-for-one.
+Replaces MainWindow's inline construction of the logo ``QLabel`` and the
+``AppStatusWidget`` instance (``telemffb.ui.widgets.custom_widgets``), and
+its ``refresh_scope_status_indicators()``, which pushed the vpconf-profile
+and gain-override indicators into that widget - ``bind()`` now keeps them in
+step with ``AppState.scope_status_changed`` instead.  The mini device row
+(``MiniDevicePanel``, ``telemffb.ui.panels.DevicePanel``) is new with this
+panel, not moved from MainWindow.
 
 One thing this panel deliberately does NOT own, because it reaches outside
 the header:
@@ -84,7 +85,7 @@ class HeaderPanel(QWidget):
         logo_width = 200
         if t_pixmap.width() > 0:
             logo_height = round(t_pixmap.height() * logo_width / t_pixmap.width())
-            t_pixmap = t_pixmap._scaled(logo_width, logo_height)
+            t_pixmap = t_pixmap.scaled_logical(logo_width, logo_height)
             t_logo.setPixmap(t_pixmap)
         else:
             logging.warning("Logo resource %s could not be loaded; skipping app logo", G.vpf_logo)

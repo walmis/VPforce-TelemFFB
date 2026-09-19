@@ -932,9 +932,7 @@ class SettingsLayout(QGridLayout):
                 continue
             name = slider.objectName().replace('sld_', '')
             matched = any(a_s in name for a_s in active_settings)
-            slider.blockSignals(True)
             slider.setActive(matched)
-            slider.blockSignals(False)
 
     def _clear_sub_layout(self, layout):
         while layout.count():

@@ -77,7 +77,6 @@ class MainMenu:
 
         menubar = mw.menuBar()
         self.menu = menubar
-        assert self.menu is not None
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
 

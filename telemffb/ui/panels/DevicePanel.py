@@ -520,31 +520,6 @@ class DeviceIconPanel(QWidget):
         changed = widget.text_label.text() != (
             text or widget.device_name.capitalize())
         widget.set_label(text)
-        return changed
-
-    def flash_device(self, device_name: str):
-        widget = self.icons.get(device_name.lower())
-        if widget:
-            widget.flash()
-
-    def set_device_icon(self, device_name: str, icon_path: str):
-        """The icon artwork for a role ('' = the role's default icon).
-        Returns True when the image actually changed."""
-        widget = self.icons.get(device_name.lower())
-        if widget is None:
-            return False
-        return widget.set_icon(
-            icon_path or DEVICE_ICONS.get(device_name.lower(), ''))
-
-    def set_device_label(self, device_name: str, text: str):
-        """The text under a role's icon: the hardware holding the role.
-        Returns True when this actually changed what was displayed."""
-        widget = self.icons.get(device_name.lower())
-        if widget is None:
-            return False
-        changed = widget.text_label.text() != (
-            text or widget.device_name.capitalize())
-        widget.set_label(text)
         self.changed.emit()
         return changed
 
@@ -563,12 +538,6 @@ class DeviceIconPanel(QWidget):
             icon_path or DEVICE_ICONS.get(device_name.lower(), ''))
         self.changed.emit()
         return result
-
-    def update_device_status_icon(self, device_name, new_icon_path):
-        if device_name.lower() in self.icons:
-            widget = self.icons[device_name.lower()]
-            pixmap = QPixmap(new_icon_path).scaled(ICON_SIZE, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            widget.icon_label.setPixmap(pixmap)
 
 
 class MiniDeviceChip(QWidget):
@@ -620,6 +589,12 @@ class MiniDeviceChip(QWidget):
     def set_active(self, active: bool):
         self._active = active
         self.update()
+
+    @property
+    def configured(self) -> bool:
+        """False while no hardware is assigned to this role (see
+        set_configured)."""
+        return self._configured
 
     def set_configured(self, configured: bool):
         """Unconfigured devices render as a static ghost-gray icon and
@@ -754,7 +729,7 @@ class MiniDevicePanel(QWidget):
 
     def set_device_status(self, device_name: str, color):
         chip = self.chips.get(device_name.lower())
-        if chip and chip._configured:
+        if chip and chip.configured:
             chip.set_status_color(color)
 
     def set_device_label(self, device_name: str, text: str):
@@ -812,11 +787,9 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
     app.setFont(QFont('Segoe UI', 10))
-    global useDarkMode
 
 
     def _setup_theme_and_styling(app):
-        global useDarkMode
         """
         Configure application theme and styling based on system settings.
 
@@ -832,18 +805,18 @@ if __name__ == "__main__":
         match theme_setting:
             case 0:  # Light Mode
                 app.styleHints().setColorScheme(Qt.ColorScheme.Light)
-                useDarkMode = False
+                G.useDarkMode = False
             case 1:  # Dark Mode
                 app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
-                useDarkMode = True
+                G.useDarkMode = True
             case 2:  # System Controlled
                 windows_mode = app.styleHints().colorScheme()
                 if windows_mode == Qt.ColorScheme.Light:
                     app.styleHints().setColorScheme(Qt.ColorScheme.Light)
-                    useDarkMode = False
+                    G.useDarkMode = False
                 else:
                     app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
-                    useDarkMode = True
+                    G.useDarkMode = True
 
         # Create and set custom palette with accent color
         palette = app.palette()
@@ -853,7 +826,7 @@ if __name__ == "__main__":
         palette.setColor(QtGui.QPalette.ColorRole.Link, accent_color)
         app.setPalette(palette)
 
-        if useDarkMode:
+        if G.useDarkMode:
             _apply_dark_mode_palette(app, palette)
 
 
@@ -878,7 +851,6 @@ if __name__ == "__main__":
         palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
 
         app.setPalette(palette)
-        STATUS_COLORS = STATUS_COLORS_DARK
 
 
     _setup_theme_and_styling(app)

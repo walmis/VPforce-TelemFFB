@@ -25,38 +25,12 @@ holds that pulse once; ``telemffb.ui.panels.PromptStack`` creates one
 NoticeCard per currently-active ``telemffb.state.app_state.Notice``.
 """
 
-from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 from PyQt6.QtCore import Qt, QVariantAnimation, pyqtSignal
 from PyQt6.QtWidgets import QLabel
 
-
-@dataclass(frozen=True)
-class NoticeStyle:
-    """One pill's look. ``fill_dim``/``fill_bright`` are the breathing
-    range (equal for a static, non-pulsing pill - the profile-change offer
-    is teal and does not pulse, since it is an offer, not something wrong).
-    """
-    fill_dim: Tuple[int, int, int]
-    fill_bright: Tuple[int, int, int]
-    border: str
-    text: str
-    hover: str
-
-
-#: The three looks in use today, colors preserved verbatim from the
-#: MainWindow QLabels this widget replaces.
-#: Red, breathing dim<->bright, white text/border - "something needs doing".
-NEW_CRAFT_STYLE = NoticeStyle(fill_dim=(150, 28, 28), fill_bright=(225, 45, 45),
-                              border='white', text='white', hover='#ef5350')
-#: Mustard, breathing (same family as the Paused status badge), black
-#: text/border so contrast holds throughout the pulse.
-TRIM_CAL_STYLE = NoticeStyle(fill_dim=(130, 100, 12), fill_bright=(242, 180, 34),
-                             border='black', text='black', hover='#f5bc28')
-#: Teal, static (dim == bright: this is an offer, not an alert).
-PROFILE_CHANGE_STYLE = NoticeStyle(fill_dim=(0, 121, 107), fill_bright=(0, 121, 107),
-                                   border='white', text='white', hover='#26a69a')
+from telemffb.ui.widgets.NoticeStyle import NoticeStyle
 
 
 class NoticeCard(QLabel):

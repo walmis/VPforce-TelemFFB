@@ -1024,7 +1024,6 @@ class NoWheelSlider(QSlider):
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
-        self.is_mouse_over = False
         self._delay = 300  # Delay in milliseconds
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -1383,7 +1382,7 @@ class InfoLabel(QWidget):
         # icon_img = os.path.join(script_dir, "image/information.png")
         icon_img = ":/image/information.png"
         self.pixmap = HiDpiPixmap(icon_img)
-        self.icon_label.setPixmap(self.pixmap._scaled(12, 12, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))  # Adjust the height as needed
+        self.icon_label.setPixmap(self.pixmap.scaled_logical(12, 12, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))  # Adjust the height as needed
         self.icon_label.setVisible(False)
 
         # Layout to align the text label and icon

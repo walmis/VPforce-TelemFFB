@@ -21,8 +21,9 @@ from PyQt6.QtWidgets import QApplication
 from telemffb.state.app_state import (AppState, Notice, NEW_CRAFT_PRIORITY,
                                       PROFILE_CHANGE_PRIORITY, TRIM_CAL_PRIORITY)
 from telemffb.ui.panels.PromptStack import PromptStack
-from telemffb.ui.widgets.NoticeCard import (NEW_CRAFT_STYLE, PROFILE_CHANGE_STYLE,
-                                            TRIM_CAL_STYLE, NoticeCard)
+from telemffb.ui.widgets.NoticeCard import NoticeCard
+from telemffb.ui.widgets.NoticeStyle import (NEW_CRAFT_STYLE, PROFILE_CHANGE_STYLE,
+                                             TRIM_CAL_STYLE)
 
 pytestmark = pytest.mark.unit
 
