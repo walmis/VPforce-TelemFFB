@@ -980,7 +980,7 @@ class NoWheelSlider(QSlider):
         self.handle_width = 16
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         # Apply styles
-        self.update_styles()
+        self._apply_handle_geometry_style()
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
@@ -1103,20 +1103,25 @@ class NoWheelSlider(QSlider):
         else:
             event.ignore()
 
-    def update_styles(self):
-        # Generate CSS based on color and size properties
+    def _apply_handle_geometry_style(self):
+        """Colors and the handle itself are drawn entirely by paintEvent from
+        handle_color, so no stylesheet is needed for those. But QSlider's own
+        (un-overridden) mousePressEvent/mouseMoveEvent hit-test drags against
+        QStyle::subControlRect(SC_SliderHandle) - and once a widget carries
+        any stylesheet touching QSlider::handle, Qt computes that rect from
+        this CSS box instead of the native style. paintEvent already ignores
+        the rect's own position/size (it sets width/height from handle_width/
+        handle_height directly), so this size-only sheet exists purely to
+        keep the invisible drag hit-box the same size as what's drawn -
+        without it, dragging would hit-test against the native (smaller)
+        Fusion handle while a bigger handle is painted on screen. Only
+        called on init and when handle_width/handle_height actually change,
+        never from setHandleColor, which is called every telemetry tick.
+        """
         css = f"""
             QSlider::handle:horizontal {{
-                background: qradialgradient(
-                    cx: 0.3, cy: 0.5, fx: 0.3, fy: 0.35, radius: 0.8,
-                    stop: 0.0 #ffffff,
-                    stop: 0.3 {self.handle_color},
-                    stop: 1.0 {QColor(self.handle_color).darker().name()}
-                );
-                border: 1px solid #565a5e;
                 width: {int(self.handle_width)}px;  /* Adjusted handle width */
                 height: {int(self.handle_height)}px;  /* Adjusted handle height */
-                border-radius: {int(self.handle_height / 4 )}px;  /* Adjusted border radius */
                 margin-top: -{int(self.handle_height / 4 )}px;  /* Negative margin to overlap with groove */
                 margin-bottom: -{int(self.handle_height / 4 )}px;  /* Negative margin to overlap with groove */
                 margin-left: -1px;  /* Adjusted left margin */
@@ -1132,12 +1137,16 @@ class NoWheelSlider(QSlider):
         self.setValue(self.value() - self.singleStep())
 
     def setGrooveColor(self, color):
+        # groove_color is unused by paintEvent (the groove is painted from
+        # the palette) and never appears in the geometry stylesheet, so
+        # storing it is all there is to do here.
         self.groove_color = color
-        self.update_styles()
 
     def setHandleColor(self, color):
+        if self.handle_color == color:
+            return
         self.handle_color = color
-        self.update_styles()
+        self.update()
 
     def setActive(self, active: bool):
         """Two-state handle color toggle (idle purple / live-effect green).
@@ -1149,8 +1158,11 @@ class NoWheelSlider(QSlider):
         self.update()
 
     def setHandleHeight(self, height):
+        if self.handle_height == height:
+            return
         self.handle_height = height
-        self.update_styles()
+        self._apply_handle_geometry_style()
+        self.update()
 
     def enterEvent(self, event):
         self.setFocus()
@@ -1166,12 +1178,13 @@ class NoWheelNumberSlider(NoWheelSlider):
         super(NoWheelNumberSlider, self).__init__(*args, **kwargs)
         self.handle_width = 32  # Different handle width for NoWheelNumberSlider
         self.value_text = ""  # Add an attribute to store the text to be shown in the handle
-        self.update_styles()
+        self._apply_handle_geometry_style()
 
     def setHandleColor(self, color, text=""):
+        if self.handle_color == color and self.value_text == text:
+            return
         self.handle_color = color
         self.value_text = text
-        self.update_styles()
         self.update()  # Ensure the slider is repainted to show the new text
 
     def paintEvent(self, event):
