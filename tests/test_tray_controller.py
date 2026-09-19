@@ -84,3 +84,29 @@ class TestShowNotification:
         t[0] += 10
         tray.show_notification("T", "M", renew_period=10)
         assert tray._notifications[("T", "M")] == 1015.0
+
+
+class TestBind:
+    """bind() replaces MainWindow's old direct tray.set_status calls from
+    update_sim_indicators: AppState.sim_status_changed -> set_status."""
+
+    def test_forwards_sim_status_changes_to_set_status(self, tray):
+        from telemffb.state.app_state import AppState
+        state = AppState()
+        tray.bind(state)
+
+        state.set_sim_status('running', 'DCS')
+        assert tray.icon.toolTip() == "VPforce TelemFFB\nDCS is Running "
+
+        state.set_sim_status('error', 'DCS', 'boom')
+        assert 'boom' in tray.icon.toolTip()
+
+    def test_child_instance_stays_a_no_op(self, tray, monkeypatch):
+        from telemffb.state.app_state import AppState
+        monkeypatch.setattr(G, 'master_instance', False, raising=False)
+        state = AppState()
+        tray.bind(state)
+        tray.icon.setToolTip("unchanged")
+
+        state.set_sim_status('error', 'DCS', 'boom')
+        assert tray.icon.toolTip() == "unchanged"

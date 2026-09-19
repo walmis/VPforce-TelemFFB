@@ -373,3 +373,56 @@ class TestPromptStackDedup:
 
         assert len(calls) == 1
         assert state.current_prompts() == (n,)
+
+
+class TestSimStatus:
+    """set_sim_status/sim_status_changed - the app/sim status indicators'
+    state, fed by SimStatusTracker (telemffb/state/sim_status.py)."""
+
+    def test_defaults_to_empty(self, state):
+        assert state.current_sim_status() == ('', '', '')
+
+    def test_reset_lets_the_same_status_emit_again(self, state):
+        seen = []
+        state.sim_status_changed.connect(lambda *v: seen.append(v))
+        state.set_sim_status('running', 'DCS')
+        state.reset_sim_status()
+        state.set_sim_status('running', 'DCS')
+        assert seen == [('running', 'DCS', ''), ('', '', ''), ('running', 'DCS', '')]
+        assert state.current_sim_status() == ('running', 'DCS', '')
+
+    def test_reset_when_nothing_reported_is_silent(self, state):
+        seen = []
+        state.sim_status_changed.connect(lambda *v: seen.append(v))
+        state.reset_sim_status()
+        assert seen == []
+
+    def test_reports_the_given_value(self, state):
+        state.set_sim_status('running', 'DCS')
+        assert state.current_sim_status() == ('running', 'DCS', '')
+
+    def test_none_message_normalizes_to_empty_string(self, state):
+        state.set_sim_status('error', 'DCS', None)
+        assert state.current_sim_status() == ('error', 'DCS', '')
+
+    def test_identical_value_does_not_re_emit(self, state):
+        state.set_sim_status('running', 'DCS')
+        calls = _capture(state.sim_status_changed)
+        state.set_sim_status('running', 'DCS')
+        assert calls == []
+
+    def test_a_changed_field_emits_the_new_tuple(self, state):
+        state.set_sim_status('running', 'DCS')
+        calls = _capture(state.sim_status_changed)
+        state.set_sim_status('paused', 'DCS')
+        assert calls == [('paused', 'DCS', '')]
+
+    def test_same_state_different_message_emits(self, state):
+        """An error message change while still erroring is still a
+        distinct value AppState should report - SimStatusTracker is the
+        one that decides whether to call this again while already in an
+        error state, not AppState's dedupe."""
+        state.set_sim_status('error', 'DCS', 'first problem')
+        calls = _capture(state.sim_status_changed)
+        state.set_sim_status('error', 'DCS', 'second problem')
+        assert calls == [('error', 'DCS', 'second problem')]

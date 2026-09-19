@@ -151,6 +151,10 @@ class AppState(QObject):
     #: The setting names (EffectTranslator's second field) of every effect
     #: currently started, e.g. ('max_elevator_coeff',) - see set_active_settings.
     active_settings_changed = pyqtSignal(tuple)
+    #: (state, source, message) - the app/sim status indicators' current
+    #: state ('running' / 'paused' / 'error'), which sim reported it, and
+    #: (only meaningful for 'error') the message - see set_sim_status.
+    sim_status_changed = pyqtSignal(str, str, str)
 
     def __init__(self):
         super().__init__()
@@ -168,6 +172,7 @@ class AppState(QObject):
         self._prompts: Dict[str, Notice] = {}
         self._last_prompts_shown: Optional[Tuple[Notice, ...]] = None
         self._active_settings: Tuple[str, ...] = ()
+        self._sim_status: Optional[Tuple[str, str, str]] = None
 
     # ---- identity (set once at startup) --------------------------------
 
@@ -344,3 +349,48 @@ class AppState(QObject):
         after connecting to paint the initial state correctly."""
         with self._lock:
             return self._active_settings
+
+    # ---- sim status (app-status "running"/"paused"/"error" indicator) ---
+
+    def set_sim_status(self, state: str, source: str, message: Optional[str] = None) -> None:
+        """Report the sim-status indicator's current state.
+
+        ``state`` is one of ``'running'``, ``'paused'`` or ``'error'``;
+        ``source`` is which sim reported it; ``message`` is only
+        meaningful for ``'error'``. Dedupes on the full ``(state, source,
+        message)`` tuple - a producer such as ``SimStatusTracker`` can call
+        this every frame with the same values without flooding
+        ``sim_status_changed``. Subscribers (``HeaderPanel``,
+        ``TrayController``) derive the flag/clear-error transition
+        themselves from consecutive emissions, since AppState only knows
+        the latest value, not the producer's own onset/hold/clear
+        bookkeeping.
+        """
+        value = (state, source, message or '')
+        with self._lock:
+            if self._sim_status == value:
+                return
+            self._sim_status = value
+        self.sim_status_changed.emit(*value)
+
+    def reset_sim_status(self) -> None:
+        """Forget the current sim status after the status widget has been
+        reset directly (sim exit, offline/online switch), so the next
+        report is treated as new even if it matches the last one - without
+        this, a reconnecting sim's first 'running' would be deduped away and
+        the widget left in its reset state. Emits ('', '', '') so
+        subscribers can drop their own edge tracking; they paint nothing
+        for it.
+        """
+        with self._lock:
+            if self._sim_status is None:
+                return
+            self._sim_status = None
+        self.sim_status_changed.emit('', '', '')
+
+    def current_sim_status(self) -> Tuple[str, str, str]:
+        """The current sim status - a subscriber calls this right after
+        connecting to paint the initial state correctly. ``('', '', '')``
+        before anything has been reported."""
+        with self._lock:
+            return self._sim_status or ('', '', '')

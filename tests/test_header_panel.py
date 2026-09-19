@@ -147,3 +147,83 @@ class TestHeaderPanelBind:
 
         state.set_scope('pedals')
         assert panel.status_container.active_vpconf_label.text() == 'child'
+
+
+class TestHeaderPanelSimStatusBind:
+    """bind() also replaces MainWindow's old update_sim_indicators +
+    explicit request_clear_error call: AppState.sim_status_changed ->
+    set_running/set_paused/set_error plus the flag/clear-error request
+    signals, fired only on the actual onset/clear transition."""
+
+    def test_bind_paints_a_status_already_reported(self, fake_logo, monkeypatch, state):
+        state.set_sim_status('running', 'DCS')
+        panel = HeaderPanel()
+        panel.bind(state)
+        assert panel.status_container.sim_status_label.sim_label.text() == 'DCS'
+        assert panel.status_container.sim_status_label.status_label.text() == 'Running'
+
+    def test_nothing_reported_yet_stays_on_the_waiting_page(self, fake_logo, monkeypatch, state):
+        panel = HeaderPanel()
+        panel.bind(state)
+        assert panel.status_container.sim_status_label.sim_label.text() == "Waiting..."
+
+    def test_reconnect_after_sim_exit_repaints_running(self, fake_logo, monkeypatch, state):
+        """Sim exit resets the widget directly; the next connection's
+        'running' (same as before the exit) must still repaint it."""
+        panel = HeaderPanel()
+        panel.bind(state)
+        state.set_sim_status('running', 'DCS')
+        panel.status_container.reset_sim_state('DCS')
+        state.reset_sim_status()
+        state.set_sim_status('running', 'DCS')
+        assert panel.status_container.sim_status_label.sim_label.text() == 'DCS'  # not "Waiting..."
+
+    def test_same_error_after_reset_flags_again(self, fake_logo, monkeypatch, state):
+        flagged = []
+        panel = HeaderPanel()
+        panel.status_container.request_flag_error.connect(lambda msg: flagged.append(msg))
+        panel.bind(state)
+        state.set_sim_status('error', 'DCS', 'bad config')
+        state.reset_sim_status()
+        state.set_sim_status('error', 'DCS', 'bad config')
+        assert flagged == ['bad config', 'bad config']
+
+    def test_running_then_paused(self, fake_logo, monkeypatch, state):
+        panel = HeaderPanel()
+        panel.bind(state)
+        state.set_sim_status('running', 'DCS')
+        state.set_sim_status('paused', 'DCS')
+        assert panel.status_container.sim_status_label.status_label.text() == 'Paused'
+
+    def test_error_onset_flags_but_repeated_error_does_not_reflag(self, fake_logo, monkeypatch, state):
+        flagged = []
+        panel = HeaderPanel()
+        panel.status_container.request_flag_error.connect(lambda msg: flagged.append(msg))
+        panel.bind(state)
+
+        state.set_sim_status('error', 'DCS', 'bad config')
+        assert flagged == ['bad config']
+        assert panel.status_container.sim_status_label.status_label.text() == 'Error'
+
+        # A different message while still erroring is a distinct AppState
+        # value (SimStatusTracker itself only calls this once per onset in
+        # practice) - the panel does not gate on message, only on the
+        # error->non-error edge, so this exercises that it does not fire a
+        # *clear* here either.
+        state.set_sim_status('error', 'DCS', 'still bad')
+        assert flagged == ['bad config']
+
+    def test_error_to_running_fires_clear_error_once(self, fake_logo, monkeypatch, state):
+        cleared = []
+        panel = HeaderPanel()
+        panel.status_container.request_clear_error.connect(lambda: cleared.append(True))
+        panel.bind(state)
+
+        state.set_sim_status('error', 'DCS', 'bad config')
+        assert cleared == []
+        state.set_sim_status('running', 'DCS')
+        assert cleared == [True]
+
+        # Back-to-back non-error states must not refire clear-error.
+        state.set_sim_status('paused', 'DCS')
+        assert cleared == [True]

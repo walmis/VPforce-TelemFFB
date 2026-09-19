@@ -25,7 +25,6 @@ import os
 import re
 import shutil
 import sys
-import time
 import traceback
 from collections import OrderedDict
 from datetime import datetime
@@ -59,6 +58,7 @@ from telemffb.ui.panels.OfflineEditorPanel import OfflineEditorPanel
 from telemffb.ui.panels.MonitorPanel import MonitorPanel
 from telemffb.ui.panels.HeaderPanel import HeaderPanel
 from telemffb.state.app_state import Notice, NEW_CRAFT_PRIORITY, PROFILE_CHANGE_PRIORITY, TRIM_CAL_PRIORITY
+from telemffb.state.sim_status import SimStatusTracker
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
@@ -94,12 +94,6 @@ class MainWindow(QMainWindow):
         'tap_effect_inertia_gain': '_pct_tap_inertia',
         'tap_effect_friction_gain': '_pct_tap_friction',
     }
-    #: How long the error status is held after the LAST error-bearing
-    #: frame before it clears.  Wall-clock on purpose: child-instance
-    #: errors reach the master over IPC on whichever frames catch them,
-    #: and a frame-counted debounce shrinks with sim frame rate.
-    ERROR_CLEAR_HOLD_S = 3.0
-
     def __init__(self):
         super().__init__()
         self.preview = EffectPreviewController(self)   # effect previews, see preview_controller
@@ -114,10 +108,10 @@ class MainWindow(QMainWindow):
         self._new_craft_prompt_active = False
         self._new_craft_target = None  # (sim, cls, name) captured at that point
         self._profile_change_prompt_active = False  # for the same one-shot-toast gating
-        self.error_state = False # True='error' key found in telem_data, False=clean telem_data
-        self._error_last_seen = 0.0 # monotonic time an 'error' key was last seen; the clear path holds ERROR_CLEAR_HOLD_S past it (child errors arrive over IPC on whichever frames catch them)
-        self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
-        self.telemetry_timed_out = True
+        # Error-onset/hold/clear state machine + timed-out flag - reports
+        # to G.app_state.set_sim_status; HeaderPanel/TrayController.bind()
+        # apply it. See telemffb/state/sim_status.py.
+        self.sim_status = SimStatusTracker(G.app_state, G.exception_tracker)
         self.last_telemetry_refresh = utils.millis()
         self.profile_mgr_dialog = None
 
@@ -241,6 +235,7 @@ class MainWindow(QMainWindow):
         self.header_panel.status_container.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.header_panel.status_container.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
         self.header_panel.bind(G.app_state)
+        self.tray.bind(G.app_state)
 
 
         """ Create Device Panel - pinned to the left edge of the window.
@@ -959,6 +954,7 @@ class MainWindow(QMainWindow):
 
             # reset the craft area text to default
             self.header_panel.status_container.reset()
+            G.app_state.reset_sim_status()
             self.settings_layout.reload_caller()
             # go_online restored the pre-offline context; re-evaluate the
             # notes button against it (dedupe dropped so a re-load of the
@@ -972,6 +968,7 @@ class MainWindow(QMainWindow):
             G.app_state.set_active_settings(())  # drop live-telemetry highlighting
             self.refresh_offline_editor_button()      # hidden while the editor is open
             self.header_panel.status_container.set_offline("None")
+            G.app_state.reset_sim_status()
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
 
@@ -1369,53 +1366,16 @@ class MainWindow(QMainWindow):
 
 
     def update_sim_indicators(self, source, paused=False, error=False, message=None):
-        """Runs on every telemetry frame
-        """
-        if source is None:
-            return
-
-        # Called only on state transitions (error onset / clear / timeout), so
-        # this is not on the per-frame hot path — traces which state the App
-        # Status area is being driven to.
-        logging.info(f"App status indicator -> {'error' if error else 'paused' if paused else 'running'} (src={source})")
-
-        if error:
-            self.header_panel.status_container.set_error(source)
-            # The in-window error notification must show on child instances too
-            # (they are headless but the widget retains state until the user
-            # opens the window). Only the tray icon/popup below stay master-only,
-            # since children have no system tray.
-            self.header_panel.status_container.request_flag_error.emit(message)
-        elif paused:
-            self.header_panel.status_container.set_paused(source)
-        else:
-            self.header_panel.status_container.set_running(source)
-
-
-        if error:
-            self.tray.set_status('error', source, message)
-        elif paused:
-            self.tray.set_status('paused', source)
-        elif not paused:
-            self.tray.set_status('running', source)
-            # re-show the "current aircraft" label once error cleared
+        """External entry point (e.g. DcsIpcThread's Ev=Start) that pushes
+        a status straight to AppState, bypassing the error-onset/hold/clear
+        state machine - see SimStatusTracker.push_status, which this now
+        just forwards to. HeaderPanel/TrayController.bind() apply the
+        result to the status container and tray."""
+        self.sim_status.push_status(source, paused=paused, error=error, message=message)
 
     def on_first_sim_frame(self, src):
-        """Handle first_frame_received: clear the initial 'Waiting' state by
-        flipping the status to Running.
-
-        Guarded against error_state: process_data emits telemetryReceived
-        before first_frame_received, so when the very first frame is the one
-        that raises a config error (common at startup), on_update_telemetry has
-        already set the error indicator by the time this runs. Without this
-        guard the unconditional flip to Running clobbers that error and, since
-        error_state stays set, it is never re-asserted. The paused-in-menus
-        case is unaffected (error_state is False there: Running here, then the
-        telemetry timeout flips it to Paused).
-        """
-        if self.error_state:
-            return
-        self.update_sim_indicators(src, paused=False)
+        """Handle first_frame_received: see SimStatusTracker.on_first_frame."""
+        self.sim_status.on_first_frame(src)
 
 
 
@@ -1585,10 +1545,7 @@ class MainWindow(QMainWindow):
         # No frames means no running effects; don't leave the last live
         # frame's slider highlighting up (on_update_telemetry won't clear it).
         G.app_state.set_active_settings(())
-        if not self.error_state:
-            # Only set icon to pause if error condition is not present when pausing
-            self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
-        self.telemetry_timed_out = True
+        self.sim_status.on_timeout(G.telem_manager.getTelemValue('src'))
 
     def on_sim_exited(self, src: str):
         """Called when a sim sends a clean exit notification (STATUS=EXIT).
@@ -1603,7 +1560,7 @@ class MainWindow(QMainWindow):
         # so the next aircraft load re-evaluates it even if identical.
         self._profile_notes_shown = None
         self.settings_layout.clear_layout()
-        self.telemetry_timed_out = False
+        self.sim_status.on_sim_exited()
         self.refresh_offline_editor_button()      # nothing loaded to edit any more
 
     def on_update_telemetry(self, datadict: dict):
@@ -1687,40 +1644,8 @@ class MainWindow(QMainWindow):
                     my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
                     my_slider.blockSignals(False)
 
-            is_paused = max(data.get('SimPaused', 0), data.get('Parked', 0))
-            error_cond = data.get('error', None)
-
-            if error_cond is None:  # no 'error' key in telemetry
-                if self.telemetry_timed_out or self.error_state:  # only set status to run if previously debug_timed out or error status was true
-                    # Hold the error state for a wall-clock window after the
-                    # last sighting: a child instance's error arrives over
-                    # IPC on whichever master frames happen to catch it, so
-                    # error-free frames BETWEEN sightings are routine.  The
-                    # old debounce counted 5 frames, a window that shrank
-                    # with sim frame rate (~30ms at 150fps) - thread timing
-                    # alone could flap clear->onset, and every re-onset
-                    # popped the tray notification again.
-                    if time.monotonic() - self._error_last_seen >= self.ERROR_CLEAR_HOLD_S:
-                        if self.error_state:
-                            logging.info("App status error cleared by an error-free frame (hold window elapsed)")
-                        self.update_sim_indicators(data.get('src'), paused=False)
-                        self.error_state = False
-                        self.telemetry_timed_out = False
-                        self.header_panel.status_container.request_clear_error.emit()
-                        # The condition was rectified: drop the flag_error
-                        # records this session logged into the exception
-                        # tracker so it agrees with the (cleared) app status
-                        for msg in self.flagged_error_msgs:
-                            G.exception_tracker.remove_matching(msg)
-                        self.flagged_error_msgs.clear()
-            elif error_cond is not None:
-
-                self._error_last_seen = time.monotonic()
-                if not self.error_state:  # only set error status once when there is error cond but state is not yet true
-                    self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
-                    logging.error(error_cond)
-                    self.flagged_error_msgs.add(error_cond)
-                    self.error_state = True
+            # Error onset/hold/clear - see SimStatusTracker.on_frame.
+            self.sim_status.on_frame(data)
 
 
 

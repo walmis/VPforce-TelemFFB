@@ -116,13 +116,20 @@ class HeaderPanel(QWidget):
         layout.addWidget(status_group, stretch=1, alignment=Qt.AlignmentFlag.AlignTop)
 
     def bind(self, state: AppState) -> None:
-        """Subscribe to ``state.scope_status_changed`` and paint its current
-        value immediately - nothing re-emits just because a new subscriber
+        """Subscribe to ``state.scope_status_changed`` and
+        ``state.sim_status_changed``, and paint each one's current value
+        immediately - nothing re-emits just because a new subscriber
         connected, so the initial paint has to be pulled, not waited for."""
         state.scope_status_changed.connect(self._on_scope_status_changed)
         status = state.current_status()
         self._on_scope_status_changed(
             status.scope, status.vpconf, status.any_vpconf, status.ovd, status.any_ovd)
+
+        self._last_sim_state = None
+        state.sim_status_changed.connect(self._on_sim_status_changed)
+        sim_state, sim_source, sim_message = state.current_sim_status()
+        if sim_source:
+            self._on_sim_status_changed(sim_state, sim_source, sim_message)
 
     def _on_scope_status_changed(self, scope, vpconf, any_vpconf, ovd, any_ovd):
         """AppState.scope_status_changed relay: update the vpconf-profile
@@ -138,3 +145,35 @@ class HeaderPanel(QWidget):
         """
         self.status_container.request_set_active_vpconf.emit(vpconf, any_vpconf)
         self.status_container.request_set_active_configurator.emit(ovd, any_ovd)
+
+    def _on_sim_status_changed(self, state: str, source: str, message: str) -> None:
+        """AppState.sim_status_changed relay: apply the sim-status field
+        (running/paused/error) that ``SimStatusTracker`` derives, and fire
+        the flag/clear-error request signals on the actual error-onset /
+        error-cleared transitions - exactly what MainWindow's old
+        ``update_sim_indicators`` plus its explicit ``request_clear_error``
+        call did, just driven by AppState instead of by MainWindow reaching
+        into this widget directly.
+
+        The onset/clear edge is derived here, from the last state this
+        panel painted, because AppState only carries the latest value, not
+        SimStatusTracker's own error-state bookkeeping.
+        """
+        if not state:
+            # AppState.reset_sim_status: the widget was reset directly;
+            # forget the last state so the next error re-flags.
+            self._last_sim_state = ''
+            return
+        was_error = self._last_sim_state == 'error'
+        if state == 'error':
+            self.status_container.set_error(source)
+            if not was_error:
+                self.status_container.request_flag_error.emit(message)
+        else:
+            if state == 'paused':
+                self.status_container.set_paused(source)
+            else:
+                self.status_container.set_running(source)
+            if was_error:
+                self.status_container.request_clear_error.emit()
+        self._last_sim_state = state

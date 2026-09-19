@@ -41,6 +41,7 @@ from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
 import telemffb.globals as G
+from telemffb.state.app_state import AppState
 from telemffb.utils import exit_application
 
 
@@ -49,6 +50,18 @@ class TrayController:
         self.mw = mainwindow
         self.icon = QSystemTrayIcon(mainwindow)
         self._notifications = {}
+
+    def bind(self, state: AppState) -> None:
+        """Subscribe to ``state.sim_status_changed`` and forward every
+        emission to ``set_status`` - replaces MainWindow's old direct call
+        from ``update_sim_indicators``. ``set_status`` is itself
+        master-only (a child instance has no tray), so nothing here needs
+        to check that again; nothing is painted until the first status is
+        reported, matching the pre-refactor tray (no icon/tooltip change
+        until the first ``update_sim_indicators`` call)."""
+        state.sim_status_changed.connect(
+            lambda sim_state, source, message:
+                sim_state and self.set_status(sim_state, source, message or None))
 
     def build(self):
         """Wire up the tray icon's context menu and show it. Master-only,
