@@ -88,6 +88,15 @@ class TestHeaderPanelConstruction:
         monkeypatch.setattr(G, 'master_instance', False, raising=False)
         panel = HeaderPanel()
         assert not panel.status_container.cb_selectProfileCombo.isEnabled()
+
+    def test_missing_logo_resource_does_not_crash(self, monkeypatch, qapp):
+        """A null pixmap (missing/unregistered resource path) has width 0 -
+        constructing the header used to divide by it and raise
+        ZeroDivisionError."""
+        monkeypatch.setattr(G, 'vpf_logo', ':/nonexistent/resource.png', raising=False)
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        panel = HeaderPanel()  # must not raise
+        assert isinstance(panel.device_mini_panel, MiniDevicePanel)
         assert not panel.status_container.cb_selectProfileCombo.isVisible()
 
 

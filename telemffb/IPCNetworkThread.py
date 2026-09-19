@@ -46,7 +46,6 @@ class IPCNetworkThread(QObject, threading.Thread):
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
     child_exception_signal = pyqtSignal(object)
-    child_status_signal = pyqtSignal()
     toggle_offline_mode_signal = pyqtSignal(bool)
     set_offline_sim_signal = pyqtSignal(str)
     set_offline_class_signal = pyqtSignal(str)
@@ -310,11 +309,6 @@ class IPCNetworkThread(QObject, threading.Thread):
                 status_dict = json.loads(payload)
                 self._ipc_telem_effects.update(status_dict)
                 self._report_child_status(status_dict)
-                # Queued to the main thread; kept for any other consumer
-                # that wants to react to "a child's status arrived" as an
-                # event - the scope-status indicators no longer need it,
-                # AppState is updated directly by _report_child_status above.
-                self.child_status_signal.emit()
             except json.JSONDecodeError:
                 pass
         elif msg.startswith("EXCEPTION:"):

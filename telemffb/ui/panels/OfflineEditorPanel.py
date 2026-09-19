@@ -52,6 +52,7 @@ into the combo boxes directly.
 """
 
 import json
+import logging
 
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFontMetrics
@@ -282,9 +283,11 @@ class OfflineEditorPanel(QWidget):
         try:
             # in case it somehow got closed
             self.mainwindow.profile_mgr_dialog.show()
-        except:
+        except (RuntimeError, AttributeError):
+            # RuntimeError: underlying Qt dialog was deleted; AttributeError:
+            # profile_mgr_dialog not created yet.
+            logging.exception("Failed to re-show profile manager dialog")
             QMessageBox.warning(self.mainwindow, "Profile Manager", "IDK WHY THIS ERROR HAPPENED")
-            pass
         self.mainwindow.toggle_offline_mode(False)
 
     @pyqtSlot(str, str, str, str)
@@ -295,40 +298,42 @@ class OfflineEditorPanel(QWidget):
         # one step.  An earlier TOGGLE OFFLINE would leave the children offline with
         # nothing selected for as long as the combos below take to fill.
         self.mainwindow.toggle_offline_mode(True, broadcast=False)
-        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
+        combo_boxes = {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}
+        for cb in combo_boxes:
             cb.blockSignals(True)
             cb.clear()
             cb.addItem('')
 
-        sim_list = xmlutils.get_sims()
-        for s in sim_list:
-            self.offline_sim.addItem(s)
-        self.offline_sim.setCurrentText(sim)
+        try:
+            sim_list = xmlutils.get_sims()
+            for s in sim_list:
+                self.offline_sim.addItem(s)
+            self.offline_sim.setCurrentText(sim)
 
-        cls_list = xmlutils.get_classes_for_sim(sim)
-        for c in cls_list:
-            self.offline_class.addItem(c)
-        self.offline_class.setCurrentText(cls)
+            cls_list = xmlutils.get_classes_for_sim(sim)
+            for c in cls_list:
+                self.offline_class.addItem(c)
+            self.offline_class.setCurrentText(cls)
 
-        model_list = xmlutils.read_models(sim, cls)
-        self.all_offline_models = model_list
-        self.filter_offline_name_list(self.offline_name_filter.text())
-        self.offline_name.setCurrentText(model)
+            model_list = xmlutils.read_models(sim, cls)
+            self.all_offline_models = model_list
+            self.filter_offline_name_list(self.offline_name_filter.text())
+            self.offline_name.setCurrentText(model)
 
-        profile_list = xmlutils.get_available_profiles(sim, cls, model)
-        self.offline_profile.clear()
-        for p in profile_list:
-            if p != 'Built-In':
-                self.offline_profile.addItem(p)
-        if not self.offline_profile.count() and model:
-            # Built-In cannot be edited: with no user profile the editor works on
-            # Auto User, which the first change creates (as offline_aircraft_changed)
-            self.offline_profile.addItem('Auto User')
-        self.offline_profile.setCurrentText(profile)
-        self.offline_profile_changed(self.offline_profile.currentText())
-
-        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
-            cb.blockSignals(False)
+            profile_list = xmlutils.get_available_profiles(sim, cls, model)
+            self.offline_profile.clear()
+            for p in profile_list:
+                if p != 'Built-In':
+                    self.offline_profile.addItem(p)
+            if not self.offline_profile.count() and model:
+                # Built-In cannot be edited: with no user profile the editor works on
+                # Auto User, which the first change creates (as offline_aircraft_changed)
+                self.offline_profile.addItem('Auto User')
+            self.offline_profile.setCurrentText(profile)
+            self.offline_profile_changed(self.offline_profile.currentText())
+        finally:
+            for cb in combo_boxes:
+                cb.blockSignals(False)
 
         if model:
             G.settings_mgr.offline_scope = 'MODEL'

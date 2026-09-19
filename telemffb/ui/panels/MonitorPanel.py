@@ -248,7 +248,7 @@ class MonitorPanel(QWidget):
             display_key = key
             # check for msfs and debug mode (alt-d pressed), change to simvar name
             if self.show_simvars:
-                if data["src"] == "MSFS":
+                if data.get("src") == "MSFS":
                     s = G.telem_manager.simconnect.get_var_name(display_key)
                     if s is not None:
                         display_key = s

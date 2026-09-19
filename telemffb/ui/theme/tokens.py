@@ -102,10 +102,8 @@ class ThemeTokens:
     expand_button_color: str
     expand_button_extra_rule: str   # "padding: 0px;" in light, "" in dark
     expand_button_hover_bg: str
-    # The hover/pressed selectors use a different attribute name than the
-    # base rule in dark mode ("button_type", a pre-existing typo that makes
-    # those two rules never match) - preserved as-is, not "fixed", to keep
-    # this refactor visually identical to the original stylesheet.
+    # The hover/pressed selectors use the same attribute name as the base
+    # rule ("buttonType") so those rules actually match in both themes.
     expand_button_selector_attr: str
 
     # QLineEdit/QPlainTextEdit/QTextEdit: dark overrides the palette in full
@@ -152,16 +150,16 @@ DARK = ThemeTokens(
     hover_pressed_color_rule="color: white;",
     erase_button_font_family="Cascadia Code",
     erase_button_size_rules="min-width: 25px;\n    min-height: 25px;",
-    erase_button_hover_bg="palett(window)",
+    erase_button_hover_bg="palette(window)",
     erase_button_pressed_bg="#666",
     p_m_button_color=PURPLE,
-    p_m_button_hover_bg="palett(window)",
+    p_m_button_hover_bg="palette(window)",
     p_m_button_pressed_extra=f"border: 1px solid {PURPLE};",
     disabled_glyph_color="#808080",
     expand_button_color=PURPLE_HOVER,
     expand_button_extra_rule="",
     expand_button_hover_bg="#666",
-    expand_button_selector_attr="button_type",
+    expand_button_selector_attr="buttonType",
     lineedit_block="""QLineEdit, QPlainTextEdit, QTextEdit {
     background-color: #414141;
     color: #ffffff;
@@ -259,7 +257,7 @@ LIGHT = ThemeTokens(
 }
 
 QMenu::item:selected {
-    color: palett(text);
+    color: palette(text);
     background-color: #ab37c8;
 }""",
     checkbox_disabled_block="",

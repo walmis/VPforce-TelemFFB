@@ -134,6 +134,16 @@ class TestTelemetryRows:
         panel.update_telemetry({'foo': 1.0, 'src': 'DCS'})
         assert 'foo' in panel.telemetry_keys()
 
+    def test_show_simvars_handles_missing_src_key(self, panel, monkeypatch):
+        """Telemetry dicts without a 'src' key (e.g. before the first frame
+        with source info arrives) must not raise a KeyError."""
+        fake_simconnect = SimpleNamespace(get_var_name=lambda k: 'SHOULD_NOT_APPEAR')
+        monkeypatch.setattr(G, 'telem_manager', SimpleNamespace(simconnect=fake_simconnect),
+                             raising=False)
+        panel.set_show_simvars(True)
+        panel.update_telemetry({'foo': 1.0})
+        assert 'foo' in panel.telemetry_keys()
+
     def test_duplicate_display_names_do_not_collide(self, panel, monkeypatch):
         """Two distinct telemetry keys that happen to rename to the same
         simvar name must still show as two rows - rows are keyed by the

@@ -51,6 +51,8 @@ API - callers reach the instance through the public ``status_container``
 attribute, same as before extraction.
 """
 
+import logging
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
@@ -84,9 +86,12 @@ class HeaderPanel(QWidget):
         t_logo = QLabel()
         t_pixmap = HiDpiPixmap(G.vpf_logo)
         logo_width = 200
-        logo_height = round(t_pixmap.height() * logo_width / t_pixmap.width())
-        t_pixmap = t_pixmap._scaled(logo_width, logo_height)
-        t_logo.setPixmap(t_pixmap)
+        if t_pixmap.width() > 0:
+            logo_height = round(t_pixmap.height() * logo_width / t_pixmap.width())
+            t_pixmap = t_pixmap._scaled(logo_width, logo_height)
+            t_logo.setPixmap(t_pixmap)
+        else:
+            logging.warning("Logo resource %s could not be loaded; skipping app logo", G.vpf_logo)
 
         self.device_mini_panel = MiniDevicePanel()
 
