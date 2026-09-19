@@ -1140,11 +1140,9 @@ class TestFFBApiSettingsScope:
         # spring_mode = CENTER, which this class does not have.
         ("aircraft_is_spring_centered", "joystick"),
         ("aircraft_is_spring_centered", "pedals"),
-        # Defaulted off for this class - see test_axis_control_defaults_off.  Helicopter
-        # only carries a collective row (via the legacy classdefaults_any), so the
-        # joystick and pedal rows are additions rather than value overrides.
-        ("telemffb_controls_axes", "joystick"),
-        ("telemffb_controls_axes", "pedals"),
+        # Helicopter's only row is a legacy classdefaults_any that restates the
+        # baseline `true`, so there is nothing to mirror: this class takes the baseline.
+        ("telemffb_controls_axes", "collective"),
     }
 
     def _msfs_rows(self, root, cls):
@@ -1213,25 +1211,6 @@ class TestFFBApiSettingsScope:
         assert len(defs) == 1
         # Must not hang off spring_mode, or excluding it would hide the gain too.
         assert "spring_mode" not in (defs[0].findtext("prereq") or "")
-
-    @pytest.mark.parametrize("device", ["joystick", "collective", "pedals"])
-    def test_axis_control_defaults_off(self, root, device):
-        """The API does not need TelemFFB to send axes, so do not ask the user to.
-
-        telemffb_controls_axes ships `true` and its own info says it is "Required for
-        Trim/AP Following" and warns "Do not assign in game or SPAD.next".  Neither
-        applies here: the API delivers trim through the spring centre, not an axis
-        offset, so leaving it on would impose unbinding the axes in MSFS for no gain.
-        The setting stays available - a collective is awkward to bind in MSFS, and a
-        user who relies on TelemFFB sending it must be able to turn it back on.
-        """
-        rows = [cd for cd in root.iter()
-                if cd.tag == "classdefaults_MSFS"
-                and cd.findtext("name") == "telemffb_controls_axes"
-                and cd.findtext("type") == self.OWNER
-                and cd.findtext("device") == device]
-        assert len(rows) == 1
-        assert rows[0].findtext("value") == "false"
 
     def test_effect_dict_names_real_settings(self, root):
         """The slider matcher is a substring test, so a wrong name fails silently.

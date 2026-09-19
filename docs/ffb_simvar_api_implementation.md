@@ -544,14 +544,10 @@ the existing inverted convention table in HPG before wiring.
   misreport intent.
 - **`center_spring_on_pause` stays.** It hangs off `system_group`, not `spring_mode`,
   and governs the pause/slew spring in `Aircraft.on_timeout` rather than control feel.
-- **`telemffb_controls_axes` defaults *off*.** It ships `true`, and its own info gives
-  the reason it does — "Required for Trim/AP Following", with a warning not to assign
-  the axes in game or SPAD.next. Neither applies under the API: trim arrives through
-  the spring centre, not an axis offset, so leaving it on would ask the user to unbind
-  their axes in MSFS for no gain. The setting stays *available* rather than excluded —
-  a collective is awkward to bind in MSFS, and a user who relies on TelemFFB sending it
-  needs a way back. This narrows the §10.2 decision: both axis models are still
-  supported and tested, but the API's default is now "the sim reads the stick".
+- **`telemffb_controls_axes` takes the baseline (`true`).** TelemFFB's standing rule is
+  that the user disables the in-sim axes and TelemFFB sends them, and this class is no
+  exception even though the API does not strictly need it: it carries no class default
+  for the setting. Both axis models of §10.2 stay supported and tested.
 - Reuse existing user parameters where they map (`trim_release_spring_gain`,
   `cyclic_spring_gain`, `collective_ap_spring_gain`, `hpg_pedal_spring_gain`,
   fly-through / hands-on deadzones and force thresholds). Rename the exposed
