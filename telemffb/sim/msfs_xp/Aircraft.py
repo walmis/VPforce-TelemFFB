@@ -243,6 +243,9 @@ class Aircraft(
             return
 
         self._probe_axis_jitter(telem_data)
+        self._sync_runtime_simvar(
+            "HydSys", self.hydraulic_source_var if self._hydraulic_source_active() else None,
+            sc_unit="number")
 
         if self._sim_is_xplane():
             self.toggle_xp_control()

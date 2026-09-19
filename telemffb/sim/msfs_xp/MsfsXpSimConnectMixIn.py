@@ -95,6 +95,8 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._trim_blend_last_v = None  # last valid IAS (kt) fed to the blend — in-frame dropout guard
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
         self._fw_override_supported_last = None
+        # telemetry name -> the variable _sync_runtime_simvar subscribed it to
+        self._runtime_simvars_subscribed: dict[str, Optional[str]] = {}
         # Monotonic stamp of the last OVERRIDE command sent; -inf means
         # nothing sent yet, so the plugin's echoed state is trusted at once.
         self.__xplane_override_sent_at = float("-inf")
@@ -279,6 +281,26 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     @property
     def _simconnect(self) -> SimConnectManager:
         return self._simconnect_proxy # type: ignore
+
+    def _sync_runtime_simvar(self, name: str, var: Optional[str], sc_unit: str = "enum"):
+        """Keep the telemetry item ``name`` subscribed to the variable a setting names.
+
+        ``var`` empty or None releases it.  Compared against what this handler
+        has subscribed rather than against the previous frame's setting: a
+        profile that loads with the option already on never changes it, and
+        must still get its variable.
+        """
+        if not self._sim_is_msfs() or not self._simconnect:
+            return
+        wanted = var or None
+        if wanted == self._runtime_simvars_subscribed.get(name):
+            return
+        if wanted:
+            self._simconnect.add_simvar(name=name, var=wanted, sc_unit=sc_unit)
+        else:
+            self._simconnect.remove_simvar(name)
+        self._simconnect._resubscribe()
+        self._runtime_simvars_subscribed[name] = wanted
 
     def send_xp_command(self, cmd):
         if self._socket is None:

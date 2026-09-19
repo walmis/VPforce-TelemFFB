@@ -80,7 +80,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     # Classes whose code reads a source that is still keyed by model, so
     # an aircraft assigned the class without a clone would be missing it:
     # HPG for the H145/H160 SDK variables; FlyInside for RotorRPM, whose
-    # scale differs per aircraft, and for the B206's HydSys.  The list is
+    # scale differs per aircraft.  The list is
     # per class, so it cannot single out one model: the CowanSim R66, whose
     # hydraulic switch is a model row, is carried by its profile note.
     # The clone list is filtered to models of the chosen class (get_models -> read_models),

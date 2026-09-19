@@ -4,6 +4,7 @@ from typing import Optional
 import telemffb.utils as utils
 from telemffb.sim.base.FFBForcesMixIn import FFBForcesMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.utils.TransformExpr import TransformExpr
 
 class HydraulicLossMixIn(FFBForcesMixIn):
     """Mixin to handle hydraulic-loss related configuration, runtime state and effects."""
@@ -11,6 +12,11 @@ class HydraulicLossMixIn(FFBForcesMixIn):
     hydraulic_loss_threshold: float = 0.95
     hydraulic_loss_damper: float = 1
     hydraulic_loss_friction: float = 1
+    # MSFS: subscribe HydSys to a variable the user names, and turn its raw
+    # value into health with the user's transform
+    hydraulic_source_var_enabled: bool = False
+    hydraulic_source_var: str = ""
+    hydraulic_source_transform: str = ""
 
     #: Seconds the hydraulic factor takes to travel the whole 0..1 range.  A
     #: switch that cuts the hydraulics ramps over this time; a pressure that
@@ -24,9 +30,56 @@ class HydraulicLossMixIn(FFBForcesMixIn):
         # taken as it is rather than ramped to
         self.hydraulic_factor: Optional[float] = None
         self._hyd_factor_time = 0.0
+        # (transform text, parsed TransformExpr or the error it raised)
+        self._hyd_transform = ("", None)
+
+    def _hydraulic_source_active(self) -> bool:
+        return bool(self.enable_hydraulic_loss_effect and self.hydraulic_source_var_enabled
+                    and self.hydraulic_source_var)
+
+    def _hydraulic_source_transform(self):
+        """The parsed transform, None when blank; raises ValueError when it does not parse."""
+        text = self.hydraulic_source_transform
+        text = "" if text is None else str(text).strip()
+        if text != self._hyd_transform[0]:
+            try:
+                parsed = TransformExpr(text) if text else None
+            except ValueError as e:
+                parsed = e
+            self._hyd_transform = (text, parsed)
+        parsed = self._hyd_transform[1]
+        if isinstance(parsed, ValueError):
+            raise parsed
+        return parsed
+
+    def _custom_hydraulic_health(self, telem_data: BaseTelemetryData) -> Optional[float]:
+        """HydSys through the user's transform, as health 0..1; None until it has a value.
+
+        Telemetry:
+            Read:    HydSys - float; the variable named in hydraulic_source_var, raw
+        """
+        raw = telem_data.get("HydSys", None)
+        if raw is None:
+            return None
+        try:
+            transform = self._hydraulic_source_transform()
+        except ValueError as e:
+            self.flag_error(f"Hydraulic loss: the transform '{self.hydraulic_source_transform}' "
+                            f"is not valid ({e}). Use x for the variable's value, for example x/3000")
+            return None
+        try:
+            value = float(raw)
+            if transform is not None:
+                value = float(transform.apply(value))
+        except (ArithmeticError, TypeError, ValueError):
+            return None
+        return utils.clamp(value, 0.0, 1.0)
 
     def _hydraulic_health(self, telem_data: BaseTelemetryData) -> Optional[float]:
         """HydSys as health, 0 (no hydraulics) to 1 (normal); None when absent.
+
+        With a custom hydraulic variable set, HydSys carries that variable's raw
+        value and the user's transform turns it into health.
 
         Telemetry:
             Read:    HydSys   - Union[bool, int, float, List[float]]; hydraulic system state.
@@ -37,6 +90,9 @@ class HydraulicLossMixIn(FFBForcesMixIn):
                                  Only used in DCS bool path to disambiguate HydSys=True
                                  with zero pressure (i.e. fluid present but no pressure).
         """
+        if self._hydraulic_source_active():
+            return self._custom_hydraulic_health(telem_data)
+
         hydraulic_sys = telem_data.get('HydSys', "n/a")
         if hydraulic_sys == 'n/a' or hydraulic_sys is None:
             return None
@@ -91,7 +147,8 @@ class HydraulicLossMixIn(FFBForcesMixIn):
 
         Telemetry:
             Read:    HydSys, HydPress - see _hydraulic_health
-            Written: _hyd_factor      (debug: current hydraulic factor 0.0–1.0)
+            Written: _hyd_health      (debug: hydraulic health this frame, 0.0–1.0, before the ramp)
+                     _hyd_factor      (debug: current hydraulic factor 0.0–1.0)
         """
         if not self.enable_hydraulic_loss_effect:
             self._reset_hydraulic_loss()
@@ -109,6 +166,7 @@ class HydraulicLossMixIn(FFBForcesMixIn):
             return False
 
         factor = self._ramp_hydraulic_factor(health)
+        telem_data._hyd_health = health
         telem_data._hyd_factor = factor
 
         if factor >= self.hydraulic_loss_threshold:

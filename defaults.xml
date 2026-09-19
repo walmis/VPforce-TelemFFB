@@ -5455,12 +5455,61 @@
 		<effecttype>damper</effecttype>
 		<grouping>FFB Overrides</grouping>
 		<parentgroup>mechanical</parentgroup>
+		<order>41800.12</order>
+		<datatype>bool</datatype>
+		<name>hydraulic_source_var_enabled</name>
+		<displayname>Custom Hydraulic Variable</displayname>
+		<prereq>enable_hydraulic_loss_effect</prereq>
+		<info>Read HydSys from a variable of your choice instead of HYDRAULIC SYSTEM INTEGRITY</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>damper</effecttype>
+		<grouping>FFB Overrides</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>41800.14</order>
+		<datatype>anylist</datatype>
+		<name>hydraulic_source_var</name>
+		<displayname>Hydraulic Variable</displayname>
+		<prereq>hydraulic_source_var_enabled</prereq>
+		<info>A SimVar, an L:Var or an input event (B:) that shows the aircraft's hydraulic state.&lt;br&gt;A switch works as it is. A pressure or other value needs a transform below.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>HYDRAULIC PRESSURE:1,HYDRAULIC SWITCH,HYDRAULIC SYSTEM INTEGRITY</validvalues>
+		<value>HYDRAULIC SYSTEM INTEGRITY</value>
+	</defaults>
+	<defaults>
+		<effecttype>damper</effecttype>
+		<grouping>FFB Overrides</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>41800.16</order>
+		<datatype>text</datatype>
+		<name>hydraulic_source_transform</name>
+		<displayname>Transform to 0-1</displayname>
+		<prereq>hydraulic_source_var_enabled</prereq>
+		<info>Turns the variable's value into 0 (no hydraulics) to 1 (normal), with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a switch, or a value that already reads 0 to 1&lt;br&gt;x/3000: a pressure that reads 3000 when normal&lt;br&gt;x/100: a percentage&lt;br&gt;1-x: a failure flag that reads 1 when failed&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as HydSys and the result as _hyd_health</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value></value>
+	</defaults>
+	<defaults>
+		<effecttype>damper</effecttype>
+		<grouping>FFB Overrides</grouping>
+		<parentgroup>mechanical</parentgroup>
 		<order>41800.2</order>
 		<datatype>float</datatype>
 		<name>hydraulic_loss_threshold</name>
 		<displayname>Hydraulic System Threshold</displayname>
 		<prereq>enable_hydraulic_loss_effect</prereq>
-		<info>"Hydraulic System Integrity" (HydSys in monitor)  value to consider "low".  Forces will start increasing below this value</info>
+		<info>Hydraulic health (_hyd_health in the Monitor, 0 to 1) below which the forces start to rise</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
@@ -6295,26 +6344,12 @@
 		<scale>3.95</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<name>HydSys</name>
-		<model>FlyInside B206.*</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Hydraulics.Enabled</var>
-		<sc_unit>bool</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
 		<name>RotorRPM</name>
 		<model>FlyInside - B206</model>
 		<sim>MSFS</sim>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.95</scale>
-	</sc_overrides>
-	<sc_overrides>
-		<name>HydSys</name>
-		<model>FlyInside - B206</model>
-		<sim>MSFS</sim>
-		<var>L:Aircraft.Hydraulics.Enabled</var>
-		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
 		<name>RotorRPM</name>
@@ -6510,13 +6545,6 @@
 		<var>L:FFB_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
-		<sc_overrides>
-			<name>HydSwitch</name>
-			<model>R66(?! Turbine).*</model>
-			<sim>MSFS</sim>
-			<var>L:CSR66_Hyd_Switch</var>
-			<sc_unit>bool</sc_unit>
-		</sc_overrides>
 		<sc_overrides>
 			<name>TaogH500CyclicFriction</name>
 			<class>TaogH500Helicopter</class>
@@ -20793,6 +20821,20 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>hydraulic_source_var_enabled</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_source_var</name>
+		<model>FlyInside - B206</model>
+		<value>L:Aircraft.Hydraulics.Enabled</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>enable_inertia_ovd</name>
 		<model>FlyInside - B206</model>
 		<value>true</value>
@@ -20817,6 +20859,20 @@
 		<name>enable_hydraulic_loss_effect</name>
 		<model>FlyInside - B206</model>
 		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>hydraulic_source_var_enabled</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>hydraulic_source_var</name>
+		<model>FlyInside - B206</model>
+		<value>L:Aircraft.Hydraulics.Enabled</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
@@ -20906,6 +20962,20 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>hydraulic_source_var_enabled</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_source_var</name>
+		<model>FlyInside B206.*</model>
+		<value>L:Aircraft.Hydraulics.Enabled</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>enable_inertia_ovd</name>
 		<model>FlyInside B206.*</model>
 		<value>true</value>
@@ -20930,6 +21000,20 @@
 		<name>enable_hydraulic_loss_effect</name>
 		<model>FlyInside B206.*</model>
 		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>hydraulic_source_var_enabled</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>hydraulic_source_var</name>
+		<model>FlyInside B206.*</model>
+		<value>L:Aircraft.Hydraulics.Enabled</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
@@ -22030,7 +22114,21 @@
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The hydraulic switch source is specific to the R66 and a clone carries it; a new profile would need it added in the overrides editor.</notes>
+		<notes>This aircraft uses the custom CowanSimHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The hydraulic switch source is specific to the R66 and a clone carries it; in a new profile, turn on Custom Hydraulic Variable under Low Hydraulic Pressure Effect and set it to L:CSR66_Hyd_Switch.</notes>
+	</models>
+	<models>
+		<name>hydraulic_source_var_enabled</name>
+		<model>R66(?! Turbine).*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>hydraulic_source_var</name>
+		<model>R66(?! Turbine).*</model>
+		<value>L:CSR66_Hyd_Switch</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>spring_mode</name>

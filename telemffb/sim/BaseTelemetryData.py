@@ -826,8 +826,9 @@ class BaseTelemetryData:
 
     HydSys: Optional[Union[bool, int, float, List[Union[bool, int, float]]]]
     """Hydraulic system integrity/state.  
-    MSFS: HYDRAULIC SYSTEM INTEGRITY SimVar — percent.  
-    Default when absent: "n/a" (use .get("HydSys", "n/a")).  
+    MSFS: HYDRAULIC SYSTEM INTEGRITY SimVar — percent; with the hydraulic loss
+    effect's Custom Hydraulic Variable on, the variable named there, raw.
+    Default when absent: "n/a" (use .get("HydSys", "n/a")).
     """
 
     HydPress: Optional[Union[float, List[float]]]
@@ -839,7 +840,7 @@ class BaseTelemetryData:
 
     HydSwitch: Optional[Union[bool, int]]
     """Hydraulic switch state.  
-    MSFS: HYDRAULIC SWITCH SimVar — bool.  
+    MSFS: HYDRAULIC SWITCH SimVar — bool.
     """
 
     # -- Autopilot --
