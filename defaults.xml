@@ -5442,7 +5442,7 @@
 		<name>enable_hydraulic_loss_effect</name>
 		<displayname>Low Hydraulic Pressure Effect&lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
 		<prereq>mechanical_group</prereq>
-		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>
+		<info>Raise damper and friction as hydraulic pressure is lost.&lt;br&gt;Below the threshold they rise from the Damper Override and Friction Override values to the values set here at zero pressure.&lt;br&gt;&lt;br&gt;** Requires the Damper Override and Friction Override under Basic FFB Effects **</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
@@ -5488,25 +5488,6 @@
 		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0.8</value>
-	</defaults>
-	<defaults>
-		<effecttype>damper</effecttype>
-		<grouping>FFB Overrides</grouping>
-		<parentgroup>mechanical</parentgroup>
-		<order>41800.4</order>
-		<datatype>float</datatype>
-		<name>hydraulic_loss_inertia</name>
-		<displayname>Inertia</displayname>
-		<prereq>enable_hydraulic_loss_effect</prereq>
-		<info>Inertia  force when hydraulic system pressure reaches 0</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<validvalues>0,100</validvalues>
-		<value>0.0</value>
 	</defaults>
 	<defaults>
 		<effecttype>damper</effecttype>
@@ -20784,13 +20765,6 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>hydraulic_loss_inertia</name>
-		<model>FlyInside - B206</model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>FI_vibration_intensity</name>
 		<model>FlyInside - B206</model>
 		<value>0.2</value>
@@ -20898,13 +20872,6 @@
 	</models>
 	<models>
 		<name>hydraulic_loss_friction</name>
-		<model>FlyInside B206.*</model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>hydraulic_loss_inertia</name>
 		<model>FlyInside B206.*</model>
 		<value>0.0</value>
 		<sim>MSFS</sim>

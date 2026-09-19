@@ -26,8 +26,12 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
         # flag moved here
         self.friction_effect_overridden: bool = False
 
-    def ac_update_ffb_forces(self, telem_data: BaseTelemetryData):
+    def ac_update_ffb_forces(self, telem_data: BaseTelemetryData, skip=()):
         """Update explicit override FFB effects (damper, inertia, friction).
+
+        Args:
+            skip: "damper" and/or "friction" when another effect owns them this
+                  frame; those are left untouched.
 
         Telemetry:
             None - no telem_data keys are read; effect parameters come entirely
@@ -36,7 +40,9 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
         # All forces are normalized (0..1); the device-unit conversion happens
         # in the effect setter (float args are scaled by 4096 internally).
         # Damper
-        if self.enable_damper_ovd:
+        if "damper" in skip:
+            pass
+        elif self.enable_damper_ovd:
             if self.anything_has_changed('damper_value', self.damper_force) or not self.effects['damper'].started:
                 force = utils.clamp(self.damper_force, 0.0, 1.0)
                 self.effects["damper"].damper(force, force).start()
@@ -54,7 +60,7 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
                 self.effects["inertia"].destroy()
 
         # Friction (unless overridden elsewhere)
-        if not self.friction_effect_overridden:
+        if not self.friction_effect_overridden and "friction" not in skip:
             if self.enable_friction_ovd:
                 force = utils.clamp(self.friction_force, 0.0, 1.0)
                 self.effects['friction'].name = 'friction'
