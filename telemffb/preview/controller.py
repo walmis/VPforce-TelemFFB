@@ -67,6 +67,42 @@ class EffectPreviewController:
             device_alive=HapticEffect.device_alive(),
             telemetry_paused=bool(getattr(manager, 'pause_state', False)) if manager else True)
 
+    @staticmethod
+    def _editor_profile():
+        """The profile the settings form is showing.  The offline editor can
+        be on one that is not the aircraft's mapped profile, and the preview
+        has to play what the form shows."""
+        return getattr(G.settings_mgr, 'active_profile', None) or None
+
+    def _refuse_unmet(self, spec, devices, interactive=True):
+        """True, after saying why, when a setting the spec ``requires`` is
+        off on one of ``devices``.  Such an effect returns early every
+        frame, so the run would be silent.  Read from the settings rather
+        than an aircraft, so the master can answer for a child's device."""
+        if not spec.requires:
+            return False
+        sim, model, cls = resolve_preview_target(G.settings_mgr)
+        problems = []
+        for dev in devices:
+            try:
+                params, *_ = TelemManager.resolve_aircraft_config(
+                    sim, model, cls, device_type=dev, active_profile=self._editor_profile())
+            except Exception:
+                logging.exception(f"Effect preview {spec.name}: could not resolve {dev} settings")
+                continue
+            problems += [label if len(devices) == 1 else f"{label} ({dev})"
+                         for label in spec.unmet(params)]
+        if not problems:
+            return False
+        if interactive:
+            QMessageBox.information(
+                self.window, "Effect Preview",
+                "This preview needs these enabled first:\n- " + "\n- ".join(problems)
+                + (f"\n\n{spec.requires_note}" if spec.requires_note else ""))
+        else:
+            logging.warning(f"Effect preview {spec.name} refused, not enabled: " + "; ".join(problems))
+        return True
+
     def running_devices(self):
         """This instance's device plus every launched child whose device
         has reported connected - the candidates for a play-all."""
@@ -137,11 +173,14 @@ class EffectPreviewController:
             else:
                 logging.warning(f"Effect preview {spec.name} refused: " + "; ".join(blockers))
             return False
+        if self._refuse_unmet(spec, [G.device_type], interactive=confirm):
+            return False
         if confirm and spec.constant_force and not self.confirm_constant_force(spec):
             return False
         sim, model, cls = resolve_preview_target(G.settings_mgr)
         try:
-            aircraft = TelemManager.build_aircraft(sim, model, cls_name=cls)
+            aircraft = TelemManager.build_aircraft(sim, model, cls_name=cls,
+                                                   active_profile=self._editor_profile())
             runner = PreviewRunner(aircraft, spec, sim)
         except Exception as e:
             logging.exception(f"Effect preview {spec.name} could not start")
@@ -207,6 +246,8 @@ class EffectPreviewController:
         if blockers:
             QMessageBox.information(self.window, "Effect Preview",
                                     "Cannot preview now:\n- " + "\n- ".join(blockers))
+            return False
+        if self._refuse_unmet(spec, devices):
             return False
         if spec.constant_force and not self.confirm_constant_force(spec):
             return False

@@ -19,7 +19,8 @@ from PyQt6 import QtWidgets
 
 import telemffb.globals as G
 import telemffb.preview.controller as pc
-from telemffb.preview.engine import JET_ENGINE_RUMBLE, AFTERBURNER, TOUCHDOWN, PREVIEW_SPECS
+from telemffb.preview.engine import (JET_ENGINE_RUMBLE, AFTERBURNER, TOUCHDOWN, PREVIEW_SPECS,
+                                     HYDRAULIC_LOSS)
 
 
 @pytest.fixture(scope="module")
@@ -261,3 +262,86 @@ class TestChildSide:
 
     def test_every_shipped_spec_is_addressable_by_name(self):
         assert all(PREVIEW_SPECS[s.name] is s for s in PREVIEW_SPECS.values())
+
+
+class TestRequirements:
+    """A spec's ``requires`` is checked when play is pressed, per device,
+    from the resolved settings - the master answers for a child's device."""
+
+    def _settings(self, monkeypatch, off=()):
+        """Every override on, except ``off``: (device, attribute) pairs."""
+        asked = []
+
+        def resolve(sim, model, cls='', device_type=None, active_profile=None):
+            asked.append(device_type)
+            params = {'enable_damper_ovd': True, 'enable_friction_ovd': True}
+            for dev, attr in off:
+                if dev == device_type:
+                    params[attr] = False
+            return params, cls, '.*', None
+
+        monkeypatch.setattr(pc.TelemManager, 'resolve_aircraft_config', resolve)
+        return asked
+
+    def test_met_requirements_play(self, rig, monkeypatch):
+        asked = self._settings(monkeypatch)
+        rig.ctl.toggle(HYDRAULIC_LOSS)
+        assert rig.timed().running and rig.box.shown == []
+        assert asked == ['joystick']
+
+    def test_an_unmet_requirement_refuses_and_names_it(self, rig, monkeypatch):
+        self._settings(monkeypatch, off=[('joystick', 'enable_damper_ovd')])
+        rig.ctl.toggle(HYDRAULIC_LOSS)
+        assert FakeTimed.instances == [] and rig.locks == []
+        text = rig.box.shown[0][2]
+        assert 'Damper Override' in text and 'Friction Override' not in text
+
+    def test_play_all_is_refused_by_any_device_and_names_it(self, rig, monkeypatch):
+        self._settings(monkeypatch, off=[('pedals', 'enable_friction_ovd')])
+        rig.ctl.toggle(HYDRAULIC_LOSS, devices=('joystick', 'pedals'))
+        assert rig.ipc.sent == [] and FakeTimed.instances == []     # nobody was started
+        text = rig.box.shown[0][2]
+        assert 'Friction Override' in text and 'pedals' in text and 'joystick' not in text
+
+    def test_a_child_refuses_quietly_and_still_reports_done(self, rig, monkeypatch):
+        self._settings(monkeypatch, off=[('joystick', 'enable_damper_ovd')])
+        rig.ctl.start_child(HYDRAULIC_LOSS.name)
+        assert rig.box.shown == [] and FakeTimed.instances == []
+        assert rig.ipc.sent == [('DONE', HYDRAULIC_LOSS.name)]
+
+    def test_specs_without_requirements_never_resolve_settings(self, rig, monkeypatch):
+        asked = self._settings(monkeypatch)
+        rig.ctl.toggle(JET_ENGINE_RUMBLE)
+        assert asked == [] and rig.timed().running
+
+
+class TestEditorProfile:
+    """The preview plays the profile the form shows, which in the offline
+    editor need not be the aircraft's mapped one."""
+
+    def _capture(self, monkeypatch):
+        seen = {}
+
+        def resolve(sim, model, cls='', device_type=None, active_profile=None):
+            seen['check'] = active_profile
+            return {'enable_damper_ovd': True, 'enable_friction_ovd': True}, cls, '.*', None
+
+        def build(sim, model, cls_name='', active_profile=None, **_):
+            seen['build'] = active_profile
+            return SimpleNamespace()
+
+        monkeypatch.setattr(pc.TelemManager, 'resolve_aircraft_config', resolve)
+        monkeypatch.setattr(pc.TelemManager, 'build_aircraft', build)
+        return seen
+
+    def test_the_editors_profile_reaches_the_check_and_the_build(self, rig, monkeypatch):
+        seen = self._capture(monkeypatch)
+        G.settings_mgr.active_profile = 'Hot Day'
+        rig.ctl.toggle(HYDRAULIC_LOSS)
+        assert seen == {'check': 'Hot Day', 'build': 'Hot Day'}
+
+    def test_no_profile_leaves_the_mapped_one_to_the_resolver(self, rig, monkeypatch):
+        seen = self._capture(monkeypatch)
+        G.settings_mgr.active_profile = ''
+        rig.ctl.toggle(HYDRAULIC_LOSS)
+        assert seen == {'check': None, 'build': None}

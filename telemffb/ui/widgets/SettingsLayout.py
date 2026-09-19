@@ -961,6 +961,8 @@ class SettingsLayout(QGridLayout):
         ]
         if spec.constant_force:
             paragraphs.append("<b>Constant force:</b> keep a firm hold on the controls.")
+        if spec.note:
+            paragraphs.append(f"<b>Note:</b> {html.escape(spec.note, quote=False)}")
         paragraphs.append("Click again to stop.")
         tip = preview_tooltip_html(paragraphs)
         make(PREVIEW_GLYPHS['pv'], 'pv', tip,

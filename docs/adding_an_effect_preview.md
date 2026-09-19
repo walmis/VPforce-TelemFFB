@@ -93,6 +93,10 @@ Field by field:
   Count"), and any telemetry the preview holds at a fixed value that the profile has no
   setting for ("at a fixed 300 rpm NR"). The user is tuning one slider; the line tells them
   what else shaped what they felt.
+- **`note`** — what the run does *not* exercise, where a good preview could be mistaken for
+  proof of it; its own paragraph in the row tooltip. The hydraulic preview steps `HydSys`
+  itself with the custom source forced off, so its note says the user's hydraulic variable
+  and transform are not validated.
 - **`method`** — a name, or `{'*': 'generic', 'MSFS': 'msfs_specific'}`, or a **recipe**
   `callable(aircraft, frame, **kwargs)` for an effect that is one step inside a longer routine
   and can only be played by sequencing the production pieces. The MSFS elevator droop is the
@@ -112,6 +116,14 @@ Field by field:
   the frame cadence *is* the effect's character: DCS gunfire re-triggers on every frame the
   round count changed, so the preview runs at a representative 60 Hz export cadence and a
   rotary cannon is felt as that cap.
+- **`requires`**, **`requires_note`** — settings the effect refuses to run without, as
+  `(attribute, label)` pairs, and one sentence saying why. An effect that checks a
+  prerequisite returns early every frame when it is off, so the preview would sit silent for
+  its whole length. The controller resolves these per device when play is pressed and, if
+  one is off, says which and shows the note instead of starting. Use it for
+  prerequisites that are the user's to set, never as a substitute for `force_attrs`: the
+  hydraulic preview *requires* the Damper and Friction Overrides rather than forcing them on,
+  because forcing them would play a "normal" value the user never chose.
 
 ### Field values
 
@@ -198,6 +210,19 @@ fields={'*': {'Damage': RandomHits(), ...}},                                # ir
 
 Hold the *other* triggers of a shared method constant so only the previewed effect fires.
 
+### Condition effects — damper, friction
+
+The low hydraulic pressure preview is the pattern. The effect raises damper and friction from
+the user's override values to its own loss values, and *hands the two back* to the FFB
+overrides when it is not active. Calling the loss method alone would leave the stick free
+before and after, which is not what the pilot has in flight, so the live loop's pair was
+lifted into one method (`ac_update_hydraulic_and_ffb_forces`, a pure refactor of the mixin's
+`on_telemetry`) and the spec calls that. The stimulus is a plain 1 → 0 → 1 step in health:
+the effect has its own 2.5 s wall-clock limiter, so the ramps are the effect's, not the
+spec's. A test for an effect like this pins `time.perf_counter` to advance one frame period
+per step, so levels can be read off at known times. Conditions resist rather than push, so
+no `constant_force`.
+
 ### Constant-force effects
 
 A constant force on an unattended axis can drive it to the stops, and the user tunes these
@@ -255,8 +280,10 @@ mistaken for a broken one. Nothing per spec is needed for it.
 
 ## 5. Register it
 
-Add the spec to the tuple that builds `PREVIEW_SPECS`, and bump the count assertion beneath
-it. `PREVIEWS_BY_ROW` and the settings button follow automatically.
+Add the spec to `_ALL_SPECS`, and bump the catalog count in
+`TestSpecIndex.test_the_shipped_catalog_indexes_cleanly`. `index_specs()` raises on a
+duplicate name or a row claimed twice; `PREVIEWS_BY_ROW` and the settings button follow
+automatically.
 
 ## 6. Write the test
 

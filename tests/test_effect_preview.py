@@ -39,6 +39,7 @@ from telemffb.preview.engine import (
     NOSEWHEEL_SHIMMY, AOA_REDUCTION, LATERAL_FORCE, LATERAL_G_REFERENCE,
     IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE,
     IL2_BUFFET_HZ, IL2_ENGINE_SHAKE_HZ,
+    HYDRAULIC_LOSS, HYDRAULIC_LEAD_IN, HYDRAULIC_FAILED, HYDRAULIC_DURATION,
     ROTOR_RPM_NOMINAL, HOLD_SECONDS, PREVIEW_SPECS, PREVIEWS_BY_ROW, preview_for_row,
     FRAME_RATE_HZ)
 from telemffb.telem import TelemManager as tm
@@ -1171,8 +1172,11 @@ class TestPreviewRows:
     def test_rows_are_strengths_not_toggles_or_thresholds(self):
         toggles = {spec.effect_id for spec in PREVIEW_SPECS.values() if spec.effect_id}
         assert not (set(PREVIEWS_BY_ROW) & toggles)
-        assert all(any(k in r for k in ('intensity', 'force', 'moment', 'gain', 'factor'))
-                   for r in PREVIEWS_BY_ROW)
+        # a strength by any of its names: a condition effect's is named for the
+        # condition (hydraulic_loss_damper), and must not be a threshold
+        strength = ('intensity', 'force', 'moment', 'gain', 'factor', 'damper', 'friction')
+        assert all(any(k in r for k in strength) for r in PREVIEWS_BY_ROW)
+        assert not any('threshold' in r for r in PREVIEWS_BY_ROW)
 
     def test_a_spec_without_a_toggle_needs_a_name(self):
         with pytest.raises(ValueError):
@@ -1441,7 +1445,7 @@ class TestSpecIndex:
         from telemffb.preview.engine import index_specs, _ALL_SPECS, PREVIEWS_BY_ROW
         by_name, by_row = index_specs(_ALL_SPECS)
         assert by_name == PREVIEW_SPECS and by_row == PREVIEWS_BY_ROW
-        assert len(by_name) == len(_ALL_SPECS) == 42
+        assert len(by_name) == len(_ALL_SPECS) == 43
 
 
 class TestPublicConstantForceApplier(BaseTelemetryEffectTestCase):
@@ -2207,3 +2211,146 @@ class TestGearMotionPreview(BaseTelemetryEffectTestCase):
         for _ in range(runner.frames_total - 1):
             runner.step()
         assert 'gearclunk' not in self.mock_effects
+
+
+class TestSpecRequires:
+    """``requires``: settings an effect refuses to run without, checked
+    before the run because the effect would otherwise sit silent."""
+
+    def test_unmet_reads_a_resolved_settings_dict(self):
+        assert HYDRAULIC_LOSS.unmet({'enable_damper_ovd': True, 'enable_friction_ovd': True}) == []
+        assert HYDRAULIC_LOSS.unmet({'enable_damper_ovd': True, 'enable_friction_ovd': False}) == \
+            ['Friction Override']
+        assert HYDRAULIC_LOSS.unmet({}) == ['Damper Override', 'Friction Override']   # absent is off
+
+    def test_unmet_reads_an_aircraft(self):
+        ac = SimpleNamespace(enable_damper_ovd=False, enable_friction_ovd=True)
+        assert HYDRAULIC_LOSS.unmet(ac) == ['Damper Override']
+
+    def test_a_spec_without_requirements_is_never_unmet(self):
+        assert JET_ENGINE_RUMBLE.requires == () and JET_ENGINE_RUMBLE.unmet({}) == []
+
+    def test_every_required_setting_is_a_bool_in_defaults_xml(self):
+        """A typo here would make the preview permanently unavailable."""
+        import xml.etree.ElementTree as ET
+        rows = {e.findtext('name'): e.findtext('datatype')
+                for e in ET.parse('defaults.xml').getroot().findall('.//defaults')}
+        for spec in PREVIEW_SPECS.values():
+            for attr, label in spec.requires:
+                assert rows.get(attr) == 'bool', f"{spec.name}: {attr!r} is not a bool setting"
+                assert label and spec.requires_note
+
+
+class TestHydraulicLossPreview(BaseTelemetryEffectTestCase):
+    """The hydraulic preview plays the live loop's own pair - the loss
+    effect, then the FFB overrides it shares damper and friction with -
+    against a 1 -> 0 -> 1 step in health.  The ramps are the effect's own
+    2.5 s wall-clock limiter, so the clock here advances one frame period
+    per step and the levels can be read off at known times."""
+
+    NORMAL = (0.1, 0.05)       # the user's Damper / Friction Override values
+    LOSS = (0.8, 0.4)          # the rows the preview is for
+
+    def _aircraft(self, sim):
+        module = aircrafts_msfs_xp if sim == 'MSFS' else aircrafts_dcs
+        ac = module.Aircraft('preview')
+        ac.enable_hydraulic_loss_effect = False            # the preview must force it on
+        ac.enable_damper_ovd, ac.damper_force = True, self.NORMAL[0]
+        ac.enable_friction_ovd, ac.friction_force = True, self.NORMAL[1]
+        ac.hydraulic_loss_damper, ac.hydraulic_loss_friction = self.LOSS
+        ac.hydraulic_loss_threshold = 0.95
+        # a custom source with a transform, as the B206 ships: must be bypassed
+        ac.hydraulic_source_var_enabled = True
+        ac.hydraulic_source_var = 'L:SOME_PRESSURE'
+        ac.hydraulic_source_transform = 'x/3000'
+        return ac
+
+    def _trace(self, ac, sim, monkeypatch, rate=10.0):
+        """[(seconds, loss damper, loss friction, normal damper, normal friction)]
+        per scripted frame; a level is None while its slot is not playing."""
+        import time
+        clock = {'t': 5000.0}
+        monkeypatch.setattr(time, 'perf_counter', lambda: clock['t'])
+        runner = PreviewRunner(ac, HYDRAULIC_LOSS, sim, frame_rate=rate)
+
+        def level(slot):
+            fx = self.mock_effects.get(slot)
+            return fx._x_coefficient if fx is not None and fx.started else None
+
+        trace = []
+        for i in range(runner.frames_total):
+            runner.step()
+            trace.append((HYDRAULIC_DURATION * i / (runner.frames_total - 1),
+                          level('hyd_loss_damper'), level('hyd_loss_friction'),
+                          level('damper'), level('friction')))
+            clock['t'] += runner.period
+        tail = []
+        while True:
+            more = runner.step()
+            if more:
+                tail.append((level('hyd_loss_damper'), level('damper'), level('friction')))
+            clock['t'] += runner.period
+            if not more:
+                break
+        return trace, tail
+
+    @pytest.mark.parametrize("sim", ['DCS', 'BMS', 'MSFS'])
+    def test_normal_then_the_loss_values_then_normal(self, sim, monkeypatch):
+        ac = self._aircraft(sim)
+        trace, tail = self._trace(ac, sim, monkeypatch)
+        assert ac.enable_hydraulic_loss_effect is True
+        assert ac.hydraulic_source_var_enabled is False      # the synthetic 0..1 is read as health
+
+        at = lambda seconds: min(trace, key=lambda row: abs(row[0] - seconds))
+        # lead-in: healthy, so the stick has its normal overrides and no loss slots
+        _, ld, lf, nd, nf = at(HYDRAULIC_LEAD_IN / 2)
+        assert (ld, lf) == (None, None) and (nd, nf) == self.NORMAL
+        # 3 s after the failure the 2.5 s rise is over: the loss values, and
+        # the normal damper / friction handed over, not stacked on top
+        _, ld, lf, nd, nf = at(HYDRAULIC_LEAD_IN + 3.0)
+        assert (ld, lf) == pytest.approx(self.LOSS) and (nd, nf) == (None, None)
+        # and they hold to the end of the failure
+        _, ld, lf, _, _ = at(HYDRAULIC_LEAD_IN + HYDRAULIC_FAILED - 0.2)
+        assert (ld, lf) == pytest.approx(self.LOSS)
+        # halfway up the rise the factor is 0.5: halfway from normal to loss, as scaled
+        _, ld, _, _, _ = at(HYDRAULIC_LEAD_IN + 1.25)
+        expected = self.LOSS[0] + (self.NORMAL[0] - self.LOSS[0]) * 0.5 / 0.95
+        assert ld == pytest.approx(expected, abs=0.04)
+        # the rise only ever rises, and starts at the normal value, not at zero
+        rise = [row[1] for row in trace
+                if HYDRAULIC_LEAD_IN < row[0] <= HYDRAULIC_LEAD_IN + 2.6 and row[1] is not None]
+        assert rise == sorted(rise) and rise[0] == pytest.approx(self.NORMAL[0], abs=0.05)
+        # recovery: falling again 1 s after health returns
+        _, ld, _, _, _ = at(HYDRAULIC_LEAD_IN + HYDRAULIC_FAILED + 1.0)
+        assert self.NORMAL[0] < ld < self.LOSS[0]
+        # and by the tail the loss effect has let go and the overrides are back
+        assert tail and tail[-1] == (None,) + self.NORMAL
+        assert not self.mock_effects.dict                    # everything freed
+
+    def test_the_failure_lasts_the_rise_plus_three_seconds(self):
+        assert HYDRAULIC_FAILED == pytest.approx(2.5 + 3.0)
+        assert HYDRAULIC_LOSS.duration == pytest.approx(HYDRAULIC_LEAD_IN + HYDRAULIC_FAILED + 2.5)
+        assert aircrafts_dcs.Aircraft.HYDRAULIC_RAMP_S == 2.5    # the rise the timeline assumes
+
+    def test_both_loss_rows_host_the_one_preview(self):
+        assert preview_for_row('hydraulic_loss_damper') is HYDRAULIC_LOSS
+        assert preview_for_row('hydraulic_loss_friction') is HYDRAULIC_LOSS
+        assert not HYDRAULIC_LOSS.constant_force             # conditions resist; they do not push
+
+    @pytest.mark.parametrize("sim", ['XPLANE', 'IL2'])
+    def test_not_offered_where_the_settings_do_not_exist(self, sim):
+        module = aircrafts_il2 if sim == 'IL2' else aircrafts_msfs_xp
+        with pytest.raises(ValueError):
+            PreviewRunner(module.Aircraft('preview'), HYDRAULIC_LOSS, sim)
+
+    def test_the_pair_is_what_the_live_loop_runs(self, monkeypatch):
+        """on_telemetry must go through the same method the preview calls,
+        or the two could drift apart."""
+        ac = aircrafts_dcs.Aircraft('preview')
+        seen = []
+        monkeypatch.setattr(ac, 'ac_update_hydraulic_and_ffb_forces', lambda frame: seen.append(frame))
+        from telemffb.sim.base.HydraulicLossMixIn import HydraulicLossMixIn
+        monkeypatch.setattr(HydraulicLossMixIn.__mro__[1], 'on_telemetry', lambda self, frame: None)
+        frame = BaseTelemetryData()
+        HydraulicLossMixIn.on_telemetry(ac, frame)
+        assert seen == [frame]

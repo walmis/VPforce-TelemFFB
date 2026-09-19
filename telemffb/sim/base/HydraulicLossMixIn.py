@@ -186,7 +186,20 @@ class HydraulicLossMixIn(FFBForcesMixIn):
 
         return True
 
-    def on_telemetry(self, telem_data: BaseTelemetryData):
-        super().on_telemetry(telem_data)
+    def ac_update_hydraulic_and_ffb_forces(self, telem_data: BaseTelemetryData):
+        """The hydraulic loss effect, then the FFB overrides it shares damper
+        and friction with - in that order, because the loss effect decides
+        each frame who owns the two.  Below the threshold it plays them and
+        the overrides leave them alone; above it the overrides play their
+        normal values.  Its own method so the effect preview can play the
+        same pair the live loop does, normal feel included.
+
+        Telemetry:
+            Read:    HydSys, HydPress - see _hydraulic_health
+        """
         hyd_loss = self.ac_update_hydraulic_loss_effect(telem_data)
         self.ac_update_ffb_forces(telem_data, skip=("damper", "friction") if hyd_loss else ())
+
+    def on_telemetry(self, telem_data: BaseTelemetryData):
+        super().on_telemetry(telem_data)
+        self.ac_update_hydraulic_and_ffb_forces(telem_data)

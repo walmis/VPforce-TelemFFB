@@ -72,7 +72,8 @@ def aircraft_module_for_source(data_source):
     }.get(data_source)
 
 
-def resolve_aircraft_config(the_sim, aircraft_name, input_modeltype='', device_type=None):
+def resolve_aircraft_config(the_sim, aircraft_name, input_modeltype='', device_type=None,
+                            active_profile=None):
     """Resolve an aircraft's full setting set into constructor parameters.
 
     Pure: reads the XML cascade for ``the_sim``/``aircraft_name`` on
@@ -85,12 +86,19 @@ def resolve_aircraft_config(the_sim, aircraft_name, input_modeltype='', device_t
     safe to call with no sim running and without disturbing the settings
     manager's notion of the current model - ``get_aircraft_config`` is the
     live-telemetry wrapper that adds that state update.
+
+    ``active_profile`` names the profile whose overrides apply; None takes
+    the one mapped to the aircraft.  The offline editor can be on a
+    profile other than the mapped one, and a caller showing that editor's
+    values (the effect preview) has to name it.
     """
     if device_type is None:
         device_type = G.device_type
     params = {}
-    cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, device_type)
-    active_profile = xmlutils.get_active_profile_for_model(the_sim, cls_name, pattern)
+    cls_name, pattern, result = xmlutils.read_single_model(
+        the_sim, aircraft_name, input_modeltype, device_type, active_profile)
+    if active_profile is None:
+        active_profile = xmlutils.get_active_profile_for_model(the_sim, cls_name, pattern)
     if cls_name == '':
         cls_name = 'Aircraft'
     for setting in result:
@@ -116,7 +124,7 @@ def resolve_aircraft_config(the_sim, aircraft_name, input_modeltype='', device_t
 
 
 def build_aircraft(data_source, aircraft_name, device_type=None, cls_name='',
-                   private_effects=True):
+                   private_effects=True, active_profile=None):
     """Construct and configure an aircraft instance with no telemetry.
 
     The same steps ``TelemManager`` takes when a new aircraft shows up in
@@ -153,7 +161,7 @@ def build_aircraft(data_source, aircraft_name, device_type=None, cls_name='',
     if module is None:
         raise ValueError(f"Unknown telemetry source {data_source!r}")
     params, resolved_cls, _pattern, _profile = resolve_aircraft_config(
-        data_source, aircraft_name, cls_name or '', device_type)
+        data_source, aircraft_name, cls_name or '', device_type, active_profile)
     aircraft_class = getattr(module, resolved_cls, None) or module.Aircraft
     logging.info(f"Building {aircraft_name!r} (class {resolved_cls}) for preview: "
                  f"{aircraft_class.__module__}.{aircraft_class.__name__}")

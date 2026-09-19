@@ -191,6 +191,24 @@ class PreviewSpec:
     # itself: DCS gunfire re-triggers on every frame the round count
     # changed, so a rotary cannon is felt as the export frame rate.
     frame_rate: Optional[float] = None
+    # What the run does NOT exercise, where a user could take a good
+    # preview as proof of it.  Its own paragraph in the row tooltip.
+    note: str = ''
+    # Bool settings the effect refuses to run without, as ``(attribute,
+    # label)``.  With one off the effect returns early every frame and the
+    # run is silent, so the controller checks them when play is pressed
+    # and says which are off; ``requires_note`` says why they are needed.
+    # For prerequisites that are the user's to set, not gates the preview
+    # may force: forcing the damper override on would play a "normal"
+    # value the user never chose.
+    requires: Tuple[Tuple[str, str], ...] = ()
+    requires_note: str = ''
+
+    def unmet(self, settings) -> List[str]:
+        """The labels of the ``requires`` entries that are off in
+        ``settings`` - a resolved settings dict, or an aircraft."""
+        read = settings.get if hasattr(settings, 'get') else lambda k, d=None: getattr(settings, k, d)
+        return [label for attr, label in self.requires if not read(attr, False)]
 
     def __post_init__(self):
         if self.kind not in KINDS:
@@ -1457,6 +1475,48 @@ IL2_RUNWAY_RUMBLE = PreviewSpec(
     sims=('IL2',),
 )
 
+# Low hydraulic pressure: health stepped 1 -> 0 -> 1.  The ramps are the
+# effect's own - it moves its factor no faster than HYDRAULIC_RAMP_S (wall
+# clock) whatever the input does - so the step IS the honest stimulus.
+# The method is the pair the live loop runs, the loss effect then the FFB
+# overrides it hands damper and friction back to; the loss method alone
+# would leave the stick free whenever health is above the threshold.
+HYDRAULIC_LEAD_IN = 0.5        # s healthy: the normal damper / friction, for contrast
+HYDRAULIC_FAILED = 5.5         # s at zero health: the 2.5 s rise, then 3 s at the loss values
+HYDRAULIC_RECOVERY = 2.5       # s healthy again: the fall back to normal
+HYDRAULIC_DURATION = HYDRAULIC_LEAD_IN + HYDRAULIC_FAILED + HYDRAULIC_RECOVERY
+
+
+def _hydraulic_health(ac, progress):
+    t = progress * HYDRAULIC_DURATION
+    return 0.0 if HYDRAULIC_LEAD_IN <= t < HYDRAULIC_LEAD_IN + HYDRAULIC_FAILED else 1.0
+
+
+HYDRAULIC_LOSS = PreviewSpec(
+    effect_id='enable_hydraulic_loss_effect',
+    reference=('a full hydraulic failure and recovery: damper and friction rise from your '
+               'Damper and Friction Override values to these loss values over 2.5 s, hold 3 s, '
+               'and fall back over 2.5 s'),
+    note=('The preview simulates the failure itself and reads nothing from the sim, so it '
+          'cannot confirm that a Custom Hydraulic Variable, its transform, or a HydSys '
+          'override works. Check those in the sim.'),
+    rows=('hydraulic_loss_damper', 'hydraulic_loss_friction'),
+    method='ac_update_hydraulic_and_ffb_forces',
+    kind='hold',
+    # a float, so the DCS bool-with-zero-pressure branch is never entered
+    fields={'*': {'HydSys': _hydraulic_health}},
+    duration=HYDRAULIC_DURATION,
+    # With a custom variable on, HydSys is read RAW through the user's
+    # transform (x/3000 on the B206): a synthetic 0..1 would be distorted.
+    # What is previewed is the damper / friction response, not the source.
+    force_attrs={'hydraulic_source_var_enabled': False},
+    requires=(('enable_damper_ovd', 'Damper Override'),
+              ('enable_friction_ovd', 'Friction Override')),
+    requires_note=('The effect raises damper and friction from their override values, so both '
+                   'overrides must be enabled under Basic FFB Effects, with their normal values set.'),
+    sims=('DCS', 'BMS', 'MSFS'),      # the settings rows exist for these only
+)
+
 _ALL_SPECS = (
         PROP_ENGINE_RUMBLE, JET_ENGINE_RUMBLE, GEAR_MOTION, STALL_BUFFET, ETL,
         AFTERBURNER, STICK_SHAKER, OVERSPEED_SHAKE, GEAR_BUFFET,
@@ -1468,7 +1528,8 @@ _ALL_SPECS = (
         TOUCHDOWN, DECELERATION, RUNWAY_RUMBLE, TURBULENCE, WIND,
         ROTOR_RUMBLE, VRS, BLADE_SLAP, ELEVATOR_DROOP, MSFS_ELEVATOR_DROOP,
         NOSEWHEEL_SHIMMY, AOA_REDUCTION, LATERAL_FORCE,
-        IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE)
+        IL2_BUFFET, IL2_PROP_ENGINE_SHAKE, IL2_JET_ENGINE_SHAKE, IL2_RUNWAY_RUMBLE,
+        HYDRAULIC_LOSS)
 
 
 
