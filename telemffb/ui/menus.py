@@ -27,12 +27,16 @@ here - only menu-construction/wiring lives in this module. ``G.master_instance``
 /``G.child_instance`` gating is carried over verbatim from where it used to
 live inline in ``MainWindow.__init__``.
 
-``menu``, ``window_menu``, ``log_menu``, ``log_window_action`` and
-``update_action`` are mirrored onto the MainWindow itself (``mainwindow.menu``
-etc.), since other MainWindow methods (``add_instance_log_menu``,
-``setup_master_instance``, ``perform_update``) read them directly.
-``add_debug_menu`` mirrors ``configurator_settings_action`` the same way,
-for ``refresh_configurator_gating``.
+``menu``, ``window_menu``, ``log_menu`` and ``log_window_action`` are mirrored
+onto the MainWindow itself (``mainwindow.menu`` etc.), since other MainWindow
+methods (``add_instance_log_menu``, ``setup_master_instance``) read them
+directly. ``add_debug_menu`` mirrors ``configurator_settings_action`` the
+same way, for ``refresh_configurator_gating``.
+
+The "Install Latest TelemFFB" action is not mirrored onto MainWindow; it is
+handed to ``mainwindow.updates`` (an ``UpdateChecker``, see
+``telemffb/ui/updates.py``) via ``bind_action`` so that module can
+enable/relabel it once a check completes.
 """
 
 import logging
@@ -164,11 +168,12 @@ class MainMenu:
         reset_action.triggered.connect(mw.reset_all_effects)
         utilities_menu.addAction(reset_action)
 
-        mw.update_action = QAction('Install Latest TelemFFB', mw)
-        mw.update_action.triggered.connect(mw.update_from_menu)
+        update_action = QAction('Install Latest TelemFFB', mw)
+        update_action.triggered.connect(mw.updates.update_from_menu)
         if not G.release_version:
-            utilities_menu.addAction(mw.update_action)
-        mw.update_action.setDisabled(True)
+            utilities_menu.addAction(update_action)
+        update_action.setDisabled(True)
+        mw.updates.bind_action(update_action)
 
         download_action = QAction('Download Other Versions', mw)
         download_action.triggered.connect(lambda: mw.open_url(dl_url))
@@ -385,8 +390,8 @@ class MainMenu:
 
         test_update = QAction('Test updater', mw)
         def do_test_update():
-            mw._update_available = True
-            mw.perform_update()
+            mw.updates._update_available = True
+            mw.updates.perform_update()
         test_update.triggered.connect(do_test_update)
         debug_menu.addAction(test_update)
 

@@ -63,7 +63,7 @@ from typing import List, Optional
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import QCoreApplication, Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit, QProgressDialog
+from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
 
 
 import resources
@@ -1346,26 +1346,7 @@ def _handle_window_display(headless_mode):
 
 def _check_version_update():
     """Check for version updates if not release or dev build."""
-    if G.master_instance and not G.release_version and not (G.dev_build or G.beta_build) and getattr(sys, 'frozen', False):
-        logging.info("Checking for version updates...")
-        dlg = QProgressDialog("Checking for updates...", "Skip", 0, 0, G.main_window)
-        dlg.setWindowTitle("TelemFFB")
-        dlg.setWindowModality(Qt.WindowModality.WindowModal)
-        dlg.setMinimumDuration(0)
-        dlg.setAutoClose(False)
-        dlg.setAutoReset(False)
-        dlg.show()
-
-        worker = utils.FetchLatestVersion(
-            G.main_window.update_version_result,
-            G.main_window.on_version_check_error
-        )
-
-        G.main_window._version_check_dialog = dlg
-        dlg.canceled.connect(G.main_window.on_version_check_cancelled)
-    else:
-        # Version checking is disabled; emit immediately so sim listeners can start.
-        G.main_window._emit_version_check_complete()
+    G.main_window.updates.start()
 
 def _check_system_settings_required():
     """Check if system settings dialog should be opened."""
@@ -1799,7 +1780,7 @@ def main():
 
     # Sim listeners start only after version check resolves (or is skipped),
     # preventing plugin dialogs from racing with the app-update prompt.
-    G.main_window.version_check_complete.connect(G.sim_listeners.start_all)
+    G.main_window.updates.version_check_complete.connect(G.sim_listeners.start_all)
 
     # Check for version updates in background (non-release builds)
     _check_version_update()
@@ -1842,7 +1823,7 @@ def main():
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop
     # ============================================================================
-    # replaced by G.main_window.version_check_complete.connect(G.sim_listeners.start_all) above
+    # replaced by G.main_window.updates.version_check_complete.connect(G.sim_listeners.start_all) above
 
     # Enter Qt application event loop - application runs until user exits.
     # The watchdog tells a native modal loop from a stall by whether the

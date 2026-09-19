@@ -24,7 +24,6 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 import sys
 import time
 import traceback
@@ -33,7 +32,7 @@ from datetime import datetime
 from typing import override
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, QUrl, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
                          QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase, QFont)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
@@ -76,10 +75,9 @@ from telemffb.ui.dialogs.ProfileManager import ProfileManagerDialog, NewProfileD
 from telemffb.utils import exit_application
 from telemffb.ui.menus import MainMenu
 from telemffb.ui.tray import TrayController
+from telemffb.ui.updates import UpdateChecker
 
 class MainWindow(QMainWindow):
-    version_check_complete = pyqtSignal()
-
     #: Number-sliders whose handle shows a live force readout: setting name
     #: -> the telemetry key its aircraft code publishes (fraction 0..1 of
     #: the relevant full scale, so 100% on the handle means clipping/max).
@@ -106,6 +104,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.preview = EffectPreviewController(self)   # effect previews, see preview_controller
         self.tray = TrayController(self)
+        self.updates = UpdateChecker(self)
         self.new_craft_notification_sent = False
         # The new-craft prompt's text/click-target lock: like the old
         # QLabel's isVisible() check, the aircraft it names is captured
@@ -120,10 +119,6 @@ class MainWindow(QMainWindow):
         self.flagged_error_msgs = set() # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
         self.telemetry_timed_out = True
         self.last_telemetry_refresh = utils.millis()
-        self.latest_version = None
-        self._update_available = None
-        self._version_check_resolved = False
-        self._version_check_dialog = None
         self.profile_mgr_dialog = None
 
 
@@ -917,91 +912,6 @@ class MainWindow(QMainWindow):
 
         self._sync_devices_display()
 
-    def on_version_check_cancelled(self):
-        """Called when the user clicks Skip on the version check progress dialog."""
-        if self._version_check_dialog is not None:
-            self._version_check_dialog = None
-        # Disconnect thread callbacks so a late result doesn't double-resolve.
-        for worker in utils.FetchLatestVersion.workers:
-            try:
-                worker.version_result_signal.disconnect(self.update_version_result)
-                worker.error_signal.disconnect(self.on_version_check_error)
-            except Exception:
-                pass
-        self._emit_version_check_complete()
-
-    def update_version_result(self, vers, url):
-        # Disconnect the canceled handler before perform_update runs its own
-        # QMessageBox inner event loops — QProgressDialog.closeEvent emits canceled,
-        # and any modal dialog processing can trigger it spuriously.
-        if self._version_check_dialog is not None:
-            try:
-                self._version_check_dialog.canceled.disconnect(self.on_version_check_cancelled)
-            except Exception:
-                pass
-
-        self.latest_version = vers
-
-        is_exe = getattr(sys, 'frozen', False)
-
-        if vers == "uptodate":
-            status_text = "Up To Date"
-            self.update_action.setDisabled(True)
-            self.version_label.setText(f'Version Status: {status_text}')
-        elif vers == "error":
-            status_text = "UNKNOWN"
-            self.version_label.setText(f'Version Status: {status_text}')
-        elif vers == 'dev':
-            if is_exe:
-                self.version_label.setText('Version Status: <b>Development Build</b>')
-            else:
-                self.version_label.setText('Version Status: <b>Development - Clean source</b>')
-
-        elif vers == 'needsupdate':
-            self.version_label.setText('Version Status: <b>Out of Date Source - Git pull needed</b>')
-
-        elif vers == 'dirty':
-            self.version_label.setText('Version Status: <b>Development - Modified Source</b>')
-
-        else:
-            self._update_available = True
-            logging.info(f"<<<<Update available - new version={vers}>>>>")
-
-            status_text = (f"New version <a href='{url}'><b>{vers}</b></a> is available! "
-                           f"(<a href='{G.release_notes_url}'>release notes</a>)")
-            self.update_action.setDisabled(False)
-            self.update_action.setText("Install Latest TelemFFB")
-            self.version_label.setToolTip(url)
-            self.version_label.setText(f'Version Status: {status_text}')
-
-        # If the user accepts the update, perform_update launches the updater and
-        # schedules app exit — sim listeners don't need to start in that case.
-        # For every other outcome (up to date, dev, error, declined) emit the signal.
-        if not self.perform_update(auto=True):
-            self._emit_version_check_complete()
-
-        # Hide (not close) the dialog so closeEvent/canceled are not emitted.
-        if self._version_check_dialog is not None:
-            self._version_check_dialog.hide()
-            self._version_check_dialog = None
-
-    def on_version_check_error(self, error_message):
-        if self._version_check_dialog is not None:
-            try:
-                self._version_check_dialog.canceled.disconnect(self.on_version_check_cancelled)
-            except Exception:
-                pass
-            self._version_check_dialog.hide()
-            self._version_check_dialog = None
-        logging.error("Error checking for version update: %s", error_message)
-        self._emit_version_check_complete()
-
-    def _emit_version_check_complete(self):
-        """Emit version_check_complete exactly once, regardless of how many paths resolve."""
-        if not self._version_check_resolved:
-            self._version_check_resolved = True
-            self.version_check_complete.emit()
-
     def change_config_scope(self, _arg):
         if isinstance(_arg, str):
             if 'joystick' in _arg: arg = 1
@@ -1457,10 +1367,6 @@ class MainWindow(QMainWindow):
                 pass
 
 
-
-    def update_from_menu(self):
-        if self.perform_update(auto=False):
-            QCoreApplication.instance().quit()
 
     def update_sim_indicators(self, source, paused=False, error=False, message=None):
         """Runs on every telemetry frame
@@ -2050,66 +1956,4 @@ class MainWindow(QMainWindow):
             self.open_trim_calibration_dialog()
         elif notice_id == 'profile_change':
             self._on_profile_change_link(None)
-
-
-    def perform_update(self, auto=True):
-        if G.release_version:
-            return False
-
-        ignore_auto_updates = G.system_settings.get('ignoreUpdate', False)
-        if not auto:
-            ignore_auto_updates = False
-        update_ans = QMessageBox.StandardButton.No
-        proceed_ans = QMessageBox.StandardButton.Cancel
-        try:
-            updater_execution_path = os.path.join(utils.get_script_path(), 'updater.exe')
-            if os.path.exists(updater_execution_path):
-                os.remove(updater_execution_path)
-        except Exception as e:
-            logging.error(f'Error in perform_update: {e}')
-
-        is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
-        # is_exe = True
-        if G.child_instance: return False
-        if ignore_auto_updates: return False
-        if not is_exe: return False
-
-        if self._update_available:
-            update_ans = QMessageBox.StandardButton.Yes
-            if auto:
-                # Rich text so the release-notes link is clickable; clicking
-                # it opens the browser without closing the dialog.
-                update_ans = QMessageBox.information(self, "Update Available!!",
-                                                     f"A new version of TelemFFB is available (<b>{self.latest_version}</b>).<br><br>"
-                                                     f"<a href='{G.release_notes_url}'>View the release notes</a> to see what's new.<br><br>"
-                                                     f"Would you like to automatically download and install it now?<br><br>"
-                                                     f"You may also update later from the Utilities menu, or the "
-                                                     f"next time TelemFFB starts.<br><br>"
-                                                     f"~~ Note ~~ If you no longer wish to see this message on startup, "
-                                                     f"you may enable `ignore_auto_updates` in your user config. "
-                                                     f"You will still be able to update via the Utilities menu",
-                                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
-
-            if update_ans == QMessageBox.StandardButton.Yes:
-                proceed_ans = QMessageBox.information(self, "TelemFFB Updater",
-                                                      f"TelemFFB will now exit and launch the updater.\n\nPress OK to continue",
-                                                      QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel)
-
-            if proceed_ans == QMessageBox.StandardButton.Ok:
-                updater_execution_path = os.path.join(utils.get_script_path(), 'updater.exe')
-                shutil.copy(sys.argv[0], updater_execution_path)
-
-                # Copy the updater executable with forced overwrite
-
-                call = [updater_execution_path, "--current_version", utils.get_version()] + sys.argv[1:]
-                subprocess.Popen(call, cwd=utils.get_install_path())
-                if auto:
-                    for child_widget in self.findChildren(QMessageBox):
-                        child_widget.reject()
-                    QTimer.singleShot(250, exit_application)
-                return True
-
-        return False
-
-
 
