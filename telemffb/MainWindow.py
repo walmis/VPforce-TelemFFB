@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QFrame, QGroupBox,
                              QHBoxLayout, QLabel, QMainWindow, QMessageBox,
                              QPushButton, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget, QSizePolicy, QSystemTrayIcon, QMenu,
+                             QToolButton, QVBoxLayout, QWidget, QSizePolicy,
                              QDialog, QStatusBar)
 
 import telemffb.globals as G
@@ -74,6 +74,8 @@ from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.ui.dialogs.ProfileManager import ProfileManagerDialog, NewProfileDialog
 from telemffb.utils import exit_application
+from telemffb.ui.menus import MainMenu
+from telemffb.ui.tray import TrayController
 
 class MainWindow(QMainWindow):
     version_check_complete = pyqtSignal()
@@ -103,8 +105,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.preview = EffectPreviewController(self)   # effect previews, see preview_controller
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_notifications = {}
+        self.tray = TrayController(self)
         self.new_craft_notification_sent = False
         # The new-craft prompt's text/click-target lock: like the old
         # QLabel's isVisible() check, the aircraft it names is captured
@@ -200,231 +201,12 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         notes_row_layout = QHBoxLayout()
 
+        """ Build the menu bar - System/Profiles/Utilities/Window/Log/
+        Help menus and (Alt+D / debug key) the Debug menu. See
+        telemffb/ui/menus.py """
 
-        """ Create the menu bar """
-
-        menubar = self.menuBar()
-        self.menu = menubar
-        assert self.menu is not None
-        # Set the background color of the menu bar
-        # "#ab37c8" is VPForce purple
-
-
-        """ Add the "System" menu and its sub-option """
-
-        system_menu = self.menu.addMenu('&System')
-
-        if G.master_instance:
-            # Settings for every device live in the master's dialog; a child
-            # has none of its own to show.
-            system_settings_action = QAction('System Settings', self)
-            system_settings_action.triggered.connect(self.open_system_settings_dialog)
-            system_menu.addAction(system_settings_action)
-
-        cfg_log_folder_action = QAction('Open Config/Log Directory', self)
-        def do_open_cfg_dir():
-            modifiers = QApplication.keyboardModifiers()
-            if (modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier) and getattr(sys, 'frozen', False):
-                os.startfile(getattr(sys, "_MEIPASS"), 'open')
-            else:
-                os.startfile(G.userconfig_rootpath, 'open')
-        cfg_log_folder_action.triggered.connect(do_open_cfg_dir)
-        system_menu.addAction(cfg_log_folder_action)
-
-        reset_geometry = QAction('Reset Window Size/Position', self)
-
-        def do_reset_window_size():
-            match G.device_type:
-                case 'joystick':
-                    x_pos = 150
-                    y_pos = 130
-                case 'pedals':
-                    x_pos = 100
-                    y_pos = 100
-                case 'collective':
-                    x_pos = 50
-                    y_pos = 70
-                case 'trimwheel':
-                    x_pos = 40
-                    y_pos = 30
-            self.setGeometry(x_pos, y_pos, 530, 700)
-
-        reset_geometry.triggered.connect(do_reset_window_size)
-        system_menu.addAction(reset_geometry)
-
-        # Quitting a child ends that instance; only the master takes the
-        # whole application down with it.
-        exit_app_action = QAction(
-            'Quit TelemFFB' if G.master_instance else
-            f'Quit the {utils.device_display_name(G.device_type)} Instance',
-            self)
-        exit_app_action.triggered.connect(exit_application)
-        system_menu.addAction(exit_app_action)
-
-        if G.master_instance:
-            """
-            Create profiles menu - only for Master Instance
-            """
-            self.profiles_menu = self.menu.addMenu('Profiles')
-
-            self.profile_manager_action = QAction('Profile Manager...', self)
-            self.profile_manager_action.triggered.connect(self.show_profile_manager)
-            self.profiles_menu.addAction(self.profile_manager_action)
-
-            self.offline_config_action = QAction(r'Offline Editor/Effect Preview', self)
-            self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
-            self.profiles_menu.addAction(self.offline_config_action)
-
-            self.profiles_menu.setToolTipsVisible(True)
-            self.forget_offers_action = QAction('Reset Dismissed Profile Prompts', self)
-            self.forget_offers_action.setToolTip(
-                "TelemFFB will ask again about each aircraft you answered with 'Keep mine' "
-                "or 'Don't ask again', the next time the aircraft loads.")
-            self.forget_offers_action.triggered.connect(self.forget_profile_offers)
-            self.profiles_menu.addAction(self.forget_offers_action)
-            # Nothing dismissed means nothing to bring back; checked as the menu
-            # opens rather than tracked, since prompts are answered elsewhere.
-            self.profiles_menu.aboutToShow.connect(
-                lambda: self.forget_offers_action.setEnabled(match_history.has_declines()))
-
-
-        """ Create the "Utilities" menu """
-
-        utilities_menu = self.menu.addMenu('Utilities')
-
-        # Add the "Reset" action to the "Utilities" menu
-        reset_action = QAction('Reset All Effects', self)
-        reset_action.triggered.connect(self.reset_all_effects)
-        utilities_menu.addAction(reset_action)
-
-        self.update_action = QAction('Install Latest TelemFFB', self)
-        self.update_action.triggered.connect(self.update_from_menu)
-        if not G.release_version:
-            utilities_menu.addAction(self.update_action)
-        self.update_action.setDisabled(True)
-
-        download_action = QAction('Download Other Versions', self)
-        download_action.triggered.connect(lambda: self.open_url(dl_url))
-        utilities_menu.addAction(download_action)
-
-        self.reset_user_config_action = QAction('Reset User Config', self)
-        self.reset_user_config_action.triggered.connect(self.reset_user_config)
-        utilities_menu.addAction(self.reset_user_config_action)
-
-        def launch_vpconf():
-            try:
-                utils.launch_vpconf()
-            except Exception as e:
-                logging.error(f"Error launching VPforce Configurator: {e}")
-                QMessageBox.critical(self, "Error", f"Error launching VPforce Configurator: {e}")
-        self.vpconf_action = QAction("Launch VPforce Configurator", self)
-        self.vpconf_action.triggered.connect(launch_vpconf)
-        utilities_menu.addAction(self.vpconf_action)
-
-        reload_action = QAction('Force Reload Aircraft (Ctrl+Shift+R)', self)
-        reload_action.triggered.connect(self.force_reload_aircraft)
-        utilities_menu.addAction(reload_action)
-
-        sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
-
-        def do_open_sc_override_dialog():
-            dialog = SCOverridesEditor(self)
-            # Overrides save immediately in the editor; refresh the status
-            # pill once the dialog closes so it reflects any changes.
-            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
-            dialog.raise_()
-            dialog.activateWindow()
-            dialog.show()
-
-        # dialog.exec_()
-        sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
-        utilities_menu.addAction(sc_overrides_action)
-
-
-        trim_cal_action = QAction('Elevator Trim Calibration...', self)
-        trim_cal_action.triggered.connect(self.open_trim_calibration_dialog)
-        utilities_menu.addAction(trim_cal_action)
-
-        # A window on the tap's shared-memory mirror: whether a game is
-        # publishing, which devices the wrapper captured, and what every
-        # effect slot is being told - with a timestamped change log to
-        # save and send in.  The remote-troubleshooting answer to "no
-        # forces in DCS".
-        tap_monitor_action = QAction('DirectInput Tap Monitor...', self)
-        tap_monitor_action.triggered.connect(self.open_tap_monitor)
-        utilities_menu.addAction(tap_monitor_action)
-
-        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
-            """
-            Add Window menu to manage child instances if it is a master instance
-            """
-            self.window_menu = self.menu.addMenu('Window')
-
-            def do_toggle_child_windows(toggle):
-                if toggle == 'show':
-                    G.ipc_instance.send_broadcast_message("SHOW WINDOW")
-                elif toggle == 'hide':
-                    G.ipc_instance.send_broadcast_message("HIDE WINDOW")
-
-            self.show_children_action = QAction('Show Child Instance Windows')
-            self.show_children_action.triggered.connect(lambda: do_toggle_child_windows('show'))
-            self.window_menu.addAction(self.show_children_action)
-            self.hide_children_action = QAction('Hide Child Instance Windows')
-            self.hide_children_action.triggered.connect(lambda: do_toggle_child_windows('hide'))
-            self.window_menu.addAction(self.hide_children_action)
-
-        if G.child_instance:
-            """
-            Add Child instance window menu
-            """
-            self.window_menu = self.menu.addMenu('Window')
-            self.hide_window_action = QAction('Hide Window')
-            def do_hide_window():
-                try:
-                    self.hide()
-                except Exception as e:
-                    logging.error(f"EXCEPTION: {e}")
-            self.hide_window_action.triggered.connect(do_hide_window)
-            self.window_menu.addAction(self.hide_window_action)
-
-
-        """ Add Log Menu """
-
-        self.log_menu = self.menu.addMenu('Log')
-        self.log_window_action = QAction("Open Console Log", self)
-
-        def do_toggle_log_window():
-            if G.log_window.isVisible():
-                G.log_window.hide()
-            else:
-                G.log_window.move(self.x()+50, self.y()+100)
-                G.log_window.show()
-
-        self.log_window_action.triggered.connect(do_toggle_log_window)
-        self.log_menu.addAction(self.log_window_action)
-
-
-        """ Add Help Menu """
-
-        help_menu = self.menu.addMenu('Help')
-
-        notes_action = QAction('Release Notes', self)
-        def do_open_file(url):
-            try:
-                file_url = QUrl.fromLocalFile(url)
-                QDesktopServices.openUrl(file_url)
-            except Exception as e:
-                logging.error(f"There was an error opening the file: {str(e)}")
-        notes_action.triggered.connect(lambda : do_open_file(notes_url))
-        help_menu.addAction(notes_action)
-
-        docs_action = QAction('Documentation', self)
-        docs_action.triggered.connect(lambda: self.open_url(doc_url))
-        help_menu.addAction(docs_action)
-
-        self.support_action = QAction("Create support bundle", self)
-        self.support_action.triggered.connect(lambda: utils.create_support_bundle(G.userconfig_rootpath))
-        help_menu.addAction(self.support_action)
+        self.main_menu = MainMenu(self)
+        self.main_menu.build()
 
         # Create a line beneath the menu bar
         line = QFrame()
@@ -681,7 +463,7 @@ class MainWindow(QMainWindow):
         """ Add Debug Menu to the menu bar - control visibility with Alt+D shortcut or via debug key in registry """
 
         debug_shortcut = QShortcut(QKeySequence('Alt+D'), self)
-        debug_shortcut.activated.connect(self.add_debug_menu)
+        debug_shortcut.activated.connect(self.main_menu.add_debug_menu)
 
         reload_shortcut = QShortcut(QKeySequence('Ctrl+Shift+R'), self)
         reload_shortcut.activated.connect(self.force_reload_aircraft)
@@ -693,7 +475,7 @@ class MainWindow(QMainWindow):
 
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
-            self.add_debug_menu()
+            self.main_menu.add_debug_menu()
 
         """  Create configurator gain dialog for use during TelemFFB session and store object in globals """
 
@@ -799,108 +581,6 @@ class MainWindow(QMainWindow):
                     G.ipc_instance.send_broadcast_message(f"MASTER_BUTTONS:{G.active_buttons}")
                 else:
                     G.ipc_instance.send_message(f"BUTTONS:{G.device_type}_{G.active_buttons}")
-
-    def add_system_tray(self):
-        self.tray_icon.setIcon(QIcon(":/image/vpforceicon.png"))
-        self.tray_icon.setToolTip("VPforce TelemFFB")
-
-        # Create the tray menu
-        tray_menu = QMenu()
-        show_action = QAction("Show Window", self)
-
-        def do_show_main_window(trigger):
-            if isinstance(trigger, QSystemTrayIcon.ActivationReason):
-                if trigger == QSystemTrayIcon.ActivationReason.DoubleClick:
-                    self.showNormal()  # Restore the window to its normal state if minimized
-                    self.show()
-                    self.raise_()
-                    self.activateWindow()
-            elif isinstance(trigger, str) and trigger == "show":
-                self.showNormal()  # Restore the window to its normal state if minimized
-                self.show()
-                self.raise_()
-                self.activateWindow()
-            if G.is_exe:
-                start_with_windows_action.setChecked(self.toggle_start_with_windows())
-            start_minimized_action.setChecked(G.system_settings.get('startToTray', False))
-            send_to_tray_action.setChecked(G.system_settings.get('closeToTray', False))
-
-        self.tray_icon.activated.connect(do_show_main_window)
-        show_action.triggered.connect(lambda: do_show_main_window('show'))
-
-        tray_menu.addAction(show_action)
-
-        # Create the "Options" menu
-        options_menu = QMenu("Options", self)
-
-        # Setup Start With Windows menu option
-        if G.is_exe:
-            start_with_windows_action = QAction("Start With Windows", self)
-            start_with_windows_action.setCheckable(True)
-            start_with_windows_action.setChecked(G.system_settings.get('startWithWindows', False))
-
-            def do_toggle_set_start_with_windows(checked):
-                self.toggle_start_with_windows(checked)
-
-            start_with_windows_action.triggered.connect(lambda checked: do_toggle_set_start_with_windows(checked))
-
-            options_menu.addAction(start_with_windows_action)
-
-        # Setup Start Minimized menu option
-        start_minimized_action = QAction("Start in Tray", self)
-        start_minimized_action.setCheckable(True)
-        start_minimized_action.setChecked(G.system_settings.get('startToTray', False))
-
-        def do_toggle_set_start_minimized(checked):
-            G.system_settings.setValue('startToTray', checked)
-
-        start_minimized_action.triggered.connect(lambda checked: do_toggle_set_start_minimized(checked))
-
-        options_menu.addAction(start_minimized_action)
-
-        # Setup Send to Tray menu option
-        send_to_tray_action = QAction("Closing App Sends to Tray", self)
-        send_to_tray_action.setCheckable(True)
-        send_to_tray_action.setChecked(G.system_settings.get('closeToTray', False))
-
-        def do_toggle_set_send_to_tray(checked):
-            G.system_settings.setValue('closeToTray', checked)
-
-        send_to_tray_action.triggered.connect(lambda checked: do_toggle_set_send_to_tray(checked))
-
-        options_menu.addAction(send_to_tray_action)
-
-        tray_menu.addMenu(options_menu)
-
-        # Create the "Instances" menu
-        if G.launched_instances:
-            show_menu = QMenu("Instances", self)
-            show_child_window_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
-                if d in G.launched_instances:
-                    def do_show_child_window(child=d):
-                        G.ipc_instance.send_broadcast_message(f'SHOW WINDOW:{child}')
-
-                    show_child_window_action[d] = QAction(f'Show {d.capitalize()} Instance', self)
-                    show_child_window_action[d].triggered.connect(lambda _, child=d: do_show_child_window(child))
-                    show_menu.addAction(show_child_window_action[d])
-            tray_menu.addMenu(show_menu)
-
-        quit_action = QAction("Quit TelemFFB", self)
-        quit_action.triggered.connect(exit_application)
-        tray_menu.addAction(quit_action)
-
-        self.tray_icon.setContextMenu(tray_menu)
-        # Show the tray icon
-        self.tray_icon.show()
-        if self.isHidden():
-            #  don't show, send message to tray icon that will pop to notify user that TelemFFB is running in Tray
-            icon = QIcon(":/image/vpforceicon.png")
-            self.pop_tray_notification(
-                None,
-                "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to show or right click to set options in the context menu",
-                5
-            )
 
     def toggle_start_with_windows(self, set_enabled=None):
         try:
@@ -1146,107 +826,6 @@ class MainWindow(QMainWindow):
         count = G.exception_tracker.get_count()
         self.exception_status_widget.set_count(count)
 
-    def add_debug_menu(self):
-        # debug mode
-        for action in self.menu.actions():
-            if action.text() == "Debug":
-                return
-        debug_menu = self.menu.addMenu("Debug")
-
-        teleplot_action = QAction("Teleplot Setup", self)
-        def do_open_teleplot_setup_dialog():
-            self.teleplot_dialog = TeleplotSetupDialog(self)
-            self.teleplot_dialog.cb_send.setChecked(utils.teleplot.enabled)
-            self.teleplot_dialog.exec()
-        teleplot_action.triggered.connect(do_open_teleplot_setup_dialog)
-        debug_menu.addAction(teleplot_action)
-
-        show_simvar_action = QAction("Show simvar in telem window", self)
-        def do_toggle_simvar_telemetry():
-            self.monitor_panel.set_show_simvars(not self.monitor_panel.show_simvars)
-            show_simvar_action.setChecked(self.monitor_panel.show_simvars)
-
-        show_simvar_action.triggered.connect(do_toggle_simvar_telemetry)
-        show_simvar_action.setCheckable(True)
-        debug_menu.addAction(show_simvar_action)
-
-        show_order_action = QAction("Show settings order numbering", self)
-        def do_toggle_order_numbering():
-            SettingsLayout.show_order_debug = not  SettingsLayout.show_order_debug
-            show_order_action.setChecked(SettingsLayout.show_order_debug)
-
-        show_order_action.triggered.connect(do_toggle_order_numbering)
-        show_order_action.setCheckable(True)
-        debug_menu.addAction(show_order_action)
-
-        show_replaced = QAction("Show settings source", self)
-        def do_toggle_replaced():
-            SettingsLayout.show_replaced = not SettingsLayout.show_replaced
-            show_replaced.setChecked(SettingsLayout.show_replaced)
-
-        show_replaced.triggered.connect(do_toggle_replaced)
-        show_replaced.setCheckable(True)
-        debug_menu.addAction(show_replaced)
-
-
-        show_settingname_action = QAction("Show settings internal name", self)
-        def do_toggle_settingsnames():
-            SettingsLayout.show_settings_names = not  SettingsLayout.show_settings_names
-            show_settingname_action.setChecked(SettingsLayout.show_settings_names)
-
-        show_settingname_action.triggered.connect(do_toggle_settingsnames)
-        show_settingname_action.setCheckable(True)
-        debug_menu.addAction(show_settingname_action)
-
-        # Effect preview (hardware check for the preview runner): one
-        # entry per shipped spec, played on the device with synthetic
-        # telemetry and the settings tab's current model.
-        preview_menu = debug_menu.addMenu("Preview Effect")
-        for name, spec in PREVIEW_SPECS.items():
-            preview_action = QAction(f"{name}  ({spec.kind}, {spec.duration:g}s)", self)
-            preview_action.triggered.connect(
-                lambda checked=False, s=spec: self.preview.start(s))
-            preview_menu.addAction(preview_action)
-        stop_preview_action = QAction("Stop preview", self)
-        stop_preview_action.triggered.connect(self.preview.stop)
-        preview_menu.addAction(stop_preview_action)
-
-        configurator_settings_action = QAction('Configurator Gain Override', self)
-        def do_open_configurator_dialog():
-            dialog = ConfiguratorDialog(self)
-            dialog.raise_()
-            dialog.activateWindow()
-            dialog.show()
-        configurator_settings_action.triggered.connect(do_open_configurator_dialog)
-        self.configurator_settings_action = configurator_settings_action
-        self.refresh_configurator_gating()
-        debug_menu.addAction(configurator_settings_action)
-
-        sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
-        def do_open_sc_override_dialog():
-            dialog = SCOverridesEditor(self)
-            # Overrides save immediately in the editor; refresh the status
-            # pill once the dialog closes so it reflects any changes.
-            dialog.finished.connect(lambda *_: self.refresh_telem_override_pill(force=True))
-            dialog.raise_()
-            dialog.activateWindow()
-            dialog.show()
-        # dialog.exec_()
-        sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
-        debug_menu.addAction(sc_overrides_action)
-
-        test_update = QAction('Test updater', self)
-        def do_test_update():
-            self._update_available = True
-            self.perform_update()
-        test_update.triggered.connect(do_test_update)
-        debug_menu.addAction(test_update)
-
-        if G.master_instance:
-            custom_userconfig_action = QAction("Load Custom User Config", self)
-            custom_userconfig_action.triggered.connect(lambda: utils.load_custom_userconfig())
-            debug_menu.addAction(custom_userconfig_action)
-
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
@@ -1311,7 +890,7 @@ class MainWindow(QMainWindow):
         # if 'trimwheel' in G.launched_instances:
         #     self.instance_status_row.trimwheel_status_icon.show()
         self.add_instance_log_menu()
-        self.add_system_tray()
+        self.tray.build()
         order, configured = self._device_display_order()
         self.device_panel.set_devices(order, configured=configured)
         self.device_panel.set_device_status(G.device_type, device_status_state())
@@ -1530,7 +1109,7 @@ class MainWindow(QMainWindow):
             if G.system_settings.get('closeToTray', False):
                 self.hide()
                 event.ignore()
-                self.pop_tray_notification(
+                self.tray.show_notification(
                     None,
                     "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to re-show or right click to set options in the context menu",
                     5
@@ -1729,7 +1308,7 @@ class MainWindow(QMainWindow):
             # Only worth a toast when the window cannot be seen, and it says
             # what is true: nothing has been decided and nothing is asked for.
             if self.isHidden() or self.isMinimized():
-                self.pop_tray_notification(
+                self.tray.show_notification(
                     "Multiple matching profiles",
                     f"{change['aircraft']}: your {change['user']} and the built-in "
                     f"{change['curated']} both match.\nOpen TelemFFB to resolve.",
@@ -1883,24 +1462,6 @@ class MainWindow(QMainWindow):
         if self.perform_update(auto=False):
             QCoreApplication.instance().quit()
 
-    def pop_tray_notification(self, title, message, renew_period):
-            current_time = time.time()
-            notification_key = (title, message)
-
-            # Check if the notification was shown within the specified period
-            if notification_key in self.tray_notifications:
-                last_shown_time = self.tray_notifications[notification_key]
-                if current_time - last_shown_time < renew_period:
-                    # Notification was shown recently, do not show again
-                    return
-            # Show the notification
-            icon = QIcon(":/image/vpforceicon.png")
-            self.tray_icon.showMessage(title, message, icon)
-            # Update the last shown time
-            self.tray_notifications[notification_key] = current_time
-            self.tray_icon.messageClicked.connect(self.show)
-
-
     def update_sim_indicators(self, source, paused=False, error=False, message=None):
         """Runs on every telemetry frame
         """
@@ -1925,29 +1486,13 @@ class MainWindow(QMainWindow):
             self.header_panel.status_container.set_running(source)
 
 
-        if G.master_instance:
-            if error:
-                # error is true and was previously false.  Set sys tray attributes and pop notification
-
-                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
-                self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-
-                # The popup's job is initial attention; the tray icon and
-                # tooltip carry the persistent state.  A short renew period
-                # made a persistent error a metronome - the same message
-                # popped every couple of seconds for as long as it held.
-                self.pop_tray_notification("Error", message,
-                                           renew_period=300)
-
-
-            elif paused:
-                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_paused.png'))
-                self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Paused ")
-
-            elif not paused:
-                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_run.png'))
-                self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
-                # re-show the "current aircraft" label once error cleared
+        if error:
+            self.tray.set_status('error', source, message)
+        elif paused:
+            self.tray.set_status('paused', source)
+        elif not paused:
+            self.tray.set_status('running', source)
+            # re-show the "current aircraft" label once error cleared
 
     def on_first_sim_frame(self, src):
         """Handle first_frame_received: clear the initial 'Waiting' state by
@@ -2300,7 +1845,7 @@ class MainWindow(QMainWindow):
                     if not data.get('STOP', False):
                         if not self.new_craft_notification_sent:
 
-                            self.pop_tray_notification(
+                            self.tray.show_notification(
                                 "** New Aircraft Found **",
                                 f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
                                 10,

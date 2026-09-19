@@ -1339,7 +1339,7 @@ def _handle_window_display(headless_mode):
         if G.args.minimize or G.system_settings.get('masterStartMin', False):
             G.main_window.showMinimized()
         elif G.master_instance and G.system_settings.get('startToTray', False):
-            # Don't show window, tray message will pop during 'setup_master_instance'->'add_system_tray'
+            # Don't show window, tray message will pop during 'setup_master_instance'->'tray.build'
             pass
         else:
             G.main_window.show()

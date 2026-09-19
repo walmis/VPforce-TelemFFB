@@ -10,9 +10,9 @@ whose device is unassigned still asks the master to open settings, and that
 ask matters more than before, because the master's dialog is now where that
 child's settings live.
 
-The menu bar is built inline in MainWindow.__init__, so these read the
-source rather than a live window: what is being asserted is the wiring, and
-the guard a statement sits under is structure, not text.
+The menu bar is built in MainMenu.build() (telemffb/ui/menus.py), so these
+read the source rather than a live window: what is being asserted is the
+wiring, and the guard a statement sits under is structure, not text.
 """
 import re
 from pathlib import Path
@@ -86,7 +86,7 @@ class TestDeviceNaming:
 class TestTheChildsMenu:
     @pytest.fixture(scope="class")
     def main_window(self):
-        return source('telemffb/MainWindow.py')
+        return source('telemffb/ui/menus.py')
 
     def test_system_settings_is_the_masters(self, main_window):
         guards = guards_of(main_window, "system_settings_action = QAction")
