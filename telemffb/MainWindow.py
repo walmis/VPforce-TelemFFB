@@ -607,21 +607,6 @@ class MainWindow(QMainWindow):
                 winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, exe_path)
                 winreg.CloseKey(reg_key)
 
-    def add_instance_log_menu(self):
-        self.log_menu.addAction(self.log_window_action)
-        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
-            self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
-
-            self.log_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
-                if d in G.launched_instances:
-                    def do_show_child_log(child=d):
-                        G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
-
-                    self.log_action[d] = QAction(f'{d} Log'.capitalize())
-                    self.log_action[d].triggered.connect(lambda _, child=d: do_show_child_log(child))
-                    self.child_log_menu.addAction(self.log_action[d])
-
     def test_function(self):
         self.set_scrollbar(400)
 
@@ -638,16 +623,10 @@ class MainWindow(QMainWindow):
             self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
 
     def refresh_configurator_gating(self):
-        # the action is part of the Debug menu, which only exists with the
-        # debug registry key (or Alt+D) - on a normal install there is
-        # nothing to gate
-        action = getattr(self, 'configurator_settings_action', None)
-        if action is None:
-            return
         caps = getattr(HapticEffect.device, 'caps', None)
         no_gains = caps is not None and not caps.has_gains
-        action.setEnabled(not no_gains)
-        action.setToolTip(
+        self.main_menu.set_configurator_action_enabled(
+            not no_gains,
             'Not supported on this device (no Configurator gains)'
             if no_gains else '')
 
@@ -879,7 +858,7 @@ class MainWindow(QMainWindow):
         #     self.instance_status_row.collective_status_icon.show()
         # if 'trimwheel' in G.launched_instances:
         #     self.instance_status_row.trimwheel_status_icon.show()
-        self.add_instance_log_menu()
+        self.main_menu.add_instance_log_menu()
         self.tray.build()
         order, configured = self._device_display_order()
         self.device_panel.set_devices(order, configured=configured)
@@ -893,17 +872,9 @@ class MainWindow(QMainWindow):
         always shown, but the rest may just be inert ghost icons """
 
         if len(configured) > 1:
-            if not hasattr(self, 'window_menu'):
-                self.window_menu = self.menu.addMenu('Window')
-            elif self.window_menu.actions():
-                self.window_menu.addSeparator()
-            self.show_devices_frame_action = QAction('Show Device Frame', self)
-            self.show_devices_frame_action.setCheckable(True)
-            self.show_devices_frame_action.setChecked(bool(G.system_settings.get('showDevicesFrame', True)))
-            def do_toggle_devices_frame():
-                self._set_devices_frame_preference(self.show_devices_frame_action.isChecked())
-            self.show_devices_frame_action.triggered.connect(do_toggle_devices_frame)
-            self.window_menu.addAction(self.show_devices_frame_action)
+            self.main_menu.add_show_devices_frame_action(
+                bool(G.system_settings.get('showDevicesFrame', True)),
+                self._set_devices_frame_preference)
 
         self._sync_devices_display()
 

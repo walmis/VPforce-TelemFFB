@@ -27,11 +27,12 @@ here - only menu-construction/wiring lives in this module. ``G.master_instance``
 /``G.child_instance`` gating is carried over verbatim from where it used to
 live inline in ``MainWindow.__init__``.
 
-``menu``, ``window_menu``, ``log_menu`` and ``log_window_action`` are mirrored
-onto the MainWindow itself (``mainwindow.menu`` etc.), since other MainWindow
-methods (``add_instance_log_menu``, ``setup_master_instance``) read them
-directly. ``add_debug_menu`` mirrors ``configurator_settings_action`` the
-same way, for ``refresh_configurator_gating``.
+The menu bar, the Window/Log menus and the Debug menu's Configurator
+action all live on this object (``self.menu``, ``self.window_menu``,
+``self.log_menu``, ``self.log_window_action``, ``self.configurator_settings_action``)
+rather than being mirrored onto MainWindow. MainWindow reaches them through
+``self.main_menu`` and the small public methods below (``add_instance_log_menu``,
+``add_show_devices_frame_action``, ``set_configurator_action_enabled``).
 
 The "Install Latest TelemFFB" action is not mirrored onto MainWindow; it is
 handed to ``mainwindow.updates`` (an ``UpdateChecker``, see
@@ -76,7 +77,6 @@ class MainMenu:
 
         menubar = mw.menuBar()
         self.menu = menubar
-        mw.menu = menubar
         assert self.menu is not None
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
@@ -230,7 +230,7 @@ class MainMenu:
             """
             Add Window menu to manage child instances if it is a master instance
             """
-            mw.window_menu = self.menu.addMenu('Window')
+            self.window_menu = self.menu.addMenu('Window')
 
             def do_toggle_child_windows(toggle):
                 if toggle == 'show':
@@ -240,16 +240,16 @@ class MainMenu:
 
             self.show_children_action = QAction('Show Child Instance Windows')
             self.show_children_action.triggered.connect(lambda: do_toggle_child_windows('show'))
-            mw.window_menu.addAction(self.show_children_action)
+            self.window_menu.addAction(self.show_children_action)
             self.hide_children_action = QAction('Hide Child Instance Windows')
             self.hide_children_action.triggered.connect(lambda: do_toggle_child_windows('hide'))
-            mw.window_menu.addAction(self.hide_children_action)
+            self.window_menu.addAction(self.hide_children_action)
 
         if G.child_instance:
             """
             Add Child instance window menu
             """
-            mw.window_menu = self.menu.addMenu('Window')
+            self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
             def do_hide_window():
                 try:
@@ -257,13 +257,13 @@ class MainMenu:
                 except Exception as e:
                     logging.error(f"EXCEPTION: {e}")
             self.hide_window_action.triggered.connect(do_hide_window)
-            mw.window_menu.addAction(self.hide_window_action)
+            self.window_menu.addAction(self.hide_window_action)
 
 
         """ Add Log Menu """
 
-        mw.log_menu = self.menu.addMenu('Log')
-        mw.log_window_action = QAction("Open Console Log", mw)
+        self.log_menu = self.menu.addMenu('Log')
+        self.log_window_action = QAction("Open Console Log", mw)
 
         def do_toggle_log_window():
             if G.log_window.isVisible():
@@ -272,8 +272,8 @@ class MainMenu:
                 G.log_window.move(mw.x()+50, mw.y()+100)
                 G.log_window.show()
 
-        mw.log_window_action.triggered.connect(do_toggle_log_window)
-        mw.log_menu.addAction(mw.log_window_action)
+        self.log_window_action.triggered.connect(do_toggle_log_window)
+        self.log_menu.addAction(self.log_window_action)
 
 
         """ Add Help Menu """
@@ -297,6 +297,47 @@ class MainMenu:
         self.support_action = QAction("Create support bundle", mw)
         self.support_action.triggered.connect(lambda: utils.create_support_bundle(G.userconfig_rootpath))
         help_menu.addAction(self.support_action)
+
+    def add_instance_log_menu(self):
+        self.log_menu.addAction(self.log_window_action)
+        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
+            self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
+
+            self.log_action = {}
+            for d in ["joystick", "pedals", "collective", 'trimwheel']:
+                if d in G.launched_instances:
+                    def do_show_child_log(child=d):
+                        G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
+
+                    self.log_action[d] = QAction(f'{d} Log'.capitalize())
+                    self.log_action[d].triggered.connect(lambda _, child=d: do_show_child_log(child))
+                    self.child_log_menu.addAction(self.log_action[d])
+
+    def add_show_devices_frame_action(self, checked, on_toggled):
+        """Window menu: 'Show Device Frame', only added when the owning
+        instance has more than one CONFIGURED device on its own panel -
+        lazily creates the Window menu if this instance hasn't needed one
+        yet (a solo master/child never gets one otherwise)."""
+        if not hasattr(self, 'window_menu'):
+            self.window_menu = self.menu.addMenu('Window')
+        elif self.window_menu.actions():
+            self.window_menu.addSeparator()
+        self.show_devices_frame_action = QAction('Show Device Frame', self.mw)
+        self.show_devices_frame_action.setCheckable(True)
+        self.show_devices_frame_action.setChecked(checked)
+        self.show_devices_frame_action.triggered.connect(
+            lambda: on_toggled(self.show_devices_frame_action.isChecked()))
+        self.window_menu.addAction(self.show_devices_frame_action)
+
+    def set_configurator_action_enabled(self, enabled, tooltip=''):
+        # the action is part of the Debug menu, which only exists with the
+        # debug registry key (or Alt+D) - on a normal install there is
+        # nothing to gate
+        action = getattr(self, 'configurator_settings_action', None)
+        if action is None:
+            return
+        action.setEnabled(enabled)
+        action.setToolTip(tooltip)
 
     def add_debug_menu(self):
         mw = self.mw
@@ -371,7 +412,7 @@ class MainMenu:
             dialog.activateWindow()
             dialog.show()
         configurator_settings_action.triggered.connect(do_open_configurator_dialog)
-        mw.configurator_settings_action = configurator_settings_action
+        self.configurator_settings_action = configurator_settings_action
         mw.refresh_configurator_gating()
         debug_menu.addAction(configurator_settings_action)
 

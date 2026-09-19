@@ -54,8 +54,8 @@ class TestAddDebugMenuIsIdempotent:
         debug_actions = [a for a in main_menu.menu.actions() if a.text() == "Debug"]
         assert len(debug_actions) == 1
 
-    def test_configurator_settings_action_lands_on_the_mainwindow(self, main_menu):
-        """refresh_configurator_gating (unmoved, on MainWindow) reads this
-        attribute directly, so the Debug menu must mirror it there."""
+    def test_configurator_settings_action_lands_on_the_main_menu(self, main_menu):
+        """refresh_configurator_gating (on MainWindow) reaches this
+        attribute through main_menu.set_configurator_action_enabled."""
         main_menu.add_debug_menu()
-        assert hasattr(main_menu.mw, 'configurator_settings_action')
+        assert hasattr(main_menu, 'configurator_settings_action')
