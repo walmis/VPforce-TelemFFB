@@ -44,7 +44,7 @@ class ConfigWriter:
         if name in any_settings:
             dev = 'any'
 
-        is_profile = profile_name is not None and profile_name.lower() != 'none'
+        is_profile = bool(profile_name) and profile_name.lower() != 'none'
 
         if not is_profile:
             # No profile named. Never persist a row without a <profile>: it

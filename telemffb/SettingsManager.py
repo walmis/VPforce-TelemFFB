@@ -173,8 +173,12 @@ class SettingsManager(QObject):
                 case 'CLASS':
                     xmlutils.write_class_to_xml(sim, class_name, value, setting, unit=unit, the_device=the_device)
                 case 'MODEL':
-                    if G.master_instance and self.active_profile == 'Auto User':
-                        xmlutils.add_new_profile(sim, class_name, model, profile_name=self.active_profile)
+                    if (G.master_instance and self.active_profile == 'Auto User'
+                            and 'Auto User' not in xmlutils.get_available_profiles(sim, class_name, model)):
+                        # A profile created by an edit is the one the aircraft should use,
+                        # as it is when a live edit forks Built-In.
+                        xmlutils.add_new_profile(sim, class_name, model, profile_name='Auto User')
+                        xmlutils.update_active_profile_entry(sim, class_name, model, 'Auto User')
                     xmlutils.write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device,profile_name=self.active_profile)
                 case _:
                     pass

@@ -1964,8 +1964,12 @@ class MainWindow(QMainWindow):
         for p in profile_list:
             if p != 'Built-In':
                 self.offline_profile.addItem(p)
+        if not self.offline_profile.count() and model:
+            # Built-In cannot be edited: with no user profile the editor works on
+            # Auto User, which the first change creates (as offline_aircraft_changed)
+            self.offline_profile.addItem('Auto User')
         self.offline_profile.setCurrentText(profile)
-        self.offline_profile_changed(profile)
+        self.offline_profile_changed(self.offline_profile.currentText())
 
         for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
             cb.blockSignals(False)
