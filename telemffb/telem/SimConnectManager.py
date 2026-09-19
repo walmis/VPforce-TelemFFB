@@ -323,10 +323,13 @@ EV_SIMSTATE = 65496
 
 
 #: Owners of variables added at runtime, in the order they are applied: a later
-#: source wins a name both define, so a user's override row beats a module's own.
+#: source wins a name both define.  An override row beats a variable an aircraft
+#: class subscribes on its own, and a variable the user names on the settings page
+#: beats both: what the settings page says is final.
 RUNTIME_SOURCE_MODULE = "module"
 RUNTIME_SOURCE_OVERRIDE = "override"
-RUNTIME_SOURCE_ORDER = (RUNTIME_SOURCE_MODULE, RUNTIME_SOURCE_OVERRIDE)
+RUNTIME_SOURCE_SETTING = "setting"
+RUNTIME_SOURCE_ORDER = (RUNTIME_SOURCE_MODULE, RUNTIME_SOURCE_OVERRIDE, RUNTIME_SOURCE_SETTING)
 
 
 class SimConnectManager(threading.Thread):
@@ -543,6 +546,11 @@ class SimConnectManager(threading.Thread):
         name, if there is one, applies again.  Call _resubscribe() afterwards."""
         with self._runtime_lock:
             self._runtime_sim_vars.get(source, {}).pop(name, None)
+
+    def has_override(self, name):
+        """True when an sc_overrides entry names ``name``."""
+        with self._runtime_lock:
+            return name in self._runtime_sim_vars.get(RUNTIME_SOURCE_OVERRIDE, {})
 
     def clear_runtime_simvars(self, source=None):
         """Drop every variable added with add_simvar(), or only one source's."""

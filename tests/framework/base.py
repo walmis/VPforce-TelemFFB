@@ -396,13 +396,17 @@ class MockSimConnect:
         """Get a variable."""
         return self.variables.get(var_name)
     
-    def add_simvar(self, name: str, var: str, sc_unit: str = ""):
+    def add_simvar(self, name: str, var: str, sc_unit: str = "", source: str = "module"):
         """Mock adding a simvar."""
         self.add_simvar_count += 1
         self.simvar_calls.append(f"add_simvar: {name} = {var} ({sc_unit})")
         self.sv_dict[name] = {"var": var, "unit": sc_unit}
 
-    def remove_simvar(self, name: str):
+    def has_override(self, name: str) -> bool:
+        """No sc_overrides rows in the mock."""
+        return False
+
+    def remove_simvar(self, name: str, source: str = "module"):
         """Mock removing a simvar."""
         self.simvar_calls.append(f"remove_simvar: {name}")
         self.sv_dict.pop(name, None)

@@ -72,7 +72,9 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         simvar_changed = self.anything_has_changed('controls_lock_simvar', self.controls_lock_simvar)
         enable_changed = self.anything_has_changed('controls_lock_enable', self.controls_lock_enable)
         if 'ControlsLock' not in self._simconnect.sv_dict or simvar_changed or enable_changed:
-            self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
+            from telemffb.telem.SimConnectManager import RUNTIME_SOURCE_SETTING
+            self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum",
+                                        source=RUNTIME_SOURCE_SETTING)
             self._simconnect._resubscribe()
 
     def _get_msfs_axis_config(self, axis: str, default_var: str, default_range: int = 16384) -> tuple[str, int | float]:

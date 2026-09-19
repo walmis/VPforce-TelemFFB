@@ -7,7 +7,7 @@ caller added has to survive a rebuild another caller asked for.
 """
 import pytest
 
-from telemffb.telem.SimConnectManager import (RUNTIME_SOURCE_OVERRIDE, SimConnectManager, SimVar,
+from telemffb.telem.SimConnectManager import (RUNTIME_SOURCE_OVERRIDE, RUNTIME_SOURCE_SETTING, SimConnectManager, SimVar,
                                               SimVarArray)
 
 pytestmark = [
@@ -69,6 +69,17 @@ def test_an_override_row_beats_a_modules_variable_of_the_same_name_in_either_ord
     m.add_simvar("ForceTrimSW", "L:USER_ROW", "bool", source=RUNTIME_SOURCE_OVERRIDE)
     m.add_simvar("ForceTrimSW", "L:MODULE", "enum")
     assert rebuild(m)["ForceTrimSW"] == "L:USER_ROW"
+
+
+def test_a_settings_variable_beats_an_override_row_in_either_order_and_hands_back_on_release():
+    m = make_manager()
+    m.add_simvar("APMaster", "L:SETTING", "number", source=RUNTIME_SOURCE_SETTING)
+    m.add_simvar("APMaster", "L:USER_ROW", "enum", source=RUNTIME_SOURCE_OVERRIDE)
+    assert rebuild(m)["APMaster"] == "L:SETTING"
+    assert m.has_override("APMaster") and not m.has_override("ForceTrimSW")
+
+    m.remove_simvar("APMaster", source=RUNTIME_SOURCE_SETTING)
+    assert rebuild(m)["APMaster"] == "L:USER_ROW"
 
 
 def test_one_source_is_replaced_without_touching_another():

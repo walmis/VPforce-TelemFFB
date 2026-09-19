@@ -85,6 +85,9 @@ class Aircraft(
 
     use_legacy_bindings = False
 
+    custom_ap_var_enabled = False
+    custom_ap_var = "AUTOPILOT MASTER"
+
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
 
@@ -246,6 +249,8 @@ class Aircraft(
         self._sync_runtime_simvar(
             "HydSys", self.hydraulic_source_var if self._hydraulic_source_active() else None,
             sc_unit="number")
+        self._sync_runtime_simvar(
+            "APMaster", self.custom_ap_var if self.custom_ap_var_enabled else None, sc_unit="number")
 
         if self._sim_is_xplane():
             self.toggle_xp_control()

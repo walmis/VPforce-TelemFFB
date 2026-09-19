@@ -2351,6 +2351,35 @@
 		<trimwheel>true</trimwheel>
 	</defaults>
 	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2100.86</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_var_enabled</name>
+		<displayname>Custom Autopilot Variable</displayname>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>Read the autopilot state from a variable of your choice instead of AUTOPILOT MASTER, for an aircraft whose autopilot does not set it</info>
+		<MSFS>true</MSFS>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2100.861</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_var</name>
+		<displayname>Custom Autopilot Variable</displayname>
+		<prereq>custom_ap_var_enabled</prereq>
+		<info>A SimVar, an L:Var or an input event (B:) that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A variable that needs converting belongs in the SimConnect Overrides Editor as APMaster instead. Turn this setting off for that entry to be used: while it is on, this variable is the one read.</info>
+		<MSFS>true</MSFS>
+		<trimwheel>true</trimwheel>
+		<validvalues>AUTOPILOT MASTER</validvalues>
+		<value>AUTOPILOT MASTER</value>
+	</defaults>
+	<defaults>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2200</order>
@@ -2791,6 +2820,37 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.92</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_var_enabled</name>
+		<displayname>    Custom Autopilot Variable</displayname>
+		<prereq>ap_following</prereq>
+		<info>Read the autopilot state from a variable of your choice instead of AUTOPILOT MASTER, for an aircraft whose autopilot does not set it</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.921</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_var</name>
+		<displayname>    Custom Autopilot Variable</displayname>
+		<prereq>custom_ap_var_enabled</prereq>
+		<info>A SimVar, an L:Var or an input event (B:) that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A variable that needs converting belongs in the SimConnect Overrides Editor as APMaster instead. Turn this setting off for that entry to be used: while it is on, this variable is the one read.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<validvalues>AUTOPILOT MASTER</validvalues>
+		<value>AUTOPILOT MASTER</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -6360,13 +6420,6 @@
 		<scale>3.6</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<name>APMaster</name>
-		<model>A2A Piper PA-24.*</model>
-		<sim>MSFS</sim>
-		<var>L:ApDisableAileron</var>
-		<sc_unit>Enum</sc_unit>
-	</sc_overrides>
-	<sc_overrides>
 		<name>PropRPM</name>
 		<model>A2A Piper PA-24.*</model>
 		<sim>MSFS</sim>
@@ -8935,27 +8988,6 @@
 		<classdefaults_MSFS>
 			<name>aircraft_is_spring_centered</name>
 			<type>!FFBApiHelicopter</type>
-			<sim>MSFS</sim>
-			<device>pedals</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>telemffb_controls_axes</name>
-			<type>FFBApiHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>telemffb_controls_axes</name>
-			<type>FFBApiHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>telemffb_controls_axes</name>
-			<type>FFBApiHelicopter</type>
-			<value>false</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
@@ -18042,6 +18074,48 @@
 		<value>L:ControlLock2</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>custom_ap_var_enabled</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_ap_var</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>L:ApDisableAileron</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_ap_var_enabled</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_ap_var</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>L:ApDisableAileron</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_ap_var_enabled</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>custom_ap_var</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>L:ApDisableAileron</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
 	</models>
 	<models>
 		<name>type</name>

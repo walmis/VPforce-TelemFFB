@@ -285,7 +285,8 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     def _sync_runtime_simvar(self, name: str, var: Optional[str], sc_unit: str = "enum"):
         """Keep the telemetry item ``name`` subscribed to the variable a setting names.
 
-        ``var`` empty or None releases it.  Compared against what this handler
+        It is added as a settings variable, so it beats an sc_overrides row of the
+        same name.  ``var`` empty or None releases it.  Compared against what this handler
         has subscribed rather than against the previous frame's setting: a
         profile that loads with the option already on never changes it, and
         must still get its variable.
@@ -295,10 +296,14 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         wanted = var or None
         if wanted == self._runtime_simvars_subscribed.get(name):
             return
+        from telemffb.telem.SimConnectManager import RUNTIME_SOURCE_SETTING
         if wanted:
-            self._simconnect.add_simvar(name=name, var=wanted, sc_unit=sc_unit)
+            self._simconnect.add_simvar(name=name, var=wanted, sc_unit=sc_unit, source=RUNTIME_SOURCE_SETTING)
+            if self._simconnect.has_override(name):
+                logging.info(f"{name}: reading {wanted} from the settings; the overrides editor "
+                             f"entry for it is not used")
         else:
-            self._simconnect.remove_simvar(name)
+            self._simconnect.remove_simvar(name, source=RUNTIME_SOURCE_SETTING)
         self._simconnect._resubscribe()
         self._runtime_simvars_subscribed[name] = wanted
 
