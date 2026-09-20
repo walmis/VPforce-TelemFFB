@@ -183,9 +183,8 @@ class MainMenu:
         update_action.setDisabled(True)
         mw.updates.bind_action(update_action)
 
-        download_action = QAction('Download Other Versions', mw)
-        download_action.triggered.connect(lambda: mw.open_url(dl_url))
-        utilities_menu.addAction(download_action)
+        # 'Download Other Versions' was removed from this menu; dl_url and
+        # mw.open_url stay so it can be put back.
 
         self.reset_user_config_action = QAction('Reset User Config', mw)
         self.reset_user_config_action.triggered.connect(mw.reset_user_config)
@@ -201,9 +200,8 @@ class MainMenu:
         self.vpconf_action.triggered.connect(launch_vpconf)
         utilities_menu.addAction(self.vpconf_action)
 
-        reload_action = QAction('Force Reload Aircraft (Ctrl+Shift+R)', mw)
-        reload_action.triggered.connect(mw.force_reload_aircraft)
-        utilities_menu.addAction(reload_action)
+        # 'Force Reload Aircraft' was removed from this menu. The Ctrl+Shift+R
+        # shortcut still invokes mw.force_reload_aircraft (MainWindow.__init__).
 
         sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', mw)
 
