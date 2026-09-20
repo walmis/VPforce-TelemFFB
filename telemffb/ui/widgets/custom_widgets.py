@@ -39,6 +39,7 @@ from PyQt6.QtCore import QAbstractListModel, QModelIndex
 import numpy as np
 
 import telemffb.globals as G
+from telemffb.ui.layout_utils import invalidate_ancestor_layouts
 from telemffb.ui.theme.tokens import PURPLE, ACTIVE_GREEN
 from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
 import styles
@@ -404,7 +405,7 @@ class AppStatusWidget(QWidget):
         self.message_stack.addWidget(self.message_placeholder)  # Index 0
         self.message_stack.addWidget(self.notification_label)  # Index 1
         self.message_stack.addWidget(self.offline_label)  # Index 2
-        self.message_stack.setCurrentIndex(0)
+        self._show_message(0)
 
         # Layout content
         sim_grid.addWidget(sim_status_header, sim_row, 0, alignment=label_align)
@@ -514,19 +515,19 @@ class AppStatusWidget(QWidget):
         self.offline_recall_pro = ''
         self.btn_split_profile.setEnabled(self.offline_recall_split)
         self.offline_recall_split = False
-        self.message_stack.setCurrentIndex(0)
+        self._show_message(0)
 
 
     def set_running(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Running')
-        self.message_stack.setCurrentIndex(0)
+        self._show_message(0)
         self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(0,200,0))
 
     def set_paused(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Paused')
-        self.message_stack.setCurrentIndex(0)
+        self._show_message(0)
         self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(255,200,0))
 
     def set_error(self, source):
@@ -552,7 +553,7 @@ class AppStatusWidget(QWidget):
         self.cur_pattern_label.setText('Offline')
         self._set_active_profile_text('Offline')
         self.cb_selectProfileCombo.setDisabled(True)
-        self.message_stack.setCurrentIndex(2)
+        self._show_message(2)
         self.pulse_label(self.sim_status_label.status_label, stop=True)
 
     def flag_error(self, message):
@@ -573,13 +574,13 @@ class AppStatusWidget(QWidget):
             f"{html.escape(note)}</div>"
         )
         self.notification_label.show()
-        self.message_stack.setCurrentIndex(1)
+        self._show_message(1)
 
 
     def clear_error(self):
         self.notification_label.setText('')
         self.notification_label.hide()
-        self.message_stack.setCurrentIndex(0)
+        self._show_message(0)
 
 
     def set_fullname(self, full_name):
@@ -606,6 +607,22 @@ class AppStatusWidget(QWidget):
         grid = self.sim_status_group.layout()
         grid.addWidget(widget, grid.rowCount(), 0, 1, grid.columnCount(),
                        Qt.AlignmentFlag.AlignHCenter)
+
+    def _show_message(self, index: int) -> None:
+        """Switch the message area: 0 nothing, 1 the error notice, 2 the
+        offline banner.
+
+        With nothing to say the area is hidden, not left blank. A stacked
+        layout is as tall as its tallest page, so blank it still held 60px
+        at the foot of the box - space the box, and on the Hide tab the
+        whole window, would rather not spend on a message that is usually
+        not there. The box grows when there is one.
+        """
+        self.message_stack.setCurrentIndex(index)
+        showing = index != 0
+        if showing != (not self.message_container.isHidden()):
+            self.message_container.setVisible(showing)
+            invalidate_ancestor_layouts(self.message_container)
 
     def _set_active_profile_text(self, text):
         """The active-profile value: a profile's name, or a state such as

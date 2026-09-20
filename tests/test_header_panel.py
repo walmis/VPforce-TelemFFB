@@ -63,6 +63,54 @@ class TestHeaderPanelConstruction:
         assert not panel.status_container.cb_selectProfileCombo.isEnabled()
 
 
+class TestMessageArea:
+    """The error notice and the offline banner share an area at the foot of
+    the box. It used to hold its 60px whether or not it had anything to
+    say, which the box - and on the Hide tab the whole window - paid for
+    all the time. Now it takes height only while there is a message."""
+
+    def _panel(self, monkeypatch):
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        monkeypatch.setattr(G, 'useDarkMode', True, raising=False)
+        panel = HeaderPanel()
+        panel.resize(1000, 300)
+        panel.show()
+        QApplication.processEvents()
+        return panel
+
+    def test_it_is_hidden_with_nothing_to_say(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
+        assert panel.status_container.message_container.isHidden()
+        panel.close()
+
+    def test_an_error_shows_it_and_clearing_the_error_hides_it(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
+        container = panel.status_container.message_container
+        panel.status_container.flag_error("Something is wrong")
+        assert not container.isHidden()
+        panel.status_container.clear_error()
+        assert container.isHidden()
+        panel.close()
+
+    def test_the_offline_banner_shows_it_and_going_back_online_hides_it(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
+        container = panel.status_container.message_container
+        panel.set_offline('MSFS')
+        assert not container.isHidden()
+        panel.reset()
+        assert container.isHidden()
+        panel.close()
+
+    def test_the_box_is_shorter_without_a_message_and_grows_for_one(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
+        quiet = panel.sizeHint().height()
+        panel.status_container.flag_error("Something is wrong")
+        assert panel.sizeHint().height() > quiet
+        panel.status_container.clear_error()
+        assert panel.sizeHint().height() == quiet
+        panel.close()
+
+
 class TestHeaderPanelBind:
     """bind() replaces MainWindow's old refresh_scope_status_indicators push:
     AppState.scope_status_changed -> the AppStatusWidget's own (queued)
