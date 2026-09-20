@@ -414,6 +414,7 @@ class DeviceIconPanel(QWidget):
     changed = pyqtSignal()
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._last_status = {}  # device -> the last status acted on (set_device_status)
 
         self.icons = {}
         self.layout = QVBoxLayout(self)
@@ -424,6 +425,7 @@ class DeviceIconPanel(QWidget):
         return list(self.icons.keys())
 
     def set_devices(self, device_list, configured=None):
+        self._last_status = {}  # new icons: every status is news again
         """``configured``, when given, is the set of device names that
         should start as real (non-ghost) devices - every other role is
         built already ghosted. Passing it here (rather than calling
@@ -482,6 +484,9 @@ class DeviceIconPanel(QWidget):
         widget = self.icons.get(device_name.lower())
         if widget:
             widget.set_configured(configured)
+            # Its icon was just re-colored (ghost, or back from it), so the
+            # next status report is news even if it repeats the last one.
+            self._last_status.pop(device_name.lower(), None)
             self.changed.emit()
 
     def set_device_status(self, device_name: str, status: str):
@@ -500,6 +505,14 @@ class DeviceIconPanel(QWidget):
             status = 'error'
         widget = self.icons.get(device_name.lower())
         if widget and widget.configured:
+            # Children report in on a timer, and nearly every report repeats
+            # the status the device already has. Acting on those re-tinted
+            # this icon and, through ``changed``, reloaded and re-tinted
+            # every icon of every compact row - enough, with several rows
+            # and several children, to stall the main thread.
+            if self._last_status.get(device_name.lower()) == dev_status:
+                return
+            self._last_status[device_name.lower()] = dev_status
             widget.set_status_color(status)
             tooltip = {
                 'ACTIVE': 'Device connected',
@@ -565,6 +578,7 @@ class MiniDeviceChip(QWidget):
         self._active = False
         self._configured = True
         self._original_pixmap = None
+        self._icon_path = None
         self._status_color = _status_colors()["normal"]
         self._label_text = device_name.capitalize()
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -583,6 +597,12 @@ class MiniDeviceChip(QWidget):
         self.set_icon(icon_path)
 
     def set_icon(self, icon_path: str):
+        # Mirroring re-asserts every chip's icon whenever anything about
+        # any device changes; loading and scaling the image again for a
+        # path it already shows is the expensive way to do nothing.
+        if icon_path == self._icon_path:
+            return
+        self._icon_path = icon_path
         pm = QPixmap(icon_path)
         self._original_pixmap = pm.scaled(
             self._ICON_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
@@ -594,6 +614,8 @@ class MiniDeviceChip(QWidget):
         self._label_text = text or self.device_name.capitalize()
 
     def set_active(self, active: bool):
+        if active == self._active:
+            return
         self._active = active
         self.update()
 
@@ -606,6 +628,8 @@ class MiniDeviceChip(QWidget):
     def set_configured(self, configured: bool):
         """Unconfigured devices render as a static ghost-gray icon and
         ignore clicks - there is nothing to switch the config scope to."""
+        if configured == self._configured:
+            return
         self._configured = configured
         if not configured:
             self.set_active(False)
@@ -616,6 +640,8 @@ class MiniDeviceChip(QWidget):
         colors = _status_colors()
         if isinstance(color, str):
             color = colors.get(color.lower(), colors["normal"])
+        if color == self._status_color:
+            return
         self._status_color = color
         self._repaint()
 
@@ -633,6 +659,8 @@ class MiniDeviceChip(QWidget):
 
     def set_clickable(self, clickable: bool):
         clickable = clickable and self._configured
+        if clickable == self._clickable and not clickable:
+            return  # still inert; a clickable chip's tooltip follows its label, so that is re-set
         self._clickable = clickable
         # The hover tint (MiniDeviceChip[clickable="true"]:hover in
         # styles.py) is QSS-selected on this property instead of swapping
