@@ -19,9 +19,9 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPalette, QFontMetrics, QBrush
 from PyQt6.QtWidgets import QDialog, QTableWidgetItem, QComboBox, QAbstractItemView, QHeaderView
-import telemffb.globals as G
 from telemffb import xmlutils
 from telemffb.ui.generated.Ui_ProfileImportDialog import Ui_ProfileImportDialog
+from telemffb.ui.theme.tokens import current_tokens, ROW_MATCH_GRAY, ROW_SKIP_FG_GRAY
 
 class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
     """
@@ -155,8 +155,9 @@ class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
             self.tw_detectedModels.setItem(row, 6, new_item("" if editable else profile, editable))
 
             if conflict:
-                bg = QColor("#5c2b2b") if G.useDarkMode else QColor("#ffd6d6")
-                fg = QColor("white") if G.useDarkMode else QColor("black")
+                t = current_tokens()
+                bg = QColor(t.row_conflict_bg)
+                fg = QColor(t.badge_fg)
                 for col in [0, 1, 2, 3, 5, 6]:
                     item = self.tw_detectedModels.item(row, col)
                     if item:
@@ -230,21 +231,23 @@ class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
                     combo.addItem("exclude")
                     combo.setEnabled(False)
                     conflict_status = "invalid"
-                    bg_color = QColor("#ffffcc") if not G.useDarkMode else QColor("#554400")
-                    fg_color = QColor("black") if not G.useDarkMode else QColor("white")
+                    t = current_tokens()
+                    bg_color = QColor(t.row_invalid_bg)
+                    fg_color = QColor(t.badge_fg)
 
                 elif value == user_value and user_value:
                     combo.addItem("ignored")
                     combo.setEnabled(False)
                     conflict_status = "match"
-                    fg_color = QColor("#888888")
+                    fg_color = QColor(ROW_MATCH_GRAY)
 
                 elif conflict:
                     combo.addItems(["overwrite", "exclude"])
                     combo.setCurrentIndex(-1)  # force user to resolve
                     conflict_status = "Yes"
-                    bg_color = QColor("#ffd6d6") if not G.useDarkMode else QColor("#5c2b2b")
-                    fg_color = QColor("black") if not G.useDarkMode else QColor("white")
+                    t = current_tokens()
+                    bg_color = QColor(t.row_conflict_bg)
+                    fg_color = QColor(t.badge_fg)
 
                 else:
                     combo.addItems(["include", "exclude"])
@@ -311,8 +314,9 @@ class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
 
         elif selected_action == "":
             conflict_item.setText("Yes")
-            bg_color = QColor("#ffd6d6") if not G.useDarkMode else QColor("#5c2b2b")
-            fg_color = QColor("black") if not G.useDarkMode else QColor("white")
+            t = current_tokens()
+            bg_color = QColor(t.row_conflict_bg)
+            fg_color = QColor(t.badge_fg)
 
             for col in range(self.tw_detectedOverrides.columnCount() - 1):
                 item = self.tw_detectedOverrides.item(row, col)
@@ -404,16 +408,18 @@ class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
                 new_key = (sim, model, new_name)
                 if not new_name or new_key in self._existing_keys or new_key in proposed:
                     all_valid = False
-                    color = QColor("#5c2b2b") if G.useDarkMode else QColor("#ffd6d6")
+                    t = current_tokens()
+                    color = QColor(t.row_conflict_bg)
                     name_item.setBackground(color)
-                    name_item.setForeground(QColor("white") if G.useDarkMode else QColor("black"))
+                    name_item.setForeground(QColor(t.badge_fg))
                     tooltip = "Please enter a new name" if name_item.text() == '' else f"Name '{new_name}' is already in use for this Aircraft/Sim"
                     name_item.setToolTip(tooltip)
                     conflict_item.setText("Yes")
                 else:
                     proposed.add(new_key)
-                    name_item.setBackground(QColor("#2d4b2d") if G.useDarkMode else QColor("#ccffcc"))
-                    name_item.setForeground(QColor("white") if G.useDarkMode else QColor("black"))
+                    t = current_tokens()
+                    name_item.setBackground(QColor(t.row_ok_bg))
+                    name_item.setForeground(QColor(t.badge_fg))
                     name_item.setToolTip("")
                     row_conflict_resolved = True
                     conflict_item.setText("No")
@@ -426,8 +432,8 @@ class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
 
             elif action == "skip":
                 # Gray out skipped row
-                skip_bg = QColor("#3a3a3a") if G.useDarkMode else QColor("#e0e0e0")
-                skip_fg = QColor("#a0a0a0")
+                skip_bg = QColor(current_tokens().row_skip_bg)
+                skip_fg = QColor(ROW_SKIP_FG_GRAY)
                 name_item.setBackground(skip_bg)
                 name_item.setForeground(skip_fg)
                 conflict_item.setText("No")
@@ -455,8 +461,9 @@ class ProfileImportDialog(QDialog, Ui_ProfileImportDialog):
 
                 # Repaint conflict rows
                 if not row_conflict_resolved and key in self._existing_keys:
-                    bg_color = QColor("#5c2b2b") if G.useDarkMode else QColor("#ffd6d6")
-                    fg_color = QColor("white") if G.useDarkMode else QColor("black")
+                    t = current_tokens()
+                    bg_color = QColor(t.row_conflict_bg)
+                    fg_color = QColor(t.badge_fg)
                     item.setBackground(bg_color)
                     item.setForeground(fg_color)
 

@@ -63,7 +63,7 @@ from typing import List, Optional
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import QCoreApplication, Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit, QProgressDialog
+from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
 
 
 import resources
@@ -79,6 +79,7 @@ from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.telem.TelemManager import TelemManager
+from telemffb.state.app_state import AppState
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             upload_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
@@ -1283,7 +1284,10 @@ def _setup_ipc_and_connections():
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
     G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
     G.ipc_instance.child_exception_signal.connect(G.main_window.on_child_exception)
-    G.ipc_instance.child_status_signal.connect(G.main_window.refresh_scope_status_indicators)
+    # child_status_signal is no longer connected here: the IPC thread now
+    # reports a child's vpconf/gain-override state straight to AppState
+    # (IPCNetworkThread._report_child_status), which repaints the scope
+    # status indicators itself when the derived view actually changes.
     G.ipc_instance.exit_signal.connect(exit_application)
     G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
     G.ipc_instance.show_signal.connect(G.main_window.show)
@@ -1301,10 +1305,10 @@ def _setup_ipc_and_connections():
     # master saved a new device selection for this instance's role: switch live
     G.ipc_instance.reacquire_device_signal.connect(switch_to_device)
     G.ipc_instance.toggle_offline_mode_signal.connect(G.main_window.toggle_offline_mode)
-    G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_sim.setCurrentText)
-    G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_class.setCurrentText)
-    G.ipc_instance.set_offline_ac_signal.connect(G.main_window.offline_name.setCurrentText)
-    G.ipc_instance.set_offline_profile_signal.connect(G.main_window.offline_profile.setCurrentText)
+    G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_editor.mirror_sim)
+    G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_editor.mirror_class)
+    G.ipc_instance.set_offline_ac_signal.connect(G.main_window.offline_editor.mirror_aircraft)
+    G.ipc_instance.set_offline_profile_signal.connect(G.main_window.offline_editor.mirror_profile)
     G.ipc_instance.show_offline_model_signal.connect(G.main_window.load_single_offline_model)
     # effect preview on a child's device: children run it, the master is told
     G.ipc_instance.preview_signal.connect(G.main_window.preview.start_child)
@@ -1335,33 +1339,14 @@ def _handle_window_display(headless_mode):
         if G.args.minimize or G.system_settings.get('masterStartMin', False):
             G.main_window.showMinimized()
         elif G.master_instance and G.system_settings.get('startToTray', False):
-            # Don't show window, tray message will pop during 'setup_master_instance'->'add_system_tray'
+            # Don't show window, tray message will pop during 'setup_master_instance'->'tray.build'
             pass
         else:
             G.main_window.show()
 
 def _check_version_update():
     """Check for version updates if not release or dev build."""
-    if G.master_instance and not G.release_version and not (G.dev_build or G.beta_build) and getattr(sys, 'frozen', False):
-        logging.info("Checking for version updates...")
-        dlg = QProgressDialog("Checking for updates...", "Skip", 0, 0, G.main_window)
-        dlg.setWindowTitle("TelemFFB")
-        dlg.setWindowModality(Qt.WindowModality.WindowModal)
-        dlg.setMinimumDuration(0)
-        dlg.setAutoClose(False)
-        dlg.setAutoReset(False)
-        dlg.show()
-
-        worker = utils.FetchLatestVersion(
-            G.main_window.update_version_result,
-            G.main_window.on_version_check_error
-        )
-
-        G.main_window._version_check_dialog = dlg
-        dlg.canceled.connect(G.main_window.on_version_check_cancelled)
-    else:
-        # Version checking is disabled; emit immediately so sim listeners can start.
-        G.main_window._emit_version_check_complete()
+    G.main_window.updates.start()
 
 def _check_system_settings_required():
     """Check if system settings dialog should be opened."""
@@ -1742,6 +1727,13 @@ def main():
     # ============================================================================
     # PHASE 10: Core Component Initialization
     # ============================================================================
+    # App-state model: created before anything that writes to it (the
+    # telemetry manager and the main window both do, from their own
+    # threads). Identity is fixed for the lifetime of this instance.
+    G.app_state = AppState()
+    G.app_state.set_own_device_type(G.device_type)
+    G.app_state.set_master(G.master_instance)
+
     # Initialize telemetry manager for handling sim data
     G.telem_manager = TelemManager()
     # queued explicitly: the request comes from the telemetry thread and
@@ -1788,7 +1780,7 @@ def main():
 
     # Sim listeners start only after version check resolves (or is skipped),
     # preventing plugin dialogs from racing with the app-update prompt.
-    G.main_window.version_check_complete.connect(G.sim_listeners.start_all)
+    G.main_window.updates.version_check_complete.connect(G.sim_listeners.start_all)
 
     # Check for version updates in background (non-release builds)
     _check_version_update()
@@ -1831,7 +1823,7 @@ def main():
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop
     # ============================================================================
-    # replaced by G.main_window.version_check_complete.connect(G.sim_listeners.start_all) above
+    # replaced by G.main_window.updates.version_check_complete.connect(G.sim_listeners.start_all) above
 
     # Enter Qt application event loop - application runs until user exits.
     # The watchdog tells a native modal loop from a stall by whether the

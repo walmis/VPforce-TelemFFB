@@ -94,7 +94,7 @@ class DcsIpcThread(threading.Thread):
 
                 if message == "Ev=Stop":
                     # Schedule GUI update on main thread
-                    schedule_on_main_thread(lambda: G.main_window.status_container.set_waiting("DCS"))
+                    schedule_on_main_thread(lambda: G.main_window.header_panel.set_waiting("DCS"))
 
                 self._telem.submit_frame(message)
             except Exception as e:
