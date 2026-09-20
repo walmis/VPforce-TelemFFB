@@ -224,6 +224,15 @@ QGroupBox::title {
     left: 10px;
     padding: 0 3px 0 3px;
 }
+
+/* The main window's tab pane, drawn with the same one-pixel gray line as
+   the group boxes: the style's own pane frame is a two-pixel bevel whose
+   visible line sits a pixel inside the Application Status box above it,
+   so the two never look flush. */
+QTabWidget#mainTabs::pane {
+    border: 1px solid gray;
+    top: -1px;  /* under the tab bar, so the selected tab still opens into the pane */
+}
 """)
 
 

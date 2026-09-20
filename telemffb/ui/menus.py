@@ -34,11 +34,10 @@ rather than being mirrored onto MainWindow. MainWindow reaches them through
 ``self.main_menu`` and the small public methods below (``add_instance_log_menu``,
 ``add_show_devices_frame_action``, ``set_configurator_action_enabled``).
 
-The app logo sits in the bar's top-right corner (``_add_logo``), where the
-menus themselves leave the width unused - it used to take a row of its own
-above the Application Status box. A corner widget sets the bar's height, so
-the logo is scaled to ``LOGO_HEIGHT`` rather than the bar being left to grow
-around it.
+The bar is held at ``MENU_BAR_HEIGHT``, a little taller than it would be
+left to itself: with the margin beneath it, that is the band the app logo
+floats over in the window's top-right corner (``telemffb.ui.widgets.
+CornerLogo``).
 
 The "Install Latest TelemFFB" action is not mirrored onto MainWindow; it is
 handed to ``mainwindow.updates`` (an ``UpdateChecker``, see
@@ -51,9 +50,9 @@ import os
 import sys
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import QUrl
 from PyQt6.QtGui import QAction, QDesktopServices
-from PyQt6.QtWidgets import QApplication, QLabel, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -63,17 +62,15 @@ from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
-from telemffb.utils import HiDpiPixmap, exit_application
+from telemffb.utils import exit_application
 
-#: Logo height in the menu bar. A corner widget drives the bar's height,
-#: so this is what the whole bar measures once the logo is in it.
-LOGO_HEIGHT = 28
+#: Height the menu bar is held at - see the module docstring.
+MENU_BAR_HEIGHT = 32
 
 
 class MainMenu:
     def __init__(self, mainwindow):
         self.mw = mainwindow
-        self.logo_label = None
 
     def build(self):
         """Build the main menu bar. Called once, from MainWindow.__init__."""
@@ -88,7 +85,7 @@ class MainMenu:
 
         menubar = mw.menuBar()
         self.menu = menubar
-        self._add_logo(menubar)
+        menubar.setMinimumHeight(MENU_BAR_HEIGHT)
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
 
@@ -323,25 +320,6 @@ class MainMenu:
                     self.log_action[d] = QAction(f'{d} Log'.capitalize())
                     self.log_action[d].triggered.connect(lambda _, child=d: do_show_child_log(child))
                     self.child_log_menu.addAction(self.log_action[d])
-
-    def _add_logo(self, menubar):
-        """Put the app logo in the menu bar's top-right corner.
-
-        Skipped when the resource will not load, leaving the bar its own
-        height - the logo is decorative, and a corner widget holding a null
-        pixmap would still claim the space.
-        """
-        pixmap = HiDpiPixmap(G.vpf_logo)
-        if pixmap.width() <= 0 or pixmap.height() <= 0:
-            logging.warning("Logo resource %s could not be loaded; skipping app logo", G.vpf_logo)
-            return
-        width = round(pixmap.width() * LOGO_HEIGHT / pixmap.height())
-        self.logo_label = QLabel()
-        self.logo_label.setPixmap(pixmap.scaled_logical(width, LOGO_HEIGHT))
-        # Clear of the window frame above and the bar's right edge: the
-        # corner widget sits flush against both otherwise.
-        self.logo_label.setContentsMargins(0, 4, 8, 0)
-        menubar.setCornerWidget(self.logo_label, Qt.Corner.TopRightCorner)
 
     def add_show_devices_frame_action(self, checked, on_toggled):
         """Window menu: 'Show Device Frame', only added when the owning

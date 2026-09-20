@@ -64,6 +64,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
+from telemffb.ui.widgets.CornerLogo import CornerLogo
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.preview.controller import EffectPreviewController
@@ -198,23 +199,15 @@ class MainWindow(QMainWindow):
         self.main_menu = MainMenu(self)
         self.main_menu.build()
 
-        # Create a line beneath the menu bar
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-
-        # Add the line to the menu frame layout
-        layout.addWidget(line)
-
-        # Set the layout of the menu frame as the main layout
-
         """ The window below the menu bar is a left column (Active
         Devices) and a right column (Application Status, prompts, offline
         editor, tabs). The two are wired together at the end of __init__,
         once every right-column piece has been built. """
 
         content_hbox = QHBoxLayout()
-        content_hbox.setContentsMargins(0, 0, 0, 0)
+        # The space under the menu bar, above both columns, so the Active
+        # Devices frame and the Application Status box start level.
+        content_hbox.setContentsMargins(0, 10, 0, 0)
         content_hbox.setSpacing(10)
         right_column_layout = QVBoxLayout()
 
@@ -229,6 +222,9 @@ class MainWindow(QMainWindow):
         self.header_panel.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.header_panel.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
         self.header_panel.bind(G.app_state)
+        # The app logo: over the corner, down to the status box, in no layout.
+        self.corner_logo = CornerLogo(self, below=self.header_panel.status_group,
+                                      menubar=self.main_menu.menu, logo_path=G.vpf_logo)
         self.tray.bind(G.app_state)
 
 
@@ -326,6 +322,7 @@ class MainWindow(QMainWindow):
         """ Create tab widget where monitor/settings/hide will live """
 
         self.tab_widget = QTabWidget(self)
+        self.tab_widget.setObjectName('mainTabs')  # styled in styles.py
 
         # Offline editing for the aircraft that is loaded right now.  The
         # other two entry points (Profiles menu, the empty-settings notice)
@@ -371,6 +368,10 @@ class MainWindow(QMainWindow):
         self.settings_area = NoKeyScrollArea()
         self.settings_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.settings_area.setWidgetResizable(True)
+        # No frame of its own: its top edge would draw a line between the
+        # page's header bar and the form, which are meant to read as one
+        # surface. The tab pane already outlines the page.
+        self.settings_area.setFrameShape(QFrame.Shape.NoFrame)
 
 
         """ Create widget to hold the settings layout """

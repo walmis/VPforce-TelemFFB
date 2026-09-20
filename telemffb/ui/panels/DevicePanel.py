@@ -698,7 +698,10 @@ class MiniDevicePanel(QWidget):
         self.chips: dict[str, MiniDeviceChip] = {}
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(0, 4, 0, 4)
-        self.layout.setSpacing(4)
+        # Room between the chips: the row has a tab page's header to
+        # itself, and the active chip's corner brackets read as part of
+        # its neighbor when they are packed tight.
+        self.layout.setSpacing(16)
         self.hide()
 
     def get_device_names(self) -> list[str]:

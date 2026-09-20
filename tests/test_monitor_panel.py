@@ -225,3 +225,43 @@ class TestDetachToolbar:
         assert panel.detach_toolbar.isHidden() is True
         panel.set_detach_toolbar_visible(True)
         assert panel.detach_toolbar.isHidden() is False
+
+
+class TestSplit:
+    """The two panes are tables with the same size hint, so the splitter
+    would start them level. 70/30 is what the page measured before its
+    panes were tables, when the split fell out of two labels' size hints."""
+
+    def _shares(self, panel):
+        telemetry, effects = panel._splitter.sizes()
+        return telemetry / (telemetry + effects)
+
+    def test_telemetry_starts_with_seventy_percent_of_the_width(self, panel):
+        panel.resize(1600, 500)
+        panel.show()
+        QApplication.processEvents()
+        assert self._shares(panel) == pytest.approx(0.70, abs=0.02)
+        panel.close()
+
+    def test_the_share_holds_as_the_window_widens(self, panel):
+        panel.resize(1600, 500)
+        panel.show()
+        QApplication.processEvents()
+        panel.resize(2200, 500)
+        QApplication.processEvents()
+        assert self._shares(panel) == pytest.approx(0.70, abs=0.02)
+        panel.close()
+
+    def test_a_split_the_user_dragged_is_not_reset_on_reshow(self, panel):
+        """The starting split is applied once - coming back to the tab
+        (or reattaching the detached window) keeps what the user set."""
+        panel.resize(1600, 500)
+        panel.show()
+        QApplication.processEvents()
+        total = sum(panel._splitter.sizes())
+        panel._splitter.setSizes([total // 2, total - total // 2])
+        panel.hide()
+        panel.show()
+        QApplication.processEvents()
+        assert self._shares(panel) == pytest.approx(0.5, abs=0.02)
+        panel.close()
