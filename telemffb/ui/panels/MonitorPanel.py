@@ -142,8 +142,6 @@ class MonitorPanel(QWidget):
         self.header_bar.add_left(self.telem_lbl)
         self.header_bar.add_left(self.telem_filter)
 
-        self.effect_lbl = QLabel('Active Effects:')
-        self.header_bar.add_right(self.effect_lbl)
 
         """ Telemetry pane: a plain "waiting for data" label shown until the
         first telemetry frame, then the live table. """
@@ -168,8 +166,10 @@ class MonitorPanel(QWidget):
         self._effects_model = KeyValueTableModel(['Active Effects'], self)
         self.effects_view = CopyableTableView(self)
         self.effects_view.setModel(self._effects_model)
+        # Its one column's header is the pane's title, and says whose
+        # effects these are (set_effects_scope_label) - level with the
+        # telemetry table's own header beside it.
         self.effects_view.horizontalHeader().setStretchLastSection(True)
-        self.effects_view.horizontalHeader().setVisible(False)
         self.effects_view.setStyleSheet(f"QTableView {{ {_MONOSPACE_STYLE} }}")
         self.effects_view.setMinimumHeight(100)
 
@@ -210,11 +210,15 @@ class MonitorPanel(QWidget):
     def set_effects_scope_label(self, device_type: Optional[str]) -> None:
         """``device_type`` is the config-scope device to name in the header
         (master only, scoped to something other than its own device type);
-        ``None`` restores the plain "Active Effects:" header."""
+        ``None`` restores the plain "Active Effects" header."""
         if device_type:
-            self.effect_lbl.setText(f'Active Effects for: <b>{device_type.title()}</b>')
+            self._effects_model.set_header(0, f'Active Effects for: {device_type.title()}')
         else:
-            self.effect_lbl.setText('Active Effects:')
+            self._effects_model.set_header(0, 'Active Effects')
+
+    def effects_title(self) -> str:
+        """The effects pane's header text."""
+        return self._effects_model.headerData(0, Qt.Orientation.Horizontal)
 
     # ---- debug menu: "Show simvar in telem window" ------------------------
 

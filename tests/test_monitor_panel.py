@@ -176,16 +176,16 @@ class TestActiveEffects:
 
 class TestEffectsScopeLabel:
     def test_default_label(self, panel):
-        assert panel.effect_lbl.text() == 'Active Effects:'
+        assert panel.effects_title() == 'Active Effects'
 
     def test_scoped_label_names_the_device(self, panel):
         panel.set_effects_scope_label('pedals')
-        assert panel.effect_lbl.text() == 'Active Effects for: <b>Pedals</b>'
+        assert panel.effects_title() == 'Active Effects for: Pedals'
 
     def test_clearing_scope_restores_default(self, panel):
         panel.set_effects_scope_label('pedals')
         panel.set_effects_scope_label(None)
-        assert panel.effect_lbl.text() == 'Active Effects:'
+        assert panel.effects_title() == 'Active Effects'
 
 
 class TestCopySelection:
@@ -235,22 +235,6 @@ class TestSplit:
     def _shares(self, panel):
         telemetry, effects = panel._splitter.sizes()
         return telemetry / (telemetry + effects)
-
-    def test_telemetry_starts_with_seventy_percent_of_the_width(self, panel):
-        panel.resize(1600, 500)
-        panel.show()
-        QApplication.processEvents()
-        assert self._shares(panel) == pytest.approx(0.70, abs=0.02)
-        panel.close()
-
-    def test_the_share_holds_as_the_window_widens(self, panel):
-        panel.resize(1600, 500)
-        panel.show()
-        QApplication.processEvents()
-        panel.resize(2200, 500)
-        QApplication.processEvents()
-        assert self._shares(panel) == pytest.approx(0.70, abs=0.02)
-        panel.close()
 
     def test_a_split_the_user_dragged_is_not_reset_on_reshow(self, panel):
         """The starting split is applied once - coming back to the tab

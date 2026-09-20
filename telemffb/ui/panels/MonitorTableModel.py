@@ -86,6 +86,12 @@ class KeyValueTableModel(QAbstractTableModel):
             return self._headers[section]
         return str(section + 1)
 
+    def set_header(self, section: int, text: str) -> None:
+        """Change one column's header text."""
+        if self._headers[section] != text:
+            self._headers[section] = text
+            self.headerDataChanged.emit(Qt.Orientation.Horizontal, section, section)
+
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
