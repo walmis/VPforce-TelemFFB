@@ -174,27 +174,12 @@ class MonitorPanel(QWidget):
         self.effects_view.setMinimumHeight(100)
 
         layout.addWidget(self.header_bar, 0, 0, 1, 2)
-        # Telemetry gets 70% of the width, which is what this page gave it
-        # before its panes were tables: the split then fell out of the two
-        # text labels' size hints, and measured 70/30 at every window
-        # width. Two tables have the same size hint and would start level,
-        # so the split is stated here. The stretch factors hold it as the
-        # window is resized; the starting split is set on first show
-        # (showEvent), once the splitter has a width to divide.
-        self._splitter = QSplitter(Qt.Orientation.Horizontal)
-        self._splitter.addWidget(self._telem_stack)
-        self._splitter.addWidget(self.effects_view)
-        self._splitter.setStretchFactor(0, 7)
-        self._splitter.setStretchFactor(1, 3)
-        self._split_applied = False
-        layout.addWidget(self._splitter, 1, 0, 1, 2)  # Span both columns
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not self._split_applied:
-            self._split_applied = True
-            width = self._splitter.width()
-            self._splitter.setSizes([width * 7 // 10, width * 3 // 10])
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(self._telem_stack)
+        splitter.addWidget(self.effects_view)
+        splitter.setStretchFactor(0, 2)  # Wider telemetry
+        splitter.setStretchFactor(1, 3)  # Narrower effects
+        layout.addWidget(splitter, 1, 0, 1, 2)  # Span both columns
 
     def _on_detach_clicked(self):
         if self.mainwindow is not None:

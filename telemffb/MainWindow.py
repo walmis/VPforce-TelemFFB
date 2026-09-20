@@ -64,8 +64,6 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
-from telemffb.ui.widgets.CornerLogo import CornerLogo
-from telemffb.ui.widgets.DeviceViewToggle import DeviceViewToggle
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.preview.controller import EffectPreviewController
@@ -200,15 +198,23 @@ class MainWindow(QMainWindow):
         self.main_menu = MainMenu(self)
         self.main_menu.build()
 
+        # Create a line beneath the menu bar
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+
+        # Add the line to the menu frame layout
+        layout.addWidget(line)
+
+        # Set the layout of the menu frame as the main layout
+
         """ The window below the menu bar is a left column (Active
         Devices) and a right column (Application Status, prompts, offline
         editor, tabs). The two are wired together at the end of __init__,
         once every right-column piece has been built. """
 
         content_hbox = QHBoxLayout()
-        # The space under the menu bar, above both columns, so the Active
-        # Devices frame and the Application Status box start level.
-        content_hbox.setContentsMargins(0, 10, 0, 0)
+        content_hbox.setContentsMargins(0, 0, 0, 0)
         content_hbox.setSpacing(10)
         right_column_layout = QVBoxLayout()
 
@@ -223,9 +229,6 @@ class MainWindow(QMainWindow):
         self.header_panel.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.header_panel.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
         self.header_panel.bind(G.app_state)
-        # The app logo: over the corner, down to the status box, in no layout.
-        self.corner_logo = CornerLogo(self, below=self.header_panel.status_group,
-                                      menubar=self.main_menu.menu, logo_path=G.vpf_logo)
         self.tray.bind(G.app_state)
 
 
@@ -240,7 +243,6 @@ class MainWindow(QMainWindow):
         # below, which is after the full panel - hence the empty list
         # rather than a late attribute.
         self._mini_device_panels = []
-        self._mini_device_toggles = {}  # mini panel -> the view toggle beside it
 
         self.device_groupbox = QGroupBox("Active Devices")
 
@@ -257,13 +259,6 @@ class MainWindow(QMainWindow):
         self.device_panel.changed.connect(self._sync_mini_device_panel)
         device_groupbox_layout.addWidget(self.device_panel)
         self.device_groupbox.setLayout(device_groupbox_layout)
-        # Switches to the compact icon rows; theirs switch back (see
-        # _register_mini_device_panel). The frame only ever shows with
-        # more than one device configured, so its button needs no gating.
-        self.device_frame_toggle = DeviceViewToggle(frame_shown=True)
-        self.device_frame_toggle.pin_to_title(self.device_groupbox)
-        self.device_frame_toggle.clicked.connect(lambda: self._set_devices_frame_preference(False))
-        self._add_device_view_context_menu(self.device_groupbox)
         # Stays hidden until _sync_devices_display() runs with a populated
         # device panel (master instances populate it later, in
         # setup_master_instance()) - otherwise an empty frame flashes
@@ -331,7 +326,6 @@ class MainWindow(QMainWindow):
         """ Create tab widget where monitor/settings/hide will live """
 
         self.tab_widget = QTabWidget(self)
-        self.tab_widget.setObjectName('mainTabs')  # styled in styles.py
 
         # Offline editing for the aircraft that is loaded right now.  The
         # other two entry points (Profiles menu, the empty-settings notice)
@@ -357,7 +351,6 @@ class MainWindow(QMainWindow):
         content_hbox.addWidget(self.device_groupbox)
         content_hbox.addLayout(right_column_layout, 1)
         layout.addLayout(content_hbox, stretch=1)
-        self._content_hbox = content_hbox  # its spacing is part of what the frame costs in width
 
 
         """ Create the monitor tab: telemetry + active-effects display """
@@ -378,10 +371,6 @@ class MainWindow(QMainWindow):
         self.settings_area = NoKeyScrollArea()
         self.settings_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.settings_area.setWidgetResizable(True)
-        # No frame of its own: its top edge would draw a line between the
-        # page's header bar and the form, which are meant to read as one
-        # surface. The tab pane already outlines the page.
-        self.settings_area.setFrameShape(QFrame.Shape.NoFrame)
 
 
         """ Create widget to hold the settings layout """
@@ -571,7 +560,6 @@ class MainWindow(QMainWindow):
 
         self._detached_tabs = getattr(self, "_detached_tabs", {})
         self._detached_tabs[title] = {"win": win, "index": index}
-        self._sync_devices_display()
 
     def reattach_tab(self, title: str):
         entry = getattr(self, "_detached_tabs", {}).pop(title, None)
@@ -596,7 +584,6 @@ class MainWindow(QMainWindow):
         self.tab_widget.insertTab(insert_at, page, title)
         self.tab_widget.setCurrentWidget(page)
         page.show()
-        self._sync_devices_display()
 
     def get_active_buttons(self):
         input_data = HapticEffect.device.get_input()
@@ -747,35 +734,8 @@ class MainWindow(QMainWindow):
         Devices panel is mirrored onto, and wire its row to the scope
         switcher."""
         header_bar.DeviceClicked.connect(self.change_config_scope)
-        toggle = DeviceViewToggle(frame_shown=False)
-        toggle.reveal_on_hover(header_bar)
-        toggle.clicked.connect(lambda: self._set_devices_frame_preference(True))
-        header_bar.add_before_devices(toggle, top_padding=DeviceViewToggle.GLYPH_TOP)
-        self._add_device_view_context_menu(header_bar.device_mini_panel)
         self._mini_device_panels.append(header_bar.device_mini_panel)
-        self._mini_device_toggles[header_bar.device_mini_panel] = toggle
         self._sync_mini_device_panel()
-
-    def _add_device_view_context_menu(self, widget):
-        """Right-click on either device display: the same switch as its
-        button and the Window menu's 'Show Device Frame'."""
-        widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        widget.customContextMenuRequested.connect(
-            lambda pos, w=widget: self._show_device_view_context_menu(w, pos))
-
-    def _show_device_view_context_menu(self, widget, pos):
-        if not self._multiple_devices_configured():
-            return  # one device: the frame never shows, nothing to switch
-        showing = self.device_groupbox.isVisible()
-        menu = QtWidgets.QMenu(widget)
-        action = menu.addAction("Show compact device icons" if showing
-                                else "Show the Active Devices panel")
-        action.triggered.connect(lambda: self._set_devices_frame_preference(not showing))
-        menu.exec(widget.mapToGlobal(pos))
-
-    def _multiple_devices_configured(self) -> bool:
-        icons = self.device_panel.icons
-        return sum(1 for name in self.device_panel.get_device_names() if icons[name].configured) > 1
 
     def _sync_mini_device_panel(self):
         """Mirror the full Active Devices panel's device list, active
@@ -828,68 +788,16 @@ class MainWindow(QMainWindow):
         show_frame = multiple and bool(G.system_settings.get('showDevicesFrame', True)) and not on_hide_tab
         self.device_groupbox.setVisible(show_frame)
         show_mini = bool(names) and not show_frame
-        # A row's switch back to the frame: only with something to switch
-        # to, and not in a detached Monitor window, where it would change
-        # a different window than the one it sits in.
-        monitor_detached = 'Monitor' in getattr(self, '_detached_tabs', {})
-        monitor_mini = self.monitor_panel.header_bar.device_mini_panel if hasattr(self, 'monitor_panel') else None
         for mini in self._mini_device_panels:
             mini.setVisible(show_mini)
             mini.set_clickable(multiple)
-            detached = monitor_detached and mini is monitor_mini
-            self._mini_device_toggles[mini].setVisible(show_mini and multiple and not detached)
         settings_bar = getattr(self, 'settings_header_bar', None)
         if settings_bar is not None:
             settings_bar.setVisible(show_mini)
 
     def _set_devices_frame_preference(self, visible: bool):
         G.system_settings.setValue('showDevicesFrame', visible)
-        # The Window menu's item is one of three ways here; keep its check
-        # mark in step when one of the others was used.
-        action = getattr(self.main_menu, 'show_devices_frame_action', None)
-        if action is not None and action.isChecked() != visible:
-            action.setChecked(visible)
-        was_showing = self.device_groupbox.isVisible()
-        frame_width, window_width = self.device_groupbox.width(), self.width()
         self._sync_devices_display()
-        self._resize_for_devices_frame(was_showing, frame_width, window_width)
-
-    def _activate_layouts(self):
-        """Bring the window's layouts up to date with a widget shown or
-        hidden in this same slot. Until they are next activated they hold
-        the minimum size they had before, and a resize stops at that old
-        floor."""
-        self.centralWidget().layout().activate()
-        QMainWindow.layout(self).activate()
-
-    def _resize_for_devices_frame(self, was_showing: bool, frame_width: int, window_width: int):
-        """Give the window the width the Active Devices frame takes when
-        it appears, and take it back when it goes, so the column beside it
-        keeps its width either way.
-
-        Left alone, the window only ever grows: showing the frame pushes
-        it wider when there is no room, and hiding the frame hands the
-        width to the tabs instead of giving it back.
-
-        ``frame_width`` and ``window_width`` are from before the change:
-        the frame's width can only be read while it is up, and activating
-        the layouts may already have widened a window too narrow for the
-        frame, which must not be counted twice.
-        """
-        now_showing = self.device_groupbox.isVisible()
-        if now_showing == was_showing or self.isMaximized() or self.isFullScreen():
-            return
-        self._activate_layouts()
-        if now_showing:
-            frame_width = self.device_groupbox.width()
-        delta = frame_width + self._content_hbox.spacing()
-        if not now_showing:
-            delta = -delta
-        self.resize(window_width + delta, self.height())
-        # The Monitor and Settings tabs each remember their own window
-        # size; the other one's is from before the frame changed.
-        for key in ("0", "1"):
-            self.tab_sizes[key]['width'] = int(self.tab_sizes[key]['width']) + delta
 
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
@@ -1525,11 +1433,13 @@ class MainWindow(QMainWindow):
             self.current_tab_index = 2
 
             # Hiding the Active Devices frame (above) leaves the layouts
-            # holding the minimum height they had while it was up. Showing
-            # the mini device row under the logo used to refresh them as a
-            # side effect; the rows now live on the tab pages, which are
-            # not visible here, so ask directly.
-            self._activate_layouts()
+            # holding the minimum height they had while it was up until
+            # they are next activated, and a resize before then stops at
+            # that old floor. Showing the mini device row under the logo
+            # used to activate them as a side effect; the rows now live on
+            # the tab pages, which are not visible here, so ask directly.
+            self.centralWidget().layout().activate()
+            QMainWindow.layout(self).activate()
             self.resize(0, 0)
 
     def interpolate_color(self, color1, color2, value):
