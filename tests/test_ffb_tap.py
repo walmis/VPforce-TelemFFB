@@ -28,8 +28,12 @@ pytestmark = [
                        reason="FFB tap shared memory is Windows-only"),
 ]
 
-# a distinct name so tests never fight a real writer or viewer
-TEST_SHM = "Local\\FFBTap_v1_test"
+# A distinct name, so these tests never fight a real writer or viewer - and
+# one per process, so they never fight each other: a named mapping is shared
+# by every process that opens it, and `pytest -n auto` runs this file in
+# several at once, where a single name had one worker reading what another
+# had just written.
+TEST_SHM = "Local\\FFBTap_v1_test_%d" % os.getpid()
 
 
 def make_shm(spring_kwargs=None, playing=1, paused=0, writer_pid=None):
