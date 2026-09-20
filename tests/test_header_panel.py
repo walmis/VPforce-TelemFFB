@@ -359,7 +359,7 @@ class TestHeaderPanelSimStatusBind:
         state.set_sim_status('paused', 'DCS')
         assert panel.status_container.sim_status_label.status_label.text() == 'Paused'
 
-    def test_error_onset_flags_but_repeated_error_does_not_reflag(self, qapp, monkeypatch, state):
+    def test_error_onset_flags_but_the_same_error_does_not_reflag(self, qapp, monkeypatch, state):
         flagged = []
         panel = HeaderPanel()
         panel.status_container.request_flag_error.connect(lambda msg: flagged.append(msg))
@@ -369,13 +369,25 @@ class TestHeaderPanelSimStatusBind:
         assert flagged == ['bad config']
         assert panel.status_container.sim_status_label.status_label.text() == 'Error'
 
-        # A different message while still erroring is a distinct AppState
-        # value (SimStatusTracker itself only calls this once per onset in
-        # practice) - the panel does not gate on message, only on the
-        # error->non-error edge, so this exercises that it does not fire a
-        # *clear* here either.
-        state.set_sim_status('error', 'DCS', 'still bad')
+        state.set_sim_status('error', 'DCS', 'bad config')
         assert flagged == ['bad config']
+
+    def test_a_new_message_while_still_erroring_repaints_the_box(self, qapp, monkeypatch, state):
+        """Several config errors can be outstanding at once and the box shows
+        one at a time, so fixing the displayed one leaves SimStatusTracker
+        reporting the next. Gating on the error->non-error edge alone left
+        the box on the message the user had just rectified."""
+        flagged, cleared = [], []
+        panel = HeaderPanel()
+        panel.status_container.request_flag_error.connect(lambda msg: flagged.append(msg))
+        panel.status_container.request_clear_error.connect(lambda: cleared.append(True))
+        panel.bind(state)
+
+        state.set_sim_status('error', 'DCS', 'bad config')
+        state.set_sim_status('error', 'DCS', 'still bad')
+
+        assert flagged == ['bad config', 'still bad']
+        assert cleared == []  # still erroring: no clear edge
 
     def test_error_to_running_fires_clear_error_once(self, qapp, monkeypatch, state):
         cleared = []

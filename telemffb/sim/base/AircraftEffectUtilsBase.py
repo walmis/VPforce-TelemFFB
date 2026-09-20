@@ -199,15 +199,33 @@ class AircraftEffectUtilsBase(object):
         return False
 
     def flag_error(self, message):
-        """Flag an error message for display in the UI.
+        """Flag a configuration error for display in the UI.
+
+        Several settings can be misconfigured at once - a helicopter with an
+        unbound force-trim button AND a hydraulic effect missing its damper
+        override - so messages ACCUMULATE for the frame, newline separated,
+        rather than the last effect to run winning the slot. The app status
+        still shows one at a time; the exception tracker gets them all, and
+        each clears on its own when its condition is fixed (see
+        telemffb.state.sim_status.SimStatusTracker.on_frame).
+
+        The telemetry frame is rebuilt every pass, so nothing carries over.
 
         Args:
             message (str): Error message to display
         """
         dev = (self.telem_data.FFBType or 'joystick').capitalize()
-        self.telem_data.error = message
+        # item access, not attribute: 'error' is not a declared field, so
+        # reading it before anything set it would raise.
+        current = self.telem_data['error']
+        messages = str(current).split("\n") if current else []
+        if message not in messages:
+            messages.append(message)
+        self.telem_data.error = "\n".join(messages)
         if not master_instance:
-            self._ipc_telem['error'] = f"{dev}: {message}"
+            # Rebuilt from the frame's full list rather than appended to:
+            # _ipc_telem belongs to the aircraft and outlives the frame.
+            self._ipc_telem['error'] = "\n".join(f"{dev}: {m}" for m in messages)
 
     def is_joystick(self):
         """Check if the current FFB device is a joystick.

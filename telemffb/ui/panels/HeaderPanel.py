@@ -152,6 +152,7 @@ class HeaderPanel(QWidget):
             status.scope, status.vpconf, status.any_vpconf, status.ovd, status.any_ovd)
 
         self._last_sim_state = None
+        self._last_sim_message = None
         state.sim_status_changed.connect(self._on_sim_status_changed)
         sim_state, sim_source, sim_message = state.current_sim_status()
         if sim_source:
@@ -184,16 +185,23 @@ class HeaderPanel(QWidget):
         The onset/clear edge is derived here, from the last state this
         panel painted, because AppState only carries the latest value, not
         SimStatusTracker's own error-state bookkeeping.
+
+        The MESSAGE is an edge of its own: several config errors can be
+        outstanding at once and the box shows one at a time, so when the
+        displayed one is fixed SimStatusTracker moves to the next. Flagging
+        only on the error-onset edge left the box on the rectified message
+        while the tray announced the new one.
         """
         if not state:
             # AppState.reset_sim_status: the widget was reset directly;
             # forget the last state so the next error re-flags.
             self._last_sim_state = ''
+            self._last_sim_message = None
             return
         was_error = self._last_sim_state == 'error'
         if state == 'error':
             self.status_container.set_error(source)
-            if not was_error:
+            if not was_error or message != self._last_sim_message:
                 self.status_container.request_flag_error.emit(message)
         else:
             if state == 'paused':
@@ -203,3 +211,4 @@ class HeaderPanel(QWidget):
             if was_error:
                 self.status_container.request_clear_error.emit()
         self._last_sim_state = state
+        self._last_sim_message = message

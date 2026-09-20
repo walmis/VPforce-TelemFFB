@@ -53,9 +53,20 @@ class SimStatusTracker:
         self._exception_tracker = exception_tracker
         self._clock = clock
         self.error_state = False  # True='error' key found in telem_data, False=clean telem_data
-        self._error_last_seen = 0.0  # monotonic time an 'error' key was last seen; the clear path holds ERROR_CLEAR_HOLD_S past it
-        self.flagged_error_msgs = set()  # flag_error messages logged into the exception tracker; auto-removed from it when the error condition clears
+        # Each flag_error message on its own clock: {message: monotonic time
+        # it was last present in a frame}. A message is logged into the
+        # exception tracker when it first appears and removed from it when it
+        # has been absent for ERROR_CLEAR_HOLD_S, so fixing one of several
+        # config errors clears that one alone.
+        self._error_seen: dict = {}
+        self._shown_msg = None  # the message currently on the status indicator
         self.telemetry_timed_out = True
+
+    @property
+    def flagged_error_msgs(self) -> set:
+        """The flag_error messages currently held (and present in the
+        exception tracker)."""
+        return set(self._error_seen)
 
     def push_status(self, source: Optional[str], paused: bool = False,
                      error: bool = False, message: Optional[str] = None) -> None:
@@ -103,36 +114,55 @@ class SimStatusTracker:
 
     def on_frame(self, data: dict) -> None:
         """Per-frame error onset/hold/clear, from ``data['error']`` (absent
-        or ``None`` when the frame is clean). Moved verbatim from
-        ``MainWindow.on_update_telemetry``'s inline block."""
-        error_cond = data.get('error', None)
+        or ``None`` when the frame is clean).
 
-        if error_cond is None:  # no 'error' key in telemetry
+        A frame carries EVERY config error the aircraft flagged, newline
+        separated (``AircraftEffectUtilsBase.flag_error`` accumulates), so
+        each is held, logged and expired on its own clock. Fixing one of
+        several therefore drops just that one - from the status indicator,
+        which moves on to the next, and from the exception tracker - while
+        the rest stay up. Tracking only the first message meant the second
+        never reached the tracker and the first never cleared.
+        """
+        now = self._clock()
+        error_cond = data.get('error', None)
+        messages = [m.strip() for m in str(error_cond).split("\n")
+                    if m.strip()] if error_cond else []
+
+        for msg in messages:
+            if msg not in self._error_seen:
+                # The exception tracker's source is the logging handler.
+                logging.error(msg)
+            self._error_seen[msg] = now
+
+        # Hold each message for a wall-clock window after its last sighting:
+        # a child instance's error arrives over IPC on whichever master
+        # frames happen to catch it, so frames without it BETWEEN sightings
+        # are routine. The old debounce counted 5 frames, a window that
+        # shrank with sim frame rate (~30ms at 150fps) - thread timing alone
+        # could flap clear->onset, and every re-onset popped the tray
+        # notification again.
+        for msg in [m for m, seen in self._error_seen.items()
+                    if now - seen >= self.ERROR_CLEAR_HOLD_S]:
+            # Rectified: drop its exception-tracker record so the tracker
+            # agrees with the status indicator.
+            del self._error_seen[msg]
+            self._exception_tracker.remove_matching(msg)
+
+        if not self._error_seen:
             if self.telemetry_timed_out or self.error_state:  # only set status to run if previously timed out or error status was true
-                # Hold the error state for a wall-clock window after the
-                # last sighting: a child instance's error arrives over
-                # IPC on whichever master frames happen to catch it, so
-                # error-free frames BETWEEN sightings are routine.  The
-                # old debounce counted 5 frames, a window that shrank
-                # with sim frame rate (~30ms at 150fps) - thread timing
-                # alone could flap clear->onset, and every re-onset
-                # popped the tray notification again.
-                if self._clock() - self._error_last_seen >= self.ERROR_CLEAR_HOLD_S:
-                    if self.error_state:
-                        logging.info("App status error cleared by an error-free frame (hold window elapsed)")
-                    self.push_status(data.get('src'), paused=False)
-                    self.error_state = False
-                    self.telemetry_timed_out = False
-                    # The condition was rectified: drop the flag_error
-                    # records this session logged into the exception
-                    # tracker so it agrees with the (cleared) app status.
-                    for msg in self.flagged_error_msgs:
-                        self._exception_tracker.remove_matching(msg)
-                    self.flagged_error_msgs.clear()
-        else:
-            self._error_last_seen = self._clock()
-            if not self.error_state:  # only set error status once when there is error cond but state is not yet true
-                self.push_status(data.get('src'), error=True, message=error_cond)
-                logging.error(error_cond)
-                self.flagged_error_msgs.add(error_cond)
-                self.error_state = True
+                if self.error_state:
+                    logging.info("App status error cleared by an error-free frame (hold window elapsed)")
+                self.push_status(data.get('src'), paused=False)
+                self.error_state = False
+                self._shown_msg = None
+                self.telemetry_timed_out = False
+            return
+
+        # One at a time on the indicator, oldest first, so a message does not
+        # jump around while several are outstanding.
+        current = next(iter(self._error_seen))
+        if current != self._shown_msg:
+            self.push_status(data.get('src'), error=True, message=current)
+            self._shown_msg = current
+        self.error_state = True
