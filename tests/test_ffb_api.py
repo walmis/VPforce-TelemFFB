@@ -108,16 +108,22 @@ class FFBApiTestBase(BaseTelemetryEffectTestCase):
         instance.local_disable_axis_control = False
         return instance
 
-    def arm(self, instance, telem, frames=FFB_API_DISCOVERY_STABLE_FRAMES):
+    def arm(self, instance, telem, frames=FFB_API_DISCOVERY_STABLE_FRAMES, settled=True):
         """Set telemetry and run enough lifecycle passes for discovery to settle.
 
         Discovery debounces on a stable read (see FFB_API_DISCOVERY_STABLE_FRAMES), so
         a single pass would never latch.  Tests that care about the debounce itself
         drive the frame count explicitly.
+
+        ``settled`` leaves the control recaptured: the steady state, where the spring
+        center is the published trim wherever the control sits.  Tests of the
+        recapture itself pass False or call _ffb_api_restart_recapture() afterwards.
         """
         self.set_telemetry(instance, telem)
         for _ in range(frames):
             instance._ffb_api_on_telemetry(telem)
+        if settled:
+            instance._ffb_api_spring_init = 1
 
     def ffb_writes(self):
         """Every L:FFB_* variable written so far, as (name, value) pairs."""
@@ -341,9 +347,8 @@ class TestFFBApiDiscoveryDebounce(FFBApiTestBase):
     def test_a_relatch_reruns_the_spring_handshake_and_keeps_the_control_enabled(self):
         instance = self.make_instance()
         self.arm(instance, self.make_telem(version=1, features=0))
-        instance._ffb_api_spring_init = 1
 
-        self.arm(instance, self.make_telem(version=1, features=ALL_TRIM))
+        self.arm(instance, self.make_telem(version=1, features=ALL_TRIM), settled=False)
 
         assert instance._ffb_api_spring_init == 0
         assert self.written_values("L:FFB_CYCLIC_ENABLED")[-1] == 1
@@ -572,18 +577,57 @@ class TestFFBApiTrim(FFBApiTestBase):
         # Full-scale spring, not a raw coefficient of 1.
         assert instance.spring_x.positiveCoefficient == 4096
 
-    def test_spring_gated_until_control_reaches_trim_reference(self):
-        """Mirrors the existing init handshake: do not yank a displaced control."""
+    def test_a_displaced_control_is_walked_back_to_the_trim_reference(self, monkeypatch):
+        """The center starts at the control, at full gain, and reaches the reference in
+        the walk time - so the control is never pulled by its whole displacement."""
+        clock = [100.0]
+        monkeypatch.setattr("telemffb.utils.CenterWalk.time.perf_counter", lambda: clock[0])
         instance = self.make_instance(device="pedals")
         instance.ffb_api_pedal_spring_gain = 0.7
         self.mock_device._input_data.set_axis(x=-0.9)
-
         telem = self.make_telem(device="pedals", ffbTrimPedals=0.9)
         self.arm(instance, telem)
+        instance._ffb_api_restart_recapture()
+
+        centers = []
+        for elapsed in (0.0, instance._ffb_api_walk.duration_s / 2, instance._ffb_api_walk.duration_s):
+            clock[0] = 100.0 + elapsed
+            instance.msfs_update_pedals(telem)
+            centers.append(instance.cpO_x)
+            assert instance.spring_x.positiveCoefficient == round(0.7 * 4096)
+
+        assert centers == pytest.approx([-0.9, 0.0, 0.9])
+        assert instance._ffb_api_spring_init == 0      # the control itself has not moved
+
+    def test_fly_through_waits_for_the_recapture(self):
+        """A control not yet brought back is away from its reference for that reason,
+        during the walk and after it, and must not be reported as the pilot's hand."""
+        instance = self.make_instance(device="pedals")
+        self.mock_device._input_data.set_axis(x=-0.9)
+        telem = self.make_telem(device="pedals", ffbTrimPedals=0.9)
+        self.arm(instance, telem)
+        instance._ffb_api_restart_recapture()
+        instance._ffb_api_walk.duration_s = 0.0      # walk over: center at the reference
+        instance.msfs_update_pedals(telem)
+        instance.msfs_update_pedals(telem)
+        assert set(self.written_values("L:FFB_PEDALS_FLY_THROUGH")) == {0}
+
+        self.mock_device._input_data.set_axis(x=0.9)
+        instance.msfs_update_pedals(telem)
+        self.mock_device._input_data.set_axis(x=0.2)
+        instance.msfs_update_pedals(telem)
+        assert self.written_values("L:FFB_PEDALS_FLY_THROUGH")[-1] == 1
+
+    def test_a_control_already_at_the_reference_is_not_walked(self):
+        instance = self.make_instance(device="pedals")
+        self.mock_device._input_data.set_axis(x=0.85)
+        telem = self.make_telem(device="pedals", ffbTrimPedals=0.9)
+        self.arm(instance, telem)
+        instance._ffb_api_restart_recapture()
         instance.msfs_update_pedals(telem)
 
-        assert instance._ffb_api_spring_init == 0
-        assert instance.spring_x.positiveCoefficient == 0
+        assert instance._ffb_api_spring_init == 1
+        assert instance.cpO_x == pytest.approx(0.9)
 
 
 # ───────────────────────────────────────────────────────────────
@@ -1015,6 +1059,111 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
         x_scale = clamp(instance.joystick_x_axis_scale, 0, 1)
         expected = instance._scale_msfs_axis_value(0.5, x_range, x_scale)
         assert lateral[-1] == pytest.approx(expected)
+
+    CONTROLS = {
+        "joystick": ("msfs_update_heli_controls", "AXIS_CYCLIC",
+                     {"ffbTrimCyclicRoll": 0.0, "ffbTrimCyclicPitch": 0.0}, {"x": 0.0, "y": 0.6}),
+        "collective": ("msfs_update_collective", "AXIS_COLLECTIVE", {"ffbTrimCollective": 0.0}, {"y": 0.6}),
+        "pedals": ("msfs_update_pedals", "ROTOR_AXIS_TAIL_ROTOR", {"ffbTrimPedals": 0.0}, {"x": 0.6}),
+    }
+
+    def _axis_events(self, prefix):
+        return [e for e in self.mock_simconnect.sent_events if e[0].startswith(prefix)]
+
+    @pytest.mark.parametrize("device", ["joystick", "collective", "pedals"])
+    def test_no_axis_is_sent_until_the_control_is_recaptured(self, device):
+        """A control left displaced over a load or a pause must not reach the sim as a
+        step input.  The cyclic case is displaced in pitch only: both axes count."""
+        update, prefix, trim, displaced = self.CONTROLS[device]
+        instance = self.make_instance(device=device)
+        instance.telemffb_controls_axes = True
+        instance.use_firmware_axis_override = False
+        telem = self.make_telem(device=device, **trim)
+        self.arm(instance, telem)
+        instance._ffb_api_restart_recapture()
+
+        self.mock_device._input_data.set_axis(**displaced)
+        getattr(instance, update)(telem)
+        assert self._axis_events(prefix) == []
+
+        self.mock_device._input_data.set_axis(**{axis: 0.05 for axis in displaced})
+        getattr(instance, update)(telem)
+        assert self._axis_events(prefix)
+
+    @pytest.mark.parametrize("device", ["joystick", "collective", "pedals"])
+    def test_a_pause_starts_the_recapture_again_and_covers_the_relatch(self, device):
+        update, prefix, trim, displaced = self.CONTROLS[device]
+        instance = self.make_instance(device=device)
+        instance.telemffb_controls_axes = True
+        instance.use_firmware_axis_override = False
+        telem = self.make_telem(device=device, **trim)
+        self.arm(instance, telem)
+        self.mock_device._input_data.set_axis(**{axis: 0.0 for axis in displaced})
+        getattr(instance, update)(telem)
+        assert self._axis_events(prefix)
+
+        instance.on_timeout()
+        self.mock_simconnect.sent_events.clear()
+        self.mock_device._input_data.set_axis(**displaced)
+        for _ in range(FFB_API_DISCOVERY_STABLE_FRAMES + 2):
+            instance._ffb_api_latch_discovery(telem)
+            getattr(instance, update)(telem)
+
+        assert instance._ffb_api_latched
+        assert self._axis_events(prefix) == []
+
+    def _untrimmed(self, device, on_ground, position):
+        """A control the aircraft gives no trim system (only the cyclic bit is set)."""
+        instance = self.make_instance(device=device)
+        instance.telemffb_controls_axes = True
+        instance.use_firmware_axis_override = False
+        instance._ffb_api_walk.duration_s = 0.0          # center straight to the target
+        telem = self.make_telem(device=device, features=BIT_CYCLIC, SimOnGround=int(on_ground))
+        self.arm(instance, telem)
+        axis = "x" if device == "pedals" else "y"
+        self.mock_device._input_data.set_axis(**{axis: position})
+        return instance, telem, axis
+
+    def test_an_untrimmed_collective_on_the_ground_is_brought_to_full_down_first(self):
+        instance, telem, _ = self._untrimmed("collective", on_ground=True, position=0.2)
+        instance._ffb_api_restart_recapture()
+        instance.msfs_update_collective(telem)
+        assert instance.cpO_y == pytest.approx(1.0)
+        assert self._axis_events("AXIS_COLLECTIVE") == []
+
+        self.mock_device._input_data.set_axis(y=0.95)
+        instance.msfs_update_collective(telem)
+        assert self._axis_events("AXIS_COLLECTIVE")
+
+    def test_an_untrimmed_collective_in_the_air_is_brought_back_to_where_it_was_paused(self):
+        instance, telem, _ = self._untrimmed("collective", on_ground=False, position=-0.3)
+        instance.msfs_update_collective(telem)             # flying, lever at -0.3
+        instance.on_timeout()
+        self.mock_simconnect.sent_events.clear()
+
+        self.mock_device._input_data.set_axis(y=0.5)       # moved while paused
+        for _ in range(FFB_API_DISCOVERY_STABLE_FRAMES + 1):
+            instance._ffb_api_latch_discovery(telem)
+            instance.msfs_update_collective(telem)
+        assert instance.cpO_y == pytest.approx(-0.3)
+        assert self._axis_events("AXIS_COLLECTIVE") == []
+
+        self.mock_device._input_data.set_axis(y=-0.28)
+        instance.msfs_update_collective(telem)
+        assert self._axis_events("AXIS_COLLECTIVE")
+
+    def test_the_recapture_spring_has_a_floor_under_a_zero_control_gain(self):
+        """The pedals ship at gain 0; with no spring nothing would bring them back."""
+        from telemffb.sim.msfs_xp.FFBApiHelicopter import FFB_API_RECAPTURE_MIN_GAIN
+        instance, telem, _ = self._untrimmed("pedals", on_ground=True, position=0.6)
+        instance.ffb_api_pedal_spring_gain = 0.0
+        instance._ffb_api_restart_recapture()
+        instance.msfs_update_pedals(telem)
+        assert instance.spring_x.positiveCoefficient == round(FFB_API_RECAPTURE_MIN_GAIN * 4096)
+
+        self.mock_device._input_data.set_axis(x=0.02)
+        instance.msfs_update_pedals(telem)
+        assert instance.spring_x.positiveCoefficient == 0
 
     def test_trim_still_reaches_the_spring_when_axes_are_sent(self):
         instance = self.make_instance()

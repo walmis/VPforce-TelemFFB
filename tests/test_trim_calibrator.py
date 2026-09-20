@@ -3130,3 +3130,41 @@ class TestHoldSpringUnits:
         targets = (123 / 4096, -456 / 4096)
         assert cal._walk_hold_toward(targets, 1 / 30.0) is True
         assert cal._hold_offs == pytest.approx(targets)
+
+
+class TestTrimCalAvailabilityStamp:
+    """The discovery prompt reads _trim_cal_available, stamped once per load.
+
+    An aircraft with no profile resolves no class name and takes its class from
+    SimConnect instead, so a stamp made from the resolved name marked a
+    helicopter as a calibration candidate; the prompt then appeared as soon as
+    the new-aircraft wizard gave it a pattern.
+    """
+
+    def test_the_stamp_uses_the_class_that_was_built(self, monkeypatch):
+        import types
+        from telemffb.telem.TelemManager import TelemManager
+        monkeypatch.setattr(G, "settings_mgr",
+                            types.SimpleNamespace(timed_out=False, active_profile=None),
+                            raising=False)
+        monkeypatch.setattr(G, "ipc_instance", None, raising=False)
+        mgr = TelemManager()
+
+        built = type("Helicopter", (), {"__init__": lambda self, name: None,
+                                        "apply_settings": lambda self, params: None})
+        info = Mock()
+        info.name = "Unprofiled Heli"
+        info.data_source = "MSFS"
+        monkeypatch.setattr(mgr, "get_aircraft_config", lambda *a, **k: ({}, ""))
+        monkeypatch.setattr(mgr, "_resolve_aircraft_class", lambda *a, **k: built)
+        for name in ("_handle_device_selection", "_handle_vpconf_setup",
+                     "_handle_command_runner", "_handle_configurator_overrides",
+                     "_setup_simconnect_overrides", "_setup_xpplugin_overrides"):
+            monkeypatch.setattr(mgr, name, lambda *a, **k: None)
+        stamped = []
+        monkeypatch.setattr(mgr, "_stamp_trim_cal_availability",
+                            lambda source, cls: stamped.append((source, cls)))
+
+        mgr._initialize_new_aircraft(info, BaseTelemetryData())
+
+        assert stamped == [("MSFS", "Helicopter")]
