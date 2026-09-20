@@ -54,6 +54,38 @@ class AircraftInfo:
     sc_engine_type: Optional[int] = None
 
 
+# The settings chain elevator trim-curve calibration drives. A class that
+# excludes ANY link of it cannot be calibrated: helicopter classes exclude
+# the lot, which is what makes this a fixed-wing-only feature.
+TRIM_CAL_SETTING_CHAIN = {
+    "joystick_trim_follow_curve_y",
+    "joystick_trim_follow_use_curve_y",
+    "trim_following",
+    "telemffb_controls_axes",
+}
+
+
+def trim_cal_applies(sim, cls_name, device_type=None):
+    """Whether elevator trim-curve calibration applies to an aircraft class.
+
+    Availability is a per-class CONFIGURATION fact, taken from the same
+    "!class" exclusion markers in defaults.xml that hide the curve settings
+    rows for helicopter classes - one data source, no class names in code.
+    Prereq VALUES are deliberately ignored: a user who has not enabled trim
+    following yet is still a valid target (the whole chain defaults off out
+    of the box); a class excluded anywhere along the chain is not.
+    """
+    if sim not in ("MSFS", "XPLANE"):
+        return False
+    try:
+        _, removal = xmlutils.read_default_class_data(
+            sim, cls_name, device_type or G.device_type)
+    except Exception as e:
+        logging.debug(f"trim-cal availability check failed: {e}")
+        return False
+    return not (removal and TRIM_CAL_SETTING_CHAIN.intersection(removal))
+
+
 def aircraft_module_for_source(data_source):
     """The aircraft module that implements a telemetry source.
 
@@ -781,31 +813,18 @@ class TelemManager(QObject, threading.Thread):
         calibration applies to this aircraft, and stamp the instance so UI
         consumers (the main-window discovery prompt) read a plain attribute.
 
-        Availability is a per-class CONFIGURATION fact, taken from the same
-        "!class" exclusion markers in defaults.xml that hide the curve
-        settings rows for helicopter classes — one data source, no class
-        names in code. Prereq VALUES are deliberately ignored: a user who
-        has not enabled trim following yet is still a valid discovery
-        target (the whole chain defaults off out of the box); a class
-        excluded anywhere along the chain is not.
+        The rule itself lives in :func:`trim_cal_applies`, which the
+        Utilities menu action consults too, so the prompt and the dialog
+        can never disagree about which aircraft can be calibrated.
         """
         ac = self.currentAircraft
         if ac is None:
             return
-        available = False
-        try:
-            ds = str(data_source or "")
-            sim = "MSFS" if "MSFS" in ds else ("XPLANE" if "XPLANE" in ds else None)
-            if sim and hasattr(ac, "get_trim_calibrator"):
-                _, removal = xmlutils.read_default_class_data(
-                    sim, cls_name, G.device_type)
-                chain = {"joystick_trim_follow_curve_y",
-                         "joystick_trim_follow_use_curve_y",
-                         "trim_following", "telemffb_controls_axes"}
-                available = not (removal and chain.intersection(removal))
-        except Exception as e:
-            logging.debug(f"trim-cal availability stamp failed: {e}")
-        ac._trim_cal_available = available
+        ds = str(data_source or "")
+        sim = "MSFS" if "MSFS" in ds else ("XPLANE" if "XPLANE" in ds else None)
+        ac._trim_cal_available = bool(
+            sim and hasattr(ac, "get_trim_calibrator")
+            and trim_cal_applies(sim, cls_name))
 
     def _resolve_aircraft_class(self, aircraft_info: AircraftInfo, cls_name, params):
         """Resolve the appropriate aircraft class to use."""

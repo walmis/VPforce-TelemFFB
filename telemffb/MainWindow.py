@@ -1494,9 +1494,9 @@ class MainWindow(QMainWindow):
         Shared entry point for the Utilities menu action and the settings-row
         'trimcal' button; one dialog instance serves both.
 
-        Trim calibration is MSFS/X-Plane only, so refuse to open (with an
-        explanation) when nothing is loaded or the active aircraft is for a
-        different simulator.
+        Trim calibration is MSFS/X-Plane FIXED-WING only, so refuse to open
+        (with an explanation) when nothing is loaded, the active aircraft is
+        for a different simulator, or its class cannot be calibrated.
         """
         # Offline editing with no aircraft selected: the settings manager
         # still carries the ONLINE aircraft's identity and offline writes go
@@ -1523,6 +1523,28 @@ class MainWindow(QMainWindow):
                 msg = (f"Elevator Trim Calibration is only available for MSFS and "
                        f"X-Plane.\n\nThe active aircraft is for {sim}.")
             QMessageBox.information(self, "Elevator Trim Calibration", msg)
+            return
+
+        # Fixed-wing only. A helicopter (or any class excluding the
+        # trim-curve chain) has nothing to calibrate: the dialog would offer
+        # a sweep that cannot run and settings rows the class does not have.
+        # Live aircraft read the flag TelemManager stamped at load - the same
+        # one behind the discovery prompt; the offline editor has no aircraft
+        # object, so its selected class is asked directly. One rule either
+        # way (telemffb.telem.TelemManager.trim_cal_applies).
+        from telemffb.telem.TelemManager import trim_cal_applies
+        cls_name = G.settings_mgr.current_class or ""
+        if getattr(G.settings_mgr, "offline_mode", False):
+            applies = trim_cal_applies(sim, cls_name)
+        else:
+            ac = G.telem_manager.currentAircraft if G.telem_manager else None
+            applies = ac is not None and getattr(ac, "_trim_cal_available", False)
+        if not applies:
+            QMessageBox.information(
+                self, "Elevator Trim Calibration",
+                "Elevator Trim Calibration is only available for fixed-wing "
+                "aircraft.\n\nThe active aircraft"
+                + (f" is a {cls_name}." if cls_name else " cannot be calibrated."))
             return
 
         from telemffb.ui.dialogs.TrimCalibrationDialog import TrimCalibrationDialog

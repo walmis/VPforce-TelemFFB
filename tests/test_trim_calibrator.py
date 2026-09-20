@@ -3168,3 +3168,156 @@ class TestTrimCalAvailabilityStamp:
         mgr._initialize_new_aircraft(info, BaseTelemetryData())
 
         assert stamped == [("MSFS", "Helicopter")]
+
+
+class TestTrimCalAppliesRule:
+    """The one rule behind both the discovery prompt and the Utilities menu.
+
+    Availability comes from the "!class" exclusion markers in defaults.xml -
+    the same data that hides the curve settings rows - so no class names are
+    spelled out in code and the two consumers cannot drift apart.
+    """
+
+    def _read(self, monkeypatch, removal):
+        import telemffb.telem.TelemManager as TM
+        monkeypatch.setattr(TM.xmlutils, "read_default_class_data",
+                            lambda sim, cls, dev: ([], removal))
+        monkeypatch.setattr(G, "device_type", "joystick", raising=False)
+        return TM.trim_cal_applies
+
+    def test_a_class_excluding_the_chain_does_not_apply(self, monkeypatch):
+        applies = self._read(monkeypatch, ["trim_following", "something_else"])
+        assert applies("MSFS", "Helicopter") is False
+
+    def test_a_class_excluding_nothing_relevant_applies(self, monkeypatch):
+        applies = self._read(monkeypatch, ["some_unrelated_setting"])
+        assert applies("MSFS", "PropellerAircraft") is True
+
+    def test_no_exclusions_at_all_applies(self, monkeypatch):
+        applies = self._read(monkeypatch, None)
+        assert applies("XPLANE", "JetAircraft") is True
+
+    def test_other_sims_never_apply(self, monkeypatch):
+        applies = self._read(monkeypatch, None)
+        assert applies("DCS", "PropellerAircraft") is False
+
+    def test_a_broken_read_is_not_an_open_door(self, monkeypatch):
+        """Trim cal drives the elevator axis; when the class data cannot be
+        read, refusing is the safe answer."""
+        import telemffb.telem.TelemManager as TM
+
+        def boom(*a, **k):
+            raise RuntimeError("defaults.xml unreadable")
+
+        monkeypatch.setattr(TM.xmlutils, "read_default_class_data", boom)
+        monkeypatch.setattr(G, "device_type", "joystick", raising=False)
+        assert TM.trim_cal_applies("MSFS", "PropellerAircraft") is False
+
+
+class TestTrimCalDialogGate:
+    """Utilities > Elevator Trim Calibration explains itself rather than
+    opening onto an aircraft it cannot calibrate.
+
+    The menu action stayed enabled for every aircraft, so a helicopter could
+    open a dialog offering a sweep that cannot run against settings rows the
+    class does not have.
+    """
+
+    def _call(self, monkeypatch, *, sim="MSFS", cls="Helicopter",
+              available=False, offline=False, applies=False):
+        """Drive MainWindow.open_trim_calibration_dialog against a stand-in
+        self: the gate touches no widget state before deciding."""
+        import types
+        import telemffb.MainWindow as MW
+
+        shown = []
+        monkeypatch.setattr(MW.QMessageBox, "information",
+                            lambda parent, title, text: shown.append((title, text)))
+        monkeypatch.setattr(G, "settings_mgr", types.SimpleNamespace(
+            current_sim=sim, current_class=cls, current_aircraft_name="Test",
+            offline_scope="model" if offline else None, offline_mode=offline),
+            raising=False)
+        monkeypatch.setattr(G, "telem_manager", types.SimpleNamespace(
+            currentAircraft=types.SimpleNamespace(_trim_cal_available=available)),
+            raising=False)
+        monkeypatch.setattr("telemffb.telem.TelemManager.trim_cal_applies",
+                            lambda *a, **k: applies)
+
+        opened = []
+        me = types.SimpleNamespace(trim_cal_dialog=None)
+
+        class FakeDialog:
+            def __init__(self, parent):
+                opened.append(parent)
+                self.result_saved = Mock()
+                self.position_mode_changed = Mock()
+                self.destroyed = Mock()
+
+            raise_ = activateWindow = show = staticmethod(lambda: None)
+            # the offline gate runs before the class gate; these tests are
+            # about the latter, so the editor always has a valid target
+            _offline_target_valid = staticmethod(lambda: True)
+
+        import telemffb.ui.dialogs.TrimCalibrationDialog as TCD
+        monkeypatch.setattr(TCD, "TrimCalibrationDialog", FakeDialog)
+        me.settings_layout = types.SimpleNamespace(
+            save_trim_calibration=Mock(), save_trim_position_mode=Mock())
+
+        MW.MainWindow.open_trim_calibration_dialog(me)
+        return shown, opened
+
+    def test_a_helicopter_is_refused_with_a_reason(self, monkeypatch):
+        shown, opened = self._call(monkeypatch, cls="Helicopter", available=False)
+        assert opened == []
+        assert len(shown) == 1
+        assert "fixed-wing" in shown[0][1]
+        assert "Helicopter" in shown[0][1]
+
+    def test_a_fixed_wing_aircraft_opens_the_dialog(self, monkeypatch):
+        shown, opened = self._call(monkeypatch, cls="PropellerAircraft",
+                                   available=True)
+        assert shown == []
+        assert len(opened) == 1
+
+    def test_the_offline_editor_asks_the_selected_class(self, monkeypatch):
+        """Offline there is no aircraft object to carry the stamp, so the
+        class the editor is pointed at is consulted directly."""
+        shown, opened = self._call(monkeypatch, cls="Helicopter", offline=True,
+                                   applies=False, available=True)
+        assert opened == []
+        assert "fixed-wing" in shown[0][1]
+
+    def test_the_offline_editor_opens_for_a_fixed_wing_class(self, monkeypatch):
+        shown, opened = self._call(monkeypatch, cls="JetAircraft", offline=True,
+                                   applies=True, available=False)
+        assert shown == []
+        assert len(opened) == 1
+
+    def test_another_sim_still_gets_the_simulator_message(self, monkeypatch):
+        """The pre-existing sim gate runs first, so its wording is kept."""
+        shown, opened = self._call(monkeypatch, sim="DCS", cls="PropellerAircraft")
+        assert opened == []
+        assert "MSFS and X-Plane" in shown[0][1]
+
+    def test_no_aircraft_loaded_still_says_so(self, monkeypatch):
+        shown, opened = self._call(monkeypatch, sim="", cls="")
+        assert opened == []
+        assert "No aircraft is loaded" in shown[0][1]
+
+    def test_no_live_aircraft_object_is_refused(self, monkeypatch):
+        """Sim reads MSFS but nothing has been built yet - there is no stamp
+        to trust, so the dialog stays shut."""
+        import types
+        import telemffb.MainWindow as MW
+        shown = []
+        monkeypatch.setattr(MW.QMessageBox, "information",
+                            lambda parent, title, text: shown.append((title, text)))
+        monkeypatch.setattr(G, "settings_mgr", types.SimpleNamespace(
+            current_sim="MSFS", current_class="PropellerAircraft",
+            offline_mode=False), raising=False)
+        monkeypatch.setattr(G, "telem_manager",
+                            types.SimpleNamespace(currentAircraft=None),
+                            raising=False)
+        MW.MainWindow.open_trim_calibration_dialog(
+            types.SimpleNamespace(trim_cal_dialog=None))
+        assert len(shown) == 1
