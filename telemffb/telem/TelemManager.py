@@ -707,7 +707,10 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraft : AircraftBase = Aircraft_Class(aircraft_name)
         self.currentAircraft.apply_settings(params)
         self.currentAircraftConfig = params
-        self._stamp_trim_cal_availability(data_source, cls_name)
+        # the class actually built, not the one the settings resolved: an
+        # aircraft with no profile gets its class from SimConnect, and the
+        # resolved name is empty
+        self._stamp_trim_cal_availability(data_source, Aircraft_Class.__name__)
 
         self._setup_simconnect_overrides(aircraft_name, data_source)
         self._setup_xpplugin_overrides(aircraft_name, data_source)
