@@ -201,3 +201,67 @@ class TestPageFit:
         assert row_top(with_margin, monitor_page) == row_top(with_inset, settings_page)
         monitor_page.close()
         settings_page.close()
+
+
+class TestBeforeDevicesSlot:
+    """Where the compact row's view toggle goes: up against the row's left
+    end and level with the top of its icons, in the left-hand column rather
+    than the row, so the row stays centered."""
+
+    def _button(self):
+        button = QPushButton('x')
+        button.setFixedSize(20, 14)
+        return button
+
+    def test_the_widget_sits_immediately_left_of_the_row(self, qapp):
+        bar = _populated(TabHeaderBar())
+        bar.add_left(QPushButton('Detach'))
+        button = self._button()
+        bar.add_before_devices(button)
+        host = _host(bar)
+        row = bar.device_mini_panel
+        gap = row.mapTo(bar, row.rect().topLeft()).x() - (
+            button.mapTo(bar, button.rect().topLeft()).x() + button.width())
+        assert 0 <= gap <= 12
+        host.close()
+
+    def test_its_content_is_level_with_the_top_of_the_icons(self, qapp):
+        bar = _populated(TabHeaderBar())
+        button = self._button()
+        bar.add_before_devices(button, top_padding=2)
+        host = _host(bar)
+        icon = next(iter(bar.device_mini_panel.chips.values())).icon_label
+        icon_top = icon.mapTo(bar, icon.rect().topLeft()).y()
+        assert button.mapTo(bar, button.rect().topLeft()).y() + 2 == icon_top
+        host.close()
+
+    def test_the_row_stays_centered(self, qapp):
+        bar = _populated(TabHeaderBar())
+        bar.add_before_devices(self._button())
+        host = _host(bar)
+        assert abs(_center_in_bar(bar) - bar.width() // 2) <= 2
+        host.close()
+
+    def test_the_row_does_not_move_when_the_widget_is_hidden(self, qapp):
+        bar = _populated(TabHeaderBar())
+        button = self._button()
+        bar.add_before_devices(button)
+        host = _host(bar)
+        shown = _center_in_bar(bar)
+        button.hide()
+        QApplication.processEvents()
+        assert _center_in_bar(bar) == shown
+        host.close()
+
+    def test_pages_with_and_without_side_content_still_agree(self, qapp):
+        monitor = _populated(TabHeaderBar())
+        monitor.add_left(QPushButton('Detach'))
+        monitor.add_left(QLabel('Telemetry:'))
+        monitor.add_right(QLabel('Active Effects for: Joystick'))
+        settings = _populated(TabHeaderBar())
+        for bar in (monitor, settings):
+            bar.add_before_devices(self._button())
+        monitor_host, settings_host = _host(monitor), _host(settings)
+        assert abs(_center_in_bar(monitor) - _center_in_bar(settings)) <= 2
+        monitor_host.close()
+        settings_host.close()
