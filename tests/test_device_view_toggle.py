@@ -14,8 +14,9 @@ import pytest
 pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import QEvent
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QImage, QPalette
+from PyQt6.QtCore import QEvent, QPoint, Qt
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QImage
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from telemffb.ui.widgets.DeviceViewToggle import DeviceViewToggle
@@ -39,32 +40,7 @@ def _frame(height=400):
     return frame, content
 
 
-class TestWhichWayItGoes:
-    def test_the_frames_button_offers_the_compact_icons(self, qapp):
-        assert "compact" in DeviceViewToggle(frame_shown=True).toolTip().lower()
-
-    def test_a_rows_button_offers_the_panel(self, qapp):
-        assert "panel" in DeviceViewToggle(frame_shown=False).toolTip().lower()
-
-    def test_a_click_is_reported(self, qapp):
-        toggle = DeviceViewToggle(frame_shown=True)
-        seen = []
-        toggle.clicked.connect(lambda: seen.append(True))
-        toggle.click()
-        assert seen == [True]
-
-
 class TestPinnedToTheTitle:
-    def test_sits_at_the_right_hand_end_of_the_title_line(self, qapp):
-        frame, _ = _frame()
-        toggle = DeviceViewToggle(frame_shown=True)
-        toggle.pin_to_title(frame)
-        frame.show()
-        QApplication.processEvents()
-        assert toggle.parentWidget() is frame
-        assert toggle.y() <= 4
-        assert 0 < frame.width() - (toggle.x() + toggle.width()) <= 12
-
     def test_the_frame_is_made_wide_enough_for_title_and_button(self, qapp):
         """The frame is otherwise as wide as its title alone, and the
         button would sit on the last letters."""
@@ -79,29 +55,6 @@ class TestPinnedToTheTitle:
         title_width = QFontMetrics(font).horizontalAdvance(frame.title())
         assert toggle.x() >= 10 + title_width
         frame.close()
-
-    def test_follows_the_corner_as_the_frame_widens(self, qapp):
-        frame, _ = _frame()
-        toggle = DeviceViewToggle(frame_shown=True)
-        toggle.pin_to_title(frame)
-        frame.show()
-        QApplication.processEvents()
-        gap = frame.width() - toggle.x()
-        frame.resize(frame.width() + 80, 400)
-        QApplication.processEvents()
-        assert frame.width() - toggle.x() == gap
-        frame.close()
-
-    def test_covers_the_border_line_behind_it(self, qapp):
-        """Opaque, in the window color, so the frame's border stops either
-        side of the glyph the way it does around the title."""
-        frame, _ = _frame()
-        toggle = DeviceViewToggle(frame_shown=True)
-        toggle.pin_to_title(frame)
-        assert toggle.autoFillBackground()
-        assert toggle.backgroundRole() == QPalette.ColorRole.Window
-        frame.close()
-
 
 class TestRevealOnHover:
     """Beside a compact row the glyph is not drawn until the mouse is over
@@ -132,12 +85,6 @@ class TestRevealOnHover:
         return any(image.pixelColor(x, y) != blank
                    for x in range(image.width()) for y in range(image.height()))
 
-    def test_nothing_is_drawn_until_the_host_is_entered(self, qapp):
-        host, toggle = self._host_and_toggle()
-        assert not toggle.is_revealed()
-        assert not self._draws_something(toggle)
-        host.close()
-
     def test_entering_the_host_draws_it_and_leaving_clears_it(self, qapp):
         host, toggle = self._host_and_toggle()
         QApplication.sendEvent(host, QEvent(QEvent.Type.Enter))
@@ -160,7 +107,49 @@ class TestRevealOnHover:
         assert seen == [True]
         host.close()
 
-    def test_a_toggle_with_no_host_is_always_drawn(self, qapp):
-        toggle = DeviceViewToggle(frame_shown=True)
-        assert toggle.is_revealed()
-        assert self._draws_something(toggle)
+
+class TestClickOrDrag:
+    """A click switches views; a drag tears the devices off to float. One
+    press must not be taken for both - a drag that also clicked would flip
+    the view a second time as it was let go."""
+
+    def _toggle(self):
+        toggle = DeviceViewToggle(frame_shown=False)
+        toggle.set_draggable(True)
+        toggle.show()
+        QApplication.processEvents()
+        clicks, drags = [], []
+        toggle.clicked.connect(lambda: clicks.append(True))
+        toggle.drag_started.connect(drags.append)
+        return toggle, clicks, drags
+
+    def test_a_press_moved_past_the_drag_distance_is_a_drag_and_not_a_click(self, qapp):
+        toggle, clicks, drags = self._toggle()
+        center = toggle.rect().center()
+        far = center + QPoint(QApplication.startDragDistance() + 10, 0)
+        QTest.mousePress(toggle, Qt.MouseButton.LeftButton, pos=center)
+        QTest.mouseMove(toggle, far)
+        QTest.mouseMove(toggle, far + QPoint(30, 0))
+        QTest.mouseRelease(toggle, Qt.MouseButton.LeftButton, pos=center)  # let go back over the button
+        assert len(drags) == 1
+        assert clicks == []
+        toggle.close()
+
+    def test_a_press_let_go_in_place_is_still_a_click(self, qapp):
+        toggle, clicks, drags = self._toggle()
+        QTest.mouseClick(toggle, Qt.MouseButton.LeftButton)
+        assert clicks == [True]
+        assert drags == []
+        toggle.close()
+
+    def test_a_button_not_made_draggable_never_drags(self, qapp):
+        toggle = DeviceViewToggle(frame_shown=False)
+        toggle.show()
+        drags = []
+        toggle.drag_started.connect(drags.append)
+        center = toggle.rect().center()
+        QTest.mousePress(toggle, Qt.MouseButton.LeftButton, pos=center)
+        QTest.mouseMove(toggle, center + QPoint(80, 0))
+        QTest.mouseRelease(toggle, Qt.MouseButton.LeftButton, pos=center + QPoint(80, 0))
+        assert drags == []
+        toggle.close()

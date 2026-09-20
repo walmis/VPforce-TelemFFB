@@ -32,7 +32,7 @@ action all live on this object (``self.menu``, ``self.window_menu``,
 ``self.log_menu``, ``self.log_window_action``, ``self.configurator_settings_action``)
 rather than being mirrored onto MainWindow. MainWindow reaches them through
 ``self.main_menu`` and the small public methods below (``add_instance_log_menu``,
-``add_show_devices_frame_action``, ``set_configurator_action_enabled``).
+``add_device_view_actions``, ``set_configurator_action_enabled``).
 
 The bar is held at ``MENU_BAR_HEIGHT``, a little taller than it would be
 left to itself: with the margin beneath it, that is the band the app logo
@@ -51,7 +51,7 @@ import sys
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QUrl
-from PyQt6.QtGui import QAction, QDesktopServices
+from PyQt6.QtGui import QAction, QActionGroup, QDesktopServices
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import telemffb.globals as G
@@ -321,21 +321,36 @@ class MainMenu:
                     self.log_action[d].triggered.connect(lambda _, child=d: do_show_child_log(child))
                     self.child_log_menu.addAction(self.log_action[d])
 
-    def add_show_devices_frame_action(self, checked, on_toggled):
-        """Window menu: 'Show Device Frame', only added when the owning
-        instance has more than one CONFIGURED device on its own panel -
-        lazily creates the Window menu if this instance hasn't needed one
-        yet (a solo master/child never gets one otherwise)."""
+    def add_device_view_actions(self, views, current, on_chosen):
+        """Window menu: a 'Devices' submenu choosing where the devices are
+        shown. ``views`` is ``[(key, label), ...]`` - which ones there are
+        depends on how many devices the instance has configured - and
+        ``on_chosen(key)`` is called with the pick. Lazily creates the
+        Window menu if this instance hasn't needed one yet (a solo
+        master/child never gets one otherwise)."""
         if not hasattr(self, 'window_menu'):
             self.window_menu = self.menu.addMenu('Window')
         elif self.window_menu.actions():
             self.window_menu.addSeparator()
-        self.show_devices_frame_action = QAction('Show Device Frame', self.mw)
-        self.show_devices_frame_action.setCheckable(True)
-        self.show_devices_frame_action.setChecked(checked)
-        self.show_devices_frame_action.triggered.connect(
-            lambda: on_toggled(self.show_devices_frame_action.isChecked()))
-        self.window_menu.addAction(self.show_devices_frame_action)
+        submenu = self.window_menu.addMenu('Devices')
+        self.device_view_actions = {}
+        group = QActionGroup(self.mw)
+        group.setExclusive(True)
+        for key, label in views:
+            action = QAction(label, self.mw)
+            action.setCheckable(True)
+            action.setChecked(key == current)
+            action.triggered.connect(lambda _checked, k=key: on_chosen(k))
+            group.addAction(action)
+            submenu.addAction(action)
+            self.device_view_actions[key] = action
+
+    def set_device_view_checked(self, key):
+        """Keep the submenu's mark in step when the view was changed from
+        somewhere else (a view-toggle button, a right-click menu)."""
+        action = getattr(self, 'device_view_actions', {}).get(key)
+        if action is not None and not action.isChecked():
+            action.setChecked(True)
 
     def set_configurator_action_enabled(self, enabled, tooltip=''):
         # the action is part of the Debug menu, which only exists with the

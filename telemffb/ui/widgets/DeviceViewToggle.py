@@ -27,15 +27,20 @@ the frame is showing, which says what a click will do without an arrow: the
 frame does not slide anywhere an arrow could point, it folds up into the
 header.
 
+A click switches; a drag tears the devices off into the floating strip
+(``set_draggable`` / ``drag_started``). The two are told apart by the
+platform's drag distance, and a press that became a drag does not also
+count as a click when it is let go.
+
 Painted rather than an image so it follows the palette in both themes and
 stays crisp at any scaling. Quiet until hovered: it is a preference, not
 something to reach for often. Beside a compact row it goes further and draws
 nothing at all until the mouse is over the row's header bar
 (``reveal_on_hover``), so the header is just the icons until you go to it.
 """
-from PyQt6.QtCore import QEvent, QRectF, QSize, Qt
+from PyQt6.QtCore import QEvent, QPoint, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPalette, QPen
-from PyQt6.QtWidgets import QAbstractButton, QWidget
+from PyQt6.QtWidgets import QAbstractButton, QApplication, QWidget
 
 #: Glyph size and the padding around it. On the frame the button's own
 #: background covers that padding, which is what breaks the frame's border
@@ -61,9 +66,16 @@ class DeviceViewToggle(QAbstractButton):
     #: How far below the button's top edge its glyph starts.
     GLYPH_TOP = _PAD_Y
 
+    #: The button was dragged rather than clicked; carries where the cursor
+    #: is on the screen. Only from a button made draggable.
+    drag_started = pyqtSignal(QPoint)
+
     def __init__(self, frame_shown: bool, parent: QWidget = None):
         super().__init__(parent)
         self._frame_shown = frame_shown
+        self._draggable = False
+        self._press_pos = None
+        self._dragged = False
         self._pinned_to = None
         self._reveal_host = None
         self._host_hovered = False
@@ -73,6 +85,37 @@ class DeviceViewToggle(QAbstractButton):
         self.setToolTip("Show compact device icons" if frame_shown
                         else "Show the Active Devices panel")
         self.setFixedSize(self.sizeHint())
+
+    def set_draggable(self, draggable: bool) -> None:
+        self._draggable = draggable
+        if draggable and "Drag" not in self.toolTip():
+            self.setToolTip(self.toolTip() + "\nDrag to float the devices as a strip.")
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_pos = event.position().toPoint()
+            self._dragged = False
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if (self._draggable and not self._dragged and self._press_pos is not None
+                and event.buttons() & Qt.MouseButton.LeftButton
+                and (event.position().toPoint() - self._press_pos).manhattanLength()
+                >= QApplication.startDragDistance()):
+            self._dragged = True
+            self.setDown(False)  # it is not going to be a click
+            self.drag_started.emit(event.globalPosition().toPoint())
+            return
+        if not self._dragged:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        self._press_pos = None
+        if self._dragged:
+            self._dragged = False
+            event.accept()  # the drag's end, not a click
+            return
+        super().mouseReleaseEvent(event)
 
     def sizeHint(self) -> QSize:
         return QSize(_GLYPH.width() + 2 * _PAD_X, _GLYPH.height() + 2 * _PAD_Y)

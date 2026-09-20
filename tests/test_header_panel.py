@@ -1,5 +1,6 @@
 """HeaderPanel (telemffb/ui/panels/HeaderPanel.py) - the Application
-Status box, full width above the tabs.
+Status box, full width above the tabs, with the compact device row inside
+it under Matched Model.
 
 Extracted from MainWindow's inline construction of the AppStatusWidget
 instance, and its ``refresh_scope_status_indicators()`` push (now
@@ -21,6 +22,7 @@ from PyQt6.QtWidgets import QApplication
 import telemffb.globals as G
 from telemffb.state.app_state import AppState
 from telemffb.ui.panels.HeaderPanel import HeaderPanel
+from telemffb.ui.widgets.DeviceStrip import DeviceStrip
 from telemffb.ui.widgets.custom_widgets import AppStatusWidget
 
 pytestmark = pytest.mark.unit
@@ -108,6 +110,45 @@ class TestMessageArea:
         assert panel.sizeHint().height() > quiet
         panel.status_container.clear_error()
         assert panel.sizeHint().height() == quiet
+        panel.close()
+
+
+class TestDeviceSlot:
+    """The device strip goes in the status box's left-hand column, below its
+    last field. MainWindow decides when; the panel owns where."""
+
+    def _panel(self, monkeypatch):
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        panel = HeaderPanel()
+        panel.resize(1000, 260)
+        panel.show()
+        QApplication.processEvents()
+        return panel
+
+    def test_the_slot_is_empty_and_takes_no_room_to_begin_with(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
+        assert panel.device_slot.isHidden()
+        panel.close()
+
+    def test_the_box_grows_for_the_strip_and_gives_the_height_back(self, qapp, monkeypatch):
+        """With no aircraft loaded the strip is the tallest thing in its
+        column. Every other view must not leave that height behind, which
+        it did until the layouts above the slot were told."""
+        panel = self._panel(monkeypatch)
+        quiet = panel.sizeHint().height()
+
+        strip = DeviceStrip()
+        strip.device_mini_panel.set_devices(['joystick', 'pedals'])
+        panel.device_slot.take(strip)
+        panel.refresh_device_slot_height()
+        QApplication.processEvents()
+        assert panel.sizeHint().height() > quiet
+
+        panel.device_slot.release()
+        panel.refresh_device_slot_height()
+        QApplication.processEvents()
+        assert panel.sizeHint().height() == quiet
+        strip.setParent(None)
         panel.close()
 
 

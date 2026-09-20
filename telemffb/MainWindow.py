@@ -64,8 +64,11 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
+from telemffb.ui.widgets.CornerDeviceSlot import CornerDeviceSlot
 from telemffb.ui.widgets.CornerLogo import CornerLogo
 from telemffb.ui.widgets.DeviceViewToggle import DeviceViewToggle
+from telemffb.ui.widgets.DockZoneOverlay import DockZoneOverlay
+from telemffb.ui.widgets.DeviceStrip import DeviceStrip
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.preview.controller import EffectPreviewController
@@ -79,6 +82,28 @@ from telemffb.utils import exit_application
 from telemffb.ui.menus import MainMenu
 from telemffb.ui.tray import TrayController
 from telemffb.ui.updates import UpdateChecker
+
+#: Where the devices are shown (system setting 'deviceView'): the Active
+#: Devices frame down the window's left edge, or the compact row in one of
+#: four places - the band across the top beside the logo, the Application
+#: Status box, the Monitor and Settings pages' headers, or a small window
+#: of its own. The four are the "integrated" views: the frame's view-toggle
+#: button goes to whichever of them was chosen last ('deviceViewIntegrated'),
+#: and theirs all go to the frame.
+DEVICE_VIEW_FRAME = 'frame'
+DEVICE_VIEW_MENUBAR = 'menubar'
+DEVICE_VIEW_ROW = 'row'
+DEVICE_VIEW_HEADER = 'header'
+DEVICE_VIEW_FLOATING = 'floating'
+INTEGRATED_DEVICE_VIEWS = (DEVICE_VIEW_MENUBAR, DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER, DEVICE_VIEW_FLOATING)
+DEVICE_VIEW_LABELS = {
+    DEVICE_VIEW_FRAME: "Side panel",
+    DEVICE_VIEW_MENUBAR: "Menu bar",
+    DEVICE_VIEW_ROW: "Application status box",
+    DEVICE_VIEW_HEADER: "Monitor/Settings header",
+    DEVICE_VIEW_FLOATING: "Floating strip",
+}
+
 
 class MainWindow(QMainWindow):
     #: Number-sliders whose handle shows a live force readout: setting name
@@ -218,6 +243,24 @@ class MainWindow(QMainWindow):
         signal connections below are the ones that need MainWindow's own
         methods/dialogs. """
 
+        # The device strip, and the stand-in a detached Monitor window
+        # gets: the two compact rows the full Active Devices panel is
+        # mirrored onto (_sync_device_strips). The strip moves between the
+        # places the devices can be shown; only its slot changes.
+        self.device_strip = DeviceStrip(
+            keep_on_top=bool(G.system_settings.get('deviceStripOnTop', False)))
+        self.device_strip.DeviceClicked.connect(self.change_config_scope)
+        self.device_strip.view_toggled.connect(lambda: self._set_devices_frame_preference(True))
+        self.device_strip.tear_off.connect(self._on_device_glyph_dragged)
+        self.device_strip.moved.connect(self._save_device_strip_pos)
+        self.device_strip.dock_requested.connect(lambda: self._set_device_view(DEVICE_VIEW_ROW))
+        self.device_strip.drag_moved.connect(self._on_device_strip_dragged)
+        self.device_strip.drag_ended.connect(self._on_device_strip_dropped)
+        self.device_strip.set_owner_window(self)
+        self.device_strip.set_confined(bool(G.system_settings.get('deviceStripConfined', True)))
+        self._add_device_view_context_menu(self.device_strip.device_mini_panel)
+        self._add_device_view_context_menu(self.device_strip.toggle)
+
         self.header_panel = HeaderPanel(parent=self)
         self.header_panel.profile_chosen.connect(self.on_profile_change)
         self.header_panel.profile_notes_clicked.connect(self.open_profile_notes_dialog)
@@ -234,13 +277,6 @@ class MainWindow(QMainWindow):
         there are multiple devices, or always when there is only one (see
         _sync_devices_display() / switch_window_view()). """
 
-        # Every tab page's header bar owns a compact device row; they are
-        # collected here so _sync_mini_device_panel() can mirror the full
-        # panel onto all of them at once. Populated as the pages are built
-        # below, which is after the full panel - hence the empty list
-        # rather than a late attribute.
-        self._mini_device_panels = []
-        self._mini_device_toggles = {}  # mini panel -> the view toggle beside it
 
         self.device_groupbox = QGroupBox("Active Devices")
 
@@ -254,7 +290,7 @@ class MainWindow(QMainWindow):
         # Keeps the mini device row in step with the full panel - device
         # list, active device, and every device's icon/label/status -
         # however it was changed.
-        self.device_panel.changed.connect(self._sync_mini_device_panel)
+        self.device_panel.changed.connect(self._sync_device_strips)
         device_groupbox_layout.addWidget(self.device_panel)
         self.device_groupbox.setLayout(device_groupbox_layout)
         # Switches to the compact icon rows; theirs switch back (see
@@ -263,7 +299,20 @@ class MainWindow(QMainWindow):
         self.device_frame_toggle = DeviceViewToggle(frame_shown=True)
         self.device_frame_toggle.pin_to_title(self.device_groupbox)
         self.device_frame_toggle.clicked.connect(lambda: self._set_devices_frame_preference(False))
+        self.device_frame_toggle.drag_started.connect(self._on_device_glyph_dragged)
+        self.device_frame_toggle.set_draggable(True)
+        self._add_device_view_context_menu(self.device_frame_toggle)
         self._add_device_view_context_menu(self.device_groupbox)
+        # The status box's compact row: registered here, not where the
+        # header is built, because mirroring needs the full panel above.
+        # The menu bar view's slot: in the band across the top, beside the
+        # logo. See telemffb/ui/widgets/CornerDeviceSlot.py.
+        self.corner_device_slot = CornerDeviceSlot(
+            self, below=self.header_panel.status_group, menubar=self.main_menu.menu, logo=self.corner_logo)
+
+        # Dropping the strip on one of the places the devices can be shown
+        # docks it there.
+        self._dock_zone_overlay = DockZoneOverlay(self)
         # Stays hidden until _sync_devices_display() runs with a populated
         # device panel (master instances populate it later, in
         # setup_master_instance()) - otherwise an empty frame flashes
@@ -363,7 +412,15 @@ class MainWindow(QMainWindow):
         """ Create the monitor tab: telemetry + active-effects display """
 
         self.monitor_panel = MonitorPanel(parent=self.tab_widget, mainwindow=self)
-        self._register_mini_device_panel(self.monitor_panel.header_bar)
+        # A detached Monitor window can see none of this window's device
+        # displays, so it keeps a stand-in strip of its own - no glyph and
+        # no grip: the view it would change and the window it would float
+        # over are not the ones it is in.
+        self.monitor_device_strip = DeviceStrip(interactive=False)
+        self.monitor_device_strip.DeviceClicked.connect(self.change_config_scope)
+        self._add_device_view_context_menu(self.monitor_device_strip.device_mini_panel)
+        self.monitor_panel.header_bar.add_beside_slot(self.monitor_device_strip)
+        self.monitor_device_strip.hide()
         if G.master_instance:
             self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
 
@@ -401,17 +458,17 @@ class MainWindow(QMainWindow):
         self.settings_area.setWidget(settings_widget)
 
         """ The settings page is the scroll area under a header bar of its
-        own, so the compact device row lands in the same place here as it
-        does on the Monitor page. The bar holds nothing else, so it is
-        shown only while the device row is (see _sync_devices_display). """
+        own, for the "tab header" device view: the compact device row lands
+        in the same place here as it does on the Monitor page. The bar
+        holds nothing else, so it shows only in that view (see
+        _sync_devices_display). """
 
         self.settings_header_bar = TabHeaderBar()
         self.settings_header_bar.match_page_background()
-        # The inset the Monitor page's own layout gives its bar, so the two
-        # device rows sit at the same height.
-        self.settings_header_bar.set_page_inset(
-            self.monitor_panel.layout().contentsMargins().top())
-        self._register_mini_device_panel(self.settings_header_bar)
+        # The insets the Monitor page's own layout gives its bar, so the
+        # two device rows sit at the same height and end at the same x.
+        monitor_margins = self.monitor_panel.layout().contentsMargins()
+        self.settings_header_bar.set_page_inset(monitor_margins.top(), monitor_margins.right())
         settings_page = QWidget()
         settings_page_layout = QVBoxLayout(settings_page)
         settings_page_layout.setContentsMargins(0, 0, 0, 0)
@@ -506,6 +563,13 @@ class MainWindow(QMainWindow):
         """  Create configurator gain dialog for use during TelemFFB session and store object in globals """
 
         G.gain_override_dialog = ConfiguratorDialog(self)
+
+        # Put the device strip where the saved view says, now that every
+        # slot exists: the syncs that ran while the window was being built
+        # had nowhere to put it yet. (A master syncs again from
+        # setup_master_instance, once it knows its devices; a child's
+        # devices are known already.)
+        self._sync_devices_display()
 
     def _install_detachable_tabs(self):
         """Enable context menu on the tab bar for detaching/reattaching."""
@@ -742,20 +806,6 @@ class MainWindow(QMainWindow):
         order = [G.device_type] + configured_rest + unconfigured_rest
         return order, configured
 
-    def _register_mini_device_panel(self, header_bar):
-        """Take a tab page's header bar into the set the full Active
-        Devices panel is mirrored onto, and wire its row to the scope
-        switcher."""
-        header_bar.DeviceClicked.connect(self.change_config_scope)
-        toggle = DeviceViewToggle(frame_shown=False)
-        toggle.reveal_on_hover(header_bar)
-        toggle.clicked.connect(lambda: self._set_devices_frame_preference(True))
-        header_bar.add_before_devices(toggle, top_padding=DeviceViewToggle.GLYPH_TOP)
-        self._add_device_view_context_menu(header_bar.device_mini_panel)
-        self._mini_device_panels.append(header_bar.device_mini_panel)
-        self._mini_device_toggles[header_bar.device_mini_panel] = toggle
-        self._sync_mini_device_panel()
-
     def _add_device_view_context_menu(self, widget):
         """Right-click on either device display: the same switch as its
         button and the Window menu's 'Show Device Frame'."""
@@ -763,29 +813,186 @@ class MainWindow(QMainWindow):
         widget.customContextMenuRequested.connect(
             lambda pos, w=widget: self._show_device_view_context_menu(w, pos))
 
+    def _device_views(self):
+        """The views on offer, as ``[(key, label), ...]``. The Active Devices
+        frame needs more than one device to be worth its width; a lone
+        device still gets the choice between the integrated views."""
+        views = list(INTEGRATED_DEVICE_VIEWS)
+        if self._multiple_devices_configured():
+            views.insert(0, DEVICE_VIEW_FRAME)
+        return [(view, DEVICE_VIEW_LABELS[view]) for view in views]
+
+    def _last_integrated_device_view(self) -> str:
+        """Where the Active Devices frame's view-toggle button goes."""
+        view = G.system_settings.get('deviceViewIntegrated', None)
+        return view if view in INTEGRATED_DEVICE_VIEWS else DEVICE_VIEW_ROW
+
+    def _device_view(self) -> str:
+        """The view in effect. ``showDevicesFrame`` is the setting from
+        before there was a choice of more than two, and still what decides
+        it until a view has been picked. A child instance always uses its
+        status box: the setting is shared by every instance, and is the
+        master's to act on."""
+        if not G.master_instance:
+            return DEVICE_VIEW_ROW
+        view = G.system_settings.get('deviceView', None)
+        if view not in DEVICE_VIEW_LABELS:
+            view = DEVICE_VIEW_FRAME if G.system_settings.get('showDevicesFrame', True) else DEVICE_VIEW_ROW
+        if view == DEVICE_VIEW_FRAME and not self._multiple_devices_configured():
+            view = self._last_integrated_device_view()  # a lone device has no frame
+        return view
+
     def _show_device_view_context_menu(self, widget, pos):
-        if not self._multiple_devices_configured():
-            return  # one device: the frame never shows, nothing to switch
-        showing = self.device_groupbox.isVisible()
+        """Right-click on any device display: the other views, and while
+        floating how the strip floats."""
+        current = self._device_view()
+        strip = self.device_strip
         menu = QtWidgets.QMenu(widget)
-        action = menu.addAction("Show compact device icons" if showing
-                                else "Show the Active Devices panel")
-        action.triggered.connect(lambda: self._set_devices_frame_preference(not showing))
+        for key, label in self._device_views():
+            if key != current:
+                menu.addAction(f"Show devices: {label.lower()}").triggered.connect(
+                    lambda _checked, k=key: self._set_device_view(k))
+        if current == DEVICE_VIEW_FLOATING and G.master_instance:
+            menu.addSeparator()
+            confined = menu.addAction("Keep inside the main window")
+            confined.setCheckable(True)
+            confined.setChecked(strip.confined())
+            confined.triggered.connect(self._set_device_strip_confined)
+            if not strip.confined():  # a strip inside the window has no window of its own to keep on top
+                on_top = menu.addAction("Keep on top of other windows")
+                on_top.setCheckable(True)
+                on_top.setChecked(strip.keep_on_top())
+                on_top.triggered.connect(self._set_device_strip_on_top)
         menu.exec(widget.mapToGlobal(pos))
+
+    def _on_device_glyph_dragged(self, on_screen):
+        """The view-toggle glyph was dragged off its slot (or off the
+        frame): float the strip and hand it the drag, so the same gesture
+        carries on - to wherever it is let go, a dock zone included."""
+        if not G.master_instance:
+            return
+        self._set_device_view(DEVICE_VIEW_FLOATING)
+        if self.device_strip.isVisible():
+            self.device_strip.drag_under_cursor(on_screen)
+
+    def _device_slot(self, view: str):
+        """The slot the strip goes in for ``view`` - None for the views
+        that are not a slot (the Active Devices frame, floating) and for a
+        slot there is no room in (the tab headers, on the Hide tab)."""
+        if view == DEVICE_VIEW_ROW:
+            return self.header_panel.device_slot
+        if view == DEVICE_VIEW_MENUBAR:
+            return self.corner_device_slot
+        if view == DEVICE_VIEW_HEADER:
+            # Whichever page is showing: only one is, and the strip is one.
+            page = self.tab_widget.currentIndex()
+            if page == 0 and 'Monitor' not in getattr(self, '_detached_tabs', {}):
+                return self.monitor_panel.header_bar.device_slot
+            if page == 1:
+                return self.settings_header_bar.device_slot
+        return None
+
+    def _device_slots(self):
+        return [self.header_panel.device_slot, self.corner_device_slot,
+                self.settings_header_bar.device_slot, self.monitor_panel.header_bar.device_slot]
+
+    def _device_dock_zones(self):
+        """Where the floating strip can be dropped to dock, as ``[(view,
+        rect in this window, label), ...]``, first match wins.
+
+        Regions of the window rather than the slots themselves: a slot the
+        strip is not in takes no space, and so is nothing to aim at. The
+        side panel's zone is a narrow strip down the left edge and comes
+        first, so that it can be reached at all past the status box, which
+        starts a few pixels in.
+        """
+        zones = []
+        box = self.header_panel.status_group
+        band = box.mapTo(self, QtCore.QPoint(0, 0)).y()
+        tabs_top_left = self.tab_widget.mapTo(self, QtCore.QPoint(0, 0))
+        tabs_bottom = tabs_top_left.y() + self.tab_widget.height()
+
+        if self._multiple_devices_configured():
+            zones.append((DEVICE_VIEW_FRAME, QtCore.QRect(0, band, 40, tabs_bottom - band)))
+
+        menubar = self.main_menu.menu
+        actions = menubar.actions()
+        left = (menubar.actionGeometry(actions[-1]).right() if actions else 0) + 12
+        right = self.corner_logo.x() - 6 if self.corner_logo.isVisible() else self.width() - 8
+        if right - left >= 100:
+            zones.append((DEVICE_VIEW_MENUBAR, QtCore.QRect(left, 0, right - left, band)))
+
+        column = self.header_panel.status_container.sim_status_group
+        zones.append((DEVICE_VIEW_ROW, QtCore.QRect(column.mapTo(self, QtCore.QPoint(0, 0)), column.size())))
+
+        page = self.tab_widget.currentWidget()
+        if self.tab_widget.currentIndex() != 2 and page is not None:  # the Hide tab has no page header
+            zones.append((DEVICE_VIEW_HEADER,
+                          QtCore.QRect(page.mapTo(self, QtCore.QPoint(0, 0)), QtCore.QSize(page.width(), 56))))
+        return [(view, rect, f"Dock: {DEVICE_VIEW_LABELS[view]}") for view, rect in zones]
+
+    def _device_dock_zone_at(self, on_screen):
+        if QApplication.keyboardModifiers() & Qt.KeyboardModifier.ControlModifier:
+            return None  # Ctrl: float here, whatever is underneath
+        pos = self.mapFromGlobal(on_screen)
+        if not self.rect().contains(pos):
+            return None
+        return next((zone for zone in self._device_dock_zones() if zone[1].contains(pos)), None)
+
+    def _on_device_strip_dragged(self, on_screen):
+        zone = self._device_dock_zone_at(on_screen)
+        strip = self.device_strip
+        if zone is None:
+            self._dock_zone_overlay.hide()
+            QtWidgets.QToolTip.hideText()
+            return
+        self._dock_zone_overlay.show_zone(zone[1])
+        if strip.confined():
+            strip.raise_()  # the strip stays above the highlight it is dragged over
+        # What the zone is, said just under the strip: written in the zone
+        # it would be beneath the strip being dragged over it.
+        QtWidgets.QToolTip.showText(strip.mapToGlobal(QtCore.QPoint(0, strip.height() - 12)), zone[2], strip)
+
+    def _on_device_strip_dropped(self, on_screen):
+        self._dock_zone_overlay.hide()
+        QtWidgets.QToolTip.hideText()
+        zone = self._device_dock_zone_at(on_screen)
+        if zone is not None:
+            self.device_strip.revert_drag()
+            self._set_device_view(zone[0])
+
+    def _set_device_strip_confined(self, confined: bool):
+        G.system_settings.setValue('deviceStripConfined', bool(confined))
+        self.device_strip.set_confined(bool(confined))
+        self._save_device_strip_pos(self.device_strip.pos())
+        self._sync_devices_display()
+
+    def _save_device_strip_pos(self, pos):
+        """Remembered separately for the two ways it floats: a place inside
+        this window and a place on the screen are different things."""
+        if not self.device_strip.floating():
+            return  # docked: the slot decides where it is
+        key = 'deviceStripPosInWindow' if self.device_strip.confined() else 'deviceStripPos'
+        G.system_settings.setValue(key, f"{pos.x()},{pos.y()}")
+
+    def _set_device_strip_on_top(self, on_top: bool):
+        G.system_settings.setValue('deviceStripOnTop', bool(on_top))
+        self.device_strip.set_keep_on_top(bool(on_top))
 
     def _multiple_devices_configured(self) -> bool:
         icons = self.device_panel.icons
         return sum(1 for name in self.device_panel.get_device_names() if icons[name].configured) > 1
 
-    def _sync_mini_device_panel(self):
+    def _sync_device_strips(self):
         """Mirror the full Active Devices panel's device list, active
         device, and each device's icon/label/status/configured state onto
-        every page's compact mini row - connected to DeviceIconPanel.changed
-        so every mutation path stays in sync automatically without its own
-        call site here."""
+        the compact rows - connected to DeviceIconPanel.changed so every
+        mutation path stays in sync automatically without its own call site
+        here."""
         names = self.device_panel.get_device_names()
         active = self.device_panel.get_active_device()
-        for mini in self._mini_device_panels:
+        for mini in (strip.device_mini_panel for strip in
+                     (self.device_strip, getattr(self, 'monitor_device_strip', None)) if strip):
             if mini.get_device_names() != names:
                 mini.set_devices(names)
             mini.set_active_device(active)
@@ -799,56 +1006,94 @@ class MainWindow(QMainWindow):
         self._sync_devices_display()
 
     def _sync_devices_display(self):
-        """Reconcile the Active Devices frame and the compact mini device
-        rows in the tab page headers with: how many devices this instance's
-        panel has *configured* (all four roles are always shown, but
-        unconfigured ones are inert ghost icons and don't count here), the
-        persisted Show/Hide Devices preference (meaningful only with
-        multiple configured devices), and whether the Hide tab is active.
+        """Put the device strip where the view in effect says it goes, and
+        show or hide the Active Devices frame with it.
 
-        One configured device: the frame never shows and the mini rows'
-        chips are not clickable, there being nothing to switch to.
-        Multiple: the frame follows the saved preference (default shown),
-        and the mini rows - shown only when the frame is not - have
-        clickable chips (for configured devices only), so status colors
-        stay visible in this small a space and clicking one switches
-        straight to it. The Hide tab always collapses the frame (its
-        minimum height would stop the window from shrinking); the mini
-        rows belong to the Monitor and Settings pages, so that tab has
-        none of its own to hide.
+        A view is a slot (``_device_slot``) or it is not: the frame is its
+        own widget and the floating view is no slot at all. The Hide tab
+        is the window at its most compact - no page for a device to be
+        switched on - so the frame goes, and so does every slot; a strip
+        floating free of the window is not this window's to hide.
 
-        The settings page's header bar holds nothing but its mini row, so
-        it goes with it rather than leaving an empty strip above the
-        settings. """
+        All four roles are always on the full panel, but the ones with no
+        hardware are inert ghost icons: "multiple devices" counts only the
+        configured ones, and without a second one there is no scope to
+        switch and no frame worth its width.
+        """
         names = self.device_panel.get_device_names()
-        configured_names = [n for n in names if self.device_panel.icons[n].configured]
-        multiple = len(configured_names) > 1
+        configured = [n for n in names if self.device_panel.icons[n].configured]
+        multiple = len(configured) > 1
         tab_widget = getattr(self, 'tab_widget', None)
         on_hide_tab = tab_widget is not None and tab_widget.currentIndex() == 2
-        show_frame = multiple and bool(G.system_settings.get('showDevicesFrame', True)) and not on_hide_tab
-        self.device_groupbox.setVisible(show_frame)
-        show_mini = bool(names) and not show_frame
-        # A row's switch back to the frame: only with something to switch
-        # to, and not in a detached Monitor window, where it would change
-        # a different window than the one it sits in.
-        monitor_detached = 'Monitor' in getattr(self, '_detached_tabs', {})
-        monitor_mini = self.monitor_panel.header_bar.device_mini_panel if hasattr(self, 'monitor_panel') else None
-        for mini in self._mini_device_panels:
-            mini.setVisible(show_mini)
-            mini.set_clickable(multiple)
-            detached = monitor_detached and mini is monitor_mini
-            self._mini_device_toggles[mini].setVisible(show_mini and multiple and not detached)
-        settings_bar = getattr(self, 'settings_header_bar', None)
-        if settings_bar is not None:
-            settings_bar.setVisible(show_mini)
+        view = self._device_view() if names else None
+        strip = self.device_strip
+
+        self.device_groupbox.setVisible(view == DEVICE_VIEW_FRAME and not on_hide_tab)
+
+        slot = None if on_hide_tab else self._device_slot(view)
+        floating = view == DEVICE_VIEW_FLOATING and not (strip.confined() and on_hide_tab)
+        if tab_widget is None:
+            slot, floating = None, False  # nothing is built yet
+        for other in self._device_slots() if tab_widget is not None else []:
+            if other is not slot:
+                other.release()
+        if slot is not None:
+            slot.take(strip)
+        elif floating:
+            if not strip.floating():
+                self._place_floating_device_strip()
+            strip.float_off()
+        else:
+            strip.hide()
+        self.header_panel.refresh_device_slot_height()
+
+        strip.device_mini_panel.set_clickable(multiple)
+        # The switch back to the frame needs a frame to switch to.
+        strip.toggle.setVisible(multiple and strip.isVisible())
+        monitor_strip = getattr(self, 'monitor_device_strip', None)
+        if monitor_strip is not None:
+            monitor_strip.device_mini_panel.set_clickable(multiple)
+            monitor_strip.setVisible(bool(names) and 'Monitor' in getattr(self, '_detached_tabs', {}))
 
     def _set_devices_frame_preference(self, visible: bool):
-        G.system_settings.setValue('showDevicesFrame', visible)
-        # The Window menu's item is one of three ways here; keep its check
-        # mark in step when one of the others was used.
-        action = getattr(self.main_menu, 'show_devices_frame_action', None)
-        if action is not None and action.isChecked() != visible:
-            action.setChecked(visible)
+        """The view-toggle buttons: the frame, or - from the frame - the
+        integrated view that was chosen last."""
+        self._set_device_view(DEVICE_VIEW_FRAME if visible else self._last_integrated_device_view())
+
+    def _place_floating_device_strip(self):
+        """Where the strip was last left - inside this window if it is
+        confined to it, on the screen if it is free and that is still on a
+        screen; otherwise just inside this window's top-left, to be
+        dragged from there."""
+        strip = self.device_strip
+        key = 'deviceStripPosInWindow' if strip.confined() else 'deviceStripPos'
+        try:
+            x, y = (int(v) for v in str(G.system_settings.get(key, '')).split(','))
+        except ValueError:
+            x = y = None
+        if strip.confined():
+            strip.place(QtCore.QPoint(24, 64) if x is None else QtCore.QPoint(x, y))
+            return
+        if x is None or not self.is_valid_geometry(x, y):
+            corner = self.mapToGlobal(QtCore.QPoint(24, 64))
+            x, y = corner.x(), corner.y()
+        strip.place(QtCore.QPoint(x, y))
+
+    def _set_device_view(self, view: str):
+        # The integrated view to come back to from the frame: the one being
+        # picked, or the one being left for the frame - which covers a
+        # configuration whose view was saved without it.
+        leaving = self._device_view()
+        G.system_settings.setValue('deviceView', view)
+        if view in INTEGRATED_DEVICE_VIEWS:
+            G.system_settings.setValue('deviceViewIntegrated', view)
+        elif leaving in INTEGRATED_DEVICE_VIEWS:
+            G.system_settings.setValue('deviceViewIntegrated', leaving)
+        # Kept for a build from before there were three views.
+        G.system_settings.setValue('showDevicesFrame', view == DEVICE_VIEW_FRAME)
+        # The Window menu is one of several ways here; keep its mark in
+        # step when one of the others was used.
+        self.main_menu.set_device_view_checked(view)
         was_showing = self.device_groupbox.isVisible()
         frame_width, window_width = self.device_groupbox.width(), self.width()
         self._sync_devices_display()
@@ -1004,14 +1249,13 @@ class MainWindow(QMainWindow):
         self.device_panel.set_active_device(G.device_type)
         self.refresh_device_labels()
 
-        """ Window menu: Show Device Frame, only meaningful with more than
-        one CONFIGURED device on this instance's own panel - all four are
-        always shown, but the rest may just be inert ghost icons """
+        """ Window menu: where the devices are shown. The side panel is
+        only on offer with more than one CONFIGURED device on this
+        instance's own panel - all four are always shown, but the rest
+        may just be inert ghost icons """
 
-        if len(configured) > 1:
-            self.main_menu.add_show_devices_frame_action(
-                bool(G.system_settings.get('showDevicesFrame', True)),
-                self._set_devices_frame_preference)
+        self.main_menu.add_device_view_actions(
+            self._device_views(), self._device_view(), self._set_device_view)
 
         self._sync_devices_display()
 

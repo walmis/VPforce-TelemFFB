@@ -25,11 +25,18 @@ instance (``telemffb.ui.widgets.custom_widgets``) and its
 gain-override indicators into that widget - ``bind()`` now keeps them in
 step with ``AppState.scope_status_changed`` instead.
 
-The logo and the compact device row used to share this row. The logo now
-floats over the window's corner (``telemffb.ui.widgets.CornerLogo``, which
-stays clear of ``status_group``) and the device row
-belongs to each tab page's header (``telemffb.ui.widgets.TabHeaderBar``),
-which leaves the status box the full width of the column.
+``device_slot`` is where the device strip goes in the "application status
+box" view: under Matched Model, where the box's left-hand column is
+otherwise empty. Which view is in effect reaches well outside this panel
+(the Active Devices frame, the tab widget, the strip's own window), so
+MainWindow decides that and this panel only offers the slot - which takes
+no space while it is empty, so the box is no taller for the other views.
+
+The logo used to share this row too. It now floats over the window's
+corner (``telemffb.ui.widgets.CornerLogo``, which stays clear of
+``status_group``). An earlier arrangement put the device row
+in a header bar on each tab page, which cost the Settings page a tall strip
+of its own for four small icons.
 
 ``AppStatusWidget`` (``status_container``) is an implementation detail of
 this panel. Outside code (MainWindow, ``DcsIpcThread``) goes through
@@ -42,6 +49,8 @@ from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QVBoxLayout, QWidget
 
 import telemffb.globals as G
 from telemffb.state.app_state import AppState
+from telemffb.ui.layout_utils import invalidate_ancestor_layouts
+from telemffb.ui.widgets.DeviceStrip import DeviceSlot
 from telemffb.ui.widgets.custom_widgets import AppStatusWidget
 
 
@@ -82,6 +91,19 @@ class HeaderPanel(QWidget):
         self.request_set_telem_overrides = self.status_container.request_set_telem_overrides
 
         layout.addWidget(self.status_group, stretch=1, alignment=Qt.AlignmentFlag.AlignTop)
+
+        """ Where the device strip goes in the status-box view. """
+
+        self.device_slot = DeviceSlot()
+        self.status_container.add_device_slot(self.device_slot)
+
+    def refresh_device_slot_height(self) -> None:
+        """The strip coming or going changes the box's height - it can be
+        the tallest thing in its column - and every layout between the slot
+        and this panel has to be told, innermost first: left alone, this
+        panel's goes on holding the box's old height, and the window keeps
+        the space after the strip has gone."""
+        invalidate_ancestor_layouts(self.device_slot)
 
     # -- Plain pass-throughs to status_container, so callers never reach
     # into the implementation widget directly. --

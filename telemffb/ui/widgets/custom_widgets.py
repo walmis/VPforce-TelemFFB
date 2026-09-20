@@ -600,7 +600,7 @@ class AppStatusWidget(QWidget):
         self.cur_pattern_label.setText(pattern)
         self._set_active_profile_text(profile)
 
-    def add_device_row(self, widget):
+    def add_device_slot(self, widget):
         """Put ``widget`` under the sim-status column's last row (Matched
         Model), centered across it - the column is otherwise empty from
         there down, the other column being the taller of the two."""

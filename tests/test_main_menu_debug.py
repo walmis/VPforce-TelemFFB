@@ -59,3 +59,29 @@ class TestAddDebugMenuIsIdempotent:
         attribute through main_menu.set_configurator_action_enabled."""
         main_menu.add_debug_menu()
         assert hasattr(main_menu, 'configurator_settings_action')
+
+
+class TestDeviceViewActions:
+    """Window > Devices: where the devices are shown. One mark at a time,
+    and the pick is handed on by key."""
+
+    VIEWS = [('frame', 'Side panel'), ('row', 'In the status box'), ('floating', 'Floating strip')]
+
+    def test_picking_one_reports_its_key(self, main_menu):
+        chosen = []
+        main_menu.add_device_view_actions(self.VIEWS, 'row', chosen.append)
+        main_menu.device_view_actions['floating'].trigger()
+        assert chosen == ['floating']
+
+    def test_the_mark_can_be_moved_from_outside(self, main_menu):
+        """A view-toggle button or a right-click menu changed the view."""
+        main_menu.add_device_view_actions(self.VIEWS, 'row', lambda key: None)
+        main_menu.set_device_view_checked('frame')
+        marks = {key: action.isChecked() for key, action in main_menu.device_view_actions.items()}
+        assert marks == {'frame': True, 'row': False, 'floating': False}
+
+    def test_moving_the_mark_does_not_report_a_pick(self, main_menu):
+        chosen = []
+        main_menu.add_device_view_actions(self.VIEWS, 'row', chosen.append)
+        main_menu.set_device_view_checked('frame')
+        assert chosen == []

@@ -126,9 +126,10 @@ class MonitorPanel(QWidget):
                 QToolButton:disabled { color: palette(mid); border-color: palette(mid); }
             """)
 
-        """ Page header - this page's own controls either side of the
-        compact device row, which sits in the same place here as it does
-        on the Settings page. See telemffb/ui/widgets/TabHeaderBar.py. """
+        """ Page header - this page's own controls, and a compact device
+        row for the "tab header" device view and for when the page is
+        detached into a window of its own. See
+        telemffb/ui/widgets/TabHeaderBar.py. """
         self.header_bar = TabHeaderBar()
 
         self.telem_lbl = QLabel('Telemetry:')
