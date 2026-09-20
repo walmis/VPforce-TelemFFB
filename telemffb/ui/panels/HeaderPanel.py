@@ -25,8 +25,9 @@ instance (``telemffb.ui.widgets.custom_widgets``) and its
 gain-override indicators into that widget - ``bind()`` now keeps them in
 step with ``AppState.scope_status_changed`` instead.
 
-The logo and the compact device row used to share this row. The logo is
-now the menu bar's corner widget (``telemffb.ui.menus``) and the device row
+The logo and the compact device row used to share this row. The logo now
+floats over the window's corner (``telemffb.ui.widgets.CornerLogo``, which
+stays clear of ``status_group``) and the device row
 belongs to each tab page's header (``telemffb.ui.widgets.TabHeaderBar``),
 which leaves the status box the full width of the column.
 
@@ -53,15 +54,20 @@ class HeaderPanel(QWidget):
 
     def _build_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        # No side margins: the box shares a column with the tab widget
+        # below it, and its sides line up with the tab pane's. None on top
+        # either - the Active Devices frame beside it starts at the top of
+        # the same row, and the space above both is the row's to give
+        # (MainWindow's content_hbox).
+        layout.setContentsMargins(0, 0, 0, 10)
         layout.setSpacing(10)
 
         """ Application Status box - sim-status and application-status
         fields as two columns inside a single group box. """
 
         self.status_container = AppStatusWidget(master_instance=G.master_instance, parent=self)
-        status_group = QGroupBox("Application Status")
-        status_layout = QVBoxLayout(status_group)
+        self.status_group = QGroupBox("Application Status")
+        status_layout = QVBoxLayout(self.status_group)
         status_layout.setContentsMargins(10, 18, 10, 8)
         status_layout.addWidget(self.status_container)
         self.status_container.sim_status_label.set_waiting()
@@ -75,7 +81,7 @@ class HeaderPanel(QWidget):
         self.split_profile_clicked = self.status_container.split_profile_clicked
         self.request_set_telem_overrides = self.status_container.request_set_telem_overrides
 
-        layout.addWidget(status_group, stretch=1, alignment=Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self.status_group, stretch=1, alignment=Qt.AlignmentFlag.AlignTop)
 
     # -- Plain pass-throughs to status_container, so callers never reach
     # into the implementation widget directly. --

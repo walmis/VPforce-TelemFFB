@@ -540,13 +540,6 @@ class DeviceIconPanel(QWidget):
         return result
 
 
-#: Vertical margins of the compact row and of each chip in it. Their sum is
-#: how far below the top of the row its icons start (MiniDevicePanel.ICON_TOP),
-#: which is what something placed beside the row lines up with.
-_MINI_ROW_MARGIN_Y = 4
-_MINI_CHIP_MARGIN_Y = 2
-
-
 class MiniDeviceChip(QWidget):
     """One small clickable icon in the compact device row - half-scale,
     tinted to its own status color like the full-size icons. Clicking it
@@ -571,7 +564,7 @@ class MiniDeviceChip(QWidget):
         self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, _MINI_CHIP_MARGIN_Y, 4, _MINI_CHIP_MARGIN_Y)
+        layout.setContentsMargins(4, 2, 4, 2)
         layout.setSpacing(0)
 
         self.icon_label = QLabel(self)
@@ -700,14 +693,11 @@ class MiniDevicePanel(QWidget):
 
     DeviceClicked = pyqtSignal(str)
 
-    #: Distance from the top of the row to the top of its icons.
-    ICON_TOP = _MINI_ROW_MARGIN_Y + _MINI_CHIP_MARGIN_Y
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.chips: dict[str, MiniDeviceChip] = {}
         self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(0, _MINI_ROW_MARGIN_Y, 0, _MINI_ROW_MARGIN_Y)
+        self.layout.setContentsMargins(0, 4, 0, 4)
         # Room between the chips: the row has a tab page's header to
         # itself, and the active chip's corner brackets read as part of
         # its neighbor when they are packed tight.
