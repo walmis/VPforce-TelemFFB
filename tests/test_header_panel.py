@@ -117,48 +117,111 @@ class TestHeaderPanelProfileCombo:
     manipulation of status_container.cb_selectProfileCombo - see
     AppStatusWidget.set_profile_choices/_on_profile_combo_changed."""
 
-    def test_set_profile_choices_populates_placeholder_and_add_new(self, qapp, monkeypatch):
-        monkeypatch.setattr(G, 'master_instance', True, raising=False)
-        panel = HeaderPanel()
+    def _panel(self, monkeypatch, master=True):
+        monkeypatch.setattr(G, 'master_instance', master, raising=False)
+        return HeaderPanel()
+
+    def test_set_profile_choices_lists_the_profiles_and_add_new(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
         panel.set_profile_choices(['Built-In', 'Auto User'])
         combo = panel.status_container.cb_selectProfileCombo
         assert [combo.itemText(i) for i in range(combo.count())] == \
-            ['Select...', 'Built-In', 'Auto User', 'Add New...']
-        assert combo.currentIndex() == 0
+            ['Built-In', 'Auto User', 'Add New...']
 
     def test_set_profile_choices_does_not_emit_profile_chosen(self, qapp, monkeypatch):
-        monkeypatch.setattr(G, 'master_instance', True, raising=False)
-        panel = HeaderPanel()
+        panel = self._panel(monkeypatch)
         chosen = []
         panel.profile_chosen.connect(chosen.append)
+        panel.set_craft_info('C172', 'C172.*', 'Auto User')
         panel.set_profile_choices(['Built-In', 'Auto User'])
         assert chosen == []
 
-    def test_picking_a_profile_emits_its_name_and_resets_to_placeholder(self, qapp, monkeypatch):
-        monkeypatch.setattr(G, 'master_instance', True, raising=False)
-        panel = HeaderPanel()
+    def test_the_active_profile_is_the_combos_selection(self, qapp, monkeypatch):
+        """Whichever of the two arrives first - the list or the name."""
+        panel = self._panel(monkeypatch)
+        combo = panel.status_container.cb_selectProfileCombo
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        panel.set_craft_info('C172', 'C172.*', 'Auto User')
+        assert combo.currentText() == 'Auto User'
+
+        other = self._panel(monkeypatch)
+        other.set_craft_info('C172', 'C172.*', 'Auto User')
+        other.set_profile_choices(['Built-In', 'Auto User'])
+        assert other.status_container.cb_selectProfileCombo.currentText() == 'Auto User'
+
+    def test_the_master_shows_no_separate_value_label(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
+        assert panel.status_container.active_profile_label.isHidden()
+        assert not panel.status_container.cb_selectProfileCombo.isHidden()
+
+    def test_a_child_keeps_the_label_and_has_no_combo(self, qapp, monkeypatch):
+        """It mirrors the master's choice and has nothing to pick."""
+        panel = self._panel(monkeypatch, master=False)
+        panel.set_craft_info('C172', 'C172.*', 'Auto User')
+        assert not panel.status_container.active_profile_label.isHidden()
+        assert panel.status_container.active_profile_label.text() == 'Auto User'
+        assert panel.status_container.cb_selectProfileCombo.isHidden()
+
+    def test_a_state_that_is_not_a_profile_shows_as_placeholder_text(self, qapp, monkeypatch):
+        """"(None)" with no sim, "Offline" in the offline editor: nothing
+        is selected, and the combo says so in its own text."""
+        panel = self._panel(monkeypatch)
+        combo = panel.status_container.cb_selectProfileCombo
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        panel.set_craft_info('C172', 'C172.*', 'Auto User')
+        panel.set_offline('MSFS')
+        assert combo.currentIndex() == -1
+        assert combo.placeholderText() == 'Offline'
+        panel.reset()
+        assert combo.currentText() == 'Auto User'
+
+    def test_picking_a_profile_emits_its_name(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
         chosen = []
         panel.profile_chosen.connect(chosen.append)
         panel.set_profile_choices(['Built-In', 'Auto User'])
+        panel.set_craft_info('C172', 'C172.*', 'Built-In')
         combo = panel.status_container.cb_selectProfileCombo
 
-        combo.setCurrentIndex(2)  # 'Auto User'
+        combo.setCurrentIndex(combo.findText('Auto User'))
 
         assert chosen == ['Auto User']
-        assert combo.currentIndex() == 0
 
-    def test_picking_the_placeholder_itself_does_not_emit(self, qapp, monkeypatch):
-        monkeypatch.setattr(G, 'master_instance', True, raising=False)
-        panel = HeaderPanel()
+    def test_the_combo_shows_what_the_handler_made_active(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        panel.set_craft_info('C172', 'C172.*', 'Built-In')
+        panel.profile_chosen.connect(lambda name: panel.set_craft_info('C172', 'C172.*', name))
+        combo = panel.status_container.cb_selectProfileCombo
+
+        combo.setCurrentIndex(combo.findText('Auto User'))
+
+        assert combo.currentText() == 'Auto User'
+
+    def test_a_refused_change_goes_back_to_the_active_profile(self, qapp, monkeypatch):
+        """Nothing reported a new active profile - a cancelled dialog, a
+        refused change - so the combo must not be left on what was clicked."""
+        panel = self._panel(monkeypatch)
+        panel.set_profile_choices(['Built-In', 'Auto User'])
+        panel.set_craft_info('C172', 'C172.*', 'Built-In')
+        combo = panel.status_container.cb_selectProfileCombo
+
+        combo.setCurrentIndex(combo.findText('Auto User'))
+
+        assert combo.currentText() == 'Built-In'
+
+    def test_add_new_is_offered_but_never_left_selected(self, qapp, monkeypatch):
+        panel = self._panel(monkeypatch)
         chosen = []
         panel.profile_chosen.connect(chosen.append)
         panel.set_profile_choices(['Built-In', 'Auto User'])
+        panel.set_craft_info('C172', 'C172.*', 'Built-In')
         combo = panel.status_container.cb_selectProfileCombo
 
-        combo.setCurrentIndex(1)
-        combo.setCurrentIndex(0)  # back to 'Select...'
+        combo.setCurrentIndex(combo.findText('Add New...'))
 
-        assert chosen == ['Built-In']
+        assert chosen == ['Add New...']
+        assert combo.currentText() == 'Built-In'
 
 
 class TestHeaderPanelSimStatusBind:

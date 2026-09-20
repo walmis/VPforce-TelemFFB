@@ -332,7 +332,7 @@ class TestProfileComboState:
     def test_enabled_when_a_pattern_names_the_aircraft(self, qt_app, monkeypatch):
         combo = self._combo(monkeypatch, "C172SP.*", ["Built-In", "Auto User"])
         assert combo.isEnabled() is True
-        assert [combo.itemText(i) for i in range(combo.count())] ==             ["Select...", "Built-In", "Auto User", "Add New..."]
+        assert [combo.itemText(i) for i in range(combo.count())] ==             ["Built-In", "Auto User", "Add New..."]
 
 
 class TestSimStatusLeavesTheProfileComboAlone:

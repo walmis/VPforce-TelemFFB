@@ -220,7 +220,6 @@ class ElidedLabel(QLabel):
 
 
 class AppStatusWidget(QWidget):
-    SELECT_LABEL = 'Select...'
     ADD_NEW_LABEL = 'Add New...'
 
     request_set_active_vpconf = pyqtSignal(str, bool)
@@ -442,7 +441,6 @@ class AppStatusWidget(QWidget):
         sim_row += 1
 
         self.cb_selectProfileCombo = QComboBox()
-        self.cb_selectProfileCombo.addItems(['Select...'])
         # Items arrive after first show, so the default AdjustToContentsOnFirstShow
         # would size the box to "Select..." only. Guarantee room for names like
         # "User Default" and let the row give it the column's spare width.
@@ -494,16 +492,23 @@ class AppStatusWidget(QWidget):
 
         grid.addWidget(self.message_container, row, 0, 1, 2)
 
-        if not master_instance:
+        # The master picks profiles, so its combo is also where the active
+        # one is shown - as the current selection - and the value label
+        # would only repeat it. A child instance mirrors the master's
+        # choice and has nothing to pick, so it keeps the plain label.
+        if master_instance:
+            self.active_profile_label.setVisible(False)
+        else:
             self.cb_selectProfileCombo.setDisabled(True)
             self.cb_selectProfileCombo.setVisible(False)
+        self._sync_profile_combo()  # the label's starting text, "(None)"
 
     def reset(self):
         self.offline = False
         self.sim_status_label.set_waiting()
         self.cur_craft_label.setText(self.offline_recall_ac)
         self.cur_pattern_label.setText(self.offline_recall_ptn)
-        self.active_profile_label.setText(self.offline_recall_pro)
+        self._set_active_profile_text(self.offline_recall_pro)
         self.offline_recall_ac = ''
         self.offline_recall_ptn = ''
         self.offline_recall_pro = ''
@@ -545,7 +550,7 @@ class AppStatusWidget(QWidget):
         self.btn_split_profile.setEnabled(False)
         self.cur_craft_label.setText('Offline')
         self.cur_pattern_label.setText('Offline')
-        self.active_profile_label.setText('Offline')
+        self._set_active_profile_text('Offline')
         self.cb_selectProfileCombo.setDisabled(True)
         self.message_stack.setCurrentIndex(2)
         self.pulse_label(self.sim_status_label.status_label, stop=True)
@@ -584,7 +589,7 @@ class AppStatusWidget(QWidget):
         self.cur_pattern_label.setText(pattern)
 
     def set_profile_name(self, profile_name):
-        self.active_profile_label.setText(profile_name)
+        self._set_active_profile_text(profile_name)
 
     def set_craft_info(self, craft, pattern, profile):
         """Update the current-aircraft, matched-pattern and active-profile
@@ -592,16 +597,44 @@ class AppStatusWidget(QWidget):
         and the full-text tooltip, so there is nothing extra to do here)."""
         self.cur_craft_label.setText(craft)
         self.cur_pattern_label.setText(pattern)
-        self.active_profile_label.setText(profile)
+        self._set_active_profile_text(profile)
+
+    def add_device_row(self, widget):
+        """Put ``widget`` under the sim-status column's last row (Matched
+        Model), centered across it - the column is otherwise empty from
+        there down, the other column being the taller of the two."""
+        grid = self.sim_status_group.layout()
+        grid.addWidget(widget, grid.rowCount(), 0, 1, grid.columnCount(),
+                       Qt.AlignmentFlag.AlignHCenter)
+
+    def _set_active_profile_text(self, text):
+        """The active-profile value: a profile's name, or a state such as
+        "(None)" or "Offline". Kept on the label - which is what a child
+        instance shows, and what the offline editor reads back to restore -
+        and mirrored onto the combo."""
+        self.active_profile_label.setText(text)
+        self._sync_profile_combo()
+
+    def _sync_profile_combo(self):
+        """Select the active profile in the combo. Anything that is not
+        one of its profiles - "(None)", "Offline", a name the list does not
+        hold yet - shows as the combo's placeholder text instead, with
+        nothing selected. Never fires ``profile_chosen``."""
+        combo = self.cb_selectProfileCombo
+        text = self.active_profile_label.text()
+        index = combo.findText(text) if text != self.ADD_NEW_LABEL else -1
+        combo.blockSignals(True)
+        combo.setPlaceholderText(text)
+        combo.setCurrentIndex(index)
+        combo.blockSignals(False)
 
     def set_profile_choices(self, profiles):
-        """Repopulate the profile combo: the placeholder, each of
-        ``profiles``, then an italicized "Add New..." entry. Always resets
-        to the placeholder itself. Repopulating never fires
-        ``profile_chosen`` - blockSignals covers clear/add/reset-index."""
+        """Repopulate the profile combo: each of ``profiles``, then an
+        italicized "Add New..." entry, with the active profile selected.
+        Repopulating never fires ``profile_chosen`` - blockSignals covers
+        clear/add, and _sync_profile_combo the selection."""
         self.cb_selectProfileCombo.blockSignals(True)
         self.cb_selectProfileCombo.clear()
-        self.cb_selectProfileCombo.addItem(self.SELECT_LABEL)
         for item in profiles:
             self.cb_selectProfileCombo.addItem(item)
         self.cb_selectProfileCombo.addItem(self.ADD_NEW_LABEL)
@@ -610,24 +643,24 @@ class AppStatusWidget(QWidget):
             font = QFont()
             font.setItalic(True)
             self.cb_selectProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
-        self.cb_selectProfileCombo.setCurrentIndex(0)
         self.cb_selectProfileCombo.blockSignals(False)
+        self._sync_profile_combo()
 
     def _on_profile_combo_changed(self, index):
-        # Index 0 is the "Select..." placeholder - nothing chosen.
-        if index <= 0:
+        if index < 0:
             return
-        profile_name = self.cb_selectProfileCombo.itemText(index)
-        self.cb_selectProfileCombo.blockSignals(True)
-        self.cb_selectProfileCombo.setCurrentIndex(0)
-        self.cb_selectProfileCombo.blockSignals(False)
-        self.profile_chosen.emit(profile_name)
+        self.profile_chosen.emit(self.cb_selectProfileCombo.itemText(index))
+        # Whoever handles the choice reports the profile now in effect back
+        # through set_craft_info before the emit returns. Showing that,
+        # rather than what was clicked, covers "Add New..." (never a
+        # profile itself) and a change that was cancelled or refused.
+        self._sync_profile_combo()
 
     def reset_sim_state(self, src: str):
         """Reset all status labels to their initial (no-sim) default values."""
         self.cur_craft_label.setText("None Detected")
         self.cur_pattern_label.setText("(No Match)")
-        self.active_profile_label.setText("(None)")
+        self._set_active_profile_text("(None)")
         self.set_notes_state(False)
         self.set_telem_overrides('', '')
         self.set_waiting(src)

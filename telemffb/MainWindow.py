@@ -1571,7 +1571,8 @@ class MainWindow(QMainWindow):
         If the "add new" option is selected, pop a dialog asking for the new profile name.  If the user chooses
         the "make active' option, make a further call to make the new profile the active one
         Args:
-            profile_name: The chosen profile name (the combo has already reset itself to the placeholder).
+            profile_name: The chosen profile name (the combo goes back to showing the active profile
+                          once this returns).
 
         Returns: Nothing
 
