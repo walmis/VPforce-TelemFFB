@@ -61,11 +61,12 @@ from typing import Dict, List, Optional, Tuple
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import (QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QSizePolicy, QSplitter, QStackedWidget, QWidget)
+from PyQt6.QtWidgets import (QGridLayout, QLabel, QLineEdit, QSplitter,
+                             QStackedWidget, QWidget)
 
 import telemffb.globals as G
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
+from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
 
 _MONOSPACE_STYLE = """
@@ -125,10 +126,10 @@ class MonitorPanel(QWidget):
                 QToolButton:disabled { color: palette(mid); border-color: palette(mid); }
             """)
 
-        telem_header_widget = QWidget()
-        telem_header_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        telem_header_layout = QHBoxLayout(telem_header_widget)
-        telem_header_layout.setContentsMargins(0, 0, 0, 0)
+        """ Page header - this page's own controls either side of the
+        compact device row, which sits in the same place here as it does
+        on the Settings page. See telemffb/ui/widgets/TabHeaderBar.py. """
+        self.header_bar = TabHeaderBar()
 
         self.telem_lbl = QLabel('Telemetry:')
         self.telem_filter = QLineEdit()
@@ -137,12 +138,12 @@ class MonitorPanel(QWidget):
         self.telem_filter.setPlaceholderText("Filter")
         self.telem_filter.setMaximumWidth(100)
 
-        telem_header_layout.addWidget(self.detach_toolbar)
-        telem_header_layout.addWidget(self.telem_lbl)
-        telem_header_layout.addWidget(self.telem_filter)
-        telem_header_layout.addStretch()
+        self.header_bar.add_left(self.detach_toolbar)
+        self.header_bar.add_left(self.telem_lbl)
+        self.header_bar.add_left(self.telem_filter)
 
         self.effect_lbl = QLabel('Active Effects:')
+        self.header_bar.add_right(self.effect_lbl)
 
         """ Telemetry pane: a plain "waiting for data" label shown until the
         first telemetry frame, then the live table. """
@@ -172,8 +173,7 @@ class MonitorPanel(QWidget):
         self.effects_view.setStyleSheet(f"QTableView {{ {_MONOSPACE_STYLE} }}")
         self.effects_view.setMinimumHeight(100)
 
-        layout.addWidget(telem_header_widget, 0, 0)
-        layout.addWidget(self.effect_lbl, 0, 1)
+        layout.addWidget(self.header_bar, 0, 0, 1, 2)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._telem_stack)
         splitter.addWidget(self.effects_view)

@@ -64,6 +64,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
+from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.preview.controller import EffectPreviewController
 # from telemffb.ui.dialogs.UserModelDialog import UserModelDialog
@@ -207,30 +208,23 @@ class MainWindow(QMainWindow):
 
         # Set the layout of the menu frame as the main layout
 
-        """ The header (logo, compact mini device row, and Application
-        Status box - see telemffb/ui/panels/HeaderPanel.py) runs full
-        width, above the device/tabs split below it. The split itself - a
-        left column (Active Devices) and a right column (offline editor,
-        tabs) - is wired together at the end of __init__, once every
-        right-column piece has been built, so Active Devices starts even
-        with the top of the tabs/offline editor rather than the top of the
-        window. """
+        """ The window below the menu bar is a left column (Active
+        Devices) and a right column (Application Status, prompts, offline
+        editor, tabs). The two are wired together at the end of __init__,
+        once every right-column piece has been built. """
 
         content_hbox = QHBoxLayout()
         content_hbox.setContentsMargins(0, 0, 0, 0)
         content_hbox.setSpacing(10)
         right_column_layout = QVBoxLayout()
 
-        """ Create the header - logo, compact mini device row (stands in
-        for the Active Devices frame whenever that frame is hidden, see
-        _sync_devices_display() / _sync_mini_device_panel() below) and the
-        Application Status box. The panel owns construction and the
-        AppState-driven vpconf/gain-override indicators (bind()); the
+        """ Create the header - the Application Status box, see
+        telemffb/ui/panels/HeaderPanel.py. The panel owns construction and
+        the AppState-driven vpconf/gain-override indicators (bind()); the
         signal connections below are the ones that need MainWindow's own
         methods/dialogs. """
 
         self.header_panel = HeaderPanel(parent=self)
-        self.header_panel.device_mini_panel.DeviceClicked.connect(self.change_config_scope)
         self.header_panel.profile_chosen.connect(self.on_profile_change)
         self.header_panel.profile_notes_clicked.connect(self.open_profile_notes_dialog)
         self.header_panel.split_profile_clicked.connect(self.split_loaded_aircraft_profile)
@@ -243,9 +237,19 @@ class MainWindow(QMainWindow):
         there are multiple devices, or always when there is only one (see
         _sync_devices_display() / switch_window_view()). """
 
+        # Every tab page's header bar owns a compact device row; they are
+        # collected here so _sync_mini_device_panel() can mirror the full
+        # panel onto all of them at once. Populated as the pages are built
+        # below, which is after the full panel - hence the empty list
+        # rather than a late attribute.
+        self._mini_device_panels = []
+
         self.device_groupbox = QGroupBox("Active Devices")
 
-        self.device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        # Expanding vertically: the frame runs the full height of the
+        # window, from the Application Status box down past the tabs,
+        # rather than stopping at the last icon.
+        self.device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         device_groupbox_layout = QVBoxLayout()
         device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
         self.device_panel = DeviceIconPanel()
@@ -285,10 +289,11 @@ class MainWindow(QMainWindow):
         G.sim_listeners.simStopped.connect(on_sims_changed)
 
 
-        """ Add the header to the main layout, full width - above where the
-        left column (Active Devices) and right column split """
+        """ Add the header to the right column, above the prompt stack -
+        the Active Devices frame runs the full height of the window beside
+        it, so the status box starts where the tabs below it do. """
 
-        layout.addWidget(self.header_panel)
+        right_column_layout.addWidget(self.header_panel)
 
 
         """ Create the prompt stack - the new-aircraft, trim-calibration-
@@ -343,7 +348,7 @@ class MainWindow(QMainWindow):
 
         """ Wire the left (Active Devices) and right columns together """
 
-        content_hbox.addWidget(self.device_groupbox, alignment=Qt.AlignmentFlag.AlignTop)
+        content_hbox.addWidget(self.device_groupbox)
         content_hbox.addLayout(right_column_layout, 1)
         layout.addLayout(content_hbox, stretch=1)
 
@@ -351,6 +356,7 @@ class MainWindow(QMainWindow):
         """ Create the monitor tab: telemetry + active-effects display """
 
         self.monitor_panel = MonitorPanel(parent=self.tab_widget, mainwindow=self)
+        self._register_mini_device_panel(self.monitor_panel.header_bar)
         if G.master_instance:
             self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
 
@@ -382,7 +388,26 @@ class MainWindow(QMainWindow):
         settings_widget.setLayout(self.settings_layout)
         self.settings_layout.bind(G.app_state)
         self.settings_area.setWidget(settings_widget)
-        self.tab_widget.addTab(self.settings_area, "Settings")
+
+        """ The settings page is the scroll area under a header bar of its
+        own, so the compact device row lands in the same place here as it
+        does on the Monitor page. The bar holds nothing else, so it is
+        shown only while the device row is (see _sync_devices_display). """
+
+        self.settings_header_bar = TabHeaderBar()
+        self.settings_header_bar.match_page_background()
+        # The inset the Monitor page's own layout gives its bar, so the two
+        # device rows sit at the same height.
+        self.settings_header_bar.set_page_inset(
+            self.monitor_panel.layout().contentsMargins().top())
+        self._register_mini_device_panel(self.settings_header_bar)
+        settings_page = QWidget()
+        settings_page_layout = QVBoxLayout(settings_page)
+        settings_page_layout.setContentsMargins(0, 0, 0, 0)
+        settings_page_layout.setSpacing(0)
+        settings_page_layout.addWidget(self.settings_header_bar)
+        settings_page_layout.addWidget(self.settings_area, stretch=1)
+        self.tab_widget.addTab(settings_page, "Settings")
 
 
         """ Create the Hide tab and set its properties """
@@ -704,42 +729,57 @@ class MainWindow(QMainWindow):
         order = [G.device_type] + configured_rest + unconfigured_rest
         return order, configured
 
+    def _register_mini_device_panel(self, header_bar):
+        """Take a tab page's header bar into the set the full Active
+        Devices panel is mirrored onto, and wire its row to the scope
+        switcher."""
+        header_bar.DeviceClicked.connect(self.change_config_scope)
+        self._mini_device_panels.append(header_bar.device_mini_panel)
+        self._sync_mini_device_panel()
+
     def _sync_mini_device_panel(self):
         """Mirror the full Active Devices panel's device list, active
         device, and each device's icon/label/status/configured state onto
-        the compact mini row - connected to DeviceIconPanel.changed so
-        every mutation path stays in sync automatically without its own
+        every page's compact mini row - connected to DeviceIconPanel.changed
+        so every mutation path stays in sync automatically without its own
         call site here."""
         names = self.device_panel.get_device_names()
-        if self.header_panel.device_mini_panel.get_device_names() != names:
-            self.header_panel.device_mini_panel.set_devices(names)
-        self.header_panel.device_mini_panel.set_active_device(self.device_panel.get_active_device())
-        for name in names:
-            widget = self.device_panel.icons[name]
-            self.header_panel.device_mini_panel.set_device_icon(name, widget.icon_path)
-            self.header_panel.device_mini_panel.set_device_label(name, widget.text_label.text())
-            self.header_panel.device_mini_panel.set_device_configured(name, widget.configured)
-            if widget.configured:
-                self.header_panel.device_mini_panel.set_device_status(name, widget.status_color)
+        active = self.device_panel.get_active_device()
+        for mini in self._mini_device_panels:
+            if mini.get_device_names() != names:
+                mini.set_devices(names)
+            mini.set_active_device(active)
+            for name in names:
+                widget = self.device_panel.icons[name]
+                mini.set_device_icon(name, widget.icon_path)
+                mini.set_device_label(name, widget.text_label.text())
+                mini.set_device_configured(name, widget.configured)
+                if widget.configured:
+                    mini.set_device_status(name, widget.status_color)
         self._sync_devices_display()
 
     def _sync_devices_display(self):
         """Reconcile the Active Devices frame and the compact mini device
-        row under the logo with: how many devices this instance's panel
-        has *configured* (all four roles are always shown, but
+        rows in the tab page headers with: how many devices this instance's
+        panel has *configured* (all four roles are always shown, but
         unconfigured ones are inert ghost icons and don't count here), the
         persisted Show/Hide Devices preference (meaningful only with
         multiple configured devices), and whether the Hide tab is active.
 
-        One configured device: the frame never shows and the mini row's
+        One configured device: the frame never shows and the mini rows'
         chips are not clickable, there being nothing to switch to.
         Multiple: the frame follows the saved preference (default shown),
-        and the mini row - shown only when the frame is not - has
+        and the mini rows - shown only when the frame is not - have
         clickable chips (for configured devices only), so status colors
         stay visible in this small a space and clicking one switches
         straight to it. The Hide tab always collapses the frame (its
-        minimum height would stop the window from shrinking) and shows
-        the mini row in its place. """
+        minimum height would stop the window from shrinking); the mini
+        rows belong to the Monitor and Settings pages, so that tab has
+        none of its own to hide.
+
+        The settings page's header bar holds nothing but its mini row, so
+        it goes with it rather than leaving an empty strip above the
+        settings. """
         names = self.device_panel.get_device_names()
         configured_names = [n for n in names if self.device_panel.icons[n].configured]
         multiple = len(configured_names) > 1
@@ -747,8 +787,13 @@ class MainWindow(QMainWindow):
         on_hide_tab = tab_widget is not None and tab_widget.currentIndex() == 2
         show_frame = multiple and bool(G.system_settings.get('showDevicesFrame', True)) and not on_hide_tab
         self.device_groupbox.setVisible(show_frame)
-        self.header_panel.device_mini_panel.setVisible(bool(names) and not show_frame)
-        self.header_panel.device_mini_panel.set_clickable(multiple)
+        show_mini = bool(names) and not show_frame
+        for mini in self._mini_device_panels:
+            mini.setVisible(show_mini)
+            mini.set_clickable(multiple)
+        settings_bar = getattr(self, 'settings_header_bar', None)
+        if settings_bar is not None:
+            settings_bar.setVisible(show_mini)
 
     def _set_devices_frame_preference(self, visible: bool):
         G.system_settings.setValue('showDevicesFrame', visible)
@@ -1387,6 +1432,14 @@ class MainWindow(QMainWindow):
         elif index == 2:  # Hide Tab
             self.current_tab_index = 2
 
+            # Hiding the Active Devices frame (above) leaves the layouts
+            # holding the minimum height they had while it was up until
+            # they are next activated, and a resize before then stops at
+            # that old floor. Showing the mini device row under the logo
+            # used to activate them as a side effect; the rows now live on
+            # the tab pages, which are not visible here, so ask directly.
+            self.centralWidget().layout().activate()
+            QMainWindow.layout(self).activate()
             self.resize(0, 0)
 
     def interpolate_color(self, color1, color2, value):
