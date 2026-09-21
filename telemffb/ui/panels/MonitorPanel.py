@@ -53,7 +53,7 @@ names) stays out of this file where it was already entangled with logic
 this refactor step is not touching (the per-frame ``NoWheelSlider`` handle
 colors, which key off the very same ``active_settings`` list the effects
 loop builds). MainWindow still does that part and calls
-``update_telemetry(data)`` / ``update_effects(text)`` with the result.
+``update_telemetry(data)`` / ``update_effects(effects)`` with the result.
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -61,11 +61,12 @@ from typing import Dict, List, Optional, Tuple
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import (QGridLayout, QLabel, QLineEdit, QSplitter,
-                             QStackedWidget, QWidget)
+from PyQt6.QtWidgets import (QGridLayout, QHeaderView, QLabel, QLineEdit,
+                             QSplitter, QStackedWidget, QWidget)
 
 import telemffb.globals as G
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
+from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
 
@@ -73,6 +74,39 @@ _MONOSPACE_STYLE = """
     padding: 2px;
     font-family: Cascadia Mono;
 """
+
+#: Wide enough for "100%" over a bar that still reads as a bar, narrow
+#: enough to leave the effect names the rest of a half-split pane.
+INTENSITY_COLUMN_WIDTH = 72
+
+
+def _intensity_tooltip(intensity, configured, factor):
+    """What the intensity cell says on hover.
+
+    The column shows device full scale, which is the honest and comparable
+    figure but reads surprisingly low, for two compounding reasons: most
+    settings carry a slider factor, so a slider at 30% stores 0.12 rather
+    than 0.3, and an effect may then split that across axes - the heli
+    rotor rumble gives each of X and Y half. 0.06 on the device is a
+    correct reading of a setting the user set to 30%.
+
+    So the second line divides by the setting's VALUE, not by its slider
+    factor: the factor describes how the slider maps to the value and says
+    nothing about what was actually set. The factor is used only to put the
+    setting back in the slider's own terms, which is how the user last saw
+    it.
+    """
+    if intensity is None:
+        return ("No meaningful intensity: this is a condition effect, and "
+                "the force it produces depends on stick position or "
+                "velocity rather than on a magnitude.")
+    text = f"{round(intensity * 100)}% of device full scale"
+    if isinstance(configured, (int, float)) and configured > 0:
+        line = f"{round(intensity / configured * 100)}% of the configured setting"
+        if factor:
+            line += f" ({round(configured / factor * 100)}% on the slider)"
+        text += "\n" + line
+    return text
 
 
 class MonitorPanel(QWidget):
@@ -164,13 +198,19 @@ class MonitorPanel(QWidget):
         self._telem_stack.setMinimumHeight(100)
 
         """ Active-effects pane. """
-        self._effects_model = KeyValueTableModel(['Active Effects'], self)
+        self._effects_model = KeyValueTableModel(['Active Effects', ''], self)
         self.effects_view = CopyableTableView(self)
         self.effects_view.setModel(self._effects_model)
-        # Its one column's header is the pane's title, and says whose
+        # The NAME column's header is the pane's title, and says whose
         # effects these are (set_effects_scope_label) - level with the
-        # telemetry table's own header beside it.
-        self.effects_view.horizontalHeader().setStretchLastSection(True)
+        # telemetry table's own header beside it. The intensity column's
+        # header stays blank so the title is not competing with it.
+        header = self.effects_view.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.effects_view.setColumnWidth(1, INTENSITY_COLUMN_WIDTH)
+        self.effects_view.setItemDelegateForColumn(1, IntensityBarDelegate(self))
         self.effects_view.setStyleSheet(f"QTableView {{ {_MONOSPACE_STYLE} }}")
         self.effects_view.setMinimumHeight(100)
 
@@ -294,14 +334,27 @@ class MonitorPanel(QWidget):
             rows.append((str(key), (str(display_key), value_str)))
         return rows
 
-    def update_effects(self, active_effects_text: str) -> None:
-        """``active_effects_text`` is the same newline-joined block
-        MainWindow builds today (and also sends over IPC to the master when
-        this is a child instance) - one line per started effect. Split into
-        rows here; each line already embeds the effect's id, so it is a
-        unique-enough row key on its own."""
-        lines = [line for line in active_effects_text.split('\n') if line]
-        self._effects_model.set_rows([(line, (line,)) for line in lines])
+    def update_effects(self, active_effects) -> None:
+        """``active_effects`` is the list of ``{'label', 'intensity'}`` dicts
+        MainWindow builds (and sends over IPC as JSON when this is a child
+        instance) - one per started effect. The label already embeds the
+        effect's id, so it is a unique-enough row key on its own.
+
+        ``intensity`` is a fraction of device full scale, or None for an
+        effect that has no meaningful one - a condition, whose force depends
+        on where the stick is. Those get a dash rather than a bar: an effect
+        that is merely started and one that is pushing nothing must not look
+        the same, but nor should a guess look like a measurement."""
+        rows, tooltips = [], {}
+        for effect in active_effects:
+            label = effect.get('label', '')
+            intensity = effect.get('intensity')
+            shown = '-' if intensity is None else f"{round(intensity * 100)}%"
+            rows.append((label, (label, shown)))
+            tooltips[label] = (None, _intensity_tooltip(intensity,
+                                                        effect.get('configured'),
+                                                        effect.get('factor')))
+        self._effects_model.set_rows(rows, tooltips)
 
     def clear_effects(self) -> None:
         self._effects_model.clear()

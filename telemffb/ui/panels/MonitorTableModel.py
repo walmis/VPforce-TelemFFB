@@ -51,7 +51,7 @@ every attached view to redraw every cell even when nothing changed).
   reproduces the target order exactly.
 """
 
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
@@ -70,6 +70,11 @@ class KeyValueTableModel(QAbstractTableModel):
         self._headers: List[str] = list(headers)
         self._keys: List[str] = []
         self._values: Dict[str, Tuple[str, ...]] = {}
+        # Optional, and per cell: {row key: (tooltip per column,)}, where a
+        # None entry means "no tooltip of its own, show the cell's text".
+        # Only the effects table's intensity column uses this; every other
+        # column keeps the plain behaviour of hovering its own value.
+        self._tooltips: Dict[str, Tuple[Optional[str], ...]] = {}
 
     # ---- QAbstractTableModel ----------------------------------------
 
@@ -95,8 +100,12 @@ class KeyValueTableModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
+        key = self._keys[index.row()]
+        if role == Qt.ItemDataRole.ToolTipRole:
+            tips = self._tooltips.get(key)
+            if tips is not None and tips[index.column()] is not None:
+                return tips[index.column()]
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
-            key = self._keys[index.row()]
             return self._values[key][index.column()]
         return None
 
@@ -116,23 +125,33 @@ class KeyValueTableModel(QAbstractTableModel):
 
     # ---- update --------------------------------------------------------
 
-    def set_rows(self, items: Sequence[Tuple[str, Tuple[str, ...]]]) -> None:
+    def set_rows(self, items: Sequence[Tuple[str, Tuple[str, ...]]],
+                 tooltips: Optional[Mapping[str, Tuple[Optional[str], ...]]] = None) -> None:
         """Replace the model's rows with ``items`` (ordered ``(key,
         values)`` pairs), touching only what changed. See module docstring
-        for the diffing strategy."""
+        for the diffing strategy.
+
+        ``tooltips`` optionally gives a row its own hover text per column;
+        a column left None hovers its displayed value, as every column does
+        without this argument. A tooltip that changes while its value does
+        not still counts as a change, or the hover would go stale."""
         new_order = [key for key, _ in items]
         new_values = dict(items)
+        new_tooltips = dict(tooltips or {})
 
         if new_order == self._keys:
             changed_rows = [i for i, key in enumerate(new_order)
-                             if self._values.get(key) != new_values[key]]
+                             if self._values.get(key) != new_values[key]
+                             or self._tooltips.get(key) != new_tooltips.get(key)]
             self._values = new_values
+            self._tooltips = new_tooltips
             if changed_rows:
                 top = self.index(min(changed_rows), 0)
                 bottom = self.index(max(changed_rows), max(len(self._headers) - 1, 0))
                 self.dataChanged.emit(top, bottom, [Qt.ItemDataRole.DisplayRole])
             return
 
+        self._tooltips = new_tooltips
         self._diff_update(new_order, new_values)
 
     def clear(self) -> None:
@@ -141,6 +160,7 @@ class KeyValueTableModel(QAbstractTableModel):
         self.beginRemoveRows(QModelIndex(), 0, len(self._keys) - 1)
         self._keys = []
         self._values = {}
+        self._tooltips = {}
         self.endRemoveRows()
 
     # ---- internals -------------------------------------------------------

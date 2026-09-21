@@ -38,6 +38,30 @@ MINIMAL_DEFAULTS = """\
   <defaults>
     <datatype>n_float</datatype>
     <grouping>Basic</grouping>
+    <order>150.0</order>
+    <name>damper_force</name>
+    <displayname>Damper Override</displayname>
+    <MSFS>true</MSFS>
+    <joystick>true</joystick>
+    <sliderfactor>0.5</sliderfactor>
+    <value>0.2</value>
+    <unit></unit>
+  </defaults>
+  <defaults>
+    <datatype>n_float</datatype>
+    <grouping>Basic</grouping>
+    <order>160.0</order>
+    <name>broken_factor_setting</name>
+    <displayname>Broken Factor</displayname>
+    <MSFS>true</MSFS>
+    <joystick>true</joystick>
+    <sliderfactor>not-a-number</sliderfactor>
+    <value>0.2</value>
+    <unit></unit>
+  </defaults>
+  <defaults>
+    <datatype>n_float</datatype>
+    <grouping>Basic</grouping>
     <order>200.0</order>
     <name>elevator_expo</name>
     <displayname>Elevator Expo</displayname>
@@ -1941,3 +1965,49 @@ class TestInjectedVisibilityPolicy:
     def test_the_wired_policy_only_speaks_for_device_settings(self):
         import telemffb.xmlutils as xu
         assert xu._setting_is_hidden('spring_mode') is False
+
+
+class TestSliderFactors:
+    """A setting's stored value is its slider position scaled by this, so
+    the Monitor page needs it to say what a device-scale reading means in
+    the terms the user actually configured."""
+
+    def test_a_declared_factor_is_read(self, xml_tmpdir):
+        factors = xmlutils.slider_factors()
+        assert factors['damper_force'] == 0.5
+
+    def test_a_setting_without_one_is_a_neutral_factor(self, xml_tmpdir):
+        """Missing means "the slider is the value" - the same fallback the
+        settings page and the API server use."""
+        factors = xmlutils.slider_factors()
+        assert factors['aileron_expo'] == 1.0
+
+    def test_an_unreadable_factor_does_not_lose_the_setting(self, xml_tmpdir):
+        """A malformed factor must not silently drop the row and make the
+        effect look uncorrected for a different reason."""
+        factors = xmlutils.slider_factors()
+        assert factors['broken_factor_setting'] == 1.0
+
+    def test_an_unknown_setting_is_simply_absent(self, xml_tmpdir):
+        assert 'no_such_setting' not in xmlutils.slider_factors()
+
+    def test_the_real_defaults_file_maps_the_effect_settings(self):
+        """Against the shipped file, not a fixture: the Monitor column is
+        only useful if the settings real effects name are in here."""
+        import telemffb.xmlutils as xu
+        from pathlib import Path
+        import tempfile, os
+        defaults = str(Path(__file__).parents[1] / 'defaults.xml')
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?><TelemFFB/>')
+            userconfig = f.name
+        try:
+            xu.update_vars('joystick', userconfig, defaults)
+            xu.update_roots()
+            factors = xu.slider_factors()
+        finally:
+            os.unlink(userconfig)
+        assert factors['canopy_motion_intensity'] == 0.4
+        assert factors['blade_slap_intensity'] == 0.5
+        # declared nowhere, so neutral rather than missing
+        assert factors['buffeting_intensity'] == 1.0

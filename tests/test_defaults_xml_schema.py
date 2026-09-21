@@ -742,3 +742,21 @@ class TestNoDuplicateChildElements:
             assert not dupes, (
                 f"'{elem.findtext('name')}' repeats child element(s): "
                 f"{dupes}")
+
+
+def test_a_setting_has_one_slider_factor_everywhere(defaults_root):
+    """The Monitor page's intensity tooltip looks a setting's slider factor
+    up in a single flat map, with no sim, class or device scope. That is
+    only correct while no setting declares different factors in different
+    blocks - if one ever does, the tooltip starts quoting the wrong one and
+    the lookup has to learn about scope."""
+    from collections import defaultdict
+    factors = defaultdict(set)
+    for elem in defaults_root.findall('.//defaults'):
+        name = elem.findtext('name')
+        factor = elem.findtext('sliderfactor')
+        if name and factor is not None:
+            factors[name].add(factor.strip())
+    conflicting = {n: sorted(f) for n, f in factors.items() if len(f) > 1}
+    assert not conflicting, (
+        f"these settings declare more than one slider factor: {conflicting}")

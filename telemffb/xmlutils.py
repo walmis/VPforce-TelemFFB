@@ -254,6 +254,15 @@ def read_xml_file(the_sim: str, instance_device: str = '') -> list[DefaultDataRo
     return _resolver().read_xml_file(the_sim, instance_device)
 
 
+def slider_factors() -> dict[str, float]:
+    """Every setting's slider factor, by setting name.
+
+    Returns:
+        {setting name: factor}, 1.0 where a setting declares none.
+    """
+    return _resolver().slider_factors()
+
+
 def read_anydevice_settings(the_sim: str) -> list[str]:
     """Get setting names applicable to any device.
 

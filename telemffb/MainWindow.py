@@ -1488,6 +1488,46 @@ class MainWindow(QMainWindow):
         self._tap_monitor = TapMonitorDialog(self)
         self._tap_monitor.show()
 
+    def _configured_value(self, setting_name):
+        """The live value of the setting driving an effect, or None.
+
+        apply_settings() puts every setting on the aircraft under its own
+        name, so this is what the effect code itself reads. Numbers only:
+        a setting can also hold a mode name or a button binding, and those
+        are not something an intensity can be a share of.
+        """
+        if not setting_name:
+            return None
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        value = getattr(ac, setting_name, None) if ac is not None else None
+        return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+    def _slider_factor(self, setting_name):
+        """The slider factor of the setting an effect is driven by, or 1.0.
+
+        Cached: the map is a walk of defaults.xml, and this is called once
+        per started effect per telemetry frame. Nothing in defaults.xml
+        gives a setting different factors in different blocks, so one map
+        serves every sim, class and device for the life of the process.
+
+        Effects whose setting name is a pattern (``.*_spring_gain``) or
+        blank simply miss, and 1.0 leaves their reading uncorrected rather
+        than guessing which setting was meant.
+
+        An EMPTY result is not cached: effects can render before the
+        defaults tree is parsed, and caching the nothing that comes back
+        then would leave every reading uncorrected for the whole session.
+        """
+        factors = getattr(self, '_slider_factor_map', None)
+        if not factors:
+            try:
+                factors = xmlutils.slider_factors()
+            except Exception as e:
+                logging.debug(f"slider factors unavailable: {e}")
+                factors = {}
+            self._slider_factor_map = factors
+        return factors.get(setting_name or '', 1.0)
+
     def open_trim_calibration_dialog(self):
         """Open (or focus) the elevator trim calibration dialog.
 
@@ -1949,22 +1989,35 @@ class MainWindow(QMainWindow):
 
             self.monitor_panel.update_telemetry(data)
 
-            active_effects = ""
+            active_effects = []
             active_settings = []
 
             if G.master_instance and G.current_device_config_scope != G.device_type:
                 dev = G.current_device_config_scope
-                active_effects = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_effects', '')
+                active_effects = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_effects', [])
                 active_settings = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:
                 effect : HapticEffect
                 for key, effect in G.effects.dict.items():
                     if effect.started:
                         descr, settingname = utils.EffectTranslator.get_translation(effect.name)
-                        
-                        descr = "ID:{} {}".format(effect.id, descr)
-                        
-                        active_effects += descr + "\n"
+
+                        # One dict per started effect, JSON over IPC as-is.
+                        # 'intensity' is None for conditions, whose force
+                        # depends on stick position rather than on any
+                        # parameter this side can read. 'configured' is the
+                        # value of the setting driving the effect and
+                        # 'factor' its slider factor, so the monitor can say
+                        # what the intensity is as a share of what the user
+                        # asked for. Resolved here because this is where the
+                        # effect's setting name and the aircraft are both in
+                        # hand; a child's effects reach the master done.
+                        active_effects.append({
+                            'label': "ID:{} {}".format(effect.id, descr),
+                            'intensity': effect.intensity,
+                            'configured': self._configured_value(settingname),
+                            'factor': self._slider_factor(settingname),
+                        })
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)
 

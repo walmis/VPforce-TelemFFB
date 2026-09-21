@@ -669,6 +669,11 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
         self._cache = {}
         self._cache_device_alive = True  # liveness snapshot for change-cache flushes
         self._started = False
+        # Last magnitude written, 0.0-1.0 of device full scale, for the
+        # monitor's intensity column. Only constant and periodic effects
+        # have one: a condition's force depends on where the stick is, not
+        # on a parameter. See the `intensity` property.
+        self._magnitude = None
 
     def invalidate(self):
         # The block is gone, so the playback state is gone with it (the
@@ -735,7 +740,26 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
     @property
     def name(self):
         return effect_names.get(self.type)
-    
+
+    @property
+    def intensity(self):
+        """How hard this effect is currently pushing, 0.0-1.0 of device full
+        scale, or None when that is not a meaningful question.
+
+        Constant and periodic effects carry it as the magnitude they were
+        last written with, so an effect that is started but commanding
+        nothing - a runway rumble sitting on the ground - reads 0.0 rather
+        than merely "active".
+
+        Conditions (spring, damper, inertia, friction) return None: they are
+        parameterised by coefficients, and the force they produce depends on
+        stick position or velocity, which this object does not know. A
+        number here would be a guess, so callers get nothing to show.
+        """
+        if self.type == EFFECT_CONSTANT or self.type in PERIODIC_EFFECTS:
+            return self._magnitude
+        return None
+
     def __repr__(self):
         return f"FFBEffectHandle({self.effect_id}, {self.name})"
     
@@ -806,6 +830,10 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
 
         self.setEffect(axesEnable=AXIS_ENABLE_DIR, directionX=direction)
 
+        # Unsigned: the direction is carried separately, so a -0.5 push is
+        # as strong as a +0.5 one.
+        self._magnitude = abs(magnitude)
+
         op = bytes(FFBReport_SetConstantForce(magnitude=round(4096*magnitude), effectBlockIndex=self.effect_id))
         if self._data_changed("SetConstantForce", op): 
             self._write(op)
@@ -864,6 +892,8 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
         direction = round(direction*255/360)
 
         self.setEffect(axesEnable=AXIS_ENABLE_DIR, directionX=direction, duration=duration, **kwargs)
+
+        self._magnitude = abs(magnitude)
 
         if freq == 0:
             period = 0
@@ -1476,6 +1506,13 @@ class HapticEffect(Destroyable):
     def id(self):
         """Return the numeric device effect id if allocated, otherwise None."""
         return self._h_effect.effect_id if self._h_effect else None
+
+    @property
+    def intensity(self):
+        """How hard this effect is currently pushing, 0.0-1.0, or None when
+        the effect has no allocated handle or is a condition (see
+        FFBEffectHandle.intensity)."""
+        return self._h_effect.intensity if self._h_effect else None
 
     @classmethod
     def open(cls, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> FFBRhino:

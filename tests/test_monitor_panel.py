@@ -157,19 +157,150 @@ class TestTelemetryRows:
 
 
 class TestActiveEffects:
-    def test_update_effects_splits_lines_into_rows(self, panel):
-        panel.update_effects('ID:1 Spring Override\nID:2 Damper Override\n')
+    def _effects(self, *pairs):
+        return [{'label': label, 'intensity': intensity}
+                for label, intensity in pairs]
+
+    def test_update_effects_makes_a_row_each(self, panel):
+        panel.update_effects(self._effects(
+            ('ID:1 Spring Override', None), ('ID:2 Damper Override', None)))
         model = panel._effects_model
         assert model.rowCount() == 2
         assert model.column_values(0) == ['ID:1 Spring Override', 'ID:2 Damper Override']
 
-    def test_empty_text_yields_no_rows(self, panel):
-        panel.update_effects('ID:1 Spring\n')
-        panel.update_effects('')
+    def test_an_empty_list_yields_no_rows(self, panel):
+        panel.update_effects(self._effects(('ID:1 Spring', None)))
+        panel.update_effects([])
         assert panel._effects_model.rowCount() == 0
 
     def test_clear_effects_empties_the_table(self, panel):
-        panel.update_effects('ID:1 Spring\n')
+        panel.update_effects(self._effects(('ID:1 Spring', None)))
+        panel.clear_effects()
+        assert panel._effects_model.rowCount() == 0
+
+    def test_intensity_shows_as_a_percentage(self, panel):
+        panel.update_effects(self._effects(('ID:1 Runway Rumble', 0.42)))
+        assert panel._effects_model.column_values(1) == ['42%']
+
+    def test_a_started_but_silent_effect_reads_zero_not_blank(self, panel):
+        """The whole point: a runway rumble sitting on the ground is started
+        but commanding nothing, and must not look like one that is."""
+        panel.update_effects(self._effects(('ID:1 Runway Rumble', 0.0)))
+        assert panel._effects_model.column_values(1) == ['0%']
+
+    def test_full_scale_reads_100(self, panel):
+        panel.update_effects(self._effects(('ID:1 Stick Shaker', 1.0)))
+        assert panel._effects_model.column_values(1) == ['100%']
+
+    def test_a_condition_gets_a_dash_not_a_number(self, panel):
+        """Springs and dampers have coefficients, not a magnitude; their
+        force depends on where the stick is. A bar there would be a guess."""
+        panel.update_effects(self._effects(('ID:1 Spring Override', None)))
+        assert panel._effects_model.column_values(1) == ['-']
+
+    def test_a_missing_intensity_key_is_treated_as_absent(self, panel):
+        panel.update_effects([{'label': 'ID:1 Spring Override'}])
+        assert panel._effects_model.column_values(1) == ['-']
+
+
+class TestIntensityTooltip:
+    """Device full scale is the honest, comparable figure, but it reads low
+    for two compounding reasons: the slider factor scales what a slider
+    position stores, and an effect may then split that across axes. The
+    hover says what the reading is as a share of the setting itself."""
+
+    def _tooltip(self, panel, intensity, configured, factor):
+        from PyQt6.QtCore import Qt
+        panel.update_effects([{'label': 'ID:11 Rotor RPM/Engine Rumble',
+                               'intensity': intensity,
+                               'configured': configured, 'factor': factor}])
+        model = panel._effects_model
+        return model.data(model.index(0, 1), Qt.ItemDataRole.ToolTipRole)
+
+    def test_the_heli_rotor_rumble_case(self, panel):
+        """The real numbers: slider at 30% with a 0.4 factor stores 0.12,
+        HelicopterEffectsMixIn gives each of X and Y half of it, so 6% on
+        the device is half of what was configured - not 15% of it, which is
+        the slider position 0.06 would have come from and meant nothing."""
+        tip = self._tooltip(panel, 0.06, 0.12, 0.4)
+        assert '6% of device full scale' in tip
+        assert '50% of the configured setting' in tip
+        assert '30% on the slider' in tip
+
+    def test_an_effect_at_its_configured_value_reads_full(self, panel):
+        tip = self._tooltip(panel, 0.12, 0.12, 0.4)
+        assert '100% of the configured setting' in tip
+
+    def test_the_factor_only_restates_the_slider_position(self, panel):
+        """It is not part of the share - dividing by it was the bug."""
+        tip = self._tooltip(panel, 0.06, 0.12, 1)
+        assert '50% of the configured setting' in tip
+        assert '12% on the slider' in tip
+
+    def test_an_unknown_setting_value_leaves_one_reading(self, panel):
+        """Effects with no setting, or a pattern for a name, have nothing to
+        be a share of - better silent than invented."""
+        tip = self._tooltip(panel, 0.5, None, 1)
+        assert tip == '50% of device full scale'
+
+    def test_a_zero_setting_is_not_divided_by(self, panel):
+        tip = self._tooltip(panel, 0.0, 0, 0.4)
+        assert tip == '0% of device full scale'
+
+    def test_a_non_numeric_setting_is_ignored(self, panel):
+        tip = self._tooltip(panel, 0.5, 'BASIC', 1)
+        assert tip == '50% of device full scale'
+
+    def test_a_condition_explains_why_there_is_no_number(self, panel):
+        tip = self._tooltip(panel, None, None, 1)
+        assert 'condition effect' in tip
+        assert 'stick position' in tip
+
+    def test_it_can_exceed_the_configured_value(self, panel):
+        """Other gains stack on top of the setting. Reporting it plainly is
+        more use than clamping it to a tidy lie."""
+        tip = self._tooltip(panel, 0.24, 0.12, 0.4)
+        assert '200% of the configured setting' in tip
+
+    def test_the_name_column_keeps_its_own_hover(self, panel):
+        from PyQt6.QtCore import Qt
+        panel.update_effects([{'label': 'ID:11 Rotor RPM/Engine Rumble',
+                               'intensity': 0.06, 'configured': 0.12,
+                               'factor': 0.4}])
+        model = panel._effects_model
+        assert model.data(model.index(0, 0), Qt.ItemDataRole.ToolTipRole) ==             'ID:11 Rotor RPM/Engine Rumble'
+
+    def test_effects_without_the_extra_keys_still_render(self, panel):
+        panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.06}])
+        assert panel._effects_model.column_values(1) == ['6%']
+
+
+class TestTooltipRefresh:
+    """The model's fast path compares values to decide what repainted; a
+    tooltip that moves while its percentage rounds to the same number has
+    to count as a change, or the hover goes stale."""
+
+    def test_a_changed_tooltip_alone_still_signals(self, panel):
+        from PyQt6.QtCore import Qt
+        changed = []
+        panel._effects_model.dataChanged.connect(
+            lambda *a, **k: changed.append(True))
+
+        panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.06,
+                               'configured': 0.12, 'factor': 0.4}])
+        changed.clear()
+        # still 6% on the device, but the user moved the slider
+        panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.06,
+                               'configured': 0.24, 'factor': 0.4}])
+
+        assert changed, 'the view was never told to repaint'
+        model = panel._effects_model
+        tip = model.data(model.index(0, 1), Qt.ItemDataRole.ToolTipRole)
+        assert '25% of the configured setting' in tip
+
+    def test_clearing_drops_the_tooltips_too(self, panel):
+        panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.06,
+                               'configured': 0.12, 'factor': 0.4}])
         panel.clear_effects()
         assert panel._effects_model.rowCount() == 0
 

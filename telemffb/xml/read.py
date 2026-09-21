@@ -208,6 +208,35 @@ class ConfigResolver:
 
         return sorted(data, key=lambda x: float(x['order']))
 
+    def slider_factors(self) -> dict[str, float]:
+        """Every setting's slider factor, by setting name.
+
+        A setting's stored value is its slider position scaled by this: a
+        factor of 0.4 means a slider at 100% stores 0.4, which gives the
+        user a usable range over the force that effect can plausibly want.
+        Reading a stored value back as a percentage of the device's full
+        scale therefore understates what the user thinks they configured,
+        which is why the Monitor page's intensity column reports both.
+
+        Not scoped by sim, class or device: no setting in defaults.xml
+        carries a different factor in different blocks, so one flat map is
+        the whole truth. A setting with no factor of its own is 1.0, the
+        same fallback the settings page and the API use.
+        """
+        root = self._store.defaults_root
+        if root is None:
+            return {}
+        factors: dict[str, float] = {}
+        for elem in root.findall('.//defaults'):
+            name = elem.findtext('name')
+            if not name:
+                continue
+            try:
+                factors[name] = float(elem.findtext('sliderfactor') or 1)
+            except (TypeError, ValueError):
+                factors[name] = 1.0
+        return factors
+
     def read_anydevice_settings(self, sim: str) -> list[str]:
         """Get setting names applicable to any device."""
         root = self._store.defaults_root
