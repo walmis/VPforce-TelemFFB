@@ -29,7 +29,8 @@ from telemffb.ExceptionTracker import ExceptionTracker
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.MainWindow import (DEVICE_VIEW_FLOATING, DEVICE_VIEW_FRAME,
                                  DEVICE_VIEW_HEADER, DEVICE_VIEW_MENUBAR,
-                                 DEVICE_VIEW_RAIL, DEVICE_VIEW_ROW, MainWindow)
+                                 DEVICE_VIEW_RAIL, DEVICE_VIEW_ROW,
+                                 DEVICE_VIEW_BOTTOM, MainWindow)
 from telemffb.state.app_state import AppState
 
 pytestmark = pytest.mark.integration
@@ -137,6 +138,7 @@ def _showing(window):
             'status box': window.header_panel.device_slot,
             'menubar': window.corner_device_slot,
             'rail': window.rail_device_slot,
+            'bottom': window.bottom_device_slot,
             'settings header': window.settings_header_bar.device_slot,
             'monitor header': window.monitor_panel.header_bar.device_slot,
         }
@@ -220,6 +222,7 @@ class TestWhichDisplayShows:
         (DEVICE_VIEW_MENUBAR, {'menubar'}),
         (DEVICE_VIEW_ROW, {'status box'}),
         (DEVICE_VIEW_HEADER, {'settings header'}),
+        (DEVICE_VIEW_BOTTOM, {'bottom'}),
         (DEVICE_VIEW_FLOATING, {'floating'}),
     ])
     def test_each_view_shows_its_own_display_and_no_other(self, build_window, view, expected):
@@ -236,7 +239,7 @@ class TestWhichDisplayShows:
         assert _showing(window) == {'monitor header'}
 
     @pytest.mark.parametrize("view", [DEVICE_VIEW_FRAME, DEVICE_VIEW_RAIL, DEVICE_VIEW_MENUBAR,
-                                      DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER])
+                                      DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER, DEVICE_VIEW_BOTTOM])
     def test_the_hide_tab_shows_none_of_the_windows_own_displays(self, build_window, view):
         window = build_window(deviceView=view)
         window.tab_widget.setCurrentIndex(HIDE_TAB)
@@ -292,7 +295,7 @@ class TestWhichDisplayShows:
 
 
 class TestTheHideTabCollapsesTheWindow:
-    @pytest.mark.parametrize("view", [DEVICE_VIEW_FRAME, DEVICE_VIEW_RAIL, DEVICE_VIEW_ROW])
+    @pytest.mark.parametrize("view", [DEVICE_VIEW_FRAME, DEVICE_VIEW_RAIL, DEVICE_VIEW_ROW, DEVICE_VIEW_BOTTOM])
     def test_to_its_minimum_height(self, build_window, view):
         """Hiding the frame and resizing in the same step stopped at the
         height the window had needed *with* the frame."""
@@ -473,3 +476,140 @@ class TestClickingAViewToggleGlyph:
         QTest.mouseRelease(window.device_strip, Qt.MouseButton.LeftButton)
         _pump()
 
+
+def _left_of_the_tabs(window, panel) -> bool:
+    from PyQt6.QtCore import QPoint
+    return panel.mapTo(window, QPoint(0, 0)).x() < window.tab_widget.mapTo(window, QPoint(0, 0)).x()
+
+
+class TestWhichSideTheSidePanelsAreOn:
+    """One setting both side panels follow, rather than a left and a right
+    view of each."""
+
+    @pytest.mark.parametrize("view, panel", [(DEVICE_VIEW_FRAME, 'device_groupbox'),
+                                             (DEVICE_VIEW_RAIL, 'rail_device_slot')])
+    def test_both_panels_follow_it(self, build_window, view, panel):
+        window = build_window(deviceView=view)
+        window.resize(1000, 700)
+        _pump()
+        assert _left_of_the_tabs(window, getattr(window, panel))
+
+        window._set_device_side(True)
+        _pump()
+        assert not _left_of_the_tabs(window, getattr(window, panel))
+        assert G.system_settings.get('deviceSideRight') is True
+
+    def test_it_is_read_when_the_window_is_built(self, build_window):
+        window = build_window(deviceView=DEVICE_VIEW_RAIL, deviceSideRight=True)
+        assert not _left_of_the_tabs(window, window.rail_device_slot)
+
+    def test_the_glyph_swaps_the_panels_where_they_stand(self, build_window):
+        """The reason side is a setting: as two more views, a click on the
+        glyph in the compact panel on the right could land the devices in a
+        full panel last used on the left."""
+        window = build_window(deviceView=DEVICE_VIEW_RAIL, deviceSideRight=True)
+        window.device_strip.toggle.click()
+        _pump()
+        assert _showing(window) == {'frame'}
+        assert not _left_of_the_tabs(window, window.device_groupbox)
+
+        window.device_frame_toggle.click()
+        _pump()
+        assert _showing(window) == {'rail'}
+        assert not _left_of_the_tabs(window, window.rail_device_slot)
+
+    def test_changing_sides_costs_the_window_nothing(self, build_window):
+        window = build_window(deviceView=DEVICE_VIEW_RAIL)
+        window.resize(1000, 700)
+        _pump()
+        width, column = window.width(), window.tab_widget.width()
+        window._set_device_side(True)
+        _pump()
+        assert (window.width(), window.tab_widget.width()) == (width, column)
+
+    def test_a_drop_on_the_right_edge_docks_there_and_moves_the_side(self, build_window):
+        from PyQt6.QtCore import QPoint
+        window = build_window(deviceView=DEVICE_VIEW_FLOATING)
+        window.resize(1000, 700)
+        window.show()
+        _pump()
+        y = window.tab_widget.mapTo(window, QPoint(0, 0)).y() + 200  # clear of the page header
+
+        def zone_at(x):
+            zone = window._device_dock_zone_at(window.mapToGlobal(QPoint(x, y)))
+            return zone and (zone[0], zone[3])
+
+        assert zone_at(window.width() - 10) == (DEVICE_VIEW_RAIL, True)
+        assert zone_at(window.width() - 50) == (DEVICE_VIEW_FRAME, True)
+        assert zone_at(10) == (DEVICE_VIEW_RAIL, False)
+
+        window._on_device_strip_dropped(window.mapToGlobal(QPoint(window.width() - 10, y)))
+        _pump()
+        assert _showing(window) == {'rail'}
+        assert not _left_of_the_tabs(window, window.rail_device_slot)
+
+    def test_the_page_header_keeps_its_right_hand_end(self, build_window):
+        """Its strip sits there, so that is what a drop there should mean -
+        not the side panel whose band it crosses."""
+        from PyQt6.QtCore import QPoint
+        window = build_window(deviceView=DEVICE_VIEW_FLOATING)
+        window.resize(1000, 700)
+        window.show()
+        _pump()
+        page = window.tab_widget.currentWidget().mapTo(window, QPoint(0, 0))
+        zone = window._device_dock_zone_at(window.mapToGlobal(QPoint(window.width() - 40, page.y() + 20)))
+        assert zone[0] == DEVICE_VIEW_HEADER
+
+
+class TestTheBottomView:
+    """A row of its own between the tabs and the status bar, the strip at its
+    right-hand end."""
+
+    def test_it_sits_under_the_tabs_and_over_the_status_bar(self, build_window):
+        from PyQt6.QtCore import QPoint
+        window = build_window(deviceView=DEVICE_VIEW_BOTTOM)
+        window.resize(1000, 700)
+        _pump()
+        top = lambda w: w.mapTo(window, QPoint(0, 0)).y()
+        strip, tabs, bar = window.device_strip, window.tab_widget, window.status_bar
+        assert top(tabs) + tabs.height() <= top(strip)
+        assert top(strip) + strip.height() <= top(bar)
+        # right-justified: its right edge is the tabs' right edge
+        right = lambda w: w.mapTo(window, QPoint(0, 0)).x() + w.width()
+        assert right(strip) == right(tabs)
+
+    def test_the_status_bar_is_left_as_it_was(self, build_window):
+        """The strip was first put in the bar itself, which it made two and
+        a half times its height."""
+        window = build_window(deviceView=DEVICE_VIEW_ROW)
+        _pump()
+        plain = window.status_bar.height()
+        window._set_device_view(DEVICE_VIEW_BOTTOM)
+        _pump()
+        assert window.status_bar.height() == plain
+
+    def test_the_row_takes_no_space_without_the_strip(self, build_window):
+        """Against the floating view, which costs the window nothing - the
+        status box view takes height of its own."""
+        window = build_window(deviceView=DEVICE_VIEW_FLOATING)
+        window.resize(1000, 700)
+        _pump()
+        tabs = window.tab_widget.height()
+        window._set_device_view(DEVICE_VIEW_BOTTOM)
+        _pump()
+        assert window.tab_widget.height() < tabs
+        window._set_device_view(DEVICE_VIEW_FLOATING)
+        _pump()
+        assert window.tab_widget.height() == tabs
+
+    def test_a_drop_at_the_foot_of_the_window_docks_there(self, build_window):
+        from PyQt6.QtCore import QPoint
+        window = build_window(deviceView=DEVICE_VIEW_FLOATING)
+        window.resize(1000, 700)
+        window.show()
+        _pump()
+        tabs = window.tab_widget
+        foot = tabs.mapTo(window, QPoint(0, 0)).y() + tabs.height() - 10
+        for x in (400, window.width() - 20):  # the right-hand end too, where the strip will sit
+            zone = window._device_dock_zone_at(window.mapToGlobal(QPoint(x, foot)))
+            assert zone[0] == DEVICE_VIEW_BOTTOM, x

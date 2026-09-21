@@ -319,13 +319,16 @@ class MainMenu:
                     self.log_action[d].triggered.connect(lambda _, child=d: do_show_child_log(child))
                     self.child_log_menu.addAction(self.log_action[d])
 
-    def add_device_view_actions(self, views, current, on_chosen):
+    def add_device_view_actions(self, views, current, on_chosen, group_starts=(),
+                                side_right=False, on_side_chosen=None):
         """Window menu: a 'Devices' submenu choosing where the devices are
-        shown. ``views`` is ``[(key, label), ...]`` - which ones there are
-        depends on how many devices the instance has configured - and
-        ``on_chosen(key)`` is called with the pick. Lazily creates the
-        Window menu if this instance hasn't needed one yet (a solo
-        master/child never gets one otherwise)."""
+        shown. ``views`` is ``[(key, label), ...]`` and ``on_chosen(key)`` is
+        called with the pick; a line is ruled above each key in
+        ``group_starts``. With ``on_side_chosen``, a checkable item under
+        the views says which side the side panels are on, and calls it with
+        True for the right. Lazily creates the Window menu if this instance
+        hasn't needed one yet (a solo master/child never gets one
+        otherwise)."""
         if not hasattr(self, 'window_menu'):
             self.window_menu = self.menu.addMenu('Window')
         elif self.window_menu.actions():
@@ -335,6 +338,8 @@ class MainMenu:
         group = QActionGroup(self.mw)
         group.setExclusive(True)
         for key, label in views:
+            if key in group_starts:
+                submenu.addSeparator()
             action = QAction(label, self.mw)
             action.setCheckable(True)
             action.setChecked(key == current)
@@ -342,6 +347,21 @@ class MainMenu:
             group.addAction(action)
             submenu.addAction(action)
             self.device_view_actions[key] = action
+        self.device_side_action = None
+        if on_side_chosen is not None:
+            submenu.addSeparator()
+            self.device_side_action = QAction("Side panels on the right", self.mw)
+            self.device_side_action.setCheckable(True)
+            self.device_side_action.setChecked(bool(side_right))
+            self.device_side_action.triggered.connect(lambda checked: on_side_chosen(bool(checked)))
+            submenu.addAction(self.device_side_action)
+
+    def set_device_side_checked(self, right: bool):
+        """Keep the item's mark in step when the side was changed from
+        somewhere else (a right-click menu, a drop on the other edge)."""
+        action = getattr(self, 'device_side_action', None)
+        if action is not None and action.isChecked() != bool(right):
+            action.setChecked(bool(right))
 
     def set_device_view_checked(self, key):
         """Keep the submenu's mark in step when the view was changed from

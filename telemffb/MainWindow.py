@@ -68,7 +68,7 @@ from telemffb.ui.widgets.CornerDeviceSlot import CornerDeviceSlot
 from telemffb.ui.widgets.CornerLogo import CornerLogo
 from telemffb.ui.widgets.DeviceViewToggle import DeviceViewToggle
 from telemffb.ui.widgets.DockZoneOverlay import DockZoneOverlay
-from telemffb.ui.widgets.DeviceStrip import DeviceStrip, RailDeviceSlot
+from telemffb.ui.widgets.DeviceStrip import DeviceSlot, DeviceStrip, RailDeviceSlot
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.preview.controller import EffectPreviewController
@@ -84,7 +84,7 @@ from telemffb.ui.tray import TrayController
 from telemffb.ui.updates import UpdateChecker
 
 #: Where the devices are shown (system setting 'deviceView'): the Active
-#: Devices frame down the window's left edge, or the compact row in one of
+#: Devices frame down one side of the window, or the compact row in one of
 #: four places - the band across the top beside the logo, the Application
 #: Status box, the Monitor and Settings pages' headers, or a small window
 #: of its own. The four are the "integrated" views: the frame's view-toggle
@@ -95,15 +95,24 @@ DEVICE_VIEW_RAIL = 'rail'
 DEVICE_VIEW_MENUBAR = 'menubar'
 DEVICE_VIEW_ROW = 'row'
 DEVICE_VIEW_HEADER = 'header'
+DEVICE_VIEW_BOTTOM = 'bottom'
 DEVICE_VIEW_FLOATING = 'floating'
 INTEGRATED_DEVICE_VIEWS = (DEVICE_VIEW_RAIL, DEVICE_VIEW_MENUBAR, DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER,
-                           DEVICE_VIEW_FLOATING)
+                           DEVICE_VIEW_BOTTOM, DEVICE_VIEW_FLOATING)
+#: The two side panels. Which side they are on is a setting of its own
+#: (deviceSideRight) that both follow, rather than a left and a right view
+#: of each: the glyph switches between them, and must do it in place.
+SIDE_DEVICE_VIEWS = (DEVICE_VIEW_FRAME, DEVICE_VIEW_RAIL)
+#: Where the views fall into groups - the side panels, the bars, floating -
+#: for the menus to rule a line above.
+DEVICE_VIEW_GROUP_STARTS = (DEVICE_VIEW_MENUBAR, DEVICE_VIEW_FLOATING)
 DEVICE_VIEW_LABELS = {
     DEVICE_VIEW_FRAME: "Side panel",
     DEVICE_VIEW_RAIL: "Side panel (compact)",
     DEVICE_VIEW_MENUBAR: "Menu bar",
     DEVICE_VIEW_ROW: "Application status box",
     DEVICE_VIEW_HEADER: "Monitor/Settings header",
+    DEVICE_VIEW_BOTTOM: "Bottom of the window",
     DEVICE_VIEW_FLOATING: "Floating strip",
 }
 
@@ -315,6 +324,10 @@ class MainWindow(QMainWindow):
         # strip stood on its end. See RailDeviceSlot.
         self.rail_device_slot = RailDeviceSlot()
         self._add_device_view_context_menu(self.rail_device_slot)
+        # The bottom view's: a row of its own between the tabs and the status
+        # bar, the strip at its right-hand end. Made here with the rest, and
+        # put under the tabs once there are tabs to put it under.
+        self.bottom_device_slot = DeviceSlot()
 
         # Dropping the strip on one of the places the devices can be shown
         # docks it there.
@@ -405,15 +418,15 @@ class MainWindow(QMainWindow):
         """ Add the tab widget to the right column """
 
         right_column_layout.addWidget(self.tab_widget, stretch=1)
+        right_column_layout.addWidget(self.bottom_device_slot, 0, Qt.AlignmentFlag.AlignRight)
         right_column_layout.setSpacing(0)
 
         """ Wire the left (Active Devices) and right columns together """
 
-        content_hbox.addWidget(self.device_groupbox)
-        content_hbox.addWidget(self.rail_device_slot)  # never up with the frame: they are two views
         content_hbox.addLayout(right_column_layout, 1)
         layout.addLayout(content_hbox, stretch=1)
         self._content_hbox = content_hbox  # its spacing is part of what the frame costs in width
+        self._apply_device_side()
 
 
         """ Create the monitor tab: telemetry + active-effects display """
@@ -820,6 +833,30 @@ class MainWindow(QMainWindow):
         widget.customContextMenuRequested.connect(
             lambda pos, w=widget: self._show_device_view_context_menu(w, pos))
 
+    def _device_side_right(self) -> bool:
+        return bool(G.system_settings.get('deviceSideRight', False))
+
+    def _apply_device_side(self):
+        """Put the two side panels on the side in effect: the outer ends of
+        the row the tabs' column is the middle of. Only ever one of them is
+        up - they are two views - so their order between themselves is moot."""
+        row = self._content_hbox
+        for panel in (self.device_groupbox, self.rail_device_slot):
+            row.removeWidget(panel)
+        if self._device_side_right():
+            row.addWidget(self.rail_device_slot)
+            row.addWidget(self.device_groupbox)
+        else:
+            row.insertWidget(0, self.rail_device_slot)
+            row.insertWidget(0, self.device_groupbox)
+
+    def _set_device_side(self, right: bool):
+        """Both side panels change sides together. A panel costs the window
+        the same width on either side, so there is nothing to resize."""
+        G.system_settings.setValue('deviceSideRight', bool(right))
+        self._apply_device_side()
+        self.main_menu.set_device_side_checked(bool(right))
+
     def _device_views(self):
         """The views on offer, as ``[(key, label), ...]`` - the same with
         one device as with several."""
@@ -855,9 +892,17 @@ class MainWindow(QMainWindow):
         strip = self.device_strip
         menu = QtWidgets.QMenu(widget)
         for key, label in self._device_views():
+            if key in DEVICE_VIEW_GROUP_STARTS:
+                menu.addSeparator()
             if key != current:
                 menu.addAction(f"Show devices: {label.lower()}").triggered.connect(
                     lambda _checked, k=key: self._set_device_view(k))
+        if G.master_instance:
+            menu.addSeparator()
+            side = menu.addAction("Side panels on the right")
+            side.setCheckable(True)
+            side.setChecked(self._device_side_right())
+            side.triggered.connect(self._set_device_side)
         if current == DEVICE_VIEW_FLOATING and G.master_instance:
             menu.addSeparator()
             confined = menu.addAction("Keep inside the main window")
@@ -889,6 +934,8 @@ class MainWindow(QMainWindow):
             return self.header_panel.device_slot
         if view == DEVICE_VIEW_RAIL:
             return self.rail_device_slot
+        if view == DEVICE_VIEW_BOTTOM:
+            return self.bottom_device_slot
         if view == DEVICE_VIEW_MENUBAR:
             return self.corner_device_slot
         if view == DEVICE_VIEW_HEADER:
@@ -902,18 +949,24 @@ class MainWindow(QMainWindow):
 
     def _device_slots(self):
         return [self.header_panel.device_slot, self.corner_device_slot, self.rail_device_slot,
+                self.bottom_device_slot,
                 self.settings_header_bar.device_slot, self.monitor_panel.header_bar.device_slot]
 
     def _device_dock_zones(self):
         """Where the floating strip can be dropped to dock, as ``[(view,
-        rect in this window, label), ...]``, first match wins.
+        rect in this window, label, side), ...]``, first match wins. ``side``
+        is the side a drop there puts the side panels on - True for the
+        right - and None for a zone that is not a side panel's.
 
         Regions of the window rather than the slots themselves: a slot the
         strip is not in takes no space, and so is nothing to aim at. The
-        two side panels share the left edge, as bands about as wide as what
+        two side panels share each edge, as bands about as wide as what
         they dock: the compact one against the edge, the full one just
-        inside it. They come first, so that they can be reached at all past
-        the status box, which starts a few pixels in.
+        inside it. The left pair come first, so that they can be reached at
+        all past the status box, which starts a few pixels in; the right
+        pair come last, so that the page header and the bottom row - whose
+        strips sit at their right-hand ends - are still what is under the
+        cursor there.
         """
         zones = []
         box = self.header_panel.status_group
@@ -921,24 +974,38 @@ class MainWindow(QMainWindow):
         tabs_top_left = self.tab_widget.mapTo(self, QtCore.QPoint(0, 0))
         tabs_bottom = tabs_top_left.y() + self.tab_widget.height()
 
-        zones.append((DEVICE_VIEW_RAIL, QtCore.QRect(0, band, 28, tabs_bottom - band)))
-        zones.append((DEVICE_VIEW_FRAME, QtCore.QRect(28, band, 44, tabs_bottom - band)))
+        height = tabs_bottom - band
+        zones.append((DEVICE_VIEW_RAIL, QtCore.QRect(0, band, 28, height), False))
+        zones.append((DEVICE_VIEW_FRAME, QtCore.QRect(28, band, 44, height), False))
 
         menubar = self.main_menu.menu
         actions = menubar.actions()
         left = (menubar.actionGeometry(actions[-1]).right() if actions else 0) + 12
         right = self.corner_logo.x() - 6 if self.corner_logo.isVisible() else self.width() - 8
         if right - left >= 100:
-            zones.append((DEVICE_VIEW_MENUBAR, QtCore.QRect(left, 0, right - left, band)))
+            zones.append((DEVICE_VIEW_MENUBAR, QtCore.QRect(left, 0, right - left, band), None))
 
         column = self.header_panel.status_container.sim_status_group
-        zones.append((DEVICE_VIEW_ROW, QtCore.QRect(column.mapTo(self, QtCore.QPoint(0, 0)), column.size())))
+        zones.append((DEVICE_VIEW_ROW, QtCore.QRect(column.mapTo(self, QtCore.QPoint(0, 0)), column.size()), None))
 
         page = self.tab_widget.currentWidget()
         if self.tab_widget.currentIndex() != 2 and page is not None:  # the Hide tab has no page header
             zones.append((DEVICE_VIEW_HEADER,
-                          QtCore.QRect(page.mapTo(self, QtCore.QPoint(0, 0)), QtCore.QSize(page.width(), 56))))
-        return [(view, rect, f"Dock: {DEVICE_VIEW_LABELS[view]}") for view, rect in zones]
+                          QtCore.QRect(page.mapTo(self, QtCore.QPoint(0, 0)), QtCore.QSize(page.width(), 56)), None))
+        if self.tab_widget.currentIndex() != 2:  # the Hide tab has no room under it
+            # The foot of the tabs and on down: the row itself takes no space
+            # until the strip is in it, and the way to the bottom of the
+            # window runs over the status bar.
+            foot = tabs_bottom - 44
+            zones.append((DEVICE_VIEW_BOTTOM,
+                          QtCore.QRect(tabs_top_left.x(), foot, self.tab_widget.width(), self.height() - foot), None))
+        zones.append((DEVICE_VIEW_RAIL, QtCore.QRect(self.width() - 28, band, 28, height), True))
+        zones.append((DEVICE_VIEW_FRAME, QtCore.QRect(self.width() - 72, band, 44, height), True))
+
+        def label(view, side):
+            where = "" if side is None else (" - right" if side else " - left")
+            return f"Dock: {DEVICE_VIEW_LABELS[view]}{where}"
+        return [(view, rect, label(view, side), side) for view, rect, side in zones]
 
     def _device_dock_zone_at(self, on_screen):
         if QApplication.keyboardModifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -968,6 +1035,8 @@ class MainWindow(QMainWindow):
         zone = self._device_dock_zone_at(on_screen)
         if zone is not None:
             self.device_strip.revert_drag()
+            if zone[3] is not None and zone[3] != self._device_side_right():
+                self._set_device_side(zone[3])
             self._set_device_view(zone[0])
 
     def _set_device_strip_confined(self, confined: bool):
@@ -1272,7 +1341,9 @@ class MainWindow(QMainWindow):
         always on the panel, the rest as inert ghost icons """
 
         self.main_menu.add_device_view_actions(
-            self._device_views(), self._device_view(), self._set_device_view)
+            self._device_views(), self._device_view(), self._set_device_view,
+            group_starts=DEVICE_VIEW_GROUP_STARTS,
+            side_right=self._device_side_right(), on_side_chosen=self._set_device_side)
 
         self._sync_devices_display()
 
