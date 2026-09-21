@@ -29,7 +29,7 @@ from telemffb.ExceptionTracker import ExceptionTracker
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.MainWindow import (DEVICE_VIEW_FLOATING, DEVICE_VIEW_FRAME,
                                  DEVICE_VIEW_HEADER, DEVICE_VIEW_MENUBAR,
-                                 DEVICE_VIEW_ROW, MainWindow)
+                                 DEVICE_VIEW_RAIL, DEVICE_VIEW_ROW, MainWindow)
 from telemffb.state.app_state import AppState
 
 pytestmark = pytest.mark.integration
@@ -136,6 +136,7 @@ def _showing(window):
         slots = {
             'status box': window.header_panel.device_slot,
             'menubar': window.corner_device_slot,
+            'rail': window.rail_device_slot,
             'settings header': window.settings_header_bar.device_slot,
             'monitor header': window.monitor_panel.header_bar.device_slot,
         }
@@ -161,11 +162,20 @@ class TestWhichViewIsInEffect:
         window = build_window(deviceView='somewhere else', showDevicesFrame=False)
         assert window._device_view() == DEVICE_VIEW_ROW
 
-    def test_a_lone_device_has_no_side_panel(self, build_window):
-        """The frame needs more than one device to be worth its width: the
-        view it would have alternated with stands in."""
+    def test_a_lone_device_has_the_side_panel_it_picked(self, build_window):
+        """The views are the same however many devices there are."""
         window = build_window(children=(), deviceView=DEVICE_VIEW_FRAME, deviceViewIntegrated=DEVICE_VIEW_MENUBAR)
-        assert window._device_view() == DEVICE_VIEW_MENUBAR
+        assert window._device_view() == DEVICE_VIEW_FRAME
+        assert _showing(window) == {'frame'}
+
+    def test_everyone_starts_on_the_frame(self, build_window):
+        """One device or several: it is what the older window had, and it is
+        never a panel for one icon - all four roles are always on it, the
+        ones with no instance greyed out."""
+        window = build_window(children=())
+        assert window._device_view() == DEVICE_VIEW_FRAME
+        assert window.device_panel.get_device_names() == ['joystick', 'pedals', 'collective', 'trimwheel']
+        assert build_window()._device_view() == DEVICE_VIEW_FRAME
 
     def test_picking_a_view_saves_it_for_new_and_old_builds_alike(self, build_window):
         window = build_window(deviceView=DEVICE_VIEW_ROW)
@@ -206,6 +216,7 @@ class TestAChildInstance:
 class TestWhichDisplayShows:
     @pytest.mark.parametrize("view, expected", [
         (DEVICE_VIEW_FRAME, {'frame'}),
+        (DEVICE_VIEW_RAIL, {'rail'}),
         (DEVICE_VIEW_MENUBAR, {'menubar'}),
         (DEVICE_VIEW_ROW, {'status box'}),
         (DEVICE_VIEW_HEADER, {'settings header'}),
@@ -224,7 +235,8 @@ class TestWhichDisplayShows:
         _pump()
         assert _showing(window) == {'monitor header'}
 
-    @pytest.mark.parametrize("view", [DEVICE_VIEW_FRAME, DEVICE_VIEW_MENUBAR, DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER])
+    @pytest.mark.parametrize("view", [DEVICE_VIEW_FRAME, DEVICE_VIEW_RAIL, DEVICE_VIEW_MENUBAR,
+                                      DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER])
     def test_the_hide_tab_shows_none_of_the_windows_own_displays(self, build_window, view):
         window = build_window(deviceView=view)
         window.tab_widget.setCurrentIndex(HIDE_TAB)
@@ -258,15 +270,29 @@ class TestWhichDisplayShows:
             window.reattach_tab('Monitor')
             _pump()
 
-    def test_a_lone_device_gets_no_view_toggle_buttons(self, build_window):
-        """There is no side panel for them to switch to."""
-        window = build_window(children=(), deviceView=DEVICE_VIEW_ROW)
-        assert _showing(window) == {'status box'}
+    def test_a_lone_device_gets_the_same_glyph_doing_the_same_thing(self, build_window):
+        """It used to be hidden, there being no frame for a lone device -
+        which left nothing on screen to say the devices could be moved, and
+        nothing to drag the strip off by."""
+        window = build_window(children=(), deviceView=DEVICE_VIEW_HEADER)
+        assert window.device_strip.toggle.isVisible()
+
+        window.device_strip.toggle.click()
+        _pump()
+        assert _showing(window) == {'frame'}
+
+        window.device_frame_toggle.click()
+        _pump()
+        assert _showing(window) == {'settings header'}
+
+    def test_a_child_instance_gets_no_glyph(self, build_window):
+        """Its view is the master's to choose."""
+        window = build_window(master=False)
         assert not window.device_strip.toggle.isVisible()
 
 
 class TestTheHideTabCollapsesTheWindow:
-    @pytest.mark.parametrize("view", [DEVICE_VIEW_FRAME, DEVICE_VIEW_ROW])
+    @pytest.mark.parametrize("view", [DEVICE_VIEW_FRAME, DEVICE_VIEW_RAIL, DEVICE_VIEW_ROW])
     def test_to_its_minimum_height(self, build_window, view):
         """Hiding the frame and resizing in the same step stopped at the
         height the window had needed *with* the frame."""
@@ -309,3 +335,141 @@ class TestTheWindowsWidthFollowsTheFrame:
         _pump()
         assert window.width() == before
         assert window.tab_widget.width() == column
+
+
+class TestTheCompactSidePanel:
+    """The strip stood on its end down the left of the window."""
+
+    def test_the_strip_stands_on_end_there_and_lies_down_anywhere_else(self, build_window):
+        """One strip moves between the slots, so which way up it is has to
+        be re-decided at every move - left alone, a strip that had been in
+        the side panel would arrive in the menu bar as a column."""
+        window = build_window(deviceView=DEVICE_VIEW_RAIL)
+        strip = window.device_strip
+        assert strip.vertical()
+        assert strip.height() > strip.width()
+
+        for view in (DEVICE_VIEW_ROW, DEVICE_VIEW_FLOATING):
+            window._set_device_view(DEVICE_VIEW_RAIL)
+            window._set_device_view(view)
+            _pump()
+            assert not strip.vertical(), view
+            assert strip.width() > strip.height(), view
+
+    def test_it_is_narrower_than_the_frame_it_stands_in_for(self, build_window):
+        window = build_window(deviceView=DEVICE_VIEW_FRAME)
+        frame = window._side_panel_cost()
+        window._set_device_view(DEVICE_VIEW_RAIL)
+        _pump()
+        assert 0 < window._side_panel_cost() < frame / 2
+
+    @pytest.mark.parametrize("start_width", [1000, 0])
+    def test_the_windows_width_follows_it_as_it_does_the_frame(self, build_window, start_width):
+        window = build_window(deviceView=DEVICE_VIEW_ROW)
+        window.resize(start_width, 700)
+        _pump()
+        before, column = window.width(), window.tab_widget.width()
+
+        window._set_device_view(DEVICE_VIEW_RAIL)
+        _pump()
+        assert window.width() == before + window._side_panel_cost()
+        assert window.tab_widget.width() == column
+
+        window._set_device_view(DEVICE_VIEW_ROW)
+        _pump()
+        assert window.width() == before
+        assert window.tab_widget.width() == column
+
+    def test_swapping_it_for_the_frame_moves_the_window_by_the_difference(self, build_window):
+        """Not by either panel's whole width: one goes as the other comes,
+        and the column beside them is owed the same width throughout."""
+        window = build_window(deviceView=DEVICE_VIEW_RAIL)
+        window.resize(1000, 700)
+        _pump()
+        width, column, rail = window.width(), window.tab_widget.width(), window._side_panel_cost()
+
+        window._set_device_view(DEVICE_VIEW_FRAME)
+        _pump()
+        assert window.width() == width - rail + window._side_panel_cost()
+        assert window.tab_widget.width() == column
+
+        window._set_device_view(DEVICE_VIEW_RAIL)
+        _pump()
+        assert window.width() == width
+        assert window.tab_widget.width() == column
+
+    def test_the_left_edge_docks_it_and_just_inside_docks_the_frame(self, build_window):
+        """Both side panels are reached at the left edge, as bands about as
+        wide as what they dock."""
+        from PyQt6.QtCore import QPoint
+        window = build_window(deviceView=DEVICE_VIEW_FLOATING)
+        window.resize(1000, 700)
+        window.show()
+        _pump()
+        y = window.tab_widget.mapTo(window, QPoint(0, 0)).y() + 40
+
+        def zone_at(x):
+            zone = window._device_dock_zone_at(window.mapToGlobal(QPoint(x, y)))
+            return zone and zone[0]
+
+        assert zone_at(10) == DEVICE_VIEW_RAIL
+        assert zone_at(50) == DEVICE_VIEW_FRAME
+
+    def test_a_lone_device_is_offered_every_view(self, build_window):
+        window = build_window(deviceView=DEVICE_VIEW_RAIL, children=())
+        offered = [key for key, _label in window._device_views()]
+        assert window._device_view() == DEVICE_VIEW_RAIL
+        # a second window swaps the settings the first one reads, so it is last
+        assert offered == [key for key, _label in build_window()._device_views()]
+
+    def test_it_stands_at_full_height_after_the_strip_has_floated(self, build_window):
+        """Floating pins the strip to the floating row's size, and docking
+        did not unpin it. Every other slot holds a row that size, so nothing
+        showed until the strip was stood on end: held to the row's height,
+        it drew the top few pixels of its first icon - and only until a
+        restart, which builds a strip that has never floated."""
+        window = build_window(deviceView=DEVICE_VIEW_FLOATING)
+        _pump()
+        window._set_device_view(DEVICE_VIEW_RAIL)
+        _pump()
+        strip = window.device_strip
+        assert strip.height() == strip.sizeHint().height()
+        assert strip.height() > 150  # four icons, not the 52px of a row
+
+
+class TestClickingAViewToggleGlyph:
+    def test_a_click_made_with_the_mouse_still_moving_is_a_click(self, build_window):
+        """The glyph is some 20px across and the drag distance 10, so a
+        click pressed before the hand had stopped covered it without leaving
+        the glyph - and floated the strip instead of switching the view."""
+        from PyQt6.QtCore import QPoint, Qt
+        from PyQt6.QtTest import QTest
+        window = build_window(deviceView=DEVICE_VIEW_FRAME, deviceViewIntegrated=DEVICE_VIEW_RAIL)
+        window.show()
+        _pump()
+        glyph = window.device_frame_toggle
+        start = QPoint(4, glyph.height() // 2)
+        end = start + QPoint(12, 2)
+        assert glyph.rect().contains(end)
+
+        QTest.mousePress(glyph, Qt.MouseButton.LeftButton, pos=start)
+        QTest.mouseMove(glyph, end)
+        QTest.mouseRelease(glyph, Qt.MouseButton.LeftButton, pos=end)
+        _pump()
+        assert window._device_view() == DEVICE_VIEW_RAIL
+
+    def test_dragging_it_off_the_glyph_still_floats_the_strip(self, build_window):
+        from PyQt6.QtCore import QPoint, Qt
+        from PyQt6.QtTest import QTest
+        window = build_window(deviceView=DEVICE_VIEW_FRAME)
+        window.show()
+        _pump()
+        glyph = window.device_frame_toggle
+        start = glyph.rect().center()
+        QTest.mousePress(glyph, Qt.MouseButton.LeftButton, pos=start)
+        QTest.mouseMove(glyph, start + QPoint(60, 40))
+        _pump()
+        assert window._device_view() == DEVICE_VIEW_FLOATING
+        QTest.mouseRelease(window.device_strip, Qt.MouseButton.LeftButton)
+        _pump()
+

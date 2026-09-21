@@ -38,14 +38,16 @@ main window.
 Dragging is by the grip (or the strip's own margins), never by the icons,
 which keep their click: switch to that device.
 """
-from PyQt6.QtCore import QEvent, QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPalette, QPen
-from PyQt6.QtWidgets import (QHBoxLayout, QLayout, QSizePolicy, QVBoxLayout,
+from PyQt6.QtWidgets import (QBoxLayout, QHBoxLayout, QLayout, QSizePolicy, QVBoxLayout,
                              QWidget)
 
+from telemffb.ui.layout_utils import invalidate_ancestor_layouts
 from telemffb.ui.panels.DevicePanel import MiniDevicePanel
 from telemffb.ui.widgets.DeviceViewToggle import DeviceViewToggle
 
+QWIDGETSIZE_MAX = (1 << 24) - 1  # Qt's own; PyQt6 does not export it
 _GRIP_WIDTH = 12
 _BORDER = QColor("gray")  # the group boxes' border, styles.py
 #: Margins around the strip's contents: roomier floating, where it is a
@@ -63,6 +65,9 @@ class DeviceSlot(QWidget):
     whichever view is in effect.
     """
 
+    #: Which way up the strip goes in this slot.
+    vertical = False
+
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
@@ -76,12 +81,52 @@ class DeviceSlot(QWidget):
     def take(self, strip: "DeviceStrip") -> None:
         if not self.holds(strip):
             strip.dock_into(self)
-            self.layout().addWidget(strip)
+            self._add(strip)
+        strip.set_vertical(self.vertical)
         strip.show()  # it may have been hidden while this slot kept it
         self.show()
 
+    def _add(self, strip: "DeviceStrip") -> None:
+        self.layout().addWidget(strip)
+
     def release(self) -> None:
         self.hide()
+
+
+class RailDeviceSlot(DeviceSlot):
+    """The compact side panel: a slot down the left of the window, where the
+    strip stands on its end.
+
+    For whoever wants the devices where the Active Devices frame has them
+    without the frame's full-size icons - about half its width, and the only
+    compact view that costs the window no height at all. It runs the height
+    of the window as the frame does, with the frame's border and no title:
+    none of the other compact views has one, and four device icons in a
+    column do not need telling what they are.
+    """
+
+    vertical = True
+    #: How far down the border starts - a group box's border starts below
+    #: its title line, and this one sits beside two of them.
+    _BORDER_TOP = 6
+    _PADDING = 6
+
+    def __init__(self, parent: QWidget = None):
+        super().__init__(parent)
+        self.layout().setContentsMargins(self._PADDING, self._BORDER_TOP + self._PADDING,
+                                         self._PADDING, self._PADDING)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+
+    def _add(self, strip: "DeviceStrip") -> None:
+        self.layout().addWidget(strip, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(QPen(_BORDER, 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, self._BORDER_TOP + 0.5, -0.5, -0.5), 5, 5)
+        painter.end()
 
 
 class _Grip(QWidget):
@@ -182,20 +227,51 @@ class DeviceStrip(QWidget):
             self.toggle.clicked.connect(self.view_toggled.emit)
             self.toggle.drag_started.connect(self.tear_off.emit)
             self.toggle.set_draggable(True)
-            # Level with the top of the icons, not the middle of the row.
-            holder = QVBoxLayout()
-            holder.setContentsMargins(
-                0, max(0, MiniDevicePanel.ICON_TOP - DeviceViewToggle.GLYPH_TOP), 0, 0)
-            holder.addWidget(self.toggle)
-            holder.addStretch()
-            self._row.addLayout(holder)
+            self._glyph_holder = QVBoxLayout()
+            self._glyph_holder.addWidget(self.toggle, 0, Qt.AlignmentFlag.AlignHCenter)
+            self._glyph_holder.addStretch()
+            self._row.addLayout(self._glyph_holder)
 
         self._row.addWidget(self.device_mini_panel)
+        self._vertical = False
+        self._seat_glyph()
 
     # -- where it lives ----------------------------------------------------
 
     def floating(self) -> bool:
         return self._floating
+
+    def vertical(self) -> bool:
+        return self._vertical
+
+    def set_vertical(self, vertical: bool) -> None:
+        """Stand the strip on its end, or lay it back down. Its slot decides
+        (DeviceSlot.vertical); floating it is always a row. The same layouts
+        turned rather than a second strip, so the chips, the glyph and
+        everything mirrored onto them carry over as they are."""
+        if vertical == self._vertical:
+            return
+        self._vertical = vertical
+        self._row.setDirection(QBoxLayout.Direction.TopToBottom if vertical
+                               else QBoxLayout.Direction.LeftToRight)
+        self.device_mini_panel.set_vertical(vertical)
+        self._seat_glyph()
+        # A turned layout reports its new shape only once its own pending
+        # layout request has been handled, and the window measures what the
+        # strip costs it in the same step as moving it: asked then, every
+        # layout above still answers with the row's width for a column.
+        # From the icon panel up - a layout caches each child's size, and
+        # it is the panel's own that has changed.
+        self.device_mini_panel.updateGeometry()
+        invalidate_ancestor_layouts(self.device_mini_panel)
+
+    def _seat_glyph(self) -> None:
+        """In a row the glyph is level with the top of the icons, not the
+        middle of the row; on end it just sits above them."""
+        if self.toggle is None:
+            return
+        top = 0 if self._vertical else max(0, MiniDevicePanel.ICON_TOP - DeviceViewToggle.GLYPH_TOP)
+        self._glyph_holder.setContentsMargins(0, top, 0, 0)
 
     def dock_into(self, slot: QWidget) -> None:
         """Become a plain child of ``slot`` - laid out by it, no window of
@@ -204,6 +280,14 @@ class DeviceStrip(QWidget):
         self._grip.setVisible(False)
         self._row.setContentsMargins(*_DOCKED_MARGINS)
         self._row.setSizeConstraint(QLayout.SizeConstraint.SetDefaultConstraint)
+        # SetFixedSize, which floating uses, works by pinning the widget's
+        # minimum and maximum size, and going back to the default constraint
+        # leaves them pinned. That went unseen while every slot held a row
+        # the size of the floating one; stood on end in the side panel the
+        # strip was held to the row's height, and showed the top few pixels
+        # of its first icon.
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
         if self._owner is not None:
             self._owner.removeEventFilter(self)
         self.setWindowFlags(Qt.WindowType.Widget)
@@ -219,6 +303,7 @@ class DeviceStrip(QWidget):
         """
         was_floating = self._floating
         self._floating = True
+        self.set_vertical(False)
         self._grip.setVisible(True)
         self._row.setContentsMargins(*_FLOATING_MARGINS)
         # Exactly the size of what it holds, and kept so: nothing here

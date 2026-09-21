@@ -68,7 +68,7 @@ from telemffb.ui.widgets.CornerDeviceSlot import CornerDeviceSlot
 from telemffb.ui.widgets.CornerLogo import CornerLogo
 from telemffb.ui.widgets.DeviceViewToggle import DeviceViewToggle
 from telemffb.ui.widgets.DockZoneOverlay import DockZoneOverlay
-from telemffb.ui.widgets.DeviceStrip import DeviceStrip
+from telemffb.ui.widgets.DeviceStrip import DeviceStrip, RailDeviceSlot
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.preview.controller import EffectPreviewController
@@ -91,13 +91,16 @@ from telemffb.ui.updates import UpdateChecker
 #: button goes to whichever of them was chosen last ('deviceViewIntegrated'),
 #: and theirs all go to the frame.
 DEVICE_VIEW_FRAME = 'frame'
+DEVICE_VIEW_RAIL = 'rail'
 DEVICE_VIEW_MENUBAR = 'menubar'
 DEVICE_VIEW_ROW = 'row'
 DEVICE_VIEW_HEADER = 'header'
 DEVICE_VIEW_FLOATING = 'floating'
-INTEGRATED_DEVICE_VIEWS = (DEVICE_VIEW_MENUBAR, DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER, DEVICE_VIEW_FLOATING)
+INTEGRATED_DEVICE_VIEWS = (DEVICE_VIEW_RAIL, DEVICE_VIEW_MENUBAR, DEVICE_VIEW_ROW, DEVICE_VIEW_HEADER,
+                           DEVICE_VIEW_FLOATING)
 DEVICE_VIEW_LABELS = {
     DEVICE_VIEW_FRAME: "Side panel",
+    DEVICE_VIEW_RAIL: "Side panel (compact)",
     DEVICE_VIEW_MENUBAR: "Menu bar",
     DEVICE_VIEW_ROW: "Application status box",
     DEVICE_VIEW_HEADER: "Monitor/Settings header",
@@ -273,9 +276,9 @@ class MainWindow(QMainWindow):
 
 
         """ Create Device Panel - pinned to the left edge of the window.
-        Hidden while the Hide tab is active, or by user preference when
-        there are multiple devices, or always when there is only one (see
-        _sync_devices_display() / switch_window_view()). """
+        Hidden while the Hide tab is active, or when another view has been
+        chosen for the devices (see _sync_devices_display() /
+        switch_window_view()). """
 
 
         self.device_groupbox = QGroupBox("Active Devices")
@@ -293,9 +296,8 @@ class MainWindow(QMainWindow):
         self.device_panel.changed.connect(self._sync_device_strips)
         device_groupbox_layout.addWidget(self.device_panel)
         self.device_groupbox.setLayout(device_groupbox_layout)
-        # Switches to the compact icon rows; theirs switch back (see
-        # _register_mini_device_panel). The frame only ever shows with
-        # more than one device configured, so its button needs no gating.
+        # Switches to the compact view last used; the strip's glyph
+        # switches back. The same with one device as with several.
         self.device_frame_toggle = DeviceViewToggle(frame_shown=True)
         self.device_frame_toggle.pin_to_title(self.device_groupbox)
         self.device_frame_toggle.clicked.connect(lambda: self._set_devices_frame_preference(False))
@@ -309,6 +311,10 @@ class MainWindow(QMainWindow):
         # logo. See telemffb/ui/widgets/CornerDeviceSlot.py.
         self.corner_device_slot = CornerDeviceSlot(
             self, below=self.header_panel.status_group, menubar=self.main_menu.menu, logo=self.corner_logo)
+        # The compact side panel's: down the left where the frame goes, the
+        # strip stood on its end. See RailDeviceSlot.
+        self.rail_device_slot = RailDeviceSlot()
+        self._add_device_view_context_menu(self.rail_device_slot)
 
         # Dropping the strip on one of the places the devices can be shown
         # docks it there.
@@ -404,6 +410,7 @@ class MainWindow(QMainWindow):
         """ Wire the left (Active Devices) and right columns together """
 
         content_hbox.addWidget(self.device_groupbox)
+        content_hbox.addWidget(self.rail_device_slot)  # never up with the frame: they are two views
         content_hbox.addLayout(right_column_layout, 1)
         layout.addLayout(content_hbox, stretch=1)
         self._content_hbox = content_hbox  # its spacing is part of what the frame costs in width
@@ -814,12 +821,9 @@ class MainWindow(QMainWindow):
             lambda pos, w=widget: self._show_device_view_context_menu(w, pos))
 
     def _device_views(self):
-        """The views on offer, as ``[(key, label), ...]``. The Active Devices
-        frame needs more than one device to be worth its width; a lone
-        device still gets the choice between the integrated views."""
-        views = list(INTEGRATED_DEVICE_VIEWS)
-        if self._multiple_devices_configured():
-            views.insert(0, DEVICE_VIEW_FRAME)
+        """The views on offer, as ``[(key, label), ...]`` - the same with
+        one device as with several."""
+        views = (DEVICE_VIEW_FRAME,) + INTEGRATED_DEVICE_VIEWS
         return [(view, DEVICE_VIEW_LABELS[view]) for view in views]
 
     def _last_integrated_device_view(self) -> str:
@@ -836,11 +840,13 @@ class MainWindow(QMainWindow):
         if not G.master_instance:
             return DEVICE_VIEW_ROW
         view = G.system_settings.get('deviceView', None)
-        if view not in DEVICE_VIEW_LABELS:
-            view = DEVICE_VIEW_FRAME if G.system_settings.get('showDevicesFrame', True) else DEVICE_VIEW_ROW
-        if view == DEVICE_VIEW_FRAME and not self._multiple_devices_configured():
-            view = self._last_integrated_device_view()  # a lone device has no frame
-        return view
+        if view in DEVICE_VIEW_LABELS:
+            return view
+        # Never picked: the Active Devices frame, one device or several. It
+        # is what everyone who knows the older window expects to find, and
+        # it is never a panel for one icon - all four roles are always on
+        # it (_device_display_order), the ones with no instance greyed out.
+        return DEVICE_VIEW_FRAME if G.system_settings.get('showDevicesFrame', True) else DEVICE_VIEW_ROW
 
     def _show_device_view_context_menu(self, widget, pos):
         """Right-click on any device display: the other views, and while
@@ -881,6 +887,8 @@ class MainWindow(QMainWindow):
         slot there is no room in (the tab headers, on the Hide tab)."""
         if view == DEVICE_VIEW_ROW:
             return self.header_panel.device_slot
+        if view == DEVICE_VIEW_RAIL:
+            return self.rail_device_slot
         if view == DEVICE_VIEW_MENUBAR:
             return self.corner_device_slot
         if view == DEVICE_VIEW_HEADER:
@@ -893,7 +901,7 @@ class MainWindow(QMainWindow):
         return None
 
     def _device_slots(self):
-        return [self.header_panel.device_slot, self.corner_device_slot,
+        return [self.header_panel.device_slot, self.corner_device_slot, self.rail_device_slot,
                 self.settings_header_bar.device_slot, self.monitor_panel.header_bar.device_slot]
 
     def _device_dock_zones(self):
@@ -902,9 +910,10 @@ class MainWindow(QMainWindow):
 
         Regions of the window rather than the slots themselves: a slot the
         strip is not in takes no space, and so is nothing to aim at. The
-        side panel's zone is a narrow strip down the left edge and comes
-        first, so that it can be reached at all past the status box, which
-        starts a few pixels in.
+        two side panels share the left edge, as bands about as wide as what
+        they dock: the compact one against the edge, the full one just
+        inside it. They come first, so that they can be reached at all past
+        the status box, which starts a few pixels in.
         """
         zones = []
         box = self.header_panel.status_group
@@ -912,8 +921,8 @@ class MainWindow(QMainWindow):
         tabs_top_left = self.tab_widget.mapTo(self, QtCore.QPoint(0, 0))
         tabs_bottom = tabs_top_left.y() + self.tab_widget.height()
 
-        if self._multiple_devices_configured():
-            zones.append((DEVICE_VIEW_FRAME, QtCore.QRect(0, band, 40, tabs_bottom - band)))
+        zones.append((DEVICE_VIEW_RAIL, QtCore.QRect(0, band, 28, tabs_bottom - band)))
+        zones.append((DEVICE_VIEW_FRAME, QtCore.QRect(28, band, 44, tabs_bottom - band)))
 
         menubar = self.main_menu.menu
         actions = menubar.actions()
@@ -1018,7 +1027,7 @@ class MainWindow(QMainWindow):
         All four roles are always on the full panel, but the ones with no
         hardware are inert ghost icons: "multiple devices" counts only the
         configured ones, and without a second one there is no scope to
-        switch and no frame worth its width.
+        switch to. The views themselves are the same either way.
         """
         names = self.device_panel.get_device_names()
         configured = [n for n in names if self.device_panel.icons[n].configured]
@@ -1047,9 +1056,13 @@ class MainWindow(QMainWindow):
             strip.hide()
         self.header_panel.refresh_device_slot_height()
 
+        # An icon is clicked to switch to that device, so with one device
+        # there is nothing for a click to do. The glyph is another matter:
+        # it behaves the same however many devices there are, and is the
+        # only thing on screen to say they can be shown somewhere else. Not
+        # on a child instance, whose view is the master's to choose.
         strip.device_mini_panel.set_clickable(multiple)
-        # The switch back to the frame needs a frame to switch to.
-        strip.toggle.setVisible(multiple and strip.isVisible())
+        strip.toggle.setVisible(bool(G.master_instance) and strip.isVisible())
         monitor_strip = getattr(self, 'monitor_device_strip', None)
         if monitor_strip is not None:
             monitor_strip.device_mini_panel.set_clickable(multiple)
@@ -1094,10 +1107,9 @@ class MainWindow(QMainWindow):
         # The Window menu is one of several ways here; keep its mark in
         # step when one of the others was used.
         self.main_menu.set_device_view_checked(view)
-        was_showing = self.device_groupbox.isVisible()
-        frame_width, window_width = self.device_groupbox.width(), self.width()
+        side_cost, window_width = self._side_panel_cost(), self.width()
         self._sync_devices_display()
-        self._resize_for_devices_frame(was_showing, frame_width, window_width)
+        self._resize_for_side_panel(side_cost, window_width)
 
     def _activate_layouts(self):
         """Bring the window's layouts up to date with a widget shown or
@@ -1107,32 +1119,38 @@ class MainWindow(QMainWindow):
         self.centralWidget().layout().activate()
         QMainWindow.layout(self).activate()
 
-    def _resize_for_devices_frame(self, was_showing: bool, frame_width: int, window_width: int):
-        """Give the window the width the Active Devices frame takes when
-        it appears, and take it back when it goes, so the column beside it
-        keeps its width either way.
+    def _side_panel_cost(self) -> int:
+        """The window width whatever is down the left is taking - the Active
+        Devices frame or the compact side panel, and the gap beside it; 0
+        with neither up. Only readable while it is up."""
+        for panel in (self.device_groupbox, self.rail_device_slot):
+            if panel.isVisible():
+                return panel.width() + self._content_hbox.spacing()
+        return 0
 
-        Left alone, the window only ever grows: showing the frame pushes
-        it wider when there is no room, and hiding the frame hands the
-        width to the tabs instead of giving it back.
+    def _resize_for_side_panel(self, cost_before: int, window_width: int):
+        """Give the window the width a side panel takes when it appears,
+        take it back when it goes, and the difference when one is swapped
+        for the other, so the column beside it keeps its width throughout.
 
-        ``frame_width`` and ``window_width`` are from before the change:
-        the frame's width can only be read while it is up, and activating
-        the layouts may already have widened a window too narrow for the
-        frame, which must not be counted twice.
+        Left alone, the window only ever grows: showing a panel pushes it
+        wider when there is no room, and hiding one hands the width to the
+        tabs instead of giving it back.
+
+        ``cost_before`` and ``window_width`` are from before the change: a
+        panel's width can only be read while it is up, and activating the
+        layouts may already have widened a window too narrow for the new
+        panel, which must not be counted twice.
         """
-        now_showing = self.device_groupbox.isVisible()
-        if now_showing == was_showing or self.isMaximized() or self.isFullScreen():
+        if self.isMaximized() or self.isFullScreen():
             return
         self._activate_layouts()
-        if now_showing:
-            frame_width = self.device_groupbox.width()
-        delta = frame_width + self._content_hbox.spacing()
-        if not now_showing:
-            delta = -delta
+        delta = self._side_panel_cost() - cost_before
+        if not delta:
+            return
         self.resize(window_width + delta, self.height())
         # The Monitor and Settings tabs each remember their own window
-        # size; the other one's is from before the frame changed.
+        # size; the other one's is from before the panel changed.
         for key in ("0", "1"):
             self.tab_sizes[key]['width'] = int(self.tab_sizes[key]['width']) + delta
 
@@ -1249,10 +1267,9 @@ class MainWindow(QMainWindow):
         self.device_panel.set_active_device(G.device_type)
         self.refresh_device_labels()
 
-        """ Window menu: where the devices are shown. The side panel is
-        only on offer with more than one CONFIGURED device on this
-        instance's own panel - all four are always shown, but the rest
-        may just be inert ghost icons """
+        """ Window menu: where the devices are shown. Every view is on
+        offer however many devices are CONFIGURED - all four roles are
+        always on the panel, the rest as inert ghost icons """
 
         self.main_menu.add_device_view_actions(
             self._device_views(), self._device_view(), self._set_device_view)

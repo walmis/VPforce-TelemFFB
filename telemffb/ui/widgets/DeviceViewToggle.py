@@ -98,8 +98,15 @@ class DeviceViewToggle(QAbstractButton):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
+        # A drag has to leave the glyph, as well as travel the usual
+        # distance. The glyph is some 20px across and the drag distance 10,
+        # so a click made with the mouse still moving - reached for, and
+        # pressed before the hand has stopped - covered it without going
+        # anywhere, and tore the strip off instead of switching the view.
+        # Dragging something off a button means leaving the button.
         if (self._draggable and not self._dragged and self._press_pos is not None
                 and event.buttons() & Qt.MouseButton.LeftButton
+                and not self.rect().contains(event.position().toPoint())
                 and (event.position().toPoint() - self._press_pos).manhattanLength()
                 >= QApplication.startDragDistance()):
             self._dragged = True

@@ -6,7 +6,7 @@ import sys
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer, QPropertyAnimation, QRect, QEasingCurve, pyqtProperty
 from PyQt6.QtGui import QPixmap, QEnterEvent, QPainter, QColor, QFont, QPainterPath, QCursor
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QLabel, QVBoxLayout,
+    QApplication, QBoxLayout, QWidget, QLabel, QVBoxLayout,
     QHBoxLayout, QMainWindow, QSizePolicy, QGraphicsOpacityEffect
 )
 import os
@@ -744,6 +744,22 @@ class MiniDevicePanel(QWidget):
 
     def get_device_names(self) -> list[str]:
         return list(self.chips.keys())
+
+    def set_vertical(self, vertical: bool) -> None:
+        """Stack the chips instead of rowing them - for the compact side
+        panel, where the strip stands on its end. The same layout turned,
+        so the chips themselves (and everything mirrored onto them) are
+        untouched. Closer together than in a row: stacked, the active
+        chip's corner brackets have the chip's own side margins between
+        them and the neighbour's, which a row does not."""
+        self.layout.setDirection(QBoxLayout.Direction.TopToBottom if vertical
+                                 else QBoxLayout.Direction.LeftToRight)
+        if vertical:
+            self.layout.setContentsMargins(0, 0, 0, 0)
+            self.layout.setSpacing(8)
+        else:
+            self.layout.setContentsMargins(0, _MINI_ROW_MARGIN_Y, 0, _MINI_ROW_MARGIN_Y)
+            self.layout.setSpacing(16)
 
     def set_devices(self, device_list):
         for w in self.chips.values():
