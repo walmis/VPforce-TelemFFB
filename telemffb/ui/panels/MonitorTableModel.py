@@ -68,7 +68,6 @@ class KeyValueTableModel(QAbstractTableModel):
     def __init__(self, headers: Sequence[str], parent=None):
         super().__init__(parent)
         self._headers: List[str] = list(headers)
-        self._header_alignments: Dict[int, Qt.AlignmentFlag] = {}
         self._keys: List[str] = []
         self._values: Dict[str, Tuple[str, ...]] = {}
         # Optional, and per cell: {row key: (tooltip per column,)}, where a
@@ -86,18 +85,11 @@ class KeyValueTableModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self._headers)
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.TextAlignmentRole:
-            return self._header_alignments.get(section)
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal:
             return self._headers[section]
         return str(section + 1)
-
-    def set_header_alignment(self, section: int, alignment) -> None:
-        """How one column's header text is aligned; centred until told."""
-        self._header_alignments[section] = alignment
-        self.headerDataChanged.emit(Qt.Orientation.Horizontal, section, section)
 
     def set_header(self, section: int, text: str) -> None:
         """Change one column's header text."""

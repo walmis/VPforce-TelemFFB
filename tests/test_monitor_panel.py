@@ -565,14 +565,16 @@ class TestEffectsScopeLabel:
         panel.set_effects_scope_label('pedals')
         assert panel.effects_title() == 'Active effects: Pedals'
 
-    def test_the_device_goes_in_the_second_header(self, panel):
-        """As one string in the first header the title was clipped at both
-        ends in a narrow pane - that column had given 72px to the
-        intensities - while the second header stood empty."""
+    def test_the_title_spans_the_header_rather_than_a_column(self, panel):
+        """The title belongs to the pane, not to either column: a column's
+        text centres within that column, which for this two-column table is
+        never the table's own centre. It lives on the header view, which
+        paints it across both sections, and the sections stay blank."""
         from PyQt6.QtCore import Qt
         panel.set_effects_scope_label('trimwheel')
         header = lambda section: panel._effects_model.headerData(section, Qt.Orientation.Horizontal)
-        assert (header(0), header(1)) == ('Active effects:', 'Trimwheel')
+        assert (header(0), header(1)) == ('', '')
+        assert panel._effects_header.title() == 'Active effects: Trimwheel'
 
     def test_clearing_scope_restores_default(self, panel):
         panel.set_effects_scope_label('pedals')
@@ -621,23 +623,74 @@ class TestDetachToolbar:
 
 class TestSplit:
     """The two panes are tables with the same size hint, so the splitter
-    would start them level. 70/30 is what the page measured before its
-    panes were tables, when the split fell out of two labels' size hints."""
+    would start them level; the telemetry pane's 55% share is stated instead.
+    Before the first frame there is no split at all - nothing has effects
+    yet, so that pane is hidden and the placeholder has the width to itself.
+    """
+
+    FRAME = {'src': 'DCS', 'N': 'F-16', 'T': 1.0}
 
     def _shares(self, panel):
         telemetry, effects = panel._splitter.sizes()
         return telemetry / (telemetry + effects)
 
-    def test_a_split_the_user_dragged_is_not_reset_on_reshow(self, panel):
-        """The starting split is applied once - coming back to the tab
-        (or reattaching the detached window) keeps what the user set."""
+    def _live(self, panel, width=1600):
+        """A shown panel with one telemetry frame in it - the only state in
+        which both panes exist."""
+        panel.resize(width, 500)
+        panel.show()
+        panel.update_telemetry(dict(self.FRAME))
+        QApplication.processEvents()
+        return panel
+
+    def test_the_effects_pane_is_hidden_until_the_first_frame(self, panel):
+        """Waiting for data, the placeholder gets the whole splitter rather
+        than being squeezed against an empty effects table."""
         panel.resize(1600, 500)
         panel.show()
         QApplication.processEvents()
+        assert panel.effects_view.isHidden()
+        assert panel._splitter.sizes()[1] == 0
+        panel.close()
+
+    def test_the_first_frame_brings_the_effects_pane_back(self, panel):
+        self._live(panel)
+        assert not panel.effects_view.isHidden()
+        assert self._shares(panel) == pytest.approx(0.55, abs=0.01)
+        panel.close()
+
+    def test_the_split_holds_at_a_width_the_placeholder_is_wider_than(self, panel):
+        """A QStackedWidget is as wide as its widest page even when that page
+        is not the current one, so the placeholder used to floor the
+        telemetry pane well past its 55% share in a narrow window."""
+        self._live(panel, width=900)
+        assert self._shares(panel) == pytest.approx(0.55, abs=0.01)
+        panel.close()
+
+    def test_a_split_the_user_dragged_is_not_reset_on_reshow(self, panel):
+        """The starting split is applied once - coming back to the tab
+        (or reattaching the detached window) keeps what the user set."""
+        self._live(panel)
         total = sum(panel._splitter.sizes())
         panel._splitter.setSizes([total // 2, total - total // 2])
         panel.hide()
         panel.show()
         QApplication.processEvents()
         assert self._shares(panel) == pytest.approx(0.5, abs=0.02)
+        panel.close()
+
+    def test_a_split_the_user_dragged_survives_a_sim_restart(self, panel):
+        """The effects pane going away with the sim and coming back with it
+        must not quietly undo a drag."""
+        self._live(panel)
+        total = sum(panel._splitter.sizes())
+        panel._splitter.setSizes([total // 2, total - total // 2])
+        QApplication.processEvents()
+        dragged = panel._splitter.sizes()
+        panel.refresh_waiting_status()
+        QApplication.processEvents()
+        assert panel.effects_view.isHidden()
+        panel.update_telemetry(dict(self.FRAME))
+        QApplication.processEvents()
+        assert panel._splitter.sizes() == dragged
         panel.close()

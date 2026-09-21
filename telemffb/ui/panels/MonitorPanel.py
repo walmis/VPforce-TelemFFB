@@ -76,6 +76,7 @@ from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
 from telemffb.ui.widgets.EffectTypeDelegate import EffectTypeDelegate
 from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
+from telemffb.ui.widgets.SpanningTitleHeaderView import SpanningTitleHeaderView
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
 
@@ -87,6 +88,10 @@ _MONOSPACE_STYLE = """
 #: Wide enough for "100%" over a bar that still reads as a bar, narrow
 #: enough to leave the effect names the rest of a half-split pane.
 INTENSITY_COLUMN_WIDTH = 72
+
+#: The telemetry pane's share of the monitor splitter, in percent - the rest
+#: goes to the active-effects pane.
+_TELEM_SHARE_PCT = 55
 
 #: The order the active-effects list is grouped into, by PID effect type.
 #: Periodics first - magnitude and shape both mean something for them -
@@ -328,6 +333,15 @@ class MonitorPanel(QWidget):
         self._telem_waiting_label.setWordWrap(False)
         self._telem_waiting_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self._telem_waiting_label.setStyleSheet(_MONOSPACE_STYLE)
+        # A QStackedWidget is as wide as its widest page, current or not, so
+        # this placeholder's longest line was flooring the telemetry pane at
+        # ~570px for the whole session - enough to claim the effects pane's
+        # share back below a ~1030px splitter. It needs no floor of its own:
+        # while it is up the effects pane is hidden and it has the splitter
+        # to itself (_hide_effects_pane), handle and all.
+        self._telem_waiting_label.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Ignored,
+            self._telem_waiting_label.sizePolicy().verticalPolicy())
 
         self._telem_stack = QStackedWidget()
         self._telem_stack.addWidget(self._telem_waiting_label)
@@ -335,20 +349,25 @@ class MonitorPanel(QWidget):
         self._telem_stack.setMinimumHeight(100)
 
         """ Active-effects pane. """
-        self._effects_model = KeyValueTableModel(['Active effects', ''], self)
-        # The pane's title runs across both headers - "Active effects:" over
-        # the names and the device over the intensities - so each is turned
-        # toward the divider, and the two read as the one phrase they are.
-        self._effects_model.set_header_alignment(
-            0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._effects_model.set_header_alignment(
-            1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        # Both sections stay blank: this table's header is the pane's title,
+        # which the header view paints across the sections as one centred
+        # phrase (set_effects_scope_label), not a label per column.
+        self._effects_model = KeyValueTableModel(['', ''], self)
         self.effects_view = CopyableTableView(self)
         self.effects_view.setModel(self._effects_model)
-        # The two headers between them are the pane's title, and say whose
-        # effects these are (set_effects_scope_label) - level with the
-        # telemetry table's own header beside it.
-        header = self.effects_view.horizontalHeader()
+        # The header is the pane's title, and says whose effects these are -
+        # level with the telemetry table's own header beside it.
+        self._effects_header = SpanningTitleHeaderView(Qt.Orientation.Horizontal, self.effects_view)
+        self.effects_view.setHorizontalHeader(self._effects_header)
+        # setHorizontalHeader only wires the header up; the defaults a table
+        # gives the one it makes itself have to be restated, or this header
+        # would behave unlike the telemetry table's.
+        self._effects_header.setSectionsClickable(True)
+        self._effects_header.setHighlightSections(True)
+        # A child instance never calls set_effects_scope_label - it has only
+        # its own device - so the untitled default has to stand on its own.
+        self._effects_header.setTitle('Active effects')
+        header = self._effects_header
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -360,27 +379,60 @@ class MonitorPanel(QWidget):
         self.effects_view.setMinimumHeight(100)
 
         layout.addWidget(self.header_bar, 0, 0, 1, 2)
-        # Telemetry gets 70% of the width, which is what this page gave it
-        # before its panes were tables: the split then fell out of the two
-        # text labels' size hints, and measured 70/30 at every window
-        # width. Two tables have the same size hint and would start level,
-        # so the split is stated here. The stretch factors hold it as the
-        # window is resized; the starting split is set on first show
+        # Two tables have the same size hint and would start level, so the
+        # split is stated (_TELEM_SHARE_PCT). The stretch factors hold it as
+        # the window is resized; the starting split is set on first show
         # (showEvent), once the splitter has a width to divide.
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
         self._splitter.addWidget(self._telem_stack)
         self._splitter.addWidget(self.effects_view)
-        self._splitter.setStretchFactor(0, 7)
-        self._splitter.setStretchFactor(1, 3)
+        self._splitter.setStretchFactor(0, _TELEM_SHARE_PCT)
+        self._splitter.setStretchFactor(1, 100 - _TELEM_SHARE_PCT)
         self._split_applied = False
+        self._restore_sizes = None
         layout.addWidget(self._splitter, 1, 0, 1, 2)  # Span both columns
 
     def showEvent(self, event):
         super().showEvent(event)
         if not self._split_applied:
             self._split_applied = True
-            width = self._splitter.width()
-            self._splitter.setSizes([width * 7 // 10, width * 3 // 10])
+            self._apply_default_split()
+
+    # ---- pane sizing --------------------------------------------------------
+
+    def _apply_default_split(self) -> None:
+        """Put the two panes back at their default share of the splitter."""
+        width = self._splitter.width()
+        if width > 0:
+            self._splitter.setSizes([width * _TELEM_SHARE_PCT // 100,
+                                     width * (100 - _TELEM_SHARE_PCT) // 100])
+
+    def _hide_effects_pane(self) -> None:
+        """Nothing is flying, so nothing has effects: hand the whole splitter
+        to the telemetry pane rather than squeezing an empty table against
+        it. This is also what keeps the default split honest - the waiting
+        placeholder's widest line floors the telemetry pane at ~570px, which
+        at 55% would otherwise claim the effects pane's share back on any
+        window narrower than about 1030px."""
+        if self.effects_view.isHidden():
+            return
+        sizes = self._splitter.sizes()
+        # Only worth remembering once a real layout has set them; before the
+        # first show they are whatever the splitter guessed.
+        if self._split_applied and all(sizes):
+            self._restore_sizes = sizes
+        self.effects_view.hide()
+
+    def _show_effects_pane(self) -> None:
+        """Bring the effects pane back at whatever share it last held, so a
+        drag of the splitter survives a sim restart, or at the default."""
+        if not self.effects_view.isHidden():
+            return
+        self.effects_view.show()
+        if self._restore_sizes:
+            self._splitter.setSizes(self._restore_sizes)
+        else:
+            self._apply_default_split()
 
     def _on_detach_clicked(self):
         if self.mainwindow is not None:
@@ -395,15 +447,15 @@ class MonitorPanel(QWidget):
 
     def set_effects_scope_label(self, device_type: Optional[str]) -> None:
         """``device_type`` is the config-scope device to name in the header
-        (master only); ``None`` restores the plain "Active effects" header.
+        (master only); ``None`` restores the plain "Active effects" title.
 
-        The device goes in the intensity column's header, not after the
-        title in the name column's. As one string the title needed about
-        170px of a column that had just given 72 of them to the intensities,
-        and came up clipped at both ends in a narrow pane; the second header
-        was standing empty, and every device name fits it."""
-        self._effects_model.set_header(0, 'Active effects:' if device_type else 'Active effects')
-        self._effects_model.set_header(1, device_type.title() if device_type else '')
+        The title is one string spanning the header rather than a label per
+        column: a column's text centres within that column, which for a
+        two-column table is never the table's own centre - the name column is
+        short by half the intensities' 72px, and a title split across both
+        columns hangs off the divider between them."""
+        self._effects_header.setTitle(
+            f'Active effects: {device_type.title()}' if device_type else 'Active effects')
 
     def set_telemetry_source(self, device_type: Optional[str], sending: bool = True) -> None:
         """Whose telemetry the table is showing (master only). ``None`` is
@@ -420,9 +472,8 @@ class MonitorPanel(QWidget):
         self._telem_model.set_header(1, header)
 
     def effects_title(self) -> str:
-        """The effects pane's title, read across its two headers."""
-        parts = [self._effects_model.headerData(section, Qt.Orientation.Horizontal) for section in (0, 1)]
-        return ' '.join(part for part in parts if part)
+        """The effects pane's title."""
+        return self._effects_header.title()
 
     # ---- debug menu: "Show simvar in telem window" ------------------------
 
@@ -451,6 +502,7 @@ class MonitorPanel(QWidget):
             "Enable or Disable in System -> System Settings"
         )
         self._telem_stack.setCurrentWidget(self._telem_waiting_label)
+        self._hide_effects_pane()
 
     # ---- per-frame updates --------------------------------------------------
 
@@ -462,6 +514,7 @@ class MonitorPanel(QWidget):
         rows = self._build_telemetry_rows(data)
         self._telem_model.set_rows(rows)
         self._telem_stack.setCurrentWidget(self.telem_view)
+        self._show_effects_pane()
 
     def _build_telemetry_rows(self, data: Dict) -> List[Tuple[str, Tuple[str, str]]]:
         raw = (self.telem_filter.text() or "")

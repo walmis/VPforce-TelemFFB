@@ -200,9 +200,15 @@ def svg_icon(svg_name, color="#d0d0d0", disabled_color="#707070", size=20):
 
 
 class ElidedLabel(QLabel):
-    """QLabel that elides its text at a fixed pixel budget so long values
-    can't grow the surrounding layout. When elided, the full text is shown
-    in the tooltip; text() always returns the full string."""
+    """QLabel that elides its text so long values can't grow the surrounding
+    layout. ``max_text_px`` is only the width the label *asks* for - the size
+    hint is capped there (and never reports more than the full text needs), so
+    content alone can't widen the panel. The text itself is elided against the
+    width the layout actually hands out, so a widened window reveals more of a
+    long value instead of leaving it clipped at the budget.
+
+    When elided, the full text is shown in the tooltip; text() always returns
+    the full string."""
     def __init__(self, text='', max_text_px=200, parent=None):
         super().__init__(parent)
         self._full_text = ''
@@ -212,12 +218,37 @@ class ElidedLabel(QLabel):
 
     def setText(self, text):
         self._full_text = text
-        elided = self.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, self._max_text_px)
-        super().setText(elided)
-        super().setToolTip(text if elided != text else '')
+        self._apply_elide()
 
     def text(self):
         return self._full_text
+
+    def _apply_elide(self):
+        # Below the budget the label still elides to what it really has;
+        # above it, the spare width goes to showing more of the text.
+        budget = max(self._max_text_px, self.width())
+        elided = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideRight, budget)
+        super().setText(elided)
+        super().setToolTip(self._full_text if elided != self._full_text else '')
+
+    def _capped(self, hint):
+        # Derive the hint from the *full* text rather than the currently
+        # elided text, so re-eliding on resize can't feed a changing hint
+        # back into the layout and oscillate.
+        fm = self.fontMetrics()
+        padding = max(0, hint.width() - fm.horizontalAdvance(super().text()))
+        hint.setWidth(min(fm.horizontalAdvance(self._full_text), self._max_text_px) + padding)
+        return hint
+
+    def sizeHint(self):
+        return self._capped(super().sizeHint())
+
+    def minimumSizeHint(self):
+        return self._capped(super().minimumSizeHint())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_elide()
 
 
 class AppStatusWidget(QWidget):
@@ -266,6 +297,10 @@ class AppStatusWidget(QWidget):
         sim_grid.setVerticalSpacing(10)
         sim_grid.setHorizontalSpacing(10)
         sim_grid.setColumnMinimumWidth(1, 200)
+        # Hand this half's spare width to the value column as the window
+        # widens, so the elided values (aircraft name above all) get room to
+        # show more of themselves instead of staying clipped at their budget.
+        sim_grid.setColumnStretch(1, 1)
 
         column_divider = QFrame()
         column_divider.setFrameShape(QFrame.Shape.VLine)
@@ -285,9 +320,13 @@ class AppStatusWidget(QWidget):
         grid.setColumnMinimumWidth(1, 280)
         grid.setColumnStretch(1, 1)
 
-        outer_layout.addWidget(self.sim_status_group, stretch=1)
+        # 60/40 in favour of the sim half: its values are free-form text from
+        # the sim (aircraft name, matched model pattern) and are the ones that
+        # need the room, while the app half's widest item is a combo box that
+        # stops being useful past its content width.
+        outer_layout.addWidget(self.sim_status_group, stretch=3)
         outer_layout.addWidget(column_divider)
-        outer_layout.addWidget(self.app_status_group, stretch=1)
+        outer_layout.addWidget(self.app_status_group, stretch=2)
 
         sim_row = 0
         row = 0
@@ -413,7 +452,11 @@ class AppStatusWidget(QWidget):
         sim_row += 1
 
         sim_grid.addWidget(make_item_label("Current Aircraft"), sim_row, 0, alignment=label_align)
-        sim_grid.addWidget(self.cur_craft_label, sim_row, 1, alignment=value_align)
+        # No alignment flag: an aligned item is pinned to its size hint, which
+        # would keep the label at its elide budget no matter how wide the
+        # window gets. Let it fill the cell and align the text inside instead.
+        self.cur_craft_label.setAlignment(value_align)
+        sim_grid.addWidget(self.cur_craft_label, sim_row, 1)
         sim_row += 1
 
         sim_grid.addWidget(make_item_label("Matched Model"), sim_row, 0, alignment=label_align)
@@ -433,6 +476,8 @@ class AppStatusWidget(QWidget):
                                           'starting from the one it matches now')
         self.btn_split_profile.setEnabled(False)
         self.btn_split_profile.clicked.connect(self.split_profile_clicked.emit)
+        # The split button stays tucked against the pattern text, so this row
+        # keeps its fixed elide budget rather than growing with the window.
         pattern_row_layout.addWidget(self.cur_pattern_label)
         pattern_row_layout.addWidget(self.btn_split_profile)
         pattern_row_layout.addStretch(1)
