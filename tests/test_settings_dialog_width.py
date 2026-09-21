@@ -86,6 +86,62 @@ class TestNoStackedWidth:
         assert dialog.minimumSizeHint().width() <= max(pages) + MARGIN
 
 
+class TestMsfsPanelRowWidth:
+    """A discovered Community path can be very long (deep Store package
+    caches - see refresh_msfs_panel_installs()); it must not become a hard
+    floor under the dialog's width. The path now lives in a QLineEdit,
+    whose minimum width doesn't track its content the way a QLabel's does -
+    this checks nobody reintroduces a content-sized widget for it.
+
+    The comparison is a long path against a SHORT one, not a long path
+    against a longer one: Qt caps a word-wrapped QLabel's minimum size
+    hint, so under the bug a 102-char path and a 306-char path both floor
+    the row at ~1600px. Only a short path separates the two states
+    (measured: ~570px short vs ~1600px long with the bug, identical
+    without it), which is why lengthening the path proves nothing.
+    """
+
+    #: A real 102-char Microsoft Store Community path (2024, measured on a
+    #: machine with both editions installed).
+    LONG_PATH = (
+        r"C:\Users\Example\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe"
+        r"\LocalCache\Packages\Community"
+    )
+    #: The same row with nothing long in it - the floor the chrome alone
+    #: (title, status, Browse, Install) is entitled to.
+    SHORT_PATH = r"C:\MSFS\Community"
+
+    def _refresh_with_path(self, dialog, monkeypatch, path):
+        from telemffb.tap import msfs_panel_install
+        monkeypatch.setattr(
+            msfs_panel_install, 'find_msfs_installs',
+            lambda: [{'version': '2024', 'edition': 'Microsoft Store',
+                     'usercfg_path': 'x', 'community_path': path,
+                     'installed_panel_version': None}])
+        dialog.refresh_msfs_panel_installs()
+
+    def test_a_long_community_path_does_not_block_shrinking(self, dialog, monkeypatch):
+        index = next(i for i in range(dialog.tabWidget.count())
+                     if dialog.tabWidget.tabText(i) == "Simulator Setup")
+        page = dialog.tabWidget.widget(index)
+
+        self._refresh_with_path(dialog, monkeypatch, self.SHORT_PATH)
+        short_container = dialog.msfsInstallsContainer.minimumSizeHint().width()
+        short_page = page.minimumSizeHint().width()
+
+        self._refresh_with_path(dialog, monkeypatch, self.LONG_PATH)
+        long_container = dialog.msfsInstallsContainer.minimumSizeHint().width()
+        long_page = page.minimumSizeHint().width()
+
+        # the row's floor comes from its title and buttons, not the path,
+        # so swapping a short path for a long one must not move it
+        assert long_container <= short_container + MARGIN, (
+            f"a long Community path floors the row at {long_container}px "
+            f"where a short one needs {short_container}px - the path label's "
+            f"unwrapped width is acting as a minimum again")
+        assert long_page <= short_page + MARGIN
+
+
 class TestChildSettingsButtonIsGone:
     def test_no_button_opens_the_child_settings_pages(self, dialog):
         """Every device is configurable from here, so there is nothing left

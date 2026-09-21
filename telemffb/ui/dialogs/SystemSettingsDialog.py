@@ -23,12 +23,15 @@ import html
 import logging
 import os
 import time
+from dataclasses import dataclass
+from typing import Optional
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QHBoxLayout, QLabel,
-                             QMessageBox, QPushButton, QSizePolicy, QStyleOption, QTabWidget, QVBoxLayout, QWidget)
+                             QLineEdit, QMessageBox, QPushButton, QSizePolicy, QStyleOption, QTabWidget,
+                             QToolButton, QVBoxLayout, QWidget)
 
 from telemffb import globals as G
 from telemffb.tap import msfs_panel_install
@@ -50,6 +53,23 @@ from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle
 from telemffb.ui.theme.tokens import (
     ATTENTION_AMBER_DARK, ATTENTION_AMBER_LIGHT, LINK_BLUE_DARK, LINK_BLUE_LIGHT,
 )
+
+
+@dataclass
+class _MsfsInstallRow:
+    """One MSFS install row's live widgets plus the detection result its
+    status is computed against, keyed by override_key in
+    SystemSettingsDialog._msfs_install_rows. Browse and Save both need to
+    act on a specific row without walking the layout, and status recompute
+    (editingFinished, Browse) needs the detected baseline to know whether
+    the current text is actually an override."""
+    path_edit: QLineEdit
+    status_label: QLabel
+    install_button: QPushButton
+    detected_path: Optional[str]
+    detected_installed_version: Optional[str]
+    bundled_version: Optional[str]
+
 
 def _as_bool(value):
     """A stored setting as a boolean.
@@ -229,6 +249,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # this, so a field the user merely tabbed through asks nothing, and
         # a refused one has somewhere to be put back to.
         self._accepted_paths = {}
+        # Community-folder overrides for the MSFS panel installer, keyed by
+        # "<version>|<edition>" (or "manual" when nothing was detected at
+        # all) - see refresh_msfs_panel_installs().  Applied immediately on
+        # Browse, like _accepted_paths, but only reaches settings on Save.
+        self._msfs_community_overrides = {}
+        # Live per-row widgets, keyed the same way, rebuilt on every
+        # refresh_msfs_panel_installs() - see _MsfsInstallRow.
+        self._msfs_install_rows = {}
         self._validating_path = False
         # while an import is populating the form, panels created on the fly
         # read the imported values instead of the store
@@ -1375,65 +1403,246 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     def refresh_msfs_panel_installs(self):
         """(Re)populate the MSFS tab's install-status rows: one per detected
-        MSFS 2020/2024 install (Store or Steam), each with an Install/Update
-        button. Called whenever the dialog loads settings (each time it's
-        opened) - detection does registry/filesystem I/O, not something to
-        run continuously."""
+        MSFS 2020/2024 install (Store or Steam), each with an editable path
+        field and an Install/Update button. Called whenever the dialog loads
+        settings (each time it's opened) - detection does registry/
+        filesystem I/O, not something to run continuously. Also called after
+        an install, so the status text and button label recompute against
+        the current path.
+
+        Rebuilding the rows would normally lose anything the user typed but
+        never committed with Browse or Save, so any such edits are folded
+        into _msfs_community_overrides first - see
+        _sync_msfs_overrides_from_rows()."""
+        self._sync_msfs_overrides_from_rows()
         layout = self.msfsInstallsLayout
         while layout.count():
             item = layout.takeAt(0)
             w = item.widget()
             if w:
                 w.deleteLater()
+        self._msfs_install_rows = {}
 
         installs = msfs_panel_install.find_msfs_installs()
+        bundled_version = msfs_panel_install.get_bundled_panel_version()
+
         if not installs:
             empty_label = QLabel("No MSFS 2020/2024 install detected (Microsoft Store or Steam).")
             empty_label.setWordWrap(True)
             layout.addWidget(empty_label)
+            # find_msfs_installs()'s docstring says a caller with nothing
+            # detected should fall back to a manual path - this row is
+            # that fallback, so there is still a way forward.
+            self._add_msfs_install_row(
+                layout, "Path to MSFS Community folder:", "Manual Community Folder",
+                "manual", None, None, bundled_version)
             return
 
-        bundled_version = msfs_panel_install.get_bundled_panel_version()
-
         for install in installs:
-            row = QWidget(self.msfsInstallsContainer)
-            row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(0, 4, 0, 4)
+            version, edition = install['version'], install['edition']
+            # Almost nobody has both a Store and a Steam copy of the same
+            # version, so the label stays plain; the edition still goes in
+            # the tooltip and in the override key, which does need it.
+            label_text = f"Path to MSFS {version} Community folder:"
+            tooltip = f"MSFS {version} ({edition})"
+            override_key = f"{version}|{edition}"
+            self._add_msfs_install_row(
+                layout, label_text, tooltip, override_key, install['community_path'],
+                install['installed_panel_version'], bundled_version)
 
-            title = f"MSFS {install['version']} ({install['edition']})"
-            community_path = install['community_path']
-            installed_version = install['installed_panel_version']
+    def _add_msfs_install_row(self, layout, label_text, tooltip, override_key, detected_path,
+                              detected_installed_version, bundled_version):
+        """One MSFS install block: two stacked lines.
 
-            button = QPushButton()
-            if not community_path:
-                desc = f"{title}\nCouldn't find Community folder (check UserCfg.opt)"
-                status = ""
-                button.setText("Install")
-                button.setEnabled(False)
-            elif installed_version is None:
-                desc = f"{title}\n{community_path}"
-                status = "Not installed"
-                button.setText("Install")
-            elif bundled_version and installed_version != bundled_version:
-                desc = f"{title}\n{community_path}"
-                status = f"Installed: {installed_version}  ->  {bundled_version} available"
-                button.setText("Update")
+        The heading line carries the label on the left and, pushed to the
+        right, what is installed there and the Install/Update/Reinstall
+        button; the path line under it is the X-Plane-style field and
+        "..." browse button. Splitting them gives the path the block's
+        full width, which is what a deep Store package path needs, and
+        keeps the button away from the field so a click near the end of a
+        long path can't land on Install.
+
+        Shared by detected installs, a detection failure (no
+        community_path) and the manual fallback row used when nothing is
+        detected at all - those last two only differ from a normal block
+        in starting with an empty field, which typing or Browse then
+        fills.
+        """
+        community_path = self._msfs_community_overrides.get(override_key, detected_path)
+
+        row = QWidget(self.msfsInstallsContainer)
+        row_layout = QVBoxLayout(row)
+        row_layout.setContentsMargins(0, 4, 0, 4)
+        row_layout.setSpacing(2)
+
+        heading_layout = QHBoxLayout()
+        heading_layout.setContentsMargins(0, 0, 0, 0)
+
+        label = QLabel(label_text)
+        label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        label.setToolTip(tooltip)
+        heading_layout.addWidget(label)
+        # The stretch is what right-justifies the status and the button
+        # against the label, rather than letting them drift in behind it.
+        heading_layout.addStretch(1)
+
+        status_label = QLabel()
+        heading_layout.addWidget(status_label)
+
+        install_button = QPushButton()
+        install_button.clicked.connect(
+            lambda checked=False, key=override_key: self._install_msfs_panel(
+                self._msfs_install_rows[key].path_edit.text().strip()))
+        heading_layout.addWidget(install_button)
+        row_layout.addLayout(heading_layout)
+
+        path_layout = QHBoxLayout()
+        path_layout.setContentsMargins(0, 0, 0, 0)
+
+        path_edit = QLineEdit(community_path or "")
+        path_edit.setToolTip(tooltip)
+        if not community_path:
+            path_edit.setPlaceholderText("Not found - browse or type the Community folder path")
+        path_layout.addWidget(path_edit, 1)
+
+        # A bare "..." here, where the block-level browse used to spell out
+        # "Browse...": this one sits against the line edit it fills, the
+        # way browseXPLANE does against pathXPLANE.
+        browse_button = QToolButton()
+        browse_button.setText("...")
+        browse_button.clicked.connect(
+            lambda checked=False, key=override_key: self._browse_msfs_community(
+                key, self._msfs_install_rows[key].path_edit.text().strip()))
+        path_layout.addWidget(browse_button)
+        row_layout.addLayout(path_layout)
+
+        self._msfs_install_rows[override_key] = _MsfsInstallRow(
+            path_edit=path_edit, status_label=status_label, install_button=install_button,
+            detected_path=detected_path, detected_installed_version=detected_installed_version,
+            bundled_version=bundled_version)
+        self._update_msfs_row_status(override_key)
+
+        # Cheap and per-keystroke: just toggles Install. editingFinished is
+        # where the filesystem read (installed version at the new path)
+        # lives, so it only runs once the user is done typing.
+        path_edit.textChanged.connect(
+            lambda text, btn=install_button: btn.setEnabled(bool(text.strip())))
+        path_edit.editingFinished.connect(
+            lambda key=override_key: self._update_msfs_row_status(key))
+
+        layout.addWidget(row)
+
+    def _update_msfs_row_status(self, override_key):
+        """Recompute one row's status text and Install/Update/Reinstall
+        label for the path currently in its line edit. Called when the row
+        is built, on editingFinished (the user typed a new path and moved
+        on) and after a Browse - never on textChanged, which fires on every
+        keystroke and would turn typing into a filesystem read per
+        character."""
+        row = self._msfs_install_rows[override_key]
+        community_path = row.path_edit.text().strip()
+        if community_path == row.detected_path:
+            installed_version = row.detected_installed_version
+        else:
+            installed_version = self._msfs_installed_panel_version(community_path)
+
+        if not community_path:
+            row.status_label.setText("")
+            row.install_button.setText("Install")
+        elif installed_version is None:
+            row.status_label.setText("Not installed")
+            row.install_button.setText("Install")
+        elif row.bundled_version and installed_version != row.bundled_version:
+            row.status_label.setText(f"Installed: {installed_version}  ->  {row.bundled_version} available")
+            row.install_button.setText("Update")
+        else:
+            row.status_label.setText(f"Installed: {installed_version} (up to date)")
+            row.install_button.setText("Reinstall")
+        row.install_button.setEnabled(bool(community_path))
+
+    def _sync_msfs_overrides_from_rows(self):
+        """Fold every row's current line-edit text back into
+        _msfs_community_overrides, keyed by override_key, keeping only the
+        entries that actually differ from what detection found. Called
+        before a rebuild (refresh_msfs_panel_installs(), which would
+        otherwise only remember the last Browse) and before Save (so a
+        typed-but-never-browsed path is persisted too) - and dropping a
+        stale entry here is what lets a later re-detection (MSFS moved or
+        reinstalled) win instead of being masked by an old override that
+        merely echoes what detection used to say."""
+        for override_key, row in self._msfs_install_rows.items():
+            typed = row.path_edit.text().strip()
+            if typed and typed != (row.detected_path or ""):
+                self._msfs_community_overrides[override_key] = typed
             else:
-                desc = f"{title}\n{community_path}"
-                status = f"Installed: {installed_version} (up to date)"
-                button.setText("Reinstall")
+                self._msfs_community_overrides.pop(override_key, None)
 
-            desc_label = QLabel(desc)
-            desc_label.setWordWrap(True)
-            row_layout.addWidget(desc_label, 1)
+    @staticmethod
+    def _msfs_installed_panel_version(community_path):
+        """Installed panel version at a Community path, read the same way
+        find_msfs_installs() reads it for a detected path. Kept here rather
+        than in msfs_panel_install.py so that module stays free of the
+        override concept (see its module docstring) - this is only needed
+        for a path the user picked, which that module never sees."""
+        if not community_path:
+            return None
+        manifest = os.path.join(community_path, 'vpforce-telemffb-panel', 'manifest.json')
+        try:
+            with open(manifest, 'r', encoding='utf-8') as f:
+                return json.load(f).get('package_version')
+        except (OSError, ValueError):
+            return None
 
-            status_label = QLabel(status)
-            row_layout.addWidget(status_label)
+    def _browse_msfs_community(self, override_key, current_path):
+        """Browse for a Community folder to override detection with (or to
+        supply manually, when nothing was detected at all). Unlike
+        _pick_sim_path, a folder that doesn't look right is not refused -
+        add-on linkers and custom package paths are legitimate Community
+        folders that a signature test can't always see through - the user
+        is asked instead, and their answer is honoured either way.
 
-            button.clicked.connect(lambda checked=False, cp=community_path: self._install_msfs_panel(cp))
-            row_layout.addWidget(button)
+        The chosen path lands directly in the row's line edit, and that
+        row's status recomputes in place - no full rebuild, so it doesn't
+        disturb any typed-but-uncommitted text in the other rows."""
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select MSFS Community Folder", current_path or "")
+        if not directory:
+            return
+        directory = os.path.normpath(directory)
+        if not self._looks_like_msfs_community(directory):
+            ans = QMessageBox.question(
+                self, "Not a Community folder?",
+                f"{directory}\n\nThis doesn't look like an MSFS Community folder."
+                f"\n\nUse it anyway?")
+            if ans != QMessageBox.StandardButton.Yes:
+                return
+        self._msfs_community_overrides[override_key] = directory
+        row = self._msfs_install_rows.get(override_key)
+        if row is None:
+            return
+        row.path_edit.setText(directory)
+        self._update_msfs_row_status(override_key)
 
-            layout.addWidget(row)
+    @staticmethod
+    def _looks_like_msfs_community(directory) -> bool:
+        """A soft signature: basename 'Community', an 'Official' folder
+        beside it, or a subfolder holding a manifest.json (an installed
+        add-on). Any one is enough - deliberately looser than
+        _sim_path_accepted's game-folder check, since this only gates a
+        confirmation prompt, never an outright refusal."""
+        if os.path.basename(directory).lower() == "community":
+            return True
+        if os.path.isdir(os.path.join(os.path.dirname(directory), "Official")):
+            return True
+        try:
+            entries = os.listdir(directory)
+        except OSError:
+            return False
+        return any(
+            os.path.isfile(os.path.join(directory, entry, "manifest.json"))
+            for entry in entries
+            if os.path.isdir(os.path.join(directory, entry))
+        )
 
     def _install_msfs_panel(self, community_path):
         ans = QMessageBox.question(
@@ -2305,12 +2514,17 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if G.is_exe:
             G.main_window.toggle_start_with_windows(self.cb_startWithWindows.isChecked())
 
+        # Picks up anything typed into an MSFS row's line edit that was
+        # never committed via Browse - see _sync_msfs_overrides_from_rows().
+        self._sync_msfs_overrides_from_rows()
+
         global_settings_dict = {
             "enableDCS": self.enableDCS.isChecked(),
             "pathDCS": self.pathDCS.text().strip(),
             "validateDCS": self.validateDCS.isChecked(),
             "enableMSFS": self.enableMSFS.isChecked(),
             "enableMsfsApiServer": self.enableMsfsApiServer.isChecked(),
+            "msfsCommunityOverrides": json.dumps(self._msfs_community_overrides),
             "enableXPLANE": self.enableXPLANE.isChecked(),
             "validateXPLANE": self.validateXPLANE.isChecked(),
             "pathXPLANE": self.pathXPLANE.text(),
@@ -3125,6 +3339,25 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableMSFS.setChecked(settings_dict.get('enableMSFS', False))
         self.enableMsfsApiServer.setChecked(settings_dict.get('enableMsfsApiServer', True))
         self.toggle_msfs_widgets()
+        try:
+            overrides = json.loads(
+                settings_dict.get('msfsCommunityOverrides', '{}') or '{}')
+        except (TypeError, ValueError):
+            logging.exception("Failed to parse msfsCommunityOverrides setting")
+            overrides = None
+        # Valid JSON that isn't an object would parse and then fail on the
+        # first .get() deep inside the row build, taking the whole dialog
+        # load with it; the settings file is shared and hand-editable, so
+        # the shape is checked here rather than trusted.
+        self._msfs_community_overrides = overrides if isinstance(overrides, dict) else {}
+        # The rows still on screen belong to the settings being replaced,
+        # and refresh_msfs_panel_installs() opens by folding their text
+        # back into the dict just loaded - which is right after an install
+        # (it keeps a path typed but not yet saved) and wrong here, where
+        # it would copy stale text over what was loaded. Dropping them
+        # first is what lets Reset to Defaults clear a custom path and an
+        # imported override reach the field.
+        self._msfs_install_rows = {}
         self.refresh_msfs_panel_installs()
 
         self.enableXPLANE.setChecked(settings_dict.get('enableXPLANE', False))
