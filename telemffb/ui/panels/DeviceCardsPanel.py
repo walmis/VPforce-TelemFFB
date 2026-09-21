@@ -45,9 +45,9 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
 from telemffb.ui.widgets.custom_widgets import LabeledToggle, Toggle
 from PyQt6.QtWidgets import (
-    QButtonGroup, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QPushButton, QRadioButton, QSizePolicy, QToolButton,
-    QVBoxLayout, QWidget,
+    QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QGridLayout,
+    QHBoxLayout, QLabel, QPushButton, QRadioButton, QSizePolicy, QSlider,
+    QToolButton, QVBoxLayout, QWidget,
 )
 
 #: Device icon choices for the joystick role's devices: settings value ->
@@ -333,6 +333,88 @@ class DeviceRow(QWidget):
                                    or self.marker.isChecked())
 
 
+class ShakerControls(QWidget):
+    """The shaker's own row under its output selector: master gain, how
+    the mix lands on the output's channels, the transducer's calibration
+    profile, and a test button that plays through the selected output
+    with the values as they stand.  The dialog fills the profile list,
+    wires the button and reads the values back at Save.
+    """
+
+    MODES = (('Mono', 'mono'), ('Left', 'left'), ('Right', 'right'), ('Pan', 'pan'))
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 2, 0, 0)
+        row.setSpacing(8)
+
+        row.addWidget(QLabel('Gain:'))
+        self.gain_spin = QDoubleSpinBox()
+        self.gain_spin.setObjectName('shaker_gain')
+        self.gain_spin.setRange(0.0, 10.0)
+        self.gain_spin.setSingleStep(0.1)
+        self.gain_spin.setDecimals(1)
+        self.gain_spin.setToolTip(
+            "Master gain for everything the shaker plays.\nTelemFFB's effect "
+            "intensities are tuned for a stick; a transducer needs several "
+            "times that.  The mix is limited, never clipped, so a high gain "
+            "is safe.")
+        row.addWidget(self.gain_spin)
+
+        row.addWidget(QLabel('Output:'))
+        self.mode_combo = QComboBox()
+        self.mode_combo.setObjectName('shaker_mode')
+        for label, value in self.MODES:
+            self.mode_combo.addItem(label, value)
+        self.mode_combo.setToolTip(
+            'Which of the output\'s channels carry the shaker.\n'
+            'Mono: both.  Left or Right: that channel only, for a shaker on '
+            'one side of a shared card.\nPan: split between the two.')
+        row.addWidget(self.mode_combo)
+
+        self.pan_slider = QSlider(Qt.Orientation.Horizontal)
+        self.pan_slider.setObjectName('shaker_pan')
+        self.pan_slider.setRange(-100, 100)
+        self.pan_slider.setValue(0)
+        self.pan_slider.setFixedWidth(90)
+        self.pan_slider.setToolTip('Left to right')
+        self.pan_slider.setVisible(False)
+        row.addWidget(self.pan_slider)
+        self.mode_combo.currentIndexChanged.connect(
+            lambda _i: self.pan_slider.setVisible(self.mode_value() == 'pan'))
+
+        row.addWidget(QLabel('Profile:'))
+        self.profile_combo = QComboBox()
+        self.profile_combo.setObjectName('shaker_profile')
+        self.profile_combo.setToolTip(
+            "How this transducer wants its pulses driven: resonance, band, "
+            "pulse edges, brake.")
+        row.addWidget(self.profile_combo)
+
+        self.test_button = QPushButton('Test')
+        self.test_button.setObjectName('shaker_test')
+        self.test_button.setToolTip(
+            'Play a pulse and a short tone through the selected output with '
+            'these settings, saved or not.')
+        row.addWidget(self.test_button)
+        row.addStretch(1)
+
+    def mode_value(self) -> str:
+        return self.mode_combo.currentData() or 'mono'
+
+    def set_mode_value(self, mode: str) -> None:
+        index = self.mode_combo.findData(mode)
+        self.mode_combo.setCurrentIndex(max(0, index))
+        self.pan_slider.setVisible(self.mode_value() == 'pan')
+
+    def pan_value(self) -> float:
+        return self.pan_slider.value() / 100.0
+
+    def set_pan_value(self, pan: float) -> None:
+        self.pan_slider.setValue(int(round(max(-1.0, min(1.0, float(pan))) * 100)))
+
+
 class RoleCard(QFrame):
     """One role: header (icon, name, master radio) over its device row(s).
 
@@ -460,6 +542,13 @@ class RoleCard(QFrame):
             self.marker_group.addButton(self.primary_row.marker)
             self.primary_row.make_active.connect(
                 lambda: self.activate_requested.emit(1))
+
+        # the shaker's controls live under its selector; the dialog
+        # reaches them through the panel's shaker_controls
+        self.shaker = None
+        if role == 'shaker':
+            self.shaker = ShakerControls()
+            self.body.addWidget(self.shaker)
 
         self.alt_rows = []               # DeviceRow, slots 2..MAX
         self.add_button = None
@@ -644,6 +733,7 @@ class DeviceCardsPanel(QWidget):
                     'A shaker runs as a child instance; a force feedback '
                     'device is the master.')
         self.joystick_card = self.cards['joystick']
+        self.shaker_controls = self.cards['shaker'].shaker
 
         # For the first launch with no VPforce hardware: the cards sit
         # empty and the one switch that would list a DirectInput stick

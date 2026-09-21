@@ -354,6 +354,17 @@ class IPCNetworkThread(QObject, threading.Thread):
         elif msg.startswith("LOADCONFIG:"):
             path = msg.removeprefix("LOADCONFIG:")
             load_custom_userconfig(path)
+        elif msg == "REAPPLY_SHAKER":
+            # the master saved shaker settings; the instance driving the
+            # shaker takes them live, every other instance has nothing to
+            # apply and ignores this
+            from telemffb.hw.ffb_rhino import HapticEffect
+            apply = getattr(HapticEffect.device, 'apply_settings', None)
+            if apply:
+                try:
+                    apply(G.system_settings)
+                except Exception:
+                    logging.exception("shaker settings could not be applied live")
         elif msg == "REAPPLY_AXIS_MAP":
             # a settings save changed an FFB axis mapping somewhere; each
             # instance re-reads ITS OWN settings, so an unchanged map is

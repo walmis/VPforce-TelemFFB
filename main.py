@@ -556,22 +556,13 @@ def _initialize_device_connection():
 
 
 def _open_shaker():
-    """This instance's shaker on the audio output its settings name,
-    with the gain, channel mode, pan and calibration profile stored for
-    it.  The profile comes from the bundled pack by name; an unknown or
-    unset name means the pack's own active profile."""
-    from telemffb.hw.ffb_shaker import (DEFAULT_GAIN, default_profiles_path,
-                                        load_profiles)
-    settings = G.system_settings
-    profiles, active = load_profiles(default_profiles_path())
-    wanted = str(settings.get('shakerProfile', '') or active)
-    profile = next((p for p in profiles if p.name == wanted), profiles[0])
-    return HapticEffect.open_shaker(
-        G.device_audio_output or None,
-        gain=float(settings.get('shakerGain', DEFAULT_GAIN) or DEFAULT_GAIN),
-        channel_mode=str(settings.get('shakerChannelMode', 'mono') or 'mono'),
-        pan=float(settings.get('shakerPan', 0.0) or 0.0),
-        profile=profile)
+    """This instance's shaker on the audio output its settings name, with
+    the gain, channel mode, pan and calibration profile stored for it."""
+    from telemffb.hw.ffb_shaker import shaker_settings
+    return HapticEffect.open_shaker(G.device_audio_output or None,
+                                    **shaker_settings(G.system_settings))
+
+
 
 
 def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
