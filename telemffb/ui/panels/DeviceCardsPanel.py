@@ -76,7 +76,13 @@ ROLES = (
     ('pedals', 'p', 'Pedals', ':/image/icon_pedals.png'),
     ('collective', 'c', 'Collective', ':/image/icon_collective.png'),
     ('trimwheel', 't', 'Trim Wheel', ':/image/icon_trimwheel.png'),
+    ('shaker', 's', 'Shaker', ':/image/icon_shaker.png'),
 )
+
+#: roles whose effects address one logical axis, so a DirectInput device
+#: in them gets an FFB axis chooser (the joystick stays native X/Y; a
+#: shaker has no axes at all)
+AXIS_ROLES = ('pedals', 'collective', 'trimwheel')
 
 def _card_qss(palette) -> str:
     """Card chrome with computed contrast: the palette's own alternate-base
@@ -444,7 +450,7 @@ class RoleCard(QFrame):
         # rest; the marker may move to an alternate within a session)
         self.primary_row = DeviceRow(f'cb_select_{suffix}',
                                      alternates=alternates, primary=True,
-                                     axis_choice=(role != 'joystick'))
+                                     axis_choice=(role in AXIS_ROLES))
         self.body.addWidget(self.primary_row)
         self.selector = self.primary_row.selector
         self.marker_group = None
@@ -584,13 +590,13 @@ class DeviceCardsPanel(QWidget):
 
     #: attribute names the dialog re-binds onto itself for compatibility
     LEGACY_WIDGETS = (
-        'cb_select_j', 'cb_select_p', 'cb_select_c', 'cb_select_t',
+        'cb_select_j', 'cb_select_p', 'cb_select_c', 'cb_select_t', 'cb_select_s',
         'cb_axis_p', 'cb_axis_c', 'cb_axis_t',
-        'rb_master_j', 'rb_master_p', 'rb_master_c', 'rb_master_t',
+        'rb_master_j', 'rb_master_p', 'rb_master_c', 'rb_master_t', 'rb_master_s',
         'cb_al_enable',
-        'cb_al_enable_j', 'cb_al_enable_p', 'cb_al_enable_c', 'cb_al_enable_t',
-        'cb_min_enable_j', 'cb_min_enable_p', 'cb_min_enable_c', 'cb_min_enable_t',
-        'cb_headless_j', 'cb_headless_p', 'cb_headless_c', 'cb_headless_t',
+        'cb_al_enable_j', 'cb_al_enable_p', 'cb_al_enable_c', 'cb_al_enable_t', 'cb_al_enable_s',
+        'cb_min_enable_j', 'cb_min_enable_p', 'cb_min_enable_c', 'cb_min_enable_t', 'cb_min_enable_s',
+        'cb_headless_j', 'cb_headless_p', 'cb_headless_c', 'cb_headless_t', 'cb_headless_s',
         'labelLaunch', 'lab_auto_launch', 'lab_start_min', 'lab_start_headless',
     )
 
@@ -627,9 +633,16 @@ class DeviceCardsPanel(QWidget):
             self.cards[role] = card
             layout.addWidget(card)
             setattr(self, f'cb_select_{suffix}', card.selector)
-            if role != 'joystick':
+            if role in AXIS_ROLES:
                 setattr(self, f'cb_axis_{suffix}', card.primary_row.axis_combo)
             setattr(self, f'rb_master_{suffix}', card.master_radio)
+            if role == 'shaker':
+                # the master coordinates the force feedback instances;
+                # a shaker is always a child of one
+                card.master_radio.setEnabled(False)
+                card.master_radio.setToolTip(
+                    'A shaker runs as a child instance; a force feedback '
+                    'device is the master.')
         self.joystick_card = self.cards['joystick']
 
         # For the first launch with no VPforce hardware: the cards sit

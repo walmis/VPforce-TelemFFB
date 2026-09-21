@@ -46,6 +46,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -62,6 +63,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>PropellerAircraft,JetAircraft,TurbopropAircraft,Helicopter</validvalues>
 	</defaults>
 	<defaults>
@@ -78,6 +80,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>JetAircraft</validvalues>
 	</defaults>
 	<defaults>
@@ -94,6 +97,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>PropellerAircraft,JetAircraft</validvalues>
 	</defaults>
 	<defaults>
@@ -111,6 +115,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
+		<shaker>true</shaker>
 		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter,CowanSimHelicopter,TaogH500Helicopter,FFBApiHelicopter</validvalues>
 	</defaults>
 	<defaults>
@@ -127,6 +132,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,GliderAircraft,XAW109Helicopter</validvalues>
 	</defaults>
 	<defaults>
@@ -1956,6 +1962,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -1972,6 +1979,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -1988,6 +1996,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,250</validvalues>
 		<value>.4</value>
 	</defaults>
@@ -2004,6 +2013,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -2019,6 +2029,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.6</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.12</value>
@@ -2036,6 +2047,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -2052,6 +2064,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>false</value>
 	</defaults>
 	<defaults>
@@ -2067,6 +2080,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.3</value>
@@ -2084,6 +2098,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.3</value>
@@ -2101,6 +2116,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.3</value>
@@ -3009,6 +3025,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -3238,6 +3255,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -3256,6 +3274,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
@@ -3275,6 +3294,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<unit>kt</unit>
 	</defaults>
@@ -3295,6 +3315,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<unit>kt</unit>
 	</defaults>
@@ -3314,6 +3335,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -3331,6 +3353,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.12</value>
@@ -3351,6 +3374,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<unit>kt</unit>
 	</defaults>
@@ -3370,6 +3394,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,fpm</validvalues>
 		<unit>fpm</unit>
 	</defaults>
@@ -3389,6 +3414,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,fpm</validvalues>
 		<unit>fpm</unit>
 	</defaults>
@@ -3408,6 +3434,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -3426,6 +3453,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 	</defaults>
@@ -3444,6 +3472,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -3461,6 +3490,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<unit>kt</unit>
 	</defaults>
@@ -3480,6 +3510,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<unit>kt</unit>
 	</defaults>
@@ -3499,6 +3530,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 	</defaults>
@@ -3518,6 +3550,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 	</defaults>
@@ -3537,6 +3570,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -3556,6 +3590,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
@@ -3573,6 +3608,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>Classic</value>
 		<validvalues>Classic,Dynamic</validvalues>
 		<datatype>list</datatype>
@@ -3594,6 +3630,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>1,20</validvalues>
 		<value>13</value>
 		<unit>hz</unit>
@@ -3613,6 +3650,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,30</validvalues>
 		<value>10</value>
 		<unit>deg</unit>
@@ -3632,6 +3670,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,30</validvalues>
 		<value>15</value>
 		<unit>deg</unit>
@@ -3652,6 +3691,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -3670,6 +3710,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
@@ -3689,6 +3730,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<unit>kt</unit>
 	</defaults>
@@ -3704,6 +3746,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<value>false</value>
 	</defaults>
 	<defaults>
@@ -3767,6 +3810,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.3</value>
 	</defaults>
@@ -3782,6 +3826,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<value>false</value>
 	</defaults>
 	<defaults>
@@ -3798,6 +3843,7 @@
 		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.4</value>
 	</defaults>
@@ -3814,6 +3860,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
 	</defaults>
@@ -4269,6 +4316,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -4287,6 +4335,7 @@
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -4305,6 +4354,7 @@
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<sliderfactor>4.0</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.9</value>
@@ -4323,6 +4373,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -4340,6 +4391,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.5</value>
 	</defaults>
@@ -4358,6 +4410,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>0,70</validvalues>
 		<value>3</value>
@@ -4374,6 +4427,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<value>false</value>
 	</defaults>
 	<defaults>
@@ -4389,6 +4443,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
 	</defaults>
@@ -4405,6 +4460,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.65</value>
 	</defaults>
@@ -4421,6 +4477,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<value>14</value>
 		<unit>kt</unit>
@@ -4506,6 +4563,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -4522,6 +4580,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>2,3,4,5,6,7,8</validvalues>
 	</defaults>
 	<defaults>
@@ -4590,6 +4649,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -4608,6 +4668,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.12</value>
@@ -4629,6 +4690,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
@@ -4648,6 +4710,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
@@ -4666,6 +4729,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -4681,6 +4745,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,500</validvalues>
 		<value>3.0</value>
 		<datatype>float</datatype>
@@ -4699,6 +4764,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -4718,6 +4784,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -4737,6 +4804,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>100</sliderfactor>
 		<validvalues>1,15</validvalues>
 		<value>650</value>
@@ -4759,6 +4827,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.35</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.06</value>
@@ -4781,6 +4850,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>100</sliderfactor>
 		<validvalues>5,60</validvalues>
 		<value>2800</value>
@@ -4803,6 +4873,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.35</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.03</value>
@@ -4821,6 +4892,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -4836,6 +4908,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,500</validvalues>
 		<value>3.0</value>
 		<datatype>float</datatype>
@@ -4858,6 +4931,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -4877,6 +4951,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 	</defaults>
@@ -4898,6 +4973,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>20,60</validvalues>
 		<value>45</value>
 		<unit>hz</unit>
@@ -4916,6 +4992,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -4933,6 +5010,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.12</value>
@@ -4952,6 +5030,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>false</value>
 	</defaults>
 	<defaults>
@@ -4970,6 +5049,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.4</value>
 	</defaults>
@@ -4990,6 +5070,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5009,6 +5090,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -5025,6 +5107,7 @@
 		<info>Effect while fuel boom/door  is deploying/retracting</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5038,6 +5121,7 @@
 		<info>Effect while fuel boom/door  is deploying/retracting</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.12</value>
@@ -5058,6 +5142,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -5077,6 +5162,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -5098,6 +5184,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>1,20</validvalues>
 		<value>10</value>
 		<unit>hz</unit>
@@ -5118,6 +5205,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 	</defaults>
 	<defaults>
@@ -5136,6 +5224,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 	</defaults>
 	<defaults>
@@ -5155,6 +5244,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -5175,6 +5265,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -5194,6 +5285,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5211,6 +5303,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -5230,6 +5323,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5247,6 +5341,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -5267,6 +5362,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5285,6 +5381,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -5304,6 +5401,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5321,6 +5419,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -5446,6 +5545,7 @@
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5460,6 +5560,7 @@
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.12</value>
@@ -5476,6 +5577,7 @@
 		<info>Effect while wing-fold  is deploying/retracting</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -5489,6 +5591,7 @@
 		<info>Effect while wing-fold  is deploying/retracting</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+		<shaker>true</shaker>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.10</value>
@@ -5680,6 +5783,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -5696,6 +5800,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -5713,6 +5818,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
@@ -5730,6 +5836,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -5747,6 +5854,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
@@ -5764,6 +5872,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -5781,6 +5890,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<shaker>true</shaker>
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
@@ -6026,6 +6136,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -6046,6 +6157,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
+		<shaker>true</shaker>
 	</defaults>
 	<defaults>
 		<grouping>System</grouping>
@@ -6180,6 +6292,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
+		<shaker>true</shaker>
 		<value>true</value>
 	</defaults>
 	<defaults>

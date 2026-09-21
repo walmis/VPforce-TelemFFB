@@ -77,7 +77,7 @@ print_debugs: bool = False
 #: Enable method-call tracing via :func:`mprint`
 print_method_calls: bool = False
 
-#: Active device type (e.g. ``'joystick'``, ``'pedals'``, ``'collective'``, ``'trimwheel'``)
+#: Active device type (e.g. ``'joystick'``, ``'pedals'``, ``'collective'``, ``'trimwheel'``, ``'shaker'``)
 device: str = ''
 
 #: Path to user configuration XML file (``userconfig_v2.xml``)

@@ -210,6 +210,9 @@ class MainWindow(QMainWindow):
             case 'trimwheel':
                 x_pos = 40
                 y_pos = 30
+            case 'shaker':
+                x_pos = 20
+                y_pos = 10
 
         self.setGeometry(x_pos, y_pos, 530, 700)
 
@@ -814,12 +817,12 @@ class MainWindow(QMainWindow):
         """Every device role, always - not just the ones this instance is
         actually driving. Order: this instance's own device first, then
         the rest of what it considers configured (itself plus any child
-        instances it launched) in joystick/pedals/collective/trimwheel
+        instances it launched) in joystick/pedals/collective/trimwheel/shaker
         order, then the unconfigured roles in that same order.
 
         Returns (ordered_roles, configured_role_set)."""
         configured = {G.device_type} | set(G.launched_instances)
-        rest = [r for r in utils.DEVICE_ROLES if r != G.device_type]
+        rest = [r for r in utils.ALL_ROLES if r != G.device_type]
         configured_rest = [r for r in rest if r in configured]
         unconfigured_rest = [r for r in rest if r not in configured]
         order = [G.device_type] + configured_rest + unconfigured_rest
@@ -1353,19 +1356,12 @@ class MainWindow(QMainWindow):
 
     def change_config_scope(self, _arg):
         if isinstance(_arg, str):
-            if 'joystick' in _arg: arg = 1
-            elif 'pedals' in _arg: arg = 2
-            elif 'collective' in _arg: arg = 3
-            elif 'trimwheel' in _arg: arg = 4
+            arg = next((i for i, role in enumerate(utils.ALL_ROLES, 1)
+                        if role in _arg), 1)
         else:
             arg = _arg
 
-        types = {
-            1 : "joystick",
-            2 : "pedals",
-            3 : "collective",
-            4 : "trimwheel"
-        }
+        types = dict(enumerate(utils.ALL_ROLES, 1))
 
         xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
         G.current_device_config_scope = types[arg]
@@ -1559,6 +1555,9 @@ class MainWindow(QMainWindow):
             case 'trimwheel':
                 x_pos = 10
                 y_pos = 40
+            case 'shaker':
+                x_pos = 20
+                y_pos = 10
                 
         self.setGeometry(x_pos, y_pos, 530, 700)
 

@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 
 import logging
+from dataclasses import dataclass
 import re
 
 import telemffb.globals as G
@@ -30,6 +31,11 @@ __all__ = [
     "device_panel_label",
     "usb_ids_from_devpath",
     "DEVICE_ROLES",
+    "ALL_ROLES",
+    "AUDIO_PREFIX",
+    "SHAKER_PSEUDO_PID",
+    "AudioOutputInfo",
+    "audio_selection_devices",
     "recover_device_identity",
     "directinput_selection_devices",
     "device_pid_key",
@@ -74,6 +80,7 @@ DEVICE_DISPLAY_NAMES = {
     'pedals': 'Pedals',
     'collective': 'Collective',
     'trimwheel': 'Trim Wheel',
+    'shaker': 'Shaker',
 }
 
 
@@ -183,6 +190,59 @@ def usb_ids_from_devpath(devpath):
 
 #: Slots TelemFFB can configure, in the order they are shown.
 DEVICE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel')
+
+#: Every role an instance can run as: the force feedback roles and the
+#: bass shaker, which drives a sound card rather than a game controller.
+ALL_ROLES = DEVICE_ROLES + ('shaker',)
+
+#: Prefix a shaker selection carries in the devpath_* settings, ahead of
+#: the audio output's name ('audio:' alone means the system default).
+AUDIO_PREFIX = 'audio:'
+
+#: A shaker has no USB product id; this stands in wherever a role's pid
+#: is used as an identity (the child's IPC port, the device beacon) and
+#: is small enough that 60000 + pid stays a valid port.
+SHAKER_PSEUDO_PID = 0x1001
+
+
+@dataclass
+class AudioOutputInfo:
+    """An audio output as the device selectors list it: the same
+    attributes the HID and DirectInput entries carry, so the selector
+    model, the identity storage and the devpath round trip need no
+    special case."""
+    name: str
+    product_string: str = ''
+    vendor_id: int = 0
+    product_id: int = SHAKER_PSEUDO_PID
+    serial_number: str = ''
+    path: bytes = b''
+
+    def __post_init__(self):
+        if not self.product_string:
+            self.product_string = self.name or 'System default output'
+        if not self.path:
+            self.path = (AUDIO_PREFIX + self.name).encode()
+
+    @property
+    def ident(self) -> str:
+        return self.product_string.strip()
+
+
+def audio_selection_devices():
+    """Audio outputs, as the shaker's device selector lists them: the
+    system default first, then each card once under its preferred host
+    API.  Empty, with the cause logged, when the audio library is not
+    usable - a build without it must not take the settings dialog down."""
+    try:
+        from telemffb.hw.shaker_synth import SoundDeviceOutput
+        listed = [AudioOutputInfo('')]
+        for dev in SoundDeviceOutput.list_devices():
+            listed.append(AudioOutputInfo(dev.name))
+        return listed
+    except Exception as e:
+        logging.error(f"Audio outputs could not be enumerated for the shaker: {e}")
+        return []
 
 
 def recover_device_identity(settings, devices):

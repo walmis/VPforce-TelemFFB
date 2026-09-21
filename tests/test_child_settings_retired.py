@@ -70,6 +70,7 @@ class TestDeviceNaming:
     @pytest.mark.parametrize("role,key", [
         ('joystick', 'pidJoystick'), ('pedals', 'pidPedals'),
         ('collective', 'pidCollective'), ('trimwheel', 'pidTrimWheel'),
+        ('shaker', 'pidShaker'),
     ])
     def test_product_id_keys_match_what_is_stored(self, role, key):
         assert device_pid_key(role) == key
@@ -79,7 +80,7 @@ class TestDeviceNaming:
         silently - its profiles would validate against no product ID."""
         written = set(re.findall(r"'(pid[A-Za-z]+)':",
                                  source('telemffb/ui/dialogs/SystemSettingsDialog.py')))
-        for role in ('joystick', 'pedals', 'collective', 'trimwheel'):
+        for role in ('joystick', 'pedals', 'collective', 'trimwheel', 'shaker'):
             assert device_pid_key(role) in written, role
 
 

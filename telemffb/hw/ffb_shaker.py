@@ -67,16 +67,9 @@ from telemffb.hw.ffb_rhino import (
 from telemffb.hw.shaker_synth import (
     ImpulseTrain, Oscillator, ShakerSynth, SoundDeviceOutput, channel_gains, clamp,
 )
+from telemffb.utils import AUDIO_PREFIX, SHAKER_PSEUDO_PID
+
 log = logging.getLogger(__name__)
-
-#: prefix a shaker selection carries in the devpath_* settings, ahead of
-#: the audio output's name ('audio:' alone means the system default)
-AUDIO_PREFIX = 'audio:'
-
-#: a shaker has no USB product id; this stands in wherever a role's pid is
-#: used as an identity (the child's IPC port, the device beacon) and is
-#: small enough that 60000 + pid stays a valid port
-SHAKER_PSEUDO_PID = 0x1001
 
 #: what a shaker can render: the universal periodic set and constant force
 SUPPORTED_EFFECTS = frozenset(list(PERIODIC_EFFECTS) + [EFFECT_CONSTANT])

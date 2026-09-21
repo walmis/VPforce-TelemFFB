@@ -62,7 +62,7 @@ from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
-from telemffb.utils import exit_application
+from telemffb.utils import ALL_ROLES, exit_application
 
 #: Height the menu bar is held at - see the module docstring.
 MENU_BAR_HEIGHT = 32
@@ -126,6 +126,9 @@ class MainMenu:
                 case 'trimwheel':
                     x_pos = 40
                     y_pos = 30
+                case 'shaker':
+                    x_pos = 20
+                    y_pos = 10
             mw.setGeometry(x_pos, y_pos, 530, 700)
 
         reset_geometry.triggered.connect(do_reset_window_size)
@@ -310,7 +313,7 @@ class MainMenu:
             self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
 
             self.log_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
+            for d in ALL_ROLES:
                 if d in G.launched_instances:
                     def do_show_child_log(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')

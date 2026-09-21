@@ -2211,12 +2211,14 @@ class InstanceStatusRow(QWidget):
         self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.GlobalColor.yellow, 8)
         self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.GlobalColor.yellow, 8)
         self.trimwheel_status_icon = StatusLabel(None, 'Trim Wheel:', Qt.GlobalColor.yellow, 8)
+        self.shaker_status_icon = StatusLabel(None, 'Shaker:', Qt.GlobalColor.yellow, 8)
 
         self.status_icons = {
             "joystick" : self.joystick_status_icon,
             "pedals" : self.pedals_status_icon,
             "collective" : self.collective_status_icon,
-            "trimwheel" : self.trimwheel_status_icon
+            "trimwheel" : self.trimwheel_status_icon,
+            "shaker" : self.shaker_status_icon,
         }
 
         self.master_status_icon.clicked.connect(self.change_config_scope)
@@ -2224,16 +2226,19 @@ class InstanceStatusRow(QWidget):
         self.pedals_status_icon.clicked.connect(self.change_config_scope)
         self.collective_status_icon.clicked.connect(self.change_config_scope)
         self.trimwheel_status_icon.clicked.connect(self.change_config_scope)
+        self.shaker_status_icon.clicked.connect(self.change_config_scope)
 
         self.instance_status_row.addWidget(self.master_status_icon)
         self.instance_status_row.addWidget(self.joystick_status_icon)
         self.instance_status_row.addWidget(self.pedals_status_icon)
         self.instance_status_row.addWidget(self.collective_status_icon)
         self.instance_status_row.addWidget(self.trimwheel_status_icon)
+        self.instance_status_row.addWidget(self.shaker_status_icon)
         self.joystick_status_icon.hide()
         self.pedals_status_icon.hide()
         self.collective_status_icon.hide()
         self.trimwheel_status_icon.hide()
+        self.shaker_status_icon.hide()
 
         self.instance_status_row.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
         self.instance_status_row.setSpacing(10)

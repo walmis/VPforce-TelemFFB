@@ -86,7 +86,8 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._ipc_telem_effects = {}
         self._child_keepalive_info = {}
         self._child_addrs = {}
-        self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
+        self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None,
+                              'shaker': None}
         # A child's whole telemetry frame, for the master's Monitor tab while
         # its config scope is that child's device. Master: which child is
         # being asked, and what it sent. Child: until when it was asked, and

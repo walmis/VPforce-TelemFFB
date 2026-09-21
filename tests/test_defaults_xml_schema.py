@@ -38,7 +38,7 @@ def defaults_root():
 # ─────────────────────────────────────────────────────────────
 
 VALID_SIMS = {"DCS", "BMS", "IL2", "MSFS", "XPLANE"}
-VALID_DEVICES = {"joystick", "pedals", "collective", "trimwheel", "any"}
+VALID_DEVICES = {"joystick", "pedals", "collective", "trimwheel", "shaker", "any"}
 VALID_DATATYPES = {
     "group", "list", "enumlist", "bool",
     "float", "d_float", "n_float", "negfloat", "pct_float", "anyfloat",
@@ -193,7 +193,7 @@ def _is_device_embedded_in_name(elem):
 def _has_any_flag(elem):
     """Return True if elem has at least one sim or device boolean flag."""
     has_sim = any(elem.findtext(s) is not None for s in VALID_SIMS)
-    has_dev = any(elem.findtext(d) is not None for d in {"joystick", "pedals", "collective", "trimwheel"})
+    has_dev = any(elem.findtext(d) is not None for d in {"joystick", "pedals", "collective", "trimwheel", "shaker"})
     has_any = elem.findtext("any") is not None
     return has_sim or has_dev or has_any
 

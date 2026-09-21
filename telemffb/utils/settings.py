@@ -204,7 +204,7 @@ class SystemSettings(QSettings):
     #: Roles by their masterInstance id, as the dialog's radio group numbers
     #: them.
     INSTANCE_ROLES = {1: 'joystick', 2: 'pedals', 3: 'collective',
-                      4: 'trimwheel'}
+                      4: 'trimwheel', 5: 'shaker'}
 
     def migrate_instance_scoped_globals(self):
         """Clear instance-scoped copies of settings that are global.
