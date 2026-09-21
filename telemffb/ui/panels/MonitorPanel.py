@@ -65,7 +65,16 @@ from PyQt6.QtWidgets import (QGridLayout, QHeaderView, QLabel, QLineEdit,
                              QSplitter, QStackedWidget, QWidget)
 
 import telemffb.globals as G
+from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
+                                   EFFECT_DAMPER, EFFECT_DETENT,
+                                   EFFECT_FRICTION, EFFECT_INERTIA,
+                                   EFFECT_RAMP, EFFECT_SAWTOOTHDOWN,
+                                   EFFECT_SAWTOOTHUP, EFFECT_SINE,
+                                   EFFECT_SPRING, EFFECT_SPRING_ADJUSTER,
+                                   EFFECT_SQUARE, EFFECT_TRIANGLE,
+                                   PERIODIC_EFFECTS, effect_names)
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
+from telemffb.ui.widgets.EffectTypeDelegate import EffectTypeDelegate
 from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
@@ -78,6 +87,40 @@ _MONOSPACE_STYLE = """
 #: Wide enough for "100%" over a bar that still reads as a bar, narrow
 #: enough to leave the effect names the rest of a half-split pane.
 INTENSITY_COLUMN_WIDTH = 72
+
+#: The order the active-effects list is grouped into, by PID effect type.
+#: Periodics first - magnitude and shape both mean something for them -
+#: then the forces that have a magnitude but no shape, then the conditions
+#: with the spring-shaped ones ahead of the rest. It puts every effect that
+#: reports a dash together at the foot of the list, so the intensity column
+#: reads as one scale at a time instead of alternating down the page.
+_EFFECT_GROUPS = {
+    EFFECT_SQUARE: 0, EFFECT_SINE: 0, EFFECT_TRIANGLE: 0,
+    EFFECT_SAWTOOTHUP: 0, EFFECT_SAWTOOTHDOWN: 0,
+    EFFECT_CONSTANT: 1, EFFECT_RAMP: 1,
+    EFFECT_SPRING: 2, EFFECT_SPRING_ADJUSTER: 2, EFFECT_DETENT: 2,
+    EFFECT_DAMPER: 3, EFFECT_INERTIA: 3, EFFECT_FRICTION: 3,
+    EFFECT_CUSTOM: 3,
+}
+#: Anything unrecognised sorts last rather than silently joining a group.
+_UNGROUPED = max(_EFFECT_GROUPS.values()) + 1
+
+
+def _name_tooltip(label, effect_type):
+    """What the name cell says on hover: the effect, and what kind it is.
+
+    The badge beside the name is a waveform or a single letter, which is a
+    reminder rather than a code to memorise - this is where it is spelled
+    out. A waveform is named as the periodic it is ("Periodic Sine"), since
+    the shape alone says nothing about which family it belongs to. None
+    when the type is unknown, so the cell falls back to hovering its own
+    text as every other column does.
+    """
+    name = effect_names.get(effect_type)
+    if not name:
+        return None
+    kind = f"Periodic {name}" if effect_type in PERIODIC_EFFECTS else name
+    return f"{label}\n{kind} effect"
 
 
 def _intensity_tooltip(intensity, configured, factor):
@@ -211,6 +254,8 @@ class MonitorPanel(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.effects_view.setColumnWidth(1, INTENSITY_COLUMN_WIDTH)
         self.effects_view.setItemDelegateForColumn(1, IntensityBarDelegate(self))
+        self._type_delegate = EffectTypeDelegate(self)
+        self.effects_view.setItemDelegateForColumn(0, self._type_delegate)
         self.effects_view.setStyleSheet(f"QTableView {{ {_MONOSPACE_STYLE} }}")
         self.effects_view.setMinimumHeight(100)
 
@@ -345,15 +390,29 @@ class MonitorPanel(QWidget):
         on where the stick is. Those get a dash rather than a bar: an effect
         that is merely started and one that is pushing nothing must not look
         the same, but nor should a guess look like a measurement."""
-        rows, tooltips = [], {}
-        for effect in active_effects:
+        # Grouped by effect type, insertion order kept inside each group.
+        # KeyValueTableModel._diff_update requires the ordering to be a
+        # stable function of the key set - a surviving row must never change
+        # position relative to the other survivors - and this is, because an
+        # effect's type is fixed for its lifetime and the sort is stable.
+        # Sorting on anything that moves (intensity, say) would silently
+        # produce a wrongly ordered list rather than an error.
+        ordered = sorted(active_effects,
+                         key=lambda e: _EFFECT_GROUPS.get(e.get('type'),
+                                                          _UNGROUPED))
+        rows, tooltips, types = [], {}, {}
+        for effect in ordered:
             label = effect.get('label', '')
             intensity = effect.get('intensity')
+            effect_type = effect.get('type')
             shown = '-' if intensity is None else f"{round(intensity * 100)}%"
             rows.append((label, (label, shown)))
-            tooltips[label] = (None, _intensity_tooltip(intensity,
-                                                        effect.get('configured'),
-                                                        effect.get('factor')))
+            tooltips[label] = (_name_tooltip(label, effect_type),
+                               _intensity_tooltip(intensity,
+                                                  effect.get('configured'),
+                                                  effect.get('factor')))
+            types[label] = effect_type
+        self._type_delegate.set_types(types)
         self._effects_model.set_rows(rows, tooltips)
 
     def clear_effects(self) -> None:

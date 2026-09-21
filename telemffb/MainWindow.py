@@ -2017,6 +2017,9 @@ class MainWindow(QMainWindow):
                             'intensity': effect.intensity,
                             'configured': self._configured_value(settingname),
                             'factor': self._slider_factor(settingname),
+                            # The PID effect type, which the monitor groups
+                            # the list by and draws the waveform glyph from.
+                            'type': effect.type_id,
                         })
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)

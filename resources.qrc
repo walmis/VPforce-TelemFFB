@@ -18,6 +18,11 @@
         <file>image/disabledcheckbox.png</file>
         <file>image/down-down.png</file>
         <file>image/delete.svg</file>
+        <file>image/wave-sine.svg</file>
+        <file>image/wave-square.svg</file>
+        <file>image/wave-triangle.svg</file>
+        <file>image/wave-sawtooth-up.svg</file>
+        <file>image/wave-sawtooth-down.svg</file>
         <file>image/delete-all.svg</file>
         <file>image/file-download.svg</file>
         <file>image/file-upload.svg</file>

@@ -1514,6 +1514,17 @@ class HapticEffect(Destroyable):
         FFBEffectHandle.intensity)."""
         return self._h_effect.intensity if self._h_effect else None
 
+    @property
+    def type_id(self):
+        """The PID effect type the device allocated (EFFECT_SINE and the
+        rest), or None before the handle exists.
+
+        Read off the handle rather than ``self.effect_type``, which only
+        some of the creation paths set. Named apart from that attribute
+        because a property cannot share its name.
+        """
+        return self._h_effect.type if self._h_effect else None
+
     @classmethod
     def open(cls, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> FFBRhino:
         """Open and attach a `FFBRhino` device for all HapticEffect instances.

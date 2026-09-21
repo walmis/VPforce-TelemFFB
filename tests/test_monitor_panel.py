@@ -262,6 +262,46 @@ class TestIntensityTooltip:
         tip = self._tooltip(panel, 0.24, 0.12, 0.4)
         assert '200% of the configured setting' in tip
 
+    def test_the_name_column_names_the_effect_type(self, panel):
+        """The badge is a waveform or a letter - a reminder, not a code to
+        memorise - so the hover spells it out."""
+        from PyQt6.QtCore import Qt
+        from telemffb.hw.ffb_rhino import EFFECT_SINE
+        panel.update_effects([{'label': 'ID:8 Jet Engine Rumble',
+                               'intensity': 0.01, 'type': EFFECT_SINE}])
+        model = panel._effects_model
+        tip = model.data(model.index(0, 0), Qt.ItemDataRole.ToolTipRole)
+        assert tip == 'ID:8 Jet Engine Rumble\nPeriodic Sine effect'
+
+    def test_every_periodic_waveform_is_named_as_a_periodic(self, panel):
+        """The shape alone says nothing about which family it belongs to."""
+        from PyQt6.QtCore import Qt
+        from telemffb.hw.ffb_rhino import PERIODIC_EFFECTS, effect_names
+        for effect_type in PERIODIC_EFFECTS:
+            panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.5,
+                                   'type': effect_type}])
+            model = panel._effects_model
+            tip = model.data(model.index(0, 0), Qt.ItemDataRole.ToolTipRole)
+            assert tip == f'ID:1 Rumble\nPeriodic {effect_names[effect_type]} effect'
+
+    def test_a_non_periodic_type_is_not_called_periodic(self, panel):
+        from PyQt6.QtCore import Qt
+        from telemffb.hw.ffb_rhino import EFFECT_CONSTANT
+        panel.update_effects([{'label': 'ID:5 Runway Rumble',
+                               'intensity': 0.0, 'type': EFFECT_CONSTANT}])
+        model = panel._effects_model
+        tip = model.data(model.index(0, 0), Qt.ItemDataRole.ToolTipRole)
+        assert tip == 'ID:5 Runway Rumble\nConstant effect'
+
+    def test_a_condition_names_its_type_too(self, panel):
+        from PyQt6.QtCore import Qt
+        from telemffb.hw.ffb_rhino import EFFECT_SPRING
+        panel.update_effects([{'label': 'ID:10 Cyclic Spring',
+                               'intensity': None, 'type': EFFECT_SPRING}])
+        model = panel._effects_model
+        tip = model.data(model.index(0, 0), Qt.ItemDataRole.ToolTipRole)
+        assert tip == 'ID:10 Cyclic Spring\nSpring effect'
+
     def test_the_name_column_keeps_its_own_hover(self, panel):
         from PyQt6.QtCore import Qt
         panel.update_effects([{'label': 'ID:11 Rotor RPM/Engine Rumble',
@@ -303,6 +343,139 @@ class TestTooltipRefresh:
                                'configured': 0.12, 'factor': 0.4}])
         panel.clear_effects()
         assert panel._effects_model.rowCount() == 0
+
+
+class TestEffectGrouping:
+    """The list is grouped by effect type so the intensity column reads as
+    one scale at a time: everything that reports a number first, everything
+    that reports a dash last."""
+
+    def _rows(self, panel, *types):
+        from telemffb.hw.ffb_rhino import EFFECT_CONSTANT  # noqa: F401
+        panel.update_effects([
+            {'label': f'ID:{i} effect', 'intensity': None, 'type': t}
+            for i, t in enumerate(types)])
+        return panel._effects_model.column_values(0)
+
+    def test_periodic_then_constant_then_condition(self, panel):
+        from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_SINE,
+                                           EFFECT_SPRING)
+        rows = self._rows(panel, EFFECT_SPRING, EFFECT_CONSTANT, EFFECT_SINE)
+        assert rows == ['ID:2 effect', 'ID:1 effect', 'ID:0 effect']
+
+    def test_ramp_sorts_with_constant_not_with_conditions(self, panel):
+        """It is a force with a magnitude, just a moving one."""
+        from telemffb.hw.ffb_rhino import EFFECT_RAMP, EFFECT_SPRING
+        rows = self._rows(panel, EFFECT_SPRING, EFFECT_RAMP)
+        assert rows == ['ID:1 effect', 'ID:0 effect']
+
+    def test_spring_shaped_conditions_lead_the_conditions(self, panel):
+        from telemffb.hw.ffb_rhino import (EFFECT_DAMPER, EFFECT_DETENT,
+                                           EFFECT_SPRING)
+        rows = self._rows(panel, EFFECT_DAMPER, EFFECT_DETENT, EFFECT_SPRING)
+        assert rows == ['ID:1 effect', 'ID:2 effect', 'ID:0 effect']
+
+    def test_insertion_order_is_kept_within_a_group(self, panel):
+        """A stable sort, so the ID order this has always shown survives -
+        and, more to the point, so the model's diff stays correct."""
+        from telemffb.hw.ffb_rhino import EFFECT_SINE, EFFECT_SQUARE
+        rows = self._rows(panel, EFFECT_SINE, EFFECT_SQUARE, EFFECT_SINE)
+        assert rows == ['ID:0 effect', 'ID:1 effect', 'ID:2 effect']
+
+    def test_an_unknown_type_sorts_last(self, panel):
+        from telemffb.hw.ffb_rhino import EFFECT_SPRING
+        rows = self._rows(panel, 999, EFFECT_SPRING)
+        assert rows == ['ID:1 effect', 'ID:0 effect']
+
+    def test_effects_with_no_type_still_render(self, panel):
+        panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.5}])
+        assert panel._effects_model.column_values(0) == ['ID:1 Rumble']
+
+    def test_survivors_keep_their_relative_order_across_updates(self, panel):
+        """What KeyValueTableModel._diff_update relies on: it removes and
+        inserts rather than resetting, so a survivor moving past another
+        survivor would leave the list wrongly ordered with no error."""
+        from telemffb.hw.ffb_rhino import EFFECT_SINE, EFFECT_SPRING
+        panel.update_effects([
+            {'label': 'A', 'intensity': 0.1, 'type': EFFECT_SINE},
+            {'label': 'B', 'intensity': None, 'type': EFFECT_SPRING},
+        ])
+        panel.update_effects([
+            {'label': 'B', 'intensity': None, 'type': EFFECT_SPRING},
+            {'label': 'C', 'intensity': 0.2, 'type': EFFECT_SINE},
+            {'label': 'A', 'intensity': 0.1, 'type': EFFECT_SINE},
+        ])
+        rows = panel._effects_model.column_values(0)
+        assert rows.index('A') < rows.index('B')
+        assert rows.index('C') < rows.index('B')
+
+
+class TestEffectTypeBadge:
+    """Square against sine is a real difference in feel, and all five shapes
+    are in use, so the glyph discriminates rather than decorates. Types with
+    no waveform to draw get a letter, and every row reserves the badge width
+    either way so the names line up."""
+
+    def test_a_periodic_effect_gets_its_shape(self, panel):
+        from telemffb.hw.ffb_rhino import EFFECT_SQUARE
+        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.5,
+                               'type': EFFECT_SQUARE}])
+        assert panel._type_delegate._types['ID:1 Rumble'] == EFFECT_SQUARE
+        assert EFFECT_SQUARE in SHAPES
+
+    def test_every_periodic_type_has_a_shape(self):
+        from telemffb.hw.ffb_rhino import PERIODIC_EFFECTS
+        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        assert set(PERIODIC_EFFECTS) == set(SHAPES)
+
+    def test_constant_effects_are_given_no_shape(self):
+        """The glyph describes the magnitude channel, and a constant's is a
+        flat line - beside "Runway Rumble", whose feel comes from a random
+        direction modulator and an envelope, that would read as "doing
+        nothing"."""
+        from telemffb.hw.ffb_rhino import EFFECT_CONSTANT, EFFECT_SPRING
+        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        assert EFFECT_CONSTANT not in SHAPES
+        assert EFFECT_SPRING not in SHAPES
+
+    def test_every_waveform_file_is_tintable(self):
+        """Tinting is a substitution of currentColor. Artwork exported with
+        a hardcoded fill renders black, which on the dark theme is an
+        invisible badge rather than an obvious mistake."""
+        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES, _svg_bytes
+        for name in SHAPES.values():
+            assert b"currentColor" in _svg_bytes(name), name
+
+    def test_every_waveform_file_is_registered_for_frozen_builds(self):
+        """Loading falls back to the source tree, so a file missing from
+        resources.qrc passes every other test here and fails only once the
+        app is built."""
+        from pathlib import Path
+        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        qrc = (Path(__file__).parents[1] / 'resources.qrc').read_text()
+        for name in SHAPES.values():
+            assert f'image/{name}' in qrc, f"{name} missing from resources.qrc"
+
+    def test_non_periodic_types_get_a_letter(self):
+        """A badge on every row, or the names of the constants and
+        conditions start further left than the periodics above them."""
+        from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_DAMPER,
+                                           EFFECT_FRICTION, EFFECT_INERTIA,
+                                           EFFECT_SPRING)
+        from telemffb.ui.widgets.EffectTypeDelegate import LETTERS
+        assert LETTERS[EFFECT_CONSTANT] == 'C'
+        assert LETTERS[EFFECT_SPRING] == 'S'
+        assert LETTERS[EFFECT_DAMPER] == 'D'
+        assert LETTERS[EFFECT_INERTIA] == 'I'
+        assert LETTERS[EFFECT_FRICTION] == 'F'
+
+    def test_types_follow_the_rows(self, panel):
+        """Keyed by the row label, so a stale entry cannot outlive its row."""
+        from telemffb.hw.ffb_rhino import EFFECT_SINE
+        panel.update_effects([{'label': 'A', 'intensity': 0.5, 'type': EFFECT_SINE}])
+        panel.update_effects([{'label': 'B', 'intensity': 0.5, 'type': EFFECT_SINE}])
+        assert 'A' not in panel._type_delegate._types
 
 
 class TestEffectsScopeLabel:
