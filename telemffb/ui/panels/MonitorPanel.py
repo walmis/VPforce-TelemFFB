@@ -56,7 +56,7 @@ loop builds). MainWindow still does that part and calls
 ``update_telemetry(data)`` / ``update_effects(effects)`` with the result.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
@@ -172,6 +172,73 @@ def _intensity_tooltip(intensity, configured, factor):
     return text
 
 
+#: Telemetry keys that can swing negative, keyed on the ORIGINAL telemetry
+#: key rather than the debug simvar display name - the display name is
+#: MSFS-only and only exists when Alt+D is toggled, so deciding sign off it
+#: would make the same field flip formatting depending on a debug setting.
+#: Casing matches BaseTelemetryData's own attribute names.
+_SIGNED_EXACT_KEYS = frozenset({
+    'AoA', 'SideSlip', 'Pitch', 'Roll', 'G', 'Gaxil', 'VerticalSpeed',
+    'Incidence', 'X', 'Y', 'MSL', 'AGL', 'TRIM_DELTA',
+    # Control-input positions, named individually because "...Pos" is not
+    # a signed suffix: the control axes run -1..1 about a neutral, but
+    # CollectivePos runs 0..1 ("unlike the other control axes" - see
+    # BaseTelemetryData), as do GearPos, NozzlePos and SpeedbrakePos.
+    'ElevPos', 'AileronPos', 'RudderPos', 'TailRotorPos',
+    'TailRotorPedalPos', 'YokeXLinearPos', 'YokeYPos',
+    # Steering angle off centre, signed left/right, and named here
+    # because its "Pct" spelling matches nothing else signed.
+    'CenterSteerAnglePct',
+})
+
+#: Case-insensitive substrings that mark a key as signed by convention:
+#: trims, deflections, positions, accelerations, velocities and the like
+#: are offsets from a zero point rather than magnitudes, so they cross
+#: zero routinely (this is what makes ACCs/VelWorld/StickXY jitter worst).
+_SIGNED_KEY_PATTERNS = (
+    'trim', 'defl', 'acc', 'vel', 'wind', 'force', 'stick', 'joy',
+    'phys_', 'sema', 'cp_xy', 'vib', 'target_', 'rot_',
+)
+
+
+def _key_is_statically_signed(key: str) -> bool:
+    """Layers 1-2 of the signed-key decision: an exact key known to go
+    negative, or a name matching one of the signed-by-convention
+    substrings (checked case-insensitively; the exact set above is not,
+    since it is quoting BaseTelemetryData's own attribute spelling)."""
+    if key in _SIGNED_EXACT_KEYS:
+        return True
+    key_cf = key.lower()
+    return any(pattern in key_cf for pattern in _SIGNED_KEY_PATTERNS)
+
+
+def _value_is_negative(v) -> bool:
+    """True when `v` itself, or any float element of it, is negative -
+    layer 3's trigger for sticky-learning a key that layers 1-2 miss."""
+    if isinstance(v, float):
+        return v < 0
+    if isinstance(v, list):
+        return any(isinstance(x, float) and x < 0 for x in v)
+    return False
+
+
+def _format_telemetry_value(v, signed: bool) -> str:
+    """Renders one telemetry cell. Unchanged from the pre-sign-flag
+    rendering except a float - scalar, or a list's float elements - gets
+    an explicit '+' when `signed` and non-negative, so its digits don't
+    shift horizontally as the value crosses zero. Non-float list elements
+    and ints are untouched either way."""
+    if isinstance(v, float):
+        return f"{v:+.3f}" if signed else f"{v:.3f}"
+    if isinstance(v, list):
+        return "[" + ", ".join(
+            (f"{x:+.3f}" if signed else f"{x:.3f}") if isinstance(x, float)
+            else str(x) if x is not None else "None"
+            for x in v
+        ) + "]"
+    return str(v)
+
+
 class MonitorPanel(QWidget):
     """The Monitor tab: telemetry table + active-effects table, the filter
     box and the detach-to-window toolbar button."""
@@ -180,6 +247,13 @@ class MonitorPanel(QWidget):
         super().__init__(parent)
         self.mainwindow = mainwindow
         self.show_simvars = False
+        # Sign-formatting state for `_build_telemetry_rows` (see
+        # `_is_signed_key`): keys known to render signed - either always
+        # (layers 1-2) or learned sticky after going negative once (layer
+        # 3) - and the (src, N) pair last seen, so a new sim/aircraft
+        # starts clean instead of inheriting another aircraft's negatives.
+        self._signed_keys: Set[str] = set()
+        self._signed_session: Tuple[Optional[str], Optional[str]] = (None, None)
         self._build_ui()
         self.refresh_waiting_status()
 
@@ -368,6 +442,16 @@ class MonitorPanel(QWidget):
     def _build_telemetry_rows(self, data: Dict) -> List[Tuple[str, Tuple[str, str]]]:
         raw = (self.telem_filter.text() or "")
         tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
+
+        # A new sim/aircraft (src or the aircraft name "N" changed since
+        # the last frame) starts the sticky-learned signed keys clean -
+        # otherwise a key one aircraft happened to push negative would
+        # render signed forever after for every aircraft that follows.
+        session = (data.get("src"), data.get("N"))
+        if session != self._signed_session:
+            self._signed_session = session
+            self._signed_keys.clear()
+
         rows: List[Tuple[str, Tuple[str, str]]] = []
         for key, v in data.items():
             display_key = key
@@ -384,13 +468,7 @@ class MonitorPanel(QWidget):
                 if not any(tok in k_cf for tok in tokens):
                     continue
 
-            if isinstance(v, float):
-                value_str = f"{v:.3f}"
-            elif isinstance(v, list):
-                value_str = "[" + ", ".join(
-                    [f"{x:.3f}" if isinstance(x, float) else str(x) if x is not None else "None" for x in v]) + "]"
-            else:
-                value_str = str(v)
+            value_str = _format_telemetry_value(v, self._is_signed_key(key, v))
 
             # Keyed by the ORIGINAL telemetry key (always unique in `data`)
             # rather than the display key, so two keys that happen to
@@ -398,6 +476,23 @@ class MonitorPanel(QWidget):
             # collide into a single row.
             rows.append((str(key), (str(display_key), value_str)))
         return rows
+
+    def _is_signed_key(self, key: str, v) -> bool:
+        """Whether `key` renders with an explicit sign this frame.
+
+        `self._signed_keys` memoizes the decision per (session, key), so a
+        key already known signed - by the static layers or learned below -
+        costs one set lookup. A key not yet in it still has to be checked
+        against this frame's value: layer 3 (sticky learning) has to catch
+        a key going negative on the very frame it first does so, or that
+        frame renders unsigned and only the next one picks up the sign.
+        """
+        if key in self._signed_keys:
+            return True
+        if _key_is_statically_signed(key) or _value_is_negative(v):
+            self._signed_keys.add(key)
+            return True
+        return False
 
     def update_effects(self, active_effects) -> None:
         """``active_effects`` is the list of ``{'label', 'intensity'}`` dicts

@@ -92,7 +92,7 @@ class TestTelemetryRows:
         assert set(keys) == {'AoA', 'N', 'src'}
         model = panel._telem_model
         row = keys.index('AoA')
-        assert model.column_values(1)[row] == '1.235'
+        assert model.column_values(1)[row] == '+1.235'
 
     def test_list_values_formatted_like_old_label(self, panel):
         panel.update_telemetry({'Gear': [1.0, 0, None]})
@@ -110,11 +110,13 @@ class TestTelemetryRows:
         assert set(panel.telemetry_keys()) == {'AoA', 'RPM'}
 
     def test_same_keys_next_frame_only_updates_values(self, panel):
-        panel.update_telemetry({'AoA': 1.0})
+        # RPM rather than AoA: this test is about row structure, not sign
+        # formatting, and RPM never renders signed so it stays a plain check.
+        panel.update_telemetry({'RPM': 1.0})
         model = panel._telem_model
         rows_inserted = []
         model.rowsInserted.connect(lambda *a: rows_inserted.append(a))
-        panel.update_telemetry({'AoA': 2.0})
+        panel.update_telemetry({'RPM': 2.0})
         assert rows_inserted == []
         assert model.column_values(1) == ['2.000']
 
@@ -154,6 +156,71 @@ class TestTelemetryRows:
         panel.set_show_simvars(True)
         panel.update_telemetry({'foo': 1.0, 'bar': 2.0, 'src': 'MSFS'})
         assert panel._telem_model.rowCount() == 3  # foo, bar, src
+
+    def test_signed_key_renders_explicit_sign_both_ways(self, panel):
+        """AoA is in the static signed-key set, so both a positive and a
+        negative value get an explicit sign - the whole point being that
+        the digits don't shift as the value crosses zero."""
+        panel.update_telemetry({'Pitch': 2.5})
+        assert panel._telem_model.column_values(1)[0] == '+2.500'
+        panel.update_telemetry({'Pitch': -2.5})
+        assert panel._telem_model.column_values(1)[0] == '-2.500'
+
+    def test_unsigned_key_stays_bare(self, panel):
+        """Keys that never go negative and aren't in the signed set or
+        pattern list (IAS, RPM) keep the old unsigned rendering."""
+        panel.update_telemetry({'IAS': 250.0, 'RPM': 2500.0})
+        keys = panel.telemetry_keys()
+        values = panel._telem_model.column_values(1)
+        assert values[keys.index('IAS')] == '250.000'
+        assert values[keys.index('RPM')] == '2500.000'
+
+    def test_list_elements_each_rendered_signed(self, panel):
+        """A vector value (ACCs matches the 'acc' pattern) gets every
+        float element signed, not just the negative one - so the columns
+        line up instead of only the sign-crossing element jittering."""
+        panel.update_telemetry({'ACCs': [1.0, -2.0, 0.5]})
+        assert panel._telem_model.column_values(1)[0] == '[+1.000, -2.000, +0.500]'
+
+    def test_pattern_matched_key_is_signed_even_when_never_negative(self, panel):
+        """The case-insensitive substring patterns are a static rule, not
+        contingent on ever seeing a negative value - StickX matches
+        'stick' and renders signed from its very first (positive) frame."""
+        panel.update_telemetry({'StickX': 0.75})
+        assert panel._telem_model.column_values(1)[0] == '+0.750'
+
+    def test_position_keys_signed_per_axis_not_per_suffix(self, panel):
+        """"...Pos" is not a signed suffix. The control axes run -1..1
+        about a neutral, but CollectivePos runs 0..1 ("unlike the other
+        control axes" - BaseTelemetryData), as do GearPos and NozzlePos,
+        so a blanket pattern would sign three fields that never go
+        negative. They are listed individually instead."""
+        panel.update_telemetry({'ElevPos': 0.5, 'CollectivePos': 0.5,
+                                'GearPos': 1.0, 'NozzlePos': 0.25})
+        keys = panel.telemetry_keys()
+        values = panel._telem_model.column_values(1)
+        assert values[keys.index('ElevPos')] == '+0.500'
+        assert values[keys.index('CollectivePos')] == '0.500'
+        assert values[keys.index('GearPos')] == '1.000'
+        assert values[keys.index('NozzlePos')] == '0.250'
+
+    def test_sticky_learn_stays_signed_after_first_negative(self, panel):
+        """An unknown key (no exact or pattern match) that goes negative
+        must be learned signed on that very frame - not one frame late -
+        and stay signed afterwards even once it goes positive again."""
+        panel.update_telemetry({'Zorp': -1.0})
+        assert panel._telem_model.column_values(1)[0] == '-1.000'
+        panel.update_telemetry({'Zorp': 1.0})
+        assert panel._telem_model.column_values(1)[0] == '+1.000'
+
+    def test_sticky_learned_keys_reset_on_new_aircraft(self, panel):
+        """A key learned signed for one aircraft/sim must not leak into
+        the next: a change in 'src' or 'N' between frames clears it."""
+        panel.update_telemetry({'Zorp': -1.0, 'N': 'F-16C', 'src': 'DCS'})
+        panel.update_telemetry({'Zorp': 1.0, 'N': 'A-10C', 'src': 'DCS'})
+        keys = panel.telemetry_keys()
+        values = panel._telem_model.column_values(1)
+        assert values[keys.index('Zorp')] == '1.000'
 
 
 class TestActiveEffects:
