@@ -6,6 +6,9 @@ the handle boundary, write coalescing, override-start downgrade, priority
 slot budgeting (tier-1 LRU eviction with invalidate-for-recreate), CP
 emulation, and button/hat signal emission.
 """
+import logging
+import time
+
 import pytest
 
 from telemffb.hw.ffb_dinput import (
@@ -401,6 +404,31 @@ class TestSlotBudgeting:
         constant = device.create_effect(EFFECT_CONSTANT)
         assert spring is not None and constant is not None
         assert device.create_effect(EFFECT_SPRING) is None  # only tier 0 present
+
+    def test_a_refused_force_model_effect_is_an_error(self, bridge, caplog):
+        """A refused force-model effect changes what the stick does, and
+        the ERROR record is what reaches the UI.  A refused cue is routine
+        on a small pool and stays below that."""
+        bridge.capacity = 1
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        spring = device.create_effect(EFFECT_SPRING)    # held: fills the pool
+        assert spring is not None
+
+        def levels():
+            return [r.levelno for r in caplog.records]
+
+        with caplog.at_level(logging.WARNING):
+            assert device.create_effect(EFFECT_SINE) is None
+            assert logging.ERROR not in levels()
+            assert device.create_effect(EFFECT_CONSTANT) is None
+            assert logging.ERROR in levels()
+
+    def test_a_failed_create_is_an_error(self, bridge, caplog):
+        bridge.create_error = DIB_ERR_GENERAL
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        with caplog.at_level(logging.WARNING):
+            assert device.create_effect(EFFECT_SPRING) is None
+        assert logging.ERROR in [r.levelno for r in caplog.records]
 
     def test_evicted_handle_recreates_via_haptic_effect(self, bridge):
         """The owning HapticEffect lazily re-creates an evicted cue."""
@@ -812,15 +840,61 @@ class TestUpdateFailureSelfHeal:
         self._fail_push(handle, 5)
         assert handle.effect_id                        # 2 + 2, never 3 in a row
 
-    def test_acquisition_loss_never_invalidates(self, bridge):
-        """FFB priority loss has its own latched handling and resolves when
-        priority returns - churning re-creates would fight it."""
+    def test_acquisition_loss_rebuilds_at_once(self, bridge):
+        """DIB_ERR_ACQUISITION is a definite report, not a suspicion to be
+        counted: the first one resets the device and drops every handle."""
         device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
         handle = device.create_effect(EFFECT_CONSTANT)
+        other = device.create_effect(EFFECT_SINE)
         bridge.effect_update = lambda effect, params: DIB_ERR_ACQUISITION
-        for magnitude in range(1, 8):
-            self._fail_push(handle, magnitude)
-        assert handle.effect_id                        # still the same effect
+        self._fail_push(handle, 1)
+        assert bridge.reset_calls == 1
+        assert handle.effect_id == 0 and other.effect_id == 0
+
+    def test_a_refused_start_rebuilds_too(self, bridge):
+        """The first call to meet it may be a start - an effect held
+        stopped through a pause is not updated, only started."""
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        handle = device.create_effect(EFFECT_CONSTANT)
+        bridge.effect_start = lambda effect, iterations=1: DIB_ERR_ACQUISITION
+        handle.start()
+        assert bridge.reset_calls == 1
+        assert handle.effect_id == 0
+
+    def test_a_device_that_stays_blocked_is_not_reset_every_frame(self, bridge):
+        """While the device stays blocked the lazy re-create fails every
+        frame, and a device reset per frame would hammer the hardware."""
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        bridge.create_error = DIB_ERR_ACQUISITION
+        for _ in range(200):
+            assert device.create_effect(EFFECT_CONSTANT) is None
+        assert bridge.reset_calls == 1
+
+    def test_recovery_clears_the_pacing(self, bridge):
+        """Each report is answered at once; only an unbroken run of failures
+        is paced, so a second one a moment later is not left waiting."""
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        bridge.create_error = DIB_ERR_ACQUISITION
+        assert device.create_effect(EFFECT_CONSTANT) is None
+        bridge.create_error = None
+        handle = device.create_effect(EFFECT_CONSTANT)     # unblocked
+        bridge.effect_update = lambda effect, params: DIB_ERR_ACQUISITION
+        self._fail_push(handle, 1)                         # blocked again
+        assert bridge.reset_calls == 2
+
+    def test_a_paced_out_loss_still_drops_the_handles(self, bridge):
+        """The report means every bridge id held for the device may already
+        be invalid, whether or not this one is answered with a reset."""
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        failing = device.create_effect(EFFECT_CONSTANT)
+        bystander = device.create_effect(EFFECT_SINE)
+        device._priority_lost = True
+        device._next_priority_recovery = time.monotonic() + 100
+        bridge.effect_update = lambda effect, params: DIB_ERR_ACQUISITION
+        self._fail_push(failing, 1)
+        assert getattr(bridge, 'reset_calls', 0) == 0
+        assert failing.effect_id == 0
+        assert bystander.effect_id == 0
 
     def test_start_failures_also_heal(self, bridge):
         device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)

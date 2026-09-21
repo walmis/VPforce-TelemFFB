@@ -971,10 +971,12 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         error.  After a few consecutive failures the handle presumes the
         device-side effect dead and invalidates itself, so the owning
         HapticEffect lazily re-creates it on the next frame.
-        DIB_ERR_ACQUISITION is exempt: FFB priority loss has its own
-        latched handling and resolves itself when priority returns.
+        DIB_ERR_ACQUISITION needs no count: it is a definite report, and
+        the device answers it at once (see
+        DInputFFBDevice.note_priority_loss).
         """
         if rc == DIB_ERR_ACQUISITION:
+            self.device.note_priority_loss(self.device.bridge.last_error())
             return
         self._consecutive_failures += 1
         if self._consecutive_failures >= self.FAILURES_BEFORE_RECREATE:
@@ -1001,7 +1003,9 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             # recovery line carries the real signal
             log = (logging.warning if self._consecutive_failures == 0
                    else logging.debug)
-            log(f"effect_update failed ({rc}) for {self!r}")
+            # read here, before the next bridge call replaces it
+            log(f"effect_update failed ({rc}) for {self!r}: "
+                f"{self.device.bridge.last_error()}")
             self._note_call_failed(rc)
 
     def _is_zero_condition(self) -> bool:
@@ -1038,9 +1042,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             if rc == DIB_OK:
                 self._device_playing = True
             elif rc == DIB_ERR_ACQUISITION:
-                # FFB priority held by another app: create_effect logs the
-                # condition once; per-frame retries stay quiet
-                logging.debug(f"effect_start blocked by FFB priority for {self!r}")
+                self._note_call_failed(rc)
             else:
                 logging.warning(f"effect_start failed ({rc}) for {self!r}")
         elif not should_play and self._device_playing:
@@ -1067,7 +1069,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             self.device.note_effect_started(self)
             self._consecutive_failures = 0
         elif rc == DIB_ERR_ACQUISITION:
-            logging.debug(f"effect_start blocked by FFB priority for {self!r}")
+            self._note_call_failed(rc)
         else:
             log = (logging.warning if self._consecutive_failures == 0
                    else logging.debug)
@@ -1214,6 +1216,10 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         # latch: log the FFB-priority-lost condition once instead of every
         # frame (the lazy effect re-create retries continuously)
         self._acquisition_warned = False
+        # priority-loss recovery pacing, see note_priority_loss
+        self._priority_lost = False
+        self._priority_retry_gap = 0.0
+        self._next_priority_recovery = 0.0
 
         self._shutdown = False
         self._last_recovery = 0.0
@@ -1495,21 +1501,58 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         now = time.monotonic()
         if now - getattr(self, '_last_recovery', 0.0) < self.RECOVERY_DEBOUNCE_S:
             return
-        self._last_recovery = now
+        self._reset_and_invalidate(reason)
+
+    def _reset_and_invalidate(self, reason: str = ""):
+        self._last_recovery = time.monotonic()
         logging.warning(
             f"DirectInput device effect recovery ({reason or 'requested'}): "
             "resetting the device and re-creating all effects")
         try:
             rc = self.bridge.device_reset(self._handle)
             if rc != DIB_OK:
-                logging.warning(f"device_reset failed ({rc}); "
+                logging.warning(f"device_reset failed ({rc}: "
+                                f"{self.bridge.last_error()}); "
                                 "continuing with handle invalidation")
         except Exception:
             logging.exception("device_reset failed")
+        self._invalidate_effects()
+
+    def _invalidate_effects(self):
         for ref in self._effect_handles:
             effect = ref()
             if effect:
                 effect.invalidate()
+
+    #: longest wait between rebuild attempts while the device stays blocked
+    PRIORITY_RETRY_MAX_S = 30.0
+
+    def note_priority_loss(self, detail: str = ""):
+        """The bridge reported DIB_ERR_ACQUISITION: another application has
+        the device.  Whatever it was playing is gone, so every effect is
+        rebuilt.
+
+        Not debounced like recover_effects: a skipped rebuild would leave
+        handles that update cleanly while nothing plays.  The device reset
+        is paced instead, by a gap that doubles while the device stays
+        blocked and clears when an effect is created again.  The handles
+        are dropped every time regardless: this report means their bridge
+        ids may already be invalid, and a stale id can alias a new effect.
+        """
+        if not self._priority_lost:
+            self._priority_lost = True
+            logging.warning("FFB priority lost"
+                            + (f" ({detail})" if detail else "")
+                            + " - rebuilding effects")
+        now = time.monotonic()
+        if now < self._next_priority_recovery:
+            self._invalidate_effects()
+            return
+        self._priority_retry_gap = min(
+            max(self._priority_retry_gap * 2, self.RECOVERY_DEBOUNCE_S),
+            self.PRIORITY_RETRY_MAX_S)
+        self._next_priority_recovery = now + self._priority_retry_gap
+        self._reset_and_invalidate("FFB priority lost")
 
     def _begin_reconnect(self):
         self._reconnecting = True
@@ -1600,30 +1643,46 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                 # tier 1 (periodic cues); a periodic may displace an older cue
                 if self._evict_one_periodic():
                     continue
-                logging.warning("Effects pool full, cannot create new effect")
+                # a refused cue is only missing; a refused force-model
+                # effect changes what the stick does, and for a constant
+                # force nothing else reports it
+                logging.log(
+                    logging.WARNING if type in PERIODIC_EFFECTS else logging.ERROR,
+                    "Effects pool full, cannot create "
+                    f"{effect_names.get(type, type)} effect")
                 return None
             if effect_id == DIB_ERR_ACQUISITION:
-                # a foreground app (typically the sim's own FFB) holds
-                # priority; effect ops fail until it releases the device.
-                # ERROR level so the exception tracker (which de-duplicates
-                # with a count) surfaces the condition in the UI; the
-                # per-frame lazy re-create doubles as automatic recovery
-                # where the other application does release the device.
-                logging.error(
-                    f"FFB effects blocked: {self.bridge.last_error()}. "
-                    "Either turn off the sim's own force feedback, or - if "
-                    "using the DirectInput tap - start TelemFFB before the "
-                    "sim and restart the sim now, since the tap is set up "
-                    "as the sim starts.")
-                self._acquisition_warned = True
+                # read before the rebuild below replaces it
+                detail = self.bridge.last_error()
+                # The first refusal is often transient.  A second in a row
+                # means the device stayed blocked, and only that is worth
+                # the exception tracker, which surfaces ERROR in the UI
+                # de-duplicated with a count.
+                if self._priority_lost:
+                    # the bridge's text goes last, as a tag: it varies with
+                    # how the recovery went, and the exception tracker
+                    # keeping those apart is the diagnosis
+                    logging.error(
+                        "FFB effects blocked: another application keeps "
+                        "taking this device. Close other force feedback "
+                        "software, or turn off the sim's own force "
+                        "feedback, or - if using the DirectInput tap - "
+                        "start TelemFFB before the sim and restart the sim "
+                        "now, since the tap is set up as the sim starts. "
+                        f"[bridge: {detail}]")
+                    self._acquisition_warned = True
+                self.note_priority_loss(detail)
                 return None
-            logging.warning(f"create_effect failed ({effect_id}): {effect_names.get(type, type)} "
-                            f"- {self.bridge.last_error()}")
+            logging.error(f"create_effect failed ({effect_id}): {effect_names.get(type, type)} "
+                          f"- {self.bridge.last_error()}")
             return None
 
-        if self._acquisition_warned:
+        if self._acquisition_warned or self._priority_lost:
             logging.info("FFB priority restored - effects resuming")
             self._acquisition_warned = False
+            self._priority_lost = False
+            self._priority_retry_gap = 0.0
+            self._next_priority_recovery = 0.0
         handle = DInputEffectHandle(self, effect_id, type)
         self._effect_handles.append(weakref.ref(handle, lambda x: self._effect_handles.remove(x)))
         return handle
