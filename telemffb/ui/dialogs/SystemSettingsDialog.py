@@ -3350,6 +3350,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # load with it; the settings file is shared and hand-editable, so
         # the shape is checked here rather than trusted.
         self._msfs_community_overrides = overrides if isinstance(overrides, dict) else {}
+        # The rows still on screen belong to the settings being replaced,
+        # and refresh_msfs_panel_installs() opens by folding their text
+        # back into the dict just loaded - which is right after an install
+        # (it keeps a path typed but not yet saved) and wrong here, where
+        # it would copy stale text over what was loaded. Dropping them
+        # first is what lets Reset to Defaults clear a custom path and an
+        # imported override reach the field.
+        self._msfs_install_rows = {}
         self.refresh_msfs_panel_installs()
 
         self.enableXPLANE.setChecked(settings_dict.get('enableXPLANE', False))
