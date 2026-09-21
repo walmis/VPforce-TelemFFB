@@ -26,9 +26,10 @@ import re
 
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCursor, QIcon, QFont, QColor, QPixmap
+from PyQt6.QtGui import QAction, QCursor, QIcon, QFont, QColor, QPixmap
 from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageBox,
-                             QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
+                             QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout,
+                             QMenu)
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from telemffb.ui.theme.tokens import ACTIVE_GREEN
@@ -946,6 +947,50 @@ class SettingsLayout(QGridLayout):
                     self._clear_sub_layout(sub_layout)
                     sub_layout.deleteLater()
 
+    def _arm_override_removal(self, label, setting, scope):
+        """Right-click the class/sim override icon to remove that override.
+
+        The counterpart to the erase button's "move setting to ..." menu:
+        without it, a setting promoted to the class or the sim can only be
+        taken back in the offline editor at that scope.
+        """
+        label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        label.customContextMenuRequested.connect(
+            lambda pos, lbl=label, name=setting, sc=scope: self._show_override_removal_menu(lbl, pos, name, sc))
+
+    def _show_override_removal_menu(self, label, pos, setting, scope):
+        csim = G.settings_mgr.current_sim
+        cclass = G.settings_mgr.current_class
+        menu = QMenu(label)
+        text = (f"Remove setting from the {csim} {cclass} class" if scope == 'CLASS'
+                else f"Remove setting from the {csim} sim level")
+        action = QAction(text, label)
+        action.triggered.connect(lambda: self.do_remove_override(csim, cclass, setting, scope))
+        menu.addAction(action)
+        menu.exec(label.mapToGlobal(pos))
+
+    def do_remove_override(self, csim, cclass, setting, scope):
+        where = (f"the {csim} {cclass} class" if scope == 'CLASS'
+                 else f"the {csim} sim level")
+        reply = QMessageBox.question(
+            None,
+            "Confirmation",
+            f"Are you sure you want to remove the {setting} setting from {where}?\n\n"
+            "Aircraft that take their value from it fall back to the value beneath it.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No  # Default button
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self.trigger_form_reload = True
+        logging.info(f"Removing {setting} setting from {where}")
+        if scope == 'CLASS':
+            xmlutils.erase_class_from_xml(csim, cclass, setting)
+        else:
+            xmlutils.erase_sim_from_xml(csim, setting)
+        if G.settings_mgr.timed_out:
+            self.reload_caller()
+
     def do_move_to_class(self, csim, cclass, value, setting, model, unit):
 
         reply = QMessageBox.question(
@@ -1782,7 +1827,10 @@ class SettingsLayout(QGridLayout):
         info_pixmap = info_pixmap.scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         info_icon.addPixmap(info_pixmap)
         info_label = QLabel()
-        info_label.setPixmap(info_pixmap)
+        # The greyed pixmap rather than a disabled widget: a disabled label
+        # receives no mouse events, so it could neither show its tooltip nor
+        # offer the right-click menu that removes the override.
+        info_label.setPixmap(info_icon.pixmap(info_pixmap.size(), QIcon.Mode.Disabled))
         info_label.setVisible(False)
         # info_label.setMaximumSize(25, 25)
         # info_label.setMinimumSize(25, 25)
@@ -1800,15 +1848,15 @@ class SettingsLayout(QGridLayout):
         if item['replaced'].lower() == "class (user)" and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "class"):
             if item['name'] != 'type':
                 action_item = info_label
-                info_label.setToolTip("Class level user override is in use")
-                info_label.setEnabled(False)
+                info_label.setToolTip("Class level user override is in use, Right-Click to remove it")
+                self._arm_override_removal(info_label, item['name'], 'CLASS')
                 include_action = True
 
         elif item['replaced'].lower() == "sim (user)"  and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "sim"):
             if item['name'] != 'type':
                 action_item = info_label
-                info_label.setToolTip("Sim level user override is in use")
-                info_label.setEnabled(False)
+                info_label.setToolTip("Sim level user override is in use, Right-Click to remove it")
+                self._arm_override_removal(info_label, item['name'], 'SIM')
                 include_action = True
 
         self.addWidget(action_item, i, erase_col, alignment=Qt.AlignmentFlag.AlignCenter)
