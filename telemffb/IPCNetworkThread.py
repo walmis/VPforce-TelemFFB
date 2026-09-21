@@ -28,7 +28,15 @@ from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
 from telemffb import utils
+from telemffb.ChildTelemView import ChildTelemView
 from telemffb.utils import load_custom_userconfig
+
+# How long a child keeps sending its telemetry view after the master last
+# asked for it. The master asks again on every keepalive tick, so the view
+# outlives a lost request but not a master that stopped wanting it.
+VIEW_LEASE_SEC = 3.0
+# The largest UDP payload is 65,507 bytes; a frame is normally a tenth of it.
+MAX_DATAGRAM = 65000
 
 
 class IPCNetworkThread(QObject, threading.Thread):
@@ -79,6 +87,15 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._child_keepalive_info = {}
         self._child_addrs = {}
         self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
+        # A child's whole telemetry frame, for the master's Monitor tab while
+        # its config scope is that child's device. Master: which child is
+        # being asked, and what it sent. Child: until when it was asked, and
+        # how many frames it has sent - see request_child_view.
+        self.child_view = ChildTelemView()
+        self._view_device = None
+        self._view_lease_until = 0.0
+        self._view_seq = 0
+        self._view_oversize_logged = False
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Generous kernel receive buffer: the master ingests continuous
@@ -193,6 +210,8 @@ class IPCNetworkThread(QObject, threading.Thread):
     def _send_keepalive(self):
         if self._master:
             self.send_broadcast_message("Keepalive")
+            if self._view_device:
+                self.send_broadcast_message(f"VIEW TELEM:{self._view_device}")
         else:
             self.send_message(f"Child Keepalive:{G.device_type}:{G.device_connection_status}")
             self.send_ipc_status()
@@ -293,6 +312,18 @@ class IPCNetworkThread(QObject, threading.Thread):
 
             except json.JSONDecodeError:
                 pass
+        elif msg.startswith('view:'):
+            # Kept as text: decoded only if the display asks for it.
+            try:
+                _, dev, seq, payload = msg.split(':', 3)
+                self.child_view.accept(dev, int(seq), payload)
+            except ValueError:
+                pass
+        elif msg.startswith('VIEW TELEM:'):
+            if msg.removeprefix('VIEW TELEM:') == G.device_type:
+                self._view_lease_until = time.monotonic() + VIEW_LEASE_SEC
+            else:
+                self._view_lease_until = 0.0
         elif msg.startswith('effects:'):
             payload = msg.removeprefix('effects:')
             try:
@@ -414,6 +445,44 @@ class IPCNetworkThread(QObject, threading.Thread):
 
     def send_ipc_telem(self, telem):
         self.send_message(f"telem:{json.dumps(telem)}")
+
+    # --- a child's telemetry view in the master's Monitor tab ---
+    #
+    #   master -> children   VIEW TELEM:<device>     (that child starts sending;
+    #                                                 any other stops)
+    #   child  -> master     view:<device>:<seq>:<json frame>
+    #
+    # Only the child being watched sends, and only as often as the display
+    # refreshes, so the traffic is one child's 20 Hz however many there are.
+
+    def request_child_view(self, device):
+        """Master: watch ``device``'s telemetry, or nobody's when None. Said
+        at once, then again on each keepalive tick while it holds."""
+        if device == self._view_device:
+            return
+        if self._view_device:
+            self.child_view.end(self._view_device)
+        self._view_device = device
+        self.send_broadcast_message(f"VIEW TELEM:{device or ''}")
+
+    @property
+    def view_requested(self):
+        return time.monotonic() < self._view_lease_until
+
+    def send_ipc_view(self, telem):
+        """Child: this frame, whole, if the master is watching this device."""
+        if not self.view_requested:
+            return
+        # default=str: a frame may carry anything an aircraft class put in
+        # it, and a value that reads oddly beats a view that stops.
+        message = f"view:{G.device_type}:{self._view_seq + 1}:{json.dumps(dict(telem.items()), default=str)}"
+        if len(message) > MAX_DATAGRAM:
+            if not self._view_oversize_logged:
+                self._view_oversize_logged = True
+                logging.warning(f"Telemetry view not sent: a {len(message)} byte frame does not fit one datagram")
+            return
+        self._view_seq += 1
+        self.send_message(message)
 
     def send_ipc_effects(self, active_effects, active_settings):
         payload = {

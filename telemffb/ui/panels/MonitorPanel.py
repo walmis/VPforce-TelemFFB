@@ -405,6 +405,20 @@ class MonitorPanel(QWidget):
         self._effects_model.set_header(0, 'Active effects:' if device_type else 'Active effects')
         self._effects_model.set_header(1, device_type.title() if device_type else '')
 
+    def set_telemetry_source(self, device_type: Optional[str], sending: bool = True) -> None:
+        """Whose telemetry the table is showing (master only). ``None`` is
+        this instance's own, under the plain "Value" header; a child's
+        device is that child's view, and is named. A child that is not
+        ``sending`` has left the table on this instance's frame, and the
+        header says so."""
+        if not device_type:
+            header = 'Value'
+        elif sending:
+            header = f'Value: {device_type.title()}'
+        else:
+            header = f'Value ({device_type.title()} not sending)'
+        self._telem_model.set_header(1, header)
+
     def effects_title(self) -> str:
         """The effects pane's title, read across its two headers."""
         parts = [self._effects_model.headerData(section, Qt.Orientation.Horizontal) for section in (0, 1)]

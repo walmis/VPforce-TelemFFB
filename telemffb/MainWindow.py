@@ -1369,6 +1369,10 @@ class MainWindow(QMainWindow):
 
         if G.master_instance:
             self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
+            # A child's device: have that child send its telemetry view.
+            ipc = getattr(G, 'ipc_instance', None)
+            if ipc:
+                ipc.request_child_view(types[arg] if types[arg] != G.device_type else None)
         G.app_state.set_scope(G.current_device_config_scope)
         self.settings_layout.reload_caller()
 
@@ -2047,11 +2051,10 @@ class MainWindow(QMainWindow):
         self.sim_status.on_sim_exited()
         self.refresh_offline_editor_button()      # nothing loaded to edit any more
 
-    def on_update_telemetry(self, datadict: dict):
-        if utils.millis() - self.last_telemetry_refresh < 50:
-            return
-        self.last_telemetry_refresh = utils.millis()
-
+    @staticmethod
+    def _ordered_telemetry(datadict) -> OrderedDict:
+        """A frame as the Monitor tab lists it: alphabetical, the identifying
+        keys first."""
         data = OrderedDict(sorted(datadict.items()))  # Alphabetize telemetry data
         keys = data.keys()
         try:
@@ -2072,10 +2075,35 @@ class MainWindow(QMainWindow):
             # Items to move to the end
         except Exception:
             pass
+        return data
 
+    def _scoped_telemetry(self, own: OrderedDict) -> OrderedDict:
+        """The frame of the device in scope, which is what the Monitor tab
+        lists and the settings page's live sliders read: this instance's, or
+        - on the master, scoped to a child's device - the one that child
+        last sent. Falls back to this instance's while the child has sent
+        nothing recent; the table's header says which it is."""
+        scope = G.current_device_config_scope
+        if not G.master_instance or scope == G.device_type:
+            self.monitor_panel.set_telemetry_source(None)
+            return own
+        frame = G.ipc_instance.child_view.frame(scope)
+        self.monitor_panel.set_telemetry_source(scope, sending=frame is not None)
+        return own if frame is None else self._ordered_telemetry(frame)
+
+    def on_update_telemetry(self, datadict: dict):
+        if utils.millis() - self.last_telemetry_refresh < 50:
+            return
+        self.last_telemetry_refresh = utils.millis()
+
+        if G.child_instance:
+            G.ipc_instance.send_ipc_view(datadict)  # only while the master is watching
+
+        data = self._ordered_telemetry(datadict)
         try:
 
-            self.monitor_panel.update_telemetry(data)
+            scoped = self._scoped_telemetry(data)
+            self.monitor_panel.update_telemetry(scoped)
 
             active_effects = []
             active_settings = []
@@ -2139,11 +2167,14 @@ class MainWindow(QMainWindow):
             # per-frame color+label update straight from telemetry, whether
             # or not active_settings changed - a small cached list, not
             # findChildren(), per SettingsLayout._rebuild_slider_caches().
+            # From the scoped device's frame: the page is that device's
+            # settings, and a key more than one device publishes (the tap
+            # gains) means its own value, not this instance's.
             if self.tab_widget.currentIndex() == 1:
                 qcolor_green = QColor(ACTIVE_GREEN)
                 qcolor_grey = QColor("grey")
                 for my_slider, live_key in self.settings_layout.live_key_sliders:
-                    pct = min(data.get(live_key, 0), 1.0)
+                    pct = min(scoped.get(live_key, 0), 1.0)
                     new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
                     my_slider.blockSignals(True)
                     my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
