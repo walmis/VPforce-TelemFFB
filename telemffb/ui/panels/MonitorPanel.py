@@ -335,13 +335,19 @@ class MonitorPanel(QWidget):
         self._telem_stack.setMinimumHeight(100)
 
         """ Active-effects pane. """
-        self._effects_model = KeyValueTableModel(['Active Effects', ''], self)
+        self._effects_model = KeyValueTableModel(['Active effects', ''], self)
+        # The pane's title runs across both headers - "Active effects:" over
+        # the names and the device over the intensities - so each is turned
+        # toward the divider, and the two read as the one phrase they are.
+        self._effects_model.set_header_alignment(
+            0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._effects_model.set_header_alignment(
+            1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.effects_view = CopyableTableView(self)
         self.effects_view.setModel(self._effects_model)
-        # The NAME column's header is the pane's title, and says whose
+        # The two headers between them are the pane's title, and say whose
         # effects these are (set_effects_scope_label) - level with the
-        # telemetry table's own header beside it. The intensity column's
-        # header stays blank so the title is not competing with it.
+        # telemetry table's own header beside it.
         header = self.effects_view.horizontalHeader()
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -389,16 +395,20 @@ class MonitorPanel(QWidget):
 
     def set_effects_scope_label(self, device_type: Optional[str]) -> None:
         """``device_type`` is the config-scope device to name in the header
-        (master only, scoped to something other than its own device type);
-        ``None`` restores the plain "Active Effects" header."""
-        if device_type:
-            self._effects_model.set_header(0, f'Active Effects for: {device_type.title()}')
-        else:
-            self._effects_model.set_header(0, 'Active Effects')
+        (master only); ``None`` restores the plain "Active effects" header.
+
+        The device goes in the intensity column's header, not after the
+        title in the name column's. As one string the title needed about
+        170px of a column that had just given 72 of them to the intensities,
+        and came up clipped at both ends in a narrow pane; the second header
+        was standing empty, and every device name fits it."""
+        self._effects_model.set_header(0, 'Active effects:' if device_type else 'Active effects')
+        self._effects_model.set_header(1, device_type.title() if device_type else '')
 
     def effects_title(self) -> str:
-        """The effects pane's header text."""
-        return self._effects_model.headerData(0, Qt.Orientation.Horizontal)
+        """The effects pane's title, read across its two headers."""
+        parts = [self._effects_model.headerData(section, Qt.Orientation.Horizontal) for section in (0, 1)]
+        return ' '.join(part for part in parts if part)
 
     # ---- debug menu: "Show simvar in telem window" ------------------------
 

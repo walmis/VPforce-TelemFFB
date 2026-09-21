@@ -559,16 +559,25 @@ class TestConditionAxes:
 
 class TestEffectsScopeLabel:
     def test_default_label(self, panel):
-        assert panel.effects_title() == 'Active Effects'
+        assert panel.effects_title() == 'Active effects'
 
     def test_scoped_label_names_the_device(self, panel):
         panel.set_effects_scope_label('pedals')
-        assert panel.effects_title() == 'Active Effects for: Pedals'
+        assert panel.effects_title() == 'Active effects: Pedals'
+
+    def test_the_device_goes_in_the_second_header(self, panel):
+        """As one string in the first header the title was clipped at both
+        ends in a narrow pane - that column had given 72px to the
+        intensities - while the second header stood empty."""
+        from PyQt6.QtCore import Qt
+        panel.set_effects_scope_label('trimwheel')
+        header = lambda section: panel._effects_model.headerData(section, Qt.Orientation.Horizontal)
+        assert (header(0), header(1)) == ('Active effects:', 'Trimwheel')
 
     def test_clearing_scope_restores_default(self, panel):
         panel.set_effects_scope_label('pedals')
         panel.set_effects_scope_label(None)
-        assert panel.effects_title() == 'Active Effects'
+        assert panel.effects_title() == 'Active effects'
 
 
 class TestCopySelection:
