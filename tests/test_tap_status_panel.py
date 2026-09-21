@@ -62,8 +62,16 @@ def bundled(monkeypatch):
     return "0.9.0.0"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", autouse=True)
 def app():
+    """Every test here builds a TapStatusPanel, and constructing a QWidget
+    with no QApplication takes the whole process down - not an exception, a
+    crash. Four tests in TestLegacyWrapperOnThePanel did not ask for this
+    fixture and survived only because some earlier test in the same worker
+    had made the application first. Under `pytest -n auto` that is luck:
+    which tests share a worker shifts with the shape of the whole suite, so
+    adding a test file elsewhere was enough to strand them and take four
+    workers down with them. Autouse, so it cannot be forgotten again."""
     return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
 
