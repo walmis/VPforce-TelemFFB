@@ -674,6 +674,10 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
         # have one: a condition's force depends on where the stick is, not
         # on a parameter. See the `intensity` property.
         self._magnitude = None
+        # A condition's gain per axis instead, by parameter block offset
+        # (0 X, 1 Y) - what the monitor shows in place of an intensity.
+        # See the `axis_gains` property.
+        self._gains = {}
 
     def invalidate(self):
         # The block is gone, so the playback state is gone with it (the
@@ -759,6 +763,21 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
         if self.type == EFFECT_CONSTANT or self.type in PERIODIC_EFFECTS:
             return self._magnitude
         return None
+
+    @property
+    def axis_gains(self):
+        """A condition's gain per axis as ``(x, y)``, each a fraction of
+        4096 or None where that axis was never written; None altogether for
+        an effect that has written no condition.
+
+        Where `intensity` has nothing honest to say about a condition, this
+        can: the force a spring produces depends on stick position, but the
+        gain it was set to does not. Single-axis devices - pedals, the
+        collective - write one block and leave the other None.
+        """
+        if not self._gains:
+            return None
+        return self._gains.get(0), self._gains.get(1)
 
     def __repr__(self):
         return f"FFBEffectHandle({self.effect_id}, {self.name})"
@@ -863,6 +882,12 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
         else:
             cond.positiveCoefficient = clamp(cond.positiveCoefficient, -4096, 4096)
             cond.negativeCoefficient = clamp(cond.negativeCoefficient, -4096, 4096)
+        # The stronger side, as a fraction of 4096: an asymmetric spring is
+        # as stiff as its stiffer half. The same reading the tap spring's
+        # live slider handle uses. A spring adjuster can exceed 1.0, since
+        # its coefficient is a gain multiplier with 4096 as unity.
+        self._gains[cond.parameterBlockOffset] = max(
+            abs(cond.positiveCoefficient), abs(cond.negativeCoefficient)) / 4096
         data = bytes(cond)
         if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
             self._write(data)
@@ -1513,6 +1538,12 @@ class HapticEffect(Destroyable):
         the effect has no allocated handle or is a condition (see
         FFBEffectHandle.intensity)."""
         return self._h_effect.intensity if self._h_effect else None
+
+    @property
+    def axis_gains(self):
+        """A condition's ``(x, y)`` gains, or None (see
+        FFBEffectHandle.axis_gains)."""
+        return self._h_effect.axis_gains if self._h_effect else None
 
     @property
     def type_id(self):

@@ -2020,6 +2020,11 @@ class MainWindow(QMainWindow):
                             # The PID effect type, which the monitor groups
                             # the list by and draws the waveform glyph from.
                             'type': effect.type_id,
+                            # A condition's [x, y] gain, shown where it has
+                            # no intensity. A list rather than a tuple only
+                            # because that is what JSON gives back.
+                            'gains': (list(effect.axis_gains)
+                                      if effect.axis_gains else None),
                         })
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)

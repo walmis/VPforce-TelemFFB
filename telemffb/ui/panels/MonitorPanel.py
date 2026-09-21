@@ -123,6 +123,26 @@ def _name_tooltip(label, effect_type):
     return f"{label}\n{kind} effect"
 
 
+def _axes_text(gains):
+    """A condition's cell text: ``"X 50% Y 30%"``, a dash for an axis that
+    was never written. Labelled rather than positional so a copied row still
+    says which is which, and it is what IntensityBarDelegate splits on."""
+    x, y = (list(gains) + [None, None])[:2]
+    pct = lambda g: '-' if g is None else f"{round(g * 100)}%"
+    return f"X {pct(x)} Y {pct(y)}"
+
+
+def _gains_tooltip(gains):
+    """A condition's hover: its gain per axis, and why that is the number
+    shown rather than an intensity."""
+    x, y = (list(gains) + [None, None])[:2]
+    lines = [f"{axis} axis gain {round(g * 100)}%"
+             for axis, g in (("X", x), ("Y", y)) if g is not None]
+    lines.append("The gain it is set to - the force it produces depends on "
+                 "where the stick is.")
+    return "\n".join(lines)
+
+
 def _intensity_tooltip(intensity, configured, factor):
     """What the intensity cell says on hover.
 
@@ -405,12 +425,20 @@ class MonitorPanel(QWidget):
             label = effect.get('label', '')
             intensity = effect.get('intensity')
             effect_type = effect.get('type')
-            shown = '-' if intensity is None else f"{round(intensity * 100)}%"
+            gains = effect.get('gains')
+            if intensity is not None:
+                shown = f"{round(intensity * 100)}%"
+                value_tip = _intensity_tooltip(intensity,
+                                               effect.get('configured'),
+                                               effect.get('factor'))
+            elif gains:
+                shown = _axes_text(gains)
+                value_tip = _gains_tooltip(gains)
+            else:
+                shown = '-'
+                value_tip = _intensity_tooltip(None, None, None)
             rows.append((label, (label, shown)))
-            tooltips[label] = (_name_tooltip(label, effect_type),
-                               _intensity_tooltip(intensity,
-                                                  effect.get('configured'),
-                                                  effect.get('factor')))
+            tooltips[label] = (_name_tooltip(label, effect_type), value_tip)
             types[label] = effect_type
         self._type_delegate.set_types(types)
         self._effects_model.set_rows(rows, tooltips)

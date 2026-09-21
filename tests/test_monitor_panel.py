@@ -478,6 +478,18 @@ class TestEffectTypeBadge:
         assert 'A' not in panel._type_delegate._types
 
 
+class TestConditionAxes:
+    def test_the_cell_text_is_what_the_delegate_splits_on(self):
+        """MonitorPanel writes the text and IntensityBarDelegate parses it
+        back. If the two drift, the cell quietly falls back to plain text
+        rather than failing."""
+        from telemffb.ui.panels.MonitorPanel import _axes_text
+        from telemffb.ui.widgets.IntensityBarDelegate import parse_axes
+        assert parse_axes(_axes_text([1.0, 0.6])) == ('100%', '60%')
+        assert parse_axes(_axes_text([0.08, None])) == ('8%', '-')
+        assert parse_axes('42%') is None
+
+
 class TestEffectsScopeLabel:
     def test_default_label(self, panel):
         assert panel.effects_title() == 'Active Effects'

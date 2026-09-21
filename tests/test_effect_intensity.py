@@ -159,6 +159,29 @@ class TestConditionsHaveNoIntensity:
         assert handle.intensity is None
 
 
+class TestConditionGains:
+    def test_each_axis_keeps_its_stronger_side(self):
+        """Offset 0 is X and 1 is Y, and an asymmetric spring is as stiff as
+        its stiffer half - neither is visible from the numbers alone."""
+        from telemffb.hw.ffb_rhino import FFBReport_SetCondition
+        handle = make_handle(EFFECT_SPRING)
+        handle.setCondition(FFBReport_SetCondition(
+            parameterBlockOffset=0, positiveCoefficient=4096,
+            negativeCoefficient=-1024))
+        handle.setCondition(FFBReport_SetCondition(
+            parameterBlockOffset=1, positiveCoefficient=512,
+            negativeCoefficient=-2048))
+        assert handle.axis_gains == (pytest.approx(1.0), pytest.approx(0.5))
+
+    def test_a_single_axis_device_leaves_the_other_empty(self):
+        from telemffb.hw.ffb_rhino import FFBReport_SetCondition
+        handle = make_handle(EFFECT_SPRING)
+        handle.setCondition(FFBReport_SetCondition(
+            parameterBlockOffset=0, positiveCoefficient=2048,
+            negativeCoefficient=-2048))
+        assert handle.axis_gains == (pytest.approx(0.5), None)
+
+
 class TestHapticEffectDelegates:
     def test_it_reports_the_handles_intensity(self):
         effect = make_effect(EFFECT_CONSTANT)

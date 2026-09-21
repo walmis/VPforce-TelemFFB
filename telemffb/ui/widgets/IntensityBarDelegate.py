@@ -29,6 +29,8 @@ Drawn rather than widgeted: the effects list rebuilds every telemetry frame
 rate for no visual gain.
 """
 
+import re
+
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QStyledItemDelegate
@@ -39,6 +41,9 @@ import telemffb.globals as G
 #: that is started but commanding almost no force stays visibly distinct
 #: from one commanding none at all.
 MIN_VISIBLE_FRACTION = 0.02
+
+#: Space between a condition's X and Y halves.
+AXIS_GAP = 3
 
 
 def parse_percent(text):
@@ -53,11 +58,29 @@ def parse_percent(text):
         return None
 
 
+_AXES = re.compile(r"^X\s+(\S+)\s+Y\s+(\S+)$")
+
+
+def parse_axes(text):
+    """The ``(x, y)`` halves of a condition's ``"X 50% Y 30%"`` cell, each
+    still as text ("50%", or "-" for an axis never written), or None when
+    the cell is not an axis pair."""
+    match = _AXES.match((text or "").strip())
+    return (match.group(1), match.group(2)) if match else None
+
+
 class IntensityBarDelegate(QStyledItemDelegate):
-    """Paints a proportional bar behind the percentage text."""
+    """Paints a proportional bar behind the percentage text - or, for a
+    condition, the cell split in two with its gain on each axis."""
 
     def paint(self, painter: QPainter, option, index) -> None:
-        fraction = parse_percent(index.data(Qt.ItemDataRole.DisplayRole))
+        text = index.data(Qt.ItemDataRole.DisplayRole)
+        axes = parse_axes(text)
+        if axes is not None:
+            self._paint_axes(painter, option, axes)
+            return
+
+        fraction = parse_percent(text)
         if fraction is None:
             # Nothing to graph - let the default painter draw the text.
             super().paint(painter, option, index)
@@ -85,6 +108,25 @@ class IntensityBarDelegate(QStyledItemDelegate):
         painter.setPen(QColor("#f0f0f0") if G.useDarkMode else QColor("#202020"))
         painter.drawText(option.rect, int(Qt.AlignmentFlag.AlignCenter),
                          index.data(Qt.ItemDataRole.DisplayRole))
+        painter.restore()
+
+    def _paint_axes(self, painter: QPainter, option, axes) -> None:
+        """A condition's cell: two halves, X then Y, each its gain as a
+        number. No bar - the gain is a setting, not an output, and filling
+        it would put it on the same footing as the intensities above."""
+        rect = QRectF(option.rect).adjusted(2, 3, -2, -3)
+        half = (rect.width() - AXIS_GAP) / 2
+        track = QColor("#3a3a3a") if G.useDarkMode else QColor("#d8d8d8")
+        pen = QColor("#f0f0f0") if G.useDarkMode else QColor("#202020")
+        painter.save()
+        for i, (axis, value) in enumerate(zip("XY", axes)):
+            box = QRectF(rect.left() + i * (half + AXIS_GAP), rect.top(),
+                         half, rect.height())
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(track)
+            painter.drawRoundedRect(box, 2, 2)
+            painter.setPen(pen)
+            painter.drawText(box, int(Qt.AlignmentFlag.AlignCenter), value)
         painter.restore()
 
     @staticmethod
