@@ -56,7 +56,7 @@ beta_build : bool = False
 
 beta_build_str: str = "BETA - 07-02-26"
 
-dev_build : bool = False 
+dev_build : bool = True
 """when True, build versions will use 'dev_build_str', will use a dev branded logo and will not look for updates"""
 
 dev_userconfig: bool = True

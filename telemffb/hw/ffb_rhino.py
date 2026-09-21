@@ -1556,6 +1556,28 @@ class HapticEffect(Destroyable):
 
         return cls.device
 
+    @classmethod
+    def open_shaker(cls, output_device=None, **kwargs):
+        """Open a bass shaker on a sound card and attach it for all
+        HapticEffect instances.
+
+        Args:
+            output_device: The audio output's name (or PortAudio index);
+                None for the system default.
+            **kwargs: Forwarded to ``ShakerFFBDevice`` (gain, channel
+                mode, calibration profile, voice table).
+
+        Returns:
+            The opened ``ShakerFFBDevice`` instance.
+        """
+        # local import: ffb_shaker imports the effect constants from this module
+        from telemffb.hw.ffb_shaker import ShakerFFBDevice
+        logging.info(f"Open bass shaker on audio output {output_device!r}")
+        cls.device = ShakerFFBDevice(output_device, **kwargs)
+        logging.info(f"Successfully opened '{cls.device.info.product_string}'")
+
+        return cls.device
+
     def _ensure_effect_created(self):
         """Allocate the underlying effect on the device if it hasn't been yet.
 

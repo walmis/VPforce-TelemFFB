@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "active": "Generic",
+  "profiles": [
+    {
+      "name": "Generic",
+      "description": "Conservative starter profile. Recalibrate per shaker for best results.",
+      "f_res_hz": 45.0,
+      "carrier_offset_pct": 15.0,
+      "band_low_hz": 15.0,
+      "band_high_hz": 120.0,
+      "halfwaves": 2,
+      "attack_ms": 1.5,
+      "release_ms": 2.0,
+      "gain": 1.0,
+      "brake_enabled": false,
+      "brake_amp_pct": 40.0,
+      "brake_delay_ms": 0.5,
+      "notes": ""
+    },
+    {
+      "name": "Dayton DAEX-25",
+      "description": "Dayton DAEX-25 tactile transducer (~45 Hz resonance, light moving mass).",
+      "f_res_hz": 45.0,
+      "carrier_offset_pct": 15.0,
+      "band_low_hz": 20.0,
+      "band_high_hz": 150.0,
+      "halfwaves": 2,
+      "attack_ms": 1.0,
+      "release_ms": 1.5,
+      "gain": 1.0,
+      "brake_enabled": true,
+      "brake_amp_pct": 35.0,
+      "brake_delay_ms": 0.4,
+      "notes": "Light moving mass tolerates a short attack; mild brake suffices."
+    },
+    {
+      "name": "Buttkicker LFE",
+      "description": "Buttkicker LFE (~25 Hz resonance, heavy moving mass).",
+      "f_res_hz": 25.0,
+      "carrier_offset_pct": 10.0,
+      "band_low_hz": 10.0,
+      "band_high_hz": 90.0,
+      "halfwaves": 1,
+      "attack_ms": 1.0,
+      "release_ms": 1.0,
+      "gain": 1.0,
+      "brake_enabled": true,
+      "brake_amp_pct": 50.0,
+      "brake_delay_ms": 0.6,
+      "notes": "Heavy mass: single halfwave plus a strong brake to kill ringing."
+    }
+  ]
+}
