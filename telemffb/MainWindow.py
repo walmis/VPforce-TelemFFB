@@ -441,8 +441,7 @@ class MainWindow(QMainWindow):
         self._add_device_view_context_menu(self.monitor_device_strip.device_mini_panel)
         self.monitor_panel.header_bar.add_beside_slot(self.monitor_device_strip)
         self.monitor_device_strip.hide()
-        if G.master_instance:
-            self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
+        self._refresh_monitor_scope()
 
         """ Add the monitor tab object to the tab widget"""
 
@@ -1136,6 +1135,10 @@ class MainWindow(QMainWindow):
         if monitor_strip is not None:
             monitor_strip.device_mini_panel.set_clickable(multiple)
             monitor_strip.setVisible(bool(names) and 'Monitor' in getattr(self, '_detached_tabs', {}))
+            # A strip in the Monitor's header bar stands in for its "Device:"
+            # indicator. Same guard: this runs before the Monitor tab is
+            # built, and an exception here takes the process down.
+            self.monitor_panel.refresh_scope_indicator()
 
     def _set_devices_frame_preference(self, visible: bool):
         """The view-toggle buttons: the frame, or - from the frame - the
@@ -1318,6 +1321,7 @@ class MainWindow(QMainWindow):
         if len(G.launched_instances):
             current_title = f"** MASTER INSTANCE ** {current_title}"
         self.setWindowTitle(current_title)
+        self._refresh_monitor_scope()      # the children exist now
         # self.instance_status_row.show()
         # if "joystick" in G.launched_instances:
         #     self.instance_status_row.joystick_status_icon.show()
@@ -1367,8 +1371,8 @@ class MainWindow(QMainWindow):
         G.current_device_config_scope = types[arg]
         self.device_panel.set_active_device(types[arg])
 
+        self._refresh_monitor_scope()
         if G.master_instance:
-            self.monitor_panel.set_effects_scope_label(G.current_device_config_scope)
             # A child's device: have that child send its telemetry view.
             ipc = getattr(G, 'ipc_instance', None)
             if ipc:
@@ -2082,14 +2086,20 @@ class MainWindow(QMainWindow):
         lists and the settings page's live sliders read: this instance's, or
         - on the master, scoped to a child's device - the one that child
         last sent. Falls back to this instance's while the child has sent
-        nothing recent; the table's header says which it is."""
+        nothing recent, which the Monitor tab's device indicator then says."""
         scope = G.current_device_config_scope
         if not G.master_instance or scope == G.device_type:
-            self.monitor_panel.set_telemetry_source(None)
+            self._refresh_monitor_scope()
             return own
         frame = G.ipc_instance.child_view.frame(scope)
-        self.monitor_panel.set_telemetry_source(scope, sending=frame is not None)
+        self._refresh_monitor_scope(sending=frame is not None)
         return own if frame is None else self._ordered_telemetry(frame)
+
+    def _refresh_monitor_scope(self, sending: bool = True) -> None:
+        """The Monitor tab's "Device:" indicator: the device in scope, on a
+        master with children to choose between - and nothing otherwise."""
+        chosen = G.master_instance and G.launched_instances
+        self.monitor_panel.set_scope_device(G.current_device_config_scope if chosen else None, sending)
 
     def on_update_telemetry(self, datadict: dict):
         if utils.millis() - self.last_telemetry_refresh < 50:

@@ -46,7 +46,7 @@ class TabHeaderBar(QWidget):
 
         self.device_slot = DeviceSlot()
 
-        # [ page controls ... ][ stretch ][ gap ][ slot ]
+        # [ page controls ... ][ stretch ][ page status ... ][ gap ][ slot ]
         # The stretch takes the spare width, so the controls keep their own
         # size at the left and the slot keeps to the right as the window
         # widens.
@@ -56,6 +56,8 @@ class TabHeaderBar(QWidget):
         self._row.addSpacing(_GAP)
         self._row.addWidget(self.device_slot, alignment=Qt.AlignmentFlag.AlignVCenter)
         self._left_count = 0  # widgets added by add_left; they go before the stretch
+        self._right_count = 0  # widgets added by add_right; they go after it
+        self._beside_slot = []
 
     def match_page_background(self) -> None:
         """Paint the palette's Window role - what the settings form below
@@ -81,9 +83,22 @@ class TabHeaderBar(QWidget):
         self._row.insertWidget(self._left_count, widget, alignment=Qt.AlignmentFlag.AlignVCenter)
         self._left_count += 1
 
+    def add_right(self, widget: QWidget) -> None:
+        """Append to what the page has to say for itself, held at the
+        right-hand end just ahead of the device slot."""
+        self._row.insertWidget(self._left_count + 1 + self._right_count, widget,
+                               alignment=Qt.AlignmentFlag.AlignVCenter)
+        self._right_count += 1
+
+    def shows_device_strip(self) -> bool:
+        """Whether a device strip is up in this bar - the one docked in the
+        slot, or a stand-in beside it."""
+        return not self.device_slot.isHidden() or any(not w.isHidden() for w in self._beside_slot)
+
     def add_beside_slot(self, widget: QWidget) -> None:
         """Put ``widget`` at the right-hand end, next to the device slot -
         for the stand-in strip a detached window shows in place of the one
         that stays behind. Its own to show and hide: it is not in the slot,
         which empties as the strip moves on."""
         self._row.addWidget(widget, alignment=Qt.AlignmentFlag.AlignVCenter)
+        self._beside_slot.append(widget)

@@ -60,9 +60,9 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import (QGridLayout, QHeaderView, QLabel, QLineEdit,
-                             QSplitter, QStackedWidget, QWidget)
+from PyQt6.QtGui import QCursor, QPixmap
+from PyQt6.QtWidgets import (QGridLayout, QHBoxLayout, QHeaderView, QLabel,
+                             QLineEdit, QSplitter, QStackedWidget, QWidget)
 
 import telemffb.globals as G
 from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
@@ -73,10 +73,10 @@ from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
                                    EFFECT_SPRING, EFFECT_SPRING_ADJUSTER,
                                    EFFECT_SQUARE, EFFECT_TRIANGLE,
                                    PERIODIC_EFFECTS, effect_names)
+from telemffb.ui.panels.DevicePanel import DEVICE_ICONS, tint_pixmap
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
 from telemffb.ui.widgets.EffectTypeDelegate import EffectTypeDelegate
 from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
-from telemffb.ui.widgets.SpanningTitleHeaderView import SpanningTitleHeaderView
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
 
@@ -88,6 +88,10 @@ _MONOSPACE_STYLE = """
 #: Wide enough for "100%" over a bar that still reads as a bar, narrow
 #: enough to leave the effect names the rest of a half-split pane.
 INTENSITY_COLUMN_WIDTH = 72
+
+#: The scoped device's icon in the page header: the height of the text it
+#: sits in, against the 72px the device panel draws it at.
+_SCOPE_ICON_PX = 16
 
 #: The telemetry pane's share of the monitor splitter, in percent - the rest
 #: goes to the active-effects pane.
@@ -315,9 +319,26 @@ class MonitorPanel(QWidget):
         self.telem_filter.setPlaceholderText("Filter")
         self.telem_filter.setMaximumWidth(100)
 
+        # Whose data the page is showing - both tables, so it is said once up
+        # here rather than in a header of each. At the far end of the bar
+        # from the page's controls: it is something to read, not to use.
+        # Hidden until there is a choice of device to speak of
+        # (set_scope_device).
+        self._scope_device = None
+        self._scope_indicator = QWidget()
+        scope_row = QHBoxLayout(self._scope_indicator)
+        scope_row.setContentsMargins(0, 0, 0, 0)
+        scope_row.setSpacing(4)
+        self._scope_icon = QLabel()
+        self._scope_name = QLabel()
+        for widget in (QLabel('Device:'), self._scope_icon, self._scope_name):
+            scope_row.addWidget(widget)
+        self._scope_indicator.hide()
+
         self.header_bar.add_left(self.detach_toolbar)
         self.header_bar.add_left(self.telem_lbl)
         self.header_bar.add_left(self.telem_filter)
+        self.header_bar.add_right(self._scope_indicator)
 
 
         """ Telemetry pane: a plain "waiting for data" label shown until the
@@ -349,25 +370,10 @@ class MonitorPanel(QWidget):
         self._telem_stack.setMinimumHeight(100)
 
         """ Active-effects pane. """
-        # Both sections stay blank: this table's header is the pane's title,
-        # which the header view paints across the sections as one centred
-        # phrase (set_effects_scope_label), not a label per column.
-        self._effects_model = KeyValueTableModel(['', ''], self)
+        self._effects_model = KeyValueTableModel(['Active Effects', 'Intensity'], self)
         self.effects_view = CopyableTableView(self)
         self.effects_view.setModel(self._effects_model)
-        # The header is the pane's title, and says whose effects these are -
-        # level with the telemetry table's own header beside it.
-        self._effects_header = SpanningTitleHeaderView(Qt.Orientation.Horizontal, self.effects_view)
-        self.effects_view.setHorizontalHeader(self._effects_header)
-        # setHorizontalHeader only wires the header up; the defaults a table
-        # gives the one it makes itself have to be restated, or this header
-        # would behave unlike the telemetry table's.
-        self._effects_header.setSectionsClickable(True)
-        self._effects_header.setHighlightSections(True)
-        # A child instance never calls set_effects_scope_label - it has only
-        # its own device - so the untitled default has to stand on its own.
-        self._effects_header.setTitle('Active effects')
-        header = self._effects_header
+        header = self.effects_view.horizontalHeader()
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -443,37 +449,48 @@ class MonitorPanel(QWidget):
     def set_detach_toolbar_visible(self, visible: bool) -> None:
         self.detach_toolbar.setVisible(visible)
 
-    # ---- active-effects header (master scope switch) ----------------------
+    # ---- whose data this is (master scope switch) --------------------------
 
-    def set_effects_scope_label(self, device_type: Optional[str]) -> None:
-        """``device_type`` is the config-scope device to name in the header
-        (master only); ``None`` restores the plain "Active effects" title.
+    def set_scope_device(self, device_type: Optional[str], sending: bool = True) -> None:
+        """Name the device whose telemetry and effects the page is showing,
+        in the header bar. ``None`` hides it: an instance with one device has
+        no other it could be.
 
-        The title is one string spanning the header rather than a label per
-        column: a column's text centres within that column, which for a
-        two-column table is never the table's own centre - the name column is
-        short by half the intensities' 72px, and a title split across both
-        columns hangs off the divider between them."""
-        self._effects_header.setTitle(
-            f'Active effects: {device_type.title()}' if device_type else 'Active effects')
-
-    def set_telemetry_source(self, device_type: Optional[str], sending: bool = True) -> None:
-        """Whose telemetry the table is showing (master only). ``None`` is
-        this instance's own, under the plain "Value" header; a child's
-        device is that child's view, and is named. A child that is not
-        ``sending`` has left the table on this instance's frame, and the
-        header says so."""
+        A child that is not ``sending`` its telemetry has left that table on
+        this instance's own frame, and the indicator says so."""
         if not device_type:
-            header = 'Value'
-        elif sending:
-            header = f'Value: {device_type.title()}'
-        else:
-            header = f'Value ({device_type.title()} not sending)'
-        self._telem_model.set_header(1, header)
+            self._scope_device = None
+            self.refresh_scope_indicator()
+            return
+        if device_type != self._scope_device:
+            self._scope_device = device_type
+            ratio = self.devicePixelRatioF()
+            icon = QPixmap(DEVICE_ICONS[device_type]).scaledToHeight(
+                round(_SCOPE_ICON_PX * ratio), Qt.TransformationMode.SmoothTransformation)
+            icon.setDevicePixelRatio(ratio)
+            # Grey, of the theme's own making: the text colour, held back.
+            grey = self._scope_name.palette().windowText().color()
+            grey.setAlphaF(0.55)
+            self._scope_icon.setPixmap(tint_pixmap(icon, grey))
+        name = device_type.title()
+        self._scope_name.setText(name if sending else f"{name} (no data)")
+        self._scope_name.setToolTip(
+            '' if sending else f"{name} is not sending its telemetry - this instance's is shown")
+        # Shown once it has its contents, so the header bar lays it out once at
+        # its real width rather than empty first and again a pass later.
+        self.refresh_scope_indicator()
 
-    def effects_title(self) -> str:
-        """The effects pane's title."""
-        return self._effects_header.title()
+    def refresh_scope_indicator(self) -> None:
+        """Show the indicator if there is a device to name and nothing beside
+        it already naming it: a device strip in this bar - the "tab header"
+        device view, or a detached Monitor's stand-in - has the device in
+        scope highlighted, an inch to the right."""
+        self._scope_indicator.setVisible(
+            self._scope_device is not None and not self.header_bar.shows_device_strip())
+
+    def scope_text(self) -> str:
+        """What the indicator says, or '' while it is hidden."""
+        return '' if self._scope_indicator.isHidden() else self._scope_name.text()
 
     # ---- debug menu: "Show simvar in telem window" ------------------------
 

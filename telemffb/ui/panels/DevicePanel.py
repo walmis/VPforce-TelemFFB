@@ -57,6 +57,21 @@ def _status_colors() -> dict:
     keeps the lookup honest if that ever changes."""
     return STATUS_COLORS_DARK if G.useDarkMode else STATUS_COLORS
 
+def tint_pixmap(base_pixmap: QPixmap, color: QColor) -> QPixmap:
+    """``base_pixmap``'s shape, filled with ``color``."""
+    tinted = QPixmap(base_pixmap.size())
+    tinted.fill(Qt.GlobalColor.transparent)
+
+    painter = QPainter(tinted)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+    painter.drawPixmap(0, 0, base_pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(tinted.rect(), color)
+    painter.end()
+
+    return tinted
+
+
 def device_status_state() -> str:
     """Derive the device panel state from the live device object.
 
@@ -329,17 +344,7 @@ class DeviceIconWidget(QWidget):
         painter.drawPath(path_bot_right)
 
     def _tint_pixmap(self, base_pixmap: QPixmap, color: QColor) -> QPixmap:
-        tinted = QPixmap(base_pixmap.size())
-        tinted.fill(Qt.GlobalColor.transparent)
-
-        painter = QPainter(tinted)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-        painter.drawPixmap(0, 0, base_pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-        painter.fillRect(tinted.rect(), color)
-        painter.end()
-
-        return tinted
+        return tint_pixmap(base_pixmap, color)
 
     def set_status_color(self, color):
         colors = _status_colors()
@@ -647,15 +652,7 @@ class MiniDeviceChip(QWidget):
 
     def _repaint(self):
         if self._original_pixmap is not None:
-            tinted = QPixmap(self._original_pixmap.size())
-            tinted.fill(Qt.GlobalColor.transparent)
-            painter = QPainter(tinted)
-            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-            painter.drawPixmap(0, 0, self._original_pixmap)
-            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-            painter.fillRect(tinted.rect(), self._status_color)
-            painter.end()
-            self.icon_label.setPixmap(tinted)
+            self.icon_label.setPixmap(tint_pixmap(self._original_pixmap, self._status_color))
 
     def set_clickable(self, clickable: bool):
         clickable = clickable and self._configured

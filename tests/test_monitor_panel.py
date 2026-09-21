@@ -557,29 +557,46 @@ class TestConditionAxes:
         assert parse_axes('42%') is None
 
 
-class TestEffectsScopeLabel:
-    def test_default_label(self, panel):
-        assert panel.effects_title() == 'Active effects'
+class TestScopeDevice:
+    """The "Device:" indicator in the page header: whose telemetry and
+    effects the two tables are showing."""
 
-    def test_scoped_label_names_the_device(self, panel):
-        panel.set_effects_scope_label('pedals')
-        assert panel.effects_title() == 'Active effects: Pedals'
+    def test_hidden_until_there_is_a_device_to_name(self, panel):
+        assert panel.scope_text() == ''
 
-    def test_the_title_spans_the_header_rather_than_a_column(self, panel):
-        """The title belongs to the pane, not to either column: a column's
-        text centres within that column, which for this two-column table is
-        never the table's own centre. It lives on the header view, which
-        paints it across both sections, and the sections stay blank."""
+    def test_names_the_device_in_scope(self, panel):
+        panel.set_scope_device('pedals')
+        assert panel.scope_text() == 'Pedals'
+        assert not panel._scope_icon.pixmap().isNull()
+
+    def test_a_child_that_is_not_sending_is_said_so(self, panel):
+        """The telemetry table has fallen back to this instance's own frame;
+        naming the child without a word would pass that off as the child's."""
+        panel.set_scope_device('pedals', sending=False)
+        assert panel.scope_text() == 'Pedals (no data)'
+
+    def test_a_device_strip_in_the_same_bar_stands_in_for_it(self, panel):
+        """The "tab header" device view docks the strip an inch to the right,
+        with the device in scope highlighted: saying it twice is clutter."""
+        panel.set_scope_device('pedals')
+        panel.header_bar.device_slot.show()
+        panel.refresh_scope_indicator()
+        assert panel.scope_text() == ''
+        panel.header_bar.device_slot.hide()
+        panel.refresh_scope_indicator()
+        assert panel.scope_text() == 'Pedals'
+
+    def test_no_device_hides_it_again(self, panel):
+        panel.set_scope_device('pedals')
+        panel.set_scope_device(None)
+        assert panel.scope_text() == ''
+
+    def test_the_tables_keep_plain_column_headers(self, panel):
         from PyQt6.QtCore import Qt
-        panel.set_effects_scope_label('trimwheel')
-        header = lambda section: panel._effects_model.headerData(section, Qt.Orientation.Horizontal)
-        assert (header(0), header(1)) == ('', '')
-        assert panel._effects_header.title() == 'Active effects: Trimwheel'
-
-    def test_clearing_scope_restores_default(self, panel):
-        panel.set_effects_scope_label('pedals')
-        panel.set_effects_scope_label(None)
-        assert panel.effects_title() == 'Active effects'
+        panel.set_scope_device('trimwheel')
+        headers = [model.headerData(section, Qt.Orientation.Horizontal)
+                   for model in (panel._telem_model, panel._effects_model) for section in (0, 1)]
+        assert headers == ['Key', 'Value', 'Active Effects', 'Intensity']
 
 
 class TestCopySelection:
