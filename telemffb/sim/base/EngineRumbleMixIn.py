@@ -1,5 +1,5 @@
 import telemffb.utils as utils
-from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE
+from telemffb.hw.ffb_rhino import EFFECT_SINE, EFFECT_TRIANGLE
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 
@@ -155,7 +155,6 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         modulation_neg = 3
         frequency2 = frequency + median_modulation
         precision = 2
-        effect_index = 4
         phase_offset = 120
         if self._sim_is_xplane():
             jet_eng_rpm = telem_data.EngPCT or 0
@@ -175,10 +174,10 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         intensity = utils.clamp(intensity, 0, 1)
         rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
         rt_freq2 = round(rt_freq + median_modulation, 4)
-        self.effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=effect_index).start()
-        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=effect_index).start()
-        self.effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=effect_index, phase=phase_offset).start()
-        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=effect_index, phase=phase_offset+30).start()
+        self.effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=EFFECT_SINE).start()
+        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_type=EFFECT_SINE).start()
+        self.effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=EFFECT_SINE, phase=phase_offset).start()
+        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_type=EFFECT_SINE, phase=phase_offset+30).start()
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
     def ac_update_ab_effect(self, telem_data: BaseTelemetryData):
