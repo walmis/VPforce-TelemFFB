@@ -16,8 +16,8 @@ from telemffb.hw.ffb_rhino import (
 )
 from telemffb.hw.ffb_shaker import (
     DEFAULT_GAIN, SHAKER_CAPABILITIES, TRANSIENT_MS, ShakerEffectHandle,
-    ShakerFFBDevice, ShakerOutputError, ShakerProfile, default_profiles_path,
-    load_profiles, profile_from_dict,
+    ShakerFFBDevice, ShakerOutputError, ShakerProfile, Transducer,
+    default_profiles_path, load_profiles, profile_from_dict,
 )
 from telemffb.hw.shaker_synth import ImpulseTrain, Oscillator
 from telemffb.utils import Dispenser
@@ -160,13 +160,32 @@ class TestOpen:
         with pytest.raises(ShakerOutputError):
             ShakerFFBDevice(output=output, reconnect_interval_ms=0)
 
-    def test_channel_mode_is_live(self, device, output):
+    def test_transducer_rows_are_live(self, device, output):
         handle = device.create_effect(EFFECT_SINE)
         handle.setPeriodic(50.0, 1.0, 0).start()
         output.render(0.2)
-        device.set_channel_mode('right')
+        device.set_transducers([Transducer('Right only', 1)])
         out = output.pump()
         assert not out[:, 0].any() and out[:, 1].any()
+        assert handle.started and handle.kind == 'tone'
+
+    def test_one_render_per_profile_not_per_transducer(self, output, clock):
+        light = ShakerProfile(name='light', band_low_hz=20.0, band_high_hz=100.0)
+        heavy = ShakerProfile(name='heavy', band_low_hz=10.0, band_high_hz=60.0)
+        rows = [Transducer('a', 0, 1.0, 'light'), Transducer('b', 1, 0.5, 'light'),
+                Transducer('c', 2, 1.0, 'heavy')]
+        dev = ShakerFFBDevice(output=output, transducers=rows, profiles=[light, heavy],
+                              gain=1.0, reconnect_interval_ms=0, clock=clock)
+        handle = dev.create_effect(EFFECT_SINE)
+        handle.setPeriodic(80.0, 1.0, 0).start()
+        assert set(handle.voices) == {'light', 'heavy'}
+        assert handle.voices['light'].frequency == pytest.approx(80.0)
+        assert handle.voices['heavy'].frequency == pytest.approx(40.0)   # folded for the heavy band
+        out = np.concatenate([output.pump() for _ in range(30)])
+        peaks = [abs(out[:, c]).max() for c in range(3)]
+        assert peaks[0] == pytest.approx(1.0, abs=0.02)
+        assert peaks[1] == pytest.approx(0.5, abs=0.02)
+        assert peaks[2] == pytest.approx(1.0, abs=0.02)
 
     def test_shutdown_stops_the_output(self, device, output):
         device.shutdown()
@@ -211,7 +230,7 @@ class TestEffectLifecycle:
         handle.setPeriodic(50.0, 1.0, 0).start()
         handle.forget_playback()
         assert not handle.started
-        assert device.synth.keys() == [str(handle.effect_id)]
+        assert device.synth.keys() == [f"{handle.effect_id}:{device.profile.name}"]
         handle.invalidate()
         assert not bool(handle)
         assert device.synth.keys() == []

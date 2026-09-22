@@ -46,7 +46,7 @@ from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
 from telemffb.ui.widgets.custom_widgets import LabeledToggle, Toggle
 from PyQt6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QGridLayout,
-    QHBoxLayout, QLabel, QPushButton, QRadioButton, QSizePolicy, QSlider,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton, QSizePolicy,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -333,23 +333,154 @@ class DeviceRow(QWidget):
                                    or self.marker.isChecked())
 
 
-class ShakerControls(QWidget):
-    """The shaker's own row under its output selector: master gain, how
-    the mix lands on the output's channels, the transducer's calibration
-    profile, and a test button that plays through the selected output
-    with the values as they stand.  The dialog fills the profile list,
-    wires the button and reads the values back at Save.
-    """
+class TransducerRow(QWidget):
+    """One transducer on the shaker card: name, output channel, position,
+    gain, calibration profile, a play button that sounds this row alone
+    (how a user tells three transducers apart) and a remove button."""
 
-    MODES = (('Mono', 'mono'), ('Left', 'left'), ('Right', 'right'), ('Pan', 'pan'))
+    removed = pyqtSignal()
+    test_requested = pyqtSignal()
+    changed = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         row = QHBoxLayout(self)
-        row.setContentsMargins(0, 2, 0, 0)
-        row.setSpacing(8)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText('Name')
+        self.name_edit.setFixedWidth(110)
+        self.name_edit.setToolTip('What this transducer is called in the list')
+        row.addWidget(self.name_edit)
+
+        row.addWidget(QLabel('Ch:'))
+        self.channel_combo = QComboBox()
+        self.channel_combo.setToolTip(
+            "Which of the output's channels this transducer is wired to.\n"
+            'On a stereo card 1 is left and 2 is right; a 7.1 card counts\n'
+            'front L/R, center, subwoofer, rear L/R, side L/R.')
+        row.addWidget(self.channel_combo)
+
+        self.position_combo = QComboBox()
+        self.position_combo.setToolTip('Where the transducer sits')
+        row.addWidget(self.position_combo)
 
         row.addWidget(QLabel('Gain:'))
+        self.gain_spin = QDoubleSpinBox()
+        self.gain_spin.setRange(0.0, 10.0)
+        self.gain_spin.setSingleStep(0.1)
+        self.gain_spin.setDecimals(1)
+        self.gain_spin.setValue(1.0)
+        self.gain_spin.setToolTip("This transducer's level, under the master gain")
+        row.addWidget(self.gain_spin)
+
+        self.profile_combo = QComboBox()
+        self.profile_combo.setToolTip(
+            'How this transducer wants its pulses driven: resonance, band, '
+            'pulse edges, brake.')
+        row.addWidget(self.profile_combo)
+
+        self.test_button = QToolButton()
+        self.test_button.setText('\u25b6')
+        self.test_button.setAutoRaise(True)
+        self.test_button.setToolTip('Play a pulse and a tone through this transducer only')
+        self.test_button.clicked.connect(self.test_requested.emit)
+        row.addWidget(self.test_button)
+
+        self.remove_button = QToolButton()
+        self.remove_button.setText('\u2715')
+        self.remove_button.setAutoRaise(True)
+        self.remove_button.setToolTip('Remove this transducer')
+        self.remove_button.clicked.connect(self.removed.emit)
+        row.addWidget(self.remove_button)
+        row.addStretch(1)
+
+        self._channels = 0
+        self.set_channel_count(2)
+        for w in (self.name_edit, self.channel_combo, self.position_combo,
+                  self.gain_spin, self.profile_combo):
+            sig = getattr(w, 'currentIndexChanged', None) or getattr(w, 'valueChanged', None) \
+                or getattr(w, 'textChanged', None)
+            sig.connect(lambda *_: self.changed.emit())
+
+    def set_channel_count(self, count: int) -> None:
+        """Offer channels 1..count; a stored channel beyond that is kept
+        on the list (marked) rather than lost, since the output may be
+        reconfigured or reselected."""
+        current = self.channel()
+        count = max(1, int(count), current + 1)
+        if count == self._channels:
+            return
+        self._channels = count
+        self.channel_combo.blockSignals(True)
+        self.channel_combo.clear()
+        for i in range(count):
+            self.channel_combo.addItem(str(i + 1), i)
+        self.channel_combo.setCurrentIndex(min(current, count - 1))
+        self.channel_combo.blockSignals(False)
+
+    def set_profiles(self, names) -> None:
+        current = self.profile_combo.currentText()
+        self.profile_combo.blockSignals(True)
+        self.profile_combo.clear()
+        for name in names:
+            self.profile_combo.addItem(name)
+        idx = self.profile_combo.findText(current)
+        self.profile_combo.setCurrentIndex(max(0, idx))
+        self.profile_combo.blockSignals(False)
+
+    def set_positions(self, positions) -> None:
+        current = self.position_combo.currentText()
+        self.position_combo.blockSignals(True)
+        self.position_combo.clear()
+        for p in positions:
+            self.position_combo.addItem(p)
+        idx = self.position_combo.findText(current)
+        self.position_combo.setCurrentIndex(max(0, idx))
+        self.position_combo.blockSignals(False)
+
+    def channel(self) -> int:
+        data = self.channel_combo.currentData()
+        return int(data) if data is not None else 0
+
+    def value(self):
+        from telemffb.hw.ffb_shaker import Transducer
+        return Transducer(self.name_edit.text().strip() or 'Shaker', self.channel(),
+                          round(self.gain_spin.value(), 2),
+                          self.profile_combo.currentText(), self.position_combo.currentText())
+
+    def set_value(self, t) -> None:
+        self.name_edit.setText(t.name)
+        self.set_channel_count(max(self._channels, t.channel + 1))
+        self.channel_combo.setCurrentIndex(self.channel_combo.findData(t.channel))
+        self.gain_spin.setValue(float(t.gain))
+        idx = self.profile_combo.findText(t.profile)
+        self.profile_combo.setCurrentIndex(max(0, idx))
+        idx = self.position_combo.findText(t.position)
+        self.position_combo.setCurrentIndex(max(0, idx))
+
+
+class ShakerControls(QWidget):
+    """The shaker's own controls under its output selector: master gain,
+    the transducer rows, a row adder and a test button for the whole
+    rig.  The dialog supplies the profile names and the output's channel
+    count, wires the buttons, and reads the rows back at Save.
+    """
+
+    row_test_requested = pyqtSignal(int)
+    rows_changed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 2, 0, 0)
+        outer.setSpacing(3)
+
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(8)
+        head.addWidget(QLabel('Gain:'))
         self.gain_spin = QDoubleSpinBox()
         self.gain_spin.setObjectName('shaker_gain')
         self.gain_spin.setRange(0.0, 10.0)
@@ -358,62 +489,96 @@ class ShakerControls(QWidget):
         self.gain_spin.setToolTip(
             "Master gain for everything the shaker plays.\nTelemFFB's effect "
             "intensities are tuned for a stick; a transducer needs several "
-            "times that.  The mix is limited, never clipped, so a high gain "
-            "is safe.")
-        row.addWidget(self.gain_spin)
-
-        row.addWidget(QLabel('Output:'))
-        self.mode_combo = QComboBox()
-        self.mode_combo.setObjectName('shaker_mode')
-        for label, value in self.MODES:
-            self.mode_combo.addItem(label, value)
-        self.mode_combo.setToolTip(
-            'Which of the output\'s channels carry the shaker.\n'
-            'Mono: both.  Left or Right: that channel only, for a shaker on '
-            'one side of a shared card.\nPan: split between the two.')
-        row.addWidget(self.mode_combo)
-
-        self.pan_slider = QSlider(Qt.Orientation.Horizontal)
-        self.pan_slider.setObjectName('shaker_pan')
-        self.pan_slider.setRange(-100, 100)
-        self.pan_slider.setValue(0)
-        self.pan_slider.setFixedWidth(90)
-        self.pan_slider.setToolTip('Left to right')
-        self.pan_slider.setVisible(False)
-        row.addWidget(self.pan_slider)
-        self.mode_combo.currentIndexChanged.connect(
-            lambda _i: self.pan_slider.setVisible(self.mode_value() == 'pan'))
-
-        row.addWidget(QLabel('Profile:'))
-        self.profile_combo = QComboBox()
-        self.profile_combo.setObjectName('shaker_profile')
-        self.profile_combo.setToolTip(
-            "How this transducer wants its pulses driven: resonance, band, "
-            "pulse edges, brake.")
-        row.addWidget(self.profile_combo)
-
-        self.test_button = QPushButton('Test')
+            "times that.  Each channel is limited, never clipped, so a high "
+            "gain is safe.")
+        head.addWidget(self.gain_spin)
+        head.addStretch(1)
+        self.add_button = QPushButton('+ add transducer')
+        self.add_button.setObjectName('shaker_add')
+        self.add_button.setFlat(True)
+        self.add_button.setToolTip('Another transducer on this sound card')
+        head.addWidget(self.add_button)
+        self.test_button = QPushButton('Test all')
         self.test_button.setObjectName('shaker_test')
         self.test_button.setToolTip(
-            'Play a pulse and a short tone through the selected output with '
-            'these settings, saved or not.')
-        row.addWidget(self.test_button)
-        row.addStretch(1)
+            'Play a pulse and a short tone through every transducer at once, '
+            'with these settings, saved or not.')
+        head.addWidget(self.test_button)
+        outer.addLayout(head)
 
-    def mode_value(self) -> str:
-        return self.mode_combo.currentData() or 'mono'
+        self.rows_host = QWidget()
+        self.rows_layout = QVBoxLayout(self.rows_host)
+        self.rows_layout.setContentsMargins(0, 0, 0, 0)
+        self.rows_layout.setSpacing(2)
+        outer.addWidget(self.rows_host)
 
-    def set_mode_value(self, mode: str) -> None:
-        index = self.mode_combo.findData(mode)
-        self.mode_combo.setCurrentIndex(max(0, index))
-        self.pan_slider.setVisible(self.mode_value() == 'pan')
+        self._profiles = []
+        self._positions = []
+        self._channels = 2
+        self.rows = []
+        self.add_button.clicked.connect(lambda: self.add_row())
 
-    def pan_value(self) -> float:
-        return self.pan_slider.value() / 100.0
+    def set_profiles(self, names) -> None:
+        self._profiles = list(names)
+        for row in self.rows:
+            row.set_profiles(self._profiles)
 
-    def set_pan_value(self, pan: float) -> None:
-        self.pan_slider.setValue(int(round(max(-1.0, min(1.0, float(pan))) * 100)))
+    def set_positions(self, positions) -> None:
+        self._positions = list(positions)
+        for row in self.rows:
+            row.set_positions(self._positions)
 
+    def set_channel_count(self, count: int) -> None:
+        self._channels = max(1, int(count))
+        for row in self.rows:
+            row.set_channel_count(self._channels)
+
+    def add_row(self, transducer=None):
+        row = TransducerRow(self.rows_host)
+        row.set_profiles(self._profiles)
+        row.set_positions(self._positions)
+        row.set_channel_count(self._channels)
+        if transducer is not None:
+            row.set_value(transducer)
+        else:
+            row.name_edit.setText(f'Transducer {len(self.rows) + 1}')
+            # a new row takes the first channel nobody else is on
+            taken = {r.channel() for r in self.rows}
+            free = next((c for c in range(self._channels) if c not in taken), 0)
+            row.channel_combo.setCurrentIndex(row.channel_combo.findData(free))
+        row.removed.connect(lambda r=row: self.remove_row(r))
+        row.test_requested.connect(lambda r=row: self.row_test_requested.emit(self.rows.index(r)))
+        row.changed.connect(self.rows_changed.emit)
+        self.rows.append(row)
+        self.rows_layout.addWidget(row)
+        self.rows_changed.emit()
+        return row
+
+    def remove_row(self, row) -> None:
+        if row not in self.rows:
+            return
+        self.rows.remove(row)
+        self.rows_layout.removeWidget(row)
+        row.setParent(None)
+        row.deleteLater()
+        self.rows_changed.emit()
+
+    def clear_rows(self) -> None:
+        for row in list(self.rows):
+            self.remove_row(row)
+
+    def transducers(self):
+        return [row.value() for row in self.rows]
+
+    def set_transducers(self, transducers) -> None:
+        self.clear_rows()
+        for t in transducers:
+            self.add_row(t)
+
+    def set_test_enabled(self, enabled: bool) -> None:
+        self.test_button.setEnabled(enabled and bool(self.rows))
+        for row in self.rows:
+            row.test_button.setEnabled(enabled)
 
 class RoleCard(QFrame):
     """One role: header (icon, name, master radio) over its device row(s).

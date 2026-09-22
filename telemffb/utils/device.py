@@ -217,6 +217,9 @@ class AudioOutputInfo:
     product_id: int = SHAKER_PSEUDO_PID
     serial_number: str = ''
     path: bytes = b''
+    #: output channels the card offers (the system default is taken as
+    #: stereo: whatever it is, the first two channels exist)
+    channels: int = 2
 
     def __post_init__(self):
         if not self.product_string:
@@ -238,7 +241,7 @@ def audio_selection_devices():
         from telemffb.hw.shaker_synth import SoundDeviceOutput
         listed = [AudioOutputInfo('')]
         for dev in SoundDeviceOutput.list_devices():
-            listed.append(AudioOutputInfo(dev.name))
+            listed.append(AudioOutputInfo(dev.name, channels=max(1, int(dev.channels))))
         return listed
     except Exception as e:
         logging.error(f"Audio outputs could not be enumerated for the shaker: {e}")

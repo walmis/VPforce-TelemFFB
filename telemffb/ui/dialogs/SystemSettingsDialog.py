@@ -609,37 +609,43 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     # ------------------------------------------------------------------
 
     _shaker_preview = None
+    _shaker_profiles = ()
 
     def _setup_shaker_card(self):
-        from telemffb.hw.ffb_shaker import default_profiles_path, load_profiles
+        from telemffb.hw.ffb_shaker import POSITIONS, default_profiles_path, load_profiles
         controls = self.device_cards.shaker_controls
-        profiles, _active = load_profiles(default_profiles_path())
-        controls.profile_combo.clear()
-        for profile in profiles:
-            controls.profile_combo.addItem(profile.name, profile)
-            controls.profile_combo.setItemData(
-                controls.profile_combo.count() - 1, profile.description,
-                Qt.ItemDataRole.ToolTipRole)
-        controls.test_button.clicked.connect(self._shaker_test_clicked)
-        self.cb_select_s.currentIndexChanged.connect(self._sync_shaker_test_button)
+        self._shaker_profiles, _active = load_profiles(default_profiles_path())
+        controls.set_profiles([p.name for p in self._shaker_profiles])
+        controls.set_positions(POSITIONS)
+        controls.test_button.clicked.connect(lambda: self._shaker_test_clicked())
+        controls.row_test_requested.connect(self._shaker_test_clicked)
+        controls.rows_changed.connect(self._sync_shaker_test_button)
+        self.cb_select_s.currentIndexChanged.connect(self._sync_shaker_output)
+        self._sync_shaker_output()
+
+    def _sync_shaker_output(self, *_):
+        """The selected output decides how many channels the rows can
+        pick from, and whether a test can play at all."""
+        controls = self.device_cards.shaker_controls
+        device = self.selected_device('shaker')
+        controls.set_channel_count(int(getattr(device, 'channels', 2) or 2) if device else 2)
         self._sync_shaker_test_button()
 
     def _sync_shaker_test_button(self, *_):
-        """The test needs an output to play through."""
         controls = self.device_cards.shaker_controls
-        controls.test_button.setEnabled(
+        controls.set_test_enabled(
             self.selected_device('shaker') is not None and self._shaker_preview is None)
+        if self.isVisible():
+            self._grow_to_fit()
 
     def shaker_settings_values(self):
         """The shaker card's controls as the settings they are stored as."""
-        from telemffb.hw.ffb_shaker import (SETTING_GAIN, SETTING_MODE, SETTING_PAN,
-                                            SETTING_PROFILE)
+        from telemffb.hw.ffb_shaker import (SETTING_GAIN, SETTING_TRANSDUCERS,
+                                            transducers_to_json)
         controls = self.device_cards.shaker_controls
         return {
             SETTING_GAIN: round(controls.gain_spin.value(), 2),
-            SETTING_MODE: controls.mode_value(),
-            SETTING_PAN: controls.pan_value(),
-            SETTING_PROFILE: controls.profile_combo.currentText(),
+            SETTING_TRANSDUCERS: transducers_to_json(controls.transducers()),
         }
 
     def _load_shaker_settings(self, settings_dict):
@@ -647,25 +653,24 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         values = shaker_settings(settings_dict)
         controls = self.device_cards.shaker_controls
         controls.gain_spin.setValue(values['gain'])
-        controls.set_mode_value(values['channel_mode'])
-        controls.set_pan_value(values['pan'])
-        index = controls.profile_combo.findText(values['profile'].name)
-        controls.profile_combo.setCurrentIndex(max(0, index))
+        controls.set_transducers(values['transducers'])
 
-    def _shaker_test_clicked(self):
-        """A second of sound through the selected output with the
-        settings as they stand on the card, saved or not."""
+    def _shaker_test_clicked(self, only=None):
+        """A second of sound through the selected output with the rows as
+        they stand on the card, saved or not; ``only`` plays one row."""
         from telemffb.hw.ffb_shaker import ShakerPreview
         device = self.selected_device('shaker')
         if device is None or self._shaker_preview is not None:
             return
         controls = self.device_cards.shaker_controls
+        rows = controls.transducers()
+        if not rows:
+            return
         try:
             preview = ShakerPreview(
-                getattr(device, 'name', '') or None,
-                profile=controls.profile_combo.currentData(),
-                gain=controls.gain_spin.value(),
-                channel_mode=controls.mode_value(), pan=controls.pan_value())
+                getattr(device, 'name', '') or None, transducers=rows,
+                profiles=self._shaker_profiles, gain=controls.gain_spin.value(),
+                only=only if isinstance(only, int) else None)
             preview.start()
         except Exception as e:
             logging.exception("shaker test could not play")

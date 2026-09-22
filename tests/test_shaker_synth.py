@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from telemffb.hw.shaker_synth import (
-    BandpassNoise, ImpulseTrain, Oscillator, PhaseAccumulator, ShakerSynth,
-    build_pulse_shape, channel_gains,
+    BandpassNoise, ImpulseTrain, Oscillator, PhaseAccumulator, Route, ShakerSynth,
+    build_pulse_shape,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -261,19 +261,32 @@ class TestImpulseTrain:
         assert train.is_silent
 
 
-class TestChannelGains:
-    def test_modes(self):
-        assert channel_gains('mono', channels=2) == [1.0, 1.0]
-        assert channel_gains('mono', channels=4) == [1.0] * 4
-        assert channel_gains('left', channels=2) == [1.0, 0.0]
-        assert channel_gains('right', channels=2) == [0.0, 1.0]
-        assert channel_gains('pan', pan=-1.0, channels=2) == pytest.approx([1.0, 0.0])
-        assert channel_gains('pan', pan=0.0, channels=2) == pytest.approx([math.sqrt(0.5)] * 2)
-        assert channel_gains('pan', pan=0.5, channels=4)[2:] == [0.0, 0.0]
+class TestRoutes:
+    def test_channel_count_follows_the_routes(self):
+        synth = ShakerSynth(SR, BLOCK, routes=[Route(0, 'a'), Route(5, 'b', 0.5)])
+        assert synth.channels == 6
+        assert synth.groups == ['a', 'b']
+        synth.set_routes([Route(1, 'a')])
+        assert synth.channels == 2
+        synth.set_routes([Route(0, 'a')], channels=4)
+        assert synth.channels == 4
 
-    def test_mono_output_takes_the_first_gain(self):
-        assert channel_gains('right', channels=1) == [0.0]
-        assert channel_gains('left', channels=1) == [1.0]
+    def test_groups_render_once_and_fan_out(self):
+        synth = ShakerSynth(SR, BLOCK, routes=[Route(0, 'a'), Route(1, 'a', 0.5), Route(2, 'b')])
+        synth.voice('x', Oscillator, 'a').set(50.0, 0.8, ramp_ms=1.0)
+        synth.voice('y', Oscillator, 'b').set(50.0, 0.4, ramp_ms=1.0)
+        for _ in range(10):
+            synth.render_block()
+        blocks = [np.array(synth.render_block(), copy=True) for _ in range(3)]
+        peaks = np.max([abs(b).max(axis=0) for b in blocks], axis=0)
+        assert peaks == pytest.approx([0.8, 0.4, 0.4], abs=0.02)
+
+    def test_a_voice_moves_group_when_remade(self):
+        synth = ShakerSynth(SR, BLOCK, routes=[Route(0, 'a'), Route(1, 'b')])
+        v1 = synth.voice('x', Oscillator, 'a')
+        assert synth.voice('x', Oscillator, 'a') is v1
+        v2 = synth.voice('x', Oscillator, 'b')
+        assert v2 is not v1
 
 
 class TestShakerSynth:
@@ -309,7 +322,7 @@ class TestShakerSynth:
         assert abs(out).max() > 0.9
         crest = abs(out).max() / np.sqrt(np.mean(out * out))
         assert crest == pytest.approx(np.sqrt(2), abs=0.05)   # still a sine: limited, not clipped
-        assert synth.limiter_gain < 0.7
+        assert synth.limiter_gains[0] < 0.7
 
     def test_limiter_lets_go_after_the_peak(self):
         synth = ShakerSynth(SR, BLOCK)
@@ -318,11 +331,11 @@ class TestShakerSynth:
         synth.set_master_gain(2.0)
         for _ in range(10):
             synth.render_block()
-        assert synth.limiter_gain == pytest.approx(0.5, abs=0.05)
+        assert synth.limiter_gains[0] == pytest.approx(0.5, abs=0.05)
         synth.set_master_gain(0.5)
         for _ in range(int(4 * ShakerSynth.LIMITER_RELEASE_S * SR / BLOCK)):   # four time constants
             synth.render_block()
-        assert synth.limiter_gain > 0.97
+        assert synth.limiter_gains[0] > 0.97
         peak = max(synth.render_block().max() for _ in range(3))
         assert peak == pytest.approx(0.5, abs=0.03)
 
@@ -335,9 +348,9 @@ class TestShakerSynth:
             synth.render_block()
         assert not synth.render_block().any()
 
-    def test_callback_fans_out_by_channel_gain(self):
+    def test_callback_fans_out_by_route(self):
         output = FakeOutput()
-        synth = ShakerSynth(SR, BLOCK, channel_gains=[1.0, 0.5], output=output)
+        synth = ShakerSynth(SR, BLOCK, routes=[Route(0, ''), Route(1, '', 0.5)], output=output)
         synth.voice('a', Oscillator).set(50.0, 1.0, ramp_ms=1.0)
         synth.start()
         assert output.channels == 2
@@ -346,9 +359,22 @@ class TestShakerSynth:
         blocks = [output.pump() for _ in range(3)]
         assert max(b[:, 0].max() for b in blocks) == pytest.approx(1.0, abs=0.01)
         assert max(b[:, 1].max() for b in blocks) == pytest.approx(0.5, abs=0.01)
-        synth.set_channel_gains(channel_gains('right', channels=2))
+        synth.set_routes([Route(1, '')], channels=2)
         out = output.pump()
         assert not out[:, 0].any() and out[:, 1].any()
+
+    def test_callback_never_writes_past_the_stream_width(self):
+        output = FakeOutput()
+        synth = ShakerSynth(SR, BLOCK, routes=[Route(0, ''), Route(1, '')], output=output)
+        synth.voice('a', Oscillator).set(50.0, 1.0, ramp_ms=1.0)
+        synth.start()
+        out = np.zeros((BLOCK, 4), dtype=np.float32)
+        synth._callback(out, BLOCK, None, None)          # a wider stream than the routes
+        assert out[:, 2:].any() is np.False_ or not out[:, 2:].any()
+        synth.set_routes([Route(3, '')], channels=4)
+        narrow = np.zeros((BLOCK, 2), dtype=np.float32)
+        synth._callback(narrow, BLOCK, None, None)       # a narrower one: nothing spills
+        assert narrow.shape == (BLOCK, 2)
 
     def test_odd_frame_counts(self):
         output = FakeOutput()
@@ -370,6 +396,15 @@ class TestShakerSynth:
         output.vanish()
         assert seen == [True]
         assert not synth.running
+
+    def test_limiters_are_per_channel(self):
+        synth = ShakerSynth(SR, BLOCK, routes=[Route(0, 'loud', 2.0), Route(1, 'quiet', 0.5)])
+        synth.voice('a', Oscillator, 'loud').set(50.0, 1.0, ramp_ms=1.0)
+        synth.voice('b', Oscillator, 'quiet').set(50.0, 1.0, ramp_ms=1.0)
+        for _ in range(10):
+            synth.render_block()
+        gains = synth.limiter_gains
+        assert gains[0] < 0.6 and gains[1] == 1.0
 
     def test_start_without_output_is_an_error(self):
         with pytest.raises(RuntimeError):

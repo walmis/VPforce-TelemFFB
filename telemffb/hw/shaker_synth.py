@@ -38,7 +38,7 @@ import logging
 import math
 import threading
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -724,69 +724,66 @@ class SoundDeviceOutput:
 # Mixer
 # ---------------------------------------------------------------------------
 
-def channel_gains(mode: str, pan: float = 0.0, channels: int = 2) -> List[float]:
-    """How a mono mix lands on the output channels.
-
-    'mono' feeds every channel, 'left' and 'right' one of the first two,
-    'pan' splits between them by an equal-power law (-1 left, +1 right).
-    """
-    channels = max(1, int(channels))
-    if mode == 'left':
-        gains = [1.0, 0.0]
-    elif mode == 'right':
-        gains = [0.0, 1.0]
-    elif mode == 'pan':
-        angle = (clamp(float(pan), -1.0, 1.0) + 1.0) * 0.25 * math.pi
-        gains = [math.cos(angle), math.sin(angle)]
-    else:
-        gains = [1.0] * channels
-    gains = gains[:channels]
-    return gains + [0.0] * (channels - len(gains))
+@dataclass(frozen=True)
+class Route:
+    """One output channel fed from one voice group at a gain: how a
+    transducer hangs off the mix.  Voices are rendered per group (a group
+    is one calibration profile), and a route says which channel hears
+    which group, how loud."""
+    channel: int
+    group: str
+    gain: float = 1.0
 
 
 class ShakerSynth:
-    """Voices under one lock, mixed to mono, fanned out to the channels.
+    """Voices in groups under one lock, mixed per group, fanned out to the
+    output channels by routes.
 
-    Voices are looked up by key and made on demand; the backend owns the
-    keys.  ``render_block`` is the whole audio path and can be called
-    without an output, which is how the tests and the waveform preview
-    use it.
+    Voices are looked up by key and made on demand; each belongs to a
+    group, which is what the routes address.  ``render_block`` is the
+    whole audio path and can be called without an output, which is how
+    the tests use it.  A peak limiter per output channel keeps a stack of
+    effects from clipping into a buzz: the whole block is pulled down at
+    once and let go over a few hundred milliseconds.
     """
 
+    #: seconds for a channel's limiter to let go after a peak
+    LIMITER_RELEASE_S = 0.3
+
     def __init__(self, samplerate: int = 48000, blocksize: int = 512,
-                 master_gain: float = 1.0, channel_gains: Sequence[float] = (1.0,),
-                 output=None):
+                 master_gain: float = 1.0, routes: Sequence[Route] = (Route(0, ''),),
+                 channels: Optional[int] = None, output=None):
         self.samplerate = int(samplerate)
         self.blocksize = int(blocksize)
         self.lock = threading.RLock()
-        self._voices: Dict[str, object] = {}
+        self._voices: Dict[str, Tuple[object, str]] = {}
         self._gain = float(master_gain)
-        self._channel_gains = [float(g) for g in channel_gains] or [1.0]
-        self._mix = np.zeros(self.blocksize, dtype=np.float32)
+        self._routes: List[Route] = []
+        self._channels = 0
+        self._limiters = np.ones(1)
+        self._mix = np.zeros((self.blocksize, 1), dtype=np.float32)
+        self.set_routes(routes, channels)
         self._output = output
         self._stopping = False
-        self._limiter = 1.0
         self.underruns = 0
         self.on_finished: Optional[Callable[[], None]] = None
 
-    #: seconds for the limiter to let go after a peak
-    LIMITER_RELEASE_S = 0.3
-
     # --- voices ------------------------------------------------------------
 
-    def voice(self, key: str, cls, **kwargs):
-        """The voice under ``key``, made (or remade, when the class
-        differs) as ``cls(samplerate, blocksize, **kwargs)``."""
+    def voice(self, key: str, cls, group: str = '', **kwargs):
+        """The voice under ``key`` in ``group``, made (or remade, when the
+        class or group differs) as ``cls(samplerate, blocksize, **kwargs)``."""
         with self.lock:
-            v = self._voices.get(key)
-            if not isinstance(v, cls):
-                v = cls(self.samplerate, self.blocksize, **kwargs)
-                self._voices[key] = v
-            return v
+            entry = self._voices.get(key)
+            if entry is None or not isinstance(entry[0], cls) or entry[1] != group:
+                entry = (cls(self.samplerate, self.blocksize, **kwargs), group)
+                self._voices[key] = entry
+            return entry[0]
 
     def get(self, key: str):
         with self.lock:
-            return self._voices.get(key)
+            entry = self._voices.get(key)
+            return entry[0] if entry else None
 
     def remove(self, key: str) -> None:
         with self.lock:
@@ -798,7 +795,7 @@ class ShakerSynth:
 
     def silence(self, ramp_ms: float = 50.0) -> None:
         with self.lock:
-            for v in self._voices.values():
+            for v, _ in self._voices.values():
                 v.stop(ramp_ms)
 
     def clear(self) -> None:
@@ -811,59 +808,93 @@ class ShakerSynth:
         with self.lock:
             self._gain = float(gain)
 
-    def set_channel_gains(self, gains: Sequence[float]) -> None:
+    def set_routes(self, routes: Sequence[Route], channels: Optional[int] = None) -> None:
+        """Replace the fan-out.  The channel count is the highest routed
+        channel plus one unless a wider count is given (an output opened
+        wider than the routes use keeps its silent channels)."""
+        routes = [Route(int(r.channel), str(r.group), float(r.gain)) for r in routes]
+        needed = max((r.channel for r in routes), default=0) + 1
+        count = max(needed, int(channels) if channels else 1)
         with self.lock:
-            self._channel_gains = [float(g) for g in gains] or [1.0]
+            self._routes = routes
+            if count != self._channels:
+                self._channels = count
+                self._limiters = np.ones(count)
+                self._mix = np.zeros((self.blocksize, count), dtype=np.float32)
+
+    @property
+    def routes(self) -> List[Route]:
+        return list(self._routes)
+
+    @property
+    def groups(self) -> List[str]:
+        """The voice groups the routes address, in route order."""
+        seen: List[str] = []
+        for r in self._routes:
+            if r.group not in seen:
+                seen.append(r.group)
+        return seen
 
     @property
     def channels(self) -> int:
-        return len(self._channel_gains)
+        return self._channels
 
     @property
-    def limiter_gain(self) -> float:
-        """How far the limiter is holding the mix down right now (1.0 =
-        not at all)."""
-        return self._limiter
+    def limiter_gains(self) -> np.ndarray:
+        """How far each channel's limiter is holding it down (1.0 = not at all)."""
+        return self._limiters.copy()
+
+    def render_groups(self, n: int) -> Dict[str, np.ndarray]:
+        """Each group's mono mix for the next ``n`` samples, before the
+        master gain.  The caller holds the lock."""
+        mixes: Dict[str, np.ndarray] = {}
+        for v, group in self._voices.values():
+            if v.is_silent:
+                continue
+            block = v.render(n)
+            if group in mixes:
+                mixes[group] += block
+            else:
+                mixes[group] = np.array(block, dtype=np.float32, copy=True)
+        return mixes
 
     def render_block(self, n: Optional[int] = None) -> np.ndarray:
-        """The next ``n`` samples of the mono mix, limited to +-1.
-
-        Several effects at full strength sum past full scale; rather than
-        clip - which turns a rumble into a buzz - a peak limiter pulls
-        the whole block down at once and lets go over a few hundred
-        milliseconds, so the mix keeps its shape and only its level
-        gives.  The clip after it is a safety net for the release.
-        """
+        """The next ``n`` samples for every output channel, shape
+        ``(n, channels)``, limited to +-1 per channel."""
         n = self.blocksize if n is None else int(n)
         with self.lock:
-            mix = self._mix if n == self.blocksize else np.zeros(n, dtype=np.float32)
-            mix.fill(0.0)
-            for v in self._voices.values():
-                if v.is_silent:
+            out = self._mix if n == self.blocksize else np.zeros((n, self._channels), dtype=np.float32)
+            out.fill(0.0)
+            mixes = self.render_groups(n)
+            for r in self._routes:
+                mix = mixes.get(r.group)
+                if mix is None or r.channel >= self._channels:
                     continue
-                mix += v.render(n)
-            if self._gain != 1.0:
-                mix *= self._gain
-            peak = float(np.abs(mix).max()) if n else 0.0
-            if peak > 1.0:
-                self._limiter = min(self._limiter, 1.0 / peak)
-            if self._limiter < 1.0:
-                mix *= self._limiter
-                self._limiter += (1.0 - self._limiter) * min(1.0, n / (self.LIMITER_RELEASE_S * self.samplerate))
-            np.clip(mix, -1.0, 1.0, out=mix)
-        return mix
+                g = r.gain * self._gain
+                if g == 1.0:
+                    out[:, r.channel] += mix
+                elif g != 0.0:
+                    out[:, r.channel] += mix * g
+            if n:
+                peaks = np.abs(out).max(axis=0)
+                over = peaks > 1.0
+                self._limiters[over] = np.minimum(self._limiters[over], 1.0 / peaks[over])
+                held = self._limiters < 1.0
+                if held.any():
+                    out[:, held] *= self._limiters[held]
+                    release = min(1.0, n / (self.LIMITER_RELEASE_S * self.samplerate))
+                    self._limiters[held] += (1.0 - self._limiters[held]) * release
+            np.clip(out, -1.0, 1.0, out=out)
+        return out
 
     def _callback(self, outdata, frames, time_info, status) -> None:
         if status:
             self.underruns += 1
-        mix = self.render_block(frames)
-        gains = self._channel_gains
-        for c in range(outdata.shape[1]):
-            g = gains[c] if c < len(gains) else 0.0
-            if g == 1.0:
-                outdata[:, c] = mix
-            else:
-                np.multiply(mix, g, out=outdata[:, c])
+        block = self.render_block(frames)
+        width = min(outdata.shape[1], block.shape[1])
+        outdata[:, :width] = block[:, :width]
+        if outdata.shape[1] > width:
+            outdata[:, width:] = 0.0
 
     # --- output ------------------------------------------------------------
 

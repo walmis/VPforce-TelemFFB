@@ -47,25 +47,34 @@ transducer's calibration profile:
   nothing.
 * Condition effects have no meaning here and are declined.
 
+One shaker instance drives one sound card and every transducer on it.
+A transducer is a row in the shaker's settings: an output channel, a
+gain and a calibration profile.  Each effect is rendered once per
+distinct profile and each transducer hears its profile's mix on its
+channel, so a heavy transducer under the seat and two light ones on the
+seat back each get pulses shaped for them, at the cost of one extra
+render per profile, not per transducer.
+
 The synthesis and the calibration profiles are adapted from 89Huey89's
 shaker work (https://github.com/89Huey89/vpforce-telemffb-Shaker).
 """
 
 import json
 import logging
+import math
 import os
 import sys
 import time
 import weakref
-from dataclasses import dataclass, fields
-from typing import List, Optional, Tuple
+from dataclasses import asdict, dataclass, fields
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from telemffb.hw import ffb_backend
 from telemffb.hw.ffb_rhino import (
     EFFECT_CONSTANT, PERIODIC_EFFECTS, effect_names,
 )
 from telemffb.hw.shaker_synth import (
-    ImpulseTrain, Oscillator, ShakerSynth, SoundDeviceOutput, channel_gains, clamp,
+    ImpulseTrain, Oscillator, Route, ShakerSynth, SoundDeviceOutput, clamp,
 )
 from telemffb.utils import AUDIO_PREFIX, SHAKER_PSEUDO_PID
 
@@ -86,14 +95,19 @@ TRANSIENT_MS = 150
 #: keeps the sum in range.
 DEFAULT_GAIN = 3.0
 
-#: how the mono mix lands on a stereo output
-CHANNEL_MODES = ('mono', 'left', 'right', 'pan')
+#: where a transducer sits, for the placement policies to come; stored
+#: with the row, unused by the rendering rules today
+POSITIONS = ('seat', 'back', 'front', 'left', 'right',
+             'back left', 'back right', 'front left', 'front right')
 
 #: the shaker's own settings, global keys like the launch options
 SETTING_GAIN = 'shakerGain'
-SETTING_MODE = 'shakerChannelMode'
-SETTING_PAN = 'shakerPan'
-SETTING_PROFILE = 'shakerProfile'
+SETTING_TRANSDUCERS = 'shakerTransducers'
+#: the single-transducer keys an earlier build stored; read once to make
+#: the equivalent rows when no transducer list is stored yet
+LEGACY_SETTING_MODE = 'shakerChannelMode'
+LEGACY_SETTING_PAN = 'shakerPan'
+LEGACY_SETTING_PROFILE = 'shakerProfile'
 
 
 class ShakerOutputError(Exception):
@@ -189,35 +203,103 @@ def default_profiles_path() -> str:
     return bundled_data_path('shaker_profiles_default.json')
 
 
-def find_profile(profiles: List[ShakerProfile], name: str, fallback: str = '') -> ShakerProfile:
+def find_profile(profiles: Sequence[ShakerProfile], name: str, fallback: str = '') -> ShakerProfile:
     """The profile called ``name``, else the one called ``fallback``, else
     the first - a pack never resolves to nothing."""
     by_name = {p.name: p for p in profiles}
     return by_name.get(name) or by_name.get(fallback) or profiles[0]
 
 
-def shaker_settings(settings) -> dict:
-    """The shaker's stored configuration as constructor arguments: gain,
-    channel mode, pan and the calibration profile, each falling back to
-    its default when unset or unreadable (registry values arrive as
-    strings)."""
-    def number(key, default):
-        try:
-            return float(settings.get(key, default))
-        except (TypeError, ValueError):
-            return float(default)
+# ---------------------------------------------------------------------------
+# Transducers
+# ---------------------------------------------------------------------------
 
-    mode = str(settings.get(SETTING_MODE, 'mono') or 'mono').lower()
-    if mode not in CHANNEL_MODES:
-        mode = 'mono'
+@dataclass(frozen=True)
+class Transducer:
+    """One transducer on the shaker's sound card: which output channel it
+    is wired to (0-based), how loud, which calibration profile shapes
+    what it plays, and where it sits."""
+    name: str = 'Shaker'
+    channel: int = 0
+    gain: float = 1.0
+    profile: str = ''
+    position: str = 'seat'
+
+
+_TRANSDUCER_FIELDS = {f.name for f in fields(Transducer)}
+
+
+def transducer_from_dict(data: dict) -> Optional[Transducer]:
+    try:
+        clean = {k: v for k, v in data.items() if k in _TRANSDUCER_FIELDS}
+        t = Transducer(**clean)
+        return Transducer(str(t.name), max(0, int(t.channel)), clamp(float(t.gain), 0.0, 10.0),
+                          str(t.profile or ''), str(t.position or 'seat'))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def transducers_from_json(text) -> List[Transducer]:
+    """The stored transducer list; empty when unset or unreadable."""
+    if not text:
+        return []
+    try:
+        data = json.loads(text) if isinstance(text, str) else list(text)
+    except (TypeError, ValueError):
+        log.warning("shaker transducers: stored list unreadable, ignored")
+        return []
+    if not isinstance(data, list):
+        return []
+    return [t for t in (transducer_from_dict(d) for d in data if isinstance(d, dict)) if t]
+
+
+def transducers_to_json(transducers: Sequence[Transducer]) -> str:
+    return json.dumps([asdict(t) for t in transducers])
+
+
+def default_transducers(profile_name: str = '') -> List[Transducer]:
+    """What a fresh shaker drives: one transducer on each of a stereo
+    output's channels, so a shaker on either side (or on both) is heard
+    before anything is configured."""
+    return [Transducer('Left', 0, 1.0, profile_name, 'seat'),
+            Transducer('Right', 1, 1.0, profile_name, 'seat')]
+
+
+def legacy_transducers(settings, profile_name: str) -> List[Transducer]:
+    """The rows equivalent to the single-transducer settings an earlier
+    build stored (channel mode and pan), so a configured shaker carries
+    over unchanged."""
+    mode = str(settings.get(LEGACY_SETTING_MODE, 'mono') or 'mono').lower()
+    if mode == 'left':
+        return [Transducer('Shaker', 0, 1.0, profile_name, 'seat')]
+    if mode == 'right':
+        return [Transducer('Shaker', 1, 1.0, profile_name, 'seat')]
+    if mode == 'pan':
+        try:
+            pan = clamp(float(settings.get(LEGACY_SETTING_PAN, 0.0)), -1.0, 1.0)
+        except (TypeError, ValueError):
+            pan = 0.0
+        angle = (pan + 1.0) * 0.25 * math.pi
+        return [Transducer('Left', 0, round(math.cos(angle), 3), profile_name, 'seat'),
+                Transducer('Right', 1, round(math.sin(angle), 3), profile_name, 'seat')]
+    return default_transducers(profile_name)
+
+
+def shaker_settings(settings) -> dict:
+    """The shaker's stored configuration as constructor arguments: the
+    master gain, the transducer rows and the profile pack they name,
+    each falling back to a default when unset or unreadable (registry
+    values arrive as strings)."""
+    try:
+        gain = clamp(float(settings.get(SETTING_GAIN, DEFAULT_GAIN)), 0.0, 10.0)
+    except (TypeError, ValueError):
+        gain = DEFAULT_GAIN
     profiles, active = load_profiles(default_profiles_path())
-    wanted = str(settings.get(SETTING_PROFILE, '') or '')
-    return {
-        'gain': clamp(number(SETTING_GAIN, DEFAULT_GAIN), 0.0, 10.0),
-        'channel_mode': mode,
-        'pan': clamp(number(SETTING_PAN, 0.0), -1.0, 1.0),
-        'profile': find_profile(profiles, wanted, active),
-    }
+    transducers = transducers_from_json(settings.get(SETTING_TRANSDUCERS, ''))
+    if not transducers:
+        legacy = str(settings.get(LEGACY_SETTING_PROFILE, '') or '')
+        transducers = legacy_transducers(settings, find_profile(profiles, legacy, active).name)
+    return {'gain': gain, 'transducers': transducers, 'profiles': profiles}
 
 
 # ---------------------------------------------------------------------------
@@ -290,7 +372,8 @@ _NO_INPUT = ShakerInputSnapshot()
 # ---------------------------------------------------------------------------
 
 class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
-    """One effect, rendered as the voice its parameters call for.
+    """One effect, rendered as the voice its parameters call for, once per
+    calibration profile in use.
 
     Continuous voices (a tone, a pulse train, the AC-coupled constant)
     follow every parameter update while the effect is started, the way a
@@ -317,8 +400,7 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
         self._gain = 1.0
         self._ramp_ms: Optional[float] = None
         self._started = False
-        self._key = str(effect_id)
-        self._voice = None
+        self._voices: Dict[str, object] = {}     # profile name -> voice
         self._kind = None
         # constant force: the running steady part and when it was last seen
         self._ac_steady = 0.0
@@ -347,7 +429,12 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
 
     @property
     def voice(self):
-        return self._voice
+        """The voice in the first profile group, or None before a start."""
+        return next(iter(self._voices.values()), None)
+
+    @property
+    def voices(self) -> Dict[str, object]:
+        return dict(self._voices)
 
     @property
     def kind(self) -> Optional[str]:
@@ -357,7 +444,7 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
 
     @property
     def intensity(self):
-        """How hard this effect is currently driving the transducer, 0.0 to
+        """How hard this effect is currently driving the transducers, 0.0 to
         1.0, for the monitor: the magnitude it was last written with, as
         the hardware handles report it (a constant reads the AC-coupled
         drive, which is what is felt)."""
@@ -374,7 +461,7 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
     # --- lifecycle -----------------------------------------------------------
 
     def invalidate(self):
-        self._drop_voice()
+        self._drop_voices()
         self.effect_id = 0
         self._started = False
 
@@ -393,25 +480,40 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
     def stop(self):
         synth = self.device.synth
         with synth.lock:
-            if self._voice is not None:
-                self._voice.stop()
+            for voice in self._voices.values():
+                voice.stop()
         self._started = False
         return self
 
     def destroy(self):
         if self.effect_id:
             log.debug(f"Destroying effect {self.effect_id} ({self.name})")
-            self._drop_voice()
+            self._drop_voices()
             self.type = 0
             self.effect_id = None
             self._started = False
 
-    def _drop_voice(self):
+    def _key(self, group: str) -> str:
+        return f"{self.effect_id}:{group}"
+
+    def _drop_voices(self):
         synth = self.device.synth
         with synth.lock:
-            synth.remove(self._key)
-        self._voice = None
+            for group in self._voices:
+                synth.remove(self._key(group))
+        self._voices = {}
         self._kind = None
+
+    def regroup(self):
+        """The device's transducers changed: render into the new profile
+        groups, without firing anything - a started transient has had its
+        hit and a settings save is not a new one."""
+        if not self.effect_id:
+            return
+        was_started = self._started
+        self._drop_voices()
+        if was_started:
+            self._apply(fire=False)
 
     # --- parameters ----------------------------------------------------------
 
@@ -464,50 +566,51 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
         self._ac_time = now
         self._ac_drive = clamp(abs(magnitude - self._ac_steady) * self.AC_GAIN, 0.0, 1.0)
 
-    def _amplitude(self) -> float:
-        return clamp(self.magnitude * self._gain * self.device.profile.gain, 0.0, 1.0)
-
     def _apply(self, fire: bool) -> None:
         device = self.device
         synth = device.synth
-        profile = device.profile
         sr = synth.samplerate
         ramp = self._ramp_ms if self._ramp_ms is not None else 50.0
         with synth.lock:
-            if self.type == EFFECT_CONSTANT:
-                amp = clamp(self._ac_drive * self._gain * profile.gain, 0.0, 1.0)
-                voice = synth.voice(self._key, Oscillator)
-                voice.set(profile.carrier_hz, amp, ramp_ms=20.0)
-                voice.expire_after(int(self.AC_HOLD_S * sr))
-                self._kind = 'constant'
-            elif 0 < self.duration_ms <= TRANSIENT_MS:
-                voice = synth.voice(self._key, Oscillator)
-                if fire:
-                    carrier = (profile.fold(self.frequency)
-                               if self.frequency >= profile.band_low_hz else profile.carrier_hz)
-                    amp = self._amplitude()
-                    if amp > 0.0:
+            voices = {}
+            for group, profile in device.groups.items():
+                key = self._key(group)
+                amp = clamp(self.magnitude * self._gain * profile.gain, 0.0, 1.0)
+                if self.type == EFFECT_CONSTANT:
+                    amp = clamp(self._ac_drive * self._gain * profile.gain, 0.0, 1.0)
+                    voice = synth.voice(key, Oscillator, group)
+                    voice.set(profile.carrier_hz, amp, ramp_ms=20.0)
+                    voice.expire_after(int(self.AC_HOLD_S * sr))
+                    self._kind = 'constant'
+                elif 0 < self.duration_ms <= TRANSIENT_MS:
+                    voice = synth.voice(key, Oscillator, group)
+                    if fire and amp > 0.0:
+                        carrier = (profile.fold(self.frequency)
+                                   if self.frequency >= profile.band_low_hz else profile.carrier_hz)
                         voice.trigger_pulse(carrier, profile.halfwaves, amp,
                                             profile.attack_ms, profile.release_ms,
                                             profile.brake_amp(amp), profile.brake_delay_ms)
-                self._kind = 'pulse'
-            elif self.frequency > 0.0 and self.frequency < profile.band_low_hz:
-                voice = synth.voice(self._key, ImpulseTrain)
-                amp = self._amplitude()
-                voice.configure(carrier_hz=profile.carrier_hz, halfwaves=profile.halfwaves,
-                                attack_ms=profile.attack_ms, release_ms=profile.release_ms,
-                                brake_amp=profile.brake_amp(amp),
-                                brake_delay_ms=profile.brake_delay_ms,
-                                gain=1.0, max_rate_hz=profile.band_low_hz)
-                voice.set_rate(self.frequency, load=amp)
-                voice.expire_after(self._lifetime(sr))
-                self._kind = 'train'
-            else:
-                voice = synth.voice(self._key, Oscillator)
-                voice.set(profile.fold(self.frequency), self._amplitude(), ramp)
-                voice.expire_after(self._lifetime(sr))
-                self._kind = 'tone'
-            self._voice = voice
+                    self._kind = 'pulse'
+                elif self.frequency > 0.0 and self.frequency < profile.band_low_hz:
+                    voice = synth.voice(key, ImpulseTrain, group)
+                    voice.configure(carrier_hz=profile.carrier_hz, halfwaves=profile.halfwaves,
+                                    attack_ms=profile.attack_ms, release_ms=profile.release_ms,
+                                    brake_amp=profile.brake_amp(amp),
+                                    brake_delay_ms=profile.brake_delay_ms,
+                                    gain=1.0, max_rate_hz=profile.band_low_hz)
+                    voice.set_rate(self.frequency, load=amp)
+                    voice.expire_after(self._lifetime(sr))
+                    self._kind = 'train'
+                else:
+                    voice = synth.voice(key, Oscillator, group)
+                    voice.set(profile.fold(self.frequency), amp, ramp)
+                    voice.expire_after(self._lifetime(sr))
+                    self._kind = 'tone'
+                voices[group] = voice
+            # groups that went away take their voices with them
+            for group in set(self._voices) - set(voices):
+                synth.remove(self._key(group))
+            self._voices = voices
 
     def _lifetime(self, sr: int) -> Optional[int]:
         return int(self.duration_ms * sr / 1000.0) if self.duration_ms > 0 else None
@@ -517,8 +620,21 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
 # Device
 # ---------------------------------------------------------------------------
 
+def _routes_for(transducers: Sequence[Transducer], profiles: Sequence[ShakerProfile],
+                fallback: str) -> Tuple[List[Route], Dict[str, ShakerProfile]]:
+    """The mixer routes and the profile groups a transducer list needs:
+    one group per distinct resolved profile, one route per transducer."""
+    groups: Dict[str, ShakerProfile] = {}
+    routes = []
+    for t in transducers:
+        profile = find_profile(profiles, t.profile, fallback)
+        groups[profile.name] = profile
+        routes.append(Route(t.channel, profile.name, t.gain))
+    return routes, groups
+
+
 class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
-    """A bass shaker, driven through a sound card.
+    """A bass shaker rig, driven through a sound card.
 
     Opens the output on construction, like the other backends open their
     hardware, and raises ``ShakerOutputError`` when it cannot, so startup
@@ -539,28 +655,30 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         return not self._lost and self.synth.running
 
     def __init__(self, output_device=None, output=None, samplerate: int = 48000,
-                 blocksize: int = 512, gain: float = DEFAULT_GAIN, channel_mode: str = 'mono',
-                 pan: float = 0.0, channels: Optional[int] = None,
+                 blocksize: int = 512, gain: float = DEFAULT_GAIN,
+                 transducers: Optional[Sequence[Transducer]] = None,
+                 profiles: Optional[Sequence[ShakerProfile]] = None,
                  profile: Optional[ShakerProfile] = None,
                  reconnect_interval_ms: int = 2000, autostart: bool = True,
                  clock=time.monotonic) -> None:
         # plain assignments only before super().__init__ (QObject caveat)
         self.output_device = output_device
-        self.profile = profile if profile is not None else DEFAULT_PROFILE
-        self.channel_mode = channel_mode
-        self.pan = float(pan)
         self.clock = clock
+        # the pack the rows' profile names resolve against; a profile
+        # passed outright (tests, previews) is the pack and the fallback
+        if profile is not None:
+            profiles = [profile] + [p for p in (profiles or []) if p.name != profile.name]
+        self.profiles: List[ShakerProfile] = list(profiles) if profiles else [DEFAULT_PROFILE]
+        self._fallback_profile = self.profiles[0].name
         if output is None:
             output = SoundDeviceOutput(output_device, samplerate, blocksize)
         self._output = output
-        if channels is None:
-            channels = 2
-            probe = getattr(output, 'supports_channels', None)
-            if probe is not None and not probe(2):
-                channels = 1
-        self.synth = ShakerSynth(samplerate, blocksize, gain,
-                                 channel_gains(channel_mode, pan, channels), output)
+        wanted = list(transducers) if transducers else default_transducers(self._fallback_profile)
+        routes, groups, channels = self._plan(wanted)
+        self.synth = ShakerSynth(samplerate, blocksize, gain, routes, channels, output)
         self.synth.on_finished = self._output_lost
+        self.transducers: List[Transducer] = wanted
+        self.groups: Dict[str, ShakerProfile] = groups
         self.info = ShakerDeviceInfo(str(output_device or ''))
         self.firmware_version = None
         self._handles: List[weakref.ref] = []
@@ -577,6 +695,32 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         if autostart:
             self._open(first=True)
 
+    @property
+    def profile(self) -> ShakerProfile:
+        """The first transducer's profile: what single-transducer callers
+        mean by 'the profile'."""
+        return next(iter(self.groups.values()), self.profiles[0])
+
+    def _plan(self, transducers: Sequence[Transducer]):
+        """Routes, groups and the channel count for a transducer list,
+        dropping (with a warning) rows on channels the output does not
+        have: an output that refuses the count loses its highest rows
+        until it accepts, so whatever fits is still driven."""
+        probe = getattr(self._output, 'supports_channels', None)
+        rows = list(transducers)
+        channels = 1
+        while rows:
+            channels = max(t.channel for t in rows) + 1
+            if probe is None or probe(channels):
+                break
+            highest = channels - 1
+            dropped = [t for t in rows if t.channel == highest]
+            rows = [t for t in rows if t.channel != highest]
+            log.warning(f"shaker output {self.output_device!r} has no channel "
+                        f"{highest + 1}; {', '.join(t.name for t in dropped)} not driven")
+        routes, groups = _routes_for(rows, self.profiles, self._fallback_profile)
+        return routes, groups, channels
+
     # --- output ----------------------------------------------------------
 
     def _open(self, first: bool = False) -> bool:
@@ -588,10 +732,11 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
                     f"could not open the audio output {self.output_device!r}: {e}") from e
             log.debug(f"shaker output reopen failed: {e}")
             return False
+        rows = ', '.join(f"{t.name} on ch {t.channel + 1} ({t.profile or self._fallback_profile})"
+                         for t in self.transducers) or 'no transducers'
         log.info(f"Shaker output open: {self.info.product_string} "
                  f"({self.synth.samplerate} Hz, {self.synth.blocksize} samples, "
-                 f"{self.synth.channels} ch, mode {self.channel_mode}, "
-                 f"profile {self.profile.name})")
+                 f"{self.synth.channels} ch); {rows}")
         return True
 
     def _output_lost(self) -> None:
@@ -632,23 +777,35 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
     def set_master_gain(self, gain: float) -> None:
         self.synth.set_master_gain(gain)
 
-    def set_channel_mode(self, mode: str, pan: Optional[float] = None) -> None:
-        self.channel_mode = mode
-        if pan is not None:
-            self.pan = float(pan)
-        self.synth.set_channel_gains(channel_gains(mode, self.pan, self.synth.channels))
+    def set_transducers(self, transducers: Sequence[Transducer]) -> None:
+        """Replace the rows live.  The routes change under the running
+        stream; a row on a channel the open stream does not have is
+        dropped with a warning, since the width is fixed at open.  Every
+        started effect re-renders into the new profile groups."""
+        rows = []
+        for t in transducers:
+            if t.channel < self.synth.channels:
+                rows.append(t)
+            else:
+                log.warning(f"shaker: {t.name} is on channel {t.channel + 1} but the output "
+                            f"was opened with {self.synth.channels}; not driven until a restart")
+        routes, groups = _routes_for(rows, self.profiles, self._fallback_profile)
+        self.synth.set_routes(routes, self.synth.channels)
+        self.transducers, self.groups = list(transducers), groups
+        for ref in list(self._handles):
+            handle = ref()
+            if handle is not None:
+                handle.regroup()
 
     def apply_settings(self, settings) -> None:
-        """Take the stored gain, channel mode, pan and profile live, after
-        a settings save.  The profile is read by every effect on its next
-        update, so a running tone changes shape without a restart."""
+        """Take the stored gain and transducer rows live, after a settings
+        save."""
         values = shaker_settings(settings)
+        self.profiles = values['profiles']
         self.set_master_gain(values['gain'])
-        self.set_channel_mode(values['channel_mode'], values['pan'])
-        self.profile = values['profile']
-        log.info(f"Shaker settings applied: gain {values['gain']:.2f}, "
-                 f"{values['channel_mode']}, pan {values['pan']:+.2f}, "
-                 f"profile {self.profile.name}")
+        self.set_transducers(values['transducers'])
+        rows = ', '.join(f"{t.name} ch {t.channel + 1} x{t.gain:.2f} {t.profile}" for t in self.transducers)
+        log.info(f"Shaker settings applied: gain {values['gain']:.2f}; {rows}")
 
     # --- identity --------------------------------------------------------
 
@@ -690,12 +847,13 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         self.synth.clear()
 
     def play_test_pulse(self, amplitude: float = 0.8) -> None:
-        """One pulse shaped by the profile, for the settings card."""
-        voice = self.synth.voice('__test__', Oscillator)
+        """One pulse per profile group, each shaped by its profile, so every
+        transducer hears its own hit."""
         with self.synth.lock:
-            voice.trigger_pulse(self.profile.carrier_hz, self.profile.halfwaves, amplitude,
-                                self.profile.attack_ms, self.profile.release_ms,
-                                self.profile.brake_amp(amplitude), self.profile.brake_delay_ms)
+            for group, p in self.groups.items():
+                voice = self.synth.voice(f'__test__:{group}', Oscillator, group)
+                voice.trigger_pulse(p.carrier_hz, p.halfwaves, amplitude, p.attack_ms, p.release_ms,
+                                    p.brake_amp(amplitude), p.brake_delay_ms)
 
 
 # ---------------------------------------------------------------------------
@@ -703,12 +861,14 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
 # ---------------------------------------------------------------------------
 
 class ShakerPreview:
-    """A second of sound on an output, for the settings card's test
-    button: one pulse shaped by the profile, then a short tone at its
-    carrier, through the gain and channel mode being configured.  Opens
-    its own stream, so it works whether or not the shaker child is
-    running (Windows mixes shared-mode streams), and ``stop`` closes it;
-    the caller decides when, since the card runs on Qt's timers.
+    """A second of sound on an output, for the settings card: one pulse
+    shaped by each transducer's profile, then a short tone at its
+    carrier, through the gains being configured.  Opens its own stream,
+    so it works whether or not the shaker child is running (Windows
+    mixes shared-mode streams), and ``stop`` closes it; the caller
+    decides when, since the card runs on Qt's timers.  ``only`` limits
+    the sound to one row, which is how a user tells the transducers
+    apart.
     """
 
     PULSE_AMPLITUDE = 0.8
@@ -717,36 +877,41 @@ class ShakerPreview:
     TONE_LENGTH_S = 0.6
     LENGTH_S = 1.0
 
-    def __init__(self, output_device=None, profile: Optional[ShakerProfile] = None,
-                 gain: float = DEFAULT_GAIN, channel_mode: str = 'mono', pan: float = 0.0,
-                 samplerate: int = 48000, blocksize: int = 512, output=None):
-        self.profile = profile if profile is not None else DEFAULT_PROFILE
+    def __init__(self, output_device=None, transducers: Optional[Sequence[Transducer]] = None,
+                 profiles: Optional[Sequence[ShakerProfile]] = None, gain: float = DEFAULT_GAIN,
+                 only: Optional[int] = None, samplerate: int = 48000, blocksize: int = 512,
+                 output=None):
+        self.profiles = list(profiles) if profiles else [DEFAULT_PROFILE]
+        rows = list(transducers) if transducers else default_transducers(self.profiles[0].name)
+        if only is not None and 0 <= only < len(rows):
+            rows = [rows[only]]
+        self.transducers = rows
         if output is None:
             output = SoundDeviceOutput(output_device, samplerate, blocksize)
-        channels = 2
+        channels = max(t.channel for t in rows) + 1
         probe = getattr(output, 'supports_channels', None)
-        if probe is not None and not probe(2):
-            channels = 1
-        self.synth = ShakerSynth(samplerate, blocksize, gain,
-                                 channel_gains(channel_mode, pan, channels), output)
+        if probe is not None and not probe(channels):
+            raise ShakerOutputError(f"the output has no channel {channels}")
+        routes, self.groups = _routes_for(rows, self.profiles, self.profiles[0].name)
+        self.synth = ShakerSynth(samplerate, blocksize, gain, routes, channels, output)
 
     def start(self) -> None:
-        """Open the output and fire the pulse."""
-        p = self.profile
-        pulse = self.synth.voice('pulse', Oscillator)
+        """Open the output and fire the pulses."""
         with self.synth.lock:
-            pulse.trigger_pulse(p.carrier_hz, p.halfwaves, self.PULSE_AMPLITUDE,
-                                p.attack_ms, p.release_ms,
-                                p.brake_amp(self.PULSE_AMPLITUDE), p.brake_delay_ms)
+            for group, p in self.groups.items():
+                pulse = self.synth.voice(f'pulse:{group}', Oscillator, group)
+                pulse.trigger_pulse(p.carrier_hz, p.halfwaves, self.PULSE_AMPLITUDE,
+                                    p.attack_ms, p.release_ms,
+                                    p.brake_amp(self.PULSE_AMPLITUDE), p.brake_delay_ms)
         self.synth.start()
 
     def cue_tone(self) -> None:
-        """Start the tone; the caller times this after the pulse."""
-        p = self.profile
-        tone = self.synth.voice('tone', Oscillator)
+        """Start the tones; the caller times this after the pulses."""
         with self.synth.lock:
-            tone.set(p.carrier_hz, self.TONE_AMPLITUDE, ramp_ms=30.0)
-            tone.expire_after(int(self.TONE_LENGTH_S * self.synth.samplerate))
+            for group, p in self.groups.items():
+                tone = self.synth.voice(f'tone:{group}', Oscillator, group)
+                tone.set(p.carrier_hz, self.TONE_AMPLITUDE, ramp_ms=30.0)
+                tone.expire_after(int(self.TONE_LENGTH_S * self.synth.samplerate))
 
     def stop(self) -> None:
         self.synth.stop()

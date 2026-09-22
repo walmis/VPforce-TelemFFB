@@ -42,8 +42,9 @@ class _Settings(dict):
 
 
 class _Output:
-    def __init__(self, name):
+    def __init__(self, name, channels=2):
         self.name = name
+        self.channels = channels
 
 
 # ---------------------------------------------------------------------------
@@ -132,13 +133,15 @@ class TestStartupIdentity:
             return 'device'
         monkeypatch.setattr(HapticEffect, 'open_shaker', staticmethod(fake_open))
         monkeypatch.setattr(G, 'device_audio_output', 'Card A', raising=False)
+        from telemffb.hw.ffb_shaker import Transducer, transducers_to_json
+        rows = [Transducer('Seat', 3, 0.7, 'Buttkicker LFE', 'seat')]
         monkeypatch.setattr(G, 'system_settings', _Settings({
-            'shakerGain': '0.5', 'shakerChannelMode': 'left', 'shakerPan': '0.25',
-            'shakerProfile': 'Buttkicker LFE'}), raising=False)
+            'shakerGain': '0.5', 'shakerTransducers': transducers_to_json(rows)}), raising=False)
         assert main._open_shaker() == 'device'
         assert seen['output'] == 'Card A'
-        assert seen['gain'] == 0.5 and seen['channel_mode'] == 'left' and seen['pan'] == 0.25
-        assert seen['profile'].name == 'Buttkicker LFE'
+        assert seen['gain'] == 0.5
+        assert seen['transducers'] == rows
+        assert 'Buttkicker LFE' in {p.name for p in seen['profiles']}
 
     def test_open_shaker_defaults(self, main, monkeypatch):
         from telemffb.hw.ffb_rhino import HapticEffect
@@ -152,8 +155,8 @@ class TestStartupIdentity:
         main._open_shaker()
         _, active = load_profiles(default_profiles_path())
         assert seen['output'] is None                 # '' = the system default
-        assert seen['profile'].name == active
-        assert seen['gain'] == DEFAULT_GAIN and seen['channel_mode'] == 'mono'
+        assert [(t.channel, t.profile) for t in seen['transducers']] == [(0, active), (1, active)]
+        assert seen['gain'] == DEFAULT_GAIN
 
 
 class TestChildLaunch:
