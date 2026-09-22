@@ -1596,6 +1596,8 @@ class HapticEffect(Destroyable):
                 return
             # Execute the pending create function
             self._pending_create()
+            if self._h_effect:
+                self._h_effect.label = self.name
             # If there are pending conditions to set, do it now
             for val in self._pending_conditions.values():
                 val()

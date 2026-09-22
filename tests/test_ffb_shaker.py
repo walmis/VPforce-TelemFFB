@@ -495,10 +495,13 @@ class TestFacade:
         monkeypatch.setattr(HapticEffect, 'device', device)
         return Dispenser(HapticEffect)
 
-    def test_effects_reach_their_voices_unnamed(self, facade, device, output):
+    def test_effects_reach_their_voices_and_carry_their_name(self, facade, device, output):
         facade['buffeting'].periodic(50.0, 1.0, 0).start()
         assert facade['buffeting'].started
-        assert facade['buffeting']._h_effect.kind == 'tone'
+        handle = facade['buffeting']._h_effect
+        assert handle.kind == 'tone'
+        assert handle.label == 'buffeting'            # advisory: rendering never reads it
+        assert 'buffeting' in repr(handle)
         assert abs(output.render(0.2)).max() > 0.9
         facade['buffeting'].stop()
         assert not facade['buffeting'].started

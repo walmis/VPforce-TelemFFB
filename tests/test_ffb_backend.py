@@ -16,6 +16,10 @@ class TestConformance:
         assert issubclass(FFBRhino, BaseFFBDevice)
         assert issubclass(FFBEffectHandle, BaseEffectHandle)
 
+    def test_handles_carry_an_advisory_label(self):
+        assert BaseEffectHandle.label is None
+        assert FFBEffectHandle.label is None
+
     def test_signals_come_from_the_base(self):
         for sig in ("buttonPressed", "buttonReleased", "deviceConnected"):
             assert hasattr(BaseFFBDevice, sig)

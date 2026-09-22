@@ -467,7 +467,7 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
         return effect_names.get(self.type)
 
     def __repr__(self):
-        return f"ShakerEffectHandle({self.effect_id}, {self.name})"
+        return f"ShakerEffectHandle({self.effect_id}, {self.name}, {self.label!r})"
 
     @property
     def started(self) -> bool:
