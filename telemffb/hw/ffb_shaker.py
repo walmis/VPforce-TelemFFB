@@ -95,10 +95,46 @@ TRANSIENT_MS = 150
 #: keeps the sum in range.
 DEFAULT_GAIN = 3.0
 
-#: where a transducer sits, for the placement policies to come; stored
-#: with the row, unused by the rendering rules today
-POSITIONS = ('seat', 'back', 'front', 'left', 'right',
-             'back left', 'back right', 'front left', 'front right')
+#: where a transducer touches the body, for the placement policies to
+#: come; stored with the row, unused by the rendering rules today.  The
+#: contact point first (the seat pan, the seat back, the floor at the
+#: feet), then the side.  Deliberately no word in common with the channel
+#: picker's Rear L / Side R, so the two columns cannot be confused.
+POSITIONS = ('seat', 'seat left', 'seat right',
+             'seat back', 'seat back left', 'seat back right',
+             'floor', 'floor left', 'floor right')
+
+#: names an earlier build stored, so a saved row keeps its place
+POSITION_ALIASES = {
+    'left': 'seat left', 'right': 'seat right',
+    'back': 'seat back', 'back left': 'seat back left', 'back right': 'seat back right',
+    'front': 'floor', 'front left': 'floor left', 'front right': 'floor right',
+}
+
+#: What each channel of a Windows speaker layout carries, by the width of
+#: the stream.  Fixed by the WAVEFORMATEXTENSIBLE channel order every
+#: layout Windows configures uses, so a card's channels can be named by
+#: position; which physical jack carries a position is the card's own
+#: business and only a test tone settles it.
+CHANNEL_POSITIONS = {
+    1: ('Mono',),
+    2: ('Left', 'Right'),
+    4: ('Front L', 'Front R', 'Rear L', 'Rear R'),
+    6: ('Front L', 'Front R', 'Center', 'Subwoofer', 'Rear L', 'Rear R'),
+    8: ('Front L', 'Front R', 'Center', 'Subwoofer', 'Rear L', 'Rear R', 'Side L', 'Side R'),
+}
+
+
+def channel_label(index: int, width: int) -> str:
+    """'4 Subwoofer' on an eight-channel output, '2 Right' on a stereo
+    one, the bare number where the layout is not a standard one or the
+    channel lies beyond it."""
+    names = CHANNEL_POSITIONS.get(int(width), ())
+    number = int(index) + 1
+    if 0 <= index < len(names):
+        return f"{number} {names[index]}"
+    return str(number)
+
 
 #: the shaker's own settings, global keys like the launch options
 SETTING_GAIN = 'shakerGain'
@@ -203,10 +239,19 @@ def default_profiles_path() -> str:
     return bundled_data_path('shaker_profiles_default.json')
 
 
+#: names earlier packs used, so a stored choice survives a rename
+PROFILE_ALIASES = {
+    'Dayton DAEX-25': 'Dayton TT25 Puck',
+    'Buttkicker LFE': 'ButtKicker LFE',
+}
+
+
 def find_profile(profiles: Sequence[ShakerProfile], name: str, fallback: str = '') -> ShakerProfile:
-    """The profile called ``name``, else the one called ``fallback``, else
-    the first - a pack never resolves to nothing."""
+    """The profile called ``name`` (or what that name is called now), else
+    the one called ``fallback``, else the first - a pack never resolves
+    to nothing."""
     by_name = {p.name: p for p in profiles}
+    name = PROFILE_ALIASES.get(name, name)
     return by_name.get(name) or by_name.get(fallback) or profiles[0]
 
 
@@ -233,8 +278,9 @@ def transducer_from_dict(data: dict) -> Optional[Transducer]:
     try:
         clean = {k: v for k, v in data.items() if k in _TRANSDUCER_FIELDS}
         t = Transducer(**clean)
+        position = str(t.position or 'seat')
         return Transducer(str(t.name), max(0, int(t.channel)), clamp(float(t.gain), 0.0, 10.0),
-                          str(t.profile or ''), str(t.position or 'seat'))
+                          str(t.profile or ''), POSITION_ALIASES.get(position, position))
     except (TypeError, ValueError, AttributeError):
         return None
 
@@ -620,6 +666,23 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
 # Device
 # ---------------------------------------------------------------------------
 
+def stream_width(output, needed: int) -> Optional[int]:
+    """The channel count to open ``output`` with for routes that need
+    ``needed`` channels: that count when the output takes it, else the
+    output's native width when that is at least as wide (a shared-mode
+    WASAPI endpoint accepts only its own width; the extra channels stay
+    silent), else None.  An output without a probe takes what it is
+    given."""
+    probe = getattr(output, 'supports_channels', None)
+    if probe is None or probe(needed):
+        return needed
+    native = getattr(output, 'native_channels', None)
+    native = native() if native is not None else None
+    if native and native >= needed and probe(native):
+        return native
+    return None
+
+
 def _routes_for(transducers: Sequence[Transducer], profiles: Sequence[ShakerProfile],
                 fallback: str) -> Tuple[List[Route], Dict[str, ShakerProfile]]:
     """The mixer routes and the profile groups a transducer list needs:
@@ -706,14 +769,15 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         dropping (with a warning) rows on channels the output does not
         have: an output that refuses the count loses its highest rows
         until it accepts, so whatever fits is still driven."""
-        probe = getattr(self._output, 'supports_channels', None)
         rows = list(transducers)
         channels = 1
         while rows:
-            channels = max(t.channel for t in rows) + 1
-            if probe is None or probe(channels):
+            needed = max(t.channel for t in rows) + 1
+            width = stream_width(self._output, needed)
+            if width is not None:
+                channels = width
                 break
-            highest = channels - 1
+            highest = needed - 1
             dropped = [t for t in rows if t.channel == highest]
             rows = [t for t in rows if t.channel != highest]
             log.warning(f"shaker output {self.output_device!r} has no channel "
@@ -888,10 +952,10 @@ class ShakerPreview:
         self.transducers = rows
         if output is None:
             output = SoundDeviceOutput(output_device, samplerate, blocksize)
-        channels = max(t.channel for t in rows) + 1
-        probe = getattr(output, 'supports_channels', None)
-        if probe is not None and not probe(channels):
-            raise ShakerOutputError(f"the output has no channel {channels}")
+        needed = max(t.channel for t in rows) + 1
+        channels = stream_width(output, needed)
+        if channels is None:
+            raise ShakerOutputError(f"the output has no channel {needed}")
         routes, self.groups = _routes_for(rows, self.profiles, self.profiles[0].name)
         self.synth = ShakerSynth(samplerate, blocksize, gain, routes, channels, output)
 

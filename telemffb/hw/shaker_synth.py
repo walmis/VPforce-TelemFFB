@@ -674,6 +674,19 @@ class SoundDeviceOutput:
             return False
         return True
 
+    def native_channels(self) -> Optional[int]:
+        """How many output channels the device itself has.  A shared-mode
+        WASAPI endpoint accepts only its own width - a card set to 7.1
+        refuses a two- or six-channel stream - so a stream is opened this
+        wide when the width the routes need is refused."""
+        import sounddevice as sd
+        try:
+            index = self.resolve(self.device)
+            info = sd.query_devices(index if index is not None else sd.default.device[1])
+            return int(info.get('max_output_channels', 0)) or None
+        except Exception:
+            return None
+
     @staticmethod
     def rescan() -> bool:
         """Make PortAudio look at the machine again.

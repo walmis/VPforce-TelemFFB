@@ -12,6 +12,7 @@ pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6 import QtWidgets
 
+import resources  # noqa: F401  (the compiled icons the card draws)
 import telemffb.globals as G
 from telemffb.hw.ffb_shaker import (
     DEFAULT_GAIN, LEGACY_SETTING_MODE, LEGACY_SETTING_PAN, LEGACY_SETTING_PROFILE,
@@ -38,16 +39,21 @@ class _Settings(dict):
 
 
 class FakeOutput:
-    def __init__(self, max_channels=8):
+    def __init__(self, max_channels=8, exact=False):
         self.callback = None
         self.channels = None
         self.finished = None
         self.running = False
         self.starts = 0
         self.max_channels = max_channels
+        #: a shared-mode WASAPI endpoint: only its own width is accepted
+        self.exact = exact
 
     def supports_channels(self, n):
-        return n <= self.max_channels
+        return n == self.max_channels if self.exact else n <= self.max_channels
+
+    def native_channels(self):
+        return self.max_channels
 
     def start(self, callback, channels, finished_callback=None):
         self.starts += 1
@@ -69,9 +75,9 @@ class FakeOutput:
         return np.concatenate(blocks)
 
 
-RIG = [Transducer('Buttkicker', 3, 1.0, 'Buttkicker LFE', 'seat'),
-       Transducer('Dayton L', 4, 0.8, 'Dayton DAEX-25', 'back left'),
-       Transducer('Dayton R', 5, 0.8, 'Dayton DAEX-25', 'back right')]
+RIG = [Transducer('Buttkicker', 3, 1.0, 'ButtKicker LFE', 'seat'),
+       Transducer('Dayton L', 4, 0.8, 'Dayton TT25 Puck', 'seat back left'),
+       Transducer('Dayton R', 5, 0.8, 'Dayton TT25 Puck', 'seat back right')]
 
 
 # ---------------------------------------------------------------------------
@@ -112,9 +118,9 @@ class TestSettingsReader:
     ])
     def test_legacy_channel_mode_becomes_rows(self, mode, expected):
         values = shaker_settings(_Settings({LEGACY_SETTING_MODE: mode,
-                                            LEGACY_SETTING_PROFILE: 'Buttkicker LFE'}))
+                                            LEGACY_SETTING_PROFILE: 'ButtKicker LFE'}))
         assert [(t.channel, t.gain) for t in values['transducers']] == expected
-        assert all(t.profile == 'Buttkicker LFE' for t in values['transducers'])
+        assert all(t.profile == 'ButtKicker LFE' for t in values['transducers'])
 
     def test_legacy_pan_becomes_two_gains(self):
         values = shaker_settings(_Settings({LEGACY_SETTING_MODE: 'pan', LEGACY_SETTING_PAN: '-1'}))
@@ -124,6 +130,20 @@ class TestSettingsReader:
     def test_stored_rows_outrank_legacy_keys(self):
         stored = _Settings({SETTING_TRANSDUCERS: transducers_to_json(RIG), LEGACY_SETTING_MODE: 'left'})
         assert shaker_settings(stored)['transducers'] == RIG
+
+    def test_old_position_names_map_to_the_new_ones(self):
+        rows = transducers_from_json(json.dumps([
+            {'name': 'a', 'channel': 0, 'position': 'back left'},
+            {'name': 'b', 'channel': 1, 'position': 'front'},
+            {'name': 'c', 'channel': 2, 'position': 'seat'},
+        ]))
+        assert [t.position for t in rows] == ['seat back left', 'floor', 'seat']
+        assert all(t.position in POSITIONS for t in rows)
+
+    def test_old_profile_names_still_resolve(self):
+        profiles, _ = load_profiles(default_profiles_path())
+        assert find_profile(profiles, 'Dayton DAEX-25').name == 'Dayton TT25 Puck'
+        assert find_profile(profiles, 'Buttkicker LFE').name == 'ButtKicker LFE'
 
     def test_find_profile_never_resolves_to_nothing(self):
         profiles = [ShakerProfile(name='a'), ShakerProfile(name='b')]
@@ -141,7 +161,7 @@ class TestLiveApply:
         from telemffb.hw.ffb_rhino import EFFECT_SINE
         handle = dev.create_effect(EFFECT_SINE)
         handle.setPeriodic(50.0, 1.0, 0).start()
-        assert set(handle.voices) == {'Buttkicker LFE', 'Dayton DAEX-25'}
+        assert set(handle.voices) == {'ButtKicker LFE', 'Dayton TT25 Puck'}
         dev.apply_settings(_Settings({SETTING_GAIN: '1.0', SETTING_TRANSDUCERS: transducers_to_json(
             [Transducer('Only', 1, 0.5, 'Generic')])}))
         assert list(dev.groups) == ['Generic']
@@ -149,6 +169,32 @@ class TestLiveApply:
         assert handle.started
         out = output.render(0.3)
         assert not out[:, 0].any() and abs(out[:, 1]).max() == pytest.approx(0.5, abs=0.02)
+
+    def test_an_endpoint_that_takes_only_its_own_width_opens_that_wide(self):
+        """A card set to 7.1 in Windows refuses a two-channel stream; two
+        rows on channels 1 and 2 still play, on an eight-wide stream."""
+        output = FakeOutput(max_channels=8, exact=True)
+        dev = ShakerFFBDevice(output=output, gain=1.0, reconnect_interval_ms=0)
+        assert output.channels == 8
+        assert [t.channel for t in dev.transducers] == [0, 1]
+        from telemffb.hw.ffb_rhino import EFFECT_SINE
+        handle = dev.create_effect(EFFECT_SINE)
+        handle.setPeriodic(50.0, 1.0, 0).start()
+        out = output.render(0.3)
+        assert abs(out[:, 0]).max() > 0.9 and abs(out[:, 1]).max() > 0.9
+        assert not out[:, 2:].any()
+        # and rows added later up to that width are driven without a restart
+        dev.set_transducers(RIG)
+        assert [r.channel for r in dev.synth.routes] == [3, 4, 5]
+
+    def test_a_preview_on_such_an_endpoint_opens_that_wide_too(self):
+        output = FakeOutput(max_channels=8, exact=True)
+        preview = ShakerPreview(transducers=RIG, gain=1.0, only=0, output=output)
+        preview.start()
+        assert output.channels == 8
+        out = output.render(0.1)
+        assert abs(out[:, 3]).max() > 0.5
+        preview.stop()
 
     def test_a_row_beyond_the_open_stream_is_kept_but_not_driven(self):
         output = FakeOutput(max_channels=2)
@@ -272,7 +318,7 @@ class TestCard:
         values = dialog.shaker_settings_values()
         assert values[SETTING_GAIN] == 4.0
         saved = transducers_from_json(values[SETTING_TRANSDUCERS])
-        assert saved[0] == Transducer('Buttkicker', 3, 0.5, 'Buttkicker LFE', 'seat')
+        assert saved[0] == Transducer('Buttkicker', 3, 0.5, 'ButtKicker LFE', 'seat')
         assert saved[1:] == RIG[1:]
 
     def test_the_ids_column_shows_the_channel_count(self, monkeypatch):
@@ -284,6 +330,24 @@ class TestCard:
         assert row.ids_label.text() == '2 ch'
         dialog.cb_select_s.setCurrentIndex(0)
         assert row.ids_label.text() == ''
+
+    def test_channels_are_named_by_position(self, monkeypatch):
+        from telemffb.hw.ffb_shaker import channel_label
+        assert channel_label(3, 8) == '4 Subwoofer'
+        assert channel_label(7, 8) == '8 Side R'
+        assert channel_label(1, 2) == '2 Right'
+        assert channel_label(4, 6) == '5 Rear L'
+        assert channel_label(2, 3) == '3'                    # no standard three-channel layout
+        assert channel_label(9, 8) == '10'                   # beyond the layout: the number
+        _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
+        combo = dialog.device_cards.shaker_controls.rows[0].channel_combo
+        dialog.cb_select_s.setCurrentIndex(2)                 # stereo
+        assert [combo.itemText(i) for i in range(combo.count())] == ['1 Left', '2 Right']
+        dialog.cb_select_s.setCurrentIndex(3)                 # the 7.1 card
+        assert combo.itemText(3) == '4 Subwoofer' and combo.count() == 8
+        combo.setCurrentIndex(7)
+        dialog.cb_select_s.setCurrentIndex(2)                 # back to stereo, channel 8 kept
+        assert combo.itemText(7) == '8' and combo.itemText(1) == '2 Right'
 
     def test_channels_follow_the_selected_output(self, monkeypatch):
         _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
@@ -389,8 +453,13 @@ class TestCard:
         row = card.primary_row.layout()
         widgets = [row.itemAt(i).widget() for i in range(row.count())]
         ids = widgets.index(card.primary_row.ids_label)
-        assert widgets[ids + 1: ids + 3] == [card.shaker.rescan_button, card.shaker.layout_button]
+        assert widgets[ids + 1: ids + 4] == [card.shaker.rescan_button, card.shaker.layout_button,
+                                             card.shaker.layout_info]
         assert card.shaker.rescan_button.parentWidget() is card.primary_row
+        # the icon says there are instructions; it and the link carry the same ones
+        assert card.shaker.layout_info.toolTip() == card.shaker.layout_button.toolTip()
+        assert card.shaker.layout_info.toolTip().count('\n') >= 4
+        assert not card.shaker.layout_info.pixmap().isNull()
         # the transducer actions stay with the transducer controls
         assert card.shaker.add_button.parentWidget() is card.shaker
         assert card.shaker.test_button.parentWidget() is card.shaker

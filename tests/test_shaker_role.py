@@ -142,14 +142,14 @@ class TestStartupIdentity:
         monkeypatch.setattr(HapticEffect, 'open_shaker', staticmethod(fake_open))
         monkeypatch.setattr(G, 'device_audio_output', 'Card A', raising=False)
         from telemffb.hw.ffb_shaker import Transducer, transducers_to_json
-        rows = [Transducer('Seat', 3, 0.7, 'Buttkicker LFE', 'seat')]
+        rows = [Transducer('Seat', 3, 0.7, 'ButtKicker LFE', 'seat')]
         monkeypatch.setattr(G, 'system_settings', _Settings({
             'shakerGain': '0.5', 'shakerTransducers': transducers_to_json(rows)}), raising=False)
         assert main._open_shaker() == 'device'
         assert seen['output'] == 'Card A'
         assert seen['gain'] == 0.5
         assert seen['transducers'] == rows
-        assert 'Buttkicker LFE' in {p.name for p in seen['profiles']}
+        assert 'ButtKicker LFE' in {p.name for p in seen['profiles']}
 
     def test_open_shaker_defaults(self, main, monkeypatch):
         from telemffb.hw.ffb_rhino import HapticEffect

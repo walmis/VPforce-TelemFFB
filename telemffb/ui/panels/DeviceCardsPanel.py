@@ -43,6 +43,7 @@ both work without theme-specific rules here.
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
+from telemffb.utils import HiDpiPixmap
 from telemffb.ui.widgets.custom_widgets import LabeledToggle, Toggle
 from PyQt6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QGridLayout,
@@ -362,6 +363,31 @@ class DeviceRow(QWidget):
                                    or self.marker.isChecked())
 
 
+#: Behind the Speaker layout link and its info icon.  Explicit line
+#: breaks: a plain-text tooltip only wraps where told to.
+MULTICHANNEL_HELP = (
+    "Setting up a 5.1 or 7.1 sound card for several transducers\n"
+    "\n"
+    "1. Plug the card in and press Rescan.  If it lists as 2 ch, Windows\n"
+    "   has it set up as a stereo pair; the extra outputs are switched off.\n"
+    "2. Press Speaker layout... to open the Windows Sound control panel.\n"
+    "   On the Playback tab select the card, press Configure, choose\n"
+    "   7.1 Surround (or 5.1), press Next through the pages, then Finish.\n"
+    "   The Test button there plays each output in turn, which shows\n"
+    "   which jack is which.\n"
+    "   If Configure is greyed out, the card's driver does not offer\n"
+    "   multi-channel output to Windows; install the maker's own driver.\n"
+    "3. Press Rescan again.  The count beside the card should read 8 (or 6).\n"
+    "4. Give each transducer its channel and press the row's play button\n"
+    "   to confirm.  Channel numbers follow the Windows layout:\n"
+    "   1 front left, 2 front right, 3 center, 4 subwoofer,\n"
+    "   5 rear left, 6 rear right, 7 side left, 8 side right.\n"
+    "   Jack colors differ between cards; the play button is the sure way.\n"
+    "\n"
+    "To rename a card, use Settings > System > Sound; the new name shows\n"
+    "here after a Rescan.")
+
+
 class TransducerRow(QWidget):
     """One transducer on the shaker card: name, output channel, position,
     gain, calibration profile, a play button that sounds this row alone
@@ -426,6 +452,7 @@ class TransducerRow(QWidget):
         row.addStretch(1)
 
         self._channels = 0
+        self._layout_width = 0
         self.set_channel_count(2)
         for w in (self.name_edit, self.channel_combo, self.position_combo,
                   self.gain_spin, self.profile_combo):
@@ -442,12 +469,23 @@ class TransducerRow(QWidget):
         if count == self._channels:
             return
         self._channels = count
+        from telemffb.hw.ffb_shaker import channel_label
         self.channel_combo.blockSignals(True)
         self.channel_combo.clear()
         for i in range(count):
-            self.channel_combo.addItem(str(i + 1), i)
+            self.channel_combo.addItem(channel_label(i, self._layout_width or count), i)
         self.channel_combo.setCurrentIndex(min(current, count - 1))
         self.channel_combo.blockSignals(False)
+
+    def set_layout_width(self, width: int) -> None:
+        """The output's own channel count, which names the positions even
+        when a stored channel has stretched the list beyond it."""
+        width = max(1, int(width))
+        if width == self._layout_width:
+            return
+        self._layout_width = width
+        count, self._channels = self._channels, 0
+        self.set_channel_count(count)
 
     def set_profiles(self, names) -> None:
         current = self.profile_combo.currentText()
@@ -529,13 +567,21 @@ class ShakerControls(QWidget):
             'Look for sound cards plugged in since TelemFFB started.')
         self.rescan_button.setObjectName('shaker_rescan')
         self.layout_button = _link_button(
-            'Speaker layout...', self.palette(),
-            "Open the Windows Sound control panel.\n"
-            "A card's channel count follows the speaker layout set there\n"
-            "(select the card on the Playback tab, then Configure):\n"
-            "a 7.1 card reports two channels until it is set to 7.1 Surround.\n"
-            "Rescan afterwards.")
+            'Speaker layout...', self.palette(), MULTICHANNEL_HELP)
         self.layout_button.setObjectName('shaker_layout')
+        # the link's name does not say there are instructions behind it;
+        # the icon does, and carries the same tooltip
+        self.layout_info = QLabel()
+        self.layout_info.setObjectName('shaker_layout_info')
+        pixmap = HiDpiPixmap(':/image/info_icon.png').scaled(
+            16, 16, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+        if pixmap.isNull():
+            self.layout_info.setText('(?)')      # no compiled resources: still a cue
+        else:
+            self.layout_info.setPixmap(pixmap)
+        self.layout_info.setToolTip(MULTICHANNEL_HELP)
+        self.layout_info.setCursor(Qt.CursorShape.WhatsThisCursor)
         self.add_button = _link_button('+ add transducer', self.palette(),
                                        'Another transducer on this sound card')
         self.add_button.setObjectName('shaker_add')
@@ -589,6 +635,7 @@ class ShakerControls(QWidget):
     def set_channel_count(self, count: int) -> None:
         self._channels = max(1, int(count))
         for row in self.rows:
+            row.set_layout_width(self._channels)
             row.set_channel_count(self._channels)
         self.refresh_hint()
 
@@ -607,6 +654,7 @@ class ShakerControls(QWidget):
         row = TransducerRow(self.rows_host)
         row.set_profiles(self._profiles)
         row.set_positions(self._positions)
+        row.set_layout_width(self._channels)
         row.set_channel_count(self._channels)
         if transducer is not None:
             row.set_value(transducer)
@@ -791,6 +839,7 @@ class RoleCard(QFrame):
             row = self.primary_row.layout()
             row.insertWidget(2, self.shaker.rescan_button)
             row.insertWidget(3, self.shaker.layout_button)
+            row.insertWidget(4, self.shaker.layout_info)
             self.body.addWidget(self.shaker)
 
         self.alt_rows = []               # DeviceRow, slots 2..MAX
