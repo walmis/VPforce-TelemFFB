@@ -722,7 +722,7 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
                                     attack_ms=profile.attack_ms, release_ms=profile.release_ms,
                                     brake_amp=profile.brake_amp(amp),
                                     brake_delay_ms=profile.brake_delay_ms,
-                                    gain=1.0, max_rate_hz=profile.band_low_hz)
+                                    gain=1.0)
                     voice.set_rate(self.frequency, load=amp)
                     voice.expire_after(self._lifetime(sr))
                     self._kind = 'train'
@@ -744,6 +744,13 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
 # ---------------------------------------------------------------------------
 # Device
 # ---------------------------------------------------------------------------
+
+def _samplerate_of(output, requested: Optional[int]) -> int:
+    """The rate the synth runs at: the one asked for, else the output's
+    own (a real output adopts its card's default), else the usual 48 kHz
+    for an output that has no opinion (tests)."""
+    return int(requested or getattr(output, 'samplerate', 0) or SoundDeviceOutput.FALLBACK_SAMPLERATE)
+
 
 def stream_width(output, needed: int) -> Optional[int]:
     """The channel count to open ``output`` with for routes that need
@@ -808,7 +815,7 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
     def connected(self) -> bool:
         return not self._lost and self.synth.running
 
-    def __init__(self, output_device=None, output=None, samplerate: int = 48000,
+    def __init__(self, output_device=None, output=None, samplerate: Optional[int] = None,
                  blocksize: int = 512, gain: float = DEFAULT_GAIN,
                  transducers: Optional[Sequence[Transducer]] = None,
                  profiles: Optional[Sequence[ShakerProfile]] = None,
@@ -833,6 +840,7 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         if output is None:
             output = SoundDeviceOutput(output_device, samplerate, blocksize)
         self._output = output
+        samplerate = _samplerate_of(output, samplerate)
         wanted = list(transducers) if transducers else default_transducers(self._fallback_profile)
         rows, channels = self._plan(wanted)
         self._samplerate = samplerate
@@ -881,6 +889,7 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
             except Exception:
                 log.exception(f"shaker: placement for {label!r} could not be resolved; playing everywhere")
         self._placements[label] = placement
+        log.info(f"Shaker: {label or 'an unnamed effect'} plays at {placement.key}")
         return placement
 
     def groups_for(self, placement: Placement) -> Dict[str, ShakerProfile]:
@@ -1095,8 +1104,9 @@ class ShakerPreview:
 
     def __init__(self, output_device=None, transducers: Optional[Sequence[Transducer]] = None,
                  profiles: Optional[Sequence[ShakerProfile]] = None, gain: float = DEFAULT_GAIN,
-                 only: Optional[int] = None, samplerate: int = 48000, blocksize: int = 512,
+                 only: Optional[int] = None, samplerate: Optional[int] = None, blocksize: int = 512,
                  output=None):
+        self.output_name = output_device
         self.profiles = list(profiles) if profiles else [DEFAULT_PROFILE]
         rows = list(transducers) if transducers else default_transducers(self.profiles[0].name)
         if only is not None and 0 <= only < len(rows):
@@ -1104,6 +1114,7 @@ class ShakerPreview:
         self.transducers = rows
         if output is None:
             output = SoundDeviceOutput(output_device, samplerate, blocksize)
+        samplerate = _samplerate_of(output, samplerate)
         needed = max(t.channel for t in rows) + 1
         channels = stream_width(output, needed)
         if channels is None:
@@ -1113,6 +1124,12 @@ class ShakerPreview:
 
     def start(self) -> None:
         """Open the output and fire the pulses."""
+        rows = ', '.join(f"{t.name} ch {t.channel + 1} ({t.position}) {t.profile}"
+                         f" @ {self.groups[t.profile].carrier_hz:.0f} Hz" if t.profile in self.groups
+                         else f"{t.name} ch {t.channel + 1} ({t.position}) {t.profile}"
+                         for t in self.transducers)
+        log.info(f"Shaker preview on {self.output_name or 'the default output'} "
+                 f"({self.synth.samplerate} Hz, {self.synth.channels} channels): {rows}")
         with self.synth.lock:
             for group, p in self.groups.items():
                 pulse = self.synth.voice(f'pulse:{group}', Oscillator, group)

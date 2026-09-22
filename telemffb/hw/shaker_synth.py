@@ -29,9 +29,8 @@ The synthesis itself is the work of 89Huey89
 (https://github.com/89Huey89/vpforce-telemffb-Shaker), carried over onto
 TelemFFB's device backend contract: phase-continuous sines with click-free
 amplitude ramps, gated half-wave pulses with an active brake to stop a
-heavy transducer ringing, and rate-locked impulse trains that fall back to
-band-limited noise above the rate a transducer can resolve as separate
-hits.  The band-pass noise runs at a decimated rate so it stays numpy-only.
+heavy transducer ringing, and rate-locked impulse trains with one gated
+pulse per cycle of a rate set from telemetry.
 """
 
 import logging
@@ -316,124 +315,6 @@ class Oscillator(_Expiring):
             self._pulse_pos = 0
 
 
-class BandpassNoise(_Expiring):
-    """Band-limited noise: white noise through one RBJ band-pass biquad.
-
-    The biquad is a recursion, which numpy cannot vectorize, so it runs
-    at one sixteenth of the sample rate in a short Python loop and the
-    result is linearly interpolated up.  Everything this voice is asked
-    for lives below a few hundred hertz, three octaves under the
-    decimated Nyquist, so nothing audible is lost.  The output level is
-    normalized to the filter's noise bandwidth, so the same amplitude
-    feels the same at any sample rate or bandwidth.
-    """
-
-    DECIMATION = 16
-    #: RMS of the output at amplitude 1.0 (Gaussian peaks then sit near 1.0)
-    RMS_AT_FULL = 0.35
-
-    def __init__(self, samplerate: int, blocksize: int = 512, seed=None):
-        self._sr = float(samplerate)
-        self._d = self.DECIMATION
-        self._lr = self._sr / self._d
-        self._center = 35.0
-        self._bw = 20.0
-        self._amp = 0.0
-        self._target = 0.0
-        self._step = 0.0
-        self._rng = np.random.default_rng(seed)
-        self._z1 = self._z2 = 0.0
-        self._prev = 0.0
-        self._next = 0.0
-        self._carry = 0.0
-        self._compute_coeffs()
-
-    def set(self, center_hz: float, bandwidth_hz: float, amplitude: float,
-            ramp_ms: float = 50.0) -> None:
-        center = clamp(float(center_hz), 1.0, 0.45 * self._lr)
-        bw = max(1.0, float(bandwidth_hz))
-        if center != self._center or bw != self._bw:
-            self._center, self._bw = center, bw
-            self._compute_coeffs()
-        self._target = clamp(float(amplitude), 0.0, 1.0)
-        ramp = max(1, int(self._sr * ramp_ms / 1000.0))
-        self._step = (self._target - self._amp) / ramp
-
-    def stop(self, ramp_ms: float = 50.0) -> None:
-        ramp = max(1, int(self._sr * ramp_ms / 1000.0))
-        self._target = 0.0
-        self._step = -self._amp / ramp
-        self._expire = None
-
-    @property
-    def is_silent(self) -> bool:
-        return self._amp <= 1e-6 and self._target <= 1e-6
-
-    @property
-    def center_hz(self) -> float:
-        return self._center
-
-    def _compute_coeffs(self) -> None:
-        omega = TWO_PI * self._center / self._lr
-        q = max(0.5, self._center / self._bw)
-        alpha = math.sin(omega) / (2.0 * q)
-        a0 = 1.0 + alpha
-        self._b0 = alpha / a0
-        self._b2 = -alpha / a0
-        self._a1 = -2.0 * math.cos(omega) / a0
-        self._a2 = (1.0 - alpha) / a0
-        # unit white noise through a 0 dB-peak band-pass of this bandwidth
-        # comes out at roughly sqrt(pi * bw / rate) RMS; undo that
-        self._norm = self.RMS_AT_FULL / math.sqrt(math.pi * self._bw / self._lr)
-
-    def _low_rate(self, count: int, into: np.ndarray) -> None:
-        x = self._rng.standard_normal(count)
-        b0, b2, a1, a2 = self._b0, self._b2, self._a1, self._a2
-        z1, z2 = self._z1, self._z2
-        for k in range(count):
-            xn = x[k]
-            yn = b0 * xn + z1
-            z1 = -a1 * yn + z2
-            z2 = b2 * xn - a2 * yn
-            into[k] = yn
-        self._z1, self._z2 = z1, z2
-
-    def render(self, n: int) -> np.ndarray:
-        if self._count_down(n):
-            self.stop()
-        if self.is_silent:
-            return np.zeros(n, dtype=np.float32)
-
-        positions = self._carry + np.arange(n, dtype=np.float64) / self._d
-        q = self._carry + n / self._d
-        j = int(math.floor(q))
-        top = j + 1
-        y = np.empty(top + 1, dtype=np.float64)
-        y[0] = self._prev
-        y[1] = self._next
-        if top >= 2:
-            self._low_rate(top - 1, y[2:])
-        out = np.interp(positions, np.arange(top + 1, dtype=np.float64), y)
-        self._prev = y[j]
-        self._next = y[j + 1]
-        self._carry = q - j
-
-        if self._amp == self._target:
-            env = self._amp
-        else:
-            env = self._amp + self._step * np.arange(1, n + 1, dtype=np.float64)
-            if self._step > 0:
-                np.minimum(env, self._target, out=env)
-            else:
-                np.maximum(env, self._target, out=env)
-            self._amp = float(env[-1])
-            if self._amp == self._target:
-                self._step = 0.0
-        out *= env * self._norm
-        np.clip(out, -1.0, 1.0, out=out)
-        return out.astype(np.float32)
-
-
 class PhaseAccumulator:
     """Integrates a rate over caller-supplied time and reports how many
     whole cycles passed: blade passes, cylinder firings, runway joints."""
@@ -460,24 +341,15 @@ class PhaseAccumulator:
 class ImpulseTrain(_Expiring):
     """One gated pulse per cycle of a rate set from telemetry.
 
-    Above ``max_rate_hz`` a transducer no longer resolves the pulses as
-    separate hits, so the voice crosses over to band-limited noise
-    centered on the rate: the thrum continues instead of going silent.
-    Hysteresis keeps a cruise RPM near the cap from flapping between the
-    two, and both voices ramp over the crossover so it does not click.
+    The backend hands a rate here only while it sits below the profile's
+    band; once the rate reaches the band the effect is a tone at that
+    rate instead, so the train never has to render pulses faster than
+    a transducer resolves them as separate hits.
     """
 
-    HIGH_FRAC = 1.00
-    LOW_FRAC = 0.85
-    NOISE_BW_FRAC = 0.20
-    NOISE_BW_MIN_HZ = 15.0
-    CROSSFADE_MS = 80.0
-
-    def __init__(self, samplerate: int, blocksize: int = 512,
-                 max_rate_hz: float = 180.0):
+    def __init__(self, samplerate: int, blocksize: int = 512):
         self._sr = float(samplerate)
         self._osc = Oscillator(samplerate, blocksize)
-        self._noise = BandpassNoise(samplerate, blocksize)
         self._acc = PhaseAccumulator()
         self._lock = threading.Lock()
         self._rate = 0.0
@@ -489,13 +361,10 @@ class ImpulseTrain(_Expiring):
         self._brake_amp = 0.0
         self._brake_delay_ms = 0.0
         self._gain = 1.0
-        self._max_rate = float(max_rate_hz)
-        self._noise_bw: Optional[float] = None
-        self._fallback = False
 
     def configure(self, *, carrier_hz=None, halfwaves=None, attack_ms=None,
                   release_ms=None, brake_amp=None, brake_delay_ms=None,
-                  gain=None, max_rate_hz=None, noise_bandwidth_hz=None) -> None:
+                  gain=None) -> None:
         with self._lock:
             if carrier_hz is not None:
                 self._carrier_hz = float(carrier_hz)
@@ -511,11 +380,6 @@ class ImpulseTrain(_Expiring):
                 self._brake_delay_ms = float(brake_delay_ms)
             if gain is not None:
                 self._gain = float(gain)
-            if max_rate_hz is not None:
-                self._max_rate = float(max_rate_hz)
-            if noise_bandwidth_hz is not None:
-                v = float(noise_bandwidth_hz)
-                self._noise_bw = v if v > 0.0 else None
 
     def set_rate(self, rate_hz: float, load: Optional[float] = None) -> None:
         with self._lock:
@@ -526,20 +390,12 @@ class ImpulseTrain(_Expiring):
     def stop(self, ramp_ms: float = 50.0) -> None:
         with self._lock:
             self._rate = 0.0
-            self._fallback = False
         self._osc.stop(ramp_ms)
-        self._noise.stop(ramp_ms)
         self._expire = None
 
     @property
     def is_silent(self) -> bool:
-        if self._rate > 0.0:
-            return False
-        return self._osc.is_silent and self._noise.is_silent
-
-    @property
-    def fallback_active(self) -> bool:
-        return self._fallback
+        return self._rate <= 0.0 and self._osc.is_silent
 
     @property
     def rate_hz(self) -> float:
@@ -549,35 +405,16 @@ class ImpulseTrain(_Expiring):
         if self._count_down(n):
             self.stop()
         with self._lock:
-            rate, load, gain, cap = self._rate, self._load, self._gain, self._max_rate
+            rate, load, gain = self._rate, self._load, self._gain
             carrier, halfwaves = self._carrier_hz, self._halfwaves
             attack, release = self._attack_ms, self._release_ms
             brake_amp, brake_delay = self._brake_amp, self._brake_delay_ms
-            bw_override, fallback = self._noise_bw, self._fallback
-
         if rate > 0.0:
-            if not fallback and rate >= cap * self.HIGH_FRAC:
-                fallback = True
-            elif fallback and rate < cap * self.LOW_FRAC:
-                fallback = False
             amp = clamp(load * gain, 0.0, 1.0)
-            if fallback:
-                bw = bw_override if bw_override is not None else max(self.NOISE_BW_MIN_HZ, rate * self.NOISE_BW_FRAC)
-                self._noise.set(rate, bw, amp, ramp_ms=self.CROSSFADE_MS)
-            else:
-                if not self._noise.is_silent:
-                    self._noise.stop(ramp_ms=self.CROSSFADE_MS)
-                if self._acc.advance(rate, n / self._sr) and amp > 0.0:
-                    self._osc.trigger_pulse(carrier, halfwaves, amp, attack, release,
-                                            brake_amp, brake_delay)
-        else:
-            if not self._noise.is_silent:
-                self._noise.stop(ramp_ms=self.CROSSFADE_MS)
-            fallback = False
-
-        with self._lock:
-            self._fallback = fallback
-        return self._osc.render(n) + self._noise.render(n)
+            if self._acc.advance(rate, n / self._sr) and amp > 0.0:
+                self._osc.trigger_pulse(carrier, halfwaves, amp, attack, release,
+                                        brake_amp, brake_delay)
+        return self._osc.render(n)
 
 
 # ---------------------------------------------------------------------------
@@ -631,13 +468,29 @@ class SoundDeviceOutput:
     callback being late is what keeps the output free of clicks.
     """
 
-    def __init__(self, device=None, samplerate: int = 48000, blocksize: int = 512,
+    FALLBACK_SAMPLERATE = 48000
+
+    def __init__(self, device=None, samplerate: Optional[int] = None, blocksize: int = 512,
                  latency='high'):
         self.device = device
-        self.samplerate = int(samplerate)
+        # a shared-mode WASAPI endpoint runs at the rate Windows gives it
+        # and refuses others, so no rate given means the card's own
+        self.samplerate = int(samplerate or self.default_samplerate() or self.FALLBACK_SAMPLERATE)
         self.blocksize = int(blocksize)
         self.latency = latency
         self._stream = None
+
+    def default_samplerate(self) -> Optional[int]:
+        """The rate the device runs at by default, or None when it cannot
+        be asked (no library, no such device)."""
+        try:
+            import sounddevice as sd
+            index = self.resolve(self.device)
+            info = sd.query_devices(index if index is not None else sd.default.device[1])
+            rate = int(round(float(info.get('default_samplerate', 0.0))))
+            return rate or None
+        except Exception:
+            return None
 
     @property
     def running(self) -> bool:

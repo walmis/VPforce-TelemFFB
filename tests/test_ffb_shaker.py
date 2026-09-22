@@ -17,7 +17,7 @@ from telemffb.hw.ffb_rhino import (
 from telemffb.hw.ffb_shaker import (
     DEFAULT_GAIN, DEFAULT_PLACEMENT_DELAY_MS, EVERYWHERE, PLACEMENT_CHOICES,
     SHAKER_CAPABILITIES, TRANSIENT_MS, Placement, ShakerEffectHandle,
-    ShakerFFBDevice, ShakerOutputError, ShakerProfile, Transducer, contact_of,
+    ShakerFFBDevice, ShakerOutputError, ShakerPreview, ShakerProfile, Transducer, contact_of,
     default_profiles_path, load_profiles, placement_from_choice, profile_from_dict,
 )
 from telemffb.hw.shaker_synth import ImpulseTrain, Oscillator
@@ -497,6 +497,69 @@ class TestPlacement:
         h.label = 'x'
         h.setPeriodic(50.0, 1.0, 0).start()
         assert all(p > 0.9 for p in peaks(output))
+
+
+class TestSampleRate:
+    """The synth runs at the output's rate, whatever the card says."""
+
+    def test_the_synth_follows_the_output(self, clock):
+        output = FakeOutput()
+        output.samplerate = 44100
+        dev = ShakerFFBDevice(output=output, reconnect_interval_ms=0, clock=clock)
+        assert dev.synth.samplerate == 44100
+        preview = ShakerPreview(output=output)
+        assert preview.synth.samplerate == 44100
+
+    def test_a_requested_rate_wins_and_a_silent_output_gets_the_usual(self, clock):
+        output = FakeOutput()
+        output.samplerate = 44100
+        assert ShakerFFBDevice(output=output, samplerate=96000, reconnect_interval_ms=0,
+                               clock=clock).synth.samplerate == 96000
+        assert ShakerFFBDevice(output=FakeOutput(), reconnect_interval_ms=0,
+                               clock=clock).synth.samplerate == 48000
+
+    def test_a_delayed_placement_is_timed_in_the_outputs_rate(self, clock):
+        output = FakeOutput()
+        output.samplerate = 24000
+        dev = ShakerFFBDevice(output=output, transducers=RIG, profiles=[LIGHT, HEAVY], gain=1.0,
+                              placement_resolver=lambda n: placement_from_choice('floor then seat back'),
+                              reconnect_interval_ms=0, clock=clock)
+        h = dev.create_effect(EFFECT_SQUARE)
+        h.label = 'runway_bump0'
+        h.setPeriodic(15.0, 1.0, 0, duration=80).start()
+        out = np.concatenate([output.pump() for _ in range(40)])
+
+        def onset(c):
+            return int(np.argmax(abs(out[:, c]) > 0.1))
+        lag = onset(1) - onset(3)                                    # seat back after the floor
+        assert abs(lag - int(round(DEFAULT_PLACEMENT_DELAY_MS * 24000 / 1000.0))) <= 2
+
+
+class TestLogging:
+    """What a log has to say when a user hears the wrong transducer."""
+
+    def test_each_preview_says_where_it_plays(self, output, caplog):
+        import logging
+        preview = ShakerPreview(output=output, transducers=RIG, profiles=[LIGHT, HEAVY])
+        with caplog.at_level(logging.INFO, logger='telemffb.hw.ffb_shaker'):
+            preview.start()
+        records = [r for r in caplog.records if r.name == 'telemffb.hw.ffb_shaker']
+        assert len(records) == 1
+        assert all(t.name in records[0].getMessage() for t in RIG)
+        preview.stop()
+
+    def test_a_placement_is_logged_once_per_effect(self, output, clock, caplog):
+        import logging
+        dev = ShakerFFBDevice(output=output, transducers=RIG, profiles=[LIGHT, HEAVY], gain=1.0,
+                              placement_resolver=lambda n: placement_from_choice('seat back'),
+                              reconnect_interval_ms=0, clock=clock)
+        with caplog.at_level(logging.INFO, logger='telemffb.hw.ffb_shaker'):
+            before = len(caplog.records)
+            dev.placement_for('buffeting')
+            dev.placement_for('buffeting')
+            dev.placement_for('gunfire')
+        new = [r for r in caplog.records[before:] if 'plays at' in r.getMessage()]
+        assert len(new) == 2
 
 
 class TestConstantForce:

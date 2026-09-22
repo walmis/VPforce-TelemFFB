@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from telemffb.hw.shaker_synth import (
-    BandpassNoise, ImpulseTrain, Oscillator, PhaseAccumulator, Route, ShakerSynth,
+    ImpulseTrain, Oscillator, PhaseAccumulator, Route, ShakerSynth,
     SoundDeviceOutput, build_pulse_shape, clean_device_name,
 )
 
@@ -141,56 +141,43 @@ class TestOscillator:
         assert osc.is_silent
 
 
-class TestBandpassNoise:
-    def test_output_sits_in_the_band_at_the_normalized_level(self):
-        noise = BandpassNoise(SR, seed=1)
-        noise.set(40.0, 20.0, 1.0, ramp_ms=1.0)
-        render(noise, SR)                       # settle
-        out = render(noise, 4 * SR).astype(np.float64)
-        rms = math.sqrt(float(np.mean(out * out)))
-        assert rms == pytest.approx(BandpassNoise.RMS_AT_FULL, rel=0.3)
-        power = np.abs(np.fft.rfft(out)) ** 2
-        freqs = np.fft.rfftfreq(out.size, 1.0 / SR)
-        peak = freqs[np.argmax(power)]
-        assert 25.0 <= peak <= 55.0
-        in_band = power[(freqs > 20) & (freqs < 80)].sum()
-        far_out = power[freqs > 400].sum()
-        assert far_out < 0.05 * in_band              # interpolation images stay far down
+class TestOutputSampleRate:
+    """A card runs at one rate in shared mode; the output adopts it
+    unless told otherwise."""
 
-    def test_level_is_independent_of_bandwidth(self):
-        levels = []
-        for bw in (10.0, 40.0):
-            noise = BandpassNoise(SR, seed=2)
-            noise.set(60.0, bw, 1.0, ramp_ms=1.0)
-            render(noise, SR)
-            out = render(noise, 4 * SR).astype(np.float64)
-            levels.append(math.sqrt(float(np.mean(out * out))))
-        assert levels[0] == pytest.approx(levels[1], rel=0.3)
+    def test_adopts_the_devices_default_rate(self, monkeypatch):
+        monkeypatch.setattr(SoundDeviceOutput, 'default_samplerate', lambda self: 44100)
+        assert SoundDeviceOutput('Card A').samplerate == 44100
 
-    def test_ramp_and_stop(self):
-        noise = BandpassNoise(SR, seed=3)
-        noise.set(40.0, 20.0, 1.0, ramp_ms=50.0)
-        first = noise.render(BLOCK)
-        assert abs(first).max() < 0.3
-        render(noise, SR)
-        noise.stop(ramp_ms=10.0)
-        render(noise, SR // 4)
-        assert noise.is_silent
-        assert not noise.render(BLOCK).any()
+    def test_a_requested_rate_wins(self, monkeypatch):
+        monkeypatch.setattr(SoundDeviceOutput, 'default_samplerate', lambda self: 44100)
+        assert SoundDeviceOutput('Card A', 48000).samplerate == 48000
 
-    def test_center_stays_under_the_decimated_nyquist(self):
-        noise = BandpassNoise(SR)
-        noise.set(5000.0, 20.0, 1.0)
-        assert noise.center_hz < SR / BandpassNoise.DECIMATION / 2
+    def test_an_unaskable_device_gets_the_usual_rate(self, monkeypatch):
+        monkeypatch.setattr(SoundDeviceOutput, 'default_samplerate', lambda self: None)
+        assert SoundDeviceOutput('Card A').samplerate == SoundDeviceOutput.FALLBACK_SAMPLERATE
 
-    def test_odd_block_sizes_keep_continuity(self):
-        noise = BandpassNoise(SR, seed=4)
-        noise.set(40.0, 20.0, 1.0, ramp_ms=1.0)
-        render(noise, SR)
-        out = np.concatenate([np.array(noise.render(n), copy=True) for n in (7, 1, 300, 13, 512)])
-        # a band-limited signal has no sample-to-sample jumps; a seam would
-        step = abs(np.diff(out.astype(np.float64))).max()
-        assert step < 0.2
+    def test_asking_reads_the_devices_entry(self, monkeypatch):
+        import sys
+        import types
+        fake = types.SimpleNamespace(
+            query_devices=lambda index=None: {'default_samplerate': 44100.0, 'index': index},
+            default=types.SimpleNamespace(device=(3, 7)))
+        monkeypatch.setitem(sys.modules, 'sounddevice', fake)
+        monkeypatch.setattr(SoundDeviceOutput, 'resolve', classmethod(lambda cls, spec: 5 if spec else None))
+        assert SoundDeviceOutput('Card A').samplerate == 44100
+        assert SoundDeviceOutput(None).samplerate == 44100
+
+    def test_a_failing_query_is_no_rate(self, monkeypatch):
+        import sys
+        import types
+
+        def boom(index=None):
+            raise RuntimeError('no PortAudio')
+        monkeypatch.setitem(sys.modules, 'sounddevice',
+                            types.SimpleNamespace(query_devices=boom, default=types.SimpleNamespace(device=(0, 0))))
+        monkeypatch.setattr(SoundDeviceOutput, 'resolve', classmethod(lambda cls, spec: None))
+        assert SoundDeviceOutput(None).default_samplerate() is None
 
 
 class TestPhaseAccumulator:
@@ -224,7 +211,7 @@ class TestImpulseTrain:
         return len(fired)
 
     def test_one_pulse_per_cycle_of_the_rate(self):
-        train = ImpulseTrain(SR, max_rate_hz=180.0)
+        train = ImpulseTrain(SR)
         train.set_rate(10.0, load=1.0)
         assert self._count_pulses(train, 2.0) in (19, 20, 21)
 
@@ -232,18 +219,6 @@ class TestImpulseTrain:
         train = ImpulseTrain(SR)
         train.set_rate(10.0, load=0.0)
         assert self._count_pulses(train, 1.0) == 0
-
-    def test_falls_back_to_noise_above_the_cap_with_hysteresis(self):
-        train = ImpulseTrain(SR, max_rate_hz=100.0)
-        train.set_rate(120.0, load=1.0)
-        render(train, BLOCK)
-        assert train.fallback_active
-        train.set_rate(95.0)
-        render(train, BLOCK)
-        assert train.fallback_active                   # still above the return threshold
-        train.set_rate(50.0)
-        render(train, BLOCK)
-        assert not train.fallback_active
 
     def test_stop_silences(self):
         train = ImpulseTrain(SR)
@@ -364,8 +339,8 @@ class TestShakerSynth:
         synth = ShakerSynth(SR, BLOCK)
         a = synth.voice('k', Oscillator)
         assert synth.voice('k', Oscillator) is a
-        b = synth.voice('k', BandpassNoise)
-        assert b is not a and isinstance(b, BandpassNoise)
+        b = synth.voice('k', ImpulseTrain)
+        assert b is not a and isinstance(b, ImpulseTrain)
         synth.remove('k')
         assert synth.get('k') is None
         assert synth.keys() == []
