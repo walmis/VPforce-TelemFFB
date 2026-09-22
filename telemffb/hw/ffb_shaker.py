@@ -511,6 +511,7 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
     AC_GAIN = 3.0
 
     def __init__(self, device: 'ShakerFFBDevice', effect_id: int, effect_type: int):
+        super().__init__()
         self.device = device
         self.effect_id = effect_id
         self.type = effect_type
@@ -572,12 +573,6 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
         if self.type == EFFECT_CONSTANT:
             return clamp(self._ac_drive * self._gain, 0.0, 1.0)
         return clamp(self.magnitude * self._gain, 0.0, 1.0)
-
-    @property
-    def axis_gains(self):
-        """A shaker renders no conditions, so there is never a per-axis
-        gain to show."""
-        return None
 
     # --- lifecycle -----------------------------------------------------------
 
