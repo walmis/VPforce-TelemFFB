@@ -67,7 +67,7 @@ import sys
 import time
 import weakref
 from dataclasses import asdict, dataclass, fields
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from telemffb.hw import ffb_backend
 from telemffb.hw.ffb_rhino import (
@@ -103,6 +103,81 @@ DEFAULT_GAIN = 3.0
 POSITIONS = ('seat', 'seat left', 'seat right',
              'seat back', 'seat back left', 'seat back right',
              'floor', 'floor left', 'floor right')
+
+#: where a transducer touches the body, without the side: what a
+#: placement names
+CONTACTS = ('seat', 'seat back', 'floor')
+
+
+def contact_of(position: str) -> str:
+    """'seat back left' -> 'seat back', 'floor right' -> 'floor'."""
+    position = POSITION_ALIASES.get(position, position or 'seat')
+    for contact in sorted(CONTACTS, key=len, reverse=True):
+        if position == contact or position.startswith(contact + ' '):
+            return contact
+    return 'seat'
+
+
+@dataclass(frozen=True)
+class Placement:
+    """Where an effect plays: the contact points that hear it (empty means
+    every transducer), and which of those hear it late, by ``delay_ms``.
+    The key names the placement for grouping voices; two effects with the
+    same profile and placement share one render."""
+    contacts: FrozenSet[str] = frozenset()
+    delayed: FrozenSet[str] = frozenset()
+    delay_ms: float = 0.0
+
+    @property
+    def everywhere(self) -> bool:
+        return not self.contacts
+
+    @property
+    def key(self) -> str:
+        if self.everywhere:
+            return 'all'
+        parts = []
+        for contact in CONTACTS:
+            if contact in self.contacts:
+                parts.append(contact + ('>' if contact in self.delayed else ''))
+        return '+'.join(parts) + (f"@{self.delay_ms:g}" if self.delayed else '')
+
+    def hears(self, position: str) -> bool:
+        return self.everywhere or contact_of(position) in self.contacts
+
+    def late(self, position: str) -> bool:
+        return contact_of(position) in self.delayed
+
+
+EVERYWHERE = Placement()
+
+#: the choices a placement setting offers, by their stored value
+PLACEMENT_CHOICES = {
+    'all': (),
+    'seat': ('seat',),
+    'seat back': ('seat back',),
+    'floor': ('floor',),
+    'seat + seat back': ('seat', 'seat back'),
+    'seat + floor': ('seat', 'floor'),
+    'seat back + floor': ('seat back', 'floor'),
+    'floor, then seat back': ('floor', 'seat back'),
+}
+#: which choices lag their second contact behind the first
+DELAYED_CHOICES = {'floor, then seat back': ('seat back',)}
+DEFAULT_PLACEMENT_DELAY_MS = 60.0
+
+
+def placement_from_choice(choice, delay_ms: float = DEFAULT_PLACEMENT_DELAY_MS) -> Placement:
+    """A Placement for a stored setting value; an unknown value plays
+    everywhere rather than nowhere."""
+    choice = str(choice or 'all').strip().lower()
+    contacts = PLACEMENT_CHOICES.get(choice)
+    if not contacts:
+        return EVERYWHERE
+    delayed = DELAYED_CHOICES.get(choice, ())
+    return Placement(frozenset(contacts), frozenset(delayed),
+                     float(delay_ms) if delayed else 0.0)
+
 
 #: names an earlier build stored, so a saved row keeps its place
 POSITION_ALIASES = {
@@ -542,6 +617,10 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
     def _key(self, group: str) -> str:
         return f"{self.effect_id}:{group}"
 
+    @property
+    def placement(self) -> Placement:
+        return self.device.placement_for(self.label)
+
     def _drop_voices(self):
         synth = self.device.synth
         with synth.lock:
@@ -619,7 +698,7 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
         ramp = self._ramp_ms if self._ramp_ms is not None else 50.0
         with synth.lock:
             voices = {}
-            for group, profile in device.groups.items():
+            for group, profile in device.groups_for(self.placement).items():
                 key = self._key(group)
                 amp = clamp(self.magnitude * self._gain * profile.gain, 0.0, 1.0)
                 if self.type == EFFECT_CONSTANT:
@@ -684,15 +763,27 @@ def stream_width(output, needed: int) -> Optional[int]:
 
 
 def _routes_for(transducers: Sequence[Transducer], profiles: Sequence[ShakerProfile],
-                fallback: str) -> Tuple[List[Route], Dict[str, ShakerProfile]]:
-    """The mixer routes and the profile groups a transducer list needs:
-    one group per distinct resolved profile, one route per transducer."""
+                fallback: str, placement: Placement = EVERYWHERE,
+                samplerate: int = 48000) -> Tuple[List[Route], Dict[str, ShakerProfile]]:
+    """The mixer routes and the profile groups a transducer list needs
+    for one placement: one group per distinct profile among the rows the
+    placement reaches, one route per such row (late where the placement
+    says so).  A placement no row can honor reaches every row instead -
+    a rig with one transducer never loses an effect to a placement it
+    cannot satisfy.  Group names carry the placement key, so the same
+    profile under two placements renders twice, once each."""
+    rows = [t for t in transducers if placement.hears(t.position)]
+    if not rows:
+        rows, placement = list(transducers), EVERYWHERE
     groups: Dict[str, ShakerProfile] = {}
     routes = []
-    for t in transducers:
+    delay = int(round(placement.delay_ms * samplerate / 1000.0))
+    for t in rows:
         profile = find_profile(profiles, t.profile, fallback)
-        groups[profile.name] = profile
-        routes.append(Route(t.channel, profile.name, t.gain))
+        group = f"{profile.name}|{placement.key}"
+        groups[group] = profile
+        routes.append(Route(t.channel, group, t.gain,
+                            delay if placement.late(t.position) else 0))
     return routes, groups
 
 
@@ -722,11 +813,17 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
                  transducers: Optional[Sequence[Transducer]] = None,
                  profiles: Optional[Sequence[ShakerProfile]] = None,
                  profile: Optional[ShakerProfile] = None,
+                 placement_resolver: Optional[Callable[[Optional[str]], Placement]] = None,
                  reconnect_interval_ms: int = 2000, autostart: bool = True,
                  clock=time.monotonic) -> None:
         # plain assignments only before super().__init__ (QObject caveat)
         self.output_device = output_device
         self.clock = clock
+        # where an effect plays, by its name: the shaker child hands in a
+        # resolver over its settings tree; without one everything plays
+        # everywhere
+        self.placement_resolver = placement_resolver
+        self._placements: Dict[str, Placement] = {}
         # the pack the rows' profile names resolve against; a profile
         # passed outright (tests, previews) is the pack and the fallback
         if profile is not None:
@@ -737,11 +834,14 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
             output = SoundDeviceOutput(output_device, samplerate, blocksize)
         self._output = output
         wanted = list(transducers) if transducers else default_transducers(self._fallback_profile)
-        routes, groups, channels = self._plan(wanted)
-        self.synth = ShakerSynth(samplerate, blocksize, gain, routes, channels, output)
+        rows, channels = self._plan(wanted)
+        self._samplerate = samplerate
+        self.synth = ShakerSynth(samplerate, blocksize, gain, [], channels, output)
         self.synth.on_finished = self._output_lost
         self.transducers: List[Transducer] = wanted
-        self.groups: Dict[str, ShakerProfile] = groups
+        self._driven: List[Transducer] = rows
+        self.groups: Dict[str, ShakerProfile] = {}
+        self._rebuild_routes()
         self.info = ShakerDeviceInfo(str(output_device or ''))
         self.firmware_version = None
         self._handles: List[weakref.ref] = []
@@ -762,12 +862,66 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
     def profile(self) -> ShakerProfile:
         """The first transducer's profile: what single-transducer callers
         mean by 'the profile'."""
-        return next(iter(self.groups.values()), self.profiles[0])
+        if self._driven:
+            return find_profile(self.profiles, self._driven[0].profile, self._fallback_profile)
+        return self.profiles[0]
+
+    # --- placement -------------------------------------------------------
+
+    def placement_for(self, label: Optional[str]) -> Placement:
+        """Where the effect called ``label`` plays.  Resolved once per name
+        and remembered; ``forget_placements`` clears the memory when the
+        settings behind the resolver change."""
+        if label in self._placements:
+            return self._placements[label]
+        placement = EVERYWHERE
+        if self.placement_resolver is not None:
+            try:
+                placement = self.placement_resolver(label) or EVERYWHERE
+            except Exception:
+                log.exception(f"shaker: placement for {label!r} could not be resolved; playing everywhere")
+        self._placements[label] = placement
+        return placement
+
+    def groups_for(self, placement: Placement) -> Dict[str, ShakerProfile]:
+        """The voice groups an effect with ``placement`` renders into,
+        making their routes the first time the placement is seen."""
+        wanted = {}
+        for t in self._driven:
+            if placement.hears(t.position):
+                wanted[t.profile] = True
+        routes, groups = _routes_for(self._driven, self.profiles, self._fallback_profile,
+                                     placement, self._samplerate)
+        missing = [g for g in groups if g not in self.groups]
+        if missing:
+            self.groups.update(groups)
+            self.synth.set_routes(self.synth.routes + [r for r in routes if r.group in missing],
+                                  self.synth.channels)
+        return groups
+
+    def forget_placements(self) -> None:
+        """The settings behind the resolver changed: re-resolve every
+        effect on its next update and drop the routes that are no longer
+        used."""
+        self._placements.clear()
+        self._rebuild_routes()
+        for ref in list(self._handles):
+            handle = ref()
+            if handle is not None:
+                handle.regroup()
+
+    def _rebuild_routes(self) -> None:
+        """Start the fan-out from the rows alone: the everywhere group per
+        profile.  Placements add their groups as effects ask for them."""
+        routes, groups = _routes_for(self._driven, self.profiles, self._fallback_profile,
+                                     EVERYWHERE, self._samplerate)
+        self.groups = groups
+        self.synth.set_routes(routes, self.synth.channels)
 
     def _plan(self, transducers: Sequence[Transducer]):
-        """Routes, groups and the channel count for a transducer list,
-        dropping (with a warning) rows on channels the output does not
-        have: an output that refuses the count loses its highest rows
+        """The rows the output can drive and the channel count to open it
+        with, dropping (with a warning) rows on channels the output does
+        not have: an output that refuses the count loses its highest rows
         until it accepts, so whatever fits is still driven."""
         rows = list(transducers)
         channels = 1
@@ -782,8 +936,7 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
             rows = [t for t in rows if t.channel != highest]
             log.warning(f"shaker output {self.output_device!r} has no channel "
                         f"{highest + 1}; {', '.join(t.name for t in dropped)} not driven")
-        routes, groups = _routes_for(rows, self.profiles, self._fallback_profile)
-        return routes, groups, channels
+        return rows, channels
 
     # --- output ----------------------------------------------------------
 
@@ -853,9 +1006,8 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
             else:
                 log.warning(f"shaker: {t.name} is on channel {t.channel + 1} but the output "
                             f"was opened with {self.synth.channels}; not driven until a restart")
-        routes, groups = _routes_for(rows, self.profiles, self._fallback_profile)
-        self.synth.set_routes(routes, self.synth.channels)
-        self.transducers, self.groups = list(transducers), groups
+        self.transducers, self._driven = list(transducers), rows
+        self._rebuild_routes()
         for ref in list(self._handles):
             handle = ref()
             if handle is not None:
@@ -911,10 +1063,10 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         self.synth.clear()
 
     def play_test_pulse(self, amplitude: float = 0.8) -> None:
-        """One pulse per profile group, each shaped by its profile, so every
-        transducer hears its own hit."""
+        """One pulse per profile, everywhere, each shaped by its profile, so
+        every transducer hears its own hit."""
         with self.synth.lock:
-            for group, p in self.groups.items():
+            for group, p in self.groups_for(EVERYWHERE).items():
                 voice = self.synth.voice(f'__test__:{group}', Oscillator, group)
                 voice.trigger_pulse(p.carrier_hz, p.halfwaves, amplitude, p.attack_ms, p.release_ms,
                                     p.brake_amp(amplitude), p.brake_delay_ms)

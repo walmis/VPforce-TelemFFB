@@ -771,13 +771,16 @@ class SoundDeviceOutput:
 
 @dataclass(frozen=True)
 class Route:
-    """One output channel fed from one voice group at a gain: how a
-    transducer hangs off the mix.  Voices are rendered per group (a group
-    is one calibration profile), and a route says which channel hears
-    which group, how loud."""
+    """One output channel fed from one voice group at a gain, after an
+    optional delay in samples: how a transducer hangs off the mix.
+    Voices are rendered per group (one calibration profile and one
+    placement), and a route says which channel hears which group, how
+    loud, and how late - a seat-back transducer can hear a runway bump a
+    wheelbase after the floor does."""
     channel: int
     group: str
     gain: float = 1.0
+    delay: int = 0
 
 
 class ShakerSynth:
@@ -804,6 +807,8 @@ class ShakerSynth:
         self._voices: Dict[str, Tuple[object, str]] = {}
         self._gain = float(master_gain)
         self._routes: List[Route] = []
+        #: delay lines, one per delayed route, keyed by the route
+        self._delays: Dict[Route, np.ndarray] = {}
         self._channels = 0
         self._limiters = np.ones(1)
         self._mix = np.zeros((self.blocksize, 1), dtype=np.float32)
@@ -857,11 +862,15 @@ class ShakerSynth:
         """Replace the fan-out.  The channel count is the highest routed
         channel plus one unless a wider count is given (an output opened
         wider than the routes use keeps its silent channels)."""
-        routes = [Route(int(r.channel), str(r.group), float(r.gain)) for r in routes]
+        routes = [Route(int(r.channel), str(r.group), float(r.gain), max(0, int(r.delay)))
+                  for r in routes]
         needed = max((r.channel for r in routes), default=0) + 1
         count = max(needed, int(channels) if channels else 1)
         with self.lock:
             self._routes = routes
+            # a delay line per delayed route; one that stays keeps its history
+            self._delays = {r: self._delays.get(r, np.zeros(r.delay, dtype=np.float32))
+                            for r in routes if r.delay > 0}
             if count != self._channels:
                 self._channels = count
                 self._limiters = np.ones(count)
@@ -913,6 +922,15 @@ class ShakerSynth:
             mixes = self.render_groups(n)
             for r in self._routes:
                 mix = mixes.get(r.group)
+                if r.delay > 0:
+                    # a delayed route keeps playing out its line after the
+                    # group falls silent, so the tail is not cut off
+                    line = self._delays[r]
+                    joined = np.concatenate([line, mix if mix is not None
+                                             else np.zeros(n, dtype=np.float32)])
+                    mix, self._delays[r] = joined[:n], joined[n:]
+                    if not mix.any():
+                        continue
                 if mix is None or r.channel >= self._channels:
                     continue
                 g = r.gain * self._gain

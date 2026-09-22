@@ -15,9 +15,10 @@ from telemffb.hw.ffb_rhino import (
     HapticEffect,
 )
 from telemffb.hw.ffb_shaker import (
-    DEFAULT_GAIN, SHAKER_CAPABILITIES, TRANSIENT_MS, ShakerEffectHandle,
-    ShakerFFBDevice, ShakerOutputError, ShakerProfile, Transducer,
-    default_profiles_path, load_profiles, profile_from_dict,
+    DEFAULT_GAIN, DEFAULT_PLACEMENT_DELAY_MS, EVERYWHERE, PLACEMENT_CHOICES,
+    SHAKER_CAPABILITIES, TRANSIENT_MS, Placement, ShakerEffectHandle,
+    ShakerFFBDevice, ShakerOutputError, ShakerProfile, Transducer, contact_of,
+    default_profiles_path, load_profiles, placement_from_choice, profile_from_dict,
 )
 from telemffb.hw.shaker_synth import ImpulseTrain, Oscillator
 from telemffb.utils import Dispenser
@@ -178,9 +179,9 @@ class TestOpen:
                               gain=1.0, reconnect_interval_ms=0, clock=clock)
         handle = dev.create_effect(EFFECT_SINE)
         handle.setPeriodic(80.0, 1.0, 0).start()
-        assert set(handle.voices) == {'light', 'heavy'}
-        assert handle.voices['light'].frequency == pytest.approx(80.0)
-        assert handle.voices['heavy'].frequency == pytest.approx(40.0)   # folded for the heavy band
+        assert set(handle.voices) == {'light|all', 'heavy|all'}
+        assert handle.voices['light|all'].frequency == pytest.approx(80.0)
+        assert handle.voices['heavy|all'].frequency == pytest.approx(40.0)   # folded for the heavy band
         out = np.concatenate([output.pump() for _ in range(30)])
         peaks = [abs(out[:, c]).max() for c in range(3)]
         assert peaks[0] == pytest.approx(1.0, abs=0.02)
@@ -230,7 +231,7 @@ class TestEffectLifecycle:
         handle.setPeriodic(50.0, 1.0, 0).start()
         handle.forget_playback()
         assert not handle.started
-        assert device.synth.keys() == [f"{handle.effect_id}:{device.profile.name}"]
+        assert device.synth.keys() == [f"{handle.effect_id}:{device.profile.name}|all"]
         handle.invalidate()
         assert not bool(handle)
         assert device.synth.keys() == []
@@ -376,6 +377,126 @@ class TestRules:
         handle.setPeriodic(50.0, 1.0, 0).start()
         settle(dev)
         assert handle.voice.amplitude == pytest.approx(0.5, abs=0.01)
+
+
+RIG = [Transducer('Buttkicker', 0, 1.0, 'heavy', 'seat'),
+       Transducer('Dayton L', 1, 1.0, 'light', 'seat back left'),
+       Transducer('Dayton R', 2, 1.0, 'light', 'seat back right'),
+       Transducer('Pedals', 3, 1.0, 'light', 'floor')]
+LIGHT = ShakerProfile(name='light', f_res_hz=50.0, carrier_offset_pct=0.0,
+                      band_low_hz=20.0, band_high_hz=100.0, halfwaves=1, attack_ms=0.0, release_ms=0.0)
+HEAVY = ShakerProfile(name='heavy', f_res_hz=50.0, carrier_offset_pct=0.0,
+                      band_low_hz=20.0, band_high_hz=100.0, halfwaves=1, attack_ms=0.0, release_ms=0.0)
+
+
+def peaks(output, seconds=0.2):
+    out = np.concatenate([output.pump() for _ in range(int(seconds * SR / BLOCK) + 1)])
+    return [float(abs(out[:, c]).max()) for c in range(out.shape[1])]
+
+
+class TestPlacement:
+    """Where an effect plays is asked of a resolver by the effect's name;
+    the rows a placement reaches get its voices, no other row does."""
+
+    def test_contacts_and_choices(self):
+        assert contact_of('seat back left') == 'seat back'
+        assert contact_of('floor right') == 'floor'
+        assert contact_of('seat') == 'seat'
+        assert contact_of('back left') == 'seat back'          # an old name
+        assert placement_from_choice('all') is EVERYWHERE
+        both = placement_from_choice('seat + floor')
+        assert both.contacts == {'seat', 'floor'} and not both.delayed
+        rolled = placement_from_choice('floor, then seat back')
+        assert rolled.contacts == {'floor', 'seat back'}
+        assert rolled.delayed == {'seat back'} and rolled.delay_ms == DEFAULT_PLACEMENT_DELAY_MS
+        assert placement_from_choice('no such place') is EVERYWHERE
+        assert set(PLACEMENT_CHOICES) >= {'all', 'seat', 'seat back', 'floor'}
+        assert Placement(frozenset({'seat'})).key != Placement(frozenset({'floor'})).key
+
+    def _device(self, output, clock, resolver):
+        return ShakerFFBDevice(output=output, transducers=RIG, profiles=[LIGHT, HEAVY], gain=1.0,
+                               placement_resolver=resolver, reconnect_interval_ms=0, clock=clock)
+
+    def test_without_a_resolver_everything_plays_everywhere(self, output, clock):
+        dev = self._device(output, clock, None)
+        handle = dev.create_effect(EFFECT_SINE)
+        handle.label = 'buffeting'
+        handle.setPeriodic(50.0, 1.0, 0).start()
+        assert all(p > 0.9 for p in peaks(output))
+
+    def test_a_placement_reaches_only_its_rows(self, output, clock):
+        table = {'buffeting': placement_from_choice('seat back'),
+                 'prop_rpm0-1': placement_from_choice('seat'),
+                 'gunfire': placement_from_choice('seat + floor')}
+        dev = self._device(output, clock, lambda name: table.get(name, EVERYWHERE))
+        expected = {'buffeting': [1, 2], 'prop_rpm0-1': [0], 'gunfire': [0, 3]}
+        for name, hz in (('buffeting', 50.0), ('prop_rpm0-1', 60.0), ('gunfire', 70.0)):
+            h = dev.create_effect(EFFECT_SINE)
+            h.label = name
+            h.setPeriodic(hz, 1.0, 0).start()
+            heard = [c for c, p in enumerate(peaks(output)) if p > 0.9]
+            assert heard == expected[name], name
+            h.stop()
+            peaks(output, 0.3)                                   # let the stop ramp out
+
+    def test_one_render_per_profile_and_placement_pair(self, output, clock):
+        dev = self._device(output, clock, lambda name: placement_from_choice('seat back') if name == 'a'
+                           else placement_from_choice('seat back + floor'))
+        a = dev.create_effect(EFFECT_SINE)
+        a.label = 'a'
+        a.setPeriodic(50.0, 1.0, 0).start()
+        b = dev.create_effect(EFFECT_SINE)
+        b.label = 'b'
+        b.setPeriodic(50.0, 1.0, 0).start()
+        assert list(a.voices) == ['light|seat back']
+        assert list(b.voices) == ['light|seat back+floor']      # the heavy seat row is not reached
+        assert len(dev.synth.keys()) == 2
+
+    def test_a_placement_no_row_can_honor_plays_everywhere(self, output, clock):
+        rows = [Transducer('Only', 0, 1.0, 'light', 'seat')]
+        dev = ShakerFFBDevice(output=output, transducers=rows, profiles=[LIGHT], gain=1.0,
+                              placement_resolver=lambda n: placement_from_choice('floor'),
+                              reconnect_interval_ms=0, clock=clock)
+        h = dev.create_effect(EFFECT_SINE)
+        h.label = 'x'
+        h.setPeriodic(50.0, 1.0, 0).start()
+        assert peaks(output)[0] > 0.9
+
+    def test_the_delayed_contact_hears_it_late(self, output, clock):
+        dev = self._device(output, clock, lambda n: placement_from_choice('floor, then seat back'))
+        h = dev.create_effect(EFFECT_SQUARE)
+        h.label = 'runway_bump0'
+        h.setPeriodic(15.0, 1.0, 0, duration=80).start()               # one pulse
+        out = np.concatenate([output.pump() for _ in range(40)])
+
+        def onset(c):
+            return int(np.argmax(abs(out[:, c]) > 0.1))
+        assert abs(out[:, 0]).max() < 1e-6                              # the seat is not in this placement
+        expected = int(round(DEFAULT_PLACEMENT_DELAY_MS * SR / 1000.0))
+        assert abs((onset(1) - onset(3)) - expected) <= 2                # the seat back hears it one delay later
+        assert abs((onset(2) - onset(3)) - expected) <= 2
+        assert abs(out[:, 1]).max() == pytest.approx(abs(out[:, 3]).max(), abs=0.02)
+
+    def test_forgetting_placements_re_resolves_started_effects(self, output, clock):
+        table = {'x': placement_from_choice('seat')}
+        dev = self._device(output, clock, lambda n: table.get(n, EVERYWHERE))
+        h = dev.create_effect(EFFECT_SINE)
+        h.label = 'x'
+        h.setPeriodic(50.0, 1.0, 0).start()
+        assert [c for c, p in enumerate(peaks(output)) if p > 0.9] == [0]
+        table['x'] = placement_from_choice('floor')
+        dev.forget_placements()
+        assert h.started
+        assert [c for c, p in enumerate(peaks(output, 0.4)) if p > 0.9] == [3]
+
+    def test_a_failing_resolver_plays_everywhere(self, output, clock):
+        def boom(name):
+            raise RuntimeError('settings not ready')
+        dev = self._device(output, clock, boom)
+        h = dev.create_effect(EFFECT_SINE)
+        h.label = 'x'
+        h.setPeriodic(50.0, 1.0, 0).start()
+        assert all(p > 0.9 for p in peaks(output))
 
 
 class TestConstantForce:

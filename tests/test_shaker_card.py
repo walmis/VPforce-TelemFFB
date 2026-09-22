@@ -161,11 +161,11 @@ class TestLiveApply:
         from telemffb.hw.ffb_rhino import EFFECT_SINE
         handle = dev.create_effect(EFFECT_SINE)
         handle.setPeriodic(50.0, 1.0, 0).start()
-        assert set(handle.voices) == {'ButtKicker LFE', 'Dayton TT25 Puck'}
+        assert set(handle.voices) == {'ButtKicker LFE|all', 'Dayton TT25 Puck|all'}
         dev.apply_settings(_Settings({SETTING_GAIN: '1.0', SETTING_TRANSDUCERS: transducers_to_json(
             [Transducer('Only', 1, 0.5, 'Generic')])}))
-        assert list(dev.groups) == ['Generic']
-        assert list(handle.voices) == ['Generic']
+        assert list(dev.groups) == ['Generic|all']
+        assert list(handle.voices) == ['Generic|all']
         assert handle.started
         out = output.render(0.3)
         assert not out[:, 0].any() and abs(out[:, 1]).max() == pytest.approx(0.5, abs=0.02)

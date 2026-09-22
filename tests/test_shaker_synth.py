@@ -339,6 +339,18 @@ class TestRoutes:
         peaks = np.max([abs(b).max(axis=0) for b in blocks], axis=0)
         assert peaks == pytest.approx([0.8, 0.4, 0.4], abs=0.02)
 
+    def test_a_delayed_route_lags_and_plays_out_its_tail(self):
+        synth = ShakerSynth(SR, BLOCK, routes=[Route(0, 'g'), Route(1, 'g', 1.0, 1000)])
+        osc = synth.voice('x', Oscillator, 'g')
+        osc.trigger_pulse(50.0, 1, 1.0, attack_ms=0.0, release_ms=0.0)
+        out = np.concatenate([np.array(synth.render_block(), copy=True) for _ in range(6)])
+        direct = np.argmax(abs(out[:, 0]) > 0.1)
+        late = np.argmax(abs(out[:, 1]) > 0.1)
+        assert late - direct == 1000
+        assert abs(out[:, 1]).max() == pytest.approx(abs(out[:, 0]).max(), abs=0.01)
+        # the group is silent now; the delayed channel still carried the pulse
+        assert osc.is_silent
+
     def test_a_voice_moves_group_when_remade(self):
         synth = ShakerSynth(SR, BLOCK, routes=[Route(0, 'a'), Route(1, 'b')])
         v1 = synth.voice('x', Oscillator, 'a')
