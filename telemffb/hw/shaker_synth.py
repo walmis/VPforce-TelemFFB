@@ -497,25 +497,42 @@ class SoundDeviceOutput:
         stream = self._stream
         return stream is not None and bool(stream.active)
 
+    #: streams held by outputs of this process; a device-table reread
+    #: tears the library down, so none may run while one is held
+    _held = 0
+
     def start(self, callback: Callable, channels: int,
               finished_callback: Optional[Callable] = None) -> None:
         import sounddevice as sd
+        self.stop()                      # a stream that died on its own is still held
         index = self.resolve(self.device)
         self._stream = sd.OutputStream(
             samplerate=self.samplerate, blocksize=self.blocksize, device=index,
             channels=int(channels), dtype='float32', latency=self.latency,
             callback=callback, finished_callback=finished_callback)
+        SoundDeviceOutput._held += 1
         self._stream.start()
 
     def stop(self) -> None:
         stream, self._stream = self._stream, None
         if stream is None:
             return
+        SoundDeviceOutput._held -= 1
         try:
             stream.stop()
             stream.close()
         except Exception:
             log.exception("closing the shaker output stream failed")
+
+    def refresh(self) -> bool:
+        """Reread the machine's device table, for a card whose channel
+        layout changed since this process started: the table is fixed
+        at library init, so until then the card reports its old width
+        and refuses it.  Refused while any output of this process holds
+        a stream."""
+        if SoundDeviceOutput._held:
+            return False
+        return self.rescan()
 
     def supports_channels(self, channels: int) -> bool:
         import sounddevice as sd
@@ -614,8 +631,9 @@ class SoundDeviceOutput:
         for dev in devices:
             if wanted in dev.name.lower():
                 return dev.index
-        log.warning(f"no audio output device matches {spec!r}; using the system default")
-        return None
+        # never the system default in its place: a shaker rig on the
+        # desktop speakers is worse than a silent one
+        raise LookupError(f"no audio output device matches {spec!r}")
 
 
 # ---------------------------------------------------------------------------

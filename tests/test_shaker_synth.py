@@ -277,8 +277,12 @@ class TestDeviceListing:
         assert SoundDeviceOutput.resolve('Speakers (USB Sound Device        )') == 0
         assert SoundDeviceOutput.resolve('Speakers (USB Sound Device)') == 0
         assert SoundDeviceOutput.resolve('usb sound') == 0
-        assert SoundDeviceOutput.resolve('no such card') is None
-        assert SoundDeviceOutput.resolve('') is None
+        assert SoundDeviceOutput.resolve('') is None                 # the system default, by choice
+
+    def test_a_missing_card_is_an_error_not_the_default_output(self, fake_portaudio):
+        # a shaker rig on the desktop speakers is worse than a silent one
+        with pytest.raises(LookupError):
+            SoundDeviceOutput.resolve('no such card')
 
     def test_rescan_reinitializes_the_library(self, monkeypatch):
         import sounddevice as sd
@@ -292,6 +296,15 @@ class TestDeviceListing:
             raise RuntimeError('busy')
         monkeypatch.setattr(sd, '_terminate', boom)
         assert SoundDeviceOutput.rescan() is False
+
+    def test_refresh_rereads_only_while_no_stream_is_held(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(SoundDeviceOutput, 'rescan', staticmethod(lambda: calls.append(1) or True))
+        out = SoundDeviceOutput('Card A', 48000)
+        monkeypatch.setattr(SoundDeviceOutput, '_held', 1)
+        assert out.refresh() is False and calls == []
+        monkeypatch.setattr(SoundDeviceOutput, '_held', 0)
+        assert out.refresh() is True and calls == [1]
 
 
 class TestRoutes:

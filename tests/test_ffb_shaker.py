@@ -562,6 +562,80 @@ class TestLogging:
         assert len(new) == 2
 
 
+class LayoutCard(FakeOutput):
+    """A card whose Windows layout can change under the process: it
+    always accepts exactly its current width, but reports the width the
+    audio library saw at startup until the library rereads the machine."""
+
+    def __init__(self, accepts, reported=None):
+        super().__init__()
+        self.accepts = accepts
+        self.reported = reported if reported is not None else accepts
+        self.refreshes = 0
+
+    def supports_channels(self, n):
+        return n == self.accepts
+
+    def native_channels(self):
+        return self.reported
+
+    def refresh(self):
+        self.refreshes += 1
+        if self.running:
+            return False
+        self.reported = self.accepts
+        return True
+
+    def start(self, callback, channels, finished_callback=None):
+        if channels != self.accepts:
+            raise RuntimeError("Invalid number of channels")
+        super().start(callback, channels, finished_callback)
+
+
+class TestLayoutChange:
+    """A card set to 7.1 when the process started and to 3.1 since:
+    the library's table still says eight, the card takes only four."""
+
+    ROWS = [Transducer('Left', 0), Transducer('Right', 1)]
+
+    def test_open_rereads_the_table_when_the_reported_width_is_refused(self, clock):
+        card = LayoutCard(accepts=4, reported=8)
+        dev = ShakerFFBDevice(output=card, transducers=self.ROWS, reconnect_interval_ms=0, clock=clock)
+        assert dev.connected and card.channels == 4
+        assert [t.name for t in dev._driven] == ['Left', 'Right']
+        assert card.refreshes == 1
+
+    def test_with_no_row_the_stream_still_opens_at_the_cards_width(self, clock):
+        card = LayoutCard(accepts=4, reported=8)
+        dev = ShakerFFBDevice(output=card, transducers=[Transducer('Rear', 6)],
+                              reconnect_interval_ms=0, clock=clock)
+        assert dev.connected and card.channels == 4
+        assert dev._driven == []
+
+    def test_reconnect_plans_again_at_the_new_width(self, clock):
+        card = LayoutCard(accepts=8)
+        dev = ShakerFFBDevice(output=card, transducers=self.ROWS, reconnect_interval_ms=0, clock=clock)
+        assert card.channels == 8
+        handle = dev.create_effect(EFFECT_SINE)
+        handle.setPeriodic(50.0, 1.0, 0).start()
+        # Windows goes to 3.1: the stream dies, the table still says eight
+        card.accepts = 4
+        card.vanish()
+        dev._tick()                                    # reopen at 8 refused, planned again, open at 4
+        assert dev.connected and card.channels == 4
+        assert [t.name for t in dev._driven] == ['Left', 'Right']
+        assert handle.started
+        out = card.pump()
+        assert out.shape[1] == 4 and out[:, 0].any() and out[:, 1].any()
+
+    def test_a_refusal_is_reported_with_the_width_tried(self, clock):
+        card = LayoutCard(accepts=4, reported=8)
+        card.refresh = lambda: False                   # a reread is not possible
+        with pytest.raises(ShakerOutputError) as err:
+            ShakerFFBDevice(output=card, transducers=self.ROWS, reconnect_interval_ms=0, clock=clock)
+        assert 'channel' in str(err.value)
+
+
 class TestConstantForce:
     """A steady push is felt as its changes: the magnitude is AC-coupled."""
 

@@ -753,7 +753,21 @@ def stream_width(output, needed: int) -> Optional[int]:
     output's native width when that is at least as wide (a shared-mode
     WASAPI endpoint accepts only its own width; the extra channels stay
     silent), else None.  An output without a probe takes what it is
-    given."""
+    given.
+
+    A card whose layout changed in Windows since the audio library
+    started still reports its old width and refuses it; when nothing is
+    accepted the output is asked to reread the machine and the question
+    is put once more."""
+    width = _accepted_width(output, needed)
+    if width is None:
+        refresh = getattr(output, 'refresh', None)
+        if refresh is not None and refresh():
+            width = _accepted_width(output, needed)
+    return width
+
+
+def _accepted_width(output, needed: int) -> Optional[int]:
     probe = getattr(output, 'supports_channels', None)
     if probe is None or probe(needed):
         return needed
@@ -837,6 +851,7 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         self._output = output
         samplerate = _samplerate_of(output, samplerate)
         wanted = list(transducers) if transducers else default_transducers(self._fallback_profile)
+        self._undriven: set = set()
         rows, channels = self._plan(wanted)
         self._samplerate = samplerate
         self.synth = ShakerSynth(samplerate, blocksize, gain, [], channels, output)
@@ -914,32 +929,51 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
             if handle is not None:
                 handle.regroup()
 
-    def _rebuild_routes(self) -> None:
+    def _rebuild_routes(self, channels: Optional[int] = None) -> None:
         """Start the fan-out from the rows alone: the everywhere group per
         profile.  Placements add their groups as effects ask for them."""
         routes, groups = _routes_for(self._driven, self.profiles, self._fallback_profile,
                                      EVERYWHERE, self._samplerate)
         self.groups = groups
-        self.synth.set_routes(routes, self.synth.channels)
+        self.synth.set_routes(routes, channels or self.synth.channels)
+
+    def _adopt(self, rows: Sequence[Transducer], channels: Optional[int] = None) -> None:
+        """Take a plan live: these rows driven, the fan-out this wide, and
+        every started effect re-rendered into the new groups."""
+        self._driven = list(rows)
+        self._rebuild_routes(channels)
+        for ref in list(self._handles):
+            handle = ref()
+            if handle is not None:
+                handle.regroup()
 
     def _plan(self, transducers: Sequence[Transducer]):
         """The rows the output can drive and the channel count to open it
         with, dropping (with a warning) rows on channels the output does
         not have: an output that refuses the count loses its highest rows
-        until it accepts, so whatever fits is still driven."""
+        until it accepts, so whatever fits is still driven.  With no row
+        left the stream still opens, at whatever width the output takes,
+        so rows added later have something to land on."""
         rows = list(transducers)
-        channels = 1
+        channels = None
+        undriven = []
         while rows:
             needed = max(t.channel for t in rows) + 1
-            width = stream_width(self._output, needed)
-            if width is not None:
-                channels = width
+            channels = stream_width(self._output, needed)
+            if channels is not None:
                 break
             highest = needed - 1
-            dropped = [t for t in rows if t.channel == highest]
+            undriven += [t for t in rows if t.channel == highest]
             rows = [t for t in rows if t.channel != highest]
-            log.warning(f"shaker output {self.output_device!r} has no channel "
-                        f"{highest + 1}; {', '.join(t.name for t in dropped)} not driven")
+        if channels is None:
+            channels = stream_width(self._output, 1) or 1
+        names = {t.name for t in undriven}
+        if names != self._undriven:
+            # once per change, not once per reconnect attempt
+            self._undriven = names
+            for t in undriven:
+                log.warning(f"shaker output {self.output_device!r} has no channel "
+                            f"{t.channel + 1}; {t.name} not driven")
         return rows, channels
 
     # --- output ----------------------------------------------------------
@@ -950,7 +984,8 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
         except Exception as e:
             if first:
                 raise ShakerOutputError(
-                    f"could not open the audio output {self.output_device!r}: {e}") from e
+                    f"could not open the audio output {self.output_device!r} "
+                    f"with {self.synth.channels} channel(s): {e}") from e
             log.debug(f"shaker output reopen failed: {e}")
             return False
         rows = ', '.join(f"{t.name} on ch {t.channel + 1} ({t.profile or self._fallback_profile})"
@@ -978,11 +1013,19 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
             self._announced = True
             log.warning("Shaker output stopped: the sound card went away or the stream failed; reconnecting")
             self.deviceConnected.emit(False)
-        if self._open():
-            self._lost = False
-            log.info("Shaker output restored")
-            self.deviceConnected.emit(True)
-            self.deviceReconnected.emit()
+        if not self._open():
+            # the width the stream was opened with may not be what the card
+            # takes any more (its layout changed in Windows): let go of the
+            # dead stream, plan again against the card as it is now, once more
+            self.synth.stop()
+            rows, channels = self._plan(self.transducers)
+            self._adopt(rows, channels)
+            if not self._open():
+                return
+        self._lost = False
+        log.info("Shaker output restored")
+        self.deviceConnected.emit(True)
+        self.deviceReconnected.emit()
 
     def shutdown(self) -> None:
         self._shutdown = True
@@ -1010,12 +1053,8 @@ class ShakerFFBDevice(ffb_backend.BaseFFBDevice):
             else:
                 log.warning(f"shaker: {t.name} is on channel {t.channel + 1} but the output "
                             f"was opened with {self.synth.channels}; not driven until a restart")
-        self.transducers, self._driven = list(transducers), rows
-        self._rebuild_routes()
-        for ref in list(self._handles):
-            handle = ref()
-            if handle is not None:
-                handle.regroup()
+        self.transducers = list(transducers)
+        self._adopt(rows)
 
     def apply_settings(self, settings) -> None:
         """Take the stored gain and transducer rows live, after a settings
