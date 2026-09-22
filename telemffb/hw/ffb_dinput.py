@@ -922,6 +922,11 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         # zero force should feel like no effect at all (see
         # _sync_device_playing).
         self._device_playing = False
+        # what the monitor shows, kept the way FFBEffectHandle keeps it: the
+        # magnitude a periodic or constant was last written with, and a
+        # condition's gain per axis (see the two properties below)
+        self._magnitude = None
+        self._gains = {}
 
     def __bool__(self) -> bool:
         return bool(self.effect_id and self.type)
@@ -939,6 +944,24 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
     @property
     def started(self):
         return self._started
+
+    @property
+    def intensity(self):
+        """How hard this effect is currently pushing, 0.0-1.0, or None for
+        a condition - the same contract as FFBEffectHandle.intensity, which
+        the monitor reads through the facade for every backend."""
+        if self.type == EFFECT_CONSTANT or self.type in PERIODIC_EFFECTS:
+            return self._magnitude
+        return None
+
+    @property
+    def axis_gains(self):
+        """A condition's gain per axis as ``(x, y)``, each a fraction of
+        4096 or None where that axis was never written; None altogether
+        before any condition was written.  See FFBEffectHandle.axis_gains."""
+        if not self._gains:
+            return None
+        return self._gains.get(0), self._gains.get(1)
 
     #: consecutive generic update/start failures before the device-side
     #: effect is presumed dead and the handle re-creates itself
@@ -1121,6 +1144,9 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         block.positive_saturation = clamp(cond.positiveSaturation, 0, 4096) or 4096
         block.negative_saturation = clamp(cond.negativeSaturation, 0, 4096) or 4096
         block.dead_band = clamp(cond.deadBand, 0, 4096)
+        # as stiff as its stiffer half, the reading the Rhino handle gives
+        self._gains[axis] = max(abs(block.positive_coefficient),
+                                abs(block.negative_coefficient)) / 4096
         self._push()
         self._sync_device_playing()
 
@@ -1135,6 +1161,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         assert (magnitude >= -1.0 and magnitude <= 1.0)
         self.params.direction_deg = round(direction) % 360
         self.params.constant_magnitude = round(4096 * magnitude)
+        self._magnitude = abs(magnitude)
         self._push()
         return self
 
@@ -1144,6 +1171,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         self.params.direction_deg = round(direction) % 360
         self.params.duration_ms = int(duration)
         self.params.periodic_magnitude = round(4096 * magnitude)
+        self._magnitude = abs(magnitude)
         self.params.periodic_period_ms = round(1000.0 / freq) if freq else 0
         if "offset" in kwargs:
             self.params.periodic_offset = clamp(int(kwargs["offset"]), -4096, 4096)

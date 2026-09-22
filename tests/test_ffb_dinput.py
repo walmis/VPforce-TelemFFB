@@ -380,6 +380,39 @@ class TestEffectLifecycle:
         assert not bridge.effects
 
 
+class TestMonitorReadouts:
+    """The two readouts the effect facade reads off every handle for the
+    monitor tab; a backend without them takes the window's refresh down."""
+
+    def test_periodic_and_constant_report_their_magnitude(self, device):
+        sine = device.create_effect(EFFECT_SINE)
+        assert sine.intensity is None                  # nothing written yet
+        sine.setPeriodic(10.0, 0.4, 0)
+        assert sine.intensity == pytest.approx(0.4)
+        assert sine.axis_gains is None
+        const = device.create_effect(EFFECT_CONSTANT)
+        const.setConstantForce(-0.7, 180)
+        assert const.intensity == pytest.approx(0.7)   # unsigned; direction is separate
+
+    def test_conditions_report_gains_per_axis_not_an_intensity(self, device):
+        spring = device.create_effect(EFFECT_SPRING)
+        assert spring.intensity is None
+        assert spring.axis_gains is None
+        spring.setCondition(make_condition(axis=0, positiveCoefficient=2048, negativeCoefficient=-1024))
+        assert spring.intensity is None
+        assert spring.axis_gains == (pytest.approx(0.5), None)
+        spring.setCondition(make_condition(axis=1, positiveCoefficient=4096))
+        assert spring.axis_gains == (pytest.approx(0.5), pytest.approx(1.0))
+
+    def test_the_facade_reads_them_through(self, device, monkeypatch):
+        monkeypatch.setattr(HapticEffect, 'device', device)
+        effect = HapticEffect()
+        effect.periodic(10.0, 0.25, 0).start()
+        assert effect.intensity == pytest.approx(0.25)
+        assert effect.axis_gains is None
+        assert effect.type_id == EFFECT_SINE
+
+
 class TestSlotBudgeting:
     def test_tier0_evicts_lru_periodic(self, bridge):
         bridge.capacity = 3
