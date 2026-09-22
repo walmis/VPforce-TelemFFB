@@ -6121,6 +6121,155 @@
 	<defaults><order>69999</order></defaults>
 	<defaults><order>69999</order></defaults>
 	<defaults>
+		<grouping>Shaker</grouping>
+		<order>5000</order>
+		<datatype>group</datatype>
+		<name>shaker_group</name>
+		<displayname>Shaker Placement</displayname>
+		<info>Where each family of effects plays on a multi-transducer shaker rig.  Effects are grouped the way the settings above group them; every effect belongs to one family.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<value>true</value>
+	</defaults>
+	<defaults>
+		<grouping>Shaker</grouping>
+		<parentgroup>shaker</parentgroup>
+		<order>5001</order>
+		<datatype>list</datatype>
+		<name>shaker_placement_ground</name>
+		<displayname>Ground effects</displayname>
+		<prereq>shaker_group</prereq>
+		<info>Runway rumble and bumps, touchdown, nosewheel shimmy.  Which transducers play this family of effects, by where they sit: seat, seat back, floor, or a combination.  Floor then seat back plays the floor first and the seat back after the placement delay, so a bump rolls through the seat.  An effect whose placement no transducer can honor plays on every transducer.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<validvalues>all,seat,seat back,floor,seat + seat back,seat + floor,seat back + floor,floor then seat back</validvalues>
+		<value>floor then seat back</value>
+	</defaults>
+	<defaults>
+		<grouping>Shaker</grouping>
+		<parentgroup>shaker</parentgroup>
+		<order>5002</order>
+		<datatype>list</datatype>
+		<name>shaker_placement_mechanical</name>
+		<displayname>Engine and mechanical effects</displayname>
+		<prereq>shaker_group</prereq>
+		<info>Engine and rotor rumble, gear, flaps, canopy and other moving parts, damage.  Which transducers play this family of effects, by where they sit: seat, seat back, floor, or a combination.  Floor then seat back plays the floor first and the seat back after the placement delay, so a bump rolls through the seat.  An effect whose placement no transducer can honor plays on every transducer.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<validvalues>all,seat,seat back,floor,seat + seat back,seat + floor,seat back + floor,floor then seat back</validvalues>
+		<value>seat</value>
+	</defaults>
+	<defaults>
+		<grouping>Shaker</grouping>
+		<parentgroup>shaker</parentgroup>
+		<order>5003</order>
+		<datatype>list</datatype>
+		<name>shaker_placement_aerodynamics</name>
+		<displayname>Aerodynamic effects</displayname>
+		<prereq>shaker_group</prereq>
+		<info>Buffeting, ETL, vortex ring state, overspeed, wind, turbulence.  Which transducers play this family of effects, by where they sit: seat, seat back, floor, or a combination.  Floor then seat back plays the floor first and the seat back after the placement delay, so a bump rolls through the seat.  An effect whose placement no transducer can honor plays on every transducer.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<validvalues>all,seat,seat back,floor,seat + seat back,seat + floor,seat back + floor,floor then seat back</validvalues>
+		<value>seat back</value>
+	</defaults>
+	<defaults>
+		<grouping>Shaker</grouping>
+		<parentgroup>shaker</parentgroup>
+		<order>5004</order>
+		<datatype>list</datatype>
+		<name>shaker_placement_inertial</name>
+		<displayname>Acceleration effects</displayname>
+		<prereq>shaker_group</prereq>
+		<info>G loading and deceleration.  Which transducers play this family of effects, by where they sit: seat, seat back, floor, or a combination.  Floor then seat back plays the floor first and the seat back after the placement delay, so a bump rolls through the seat.  An effect whose placement no transducer can honor plays on every transducer.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<validvalues>all,seat,seat back,floor,seat + seat back,seat + floor,seat back + floor,floor then seat back</validvalues>
+		<value>seat</value>
+	</defaults>
+	<defaults>
+		<grouping>Shaker</grouping>
+		<parentgroup>shaker</parentgroup>
+		<order>5005</order>
+		<datatype>list</datatype>
+		<name>shaker_placement_weapons</name>
+		<displayname>Weapons effects</displayname>
+		<prereq>shaker_group</prereq>
+		<info>Gunfire, countermeasures, weapon release.  Which transducers play this family of effects, by where they sit: seat, seat back, floor, or a combination.  Floor then seat back plays the floor first and the seat back after the placement delay, so a bump rolls through the seat.  An effect whose placement no transducer can honor plays on every transducer.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<validvalues>all,seat,seat back,floor,seat + seat back,seat + floor,seat back + floor,floor then seat back</validvalues>
+		<value>seat back + floor</value>
+	</defaults>
+	<defaults>
+		<grouping>Shaker</grouping>
+		<parentgroup>shaker</parentgroup>
+		<order>5006</order>
+		<datatype>list</datatype>
+		<name>shaker_placement_other</name>
+		<displayname>Other effects</displayname>
+		<prereq>shaker_group</prereq>
+		<info>Effects in no family above.  Which transducers play this family of effects, by where they sit: seat, seat back, floor, or a combination.  Floor then seat back plays the floor first and the seat back after the placement delay, so a bump rolls through the seat.  An effect whose placement no transducer can honor plays on every transducer.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<validvalues>all,seat,seat back,floor,seat + seat back,seat + floor,seat back + floor,floor then seat back</validvalues>
+		<value>all</value>
+	</defaults>
+	<defaults>
+		<grouping>Shaker</grouping>
+		<parentgroup>shaker</parentgroup>
+		<order>5007</order>
+		<datatype>int</datatype>
+		<name>shaker_placement_delay_ms</name>
+		<displayname>Placement delay (ms)</displayname>
+		<prereq>shaker_group</prereq>
+		<info>How long the seat back lags the floor in a floor then seat back placement: the time a bump takes to travel the wheelbase at taxi speed, roughly 40 to 120 ms.</info>
+		<any>true</any>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<shaker>true</shaker>
+		<validvalues>0,300</validvalues>
+		<value>60</value>
+	</defaults>
+	<defaults>
 		<grouping>System</grouping>
 		<order>80000</order>
 		<datatype>group</datatype>

@@ -557,10 +557,20 @@ def _initialize_device_connection():
 
 def _open_shaker():
     """This instance's shaker on the audio output its settings name, with
-    the gain, channel mode, pan and calibration profile stored for it."""
+    the gain and transducer rows stored for it.  Where each effect plays
+    is read from the aircraft's settings as effects start."""
+    from telemffb import shaker_placement
     from telemffb.hw.ffb_shaker import shaker_settings
     return HapticEffect.open_shaker(G.device_audio_output or None,
+                                    placement_resolver=shaker_placement.resolve,
                                     **shaker_settings(G.system_settings))
+
+
+def _forget_shaker_placements():
+    """A new aircraft, or new settings on the running one, may place effects
+    elsewhere; the shaker (when this instance is one) re-asks per effect."""
+    from telemffb import shaker_placement
+    shaker_placement.forget_placements(HapticEffect.device)
 
 
 
@@ -1374,6 +1384,7 @@ def _sim_connected_events():
     G.telem_manager.sim_exited.connect(api_server.on_sim_exited)
     G.telem_manager.sim_exited.connect(dcs_settings.on_sim_exited)
     G.telem_manager.aircraftUpdated.connect(dcs_settings.on_aircraft_updated)
+    G.telem_manager.aircraftUpdated.connect(_forget_shaker_placements)
 
 def _handle_window_display(headless_mode):
     """Handle initial window display based on configuration."""

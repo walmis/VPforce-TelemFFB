@@ -160,10 +160,10 @@ PLACEMENT_CHOICES = {
     'seat + seat back': ('seat', 'seat back'),
     'seat + floor': ('seat', 'floor'),
     'seat back + floor': ('seat back', 'floor'),
-    'floor, then seat back': ('floor', 'seat back'),
+    'floor then seat back': ('floor', 'seat back'),
 }
 #: which choices lag their second contact behind the first
-DELAYED_CHOICES = {'floor, then seat back': ('seat back',)}
+DELAYED_CHOICES = {'floor then seat back': ('seat back',)}
 DEFAULT_PLACEMENT_DELAY_MS = 60.0
 
 

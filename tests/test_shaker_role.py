@@ -166,6 +166,26 @@ class TestStartupIdentity:
         assert [(t.channel, t.profile) for t in seen['transducers']] == [(0, active), (1, active)]
         assert seen['gain'] == DEFAULT_GAIN
 
+    def test_open_shaker_places_effects_from_the_settings_tree(self, main, monkeypatch):
+        from telemffb import shaker_placement
+        from telemffb.hw.ffb_rhino import HapticEffect
+        seen = {}
+        monkeypatch.setattr(HapticEffect, 'open_shaker',
+                            staticmethod(lambda output_device=None, **kw: seen.update(kw)))
+        monkeypatch.setattr(G, 'device_audio_output', 'Card A', raising=False)
+        monkeypatch.setattr(G, 'system_settings', _Settings({}), raising=False)
+        main._open_shaker()
+        assert seen['placement_resolver'] is shaker_placement.resolve
+
+    def test_an_aircraft_change_makes_the_shaker_re_place_its_effects(self, main, monkeypatch):
+        from telemffb.hw.ffb_rhino import HapticEffect
+        calls = []
+        monkeypatch.setattr(HapticEffect, 'device', SimpleNamespace(forget_placements=lambda: calls.append(1)))
+        main._forget_shaker_placements()
+        assert calls == [1]
+        monkeypatch.setattr(HapticEffect, 'device', None)
+        main._forget_shaker_placements()                   # nothing open: nothing to do
+
 
 class TestChildLaunch:
     def test_shaker_child_is_launched_by_its_pseudo_pid(self, monkeypatch):
@@ -285,7 +305,8 @@ class TestSettingsScope:
     def test_the_shaker_sees_what_it_renders(self, names):
         for name in ('buffeting_intensity', 'engine_prop_rumble_enabled',
                      'gunfire_effect_enabled', 'touchdown_effect_enabled',
-                     'runway_rumble_enabled', 'type', 'basic_group', 'mechanical_group'):
+                     'runway_rumble_enabled', 'type', 'basic_group', 'mechanical_group',
+                     'shaker_group', 'shaker_placement_ground', 'shaker_placement_delay_ms'):
             assert name in names, name
 
     def test_and_not_what_it_cannot(self, names):

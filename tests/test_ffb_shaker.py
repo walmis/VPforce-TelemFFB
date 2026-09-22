@@ -406,7 +406,7 @@ class TestPlacement:
         assert placement_from_choice('all') is EVERYWHERE
         both = placement_from_choice('seat + floor')
         assert both.contacts == {'seat', 'floor'} and not both.delayed
-        rolled = placement_from_choice('floor, then seat back')
+        rolled = placement_from_choice('floor then seat back')
         assert rolled.contacts == {'floor', 'seat back'}
         assert rolled.delayed == {'seat back'} and rolled.delay_ms == DEFAULT_PLACEMENT_DELAY_MS
         assert placement_from_choice('no such place') is EVERYWHERE
@@ -463,7 +463,7 @@ class TestPlacement:
         assert peaks(output)[0] > 0.9
 
     def test_the_delayed_contact_hears_it_late(self, output, clock):
-        dev = self._device(output, clock, lambda n: placement_from_choice('floor, then seat back'))
+        dev = self._device(output, clock, lambda n: placement_from_choice('floor then seat back'))
         h = dev.create_effect(EFFECT_SQUARE)
         h.label = 'runway_bump0'
         h.setPeriodic(15.0, 1.0, 0, duration=80).start()               # one pulse
