@@ -621,8 +621,20 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         controls.row_test_requested.connect(self._shaker_test_clicked)
         controls.rows_changed.connect(self._sync_shaker_test_button)
         controls.rescan_button.clicked.connect(self._rescan_audio_outputs)
+        controls.layout_button.clicked.connect(lambda: self._open_speaker_layout())
         self.cb_select_s.currentIndexChanged.connect(self._sync_shaker_output)
         self._sync_shaker_output()
+
+    @staticmethod
+    def _open_speaker_layout():
+        """The Windows Sound control panel, Playback tab, where a card's
+        speaker layout (and so its channel count) is set.  The new
+        Settings app has no such page."""
+        import subprocess
+        try:
+            subprocess.Popen(['control.exe', 'mmsys.cpl'])
+        except Exception:
+            logging.exception("could not open the Sound control panel")
 
     @staticmethod
     def _rescan_audio_library():

@@ -353,6 +353,32 @@ class TestCard:
         assert FakePreview.made[0].output_device is None
         dialog._shaker_test_finished()
 
+    def test_hint_names_rows_the_output_cannot_drive(self, monkeypatch):
+        stored = _Settings({SETTING_TRANSDUCERS: transducers_to_json(RIG),
+                            'devpath_shaker': 'audio:Card A'})
+        _, dialog = _make_dialog(monkeypatch, stored, OUTPUTS)
+        controls = dialog.device_cards.shaker_controls
+        assert controls.hint.isVisibleTo(dialog)
+        for name in ('Buttkicker', 'Dayton L', 'Dayton R'):
+            assert name in controls.hint.text()
+        dialog.cb_select_s.setCurrentIndex(3)                     # the 7.1 card
+        assert not controls.hint.isVisibleTo(dialog)
+        controls.rows[0].channel_combo.setCurrentIndex(7)
+        dialog.cb_select_s.setCurrentIndex(2)                     # back to stereo
+        assert 'Buttkicker' in controls.hint.text()
+        controls.rows[0].remove_button.click()
+        controls.rows[0].remove_button.click()
+        controls.rows[0].remove_button.click()
+        assert not controls.hint.isVisibleTo(dialog)
+
+    def test_speaker_layout_button_opens_the_panel(self, monkeypatch):
+        _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
+        opened = []
+        monkeypatch.setattr(type(dialog), '_open_speaker_layout',
+                            staticmethod(lambda: opened.append(True)))
+        dialog.device_cards.shaker_controls.layout_button.click()
+        assert opened == [True]
+
     def test_rescan_relists_the_outputs_and_keeps_the_pick(self, monkeypatch):
         outputs = [AudioOutputInfo(''), AudioOutputInfo('Card A')]
         _, dialog = _make_dialog(monkeypatch, _Settings(), outputs)

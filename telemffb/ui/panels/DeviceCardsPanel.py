@@ -505,6 +505,15 @@ class ShakerControls(QWidget):
         self.rescan_button.setToolTip(
             'Look for sound cards plugged in since TelemFFB started.')
         head.addWidget(self.rescan_button)
+        self.layout_button = QPushButton('Speaker layout...')
+        self.layout_button.setObjectName('shaker_layout')
+        self.layout_button.setFlat(True)
+        self.layout_button.setToolTip(
+            "Open the Windows Sound control panel.  A card's channel count "
+            "follows the speaker layout set there (Configure on the "
+            "Playback tab): a 7.1 card reports two channels until it is set "
+            "to 7.1 Surround.  Rescan afterwards.")
+        head.addWidget(self.layout_button)
         self.add_button = QPushButton('+ add transducer')
         self.add_button.setObjectName('shaker_add')
         self.add_button.setFlat(True)
@@ -523,6 +532,16 @@ class ShakerControls(QWidget):
         self.rows_layout.setContentsMargins(0, 0, 0, 0)
         self.rows_layout.setSpacing(2)
         outer.addWidget(self.rows_host)
+
+        # shown when a row names a channel the selected output does not
+        # report: the usual cause is a multi-channel card that Windows
+        # still has set to stereo
+        self.hint = QLabel('')
+        self.hint.setObjectName('shakerHint')
+        self.hint.setWordWrap(True)
+        self.hint.setForegroundRole(QPalette.ColorRole.PlaceholderText)
+        self.hint.setVisible(False)
+        outer.addWidget(self.hint)
 
         self._profiles = []
         self._positions = []
@@ -544,6 +563,18 @@ class ShakerControls(QWidget):
         self._channels = max(1, int(count))
         for row in self.rows:
             row.set_channel_count(self._channels)
+        self.refresh_hint()
+
+    def refresh_hint(self) -> None:
+        """Say which rows the selected output cannot drive as it stands."""
+        beyond = [row.value().name for row in self.rows if row.channel() >= self._channels]
+        if beyond:
+            self.hint.setText(
+                f"This output reports {self._channels} channel"
+                f"{'' if self._channels == 1 else 's'}, so {', '.join(beyond)} "
+                f"cannot be driven yet.  If the card has more, set its speaker "
+                f"layout in Windows (Speaker layout...), then Rescan outputs.")
+        self.hint.setVisible(bool(beyond))
 
     def add_row(self, transducer=None):
         row = TransducerRow(self.rows_host)
@@ -561,8 +592,10 @@ class ShakerControls(QWidget):
         row.removed.connect(lambda r=row: self.remove_row(r))
         row.test_requested.connect(lambda r=row: self.row_test_requested.emit(self.rows.index(r)))
         row.changed.connect(self.rows_changed.emit)
+        row.changed.connect(self.refresh_hint)
         self.rows.append(row)
         self.rows_layout.addWidget(row)
+        self.refresh_hint()
         self.rows_changed.emit()
         return row
 
@@ -573,6 +606,7 @@ class ShakerControls(QWidget):
         self.rows_layout.removeWidget(row)
         row.setParent(None)
         row.deleteLater()
+        self.refresh_hint()
         self.rows_changed.emit()
 
     def clear_rows(self) -> None:
