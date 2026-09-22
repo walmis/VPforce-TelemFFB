@@ -36,6 +36,7 @@ hits.  The band-pass noise runs at a decimated rate so it stays numpy-only.
 
 import logging
 import math
+import re
 import threading
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -601,6 +602,16 @@ HOST_API_PREFERENCE = ('Windows WASAPI', 'Windows DirectSound', 'MME', 'Windows 
 VIRTUAL_OUTPUTS = frozenset(('Microsoft Sound Mapper - Output', 'Primary Sound Driver'))
 
 
+def clean_device_name(name) -> str:
+    """A device name as the list shows and stores it: whitespace runs
+    collapsed and none left before a closing bracket.  Some drivers pad a
+    name inside its brackets under one host API and not another, which
+    would list one card as two and store the padding with it."""
+    name = re.sub(r'\s+', ' ', str(name or ''))
+    name = re.sub(r'\s+([)\]])', r'\1', name)
+    return name.strip()
+
+
 def sounddevice_available() -> bool:
     try:
         import sounddevice  # noqa: F401
@@ -664,9 +675,30 @@ class SoundDeviceOutput:
         return True
 
     @staticmethod
+    def rescan() -> bool:
+        """Make PortAudio look at the machine again.
+
+        The library takes its device list once, when it initializes, so a
+        card plugged in after that is invisible to a long-running process
+        until the library is torn down and brought back up.  Never call
+        this with a stream open in this process: the shaker child owns its
+        stream, so the master's settings dialog is where this runs.
+        """
+        import sounddevice as sd
+        try:
+            sd._terminate()
+            sd._initialize()
+        except Exception:
+            log.exception("audio device rescan failed")
+            return False
+        return True
+
+    @staticmethod
     def list_devices(all_host_apis: bool = False) -> List[OutputDevice]:
         """Output-capable devices.  PortAudio lists one card once per host
-        API; by default each name appears once, under the preferred API."""
+        API; by default each name appears once, under the preferred API.
+        Names are cleaned (see clean_device_name): some drivers pad a name
+        under one API and not another, which would list one card as two."""
         import sounddevice as sd
         try:
             apis = [a.get('name', '') for a in sd.query_hostapis()]
@@ -680,7 +712,7 @@ class SoundDeviceOutput:
                 continue
             api_index = d.get('hostapi', -1)
             api = apis[api_index] if 0 <= api_index < len(apis) else ''
-            found.append(OutputDevice(i, d.get('name', ''), api,
+            found.append(OutputDevice(i, clean_device_name(d.get('name', '')), api,
                                       int(d['max_output_channels']),
                                       float(d.get('default_samplerate', 0.0))))
         if all_host_apis:
@@ -708,7 +740,7 @@ class SoundDeviceOutput:
             return None
         if isinstance(spec, int):
             return spec
-        wanted = str(spec).lower()
+        wanted = clean_device_name(spec).lower()
         devices = cls.list_devices()
         for dev in devices:
             if dev.name.lower() == wanted:

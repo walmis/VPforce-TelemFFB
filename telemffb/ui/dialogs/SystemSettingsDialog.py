@@ -620,7 +620,30 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         controls.test_button.clicked.connect(lambda: self._shaker_test_clicked())
         controls.row_test_requested.connect(self._shaker_test_clicked)
         controls.rows_changed.connect(self._sync_shaker_test_button)
+        controls.rescan_button.clicked.connect(self._rescan_audio_outputs)
         self.cb_select_s.currentIndexChanged.connect(self._sync_shaker_output)
+        self._sync_shaker_output()
+
+    @staticmethod
+    def _rescan_audio_library():
+        """A seam like _enumerate_audio_outputs: tests stub it, the real
+        one re-initializes the audio library."""
+        from telemffb.hw.shaker_synth import SoundDeviceOutput
+        return SoundDeviceOutput.rescan()
+
+    def _rescan_audio_outputs(self):
+        """A sound card plugged in after TelemFFB started: re-initialize
+        the audio library, then re-list every selector the way the
+        DirectInput toggle does, keeping the current picks.  Refused
+        while a preview holds a stream, which the re-initialization would
+        pull out from under it."""
+        if self._shaker_preview is not None:
+            return
+        if not self._rescan_audio_library():
+            QMessageBox.warning(self, "Shaker",
+                                "The audio outputs could not be rescanned; see the log.")
+            return
+        self.populateUSBSelectors()
         self._sync_shaker_output()
 
     def _sync_shaker_output(self, *_):

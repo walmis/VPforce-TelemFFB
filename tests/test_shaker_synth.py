@@ -8,7 +8,7 @@ import pytest
 
 from telemffb.hw.shaker_synth import (
     BandpassNoise, ImpulseTrain, Oscillator, PhaseAccumulator, Route, ShakerSynth,
-    build_pulse_shape,
+    SoundDeviceOutput, build_pulse_shape, clean_device_name,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -259,6 +259,64 @@ class TestImpulseTrain:
         train.expire_after(SR // 10)
         render(train, SR)
         assert train.is_silent
+
+
+class TestDeviceListing:
+    """PortAudio's raw list, as a driver on this machine reports it: one
+    card under several host APIs, with its name padded under one."""
+
+    RAW = [
+        {'name': 'Speakers (USB Sound Device        )', 'hostapi': 0, 'max_output_channels': 2,
+         'default_samplerate': 48000.0},
+        {'name': 'Speakers (USB Sound Device)', 'hostapi': 1, 'max_output_channels': 8,
+         'default_samplerate': 48000.0},
+        {'name': 'Microphone (USB Sound Device)', 'hostapi': 0, 'max_output_channels': 0,
+         'max_input_channels': 2, 'default_samplerate': 48000.0},
+        {'name': 'Primary Sound Driver', 'hostapi': 2, 'max_output_channels': 2,
+         'default_samplerate': 44100.0},
+    ]
+    APIS = [{'name': 'Windows WASAPI'}, {'name': 'Windows WDM-KS'}, {'name': 'Windows DirectSound'}]
+
+    @pytest.fixture
+    def fake_portaudio(self, monkeypatch):
+        import sounddevice as sd
+        monkeypatch.setattr(sd, 'query_devices', lambda *a, **k: list(self.RAW))
+        monkeypatch.setattr(sd, 'query_hostapis', lambda *a, **k: list(self.APIS))
+
+    def test_clean_name(self):
+        assert clean_device_name('Speakers (USB Sound Device        )') == 'Speakers (USB Sound Device)'
+        assert clean_device_name('  Realtek   Digital  Output ') == 'Realtek Digital Output'
+        assert clean_device_name(None) == ''
+
+    def test_a_padded_name_lists_once_under_the_preferred_api(self, fake_portaudio):
+        listed = SoundDeviceOutput.list_devices()
+        assert [(d.name, d.host_api, d.channels) for d in listed] == [
+            ('Speakers (USB Sound Device)', 'Windows WASAPI', 2)]
+
+    def test_inputs_and_virtual_outputs_are_left_out(self, fake_portaudio):
+        names = [d.name for d in SoundDeviceOutput.list_devices(all_host_apis=True)]
+        assert 'Microphone (USB Sound Device)' not in names
+        assert 'Primary Sound Driver' in names          # only the deduplicated list hides it
+
+    def test_a_stored_name_resolves_padded_or_clean(self, fake_portaudio):
+        assert SoundDeviceOutput.resolve('Speakers (USB Sound Device        )') == 0
+        assert SoundDeviceOutput.resolve('Speakers (USB Sound Device)') == 0
+        assert SoundDeviceOutput.resolve('usb sound') == 0
+        assert SoundDeviceOutput.resolve('no such card') is None
+        assert SoundDeviceOutput.resolve('') is None
+
+    def test_rescan_reinitializes_the_library(self, monkeypatch):
+        import sounddevice as sd
+        calls = []
+        monkeypatch.setattr(sd, '_terminate', lambda: calls.append('down'))
+        monkeypatch.setattr(sd, '_initialize', lambda: calls.append('up'))
+        assert SoundDeviceOutput.rescan() is True
+        assert calls == ['down', 'up']
+
+        def boom():
+            raise RuntimeError('busy')
+        monkeypatch.setattr(sd, '_terminate', boom)
+        assert SoundDeviceOutput.rescan() is False
 
 
 class TestRoutes:

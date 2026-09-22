@@ -343,6 +343,36 @@ class TestCard:
         assert FakePreview.made[0].output_device is None
         dialog._shaker_test_finished()
 
+    def test_rescan_relists_the_outputs_and_keeps_the_pick(self, monkeypatch):
+        outputs = [AudioOutputInfo(''), AudioOutputInfo('Card A')]
+        _, dialog = _make_dialog(monkeypatch, _Settings(), outputs)
+        rescans = []
+        monkeypatch.setattr(type(dialog), '_rescan_audio_library',
+                            staticmethod(lambda: rescans.append(True) or True))
+        dialog.cb_select_s.setCurrentIndex(2)                     # Card A
+        outputs.append(AudioOutputInfo('New USB card', channels=8))
+        dialog.device_cards.shaker_controls.rescan_button.click()
+        assert rescans == [True]
+        assert dialog.cb_select_s.count() == 1 + 3
+        assert dialog.selected_device('shaker').name == 'Card A'   # the pick survives the re-list
+        dialog.cb_select_s.setCurrentIndex(3)
+        assert dialog.device_cards.shaker_controls.rows[0].channel_combo.count() == 8
+
+    def test_rescan_waits_for_a_running_test(self, monkeypatch):
+        FakePreview.made = []
+        monkeypatch.setattr('telemffb.hw.ffb_shaker.ShakerPreview', FakePreview)
+        _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
+        rescans = []
+        monkeypatch.setattr(type(dialog), '_rescan_audio_library',
+                            staticmethod(lambda: rescans.append(True) or True))
+        dialog.cb_select_s.setCurrentIndex(2)
+        dialog.device_cards.shaker_controls.test_button.click()
+        dialog.device_cards.shaker_controls.rescan_button.click()
+        assert rescans == []                                       # a stream is open: refused
+        dialog._shaker_test_finished()
+        dialog.device_cards.shaker_controls.rescan_button.click()
+        assert rescans == [True]
+
     def test_save_reapplies_live(self, monkeypatch):
         from telemffb.hw.ffb_rhino import HapticEffect
         _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)

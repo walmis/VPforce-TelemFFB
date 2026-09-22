@@ -493,6 +493,12 @@ class ShakerControls(QWidget):
             "gain is safe.")
         head.addWidget(self.gain_spin)
         head.addStretch(1)
+        self.rescan_button = QPushButton('Rescan outputs')
+        self.rescan_button.setObjectName('shaker_rescan')
+        self.rescan_button.setFlat(True)
+        self.rescan_button.setToolTip(
+            'Look for sound cards plugged in since TelemFFB started.')
+        head.addWidget(self.rescan_button)
         self.add_button = QPushButton('+ add transducer')
         self.add_button.setObjectName('shaker_add')
         self.add_button.setFlat(True)
