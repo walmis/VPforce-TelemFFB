@@ -91,6 +91,9 @@ class FFBDeviceListModel(QAbstractListModel):
                 pid = getattr(dev, 'product_id', 0)
                 ident = getattr(dev, 'ident', getattr(dev, 'product_string', 'Unknown'))
                 serial = getattr(dev, 'serial_number', '')
+                if not vid:
+                    # an audio output: no USB identity worth showing
+                    return ident
                 return f"{ident} ({vid:04X}:{pid:04X}) {serial}"
             except Exception:
                 return str(getattr(dev, 'product_string', dev))

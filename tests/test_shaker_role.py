@@ -74,6 +74,14 @@ class TestAudioListing:
         assert card.ident == 'Speakers (USB)'
         assert card.vendor_id == 0 and card.product_id == SHAKER_PSEUDO_PID
 
+    def test_selector_shows_the_name_without_usb_ids(self):
+        from PyQt6.QtCore import Qt
+        from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel
+        model = FFBDeviceListModel([AudioOutputInfo(''), AudioOutputInfo('Card A')])
+        labels = [model.data(model.index(i, 0), Qt.ItemDataRole.DisplayRole)
+                  for i in range(1, model.rowCount())]
+        assert labels == ['System default output', 'Card A']
+
     def test_listing_puts_the_default_first(self, monkeypatch):
         from telemffb.hw.shaker_synth import SoundDeviceOutput
         monkeypatch.setattr(SoundDeviceOutput, 'list_devices',
