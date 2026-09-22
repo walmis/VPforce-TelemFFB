@@ -945,6 +945,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # restores above ran with signals blocked; bring the ids
         # readouts in line with what is actually selected
         self.device_cards.refresh_ids_labels()
+        # and the shaker's channel count and hint with its restored output
+        if hasattr(self, '_shaker_profiles'):
+            self._sync_shaker_output()
 
         # First-launch guidance for the non-VPforce user: their stick can
         # only appear through the DirectInput listing, and that switch

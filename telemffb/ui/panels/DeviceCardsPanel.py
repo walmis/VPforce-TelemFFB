@@ -121,6 +121,29 @@ def _icon_tint(palette) -> QColor:
     return tint
 
 
+def _link_button(text: str, palette, tooltip: str = '') -> QPushButton:
+    """A quiet link-style action: the family purple text, no box -
+    bordered variants read as a broken widget, and the theme paints a
+    flat QPushButton as a filled one.  Hover stays in the family: a step
+    brighter, not a jump to grey."""
+    button = QPushButton(text)
+    button.setFlat(True)
+    base = _icon_tint(palette)
+    dark_theme = palette.color(QPalette.ColorRole.Window).lightness() < 128
+    hover = base.lighter(130) if dark_theme else base.darker(120)
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
+    button.setStyleSheet(
+        'QPushButton { border: none; background: transparent;'
+        ' padding: 1px 6px; text-align: left;'
+        ' color: %s; }'
+        'QPushButton:hover { color: %s; }'
+        % (base.name(), hover.name()))
+    button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+    if tooltip:
+        button.setToolTip(tooltip)
+    return button
+
+
 def _tinted_icon(path, color) -> QIcon:
     """The icon artwork recolored (the source PNGs are purple line art,
     which disappears at small sizes on the dark theme)."""
@@ -484,6 +507,7 @@ class ShakerControls(QWidget):
         outer.setSpacing(3)
 
         head = QHBoxLayout()
+        self.head = head
         head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(8)
         head.addWidget(QLabel('Gain:'))
@@ -499,32 +523,23 @@ class ShakerControls(QWidget):
             "gain is safe.")
         head.addWidget(self.gain_spin)
         head.addStretch(1)
-        self.rescan_button = QPushButton('Rescan outputs')
-        self.rescan_button.setObjectName('shaker_rescan')
-        self.rescan_button.setFlat(True)
-        self.rescan_button.setToolTip(
+        # the output's own actions; the card places them on the selector row
+        self.rescan_button = _link_button(
+            'Rescan', self.palette(),
             'Look for sound cards plugged in since TelemFFB started.')
-        head.addWidget(self.rescan_button)
-        self.layout_button = QPushButton('Speaker layout...')
+        self.rescan_button.setObjectName('shaker_rescan')
+        self.layout_button = _link_button(
+            'Speaker layout...', self.palette(),
+            "Open the Windows Sound control panel.\n"
+            "A card's channel count follows the speaker layout set there\n"
+            "(select the card on the Playback tab, then Configure):\n"
+            "a 7.1 card reports two channels until it is set to 7.1 Surround.\n"
+            "Rescan afterwards.")
         self.layout_button.setObjectName('shaker_layout')
-        self.layout_button.setFlat(True)
-        self.layout_button.setToolTip(
-            "Open the Windows Sound control panel.  A card's channel count "
-            "follows the speaker layout set there (Configure on the "
-            "Playback tab): a 7.1 card reports two channels until it is set "
-            "to 7.1 Surround.  Rescan afterwards.")
-        head.addWidget(self.layout_button)
-        self.add_button = QPushButton('+ add transducer')
+        self.add_button = _link_button('+ add transducer', self.palette(),
+                                       'Another transducer on this sound card')
         self.add_button.setObjectName('shaker_add')
-        self.add_button.setFlat(True)
-        self.add_button.setToolTip('Another transducer on this sound card')
-        head.addWidget(self.add_button)
-        self.test_button = QPushButton('Test all')
-        self.test_button.setObjectName('shaker_test')
-        self.test_button.setToolTip(
-            'Play a pulse and a short tone through every transducer at once, '
-            'with these settings, saved or not.')
-        head.addWidget(self.test_button)
+        head.insertWidget(2, self.add_button)
         outer.addLayout(head)
 
         self.rows_host = QWidget()
@@ -542,6 +557,18 @@ class ShakerControls(QWidget):
         self.hint.setForegroundRole(QPalette.ColorRole.PlaceholderText)
         self.hint.setVisible(False)
         outer.addWidget(self.hint)
+
+        # the one real button on the card, bottom right
+        foot = QHBoxLayout()
+        foot.setContentsMargins(0, 2, 0, 0)
+        foot.addStretch(1)
+        self.test_button = QPushButton('Test all')
+        self.test_button.setObjectName('shaker_test')
+        self.test_button.setToolTip(
+            'Play a pulse and a short tone through every transducer at once, '
+            'with these settings, saved or not.')
+        foot.addWidget(self.test_button)
+        outer.addLayout(foot)
 
         self._profiles = []
         self._positions = []
@@ -759,30 +786,17 @@ class RoleCard(QFrame):
         self.shaker = None
         if role == 'shaker':
             self.shaker = ShakerControls()
+            # the output's actions sit at the right end of the output's
+            # own row, not among the transducer controls
+            row = self.primary_row.layout()
+            row.insertWidget(2, self.shaker.rescan_button)
+            row.insertWidget(3, self.shaker.layout_button)
             self.body.addWidget(self.shaker)
 
         self.alt_rows = []               # DeviceRow, slots 2..MAX
         self.add_button = None
         if alternates:
-            self.add_button = QPushButton('+ add device')
-            self.add_button.setFlat(True)
-            # a quiet link-style action: the family purple text, no box -
-            # bordered variants read as a broken widget.  Hover stays in
-            # the family: a step brighter, not a jump to grey.
-            base = _icon_tint(self.palette())
-            dark_theme = self.palette().color(
-                QPalette.ColorRole.Window).lightness() < 128
-            hover = base.lighter(130) if dark_theme else base.darker(120)
-            self.add_button.setCursor(
-                Qt.CursorShape.PointingHandCursor)
-            self.add_button.setStyleSheet(
-                'QPushButton { border: none; background: transparent;'
-                ' padding: 1px 6px; text-align: left;'
-                ' color: %s; }'
-                'QPushButton:hover { color: %s; }'
-                % (base.name(), hover.name()))
-            self.add_button.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                          QSizePolicy.Policy.Fixed)
+            self.add_button = _link_button('+ add device', self.palette())
             self.add_button.clicked.connect(self.add_requested.emit)
             wrap = QHBoxLayout()
             wrap.setContentsMargins(24, 1, 0, 0)

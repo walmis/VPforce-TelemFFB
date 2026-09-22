@@ -263,6 +263,10 @@ class TestCard:
         controls = dialog.device_cards.shaker_controls
         assert controls.gain_spin.value() == 2.5
         assert controls.transducers() == RIG
+        # the stored output was restored silently; the rows still learn
+        # its channel count, so no hint and a full channel list
+        assert not controls.hint.isVisibleTo(dialog)
+        assert controls.rows[0].channel_combo.count() == 8
         controls.gain_spin.setValue(4.0)
         controls.rows[0].gain_spin.setValue(0.5)
         values = dialog.shaker_settings_values()
@@ -378,6 +382,18 @@ class TestCard:
                             staticmethod(lambda: opened.append(True)))
         dialog.device_cards.shaker_controls.layout_button.click()
         assert opened == [True]
+
+    def test_output_actions_sit_at_the_end_of_the_selector_row(self, monkeypatch):
+        _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
+        card = dialog.device_cards.cards['shaker']
+        row = card.primary_row.layout()
+        widgets = [row.itemAt(i).widget() for i in range(row.count())]
+        ids = widgets.index(card.primary_row.ids_label)
+        assert widgets[ids + 1: ids + 3] == [card.shaker.rescan_button, card.shaker.layout_button]
+        assert card.shaker.rescan_button.parentWidget() is card.primary_row
+        # the transducer actions stay with the transducer controls
+        assert card.shaker.add_button.parentWidget() is card.shaker
+        assert card.shaker.test_button.parentWidget() is card.shaker
 
     def test_rescan_relists_the_outputs_and_keeps_the_pick(self, monkeypatch):
         outputs = [AudioOutputInfo(''), AudioOutputInfo('Card A')]
