@@ -662,6 +662,7 @@ input_report_handlers = {
 
 class FFBEffectHandle(ffb_backend.BaseEffectHandle):
     def __init__(self, device, effect_id, effect_type) -> None:
+        super().__init__()
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
         self.type = effect_type
@@ -669,15 +670,6 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
         self._cache = {}
         self._cache_device_alive = True  # liveness snapshot for change-cache flushes
         self._started = False
-        # Last magnitude written, 0.0-1.0 of device full scale, for the
-        # monitor's intensity column. Only constant and periodic effects
-        # have one: a condition's force depends on where the stick is, not
-        # on a parameter. See the `intensity` property.
-        self._magnitude = None
-        # A condition's gain per axis instead, by parameter block offset
-        # (0 X, 1 Y) - what the monitor shows in place of an intensity.
-        # See the `axis_gains` property.
-        self._gains = {}
 
     def invalidate(self):
         # The block is gone, so the playback state is gone with it (the
@@ -744,40 +736,6 @@ class FFBEffectHandle(ffb_backend.BaseEffectHandle):
     @property
     def name(self):
         return effect_names.get(self.type)
-
-    @property
-    def intensity(self):
-        """How hard this effect is currently pushing, 0.0-1.0 of device full
-        scale, or None when that is not a meaningful question.
-
-        Constant and periodic effects carry it as the magnitude they were
-        last written with, so an effect that is started but commanding
-        nothing - a runway rumble sitting on the ground - reads 0.0 rather
-        than merely "active".
-
-        Conditions (spring, damper, inertia, friction) return None: they are
-        parameterised by coefficients, and the force they produce depends on
-        stick position or velocity, which this object does not know. A
-        number here would be a guess, so callers get nothing to show.
-        """
-        if self.type == EFFECT_CONSTANT or self.type in PERIODIC_EFFECTS:
-            return self._magnitude
-        return None
-
-    @property
-    def axis_gains(self):
-        """A condition's gain per axis as ``(x, y)``, each a fraction of
-        4096 or None where that axis was never written; None altogether for
-        an effect that has written no condition.
-
-        Where `intensity` has nothing honest to say about a condition, this
-        can: the force a spring produces depends on stick position, but the
-        gain it was set to does not. Single-axis devices - pedals, the
-        collective - write one block and leave the other None.
-        """
-        if not self._gains:
-            return None
-        return self._gains.get(0), self._gains.get(1)
 
     def __repr__(self):
         return f"FFBEffectHandle({self.effect_id}, {self.name})"

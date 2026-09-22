@@ -908,6 +908,7 @@ class DInputInputSnapshot:
 
 class DInputEffectHandle(ffb_backend.BaseEffectHandle):
     def __init__(self, device: "DInputFFBDevice", effect_id: int, effect_type: int) -> None:
+        super().__init__()
         self.device = device
         self.effect_id = effect_id
         self.type = effect_type
@@ -922,11 +923,6 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         # zero force should feel like no effect at all (see
         # _sync_device_playing).
         self._device_playing = False
-        # what the monitor shows, kept the way FFBEffectHandle keeps it: the
-        # magnitude a periodic or constant was last written with, and a
-        # condition's gain per axis (see the two properties below)
-        self._magnitude = None
-        self._gains = {}
 
     def __bool__(self) -> bool:
         return bool(self.effect_id and self.type)
@@ -944,24 +940,6 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
     @property
     def started(self):
         return self._started
-
-    @property
-    def intensity(self):
-        """How hard this effect is currently pushing, 0.0-1.0, or None for
-        a condition - the same contract as FFBEffectHandle.intensity, which
-        the monitor reads through the facade for every backend."""
-        if self.type == EFFECT_CONSTANT or self.type in PERIODIC_EFFECTS:
-            return self._magnitude
-        return None
-
-    @property
-    def axis_gains(self):
-        """A condition's gain per axis as ``(x, y)``, each a fraction of
-        4096 or None where that axis was never written; None altogether
-        before any condition was written.  See FFBEffectHandle.axis_gains."""
-        if not self._gains:
-            return None
-        return self._gains.get(0), self._gains.get(1)
 
     #: consecutive generic update/start failures before the device-side
     #: effect is presumed dead and the handle re-creates itself

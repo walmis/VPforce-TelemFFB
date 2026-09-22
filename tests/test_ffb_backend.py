@@ -66,3 +66,50 @@ class TestBaseDefaults:
     def test_capabilities_are_immutable(self):
         with pytest.raises(Exception):
             VPFORCE_CAPABILITIES.has_gains = False
+
+
+class TestIntrospection:
+    """intensity and axis_gains come from the base handle, read off what
+    a backend writes into _magnitude and _gains, so every backend - and
+    any new one - reads the same way in the monitor."""
+
+    @staticmethod
+    def handle(effect_type):
+        class Bare(BaseEffectHandle):
+            type = effect_type
+        return Bare()
+
+    def test_every_backend_inherits_the_readouts(self):
+        from telemffb.hw.ffb_dinput import DInputEffectHandle
+        for cls in (FFBEffectHandle, DInputEffectHandle):
+            assert cls.intensity is BaseEffectHandle.intensity, cls
+            assert cls.axis_gains is BaseEffectHandle.axis_gains, cls
+
+    def test_a_fresh_handle_shows_nothing(self):
+        from telemffb.hw.ffb_rhino import EFFECT_CONSTANT
+        h = self.handle(EFFECT_CONSTANT)
+        assert h.intensity is None and h.axis_gains is None
+
+    def test_a_written_magnitude_shows_for_constant_and_periodic_only(self):
+        from telemffb.hw.ffb_rhino import EFFECT_CONSTANT, EFFECT_SINE, EFFECT_SPRING
+        for effect_type in (EFFECT_CONSTANT, EFFECT_SINE):
+            h = self.handle(effect_type)
+            h._magnitude = 0.5
+            assert h.intensity == pytest.approx(0.5)
+        spring = self.handle(EFFECT_SPRING)
+        spring._magnitude = 0.9                     # a stray stash changes nothing
+        assert spring.intensity is None
+
+    def test_condition_gains_read_per_axis(self):
+        from telemffb.hw.ffb_rhino import EFFECT_SPRING
+        h = self.handle(EFFECT_SPRING)
+        h._gains[0] = 1.0
+        assert h.axis_gains == (pytest.approx(1.0), None)
+        h._gains[1] = 0.25
+        assert h.axis_gains == (pytest.approx(1.0), pytest.approx(0.25))
+
+    def test_gains_are_per_handle_not_per_class(self):
+        from telemffb.hw.ffb_rhino import EFFECT_SPRING
+        a, b = self.handle(EFFECT_SPRING), self.handle(EFFECT_SPRING)
+        a._gains[0] = 1.0
+        assert b.axis_gains is None

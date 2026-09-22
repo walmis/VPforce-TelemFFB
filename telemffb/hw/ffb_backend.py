@@ -91,6 +91,10 @@ class BaseEffectHandle:
     effect_id = None
     type = None
 
+    def __init__(self) -> None:
+        self._magnitude = None
+        self._gains = {}
+
     @property
     def started(self) -> bool:
         raise NotImplementedError
@@ -132,6 +136,27 @@ class BaseEffectHandle:
 
     def setEnvelope(self, envelope):
         raise NotImplementedError
+
+    @property
+    def intensity(self):
+        """The magnitude a constant or periodic was last written with,
+        0.0-1.0 of device full scale; None for a condition, whose force
+        depends on stick position rather than on a parameter."""
+        # the effect type constants live with the PID report layouts in
+        # ffb_rhino, which imports this module; resolved at call time
+        from telemffb.hw.ffb_rhino import EFFECT_CONSTANT, PERIODIC_EFFECTS
+        if self.type == EFFECT_CONSTANT or self.type in PERIODIC_EFFECTS:
+            return self._magnitude
+        return None
+
+    @property
+    def axis_gains(self):
+        """A condition's gain per axis as ``(x, y)``, each a fraction of
+        4096 or None for an axis never written; None altogether before
+        any condition was written."""
+        if not self._gains:
+            return None
+        return self._gains.get(0), self._gains.get(1)
 
 
 class BaseFFBDevice(QObject):
