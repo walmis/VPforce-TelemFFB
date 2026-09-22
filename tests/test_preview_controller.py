@@ -196,6 +196,24 @@ class TestBlockedAndConfirmed:
         assert rig.ctl.start(TOUCHDOWN)
         assert rig.timed().running
 
+    def test_constant_force_on_a_shaker_alone_asks_nothing(self, rig, monkeypatch):
+        """A shaker has no axis to drive to its stops: the touchdown preview
+        scoped to it goes straight to the child."""
+        monkeypatch.setattr(G, 'launched_instances', {'shaker': object()}, raising=False)
+        monkeypatch.setattr(G, 'current_device_config_scope', 'shaker', raising=False)
+        rig.box.confirm = False                       # a dialog, if shown, would cancel
+        rig.ctl.toggle(TOUCHDOWN)
+        assert rig.box.shown == []
+        assert ('PREVIEW', 'shaker', TOUCHDOWN.name) in rig.ipc.sent
+
+    def test_constant_force_still_asks_when_a_shaker_plays_with_an_axis_device(self, rig, monkeypatch):
+        monkeypatch.setattr(G, 'launched_instances', {'shaker': object(), 'pedals': object()},
+                            raising=False)
+        rig.box.confirm = False
+        assert not rig.ctl._start_group(TOUCHDOWN, ['joystick', 'shaker'])
+        assert rig.box.shown[0][1] == "Constant Force Preview"
+        assert rig.ipc.sent == []
+
     def test_running_devices_lists_connected_children_only(self, rig):
         assert rig.ctl.running_devices() == ['joystick', 'pedals']
         rig.ipc.connected = False
