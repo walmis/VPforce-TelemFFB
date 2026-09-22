@@ -220,6 +220,8 @@ class AudioOutputInfo:
     #: output channels the card offers (the system default is taken as
     #: stereo: whatever it is, the first two channels exist)
     channels: int = 2
+    #: the speaker each channel drives, when the platform says
+    positions: tuple = ()
 
     def __post_init__(self):
         if not self.product_string:
@@ -241,7 +243,8 @@ def audio_selection_devices():
         from telemffb.hw.shaker_synth import SoundDeviceOutput
         listed = [AudioOutputInfo('')]
         for dev in SoundDeviceOutput.list_devices():
-            listed.append(AudioOutputInfo(dev.name, channels=max(1, int(dev.channels))))
+            listed.append(AudioOutputInfo(dev.name, channels=max(1, int(dev.channels)),
+                                          positions=tuple(getattr(dev, 'positions', ()) or ())))
         return listed
     except Exception as e:
         logging.error(f"Audio outputs could not be enumerated for the shaker: {e}")

@@ -191,20 +191,22 @@ POSITION_ALIASES = {
 #: layout Windows configures uses, so a card's channels can be named by
 #: position; which physical jack carries a position is the card's own
 #: business and only a test tone settles it.
+#: what a channel count implies when the platform does not say which
+#: speaker each channel is; four is left out, being Quadraphonic or 3.1
 CHANNEL_POSITIONS = {
     1: ('Mono',),
     2: ('Left', 'Right'),
-    4: ('Front L', 'Front R', 'Rear L', 'Rear R'),
     6: ('Front L', 'Front R', 'Center', 'Subwoofer', 'Rear L', 'Rear R'),
     8: ('Front L', 'Front R', 'Center', 'Subwoofer', 'Rear L', 'Rear R', 'Side L', 'Side R'),
 }
 
 
-def channel_label(index: int, width: int) -> str:
+def channel_label(index: int, width: int, positions: Sequence[str] = ()) -> str:
     """'4 Subwoofer' on an eight-channel output, '2 Right' on a stereo
-    one, the bare number where the layout is not a standard one or the
-    channel lies beyond it."""
-    names = CHANNEL_POSITIONS.get(int(width), ())
+    one; the output's own speaker names when the platform gave them, the
+    bare number where nothing says what the channel is or it lies beyond
+    the layout."""
+    names = tuple(positions) if positions else CHANNEL_POSITIONS.get(int(width), ())
     number = int(index) + 1
     if 0 <= index < len(names):
         return f"{number} {names[index]}"

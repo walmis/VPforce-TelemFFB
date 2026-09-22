@@ -428,6 +428,10 @@ class OutputDevice:
     host_api: str
     channels: int
     samplerate: float
+    #: the speaker each channel drives, in stream order, when the
+    #: platform says (Windows does, from the endpoint's format); empty
+    #: otherwise
+    positions: Tuple[str, ...] = ()
 
 
 #: host APIs in the order the device list prefers them when one card shows
@@ -583,21 +587,27 @@ class SoundDeviceOutput:
         Names are cleaned (see clean_device_name): some drivers pad a name
         under one API and not another, which would list one card as two."""
         import sounddevice as sd
+        from telemffb.hw import win_audio
         try:
             apis = [a.get('name', '') for a in sd.query_hostapis()]
             raw = sd.query_devices()
         except Exception:
             log.exception("audio device enumeration failed")
             return []
+        # four channels is Quadraphonic or 3.1 depending on the speaker
+        # panel; the endpoint's own format says which, by name
+        layouts = {clean_device_name(k).lower(): v for k, v in win_audio.output_layouts().items()}
         found: List[OutputDevice] = []
         for i, d in enumerate(raw):
             if d.get('max_output_channels', 0) <= 0:
                 continue
             api_index = d.get('hostapi', -1)
             api = apis[api_index] if 0 <= api_index < len(apis) else ''
-            found.append(OutputDevice(i, clean_device_name(d.get('name', '')), api,
-                                      int(d['max_output_channels']),
-                                      float(d.get('default_samplerate', 0.0))))
+            name = clean_device_name(d.get('name', ''))
+            channels = int(d['max_output_channels'])
+            positions = layouts.get(name.lower(), ())
+            found.append(OutputDevice(i, name, api, channels, float(d.get('default_samplerate', 0.0)),
+                                      positions if len(positions) == channels else ()))
         if all_host_apis:
             return found
 

@@ -339,6 +339,25 @@ class TestCard:
         assert channel_label(4, 6) == '5 Rear L'
         assert channel_label(2, 3) == '3'                    # no standard three-channel layout
         assert channel_label(9, 8) == '10'                   # beyond the layout: the number
+        assert channel_label(3, 4) == '4'                    # Quadraphonic or 3.1: the count cannot say
+        three_one = ('Front L', 'Front R', 'Center', 'Subwoofer')
+        assert channel_label(3, 4, three_one) == '4 Subwoofer'
+        assert channel_label(2, 4, three_one) == '3 Center'
+        assert channel_label(3, 8, three_one) == '4 Subwoofer'   # the platform's names win over the count
+        assert channel_label(5, 4, three_one) == '6'
+
+    def test_the_rows_name_channels_by_the_outputs_speaker_layout(self, monkeypatch):
+        outputs = [AudioOutputInfo(''),
+                   AudioOutputInfo('StarTech 3.1', channels=4,
+                                   positions=('Front L', 'Front R', 'Center', 'Subwoofer'))]
+        _, dialog = _make_dialog(monkeypatch, _Settings(), outputs)
+        dialog.cb_select_s.setCurrentIndex(2)
+        combo = dialog.device_cards.shaker_controls.rows[0].channel_combo
+        assert [combo.itemText(i) for i in range(combo.count())] == [
+            '1 Front L', '2 Front R', '3 Center', '4 Subwoofer']
+        dialog.device_cards.shaker_controls.add_row()
+        combo = dialog.device_cards.shaker_controls.rows[-1].channel_combo
+        assert combo.itemText(3) == '4 Subwoofer'
         _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
         combo = dialog.device_cards.shaker_controls.rows[0].channel_combo
         dialog.cb_select_s.setCurrentIndex(2)                 # stereo

@@ -453,6 +453,7 @@ class TransducerRow(QWidget):
 
         self._channels = 0
         self._layout_width = 0
+        self._layout_names = ()
         self.set_channel_count(2)
         for w in (self.name_edit, self.channel_combo, self.position_combo,
                   self.gain_spin, self.profile_combo):
@@ -473,17 +474,19 @@ class TransducerRow(QWidget):
         self.channel_combo.blockSignals(True)
         self.channel_combo.clear()
         for i in range(count):
-            self.channel_combo.addItem(channel_label(i, self._layout_width or count), i)
+            self.channel_combo.addItem(channel_label(i, self._layout_width or count, self._layout_names), i)
         self.channel_combo.setCurrentIndex(min(current, count - 1))
         self.channel_combo.blockSignals(False)
 
-    def set_layout_width(self, width: int) -> None:
-        """The output's own channel count, which names the positions even
-        when a stored channel has stretched the list beyond it."""
+    def set_layout_width(self, width: int, names=()) -> None:
+        """The output's own channel count, and the speaker each channel
+        drives when the platform says: these name the channels even when
+        a stored channel has stretched the list beyond them."""
         width = max(1, int(width))
-        if width == self._layout_width:
+        names = tuple(names)
+        if width == self._layout_width and names == self._layout_names:
             return
-        self._layout_width = width
+        self._layout_width, self._layout_names = width, names
         count, self._channels = self._channels, 0
         self.set_channel_count(count)
 
@@ -632,10 +635,13 @@ class ShakerControls(QWidget):
         for row in self.rows:
             row.set_positions(self._positions)
 
-    def set_channel_count(self, count: int) -> None:
+    def set_channel_count(self, count: int, names=()) -> None:
+        """How many channels the selected output has, and what each one
+        drives when known."""
         self._channels = max(1, int(count))
+        self._channel_names = tuple(names)
         for row in self.rows:
-            row.set_layout_width(self._channels)
+            row.set_layout_width(self._channels, self._channel_names)
             row.set_channel_count(self._channels)
         self.refresh_hint()
 
@@ -654,7 +660,7 @@ class ShakerControls(QWidget):
         row = TransducerRow(self.rows_host)
         row.set_profiles(self._profiles)
         row.set_positions(self._positions)
-        row.set_layout_width(self._channels)
+        row.set_layout_width(self._channels, getattr(self, '_channel_names', ()))
         row.set_channel_count(self._channels)
         if transducer is not None:
             row.set_value(transducer)

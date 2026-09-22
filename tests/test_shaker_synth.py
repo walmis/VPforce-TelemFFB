@@ -268,6 +268,19 @@ class TestDeviceListing:
         assert [(d.name, d.host_api, d.channels) for d in listed] == [
             ('Speakers (USB Sound Device)', 'Windows WASAPI', 2)]
 
+    def test_the_platforms_speaker_layout_names_the_channels(self, fake_portaudio, monkeypatch):
+        from telemffb.hw import win_audio
+        monkeypatch.setattr(win_audio, 'output_layouts',
+                            lambda: {'Speakers (USB Sound Device        )': ('Front L', 'Front R')})
+        listed = SoundDeviceOutput.list_devices()
+        assert listed[0].positions == ('Front L', 'Front R')
+        # a layout that does not fit the channel count is not trusted
+        monkeypatch.setattr(win_audio, 'output_layouts',
+                            lambda: {'Speakers (USB Sound Device)': ('Front L', 'Front R', 'Center', 'Subwoofer')})
+        assert SoundDeviceOutput.list_devices()[0].positions == ()
+        monkeypatch.setattr(win_audio, 'output_layouts', lambda: {})
+        assert SoundDeviceOutput.list_devices()[0].positions == ()
+
     def test_inputs_and_virtual_outputs_are_left_out(self, fake_portaudio):
         names = [d.name for d in SoundDeviceOutput.list_devices(all_host_apis=True)]
         assert 'Microphone (USB Sound Device)' not in names

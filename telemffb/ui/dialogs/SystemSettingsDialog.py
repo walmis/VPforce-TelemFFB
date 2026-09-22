@@ -661,7 +661,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         pick from, and whether a test can play at all."""
         controls = self.device_cards.shaker_controls
         device = self.selected_device('shaker')
-        controls.set_channel_count(int(getattr(device, 'channels', 2) or 2) if device else 2)
+        controls.set_channel_count(int(getattr(device, 'channels', 2) or 2) if device else 2,
+                                   getattr(device, 'positions', ()) if device else ())
         self._sync_shaker_test_button()
 
     def _sync_shaker_test_button(self, *_):
