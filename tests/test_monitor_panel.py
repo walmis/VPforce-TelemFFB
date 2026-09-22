@@ -19,7 +19,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication
 
 import telemffb.globals as G
-from telemffb.ui.panels.MonitorPanel import MonitorPanel
+from telemffb.ui.panels.MonitorPanel import (_KEY_COL, _STAR_COL, _VALUE_COL,
+                                            MonitorPanel)
 
 pytestmark = pytest.mark.unit
 
@@ -30,13 +31,17 @@ def qapp():
 
 
 class _FakeSettings:
-    """Minimal stand-in for G.system_settings (a .get(key, default) API)."""
+    """Minimal stand-in for G.system_settings: the .get(key, default) read
+    and the global (un-scoped) .setValue the favourites list is saved with."""
 
     def __init__(self, values=None):
         self.values = dict(values or {})
 
     def get(self, key, default=None):
         return self.values.get(key, default)
+
+    def setValue(self, key, value, instance=None):
+        self.values[key] = value
 
 
 class FakeMainWindow:
@@ -92,12 +97,12 @@ class TestTelemetryRows:
         assert set(keys) == {'AoA', 'N', 'src'}
         model = panel._telem_model
         row = keys.index('AoA')
-        assert model.column_values(1)[row] == '+1.235'
+        assert model.column_values(_VALUE_COL)[row] == '+1.235'
 
     def test_list_values_formatted_like_old_label(self, panel):
         panel.update_telemetry({'Gear': [1.0, 0, None]})
         model = panel._telem_model
-        assert model.column_values(1)[0] == '[1.000, 0, None]'
+        assert model.column_values(_VALUE_COL)[0] == '[1.000, 0, None]'
 
     def test_filter_keeps_only_matching_keys(self, panel):
         panel.telem_filter.setText('aoa, ias')
@@ -118,7 +123,7 @@ class TestTelemetryRows:
         model.rowsInserted.connect(lambda *a: rows_inserted.append(a))
         panel.update_telemetry({'RPM': 2.0})
         assert rows_inserted == []
-        assert model.column_values(1) == ['2.000']
+        assert model.column_values(_VALUE_COL) == ['2.000']
 
     def test_show_simvars_renames_msfs_keys(self, panel, monkeypatch):
         fake_simconnect = SimpleNamespace(get_var_name=lambda k: f"SIMVAR_{k}" if k == 'foo' else None)
@@ -162,16 +167,16 @@ class TestTelemetryRows:
         negative value get an explicit sign - the whole point being that
         the digits don't shift as the value crosses zero."""
         panel.update_telemetry({'Pitch': 2.5})
-        assert panel._telem_model.column_values(1)[0] == '+2.500'
+        assert panel._telem_model.column_values(_VALUE_COL)[0] == '+2.500'
         panel.update_telemetry({'Pitch': -2.5})
-        assert panel._telem_model.column_values(1)[0] == '-2.500'
+        assert panel._telem_model.column_values(_VALUE_COL)[0] == '-2.500'
 
     def test_unsigned_key_stays_bare(self, panel):
         """Keys that never go negative and aren't in the signed set or
         pattern list (IAS, RPM) keep the old unsigned rendering."""
         panel.update_telemetry({'IAS': 250.0, 'RPM': 2500.0})
         keys = panel.telemetry_keys()
-        values = panel._telem_model.column_values(1)
+        values = panel._telem_model.column_values(_VALUE_COL)
         assert values[keys.index('IAS')] == '250.000'
         assert values[keys.index('RPM')] == '2500.000'
 
@@ -180,14 +185,14 @@ class TestTelemetryRows:
         float element signed, not just the negative one - so the columns
         line up instead of only the sign-crossing element jittering."""
         panel.update_telemetry({'ACCs': [1.0, -2.0, 0.5]})
-        assert panel._telem_model.column_values(1)[0] == '[+1.000, -2.000, +0.500]'
+        assert panel._telem_model.column_values(_VALUE_COL)[0] == '[+1.000, -2.000, +0.500]'
 
     def test_pattern_matched_key_is_signed_even_when_never_negative(self, panel):
         """The case-insensitive substring patterns are a static rule, not
         contingent on ever seeing a negative value - StickX matches
         'stick' and renders signed from its very first (positive) frame."""
         panel.update_telemetry({'StickX': 0.75})
-        assert panel._telem_model.column_values(1)[0] == '+0.750'
+        assert panel._telem_model.column_values(_VALUE_COL)[0] == '+0.750'
 
     def test_position_keys_signed_per_axis_not_per_suffix(self, panel):
         """"...Pos" is not a signed suffix. The control axes run -1..1
@@ -198,7 +203,7 @@ class TestTelemetryRows:
         panel.update_telemetry({'ElevPos': 0.5, 'CollectivePos': 0.5,
                                 'GearPos': 1.0, 'NozzlePos': 0.25})
         keys = panel.telemetry_keys()
-        values = panel._telem_model.column_values(1)
+        values = panel._telem_model.column_values(_VALUE_COL)
         assert values[keys.index('ElevPos')] == '+0.500'
         assert values[keys.index('CollectivePos')] == '0.500'
         assert values[keys.index('GearPos')] == '1.000'
@@ -209,9 +214,9 @@ class TestTelemetryRows:
         must be learned signed on that very frame - not one frame late -
         and stay signed afterwards even once it goes positive again."""
         panel.update_telemetry({'Zorp': -1.0})
-        assert panel._telem_model.column_values(1)[0] == '-1.000'
+        assert panel._telem_model.column_values(_VALUE_COL)[0] == '-1.000'
         panel.update_telemetry({'Zorp': 1.0})
-        assert panel._telem_model.column_values(1)[0] == '+1.000'
+        assert panel._telem_model.column_values(_VALUE_COL)[0] == '+1.000'
 
     def test_sticky_learned_keys_reset_on_new_aircraft(self, panel):
         """A key learned signed for one aircraft/sim must not leak into
@@ -219,8 +224,92 @@ class TestTelemetryRows:
         panel.update_telemetry({'Zorp': -1.0, 'N': 'F-16C', 'src': 'DCS'})
         panel.update_telemetry({'Zorp': 1.0, 'N': 'A-10C', 'src': 'DCS'})
         keys = panel.telemetry_keys()
-        values = panel._telem_model.column_values(1)
+        values = panel._telem_model.column_values(_VALUE_COL)
         assert values[keys.index('Zorp')] == '1.000'
+
+
+class TestFavorites:
+    """The star gutter: click a row's star to favourite its telemetry key,
+    tick "Favorites" to list only those. The set is saved to one global
+    registry value, so it is the same list on every device instance."""
+
+    def _click_star(self, panel, key):
+        row = panel.telemetry_keys().index(key)
+        panel._on_telem_clicked(panel._telem_model.index(row, _STAR_COL))
+
+    def test_clicking_the_star_column_favorites_the_row(self, panel):
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
+        self._click_star(panel, 'AoA')
+        assert panel._favorites == {'AoA'}
+
+    def test_clicking_it_again_unfavorites(self, panel):
+        panel.update_telemetry({'AoA': 1.0})
+        self._click_star(panel, 'AoA')
+        self._click_star(panel, 'AoA')
+        assert panel._favorites == set()
+
+    def test_a_click_outside_the_star_column_changes_nothing(self, panel):
+        panel.update_telemetry({'AoA': 1.0})
+        panel._on_telem_clicked(panel._telem_model.index(0, _KEY_COL))
+        assert panel._favorites == set()
+
+    def test_the_delegate_paints_from_the_panels_own_set(self, panel):
+        """Held by reference, never rebound - or a toggle would show only
+        once something else forced the delegate to be handed a new set."""
+        panel.update_telemetry({'AoA': 1.0})
+        self._click_star(panel, 'AoA')
+        assert panel._star_delegate._favorites is panel._favorites
+
+    def test_favorites_are_saved_globally_not_per_device(self, panel):
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
+        self._click_star(panel, 'IAS')
+        self._click_star(panel, 'AoA')
+        # Comma-separated under one un-scoped key: `instance` is never
+        # passed, which is what makes it common to all devices.
+        assert G.system_settings.values['monitorFavoriteKeys'] == 'AoA,IAS'
+
+    def test_favorites_are_restored_on_construction(self, qapp, mainwindow, monkeypatch):
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings({
+            'monitorFavoriteKeys': 'AoA, IAS ,',
+        }), raising=False)
+        assert MonitorPanel(mainwindow=mainwindow)._favorites == {'AoA', 'IAS'}
+
+    def test_favorites_checkbox_filters_the_list(self, panel):
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0, 'RPM': 3.0})
+        self._click_star(panel, 'IAS')
+        panel.favorites_check.setChecked(True)
+        assert panel.telemetry_keys() == ['IAS']
+
+    def test_it_combines_with_the_text_filter(self, panel):
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0, 'RPM': 3.0})
+        for key in ('AoA', 'IAS'):
+            self._click_star(panel, key)
+        panel.favorites_check.setChecked(True)
+        panel.telem_filter.setText('ias')
+        assert panel.telemetry_keys() == ['IAS']
+
+    def test_unstarring_while_filtered_drops_the_row_at_once(self, panel):
+        """No telemetry frame need arrive in between - with the sim closed
+        none ever would, and the row would sit there un-starred but listed."""
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
+        self._click_star(panel, 'AoA')
+        panel.favorites_check.setChecked(True)
+        self._click_star(panel, 'AoA')
+        assert panel.telemetry_keys() == []
+
+    def test_the_checkbox_state_is_remembered(self, panel):
+        panel.update_telemetry({'AoA': 1.0})
+        self._click_star(panel, 'AoA')
+        panel.favorites_check.setChecked(True)
+        assert G.system_settings.values['monitorFavoritesOnly'] == 1
+
+    def test_it_is_not_restored_with_nothing_starred(self, qapp, mainwindow, monkeypatch):
+        """An empty Monitor tab is a poor way to be told the box was left
+        ticked on a machine whose favourites have since been cleared."""
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings({
+            'monitorFavoritesOnly': 1, 'monitorFavoriteKeys': '',
+        }), raising=False)
+        assert not MonitorPanel(mainwindow=mainwindow).favorites_check.isChecked()
 
 
 class TestActiveEffects:
@@ -594,9 +683,13 @@ class TestScopeDevice:
     def test_the_tables_keep_plain_column_headers(self, panel):
         from PyQt6.QtCore import Qt
         panel.set_scope_device('trimwheel')
-        headers = [model.headerData(section, Qt.Orientation.Horizontal)
-                   for model in (panel._telem_model, panel._effects_model) for section in (0, 1)]
-        assert headers == ['Key', 'Value', 'Active Effects', 'Intensity']
+        headers = [panel._telem_model.headerData(section, Qt.Orientation.Horizontal)
+                   for section in (_STAR_COL, _KEY_COL, _VALUE_COL)]
+        headers += [panel._effects_model.headerData(section, Qt.Orientation.Horizontal)
+                    for section in (0, 1)]
+        # The star gutter has no header text of its own - a column heading
+        # over a row of stars would only label the obvious.
+        assert headers == ['', 'Key', 'Value', 'Active Effects', 'Intensity']
 
 
 class TestCopySelection:
@@ -609,13 +702,27 @@ class TestCopySelection:
         view = panel.telem_view
         model = view.model()
         selection = view.selectionModel()
-        selection.select(model.index(0, 0),
-                          selection.SelectionFlag.Select)
-        selection.select(model.index(0, 1),
-                          selection.SelectionFlag.Select)
+        for column in (_KEY_COL, _VALUE_COL):
+            selection.select(model.index(0, column),
+                             selection.SelectionFlag.Select)
         view._copy_selection()
-        expected = '\t'.join([model.data(model.index(0, 0)), model.data(model.index(0, 1))])
+        expected = '\t'.join([model.data(model.index(0, _KEY_COL)),
+                              model.data(model.index(0, _VALUE_COL))])
         assert QApplication.clipboard().text() == expected
+
+    def test_star_gutter_is_not_copied_with_the_row(self, panel):
+        """The star column holds no value, so it must stay out of a
+        selection - otherwise every copied row would start with an empty
+        field. KeyValueTableModel drops ItemIsSelectable for it, which
+        QItemSelectionModel honours even for a programmatic select()."""
+        panel.update_telemetry({'AoA': 1.0})
+        view = panel.telem_view
+        model = view.model()
+        selection = view.selectionModel()
+        selection.select(model.index(0, 0), selection.SelectionFlag.Select)
+        selection.select(model.index(0, 1), selection.SelectionFlag.Select)
+        selection.select(model.index(0, 2), selection.SelectionFlag.Select)
+        assert {i.column() for i in selection.selectedIndexes()} == {_KEY_COL, _VALUE_COL}
 
     def test_copy_with_no_selection_leaves_clipboard_untouched(self, panel):
         QApplication.clipboard().setText('unchanged')
