@@ -255,7 +255,8 @@ class TestDeviceListing:
     @pytest.fixture
     def fake_portaudio(self, monkeypatch):
         import sounddevice as sd
-        monkeypatch.setattr(sd, 'query_devices', lambda *a, **k: list(self.RAW))
+        monkeypatch.setattr(sd, 'query_devices',
+                            lambda *a, **k: self.RAW[a[0]] if a and isinstance(a[0], int) else list(self.RAW))
         monkeypatch.setattr(sd, 'query_hostapis', lambda *a, **k: list(self.APIS))
 
     def test_clean_name(self):
@@ -267,6 +268,48 @@ class TestDeviceListing:
         listed = SoundDeviceOutput.list_devices()
         assert [(d.name, d.host_api, d.channels) for d in listed] == [
             ('Speakers (USB Sound Device)', 'Windows WASAPI', 2)]
+
+    def test_a_wasapi_stream_carries_the_endpoints_speaker_mask(self, fake_portaudio, monkeypatch):
+        from telemffb.hw import win_audio
+        monkeypatch.setattr(win_audio, 'output_formats',
+                            lambda: {'Speakers (USB Sound Device        )': (2, 0x3)})
+        settings = SoundDeviceOutput._wasapi_settings(0, 2)
+        assert settings is not None
+        assert settings._streaminfo.channelMask == 0x3
+        assert settings._streaminfo.flags & 0x4
+        assert SoundDeviceOutput._wasapi_settings(0, 4) is None       # not the endpoint's width
+        assert SoundDeviceOutput._wasapi_settings(1, 8) is None       # WDM-KS: not a WASAPI stream
+        monkeypatch.setattr(win_audio, 'output_formats', lambda: {})
+        assert SoundDeviceOutput._wasapi_settings(0, 2) is None       # no mask known
+
+    def test_the_stream_is_opened_with_those_settings(self, fake_portaudio, monkeypatch):
+        import sounddevice as sd
+        from telemffb.hw import win_audio
+        monkeypatch.setattr(win_audio, 'output_formats',
+                            lambda: {'Speakers (USB Sound Device)': (2, 0x3)})
+        opened = {}
+
+        class FakeStream:
+            def __init__(self, **kw):
+                opened.update(kw)
+                self.active = False
+
+            def start(self):
+                self.active = True
+
+            def stop(self):
+                self.active = False
+
+            def close(self):
+                pass
+        monkeypatch.setattr(sd, 'OutputStream', FakeStream)
+        out = SoundDeviceOutput('Speakers (USB Sound Device)', 48000)
+        out.start(lambda *a: None, 2)
+        try:
+            assert opened['device'] == 0 and opened['channels'] == 2
+            assert opened['extra_settings']._streaminfo.channelMask == 0x3
+        finally:
+            out.stop()
 
     def test_the_platforms_speaker_layout_names_the_channels(self, fake_portaudio, monkeypatch):
         from telemffb.hw import win_audio

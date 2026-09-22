@@ -513,9 +513,42 @@ class SoundDeviceOutput:
         self._stream = sd.OutputStream(
             samplerate=self.samplerate, blocksize=self.blocksize, device=index,
             channels=int(channels), dtype='float32', latency=self.latency,
-            callback=callback, finished_callback=finished_callback)
+            callback=callback, finished_callback=finished_callback,
+            extra_settings=self._wasapi_settings(index, int(channels)))
         SoundDeviceOutput._held += 1
         self._stream.start()
+
+    @staticmethod
+    def _wasapi_settings(index: Optional[int], channels: int):
+        """Stream settings that label the channels the way the endpoint
+        does, for a shared-mode WASAPI output whose width matches.
+
+        PortAudio labels a stream by a default mask for its count: four
+        channels is Quadraphonic to it.  On a card set to 3.1 Windows
+        then folds the "rear" pair into the fronts and sends nothing to
+        the center or the subwoofer.  With the endpoint's own mask on the
+        stream, channel N is speaker N of the card.  None where the
+        output is not WASAPI, the mask is unknown, or the widths differ
+        (the default labelling is then what there is)."""
+        import sounddevice as sd
+        from telemffb.hw import win_audio
+        try:
+            info = sd.query_devices(index if index is not None else sd.default.device[1])
+            api = sd.query_hostapis()[info['hostapi']]['name']
+            if api != 'Windows WASAPI':
+                return None
+            name = clean_device_name(info.get('name', '')).lower()
+            formats = {clean_device_name(k).lower(): v for k, v in win_audio.output_formats().items()}
+            found = formats.get(name)
+            if not found or found[0] != channels:
+                return None
+            settings = sd.WasapiSettings()
+            settings._streaminfo.flags |= 0x4          # paWinWasapiUseChannelMask
+            settings._streaminfo.channelMask = found[1]
+            return settings
+        except Exception as e:
+            log.debug(f"no speaker mask for the stream: {e}")
+            return None
 
     def stop(self) -> None:
         stream, self._stream = self._stream, None
