@@ -271,6 +271,16 @@ class TestCard:
         assert saved[0] == Transducer('Buttkicker', 3, 0.5, 'Buttkicker LFE', 'seat')
         assert saved[1:] == RIG[1:]
 
+    def test_the_ids_column_shows_the_channel_count(self, monkeypatch):
+        _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
+        row = dialog.device_cards.cards['shaker'].primary_row
+        dialog.cb_select_s.setCurrentIndex(3)
+        assert row.ids_label.text() == '8 ch'
+        dialog.cb_select_s.setCurrentIndex(2)
+        assert row.ids_label.text() == '2 ch'
+        dialog.cb_select_s.setCurrentIndex(0)
+        assert row.ids_label.text() == ''
+
     def test_channels_follow_the_selected_output(self, monkeypatch):
         _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
         controls = dialog.device_cards.shaker_controls

@@ -322,8 +322,14 @@ class DeviceRow(QWidget):
         device = self.selector.currentData()
         vid = getattr(device, 'vendor_id', None)
         pid = getattr(device, 'product_id', None)
+        channels = getattr(device, 'channels', None)
         if vid and pid is not None:
             self.ids_label.setText(f'{vid:04X}:{pid:04X}')
+        elif device is not None and channels:
+            # an audio output has no USB identity; its channel count is
+            # what tells two 'Speakers' apart, and it reads 2 until
+            # Windows has the card's layout set to more
+            self.ids_label.setText(f'{int(channels)} ch')
         else:
             self.ids_label.setText('')
         if self.marker is not None:
