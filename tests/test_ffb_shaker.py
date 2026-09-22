@@ -287,10 +287,14 @@ class TestRules:
         out = output.render(0.5)
         assert abs(out).max() > 0.9
         assert voice.is_silent                       # the pulse ended itself
-        # an update or a repeated start while started never re-fires
+        # an update while started does not re-fire; a start does, since the
+        # effect code starts a running effect only to restart it (gunfire
+        # per round) and the hardware handles restart on start too
         handle.setPeriodic(15.0, 1.0, 0, duration=80)
-        handle.start()
         assert voice.is_silent
+        handle.start()
+        assert not voice.is_silent
+        output.render(0.5)
         handle.stop()
         handle.start()
         assert not voice.is_silent

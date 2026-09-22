@@ -590,9 +590,12 @@ class ShakerEffectHandle(ffb_backend.BaseEffectHandle):
         if not self.effect_id:
             log.warning(f"start on an invalidated effect ({self.name})")
             return self
-        firing = not self._started
+        # every start fires: the facade only calls this for an effect
+        # that is not playing or that the effect code restarts on purpose
+        # (gunfire re-triggers per round), and the hardware handles restart
+        # on OP_START the same way.  A tone or a train is unmoved by it.
         self._started = True
-        self._apply(fire=firing)
+        self._apply(fire=True)
         return self
 
     def stop(self):
