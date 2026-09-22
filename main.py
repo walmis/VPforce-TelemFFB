@@ -373,21 +373,11 @@ def _determine_master_instance_status():
         'shaker': 5,
     }
     master_index = G.system_settings.get('masterInstance', 1)
-    if index_dict[G.device_type] == master_index:
-        G.master_instance = True
-    else:
-        G.master_instance = False
-    if G.device_type == 'shaker' and G.master_instance:
-        # the master coordinates the force feedback instances and the
-        # settings dialog refuses this radio; a stored value that says
-        # otherwise is corrupt, and a shaker-led session would run with
-        # no force feedback device in charge
-        logging.error("The shaker instance cannot be the master instance")
-        QMessageBox.critical(
-            None, "TelemFFB",
-            "The shaker instance cannot be the master instance.\n\n"
-            "Choose a force feedback device as the master in System Settings.")
-        sys.exit(1)
+    # any role can lead, the shaker included: everything the master does
+    # (children, IPC, the sim sockets, settings, the tray) is the same
+    # whatever device it drives, and a rig with no force feedback device
+    # has nothing else to put in charge
+    G.master_instance = index_dict[G.device_type] == master_index
 
 def _setup_config_paths():
     """
@@ -1429,7 +1419,7 @@ def _check_system_settings_required():
 
     if G.device_devpath is None:
         QMessageBox.information(None, "System Settings Required",
-                                f"VPforce Device for {G.device_type} is not assigned.  Please assign a device in System Settings.")
+                                f"No device is assigned to the {G.device_type} instance.  Please assign one in System Settings.")
         if G.child_instance:
             G.ipc_instance.send_message("SHOW SETTINGS")
         else:

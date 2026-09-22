@@ -296,8 +296,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.addButton(self.rb_master_p, id=2)
         self.master_button_group.addButton(self.rb_master_c, id=3)
         self.master_button_group.addButton(self.rb_master_t, id=4)
-        # in the group so the ids stay aligned with the roles; the card
-        # keeps it disabled (a shaker is never the master)
         self.master_button_group.addButton(self.rb_master_s, id=5)
 
         # depreciate this option
@@ -1545,8 +1543,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             # global switch is on; master selection itself is independent
             # of auto-launch
             getattr(self, radio).setEnabled(
-                role != 'shaker' and assigned
-                and (is_master or not al_enabled or launches))
+                assigned and (is_master or not al_enabled or launches))
             card.set_collapsed(
                 (not is_master) and al_enabled and not launches)
         # cards expanding (or rows appearing) can push the content past

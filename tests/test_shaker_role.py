@@ -106,6 +106,15 @@ class TestStartupIdentity:
             monkeypatch.setattr(G, name, None, raising=False)
         return main
 
+    def test_a_shaker_may_be_the_master(self, main, monkeypatch):
+        monkeypatch.setattr(G, 'device_type', 'shaker', raising=False)
+        monkeypatch.setattr(G, 'system_settings', _Settings({'masterInstance': 5}), raising=False)
+        main._determine_master_instance_status()
+        assert G.master_instance is True
+        monkeypatch.setattr(G, 'system_settings', _Settings({'masterInstance': 1}), raising=False)
+        main._determine_master_instance_status()
+        assert G.master_instance is False
+
     def test_devpath_prefixes_set_one_identity_each(self, main):
         main._identity_from_devpath('audio:Card A')
         assert G.device_audio_output == 'Card A' and G.device_di_guid is None
@@ -244,7 +253,7 @@ class TestSettingsDialog:
         _, dialog = _make_dialog(monkeypatch, _Settings(), OUTPUTS)
         card = dialog.device_cards.cards['shaker']
         assert card.primary_row.axis_combo is None
-        assert not dialog.rb_master_s.isEnabled()
+        assert not dialog.rb_master_s.isEnabled()                 # no output picked yet
         assert dialog.cb_select_s.count() == 1 + len(OUTPUTS)      # (None) + outputs
         assert dialog.cb_select_s.itemText(0).startswith('(None)')
         paths = [dialog.cb_select_s.model().data(dialog.cb_select_s.model().index(i, 0), 0x0100).path
@@ -267,7 +276,7 @@ class TestSettingsDialog:
         assert dialog.device_is_audio('shaker')
         assert not dialog.device_is_dinput('shaker')
         dialog.toggle_device_launch_widgets()
-        assert not dialog.rb_master_s.isEnabled()
+        assert dialog.rb_master_s.isEnabled()                     # a shaker may lead a rig without FFB
         assert 'shaker' in dialog._selected_roles()
         startup = dialog.instance_panels[('startup', 'shaker')]
         assert startup.vpforce_blocked
