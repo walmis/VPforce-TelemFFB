@@ -40,6 +40,15 @@ closest faithful option for a table view:
 - Copy is now cell/row based (``CopyableTableView``'s Ctrl+C) rather than
   drag-selecting arbitrary runs of free text out of a QLabel.
 
+The telemetry table's leading column is a star gutter: click a row's star
+to favourite that telemetry key, tick "Favorites" beside the filter to
+list only those. The set is kept here and saved to one *global* registry
+value - not an instance-scoped one - so it is the same list whichever
+device's instance you star a key from; what the interesting telemetry is
+is a property of the sim, not of the device watching it. The stars
+themselves are painted by ``FavoriteStarDelegate``, which is handed this
+panel's own set to read.
+
 Ownership split follows ``OfflineEditorPanel``/``SettingsLayout``: this
 panel owns the two tables, the filter box and the detach toolbar button;
 what a detach *does* (reparenting the tab into its own window) stays
@@ -61,8 +70,9 @@ from typing import Dict, List, Optional, Set, Tuple
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor, QPixmap
-from PyQt6.QtWidgets import (QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-                             QLineEdit, QSplitter, QStackedWidget, QWidget)
+from PyQt6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QHeaderView,
+                             QLabel, QLineEdit, QSplitter, QStackedWidget,
+                             QWidget)
 
 import telemffb.globals as G
 from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
@@ -76,6 +86,8 @@ from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
 from telemffb.ui.panels.DevicePanel import DEVICE_ICONS, tint_pixmap
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
 from telemffb.ui.widgets.EffectTypeDelegate import EffectTypeDelegate
+from telemffb.ui.widgets.FavoriteStarDelegate import (STAR_COLUMN_WIDTH,
+                                                      FavoriteStarDelegate)
 from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
@@ -88,6 +100,19 @@ _MONOSPACE_STYLE = """
 #: Wide enough for "100%" over a bar that still reads as a bar, narrow
 #: enough to leave the effect names the rest of a half-split pane.
 INTENSITY_COLUMN_WIDTH = 72
+
+#: The telemetry table's columns. The favourite star sits in a gutter ahead
+#: of the key, the way a starred row reads in a mail client - and the model
+#: is told it holds no selectable value (see KeyValueTableModel).
+_STAR_COL, _KEY_COL, _VALUE_COL = 0, 1, 2
+
+#: Where the favourite keys live: one registry value, deliberately global
+#: rather than instance-scoped (SystemSettings.setValue without an
+#: `instance`), so starring a key on the joystick instance stars it for the
+#: pedals and collective too - the interesting telemetry is a property of
+#: the sim, not of the device watching it.
+_FAVORITES_KEY = 'monitorFavoriteKeys'
+_FAVORITES_ONLY_KEY = 'monitorFavoritesOnly'
 
 #: The scoped device's icon in the page header: the height of the text it
 #: sits in, against the 72px the device panel draws it at.
@@ -263,6 +288,15 @@ class MonitorPanel(QWidget):
         # starts clean instead of inheriting another aircraft's negatives.
         self._signed_keys: Set[str] = set()
         self._signed_session: Tuple[Optional[str], Optional[str]] = (None, None)
+        # Starred telemetry keys, by their ORIGINAL key rather than the
+        # MSFS simvar display name - the display name only exists while the
+        # Alt+D debug rename is on, so a favourite made with it on has to
+        # survive it going off again.
+        self._favorites: Set[str] = self._load_favorites()
+        # The last frame rendered, so toggling a star or the Favorites box
+        # redraws the list now rather than at whatever point the next frame
+        # arrives (which, with the sim closed, is never).
+        self._last_data: Optional[Dict] = None
         self._build_ui()
         self.refresh_waiting_status()
 
@@ -318,6 +352,18 @@ class MonitorPanel(QWidget):
             "Comma Separated, Case Insensitive list of telemetry items to show (e.g. 'aoa, ias, rpm')")
         self.telem_filter.setPlaceholderText("Filter")
         self.telem_filter.setMaximumWidth(100)
+        self.telem_filter.textChanged.connect(self._refresh_rows)
+
+        self.favorites_check = QCheckBox("Favorites")
+        self.favorites_check.setToolTip(
+            "Show only the telemetry items starred in the left-hand column.\n"
+            "Favorites are shared by all devices and kept between sessions.")
+        # Restored, but only when there is something starred to show for it:
+        # an empty Monitor tab is a poor way to be reminded the box was left
+        # ticked on a machine whose favourites have since been cleared.
+        self.favorites_check.setChecked(
+            bool(self._favorites) and bool(G.system_settings.get(_FAVORITES_ONLY_KEY, 0)))
+        self.favorites_check.toggled.connect(self._on_favorites_only_toggled)
 
         # Whose data the page is showing - both tables, so it is said once up
         # here rather than in a header of each. At the far end of the bar
@@ -338,15 +384,27 @@ class MonitorPanel(QWidget):
         self.header_bar.add_left(self.detach_toolbar)
         self.header_bar.add_left(self.telem_lbl)
         self.header_bar.add_left(self.telem_filter)
+        self.header_bar.add_left(self.favorites_check)
         self.header_bar.add_right(self._scope_indicator)
 
 
         """ Telemetry pane: a plain "waiting for data" label shown until the
         first telemetry frame, then the live table. """
-        self._telem_model = KeyValueTableModel(['Key', 'Value'], self)
+        self._telem_model = KeyValueTableModel(
+            ['', 'Key', 'Value'], self, unselectable_columns=[_STAR_COL])
         self.telem_view = CopyableTableView(self)
         self.telem_view.setModel(self._telem_model)
-        self.telem_view.horizontalHeader().setStretchLastSection(True)
+        telem_header = self.telem_view.horizontalHeader()
+        telem_header.setStretchLastSection(True)
+        telem_header.setSectionResizeMode(_STAR_COL, QHeaderView.ResizeMode.Fixed)
+        self.telem_view.setColumnWidth(_STAR_COL, STAR_COLUMN_WIDTH)
+        self._star_delegate = FavoriteStarDelegate(self)
+        self._star_delegate.set_favorites(self._favorites)
+        self.telem_view.setItemDelegateForColumn(_STAR_COL, self._star_delegate)
+        # So an unstarred row's star lights up under the cursor - the column
+        # carries no text to make it look clickable on its own.
+        self.telem_view.setMouseTracking(True)
+        self.telem_view.clicked.connect(self._on_telem_clicked)
         self.telem_view.setStyleSheet(f"QTableView {{ {_MONOSPACE_STYLE} }}")
 
         self._telem_waiting_label = QLabel()
@@ -528,14 +586,23 @@ class MonitorPanel(QWidget):
         for this frame. Builds one table row per key, applying the same
         filter and MSFS-simvar-name debug substitution
         ``get_telem_items`` used to."""
-        rows = self._build_telemetry_rows(data)
-        self._telem_model.set_rows(rows)
+        self._last_data = data
+        self._telem_model.set_rows(self._build_telemetry_rows(data))
         self._telem_stack.setCurrentWidget(self.telem_view)
         self._show_effects_pane()
 
-    def _build_telemetry_rows(self, data: Dict) -> List[Tuple[str, Tuple[str, str]]]:
+    def _refresh_rows(self) -> None:
+        """Re-render the last frame under whatever the filter, the Favorites
+        box and the favourites set now say. Does not touch the stacked
+        widget: while the "waiting for data" page is up there is no frame to
+        re-render anyway."""
+        if self._last_data is not None:
+            self._telem_model.set_rows(self._build_telemetry_rows(self._last_data))
+
+    def _build_telemetry_rows(self, data: Dict) -> List[Tuple[str, Tuple[str, str, str]]]:
         raw = (self.telem_filter.text() or "")
         tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
+        favorites_only = self.favorites_check.isChecked()
 
         # A new sim/aircraft (src or the aircraft name "N" changed since
         # the last frame) starts the sticky-learned signed keys clean -
@@ -546,8 +613,13 @@ class MonitorPanel(QWidget):
             self._signed_session = session
             self._signed_keys.clear()
 
-        rows: List[Tuple[str, Tuple[str, str]]] = []
+        rows: List[Tuple[str, Tuple[str, str, str]]] = []
         for key, v in data.items():
+            # Favourites are keyed on the raw telemetry key, so this is
+            # settled before the debug rename and costs one set lookup.
+            if favorites_only and key not in self._favorites:
+                continue
+
             display_key = key
             # check for msfs and debug mode (alt-d pressed), change to simvar name
             if self.show_simvars:
@@ -567,9 +639,54 @@ class MonitorPanel(QWidget):
             # Keyed by the ORIGINAL telemetry key (always unique in `data`)
             # rather than the display key, so two keys that happen to
             # resolve to the same simvar name under the debug rename don't
-            # collide into a single row.
-            rows.append((str(key), (str(display_key), value_str)))
+            # collide into a single row. The star column holds no text of
+            # its own - FavoriteStarDelegate paints it from the row key.
+            rows.append((str(key), ('', str(display_key), value_str)))
         return rows
+
+    # ---- favourites ---------------------------------------------------------
+
+    @staticmethod
+    def _load_favorites() -> Set[str]:
+        """The starred keys from the registry, as written by
+        ``_save_favorites``. Telemetry keys carry no commas, so one comma-
+        separated value keeps this to a single registry entry."""
+        raw = G.system_settings.get(_FAVORITES_KEY, '')
+        return {key.strip() for key in str(raw or '').split(',') if key.strip()}
+
+    def _save_favorites(self) -> None:
+        G.system_settings.setValue(_FAVORITES_KEY,
+                                   ','.join(sorted(self._favorites)))
+
+    def _on_telem_clicked(self, index) -> None:
+        """A click in the star gutter toggles that row's favourite. Handled
+        from the view rather than inside the delegate so the favourites set
+        is only ever mutated by the object that owns and persists it."""
+        if index.column() != _STAR_COL:
+            return
+        key = self._telem_model.row_key(index.row())
+        # Re-read before toggling: every instance shares this one registry
+        # value but each holds only the copy it read at startup, so writing
+        # a stale set back would silently drop whatever another instance
+        # has starred since - and this instance would go on not showing it
+        # until restarted. Mutated in place, never rebound:
+        # FavoriteStarDelegate paints from this very set.
+        self._favorites.clear()
+        self._favorites.update(self._load_favorites())
+        if key in self._favorites:
+            self._favorites.discard(key)
+        else:
+            self._favorites.add(key)
+        self._save_favorites()
+        # The row's values have not changed, so set_rows would see nothing
+        # to emit and the star would keep its old colour until some other
+        # value moved - repaint the column outright.
+        self.telem_view.viewport().update()
+        self._refresh_rows()
+
+    def _on_favorites_only_toggled(self, checked: bool) -> None:
+        G.system_settings.setValue(_FAVORITES_ONLY_KEY, int(checked))
+        self._refresh_rows()
 
     def _is_signed_key(self, key: str, v) -> bool:
         """Whether `key` renders with an explicit sign this frame.
@@ -645,4 +762,4 @@ class MonitorPanel(QWidget):
         pre-telemetry state."""
         if self._telem_stack.currentWidget() is self._telem_waiting_label:
             return ['Sim not running']
-        return self._telem_model.column_values(0)
+        return self._telem_model.column_values(_KEY_COL)

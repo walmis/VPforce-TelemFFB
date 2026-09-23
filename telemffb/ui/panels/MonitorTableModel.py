@@ -63,11 +63,20 @@ class KeyValueTableModel(QAbstractTableModel):
     ``(key, values)`` where ``values`` has one entry per header; ``key`` is
     never displayed - it is only how ``set_rows`` matches a row across
     updates.
+
+    ``unselectable_columns`` names columns that hold a marker rather than a
+    value - the telemetry table's favourite-star gutter, whose cell text is
+    always empty and whose look comes from a delegate. Dropping
+    ``ItemIsSelectable`` keeps them out of a rubber-band selection and so
+    out of ``CopyableTableView``'s Ctrl+C, which would otherwise prefix
+    every copied row with an empty field.
     """
 
-    def __init__(self, headers: Sequence[str], parent=None):
+    def __init__(self, headers: Sequence[str], parent=None,
+                 unselectable_columns: Sequence[int] = ()):
         super().__init__(parent)
         self._headers: List[str] = list(headers)
+        self._unselectable = frozenset(unselectable_columns)
         self._keys: List[str] = []
         self._values: Dict[str, Tuple[str, ...]] = {}
         # Optional, and per cell: {row key: (tooltip per column,)}, where a
@@ -112,6 +121,8 @@ class KeyValueTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex):
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
+        if index.column() in self._unselectable:
+            return Qt.ItemFlag.ItemIsEnabled
         return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
     # ---- row key lookup (for copy support) ---------------------------
