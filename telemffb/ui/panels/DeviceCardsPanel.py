@@ -446,7 +446,8 @@ class TransducerRow(QWidget):
         self.test_button = QToolButton()
         self.test_button.setText('\u25b6')
         self.test_button.setAutoRaise(True)
-        self.test_button.setToolTip('Play a pulse and a tone through this transducer only')
+        self.test_button.setToolTip('Play a pulse and a tone through this transducer only, '
+                                    'at the level of a typical effect through the master gain')
         self.test_button.clicked.connect(self.test_requested.emit)
         row.addWidget(self.test_button)
 
@@ -558,7 +559,7 @@ class ShakerControls(QWidget):
         self.head = head
         head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(8)
-        head.addWidget(QLabel('Gain:'))
+        head.addWidget(QLabel('Master gain:'))
         self.gain_spin = QDoubleSpinBox()
         self.gain_spin.setObjectName('shaker_gain')
         self.gain_spin.setRange(0.0, 10.0)
@@ -567,8 +568,9 @@ class ShakerControls(QWidget):
         self.gain_spin.setToolTip(
             "Master gain for everything the shaker plays.\nTelemFFB's effect "
             "intensities are tuned for a stick; a transducer needs several "
-            "times that.  Each channel is limited, never clipped, so a high "
-            "gain is safe.")
+            "times that, and the test buttons play through this gain so it "
+            "can be set by feel.  Each channel is limited, never clipped, so "
+            "a high gain is safe.")
         head.addWidget(self.gain_spin)
         head.addStretch(1)
         # the output's own actions; the card places them on the selector row
@@ -622,7 +624,9 @@ class ShakerControls(QWidget):
         self.test_button.setObjectName('shaker_test')
         self.test_button.setToolTip(
             'Play a pulse and a short tone through every transducer at once, '
-            'with these settings, saved or not.')
+            'with these settings, saved or not.  The level is that of a typical '
+            'effect through the master gain, so what feels right here feels '
+            'right in flight.')
         foot.addWidget(self.test_button)
         outer.addLayout(foot)
 

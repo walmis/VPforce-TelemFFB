@@ -189,7 +189,7 @@ class TestLiveApply:
 
     def test_a_preview_on_such_an_endpoint_opens_that_wide_too(self):
         output = FakeOutput(max_channels=8, exact=True)
-        preview = ShakerPreview(transducers=RIG, gain=1.0, only=0, output=output)
+        preview = ShakerPreview(transducers=RIG, gain=DEFAULT_GAIN, only=0, output=output)
         preview.start()
         assert output.channels == 8
         out = output.render(0.1)
@@ -205,10 +205,23 @@ class TestLiveApply:
 
 
 class TestPreview:
+    def test_the_levels_are_a_typical_effects_and_the_default_gain_brings_them_up(self):
+        # a stick intensity is a few tenths; through the default gain the
+        # test lands near full scale without the limiter taking it
+        assert 0.1 <= ShakerPreview.PULSE_AMPLITUDE <= 0.35
+        assert ShakerPreview.TONE_AMPLITUDE < ShakerPreview.PULSE_AMPLITUDE
+        assert 0.6 <= ShakerPreview.PULSE_AMPLITUDE * DEFAULT_GAIN <= 1.0
+        output = FakeOutput()
+        preview = ShakerPreview(transducers=RIG, gain=1.0, only=0, output=output)
+        preview.start()
+        out = output.render(0.1)
+        assert 0.15 < abs(out[:, 3]).max() < 0.35             # at unity gain: a typical effect's level
+        preview.stop()
+
     def test_pulse_then_tone_then_silence_per_row(self):
         output = FakeOutput()
         profiles, _ = load_profiles(default_profiles_path())
-        preview = ShakerPreview(transducers=RIG, profiles=profiles, gain=1.0, output=output)
+        preview = ShakerPreview(transducers=RIG, profiles=profiles, gain=DEFAULT_GAIN, output=output)
         preview.start()
         assert output.channels == 6
         first = output.render(ShakerPreview.TONE_START_S)
@@ -224,7 +237,7 @@ class TestPreview:
 
     def test_only_one_row(self):
         output = FakeOutput()
-        preview = ShakerPreview(transducers=RIG, gain=1.0, only=1, output=output)
+        preview = ShakerPreview(transducers=RIG, gain=DEFAULT_GAIN, only=1, output=output)
         preview.start()
         assert output.channels == 5                      # opened only as wide as that row needs
         out = output.render(0.1)

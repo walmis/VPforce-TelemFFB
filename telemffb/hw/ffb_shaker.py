@@ -1133,10 +1133,17 @@ class ShakerPreview:
     decides when, since the card runs on Qt's timers.  ``only`` limits
     the sound to one row, which is how a user tells the transducers
     apart.
+
+    The levels are those of a typical effect, not full scale: an
+    intensity in the tree is a stick's, a few tenths at most, and the
+    master gain is what brings it up for a transducer.  A test at these
+    levels through the same gain feels like flight will, so the amp and
+    the gain can be set by it; at the default gain it lands near full
+    scale, and it still tells the gain apart up to the limiter.
     """
 
-    PULSE_AMPLITUDE = 0.8
-    TONE_AMPLITUDE = 0.5
+    PULSE_AMPLITUDE = 0.25
+    TONE_AMPLITUDE = 0.15
     TONE_START_S = 0.3
     TONE_LENGTH_S = 0.6
     LENGTH_S = 1.0
