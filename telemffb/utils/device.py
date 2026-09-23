@@ -36,6 +36,11 @@ __all__ = [
     "active_joystick_slot_suffix",
     "multiple_joystick_devices",
     "joystick_device_choices",
+    "GAIN_SLIDERS",
+    "format_gains",
+    "read_device_gains",
+    "format_device_gains",
+    "log_device_gains",
 ]
 
 def get_device_logo(dev_type :str):
@@ -346,3 +351,53 @@ def joystick_device_choices(settings):
             label += ' *'
         choices.append((path, label))
     return choices
+
+#: The device's gain sliders, in the order the Configurator shows them.
+GAIN_SLIDERS = ("master", "periodic", "spring", "damper", "inertia", "friction", "constant")
+
+
+def format_gains(gains) -> str:
+    """One gains object as ``master=100 ...``; empty when there is none."""
+    if gains is None:
+        return ""
+    return " ".join(f"{name}={getattr(gains, name + '_gain')}" for name in GAIN_SLIDERS)
+
+
+def read_device_gains():
+    """The device's gain sliders, or None.
+
+    None for anything but VPforce hardware, the only backend with Configurator
+    gain sliders, and None rather than raising when the read fails.
+    """
+    from telemffb.hw.ffb_rhino import HapticEffect
+    try:
+        device = HapticEffect.device
+        caps = getattr(device, "caps", None)
+        if device is None or (caps is not None and not caps.has_gains):
+            return None
+        return device.get_gains()
+    except Exception:
+        logging.debug("Could not read the device gain sliders", exc_info=True)
+        return None
+
+
+def format_device_gains() -> str:
+    """The device's gain sliders as they stand right now, as ``master=100 ...``.
+
+    Empty for anything but VPforce hardware, the only backend with Configurator
+    gain sliders, and empty rather than raising when the read fails: every caller
+    is decorating a log line and none may disturb what it reports on.
+    """
+    return format_gains(read_device_gains())
+
+
+def log_device_gains(context: str, gains=None) -> None:
+    """Log the gain sliders once, naming what set them.
+
+    Every force the device renders is scaled by these, so a log that does not
+    state them cannot be read.  Called where they change: at startup, and after a
+    vpconf push has finished applying.  Silent on a device without them.
+    """
+    text = format_gains(gains) if gains is not None else format_device_gains()
+    if text:
+        logging.info(f"Device gains ({context}): {text}")

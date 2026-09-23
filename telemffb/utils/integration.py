@@ -28,6 +28,7 @@ from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
+from .device import log_device_gains, read_device_gains
 from .filesystem import calculate_checksum, calculate_crc, get_resource_path
 from .misc import insert_dict_item
 
@@ -1076,7 +1077,13 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
     return True
 
 
-def upload_vpconf_profile(config_filepath, serial):
+#: How long a caller that asked to wait gives the Configurator before giving up
+#: on it.  A push takes ~100 ms; this is only a guard against a hung process
+#: holding up shutdown.
+VPCONF_PUSH_WAIT_S = 10.0
+
+
+def upload_vpconf_profile(config_filepath, serial, wait=False):
     from telemffb.namedmutex import NamedMutex
 
     # central gate: VPConfigurator profiles only apply to VPforce hardware
@@ -1129,6 +1136,15 @@ def upload_vpconf_profile(config_filepath, serial):
                     G.vpconf_init_pending = True
                     ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
                     logging.info(f"VPForce Configurator exited with code {ret}")
+                    # The one point where the pushed profile is known to be ON the
+                    # device, so the gains it set are latched here rather than by
+                    # the caller: a caller reads the instant it spawns this thread,
+                    # which races the Configurator and can store pre-push values as
+                    # the revert baseline for gain overrides.
+                    gains = read_device_gains()
+                    if gains is not None:
+                        G.vpconf_configurator_gains = gains
+                    log_device_gains(f"vpconf {os.path.basename(config_filepath)}", gains)
             finally:
                 G.vpconf_init_pending = False
                 # Deliver any telemetry frame that arrived while frames were
@@ -1137,6 +1153,14 @@ def upload_vpconf_profile(config_filepath, serial):
                 # camera-state change.
                 tm = getattr(G, "telem_manager", None)
                 if tm is not None:
+                    # the profile just wrote every gain slider, including any this
+                    # aircraft overrides: they were applied before the Configurator
+                    # got there, so ask for them again (on the telemetry thread,
+                    # which is where they are normally written)
+                    try:
+                        tm.request_configurator_override_reapply()
+                    except Exception:
+                        logging.exception("could not request a gain override re-apply")
                     try:
                         tm.flush_deferred_startup_frame()
                     except Exception:
@@ -1144,6 +1168,15 @@ def upload_vpconf_profile(config_filepath, serial):
 
         thread = threading.Thread(target=exec)
         thread.start()
+        if wait:
+            # The exit path pushes and then restores the startup gains, and the
+            # process releases the device right after: without this the profile
+            # lands on top of the restore, or the exit kills the Configurator
+            # mid-write.
+            thread.join(VPCONF_PUSH_WAIT_S)
+            if thread.is_alive():
+                logging.warning(f"vpconf push still running after {VPCONF_PUSH_WAIT_S:g}s; "
+                                f"continuing without it")
 
     else:
         logging.error("Unable to find VPforce Configurator installation location")

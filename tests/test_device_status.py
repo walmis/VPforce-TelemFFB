@@ -258,7 +258,7 @@ class TestRecoveryRepushesVpconfProfile:
                             raising=False)
         _main_module._replay_device_setup()
         self.push.assert_called_once_with('C:/ac/ace.json', "SER1")
-        self.dev.get_gains.assert_called_once()
+        self.dev.get_gains.assert_not_called()   # the push latches them
 
     def test_global_default_when_the_aircraft_has_no_profile(self, monkeypatch):
         import telemffb.globals as G
@@ -305,7 +305,7 @@ class TestRecoveryRepushesVpconfProfile:
         finally:
             monkeypatch.undo()
 
-    def test_gains_are_reread_after_the_push(self):
+    def test_the_push_latches_the_gains_rather_than_the_replay(self):
         import telemffb.globals as G
 
         monkeypatch = pytest.MonkeyPatch()
@@ -318,4 +318,7 @@ class TestRecoveryRepushesVpconfProfile:
             _main_module._replay_device_setup()
         finally:
             monkeypatch.undo()
-        assert order == ["push", "gains"]
+        # upload_vpconf_profile runs the Configurator in a background thread and
+        # returns at once, so a read here would capture pre-push values as the
+        # revert baseline; the push latches them when the profile has landed.
+        assert order == ["push"]

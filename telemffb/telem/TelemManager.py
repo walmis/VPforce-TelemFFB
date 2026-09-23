@@ -40,7 +40,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.telem.SimConnectManager import SimConnectManager, RUNTIME_SOURCE_OVERRIDE
-from telemffb.utils import upload_vpconf_profile
+from telemffb.utils import log_device_gains, upload_vpconf_profile
 
 if TYPE_CHECKING:
     from telemffb.sim.aircraft_base import AircraftBase
@@ -269,6 +269,10 @@ class TelemManager(QObject, threading.Thread):
     #: or '' for the stored primary
     deviceSwapRequested = pyqtSignal(str)
 
+    #: set by a finished vpconf push, consumed on the next frame; a class
+    #: attribute so a manager built without __init__ still answers
+    _reapply_overrides_pending = False
+
     currentAircraft: Optional['AircraftBase'] = None
     currentAircraftName: Optional[str] = None
     currentAircraftConfig: dict
@@ -301,6 +305,7 @@ class TelemManager(QObject, threading.Thread):
         self._ipc_telem_data = {}
         self._simconnect : Optional[SimConnectManager] = None
         self._gain_overrides_active = False
+        self._reapply_overrides_pending = False
         self.stop_state = False
         self.pause_state = False
         self._vpconf_deferred_frame = None   # single-slot buffer for a frame arriving during the startup vpconf push
@@ -550,6 +555,35 @@ class TelemManager(QObject, threading.Thread):
             self.submit_frame(frame)
         finally:
             self._flushing_deferred = False
+
+    def request_configurator_override_reapply(self) -> None:
+        """Ask for this aircraft's gain overrides to be written again.
+
+        A vpconf push writes every gain slider, so it lands on top of the
+        overrides applied when the aircraft loaded: the push is asynchronous and
+        the Configurator finishes ~100 ms after the overrides were written.
+        Called by the push once the profile is actually on the device; the write
+        itself waits for the telemetry thread, which is where overrides are
+        normally applied.
+        """
+        self._reapply_overrides_pending = True
+        # wake the loop rather than wait out its timeout: a paused sim sends no
+        # frames, and until this runs the device holds the profile's gains
+        with self._cond:
+            self._cond.notify()
+
+    def _reapply_configurator_overrides(self) -> None:
+        """Write this aircraft's gain overrides again after a vpconf push.
+
+        Announced before the write, not after: the gains line that follows reads
+        the device, and a read that fails says nothing at all.
+        """
+        if not self._reapply_overrides_pending or G.vpconf_init_pending:
+            return
+        self._reapply_overrides_pending = False
+        logging.info("Re-applying the configurator gain overrides the vpconf push overwrote")
+        self._handle_configurator_overrides(self.currentAircraftConfig or {},
+                                            context="gain overrides re-applied after vpconf")
 
     def submit_frame(self, data_in: bytes):
         if G.vpconf_init_pending:
@@ -859,8 +893,9 @@ class TelemManager(QObject, threading.Thread):
             return
         if "vpconf" in params:
             if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
+                # the push is async; it latches G.vpconf_configurator_gains itself
+                # once the Configurator has actually applied the profile
                 upload_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
-                G.vpconf_configurator_gains = HapticEffect.device.get_gains()
                 G.force_reload_aircraft_trigger = False
         else:
             self._handle_global_vpconf_default()
@@ -878,7 +913,6 @@ class TelemManager(QObject, threading.Thread):
         if load_global and global_path != G.current_vpconf_profile:
             logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
             upload_vpconf_profile(global_path, HapticEffect.device.serial)
-            G.vpconf_configurator_gains = HapticEffect.device.get_gains()
 
     def _handle_command_runner(self, params):
         """Handle command runner execution for the aircraft."""
@@ -890,8 +924,14 @@ class TelemManager(QObject, threading.Thread):
                 except Exception as e:
                     logging.error(f"Error running Command Executor for model: {e}")
 
-    def _handle_configurator_overrides(self, params):
-        """Handle configurator gain overrides for the aircraft."""
+    def _handle_configurator_overrides(self, params, context="gain overrides"):
+        """Handle configurator gain overrides for the aircraft.
+
+        ``context`` names the write in the gains log.  The re-apply after a
+        vpconf push must not say the same thing as the first pass: the log
+        deduplicates identical messages, so two identical lines are one line and
+        the re-apply becomes invisible.
+        """
         if not self._device_has_gains():
             if params.get('configurator_override_enabled', False):
                 logging.info("configurator overrides enabled but this device has no Configurator gains; skipping")
@@ -904,13 +944,16 @@ class TelemManager(QObject, threading.Thread):
                 G.current_configurator_gains = state
                 any_true = any(sub.get('enabled', False) for sub in state.values())
                 self.gain_overrides_active = any_true
+                log_device_gains(context)
             else:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
+                log_device_gains(f"{context} reverted")
         else:
             if self.gain_overrides_active:
                 G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
                 self.gain_overrides_active = False
+                log_device_gains(f"{context} reverted")
 
     def _current_class_name(self) -> Optional[str]:
         """The class the loaded aircraft actually resolved to - what its
@@ -1286,6 +1329,13 @@ class TelemManager(QObject, threading.Thread):
                 self._events = []
 
             with self._processing_lock:
+                # Every loop pass, not just the ones carrying a frame: gains live
+                # on the device, and a sim sitting paused after the aircraft
+                # loaded (which is exactly when a vpconf push lands) delivers no
+                # frames at all.  On this thread because every other gain write
+                # happens here.
+                self._safe_call("_reapply_configurator_overrides",
+                                self._reapply_configurator_overrides)
                 if not wait_returned:
                     # A paused sim sends no frames, and a profile edit
                     # (the new-aircraft wizard included) must not wait

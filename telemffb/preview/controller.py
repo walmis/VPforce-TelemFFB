@@ -28,36 +28,8 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.preview.engine import (PREVIEW_SPECS, PreviewRunner, TimedPreview,
                               preview_blockers, resolve_preview_target)
 from telemffb.ui.widgets.SettingsLayout import lock_preview_rows
+from telemffb.utils.device import format_device_gains
 from telemffb.telem import TelemManager
-
-
-#: The device's gain sliders, in the order the Configurator shows them.
-GAIN_SLIDERS = ("master", "periodic", "spring", "damper", "inertia", "friction", "constant")
-
-
-def device_gains_line() -> str:
-    """The device's gain sliders as they stand right now, for the preview log line.
-
-    How strong a preview feels is the effect's own intensity scaled by these, so a
-    log without them cannot be read.  Taken live from the device rather than from
-    the values latched at startup, since a vpconf push or a per-aircraft gain
-    override moves them.  Empty for anything but VPforce hardware, which is the
-    only backend with Configurator gain sliders, and empty rather than noisy if
-    the read fails: a log decoration must not disturb the preview.
-    """
-    try:
-        device = HapticEffect.device
-        caps = getattr(device, "caps", None)
-        if device is None or (caps is not None and not caps.has_gains):
-            return ""
-        gains = device.get_gains()
-    except Exception:
-        logging.debug("Effect preview: could not read the device gains", exc_info=True)
-        return ""
-    if gains is None:
-        return ""
-    return ", gains " + " ".join(
-        f"{name}={getattr(gains, name + '_gain')}" for name in GAIN_SLIDERS)
 
 
 class EffectPreviewController:
@@ -222,9 +194,10 @@ class EffectPreviewController:
             if confirm:
                 QMessageBox.warning(self.window, "Effect Preview", f"Could not start preview:\n{e}")
             return False
+        gains = format_device_gains()
         logging.info(f"Effect preview: {spec.name} on {sim} / {cls or '-'} / {model} "
                      f"({type(aircraft).__name__}), {runner.steps_total} frames "
-                     f"at {runner.frame_rate:g} Hz{device_gains_line()}")
+                     f"at {runner.frame_rate:g} Hz" + (f", gains {gains}" if gains else ""))
         if cues:
             self._hold_rows(spec, True, slot=slot)
 

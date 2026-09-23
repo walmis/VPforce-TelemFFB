@@ -668,16 +668,24 @@ def _replay_device_setup():
     if aircraft is not None and hasattr(aircraft, 'ac_update_deadzone'):
         aircraft.ac_update_deadzone(force=True)
     profile = _recovery_vpconf_profile()
+    pushed = False
     if profile:
         logging.info(f"Re-pushing VPConf profile after recovery: {profile}")
         try:
+            # the push latches the gains itself, once the Configurator has
+            # applied them; reading here would race it
             upload_vpconf_profile(profile, dev.serial)
+            pushed = True
         except Exception:
             logging.exception("Unable to re-push VPConf profile after recovery")
-    try:
-        G.vpconf_configurator_gains = dev.get_gains()
-    except Exception:
-        logging.exception("Exception")
+    if not pushed:
+        # nothing was applied, so the device is on whatever it came back with
+        try:
+            gains = dev.get_gains()
+            G.vpconf_configurator_gains = gains
+            utils.log_device_gains("device recovery", gains)
+        except Exception:
+            logging.exception("Exception")
 
 
 def _recovery_vpconf_profile():
@@ -1389,10 +1397,12 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
         try:
             if dev:
                 G.startup_configurator_gains = dev.get_gains()
+                utils.log_device_gains("startup", G.startup_configurator_gains)
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
         device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
+        pushed_startup_vpconf = False
         if G.system_settings.enableVPConfStartup:
             if not device_has_gains:
                 logging.info("Startup vpconf profile configured but this device has no Configurator gains; skipping")
@@ -1401,14 +1411,18 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
                 try:
                     upload_vpconf_profile(G.system_settings.pathVPConfStartup,
                                           getattr(G, 'device_serial', None))
+                    pushed_startup_vpconf = True
                 except Exception:
                     logging.exception("Unable to set VPConfigurator startup profile")
 
-        try:
-            if dev:
-                G.vpconf_configurator_gains = dev.get_gains()
-        except Exception:
-            logging.exception("Unable to get configurator slider values from device")
+        # A push latches these itself when the Configurator has applied the
+        # profile; reading here would race it and store pre-push values.
+        if not pushed_startup_vpconf:
+            try:
+                if dev:
+                    G.vpconf_configurator_gains = dev.get_gains()
+            except Exception:
+                logging.exception("Unable to get configurator slider values from device")
 
         # Startup race: when the sim is already running with an aircraft loaded,
         # the sim-listener thread loads that aircraft and applies its vpconf /
@@ -1461,16 +1475,23 @@ def _cleanup_on_exit(dev_serial):
     device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
     if G.system_settings.enableVPConfExit and device_has_gains:
         try:
+            # wait: the restore below has to land after the profile, and the
+            # device is released a few lines down
             upload_vpconf_profile(G.system_settings.pathVPConfExit,
-                                  getattr(G, 'device_serial', None))
+                                  getattr(G, 'device_serial', None), wait=True)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
 
     if G.system_settings.enableResetGainsExit and device_has_gains:
+        # documented as leaving the device as TelemFFB found it, so this is the
+        # last write of the session
         try:
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
-        except:
-            pass
+            # read back rather than echo what we wrote: this is the last state
+            # the device is left in
+            utils.log_device_gains("exit restore")
+        except Exception:
+            logging.exception("Unable to restore the startup gains on exit")
         
     if HapticEffect.device:
         # Hand the device back clean: effects we allocated would otherwise
