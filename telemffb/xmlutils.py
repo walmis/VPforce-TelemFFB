@@ -190,6 +190,19 @@ def update_roots() -> None:
     auto_defaults_root = store.auto_defaults_root
 
 
+def refresh_if_changed() -> bool:
+    """Re-parse the XML files when either changed on disk since the last
+    parse (another instance wrote userconfig); True when they were."""
+    global auto_user_root, auto_user_tree, auto_defaults_root  # noqa: PLW0603
+    store = _store()
+    if not store.refresh_if_changed():
+        return False
+    auto_user_root = store.auto_user_root
+    auto_user_tree = store.auto_user_tree
+    auto_defaults_root = store.auto_defaults_root
+    return True
+
+
 def try_parse(file_path: str, max_attempts: int = 3, delay: float = 0.1) -> Optional[ET.ElementTree]:
     """Parse an XML file with automatic retry on parse errors.
 
