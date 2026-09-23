@@ -339,6 +339,31 @@ def xml_tmpdir(tmp_path):
 # try_parse
 # ─────────────────────────────────────────────────────────────
 
+class TestRefreshIfChanged:
+    """The trees follow the files: another instance's write is seen on
+    the next ask, an unchanged file costs no re-parse."""
+
+    def test_unchanged_files_are_not_re_parsed(self, xml_tmpdir):
+        before = xmlutils.auto_user_root
+        assert xmlutils.refresh_if_changed() is False
+        assert xmlutils.auto_user_root is before
+
+    def test_a_rewritten_userconfig_is_re_parsed(self, xml_tmpdir):
+        path = Path(xml_tmpdir["userconfig"])
+        before = xmlutils.auto_user_root
+        text = path.read_text().replace('</TelemFFB>', '<marker/></TelemFFB>')
+        path.write_text(text)
+        os.utime(path, (time.time() + 5, time.time() + 5))     # unmistakably later
+        assert xmlutils.refresh_if_changed() is True
+        assert xmlutils.auto_user_root is not before
+        assert xmlutils.auto_user_root.find('marker') is not None
+        assert xmlutils.refresh_if_changed() is False
+
+    def test_a_store_with_no_files_has_nothing_to_refresh(self):
+        from telemffb.xml.store import XmlStore
+        assert XmlStore('joystick', '', '').refresh_if_changed() is False
+
+
 class TestTryParse:
     def test_parses_valid_xml(self, xml_tmpdir):
         tree = xmlutils.try_parse(xml_tmpdir["defaults"])

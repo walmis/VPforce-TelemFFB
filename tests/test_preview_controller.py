@@ -106,6 +106,7 @@ def rig(qapp, monkeypatch):
     monkeypatch.setattr(pc, 'QMessageBox', box)
     monkeypatch.setattr(pc, 'HapticEffect', SimpleNamespace(device_alive=lambda: True))
     monkeypatch.setattr(pc.TelemManager, 'build_aircraft', lambda *a, **k: SimpleNamespace())
+    monkeypatch.setattr(pc.xmlutils, 'refresh_if_changed', lambda: False)
     monkeypatch.setattr(pc, 'lock_preview_rows',
                         lambda root, spec, locked, slot=None: locks.append((spec, locked, slot)))
     monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
@@ -122,6 +123,14 @@ def rig(qapp, monkeypatch):
 
 
 class TestLocalRun:
+    def test_a_preview_reads_the_settings_on_disk_before_building(self, rig, monkeypatch):
+        order = []
+        monkeypatch.setattr(pc.xmlutils, 'refresh_if_changed', lambda: order.append('refresh') or True)
+        monkeypatch.setattr(pc.TelemManager, 'build_aircraft',
+                            lambda *a, **k: order.append('build') or SimpleNamespace())
+        assert rig.ctl.start(JET_ENGINE_RUMBLE, confirm=False)
+        assert order == ['refresh', 'build']
+
     def test_toggle_starts_on_the_scoped_device_and_holds_the_row(self, rig):
         rig.ctl.toggle(JET_ENGINE_RUMBLE)
         assert rig.timed().running and rig.timed().runner.spec is JET_ENGINE_RUMBLE

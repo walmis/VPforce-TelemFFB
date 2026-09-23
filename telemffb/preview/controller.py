@@ -23,6 +23,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
+import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.preview.engine import (PREVIEW_SPECS, PreviewRunner, TimedPreview,
                               preview_blockers, resolve_preview_target)
@@ -178,6 +179,11 @@ class EffectPreviewController:
         if confirm and spec.constant_force and not self.confirm_constant_force(spec):
             return False
         sim, model, cls = resolve_preview_target(G.settings_mgr)
+        # the settings as they are now: a child re-reads userconfig only
+        # while telemetry streams, and the slider the user just moved was
+        # written by the master
+        if xmlutils.refresh_if_changed():
+            logging.info("Effect preview: settings re-read from disk")
         try:
             aircraft = TelemManager.build_aircraft(sim, model, cls_name=cls,
                                                    active_profile=self._editor_profile())

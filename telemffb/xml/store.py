@@ -22,6 +22,8 @@ class XmlStore:
         self.userconfig_path = userconfig_path
         self.defaults_path = defaults_path
         self._user_tree: Optional[ET.ElementTree] = None
+        #: the files' modification times when the trees were last parsed
+        self._parsed_mtimes: Optional[tuple] = None
         self._user_root: Optional[ET.Element] = None
         self._defaults_root: Optional[ET.Element] = None
 
@@ -56,11 +58,32 @@ class XmlStore:
     auto_user_tree = user_tree
     auto_defaults_root = defaults_root
 
+    def _mtimes(self) -> tuple:
+        def mtime(path):
+            try:
+                return os.path.getmtime(path) if path else 0.0
+            except OSError:
+                return 0.0
+        return mtime(self.userconfig_path), mtime(self.defaults_path)
+
+    def refresh_if_changed(self) -> bool:
+        """Re-parse when either file changed since the trees were last
+        parsed; True when a re-parse happened.  Another process may have
+        written userconfig (the master's settings form, for a child), and
+        nothing else re-reads it while no telemetry is streaming."""
+        if not self.userconfig_path and not self.defaults_path:
+            return False
+        if self._parsed_mtimes is not None and self._mtimes() == self._parsed_mtimes:
+            return False
+        self.update_roots()
+        return True
+
     def update_roots(self) -> None:
         """Re-parse both XML files into in-memory trees under file locks."""
         # try_parse() acquires its own lock per file and holds it only while
         # reading raw bytes, so the critical section is tiny.  The lock
         # guarantees we never observe a file mid-write.
+        self._parsed_mtimes = self._mtimes()
         self._user_tree = try_parse(self.userconfig_path)
         self._user_root = (
             self._user_tree.getroot() if self._user_tree is not None else None
