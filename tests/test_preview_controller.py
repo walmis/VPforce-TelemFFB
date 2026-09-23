@@ -104,7 +104,7 @@ def rig(qapp, monkeypatch):
     monkeypatch.setattr(pc, 'TimedPreview', FakeTimed)
     monkeypatch.setattr(pc, 'PreviewRunner', FakeRunner)
     monkeypatch.setattr(pc, 'QMessageBox', box)
-    monkeypatch.setattr(pc, 'HapticEffect', SimpleNamespace(device_alive=lambda: True))
+    monkeypatch.setattr(pc, 'HapticEffect', SimpleNamespace(device_alive=lambda: True, device=None))
     monkeypatch.setattr(pc.TelemManager, 'build_aircraft', lambda *a, **k: SimpleNamespace())
     monkeypatch.setattr(pc.xmlutils, 'refresh_if_changed', lambda: False)
     monkeypatch.setattr(pc, 'lock_preview_rows',
@@ -354,3 +354,46 @@ class TestEditorProfile:
         G.settings_mgr.active_profile = ''
         rig.ctl.toggle(HYDRAULIC_LOSS)
         assert seen == {'check': None, 'build': None}
+
+
+class TestDeviceGainsLine:
+    """The preview log names the device's gain sliders, which only VPforce
+    hardware has.  Any other backend must be left alone entirely: a DirectInput
+    device has no Configurator gains to read."""
+
+    GAINS = SimpleNamespace(master_gain=80, periodic_gain=100, spring_gain=95,
+                            damper_gain=70, inertia_gain=45, friction_gain=60,
+                            constant_gain=100)
+
+    def _device(self, monkeypatch, has_gains, gains=None, reads=None):
+        def get_gains():
+            if reads is not None:
+                reads.append(True)
+            if isinstance(gains, Exception):
+                raise gains
+            return gains
+
+        device = SimpleNamespace(caps=SimpleNamespace(has_gains=has_gains), get_gains=get_gains)
+        monkeypatch.setattr(pc, 'HapticEffect', SimpleNamespace(device=device))
+        return device
+
+    def test_a_vpforce_device_reports_every_slider(self, monkeypatch):
+        self._device(monkeypatch, True, self.GAINS)
+        line = pc.device_gains_line()
+        for slider in pc.GAIN_SLIDERS:
+            assert str(getattr(self.GAINS, f'{slider}_gain')) in line
+            assert slider in line
+
+    def test_a_device_without_gains_is_never_asked(self, monkeypatch):
+        reads = []
+        self._device(monkeypatch, False, self.GAINS, reads)
+        assert pc.device_gains_line() == ''
+        assert reads == []
+
+    def test_a_failed_read_leaves_the_line_alone(self, monkeypatch):
+        self._device(monkeypatch, True, RuntimeError('device went away'))
+        assert pc.device_gains_line() == ''
+
+    def test_no_device_leaves_the_line_alone(self, monkeypatch):
+        monkeypatch.setattr(pc, 'HapticEffect', SimpleNamespace(device=None))
+        assert pc.device_gains_line() == ''
