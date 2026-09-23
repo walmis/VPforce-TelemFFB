@@ -665,8 +665,14 @@ class MonitorPanel(QWidget):
         if index.column() != _STAR_COL:
             return
         key = self._telem_model.row_key(index.row())
-        # Mutated in place, never rebound: FavoriteStarDelegate paints from
-        # this very set.
+        # Re-read before toggling: every instance shares this one registry
+        # value but each holds only the copy it read at startup, so writing
+        # a stale set back would silently drop whatever another instance
+        # has starred since - and this instance would go on not showing it
+        # until restarted. Mutated in place, never rebound:
+        # FavoriteStarDelegate paints from this very set.
+        self._favorites.clear()
+        self._favorites.update(self._load_favorites())
         if key in self._favorites:
             self._favorites.discard(key)
         else:

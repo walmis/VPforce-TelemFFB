@@ -36,11 +36,17 @@ class _FakeSettings:
 
     def __init__(self, values=None):
         self.values = dict(values or {})
+        #: Every setValue as (key, value, instance) - the real
+        #: SystemSettings scopes a write under `{instance}/` when one is
+        #: passed, so what a favourites write does NOT pass is the whole
+        #: point of it being common to all devices.
+        self.writes = []
 
     def get(self, key, default=None):
         return self.values.get(key, default)
 
     def setValue(self, key, value, instance=None):
+        self.writes.append((key, value, instance))
         self.values[key] = value
 
 
@@ -264,9 +270,33 @@ class TestFavorites:
         panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
         self._click_star(panel, 'IAS')
         self._click_star(panel, 'AoA')
-        # Comma-separated under one un-scoped key: `instance` is never
-        # passed, which is what makes it common to all devices.
+        # Comma-separated under one key, written with no `instance` - which
+        # is what keeps it out of the `{device}/` scope and so common to
+        # every device's instance.
         assert G.system_settings.values['monitorFavoriteKeys'] == 'AoA,IAS'
+        assert G.system_settings.writes == [
+            ('monitorFavoriteKeys', 'IAS', None),
+            ('monitorFavoriteKeys', 'AoA,IAS', None),
+        ]
+
+    def test_a_click_picks_up_another_instances_stars(self, panel):
+        """Every instance shares the one registry value but each holds only
+        the copy it read at startup, so a click has to re-read before it
+        writes - otherwise starring here would drop whatever the pedals
+        instance starred in the meantime, silently."""
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
+        G.system_settings.values['monitorFavoriteKeys'] = 'RPM'  # another instance
+        self._click_star(panel, 'AoA')
+        assert panel._favorites == {'AoA', 'RPM'}
+        assert G.system_settings.values['monitorFavoriteKeys'] == 'AoA,RPM'
+
+    def test_re_reading_keeps_the_delegates_set(self, panel):
+        """The re-read must mutate the set in place - rebinding it would
+        leave FavoriteStarDelegate painting from the old one."""
+        panel.update_telemetry({'AoA': 1.0})
+        G.system_settings.values['monitorFavoriteKeys'] = 'RPM'
+        self._click_star(panel, 'AoA')
+        assert panel._star_delegate._favorites is panel._favorites
 
     def test_favorites_are_restored_on_construction(self, qapp, mainwindow, monkeypatch):
         monkeypatch.setattr(G, 'system_settings', _FakeSettings({
