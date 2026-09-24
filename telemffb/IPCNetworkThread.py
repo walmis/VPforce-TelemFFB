@@ -263,6 +263,17 @@ class IPCNetworkThread(QObject, threading.Thread):
                 logging.info("Device reacquire command received via IPC - "
                              "switching to the saved device selection")
                 self.reacquire_device_signal.emit()
+        elif msg.startswith('LOGLEVEL:'):
+            # master -> the child owning ``dev``: its log level was changed in the
+            # master's system settings, which this instance only reads at startup.
+            # Applied here rather than through a signal: the root logger is not Qt.
+            try:
+                _, dev, level = msg.split(':', 2)
+            except ValueError:
+                return
+            if dev == G.device_type:
+                logging.info(f"Log level change received via IPC: {level}")
+                utils.apply_log_level(level)
         elif msg.startswith('SHOW LOG:'):
             dev = msg.removeprefix('SHOW LOG:')
             if dev == G.device_type:

@@ -31,6 +31,8 @@ import telemffb.globals as G
 
 
 __all__ = [
+    "LOG_LEVELS",
+    "apply_log_level",
     "dbprint",
     "debug_timed",
     "debug_caller_args",
@@ -45,6 +47,33 @@ __all__ = [
     "DedupHandler",
     "LoggingFilter",
 ]
+
+
+#: The log levels the settings offer, by the name stored in the settings.
+LOG_LEVELS = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+
+
+def apply_log_level(level_name: str) -> int:
+    """Set the root logger to the named level and log the change.
+
+    One place for the name -> level mapping, because three callers set it: the
+    startup read, the settings dialog for this instance, and the IPC message a
+    master sends a child whose level was changed from the master's dialog.
+
+    :param level_name: a key of :data:`LOG_LEVELS`; anything else means DEBUG
+    :returns: the level that was applied
+    """
+    level = LOG_LEVELS.get(str(level_name).upper(), logging.DEBUG)
+    logger = logging.getLogger()
+    logger.setLevel(level)
+    logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+    return level
 
 
 def dbprint(color, msg, instance=None):

@@ -1206,17 +1206,7 @@ def _check_firmware_version(dev_firmware_version, min_firmware_version):
 
 def _setup_logging_level():
     """Configure logging level based on system settings."""
-    ll = G.system_settings.get('logLevel', 'INFO')
-    log_levels = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
-    }
-    logger = logging.getLogger()
-    logger.setLevel(log_levels.get(ll, logging.DEBUG))
-    logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+    utils.apply_log_level(G.system_settings.get('logLevel', 'INFO'))
 
 def _convert_user_config():
     """

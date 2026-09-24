@@ -2741,13 +2741,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 f"{what[0].upper()}{what[1:]} changed. Restart TelemFFB for "
                 "this to take effect.")
 
-        # adjust logging level (this instance's own panel):
-        own = self.instance_panels.get(('system', G.device_type))
-        ll = own.widgets['logLevel'].currentText() if own else 'INFO'
-        if ll == "INFO":
-            logging.getLogger().setLevel(logging.INFO)
-        elif ll == "DEBUG":
-            logging.getLogger().setLevel(logging.DEBUG)
+        self._apply_log_levels()
 
         self.accept()
 
@@ -3462,6 +3456,24 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                                      'startHeadlessTrimWheel')),
         ("the theme", ('themeId',)),
     )
+
+    def _apply_log_levels(self):
+        """Put every instance's saved log level into effect now.
+
+        A child reads its own level once, at startup, so one changed here from
+        the master's dialog would otherwise do nothing until the next launch.
+        Only instances that are actually running are told.
+        """
+        for role in self.INSTANCE_ROLES:
+            panel = self.instance_panels.get(('system', role))
+            if panel is None:
+                continue
+            level = panel.widgets['logLevel'].currentText()
+            if role == G.device_type:
+                utils.apply_log_level(level)
+            elif role in G.launched_instances and G.ipc_instance is not None:
+                logging.info(f"Telling the '{role}' instance to log at {level}")
+                G.ipc_instance.send_broadcast_message(f'LOGLEVEL:{role}:{level}')
 
     def _restart_worthy_changes(self, saved):
         """Which of the restart-only groups differ between what the dialog
