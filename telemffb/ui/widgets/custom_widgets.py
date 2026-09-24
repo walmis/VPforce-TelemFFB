@@ -1238,28 +1238,29 @@ class NoWheelSlider(QSlider):
             event.ignore()
 
     def _apply_handle_geometry_style(self):
-        """Colors and the handle itself are drawn entirely by paintEvent from
-        handle_color, so no stylesheet is needed for those. But QSlider's own
-        (un-overridden) mousePressEvent/mouseMoveEvent hit-test drags against
-        QStyle::subControlRect(SC_SliderHandle) - and once a widget carries
-        any stylesheet touching QSlider::handle, Qt computes that rect from
-        this CSS box instead of the native style. paintEvent already ignores
-        the rect's own position/size (it sets width/height from handle_width/
-        handle_height directly), so this size-only sheet exists purely to
-        keep the invisible drag hit-box the same size as what's drawn -
-        without it, dragging would hit-test against the native (smaller)
-        Fusion handle while a bigger handle is painted on screen. Only
-        called on init and when handle_width/handle_height actually change,
-        never from setHandleColor, which is called every telemetry tick.
+        """Keep QSlider's drag hit-box on the handle paintEvent draws.
+
+        paintEvent paints the groove and handle itself, but the inherited
+        mousePressEvent hit-tests against QStyle::subControlRect
+        (SC_SliderHandle). Qt only takes that rect from this stylesheet
+        when the groove rule has something drawable (the background); with
+        a handle-only sheet it silently falls back to the native Fusion
+        handle, which is narrower than the painted one. The groove height
+        and the vertical handle margin mirror the numbers in paintEvent
+        (10 px groove, handle centered on it). Only called on init and when
+        handle_width/handle_height change, never from setHandleColor, which
+        runs every telemetry tick.
         """
+        groove_height = 10
         css = f"""
+            QSlider::groove:horizontal {{
+                background: transparent;
+                height: {groove_height}px;
+            }}
             QSlider::handle:horizontal {{
-                width: {int(self.handle_width)}px;  /* Adjusted handle width */
-                height: {int(self.handle_height)}px;  /* Adjusted handle height */
-                margin-top: -{int(self.handle_height / 4 )}px;  /* Negative margin to overlap with groove */
-                margin-bottom: -{int(self.handle_height / 4 )}px;  /* Negative margin to overlap with groove */
-                margin-left: -1px;  /* Adjusted left margin */
-                margin-right: -1px;  /* Adjusted right margin */
+                width: {int(self.handle_width)}px;
+                height: {int(self.handle_height)}px;
+                margin: -{int((self.handle_height - groove_height) / 2)}px 0px;
             }}
         """
         self.setStyleSheet(css)
@@ -1415,19 +1416,6 @@ class NoWheelNumberSlider(NoWheelSlider):
         painter.drawText(handle_rect, Qt.AlignmentFlag.AlignCenter, self.value_text)
 
         painter.end()
-
-    def initStyleOption(self, option):
-        option.initFrom(self)
-        option.subControls = QStyle.SubControl.SC_SliderHandle | QStyle.SubControl.SC_SliderGroove
-        option.orientation = self.orientation()
-        option.minimum = self.minimum()
-        option.maximum = self.maximum()
-        option.sliderPosition = self.sliderPosition()
-        option.sliderValue = self.value()
-        option.singleStep = self.singleStep()
-        option.pageStep = self.pageStep()
-        option.tickPosition = self.tickPosition()
-        option.tickInterval = self.tickInterval()
 
 class ClickLogo(QLabel):
     clicked = pyqtSignal()
