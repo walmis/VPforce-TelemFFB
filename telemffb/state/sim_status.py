@@ -40,6 +40,12 @@ import logging
 import time
 from typing import Callable, Optional
 
+#: Separates the configuration errors a frame carries in ``error``:
+#: ``AircraftEffectUtilsBase.flag_error`` accumulates them and
+#: ``SimStatusTracker.on_frame`` holds and expires each one.  A control
+#: character rather than a newline, so a message may span several lines.
+ERROR_SEPARATOR = "\x1e"
+
 
 class SimStatusTracker:
     #: How long the error status is held after the LAST error-bearing
@@ -116,8 +122,8 @@ class SimStatusTracker:
         """Per-frame error onset/hold/clear, from ``data['error']`` (absent
         or ``None`` when the frame is clean).
 
-        A frame carries EVERY config error the aircraft flagged, newline
-        separated (``AircraftEffectUtilsBase.flag_error`` accumulates), so
+        A frame carries EVERY config error the aircraft flagged, separated by
+        ERROR_SEPARATOR (``AircraftEffectUtilsBase.flag_error`` accumulates), so
         each is held, logged and expired on its own clock. Fixing one of
         several therefore drops just that one - from the status indicator,
         which moves on to the next, and from the exception tracker - while
@@ -126,7 +132,7 @@ class SimStatusTracker:
         """
         now = self._clock()
         error_cond = data.get('error', None)
-        messages = [m.strip() for m in str(error_cond).split("\n")
+        messages = [m.strip() for m in str(error_cond).split(ERROR_SEPARATOR)
                     if m.strip()] if error_cond else []
 
         for msg in messages:

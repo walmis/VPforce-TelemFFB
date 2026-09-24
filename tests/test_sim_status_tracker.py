@@ -9,7 +9,7 @@ MainWindow, no real 3-second sleep.
 """
 import pytest
 
-from telemffb.state.sim_status import SimStatusTracker
+from telemffb.state.sim_status import ERROR_SEPARATOR, SimStatusTracker
 
 pytestmark = pytest.mark.unit
 
@@ -175,7 +175,7 @@ class TestSeveralErrorsAtOnce:
     B = "Low Hydraulic Pressure Effect is enabled but needs the Damper Override"
 
     def _frame(self, *messages):
-        return {"src": "MSFS", "error": "\n".join(messages)}
+        return {"src": "MSFS", "error": ERROR_SEPARATOR.join(messages)}
 
     def test_every_message_is_held(self, tracker):
         tracker.on_frame(self._frame(self.A, self.B))
@@ -252,10 +252,13 @@ class TestSeveralErrorsAtOnce:
         assert exception_tracker.removed == [self.A]
         assert tracker.error_state is False
 
-    def test_blank_segments_are_ignored(self, tracker):
-        """Messages are joined, and some carry their own trailing newlines."""
-        tracker.on_frame({"src": "MSFS", "error": f"{self.A}\n\n\n{self.B}\n"})
-        assert tracker.flagged_error_msgs == {self.A, self.B}
+    def test_blank_segments_are_ignored_and_lines_stay_together(self, tracker):
+        """Messages are joined, some carry trailing newlines, and a message
+        spanning several lines is still one message, not one per line."""
+        multi = f"{self.A}\nsecond line of the same message"
+        sep = ERROR_SEPARATOR
+        tracker.on_frame({"src": "MSFS", "error": f"{multi}{sep}{sep}{self.B}\n"})
+        assert tracker.flagged_error_msgs == {multi, self.B}
 
 
 class TestFlagErrorAccumulates:
@@ -275,7 +278,7 @@ class TestFlagErrorAccumulates:
         ac = self._aircraft()
         ac.flag_error("first problem")
         ac.flag_error("second problem")
-        assert ac.telem_data["error"] == "first problem\nsecond problem"
+        assert ac.telem_data["error"] == ERROR_SEPARATOR.join(["first problem", "second problem"])
 
     def test_the_same_error_twice_is_not_duplicated(self):
         ac = self._aircraft()

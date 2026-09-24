@@ -3,6 +3,7 @@ import telemffb.utils as utils
 from telemffb.globals import master_instance
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.state.sim_status import ERROR_SEPARATOR
 
 import logging
 import random
@@ -203,7 +204,8 @@ class AircraftEffectUtilsBase(object):
 
         Several settings can be misconfigured at once - a helicopter with an
         unbound force-trim button AND a hydraulic effect missing its damper
-        override - so messages ACCUMULATE for the frame, newline separated,
+        override - so messages ACCUMULATE for the frame, separated by
+        ERROR_SEPARATOR (a message itself may contain newlines),
         rather than the last effect to run winning the slot. The app status
         still shows one at a time; the exception tracker gets them all, and
         each clears on its own when its condition is fixed (see
@@ -218,14 +220,14 @@ class AircraftEffectUtilsBase(object):
         # item access, not attribute: 'error' is not a declared field, so
         # reading it before anything set it would raise.
         current = self.telem_data['error']
-        messages = str(current).split("\n") if current else []
+        messages = str(current).split(ERROR_SEPARATOR) if current else []
         if message not in messages:
             messages.append(message)
-        self.telem_data.error = "\n".join(messages)
+        self.telem_data.error = ERROR_SEPARATOR.join(messages)
         if not master_instance:
             # Rebuilt from the frame's full list rather than appended to:
             # _ipc_telem belongs to the aircraft and outlives the frame.
-            self._ipc_telem['error'] = "\n".join(f"{dev}: {m}" for m in messages)
+            self._ipc_telem['error'] = ERROR_SEPARATOR.join(f"{dev}: {m}" for m in messages)
 
     def is_joystick(self):
         """Check if the current FFB device is a joystick.
