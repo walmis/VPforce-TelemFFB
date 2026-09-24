@@ -21,6 +21,7 @@ def mgr(monkeypatch):
     """A manager with only the state this path touches."""
     m = TelemManager.__new__(TelemManager)      # skip QObject/thread __init__
     m._cond = threading.Condition()             # the loop's wakeup, normally built in __init__
+    m.currentAircraft = object()                # something is flying
     m.currentAircraftConfig = {'configurator_override_enabled': True,
                                'configurator_gains': '{"master_gain": {"enabled": true, "value": 0}}'}
     applied = []
@@ -64,6 +65,37 @@ class TestOverrideReapply:
     def test_it_happens_once_not_on_every_frame(self, mgr):
         mgr.request_configurator_override_reapply()
         assert len(_frames(mgr, count=5)) == 1
+
+    def test_a_push_before_any_aircraft_is_a_no_op(self, monkeypatch, caplog):
+        """The startup push fires before the first aircraft has loaded, when the
+        manager carries no currentAircraftConfig at all: nothing to re-apply,
+        and the aircraft writes its own overrides when it does load.
+
+        Driven through a stand-in rather than the fixture's manager: the point
+        is the attribute being absent, which a real instance only is at startup.
+        """
+        import logging as _logging
+        from types import SimpleNamespace
+
+        applied = []
+        nothing_loaded = SimpleNamespace(
+            _reapply_overrides_pending=True,
+            _handle_configurator_overrides=lambda params, context=None: applied.append(params))
+        monkeypatch.setattr(G, 'vpconf_init_pending', False, raising=False)
+
+        with caplog.at_level(_logging.INFO):
+            TelemManager._reapply_configurator_overrides(nothing_loaded)
+        assert applied == []
+        assert caplog.records == []
+
+    def test_no_aircraft_means_no_request_at_all(self, mgr):
+        """A startup or exit push happens with nothing loaded, and every instance
+        with a startup profile does one: it must not queue work for an aircraft
+        that does not exist."""
+        mgr.currentAircraft = None
+        mgr.request_configurator_override_reapply()
+        assert mgr._reapply_overrides_pending is False
+        assert _frames(mgr) == []
 
     def test_nothing_is_rewritten_without_a_push(self, mgr):
         assert _frames(mgr, count=3) == []

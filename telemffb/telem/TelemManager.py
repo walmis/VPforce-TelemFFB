@@ -566,6 +566,10 @@ class TelemManager(QObject, threading.Thread):
         itself waits for the telemetry thread, which is where overrides are
         normally applied.
         """
+        if getattr(self, "currentAircraft", None) is None:
+            # a startup or exit push with nothing loaded: no aircraft means no
+            # overrides of its own, and one that loads later writes them itself
+            return
         self._reapply_overrides_pending = True
         # wake the loop rather than wait out its timeout: a paused sim sends no
         # frames, and until this runs the device holds the profile's gains
@@ -581,8 +585,11 @@ class TelemManager(QObject, threading.Thread):
         if not self._reapply_overrides_pending or G.vpconf_init_pending:
             return
         self._reapply_overrides_pending = False
+        params = getattr(self, "currentAircraftConfig", None)
+        if not params:
+            return
         logging.info("Re-applying the configurator gain overrides the vpconf push overwrote")
-        self._handle_configurator_overrides(self.currentAircraftConfig or {},
+        self._handle_configurator_overrides(params,
                                             context="gain overrides re-applied after vpconf")
 
     def submit_frame(self, data_in: bytes):
@@ -776,9 +783,9 @@ class TelemManager(QObject, threading.Thread):
         Aircraft_Class = self._resolve_aircraft_class(aircraft_info, cls_name, params)
 
         self._handle_device_selection(aircraft_name, params)
-        self._handle_vpconf_setup(params)
+        vpconf_pushed = self._handle_vpconf_setup(params)
         self._handle_command_runner(params)
-        self._handle_configurator_overrides(params)
+        self._handle_configurator_overrides(params, vpconf_pushed=vpconf_pushed)
 
         logging.info(f"Creating handler for [blue]{aircraft_name}[/blue]: [dim]{Aircraft_Class.__module__}.{Aircraft_Class.__name__}[/dim]")
 
@@ -878,41 +885,49 @@ class TelemManager(QObject, threading.Thread):
         caps = getattr(HapticEffect.device, 'caps', None)
         return caps is None or caps.has_gains
 
-    def _handle_vpconf_setup(self, params):
-        """Handle VPConf profile setup for the aircraft."""
+    def _handle_vpconf_setup(self, params) -> bool:
+        """Handle VPConf profile setup for the aircraft.
+
+        Returns whether a profile was pushed.  A push writes every gain slider,
+        so the caller knows the outgoing aircraft's gain overrides are gone
+        without undoing them itself.
+        """
         # Nothing to do (and no dereference) without a live device.  A
         # push arriving while the device is dead is dropped here, but
         # the firmware holds profiles in RAM only, so the recovery
         # replay (main._replay_device_setup) re-pushes the current
         # context's profile when the device comes back.
         if not HapticEffect.device_alive():
-            return
+            return False
         if not self._device_has_gains():
             if "vpconf" in params:
                 logging.info("vpconf profile configured but this device has no Configurator gains; skipping")
-            return
+            return False
         if "vpconf" in params:
             if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
                 # the push is async; it latches G.vpconf_configurator_gains itself
                 # once the Configurator has actually applied the profile
                 upload_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
                 G.force_reload_aircraft_trigger = False
-        else:
-            self._handle_global_vpconf_default()
+                return True
+            return False
+        return self._handle_global_vpconf_default()
 
-    def _handle_global_vpconf_default(self):
-        """Handle global VPConf default profile setup."""
+    def _handle_global_vpconf_default(self) -> bool:
+        """Handle global VPConf default profile setup.  Returns whether it pushed."""
         # Same drop rule as _handle_vpconf_setup: a push while the device
         # is dead is dropped here; the recovery replay re-pushes the
         # global default on the device's return, since the firmware
         # profile is RAM-only and died with the power cycle.
         if not HapticEffect.device_alive():
-            return
+            return False
         load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
         global_path = G.system_settings.get("pathVPConfStartup", "")
         if load_global and global_path != G.current_vpconf_profile:
             logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
             upload_vpconf_profile(global_path, HapticEffect.device.serial)
+            return True
+        return False
 
     def _handle_command_runner(self, params):
         """Handle command runner execution for the aircraft."""
@@ -924,36 +939,42 @@ class TelemManager(QObject, threading.Thread):
                 except Exception as e:
                     logging.error(f"Error running Command Executor for model: {e}")
 
-    def _handle_configurator_overrides(self, params, context="gain overrides"):
-        """Handle configurator gain overrides for the aircraft.
+    def _handle_configurator_overrides(self, params, context="gain overrides",
+                                      vpconf_pushed=False):
+        """Write this aircraft's gain overrides, or undo the last one's.
 
-        ``context`` names the write in the gains log.  The re-apply after a
-        vpconf push must not say the same thing as the first pass: the log
-        deduplicates identical messages, so two identical lines are one line and
-        the re-apply becomes invisible.
+        The device is only written when the aircraft has overrides of its own,
+        or when the aircraft before it had some and nothing else is about to
+        set every slider anyway.  ``vpconf_pushed`` says a profile push is on
+        its way for this aircraft: it writes all seven sliders, so the previous
+        aircraft's overrides need no undoing and a revert here would be a write
+        the profile immediately overwrites.
+
+        ``context`` names the write in the gains log; the re-apply after a push
+        must not repeat the first pass's wording, which the log deduplicates.
         """
         if not self._device_has_gains():
             if params.get('configurator_override_enabled', False):
                 logging.info("configurator overrides enabled but this device has no Configurator gains; skipping")
             return
-        if params.get('configurator_override_enabled', False):
-            state = params.get('configurator_gains', 'none')
-            if state != "none":
-                state = json.loads(state)
-                G.gain_override_dialog.set_gains_from_state(state)
-                G.current_configurator_gains = state
-                any_true = any(sub.get('enabled', False) for sub in state.values())
-                self.gain_overrides_active = any_true
-                log_device_gains(context)
-            else:
-                G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
-                self.gain_overrides_active = False
-                log_device_gains(f"{context} reverted")
-        else:
-            if self.gain_overrides_active:
-                G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
-                self.gain_overrides_active = False
-                log_device_gains(f"{context} reverted")
+
+        overrides_on = params.get('configurator_override_enabled', False)
+        state = params.get('configurator_gains', 'none') if overrides_on else 'none'
+        if state != "none":
+            state = json.loads(state)
+            G.gain_override_dialog.set_gains_from_state(state)
+            G.current_configurator_gains = state
+            self.gain_overrides_active = any(sub.get('enabled', False) for sub in state.values())
+            log_device_gains(context)
+            return
+
+        if not self.gain_overrides_active:
+            return                      # nothing of ours is on the device
+        self.gain_overrides_active = False
+        if vpconf_pushed:
+            return                      # the profile sets every slider itself
+        G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
+        log_device_gains(f"{context} reverted")
 
     def _current_class_name(self) -> Optional[str]:
         """The class the loaded aircraft actually resolved to - what its
@@ -1024,9 +1045,9 @@ class TelemManager(QObject, threading.Thread):
             if 'joystick_device' in updated_params:
                 self._handle_device_selection(aircraft_name, params)
 
-            self._handle_vpconf_setup(params)
+            vpconf_pushed = self._handle_vpconf_setup(params)
             self._handle_command_runner(params)
-            self._handle_configurator_overrides_update(params)
+            self._handle_configurator_overrides_update(params, vpconf_pushed=vpconf_pushed)
 
             if "type" in updated_params:
                 self._recreate_aircraft_with_new_type(aircraft_info, params, cls_name)
@@ -1035,21 +1056,12 @@ class TelemManager(QObject, threading.Thread):
             self._setup_xpplugin_overrides(aircraft_name, data_source)
             self.aircraftUpdated.emit()
 
-    def _handle_configurator_overrides_update(self, params):
-        """Handle configurator overrides during config updates."""
-        if not self._device_has_gains():
-            return
-        if params.get('configurator_override_enabled', False):
-            state = params.get('configurator_gains', 'none')
-            if state != "none":
-                state = json.loads(state)
-                G.gain_override_dialog.set_gains_from_state(state)
-                G.current_configurator_gains = state
-                any_true = any(sub.get('enabled', False) for sub in state.values())
-                self.gain_overrides_active = any_true
-            else:
-                G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
-                self.gain_overrides_active = False
+    def _handle_configurator_overrides_update(self, params, vpconf_pushed=False):
+        """The same rules as the aircraft-load path, for a settings change on
+        the loaded aircraft: write this aircraft's overrides, or undo the ones
+        it no longer has - unless a profile push is about to set every slider."""
+        self._handle_configurator_overrides(params, context="gain overrides updated",
+                                            vpconf_pushed=vpconf_pushed)
 
     def _recreate_aircraft_with_new_type(self, aircraft_info: AircraftInfo, params, cls_name):
         """Recreate aircraft instance when type changes."""
