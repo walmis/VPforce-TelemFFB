@@ -312,7 +312,17 @@ class HPGHelicopter(Helicopter):
                 hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
             hands_on_either = hands_on_dict["master_result"]
 
-            if self.handson_force_mode:
+            force_mode = self.handson_force_mode
+            if force_mode:
+                caps = getattr(HapticEffect.device, 'caps', None)
+                if caps is not None and not caps.has_force_telemetry:
+                    self.flag_error('Hands On Force Mode is not supported on this device.\n'
+                                    'It requires the force telemetry which is only available '
+                                    'from VPforce hardware; '
+                                    'The standard hands-on/off detection settings are currently being used.')
+                    force_mode = False          # keep the deflection result above
+
+            if force_mode:
                 # Override axis-deviation detection with force-based detection.
                 # The hands-on state is latched True as soon as force exceeds the
                 # threshold, and held True for handsoff_force_duration ms after the
