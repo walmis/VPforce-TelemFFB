@@ -2,7 +2,7 @@
 
 ``config_has_changed`` is the gate ``TelemManager._handle_config_changes`` runs
 on every telemetry frame to decide whether the on-disk XML config changed since
-last frame.  It compares the (integer-second) mtimes of userconfig.xml and
+last frame.  It compares the mtimes of userconfig.xml and
 defaults.xml against a stored baseline, defers the actual reload by a short
 delay (to dodge multi-instance file-access races), and reports the change
 exactly once.
@@ -71,8 +71,7 @@ def clock(monkeypatch, tmp_path):
 class TestConfigHasChanged:
     def test_first_call_seeds_baseline_and_reports_no_change(self, clock):
         assert tm.config_has_changed() is False
-        # baseline is the sum of the two integer mtimes (1000 + 1000)
-        assert tm._config_mtime == 2000
+        assert tm._config_mtime == (1000.0, 1000.0)
         # an immediately-following call still reports no change
         clock.now[0] = 0.5
         assert tm.config_has_changed() is False
@@ -88,7 +87,6 @@ class TestConfigHasChanged:
         clock.now[0] = 1.0
         tm.config_has_changed()            # still 2000, no change
 
-        # user bumps the userconfig mtime -> hash becomes 9999 + 1000 = 10999
         clock.mtime['user'] = 9999.0
         clock.now[0] = 2.0
         # change detected, but the reload delay has not elapsed yet
@@ -103,6 +101,21 @@ class TestConfigHasChanged:
         # and it is not reported again without a further change
         clock.now[0] = 3.0
         assert tm.config_has_changed() is False
+
+    def test_second_write_in_the_same_second_is_reported(self, clock):
+        tm.config_has_changed()            # seed
+        clock.mtime['user'] = 5000.2
+        clock.now[0] = 1.0
+        tm.config_has_changed()            # detected, delay pending
+        clock.now[0] = 1.2
+        assert tm.config_has_changed() is True
+
+        # a second write lands in the same wall-clock second as the first
+        clock.mtime['user'] = 5000.7
+        clock.now[0] = 1.4
+        tm.config_has_changed()
+        clock.now[0] = 1.6
+        assert tm.config_has_changed() is True
 
     def test_mtime_stat_is_throttled_not_per_call(self, clock):
         # A stat round reads the mtime of BOTH config files, so each gated

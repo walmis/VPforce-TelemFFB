@@ -228,8 +228,10 @@ def config_has_changed(update=False) -> bool:
 
     if _last_mtime_check is None or time_now - _last_mtime_check >= _MTIME_CHECK_INTERVAL:
         _last_mtime_check = time_now
-        # "hash" both mtimes together
-        tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(G.defaults_path))
+        # Exact mtimes: two settings-form writes within one wall-clock second
+        # (an erase right after another) must both register, and the form
+        # only rebuilds off this detection while telemetry is live.
+        tm = (os.path.getmtime(G.userconfig_path), os.path.getmtime(G.defaults_path))
         if not _config_mtime:
             # First real check: seed the baseline and report no change, to avoid
             # a spurious config load on the very first frame.
