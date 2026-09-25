@@ -91,7 +91,8 @@ active simulator matches:
 | `<any>true</any>` | All simulators |
 | `<DCS>true</DCS>` | DCS World |
 | `<BMS>true</BMS>` | Falcon BMS |
-| `<IL2>true</IL2>` | IL-2 Sturmovik |
+| `<IL2>true</IL2>` | IL-2 Sturmovik (Great Battles) |
+| `<IL2K>true</IL2K>` | IL-2 Korea |
 | `<MSFS>true</MSFS>` | Microsoft Flight Simulator (2020/2024) |
 | `<XPLANE>true</XPLANE>` | X-Plane |
 
@@ -121,7 +122,7 @@ Each `<models>` block is an aircraft-specific default override stored in `defaul
 | `name` | Setting name — must match a `name` defined in `<defaults>`. |
 | `model` | Python regex pattern matched against the full aircraft name string. |
 | `value` | The override value for this setting. |
-| `sim` | Simulator this entry applies to (`DCS`, `BMS`, `IL2`, `MSFS`, `XPLANE`). |
+| `sim` | Simulator this entry applies to (`DCS`, `BMS`, `IL2`, `IL2K`, `MSFS`, `XPLANE`). |
 | `device` | Device type (`joystick`, `pedals`, `collective`, `trimwheel`, `any`). |
 | `unit` | Optional unit string, stored alongside the value. |
 
@@ -311,6 +312,7 @@ per supported simulator:
 - `<classdefaults_DCS>`
 - `<classdefaults_BMS>`
 - `<classdefaults_IL2>`
+- `<classdefaults_IL2K>`
 - `<classdefaults_MSFS>`
 - `<classdefaults_XPLANE>`
 
@@ -805,9 +807,9 @@ The following class names are used in `type`, `prereq`, and `<classdefaults_{sim
 
 | Class | Used in |
 |-------|---------|
-| `PropellerAircraft` | DCS, MSFS, XPLANE |
+| `PropellerAircraft` | DCS, IL2, IL2K, MSFS, XPLANE |
 | `TurbopropAircraft` | MSFS, XPLANE |
-| `JetAircraft` | DCS, BMS, IL2, MSFS, XPLANE |
+| `JetAircraft` | DCS, BMS, IL2, IL2K, MSFS, XPLANE |
 | `GliderAircraft` | MSFS, XPLANE |
 | `Helicopter` | DCS, IL2, MSFS, XPLANE |
 | `HPGHelicopter` | MSFS (HPG addon helicopters) |

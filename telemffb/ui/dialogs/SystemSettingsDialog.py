@@ -299,6 +299,20 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.focus_pauseIL2.setChecked(False)
         self.focus_pauseIL2.setVisible(False)
 
+        # Korea's own telemetry port, on the IL2 port row (the .ui carries
+        # one port field; a second one is added here rather than in the
+        # generated layout).  Same size policy as the field beside it.
+        self.lab_portIL2_K = QLabel("Korea port:", parent=self.tab_IL2)
+        self.portIL2_K = QLineEdit(parent=self.tab_IL2)
+        self.portIL2_K.setObjectName("portIL2_K")
+        self.portIL2_K.setSizePolicy(self.portIL2.sizePolicy())
+        self.portIL2_K.setMaximumWidth(self.portIL2.maximumWidth())
+        idx = self.horizontalLayout_7.indexOf(self.portIL2) + 1
+        self.horizontalLayout_7.insertWidget(idx, self.lab_portIL2_K)
+        self.horizontalLayout_7.insertWidget(idx + 1, self.portIL2_K)
+        self.setTabOrder(self.portIL2, self.portIL2_K)
+        self.portIL2_K.setToolTip('UDP port IL-2 Korea sends telemetry to; kept apart from the IL-2 Sturmovik port so TelemFFB can tell the two games apart')
+
         # Add tooltips
         self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
         self.enableMsfsApiServer.setToolTip('If enabled, the master instance starts a local HTTP server while MSFS is the active sim, letting the VPforce Settings in-sim toolbar panel view and edit the current aircraft\'s settings')
@@ -2130,6 +2144,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseIL2.setEnabled(il2_enabled)
         self.lab_portIL2.setEnabled(il2_enabled)
         self.portIL2.setEnabled(il2_enabled)
+        self.lab_portIL2_K.setEnabled(il2_enabled)
+        self.portIL2_K.setEnabled(il2_enabled)
         icon = self.IL2_ICON_ENABLED if il2_enabled else self.IL2_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.IL2_TAB, icon)
         self.lab_pathIL2_2.setEnabled(il2_enabled)
@@ -2534,6 +2550,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "focus_pauseIL2": self.focus_pauseIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
             "portIL2": str(self.portIL2.text()),
+            "portIL2_K": str(self.portIL2_K.text()),
             "pathIL2_K": self.pathIL2_K.text(),
             "il2_fwd_enable": self.il2_fwd_enable.isChecked(),
             "il2_fwd_destinations": json.dumps(self.get_il2_fwd_destinations()),
@@ -3376,6 +3393,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.toggle_il2_fwd_widgets()
 
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
+        self.portIL2_K.setText(str(settings_dict.get('portIL2_K', 34386)))
 
         self.enableBMS.setChecked(settings_dict.get('enableBMS', False))
         self.pathBMS.setText(settings_dict.get('pathBMS', ''))

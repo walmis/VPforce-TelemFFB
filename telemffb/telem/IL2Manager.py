@@ -190,7 +190,10 @@ class StateDataStructure:
 
 
 class IL2TelemParser(TelemParserBase):
-    def __init__(self):
+    def __init__(self, src: str = "IL2"):
+        # 'IL2' (Great Battles) or 'IL2K' (Korea): same protocol, told
+        # apart only by the port the owning listener bound
+        self.src = src
         self.ac_name: str = ""
         self.engine_info: list = []
         self.engine_rpm: list = [0.0]
@@ -227,7 +230,7 @@ class IL2TelemParser(TelemParserBase):
         self.last_paused_data: list = []
         self._stale_count: int = 0
         self._il2_stop_state: bool = False
-        self.telem_data = {"src": "IL2", "N": "", "AircraftClass": "unknown"}
+        self.telem_data = {"src": self.src, "N": "", "AircraftClass": "unknown"}
 
         self.state = StateDataStructure()
 
@@ -255,7 +258,7 @@ class IL2TelemParser(TelemParserBase):
         else:
             logging.error(f'Unknown packet type:  Header=0x{packet_header:X}')
 
-        self.telem_data["src"] = "IL2"
+        self.telem_data["src"] = self.src
         if self.ac_name != "":
             self.telem_data["N"] = self.ac_name
         self.telem_data['TAS'] = self.state.indicated_air_speed_metres_second
@@ -520,7 +523,7 @@ class IL2TelemParser(TelemParserBase):
                 # aircraft_name = ''.join(c for c in aircraft_name if ord(c) <= 127)
                 if aircraft_name != self.ac_name:
                     logging.info(f"aircraft_name={aircraft_name} | self.ac_name={self.ac_name}")
-                    self.__init__()
+                    self.__init__(src=self.src)   # a fresh state for the new aircraft, same source
                     
                 self.ac_name = aircraft_name
 

@@ -106,7 +106,7 @@ class UserModelDialog(QDialog):
         match sim:
             case 'DCS':
                 classes = ["PropellerAircraft", "JetAircraft", "Helicopter"]
-            case 'IL2':
+            case 'IL2' | 'IL2K':
                 classes = ["PropellerAircraft", "JetAircraft"]
             case 'MSFS':
                 classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter',

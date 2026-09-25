@@ -91,67 +91,119 @@ class SimTelemListener(QtCore.QObject):
         return port
 
 
-class SimIL2(SimTelemListener):
-    def __init__(self) -> None:
-        super().__init__("IL2")
+class _SimIL2Base(SimTelemListener):
+    """IL-2 Great Battles and IL-2 Korea speak the same telemetry protocol
+    and share the IL2 tab, its enable toggle and the forwarder settings.
+    Nothing in the packets says which game sent them, so the config
+    validator gives each game its own UDP port and each gets its own
+    listener; frames are tagged with the listener's source key.
+    """
+    label: str          # for log lines and the validator's dialogs
+    #: the game also publishes ffbdevice records, whose config section the
+    #: validator maintains alongside telemetry and motion
+    ffb_stream = False
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
         self._forwarder = IL2PacketForwarder()
+
+    @property
+    def startup_cfg(self) -> str:
+        raise NotImplementedError
 
     @override
     def start(self):
         if not self.is_enabled:
             return
 
-        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp, telem_parser=IL2TelemParser(),
+        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp,
+                                    telem_parser=IL2TelemParser(src=self.name),
                                     raw_packet_hook=self._forwarder.forward)
 
         if self.do_validate() is False:
             logging.warning(
-                "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
+                f"{self.label} config validation is disabled - please ensure its startup.cfg is configured correctly")
 
         if self.telem is None:  # stopped during validation (e.g. another sim won the race)
             return
 
-        logging.info("Starting IL2 Telemetry Listener")
+        logging.info(f"Starting {self.label} Telemetry Listener")
         self.telem.start()
         self.started = True
 
-        if G.system_settings.get('validateIL2_K') and G.device_info:
-            G.il2_ffb_device_ordinal = utils.resolve_il2_ffb_device_ordinal(
-                G.system_settings.get('pathIL2_K'), G.device_info.vendor_id, G.device_info.product_id
-            )
-
-    @override
-    def do_validate(self) -> bool:
-        if G.child_instance:
-            return None
-        sturmovik = G.system_settings.get('validateIL2')
-        korea = G.system_settings.get('validateIL2_K')
-        if sturmovik or korea:
-            self.validate()
-            return True
-        return False
-
     @override
     def validate(self):
-        if G.system_settings.get('validateIL2'):
-            il2_path = os.path.join(G.system_settings.get('pathIL2'), 'data\\startup.cfg')
-            logging.info("Validating IL2 Sturmovik Telemetry Config")
-            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Sturmovik")
-        if G.system_settings.get('validateIL2_K'):
-            # Standalone: <root>\game\data; Steam (IL2Series): <root>\data.
-            game_root = utils.il2_korea_game_root(G.system_settings.get('pathIL2_K'))
-            il2_path = os.path.join(game_root, 'data', 'startup.cfg')
-            logging.info("Validating IL2 Korea Telemetry Config")
-            utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window, sim_name="IL-2 Korea", korea=True)
+        logging.info(f"Validating {self.label} Telemetry Config")
+        utils.analyze_il2_config(self.startup_cfg, port=self.port_udp, window=G.main_window,
+                                 sim_name=self.label, korea=self.ffb_stream)
 
     @override
     def stop(self):
-        logging.info("Stopping IL2 Telemetry Listener")
+        logging.info(f"Stopping {self.label} Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
             self.started = False
         self._forwarder.close()
+
+
+class SimIL2(_SimIL2Base):
+    label = "IL-2 Sturmovik"
+
+    def __init__(self) -> None:
+        super().__init__("IL2")
+
+    @property
+    def startup_cfg(self) -> str:
+        return os.path.join(G.system_settings.get('pathIL2'), 'data\\startup.cfg')
+
+
+class SimIL2K(_SimIL2Base):
+    """IL-2 Korea.  Shares the IL2 tab: enabled by the IL2 toggle once a
+    Korea path is set, validated by its own checkbox, listening on its own
+    port (portIL2_K).  A Korea install whose startup.cfg still names the
+    shared port keeps working through SimIL2, just not as IL2K.
+    """
+    label = "IL-2 Korea"
+    ffb_stream = True
+
+    def __init__(self) -> None:
+        super().__init__("IL2K")
+
+    @property
+    def is_enabled(self) -> bool:
+        if G.args.sim == self.name:
+            return True
+        return bool(G.system_settings.get('enableIL2') and G.system_settings.get('pathIL2_K'))
+
+    @property
+    def port_udp(self):
+        port = int(G.system_settings.get('portIL2_K'))
+        assert port
+        return port
+
+    @override
+    def do_validate(self) -> bool:
+        if G.child_instance:
+            return None
+        if G.system_settings.get('validateIL2_K'):
+            self.validate()
+            return True
+        return False
+
+    @property
+    def startup_cfg(self) -> str:
+        # Standalone: <root>\game\data; Steam (IL2Series): <root>\data.
+        game_root = utils.il2_korea_game_root(G.system_settings.get('pathIL2_K'))
+        return os.path.join(game_root, 'data', 'startup.cfg')
+
+    @override
+    def start(self):
+        super().start()
+        if self.started and G.device_info:
+            G.il2_ffb_device_ordinal = utils.resolve_il2_ffb_device_ordinal(
+                G.system_settings.get('pathIL2_K'), G.device_info.vendor_id, G.device_info.product_id
+            )
 
 
 class SimBMS(SimTelemListener):
@@ -303,6 +355,7 @@ class SimListenerManager(QtCore.QObject):
             SimDCS(),
             SimMSFS(),
             SimIL2(),
+            SimIL2K(),
             SimBMS(),
             SimXPLANE()
         ]

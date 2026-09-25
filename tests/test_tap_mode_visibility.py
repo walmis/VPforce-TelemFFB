@@ -56,11 +56,15 @@ def test_other_sims_toggle_does_not_offer(monkeypatch):
     assert SpringModeEnum.DINPUT_TAP not in mgr.resolve_enum_list(LIST)
 
 
-def test_il2_offered_by_either_toggle(monkeypatch):
-    for flag in ('enableTapIL2', 'enableTapIL2_K'):
-        mgr = make_mgr('IL2', monkeypatch, **{flag: True})
-        d = mgr.resolve_enum_list('IL2_JOYSTICK_SPRING_MODE')
-        assert SpringModeEnum.DINPUT_TAP in d, flag
+def test_each_il2_title_is_offered_by_its_own_toggle(monkeypatch):
+    """Great Battles and Korea are separate sims with separate tap
+    toggles; neither toggle offers the mode for the other."""
+    for sim, own, other in (('IL2', 'enableTapIL2', 'enableTapIL2_K'),
+                            ('IL2K', 'enableTapIL2_K', 'enableTapIL2')):
+        offered = make_mgr(sim, monkeypatch, **{own: True})
+        assert SpringModeEnum.DINPUT_TAP in offered.resolve_enum_list('IL2_JOYSTICK_SPRING_MODE'), sim
+        not_offered = make_mgr(sim, monkeypatch, **{other: True})
+        assert SpringModeEnum.DINPUT_TAP not in not_offered.resolve_enum_list('IL2_JOYSTICK_SPRING_MODE'), sim
 
 
 def test_il2_hidden_when_both_toggles_off(monkeypatch):

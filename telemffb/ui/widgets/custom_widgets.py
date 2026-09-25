@@ -824,6 +824,7 @@ class AppStatusWidget(QWidget):
                 "MSFS": False,
                 "XPLANE": False,
                 "IL2": False,
+                "IL2K": False,
                 "BMS": False,
             }
 

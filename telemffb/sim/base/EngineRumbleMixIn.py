@@ -54,7 +54,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
             rpm = telem_data.ActualRPM or 0.0
         elif self._sim_is('MSFS') or self._sim_is_xplane():
             rpm = telem_data.PropRPM or 0.0
-        elif self._sim_is('IL2'):
+        elif self._sim_is_il2():
             rpm = telem_data.RPM or 0.0
         else:
             logging.warning("Unknown sim trying to play Engine Rumble effect")

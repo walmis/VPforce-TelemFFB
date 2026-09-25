@@ -58,7 +58,8 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         "BMS": "Falcon BMS",
         "MSFS": "Microsoft Flight Simulator 20/24",
         "XPLANE": "X-Plane 11/12",
-        "IL2": "IL-2 Sturmovik"
+        "IL2": "IL-2 Sturmovik",
+        "IL2K": "IL-2 Korea"
     }
     internal_sim_names = {v: k for k, v in friendly_sim_names.items()}  # Build reverse lookup table
 

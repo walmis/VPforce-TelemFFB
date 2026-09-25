@@ -138,7 +138,7 @@ dialog to open."""
 il2_ffb_device_ordinal: Optional[int] = None
 """This instance's device ordinal ('lastAttachedId') as resolved from IL-2 Korea's
 known.devices.json, used to match the 'devNo' field in FFB telemetry records.
-Resolved once per SimIL2 listener start; None if not IL-2 Korea or not yet resolved."""
+Resolved once per SimIL2K listener start; None if not IL-2 Korea or not yet resolved."""
 
 vpconf_init_pending: bool = False
 """switch to True when async device init is complete"""

@@ -113,6 +113,7 @@ class SystemSettings(QSettings):
     pathIL2: str
     pathIL2_K: str
     portIL2: int
+    portIL2_K: int
     enableBMS: bool
     pathBMS: str
     enableDirectInput: bool
@@ -172,6 +173,9 @@ class SystemSettings(QSettings):
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
         'pathIL2_K': '',
         'portIL2': 34385,
+        # Korea gets its own port: the two games' telemetry is otherwise
+        # indistinguishable, and the port is what tells the listeners apart
+        'portIL2_K': 34386,
         'il2_fwd_enable': False,
         'il2_fwd_destinations': '[]',
         'enableBMS': False,

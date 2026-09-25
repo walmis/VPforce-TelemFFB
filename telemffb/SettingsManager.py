@@ -64,11 +64,12 @@ class SettingsManager(QObject):
 
     #: Settings-tab sim -> the DirectInput Tap sims whose enable toggle
     #: offers the DINPUT_TAP spring mode there.  IL-2 Great Battles and
-    #: Korea are indistinguishable at the telemetry/profile level (both
-    #: arrive as 'IL2'), so either toggle offers the mode for IL2.
+    #: Korea are separate sims (their listeners tag frames IL2 / IL2K),
+    #: each offered by its own tap toggle.
     TAP_SIM_KEYS = {
         'DCS': ('DCS',),
-        'IL2': ('IL2', 'IL2_K'),
+        'IL2': ('IL2',),
+        'IL2K': ('IL2_K',),
         'BMS': ('BMS',),
     }
 
