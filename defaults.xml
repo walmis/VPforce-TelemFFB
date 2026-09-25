@@ -40,6 +40,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -91,6 +92,7 @@
 		<info>Aircraft Type</info>
 		<any>true</any>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -443,6 +445,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<collective>true</collective>
 		<validvalues>DCS_HELI_COLLECTIVE_SPRING_MODE</validvalues>
 	</defaults>
@@ -454,6 +457,7 @@
 		<name>spring_mode</name>
 		<displayname>Joystick Spring Mode</displayname>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<validvalues>IL2_JOYSTICK_SPRING_MODE</validvalues>
 		<datatype>enumlist</datatype>
@@ -466,6 +470,7 @@
 		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<pedals>true</pedals>
 		<validvalues>IL2_PEDAL_SPRING_MODE</validvalues>
 		<datatype>enumlist</datatype>
@@ -483,6 +488,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
 		<value>.75</value>
@@ -501,6 +507,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<pedals>true</pedals>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<value>87</value>
@@ -519,6 +526,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
 		<value>0.25</value>
@@ -537,6 +545,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<pedals>true</pedals>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<value>438</value>
@@ -555,6 +564,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
@@ -571,6 +581,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>none</value>
@@ -588,6 +599,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>false</value>
@@ -601,6 +613,7 @@
 		<displayname>Trim Reset</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>0</value>
@@ -612,6 +625,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>770.34</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -627,6 +641,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>770.36</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -642,6 +657,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>770.38</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_left</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -658,6 +674,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>770.40</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_right</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -674,6 +691,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>770.42</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>d_int</datatype>
 		<name>override_spring_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
@@ -707,6 +725,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>800.2</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>float</datatype>
 		<name>override_spring_gain</name>
 		<displayname>Override Spring Gain</displayname>
@@ -728,6 +747,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -745,6 +765,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<value>false</value>
 		<datatype>bool</datatype>
@@ -761,6 +782,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>false</value>
@@ -778,6 +800,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<value>false</value>
 		<datatype>bool</datatype>
@@ -794,6 +817,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -811,6 +835,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>1.0</value>
@@ -830,6 +855,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<value>1.0</value>
 		<datatype>n_float</datatype>
@@ -848,6 +874,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -865,6 +892,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -882,6 +910,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>1.0</value>
@@ -901,6 +930,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -918,6 +948,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>1.0</value>
@@ -937,6 +968,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -954,6 +986,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>1.0</value>
@@ -973,6 +1006,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -990,6 +1024,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>1.0</value>
@@ -1009,6 +1044,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>true</value>
@@ -1026,6 +1062,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>1.0</value>
@@ -1040,6 +1077,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>900</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>bool</datatype>
 		<name>override_spring_ft_enabled</name>
 		<displayname>Hardware Force Trim</displayname>
@@ -1086,6 +1124,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>900.4</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_reset</name>
 		<displayname>Trim Reset</displayname>
@@ -1101,6 +1140,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>900.5</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -1116,6 +1156,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>900.6</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -1131,6 +1172,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>900.7</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_left</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -1146,6 +1188,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>900.8</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>button</datatype>
 		<name>override_spring_trim_right</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -1161,6 +1204,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>900.9</order>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<datatype>d_int</datatype>
 		<name>override_spring_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
@@ -1970,6 +2014,7 @@
 		<prereq>basic_group</prereq>
 		<info>These effects are duplicates of effects that are implemented by IL2 natively.  Recommend to disable the "shake" in IL2 FFB settings if you enable these.</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -1986,6 +2031,7 @@
 		<prereq>il2_shake_master</prereq>
 		<info>These effects are duplicates of IL-2 native effects&lt;br&gt;&lt;br&gt;.  Recommend to disable 'shake' in IL-2 FFB settings when using these effects.</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2002,6 +2048,7 @@
 		<prereq>il2_enable_buffet</prereq>
 		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2018,6 +2065,7 @@
 		<displayname>Runway Rumble</displayname>
 		<prereq>il2_shake_master</prereq>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2033,6 +2081,7 @@
 		<displayname>Runway Rumble</displayname>
 		<prereq>il2_enable_runway_rumble</prereq>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2050,6 +2099,7 @@
 		<displayname>Weapon Effects</displayname>
 		<prereq>il2_shake_master</prereq>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2066,6 +2116,7 @@
 		<prereq>il2_enable_weapons</prereq>
 		<info>Reads gun data (mass, velocity) from telemetry and plays a stonger/weaker, faster/slower effect based on the data</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2081,6 +2132,7 @@
 		<displayname>Gunfire</displayname>
 		<prereq>il2_enable_weapons</prereq>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2098,6 +2150,7 @@
 		<displayname>Bombs</displayname>
 		<prereq>il2_enable_weapons</prereq>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2115,6 +2168,7 @@
 		<displayname>Rockets</displayname>
 		<prereq>il2_enable_weapons</prereq>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -3021,6 +3075,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3146,6 +3201,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -3161,6 +3217,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -3850,6 +3907,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3884,6 +3942,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<validvalues>DCS_IL2_G_EFFECT_MODE</validvalues>
 		<value>LEGACY</value>
@@ -3901,6 +3960,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
@@ -3918,6 +3978,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>10,30</validvalues>
@@ -3936,6 +3997,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>10,30</validvalues>
@@ -3954,6 +4016,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>40,100</validvalues>
@@ -3972,6 +4035,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3991,6 +4055,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4011,6 +4076,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4031,6 +4097,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4049,6 +4116,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4067,6 +4135,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4085,6 +4154,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4104,6 +4174,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4124,6 +4195,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4144,6 +4216,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4163,6 +4236,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4180,6 +4254,7 @@
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4198,6 +4273,7 @@
 		<info>Artificially increase the G forces in the direction of deceleration</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4217,6 +4293,7 @@
 		<info>Invert the frame of reference (direction of force) for the effect.  I.e. stick moving away from pilot vs. pilot moving towards stick.</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4234,6 +4311,7 @@
 		<info>Disable effect while airborne</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4281,6 +4359,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4518,6 +4597,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4680,6 +4760,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Separate engine rumble effect using "Engine Shake Amp/Freq" from game telemetry rather than RPM</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4695,6 +4776,7 @@
 		<prereq>il2_prop_eng_shake_enabled</prereq>
 		<info>Factor applied to "Engine Shake Amplitude" from game telemetry</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4713,6 +4795,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Enable Propeller Rumble</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4749,6 +4832,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4771,6 +4855,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4793,6 +4878,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4815,6 +4901,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4835,6 +4922,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Separate engine rumble effect using "Engine Shake Amp/Freq" from game telemetry rather than RPM</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4850,6 +4938,7 @@
 		<prereq>il2_jet_eng_shake_enabled</prereq>
 		<info>Factor applied to "Engine Shake Amplitude" from game telemetry</info>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4870,6 +4959,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4889,6 +4979,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4910,6 +5001,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -4966,6 +5058,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4984,6 +5077,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -5002,6 +5096,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5021,6 +5116,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5167,6 +5263,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5187,6 +5284,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5847,6 +5945,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5868,6 +5967,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5889,6 +5989,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5911,6 +6012,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5932,6 +6034,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5954,6 +6057,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5975,6 +6079,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -5995,6 +6100,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6015,6 +6121,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6037,6 +6144,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6057,6 +6165,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6076,6 +6185,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6095,6 +6205,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6115,6 +6226,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6136,6 +6248,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6155,6 +6268,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6191,6 +6305,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6234,6 +6349,7 @@
 		<info>See manual for details</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -6249,6 +6365,7 @@
 		<info>Alternate G Force Effec - Enabling will override legacy G Force Effect&lt;br&gt;&lt;br&gt;See manual for details</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<IL2K>true</IL2K>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -13171,6 +13288,223 @@
 			<sim>IL2</sim>
 			<device>pedals</device>
 		</classdefaults_IL2>
+		<classdefaults_IL2K>
+			<name>il2_dynamic_gunfire_mode</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>IL2K</sim>
+			<device>any</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>il2_dynamic_gunfire_mode</name>
+			<type>PropellerAircraft</type>
+			<value>true</value>
+			<sim>IL2K</sim>
+			<device>any</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>elevator_droop_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>elevator_droop_enabled</name>
+			<type>PropellerAircraft</type>
+			<value>true</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_effect_curvature</name>
+			<type>JetAircraft</type>
+			<value>2.5</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_effect_curvature</name>
+			<type>PropellerAircraft</type>
+			<value>2.5</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_effect_mode</name>
+			<type>JetAircraft</type>
+			<value>LEGACY</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_effect_mode</name>
+			<type>JetAircraft</type>
+			<value>LEGACY</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_effect_max_intensity</name>
+			<type>JetAircraft</type>
+			<value>0.8</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_effect_max_intensity</name>
+			<type>PropellerAircraft</type>
+			<value>0.8</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_max_gs</name>
+			<type>JetAircraft</type>
+			<value>7.0</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_max_gs</name>
+			<type>PropellerAircraft</type>
+			<value>7.0</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_min_gs</name>
+			<type>JetAircraft</type>
+			<value>1.1</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>gforce_min_gs</name>
+			<type>PropellerAircraft</type>
+			<value>1.4</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>il2_prop_eng_shake_enabled</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>IL2K</sim>
+			<device>any</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>il2_prop_eng_shake_factor</name>
+			<type>PropellerAircraft</type>
+			<value>1.5</value>
+			<sim>IL2K</sim>
+			<device>any</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>il2_jet_eng_shake_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>IL2K</sim>
+			<device>any</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>il2_jet_eng_shake_factor</name>
+			<type>JetAircraft</type>
+			<value>2.0</value>
+			<sim>IL2K</sim>
+			<device>any</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>jet_engine_rumble_intensity</name>
+			<type>JetAircraft</type>
+			<value>0.05</value>
+			<sim>IL2K</sim>
+			<device>any</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>new_gforce_enable_neg_gs</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>new_gforce_enable_neg_gs</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>new_gforce_max_gs</name>
+			<type>JetAircraft</type>
+			<value>7.0</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>new_gforce_max_gs</name>
+			<type>PropellerAircraft</type>
+			<value>5.0</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>new_gforce_max_gs_neg</name>
+			<type>JetAircraft</type>
+			<value>-4.0</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>new_gforce_max_gs_neg</name>
+			<type>PropellerAircraft</type>
+			<value>-3.0</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>spring_mode</name>
+			<type>JetAircraft</type>
+			<value>NONE</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>spring_mode</name>
+			<type>PropellerAircraft</type>
+			<value>NONE</value>
+			<sim>IL2K</sim>
+			<device>joystick</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>spring_mode</name>
+			<type>JetAircraft</type>
+			<value>DYNAMIC</value>
+			<sim>IL2K</sim>
+			<device>pedals</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>spring_mode</name>
+			<type>PropellerAircraft</type>
+			<value>DYNAMIC</value>
+			<sim>IL2K</sim>
+			<device>pedals</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>pedal_spring_gain</name>
+			<type>JetAircraft</type>
+			<value>1.0</value>
+			<sim>IL2K</sim>
+			<device>pedals</device>
+		</classdefaults_IL2K>
+		<classdefaults_IL2K>
+			<name>pedal_spring_gain</name>
+			<type>PropellerAircraft</type>
+			<value>1.0</value>
+			<sim>IL2K</sim>
+			<device>pedals</device>
+		</classdefaults_IL2K>
 <classdefaults_BMS>
 			<name>afterburner_effect_enabled</name>
 			<type>JetAircraft</type>
@@ -17250,7 +17584,7 @@
 		<model>F-51D.*</model>
 		<value>439</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17258,42 +17592,42 @@
 		<model>F-51D.*</model>
 		<value>87</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-51D.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 488, "points": [{"x": 0.0, "y": 0.0}, {"x": 43.5, "y": 7.0}, {"x": 72.5, "y": 16.0}, {"x": 87.0, "y": 25.0}, {"x": 235.6, "y": 38.0}, {"x": 354.3, "y": 62.0}, {"x": 439.0, "y": 90.0}, {"x": 488.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 488, "points": [{"x": 0.0, "y": 0.0}, {"x": 43.5, "y": 7.0}, {"x": 72.5, "y": 16.0}, {"x": 87.0, "y": 25.0}, {"x": 235.6, "y": 48.0}, {"x": 354.3, "y": 71.0}, {"x": 439.0, "y": 90.0}, {"x": 488.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 488}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-51D.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 488, "points": [{"x": 0.0, "y": 0.0}, {"x": 43.5, "y": 7.0}, {"x": 72.5, "y": 16.0}, {"x": 87.0, "y": 25.0}, {"x": 235.6, "y": 48.0}, {"x": 354.3, "y": 71.0}, {"x": 439.0, "y": 90.0}, {"x": 488.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 488, "points": [{"x": 0.0, "y": 0.0}, {"x": 488.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 488}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_prop_rumble_enabled</name>
 		<model>F-51D.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_prop_eng_shake_enabled</name>
 		<model>F-51D.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>F-51D.*</model>
 		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -17302,7 +17636,7 @@
 		<model>F-80C-10.*</model>
 		<value>505</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17310,42 +17644,42 @@
 		<model>F-80C-10.*</model>
 		<value>100</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-80C-10.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 561, "points": [{"x": 0.0, "y": 0.0}, {"x": 50.0, "y": 7.0}, {"x": 83.3, "y": 16.0}, {"x": 100.0, "y": 25.0}, {"x": 271.0, "y": 38.0}, {"x": 407.5, "y": 62.0}, {"x": 505.0, "y": 90.0}, {"x": 561.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 561, "points": [{"x": 0.0, "y": 0.0}, {"x": 50.0, "y": 7.0}, {"x": 83.3, "y": 16.0}, {"x": 100.0, "y": 25.0}, {"x": 271.0, "y": 48.0}, {"x": 407.5, "y": 71.0}, {"x": 505.0, "y": 90.0}, {"x": 561.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 561}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-80C-10.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 561, "points": [{"x": 0.0, "y": 0.0}, {"x": 50.0, "y": 7.0}, {"x": 83.3, "y": 16.0}, {"x": 100.0, "y": 25.0}, {"x": 271.0, "y": 48.0}, {"x": 407.5, "y": 71.0}, {"x": 505.0, "y": 90.0}, {"x": 561.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 561, "points": [{"x": 0.0, "y": 0.0}, {"x": 561.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 561}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_jet_rumble_enabled</name>
 		<model>F-80C-10.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_jet_eng_shake_enabled</name>
 		<model>F-80C-10.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>F-80C-10.*</model>
 		<value>JetAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -17354,7 +17688,7 @@
 		<model>F-84E.*</model>
 		<value>540</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17362,42 +17696,42 @@
 		<model>F-84E.*</model>
 		<value>115</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-84E.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 600, "points": [{"x": 0.0, "y": 0.0}, {"x": 57.5, "y": 7.0}, {"x": 95.8, "y": 16.0}, {"x": 115.0, "y": 25.0}, {"x": 295.35, "y": 48.0}, {"x": 438.1, "y": 71.0}, {"x": 540.0, "y": 90.0}, {"x": 600.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 600, "points": [{"x": 0.0, "y": 0.0}, {"x": 57.5, "y": 7.0}, {"x": 95.8, "y": 16.0}, {"x": 115.0, "y": 25.0}, {"x": 295.35, "y": 38.0}, {"x": 438.1, "y": 62.0}, {"x": 540.0, "y": 90.0}, {"x": 600.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 600}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-84E.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 600, "points": [{"x": 0.0, "y": 0.0}, {"x": 57.5, "y": 7.0}, {"x": 95.8, "y": 16.0}, {"x": 115.0, "y": 25.0}, {"x": 295.35, "y": 48.0}, {"x": 438.1, "y": 71.0}, {"x": 540.0, "y": 90.0}, {"x": 600.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 600, "points": [{"x": 0.0, "y": 0.0}, {"x": 600.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 600}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_jet_rumble_enabled</name>
 		<model>F-84E.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_jet_eng_shake_enabled</name>
 		<model>F-84E.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>F-84E.*</model>
 		<value>JetAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -17406,7 +17740,7 @@
 		<model>F-86A-5.*</model>
 		<value>550</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17414,42 +17748,42 @@
 		<model>F-86A-5.*</model>
 		<value>108</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-86A-5.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 611, "points": [{"x": 0.0, "y": 0.0}, {"x": 54.0, "y": 7.0}, {"x": 90.0, "y": 16.0}, {"x": 108.0, "y": 25.0}, {"x": 294.5, "y": 38.0}, {"x": 443.6, "y": 62.0}, {"x": 550.0, "y": 90.0}, {"x": 611.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 611, "points": [{"x": 0.0, "y": 0.0}, {"x": 54.0, "y": 7.0}, {"x": 90.0, "y": 16.0}, {"x": 108.0, "y": 25.0}, {"x": 294.5, "y": 48.0}, {"x": 443.6, "y": 71.0}, {"x": 550.0, "y": 90.0}, {"x": 611.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 611}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>F-86A-5.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 611, "points": [{"x": 0.0, "y": 0.0}, {"x": 54.0, "y": 7.0}, {"x": 90.0, "y": 16.0}, {"x": 108.0, "y": 25.0}, {"x": 294.5, "y": 48.0}, {"x": 443.6, "y": 71.0}, {"x": 550.0, "y": 90.0}, {"x": 611.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 611, "points": [{"x": 0.0, "y": 0.0}, {"x": 611.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 611}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_jet_rumble_enabled</name>
 		<model>F-86A-5.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_jet_eng_shake_enabled</name>
 		<model>F-86A-5.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>F-86A-5.*</model>
 		<value>JetAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -17458,7 +17792,7 @@
 		<model>IL-10.*</model>
 		<value>340</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17466,42 +17800,42 @@
 		<model>IL-10.*</model>
 		<value>90</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>IL-10.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 378, "points": [{"x": 0.0, "y": 0.0}, {"x": 45.0, "y": 7.0}, {"x": 75.0, "y": 16.0}, {"x": 90.0, "y": 25.0}, {"x": 198.1, "y": 48.0}, {"x": 280.9, "y": 71.0}, {"x": 340.0, "y": 90.0}, {"x": 378.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 378, "points": [{"x": 0.0, "y": 0.0}, {"x": 45.0, "y": 7.0}, {"x": 75.0, "y": 16.0}, {"x": 90.0, "y": 25.0}, {"x": 198.1, "y": 48.0}, {"x": 280.9, "y": 71.0}, {"x": 340.0, "y": 90.0}, {"x": 378.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 378}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>IL-10.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 378, "points": [{"x": 0.0, "y": 0.0}, {"x": 45.0, "y": 7.0}, {"x": 75.0, "y": 16.0}, {"x": 90.0, "y": 25.0}, {"x": 198.1, "y": 48.0}, {"x": 280.9, "y": 71.0}, {"x": 340.0, "y": 90.0}, {"x": 378.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 378, "points": [{"x": 0.0, "y": 0.0}, {"x": 378.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 378}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_prop_rumble_enabled</name>
 		<model>IL-10.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_prop_eng_shake_enabled</name>
 		<model>IL-10.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>IL-10.*</model>
 		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -17510,7 +17844,7 @@
 		<model>La-11.*</model>
 		<value>420</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17518,42 +17852,42 @@
 		<model>La-11.*</model>
 		<value>85</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>La-11.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 467, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 226.65, "y": 38.0}, {"x": 339.4, "y": 62.0}, {"x": 420.0, "y": 90.0}, {"x": 467.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 467, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 226.65, "y": 48.0}, {"x": 339.4, "y": 71.0}, {"x": 420.0, "y": 90.0}, {"x": 467.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 467}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>La-11.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 467, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 226.65, "y": 48.0}, {"x": 339.4, "y": 71.0}, {"x": 420.0, "y": 90.0}, {"x": 467.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 467, "points": [{"x": 0.0, "y": 0.0}, {"x": 467.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 467}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_prop_rumble_enabled</name>
 		<model>La-11.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_prop_eng_shake_enabled</name>
 		<model>La-11.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>La-11.*</model>
 		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -17562,7 +17896,7 @@
 		<model>MiG-15bis.*</model>
 		<value>594</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17570,42 +17904,42 @@
 		<model>MiG-15bis.*</model>
 		<value>120</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>MiG-15bis.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 660, "points": [{"x": 0.0, "y": 0.0}, {"x": 60.0, "y": 7.0}, {"x": 100.0, "y": 16.0}, {"x": 120.0, "y": 25.0}, {"x": 320.4, "y": 48.0}, {"x": 480.0, "y": 71.0}, {"x": 594.0, "y": 90.0}, {"x": 660.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 660, "points": [{"x": 0.0, "y": 0.0}, {"x": 60.0, "y": 7.0}, {"x": 100.0, "y": 16.0}, {"x": 120.0, "y": 25.0}, {"x": 320.4, "y": 38.0}, {"x": 480.0, "y": 62.0}, {"x": 594.0, "y": 90.0}, {"x": 660.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 660}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>MiG-15bis.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 660, "points": [{"x": 0.0, "y": 0.0}, {"x": 60.0, "y": 7.0}, {"x": 100.0, "y": 16.0}, {"x": 120.0, "y": 25.0}, {"x": 320.4, "y": 48.0}, {"x": 480.0, "y": 71.0}, {"x": 594.0, "y": 90.0}, {"x": 660.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 660, "points": [{"x": 0.0, "y": 0.0}, {"x": 660.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 660}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_jet_rumble_enabled</name>
 		<model>MiG-15bis.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_jet_eng_shake_enabled</name>
 		<model>MiG-15bis.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>MiG-15bis.*</model>
 		<value>JetAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -17614,7 +17948,7 @@
 		<model>Yak-9P.*</model>
 		<value>405</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -17622,42 +17956,42 @@
 		<model>Yak-9P.*</model>
 		<value>85</value>
 		<unit>kt</unit>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>Yak-9P.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 220.65, "y": 38.0}, {"x": 328.2, "y": 62.0}, {"x": 405.0, "y": 90.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 220.65, "y": 48.0}, {"x": 328.2, "y": 71.0}, {"x": 405.0, "y": 90.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 450}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>adv_spr_gains</name>
 		<model>Yak-9P.*</model>
 		<value>{"curve_x": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 42.5, "y": 7.0}, {"x": 70.8, "y": 16.0}, {"x": 85.0, "y": 25.0}, {"x": 220.65, "y": 48.0}, {"x": 328.2, "y": 71.0}, {"x": 405.0, "y": 90.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 450}</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>pedals</device>
 	</models>
 	<models>
 		<name>engine_prop_rumble_enabled</name>
 		<model>Yak-9P.*</model>
 		<value>false</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>il2_prop_eng_shake_enabled</name>
 		<model>Yak-9P.*</model>
 		<value>true</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
 		<model>Yak-9P.*</model>
 		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
+		<sim>IL2K</sim>
 		<device>any</device>
 		<notes>Engine rumble is disabled by default for IL-2 Korea aircraft: the sim does not provide engine RPM telemetry, so this profile uses the EngineShake telemetry effect instead.</notes>
 	</models>
@@ -23812,6 +24146,14 @@
 		<class_name>JetAircraft</class_name>
 	</classes>
 	<classes>
+		<sim>IL2K</sim>
+		<class_name>PropellerAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>IL2K</sim>
+		<class_name>JetAircraft</class_name>
+	</classes>
+	<classes>
 		<sim>MSFS</sim>
 		<class_name>PropellerAircraft</class_name>
 	</classes>
@@ -23887,6 +24229,9 @@
 	</sims>
 	<sims>
 		<sim>IL2</sim>
+	</sims>
+	<sims>
+		<sim>IL2K</sim>
 	</sims>
 	<sims>
 		<sim>MSFS</sim>

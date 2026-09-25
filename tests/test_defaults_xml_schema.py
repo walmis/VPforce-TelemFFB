@@ -37,7 +37,7 @@ def defaults_root():
 # Constants
 # ─────────────────────────────────────────────────────────────
 
-VALID_SIMS = {"DCS", "BMS", "IL2", "MSFS", "XPLANE"}
+VALID_SIMS = {"DCS", "BMS", "IL2", "IL2K", "MSFS", "XPLANE"}
 VALID_DEVICES = {"joystick", "pedals", "collective", "trimwheel", "any"}
 VALID_DATATYPES = {
     "group", "list", "enumlist", "bool",
