@@ -78,7 +78,15 @@ def no_real_hardware(monkeypatch):
             # paths write to whatever root they are handed.  Stubbed at the
             # one registry read they all share, so the discovery logic above
             # it is still the code under test.
-            ('telemffb.tap.tap_install', '_registry_values', lambda *a, **k: [])):
+            ('telemffb.tap.tap_install', '_registry_values', lambda *a, **k: []),
+            # The DirectInput Tap's shared memory: a sim running on the
+            # developer's machine with the wrapper live would otherwise be
+            # seen by any aircraft frame in a tap-fed spring mode.  Tests
+            # that want a tap patch these themselves.
+            ('telemffb.hw.ffb_tap', 'device_is_tapped', lambda *a, **k: False),
+            ('telemffb.hw.ffb_tap', 'game_started_first', lambda *a, **k: False),
+            ('telemffb.hw.ffb_tap', 'read_game_spring', lambda *a, **k: None),
+            ('telemffb.hw.ffb_tap', 'read_game_effects', lambda *a, **k: None)):
         try:
             module = importlib.import_module(module_name)
         except Exception:

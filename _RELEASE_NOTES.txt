@@ -12,6 +12,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - "The tap" intercepts the games own FFB effects and lets TelemFFB render them locally.  The game is unaware
   - New **Game Managed (DirectInput Tap)** spring mode re-renders the game's spring: trim center follow and force-trim collapse reproduce exactly. IL-2 Korea gets the matching pedal spring mode
     - Per-axis spring and the other five effect types a game may generate get an enable and a gain slider, with the live output strength shown on the slider bar
+  - **Advanced Dynamic** spring mode now renders through the tap as well - on a DirectLink device, and on a VPforce device while the tap is capturing it - so the airspeed curve works on the game's own spring on any hardware
   - Per-sim setup in System Settings finds your sims, installs the wrapper and keeps its config in step with your devices. An existing community ffb-fix install is recognized and upgraded in place; DCS can also run the wrapper in **FFB-Fix only mode**, without the tap
 - **NEW: "DCS FFB Fix" installer (DCS)**
   - Installs the DirectInput Tap wrapper without the tap - in the same way the "dcs-force-feedback-fix" wrapper is used today

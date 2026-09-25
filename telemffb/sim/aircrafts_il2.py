@@ -509,7 +509,10 @@ class Aircraft(AircraftBase):
         if not self.spring_mode_is(SpringModeEnum.TELEM) and not self.spring_mode_is(SpringModeEnum.ADVANCED):
             self.effects['il2_ffb_spring'].stop()
             return
-        if self.spring_mode_is(SpringModeEnum.ADVANCED) and self.adv_spr_use_hardware_trim:
+        if self.spring_mode_is(SpringModeEnum.ADVANCED) and (
+                self.adv_spr_use_hardware_trim
+                # a curve spring TelemFFB owns would double this one
+                or not self._adv_spr_via_adjuster()):
             self.effects['il2_ffb_spring'].stop()
             return
 

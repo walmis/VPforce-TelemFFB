@@ -5,6 +5,7 @@ A fake tap writer is simulated by writing TapShm bytes into the real named
 mapping - the same order-independent attach the wrapper's writer uses.
 """
 import ctypes
+import json
 import mmap
 import os
 import sys
@@ -408,6 +409,152 @@ class TestTapSpringMode:
                         return_value=self._state()):
             assert inst.ffb_tap_spring() is False
         assert not case.mock_effects.dict['ffb_tap_spring'].started
+
+
+class TestTapAdvancedSpring:
+    """Spring mode ADVANCED on a device without a spring adjuster: the
+    game's captured spring re-rendered as a TelemFFB spring with the curve
+    as its coefficients and the trim/G shifts on the game's center."""
+
+    CURVE = json.dumps({
+        "gain_x": 100, "gain_y": 100,
+        "curve_x": {"points": [{"x": 0, "y": 0}, {"x": 100, "y": 100}], "smooth_curve_enabled": False},
+        "curve_y": {"points": [{"x": 0, "y": 0}, {"x": 100, "y": 100}], "smooth_curve_enabled": False},
+        "units": "m/s",
+    })
+
+    def _make_instance(self, caps, device_type="joystick", ias=50.0):
+        import telemffb.globals as G
+        from tests.framework.base import BaseTelemetryEffectTestCase
+        from tests.framework.utils import TelemetryDataBuilder
+        from telemffb.sim.aircrafts_dcs import Aircraft as DCSAircraft
+
+        case = BaseTelemetryEffectTestCase()
+        case.setup_method()
+        case.mock_device.caps = caps
+        G.device_firmware_version = "v1.0.18"
+        inst = case.create_aircraft_instance(DCSAircraft, name="TestDCS",
+                                             _test_device_type=device_type)
+        inst.spring_mode = "ADVANCED"
+        inst.adv_spr_gains = self.CURVE
+        inst._telem_data = (TelemetryDataBuilder()
+                            .set("FFBType", device_type)
+                            .set("IAS", ias).build())
+        return case, inst
+
+    def _state(self):
+        from telemffb.hw.ffb_tap import TapAxisCondition, TapSpringState
+        return TapSpringState(
+            x=TapAxisCondition(offset=1024, positive_coefficient=4096,
+                               negative_coefficient=4096,
+                               positive_saturation=4096,
+                               negative_saturation=4096, deadband=0),
+            y=TapAxisCondition(offset=-2048, positive_coefficient=41,
+                               negative_coefficient=41,
+                               positive_saturation=3000,
+                               negative_saturation=4096, deadband=100),
+            device_name="MOZA AB9", generation=1, reset_count=0, update_count=7)
+
+    def _run_frame(self, inst, state):
+        import unittest.mock as mock
+        with mock.patch("telemffb.hw.ffb_tap.read_game_spring", return_value=state), \
+                mock.patch("telemffb.hw.ffb_tap.read_game_effects", return_value=None), \
+                mock.patch("telemffb.hw.ffb_tap.device_is_tapped", return_value=False), \
+                mock.patch("telemffb.hw.ffb_tap.game_started_first", return_value=False):
+            inst.ac_modify_game_spring()
+
+    def test_curve_replaces_game_coefficients_on_game_center(self):
+        from telemffb.hw.ffb_dinput import DINPUT_CAPABILITIES
+        case, inst = self._make_instance(DINPUT_CAPABILITIES)
+        self._run_frame(inst, self._state())
+        spring = case.mock_effects.dict['adv_spr']
+        assert spring.started
+        # IAS 50 on a 0..100 m/s linear curve = 0.5 of full scale, both axes
+        assert inst._tap_cond_x.positiveCoefficient == 2048
+        assert inst._tap_cond_x.negativeCoefficient == 2048
+        assert inst._tap_cond_y.positiveCoefficient == 2048
+        # the game's center, saturation and deadband stay as captured
+        assert inst._tap_cond_x.cpOffset == 1024
+        assert inst._tap_cond_y.cpOffset == -2048
+        assert inst._tap_cond_y.positiveSaturation == 3000
+        assert inst._tap_cond_y.deadBand == 100
+        assert inst._telem_data['FFB_Tap'] == 'active'
+        assert inst._telem_data['FFB_X_Force'] == 0.5
+        assert inst._telem_data['FFB_Y_Center'] == -0.5
+
+    def test_trim_and_g_shifts_add_to_game_center(self):
+        from telemffb.hw.ffb_dinput import DINPUT_CAPABILITIES
+        case, inst = self._make_instance(DINPUT_CAPABILITIES)
+        import unittest.mock as mock
+        with mock.patch("telemffb.hw.ffb_tap.read_game_spring", return_value=self._state()), \
+                mock.patch("telemffb.hw.ffb_tap.read_game_effects", return_value=None):
+            assert inst.ffb_tap_advanced_spring(0.5, 0.5, 0.25, -0.75) is True
+        assert inst._tap_cond_x.cpOffset == 2048        # 1024 + 0.25 * 4096
+        assert inst._tap_cond_y.cpOffset == -4096       # -2048 - 3072, clamped
+
+    def test_no_capture_stops_the_spring(self):
+        from telemffb.hw.ffb_dinput import DINPUT_CAPABILITIES
+        case, inst = self._make_instance(DINPUT_CAPABILITIES)
+        self._run_frame(inst, None)
+        assert not case.mock_effects.dict['adv_spr'].started
+        assert inst._telem_data['FFB_Tap'] == 'inactive'
+
+    def test_untapped_adjuster_device_never_reads_the_tap(self):
+        import unittest.mock as mock
+        from telemffb.hw.ffb_backend import VPFORCE_CAPABILITIES
+        case, inst = self._make_instance(VPFORCE_CAPABILITIES)
+        with mock.patch("telemffb.hw.ffb_tap.read_game_spring") as read, \
+                mock.patch("telemffb.hw.ffb_tap.device_is_tapped", return_value=False):
+            inst.ac_modify_game_spring()
+        read.assert_not_called()
+        assert case.mock_effects.dict['adv_spr'].started
+        assert inst.spring_adjuster_x.positiveCoefficient == 2048
+
+    def test_tapped_adjuster_device_takes_the_tap_path(self):
+        """With the wrapper capturing the device, the game's spring never
+        reaches it, so an adjuster would have nothing to act on."""
+        import unittest.mock as mock
+        from telemffb.hw.ffb_backend import VPFORCE_CAPABILITIES
+        case, inst = self._make_instance(VPFORCE_CAPABILITIES)
+        with mock.patch("telemffb.hw.ffb_tap.read_game_spring", return_value=self._state()), \
+                mock.patch("telemffb.hw.ffb_tap.read_game_effects", return_value=None), \
+                mock.patch("telemffb.hw.ffb_tap.device_is_tapped", return_value=True):
+            inst.ac_modify_game_spring()
+        assert case.mock_effects.dict['adv_spr'].started
+        assert inst._tap_cond_x.positiveCoefficient == 2048
+        assert inst._tap_cond_x.cpOffset == 1024
+        assert inst.spring_adjuster_x.positiveCoefficient == 0    # adjuster untouched
+
+    def test_tap_mode_handler_leaves_game_effects_to_advanced(self):
+        import unittest.mock as mock
+        from telemffb.hw.ffb_dinput import DINPUT_CAPABILITIES
+        case, inst = self._make_instance(DINPUT_CAPABILITIES)
+        with mock.patch.object(inst, '_tap_effects_teardown') as teardown, \
+                mock.patch("telemffb.hw.ffb_tap.device_is_tapped", return_value=False):
+            assert inst.ffb_tap_spring() is False
+        teardown.assert_not_called()
+        inst.spring_mode = "NONE"
+        with mock.patch.object(inst, '_tap_effects_teardown') as teardown, \
+                mock.patch("telemffb.hw.ffb_tap.device_is_tapped", return_value=False):
+            inst.ffb_tap_spring()
+        teardown.assert_called_once()
+
+    def test_pedals_without_adjuster_take_curve_and_trim_offset(self):
+        from telemffb.hw.ffb_dinput import DINPUT_CAPABILITIES
+        case, inst = self._make_instance(DINPUT_CAPABILITIES, device_type="pedals")
+        inst.override_spring_cp0_x = 0.25
+        inst.ac_override_pedal_spring(inst._telem_data)
+        assert case.mock_effects.dict['pedal_spring'].started
+        assert inst.spring_x.positiveCoefficient == 2048
+        assert inst.spring_x.cpOffset == 1024
+
+    def test_pedals_with_adjuster_keep_spring_untouched(self):
+        from telemffb.hw.ffb_backend import VPFORCE_CAPABILITIES
+        case, inst = self._make_instance(VPFORCE_CAPABILITIES, device_type="pedals")
+        inst.override_spring_cp0_x = 0.25
+        inst.ac_override_pedal_spring(inst._telem_data)
+        assert inst.spring_x.positiveCoefficient == 0
+        assert inst.spring_x.cpOffset == 0
 
 
 class TestEffectTranslations:

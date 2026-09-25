@@ -104,7 +104,8 @@ class FfbTapMixIn:
             return False
         if not self.spring_mode_is(SpringModeEnum.DINPUT_TAP):
             self.effects['ffb_tap_spring'].stop()
-            self._tap_effects_teardown()
+            if not self._tap_feeds_advanced_spring():
+                self._tap_effects_teardown()
             self._warn_if_tap_is_swallowing()
             return False
 
@@ -162,8 +163,54 @@ class FfbTapMixIn:
         spring.start(override=True)
         return True
 
-    def _warn_if_tap_is_missing(self):
-        """Say so when spring mode DINPUT_TAP has no live tap behind it -
+    def ffb_tap_advanced_spring(self, gain_x: float, gain_y: float,
+                                cp0_x: float, cp0_y: float) -> bool:
+        """Render the tap's captured game spring with the Advanced Dynamic
+        curve (gains 0..1) as its coefficients and the trim/G shifts
+        (normalized -1..1) added to the game's center.  Returns True while
+        rendering; False, with the effect stopped, when nothing is captured.
+        """
+        from telemffb.hw import ffb_tap
+        state = ffb_tap.read_game_spring()
+        self.telem_data['FFB_Tap'] = 'active' if state else 'inactive'
+        if state is None:
+            self.effects['adv_spr'].stop()
+            self._warn_if_tap_is_missing(mode_name="Advanced Dynamic")
+            return False
+
+        # the tap swallows every game effect, not only the spring
+        self._ffb_tap_game_effects()
+
+        x_state, y_state = state.x, state.y
+        if self.tap_spring_swap_axes:
+            x_state, y_state = y_state, x_state
+        if self.tap_spring_invert_x and x_state is not None:
+            x_state = x_state.inverted()
+        if self.tap_spring_invert_y and y_state is not None:
+            y_state = y_state.inverted()
+
+        spring = self.effects['adv_spr'].spring()
+        for axis_state, cond, gain, cp0, axis_name in (
+                (x_state, self._tap_cond_x, gain_x, cp0_x, 'X'),
+                (y_state, self._tap_cond_y, gain_y, cp0_y, 'Y')):
+            if axis_state is None:
+                continue
+            coefficient = round(max(0.0, min(1.0, gain)) * 4096)
+            offset = max(-4096, min(4096, axis_state.offset + round(cp0 * 4096)))
+            cond.cpOffset = offset
+            cond.positiveCoefficient = coefficient
+            cond.negativeCoefficient = coefficient
+            cond.positiveSaturation = axis_state.positive_saturation
+            cond.negativeSaturation = axis_state.negative_saturation
+            cond.deadBand = axis_state.deadband
+            spring.setCondition(cond)
+            self.telem_data[f'FFB_{axis_name}_Force'] = round(coefficient / 4096, 4)
+            self.telem_data[f'FFB_{axis_name}_Center'] = round(offset / 4096, 4)
+        spring.start(override=True)
+        return True
+
+    def _warn_if_tap_is_missing(self, mode_name="Game Managed (DirectInput Tap)"):
+        """Say so when a tap-fed spring mode has no live tap behind it -
         the reverse of _warn_if_tap_is_swallowing.
 
         The mode renders only what the wrapper captures, and the wrapper
@@ -183,13 +230,13 @@ class FfbTapMixIn:
         # diagnosis and the message can commit to the one actual fix.
         if ffb_tap.game_started_first():
             self.flag_error(
-                "Spring mode is 'Game Managed (DirectInput Tap)', but "
+                f"Spring mode is '{mode_name}', but "
                 "the game was started before TelemFFB, so the tap did "
                 "not engage for this session.  Restart the game with "
                 "TelemFFB already running.")
             return
         self.flag_error(
-            "Spring mode is 'Game Managed (DirectInput Tap)', but the "
+            f"Spring mode is '{mode_name}', but the "
             "DirectInput Tap is not capturing this game's force feedback "
             "for this device, so there is no game spring to render.  If "
             "the game was started before TelemFFB, restart the game - the "

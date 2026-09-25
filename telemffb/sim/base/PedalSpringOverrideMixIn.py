@@ -162,6 +162,16 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
                 spring_coeff = utils.clamp(self.pedal_spring_gain, 0, 1.0)
                 self.spring_x.set_coefficient(spring_coeff)
 
+        elif self.spring_mode_is(SpringModeEnum.ADVANCED):
+            # with an adjuster, AdvancedSpringMixIn applies the curve and trim
+            if not self._adv_spr_via_adjuster():
+                if self.adv_spr_gains:
+                    gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.IAS or 0)
+                    self.spring_x.set_coefficient(gains.get('x', 0))
+                else:
+                    self.spring_x.set_coefficient(0)
+                self.spring_x.set_offset(self.override_spring_cp0_x)
+
         elif self.spring_mode_is(SpringModeEnum.DYNAMIC) or self.spring_mode_is(SpringModeEnum.CUSTOM):
             tas = telem_data.TAS or 0
 

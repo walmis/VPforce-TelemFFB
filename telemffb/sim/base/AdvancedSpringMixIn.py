@@ -97,37 +97,57 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     def spring_mode_is(self, mode : SpringModeEnum):
         return mode == self.spring_mode
 
+    @staticmethod
+    def _adv_spr_device_has_adjuster() -> bool:
+        caps = getattr(HapticEffect.device, 'caps', None)
+        return caps is None or caps.has_spring_adjuster
+
+    def _tap_feeds_advanced_spring(self) -> bool:
+        """A joystick in ADVANCED whose game spring only the tap can supply:
+        the device has no spring adjuster, or the tap is capturing it."""
+        if not (self.is_joystick() and self.spring_mode_is(SpringModeEnum.ADVANCED)):
+            return False
+        if not self._adv_spr_device_has_adjuster():
+            return True
+        from telemffb.hw import ffb_tap
+        return ffb_tap.device_is_tapped()
+
+    def _adv_spr_via_adjuster(self) -> bool:
+        """Whether the spring adjuster renders this mode.  Otherwise a spring
+        TelemFFB owns carries the curve: the tap spring on the joystick, the
+        pedal spring on pedals."""
+        return self._adv_spr_device_has_adjuster() and not self._tap_feeds_advanced_spring()
+
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):
             self.effects['adv_spr'].stop()
             return
-        if self._sim_is_il2():
-            if not self.adv_spr_use_hardware_trim:
-                self.il2_ffb_spring(force=True)
-            else:
-                self.effects['il2_ffb_spring'].stop()
-        caps = getattr(HapticEffect.device, 'caps', None)
-        if caps is not None and not caps.has_spring_adjuster:
-            self.flag_error('The Advanced/Custom Spring Override is not supported on this device.\n'
-                            'It requires the spring adjuster feature of VPforce hardware.')
-            return
-        # Verify the device firmware meets the minimum version required to execute this effect
-        # Flag error and abort if not met
-        if self.__firmware_supported is None:
-            self.__firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
-        if not self.__firmware_supported:
-            self.flag_error('The Advanced/Custom Spring Override requires firmware v1.0.18 or higher.\n'
-                            f'The device is currently running version {G.device_firmware_version}\n'
-                            f'Please update your device firmware!')
-            return
+        via_adjuster = self._adv_spr_via_adjuster()
+        if via_adjuster:
+            if self._sim_is_il2():
+                # the adjuster needs a spring on the device to act on
+                if not self.adv_spr_use_hardware_trim:
+                    self.il2_ffb_spring(force=True)
+                else:
+                    self.effects['il2_ffb_spring'].stop()
+            # Verify the device firmware meets the minimum version required to execute this effect
+            # Flag error and abort if not met
+            if self.__firmware_supported is None:
+                self.__firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+            if not self.__firmware_supported:
+                self.flag_error('The Advanced/Custom Spring Override requires firmware v1.0.18 or higher.\n'
+                                f'The device is currently running version {G.device_firmware_version}\n'
+                                f'Please update your device firmware!')
+                return
         if not self.adv_spr_gains:
             self.flag_error('Please open and configure the advanced spring gain settings')
             return
 
         gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.IAS or 0)
 
-        self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
-        self.spring_adjuster_x.set_coefficient(gains.get('x', 0))
+        if via_adjuster:
+            self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
+            self.spring_adjuster_x.set_coefficient(gains.get('x', 0))
 
         if self.adv_spr_use_hardware_trim:
             dt = perftracker.get_time_delta('override_spring_perf')
@@ -167,6 +187,14 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             self.override_spring_cp0_y,
             g_y_offset,
         ]
+        if not via_adjuster:
+            if self.is_joystick():
+                self.ffb_tap_advanced_spring(gains.get('x', 0), gains.get('y', 0),
+                                             self.override_spring_cp0_x,
+                                             self.override_spring_cp0_y + g_y_offset)
+            # pedals: ac_override_pedal_spring carries the curve and trim
+            return
+
         self.spring_adjuster_y.set_offset(self.override_spring_cp0_y + g_y_offset)
         self.spring_adjuster_x.set_offset(self.override_spring_cp0_x)
 
