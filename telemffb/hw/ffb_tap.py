@@ -271,9 +271,43 @@ class TapAxisCondition:
             deadband=self.deadband)
 
 
+def _merge_axis(parts: list) -> TapAxisCondition:
+    """One axis of the spring the game is rendering, from every playing
+    spring slot's block for that axis.  Springs add: coefficients and
+    saturations sum (clamped), the center is the coefficient-weighted mean
+    of the contributors' offsets, and the deadband is the strongest
+    contributor's.  A block with no coefficient adds no force and is left
+    out, so a game that splits X and Y across two spring effects, each
+    with a zero block on the other axis, yields each axis from the effect
+    that drives it."""
+    def weight(p: TapAxisCondition) -> int:
+        return abs(p.positive_coefficient) + abs(p.negative_coefficient)
+
+    live = [p for p in parts if weight(p)]
+    if not live:
+        return parts[0]
+    if len(live) == 1:
+        return live[0]
+
+    def clamp_c(v: int) -> int:
+        return max(-4096, min(4096, v))
+
+    total = sum(weight(p) for p in live)
+    return TapAxisCondition(
+        offset=round(sum(weight(p) * p.offset for p in live) / total),
+        positive_coefficient=clamp_c(sum(p.positive_coefficient for p in live)),
+        negative_coefficient=clamp_c(sum(p.negative_coefficient for p in live)),
+        positive_saturation=min(4096, sum(p.positive_saturation for p in live)),
+        negative_saturation=min(4096, sum(p.negative_saturation for p in live)),
+        deadband=max(live, key=weight).deadband,
+    )
+
+
 @dataclass
 class TapSpringState:
-    """The game's spring as published by the tap, translated for rendering."""
+    """The spring the game is rendering, as published by the tap and
+    translated for rendering: every playing spring slot merged into one
+    condition per axis (see _merge_axis)."""
     x: Optional[TapAxisCondition]
     y: Optional[TapAxisCondition]
     device_name: str
@@ -584,7 +618,9 @@ class FfbTapReader:
     def read_game_spring(self) -> Optional[TapSpringState]:
         """This instance's tapped device's playing spring, in Rhino
         units - or None (no writer, wrong protocol version, device paused,
-        or spring not playing).
+        or no spring playing).  A game may render its spring as several
+        spring effects (IL-2 Sturmovik: one per axis); the device would
+        sum them, so the mode does too, into one condition per axis.
 
         Called from the telemetry loop, so state-transition logging is
         edge-triggered here.
@@ -615,19 +651,26 @@ class FfbTapReader:
             self._logged_device_gen = (dev.generation, dev.resetCount)
         if dev.pausedState:
             return None
+        x_parts, y_parts, updates = [], [], 0
         for e in dev.effects:
             if e.slotUsed and e.effectType == ET_SPRING and e.playing:
                 c = e.u.condition
                 n = min(c.count, 2)
-                return TapSpringState(
-                    x=_translate_axis(c, 0) if n >= 1 else None,
-                    y=_translate_axis(c, 1) if n >= 2 else None,
-                    device_name=name,
-                    generation=dev.generation,
-                    reset_count=dev.resetCount,
-                    update_count=e.updateCount,
-                )
-        return None   # tapped device present, no playing spring
+                if n >= 1:
+                    x_parts.append(_translate_axis(c, 0))
+                if n >= 2:
+                    y_parts.append(_translate_axis(c, 1))
+                updates += e.updateCount
+        if not (x_parts or y_parts):
+            return None   # tapped device present, no playing spring
+        return TapSpringState(
+            x=_merge_axis(x_parts) if x_parts else None,
+            y=_merge_axis(y_parts) if y_parts else None,
+            device_name=name,
+            generation=dev.generation,
+            reset_count=dev.resetCount,
+            update_count=updates,
+        )
 
     def read_game_effects(self) -> Optional[TapGameEffects]:
         """Every mirrored NON-spring effect slot of this instance's tapped

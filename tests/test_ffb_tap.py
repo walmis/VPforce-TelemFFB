@@ -153,6 +153,43 @@ class TestReadGameSpring:
         reader.close()
         return state
 
+    @staticmethod
+    def _add_spring(shm, slot, coef, offset=(0, 0), sat=(10000, 10000), playing=1):
+        e = shm.devices[0].effects[slot]
+        e.slotUsed = 1
+        e.effectType = ET_SPRING
+        e.playing = playing
+        c = e.u.condition
+        c.count = 2
+        for i in range(2):
+            c.offset[i] = offset[i]
+            c.positiveCoefficient[i] = c.negativeCoefficient[i] = coef[i]
+            c.positiveSaturation[i] = c.negativeSaturation[i] = sat[i]
+
+    def test_a_spring_split_across_two_effects_renders_both_axes(self, tap_mapping):
+        """IL-2 Sturmovik: one spring effect per axis, each with a zero
+        block on the other axis.  Each axis comes from the effect that
+        drives it; a stopped spring adds nothing."""
+        shm = make_shm(spring_kwargs=dict(coef=(0, 10000), sat=(0, 10000),
+                                          offset=(0, -5000), deadband=(0, 0)))
+        self._add_spring(shm, 2, coef=(10000, 0), sat=(10000, 0), offset=(2500, 0))
+        self._add_spring(shm, 3, coef=(10000, 10000), offset=(-9000, 9000), playing=0)
+        state = self._read(tap_mapping, shm)
+        assert (state.x.positive_coefficient, state.x.offset, state.x.positive_saturation) == (4096, 1024, 4096)
+        assert (state.y.positive_coefficient, state.y.offset) == (4096, -2048)
+
+    def test_springs_stacked_on_one_axis_add(self, tap_mapping):
+        """Two springs on the same axis sum like the device would: the
+        coefficients add (clamped to full scale) and the center is the
+        coefficient-weighted mean of theirs."""
+        shm = make_shm(spring_kwargs=dict(coef=(7500, 10000), offset=(2500, 0),
+                                          sat=(10000, 10000), deadband=(0, 0)))
+        self._add_spring(shm, 1, coef=(2500, 10000), offset=(-2500, 0))
+        state = self._read(tap_mapping, shm)
+        assert state.x.positive_coefficient == 4096          # 3072 + 1024
+        assert state.x.offset == 512                          # (3072*1024 + 1024*-1024) / 4096
+        assert state.y.positive_coefficient == 4096          # 4096 + 4096, clamped
+
     def test_units_translated_to_rhino_scale(self, tap_mapping):
         state = self._read(tap_mapping, make_shm())
         assert state is not None
