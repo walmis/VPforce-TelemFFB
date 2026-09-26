@@ -216,10 +216,10 @@ class Aircraft(
 
         Commands are taken, not read, so an axis nothing was sent on this
         frame offers none and is recorded with nothing to difference it
-        against rather than against a stale value.  They come from the
-        previous frame, this running ahead of the send, and the probe fits
-        that lag out.  An axis the simulator does not report arrives as
-        None and is skipped.
+        against rather than against a stale value.  Each reported value is
+        brought into the command's range and sense here, so the probe
+        compares like with like.  An axis the simulator does not report
+        arrives as None and is skipped.
         """
         probe = self._axis_jitter
         if probe is None:
@@ -232,9 +232,9 @@ class Aircraft(
                 probe.set_provisional(axis, not verified)
             reported = getattr(telem_data, field, None)
             if axis == 'collective' and reported is not None:
-                # reported fully up to fully down as 0..1; the command is
-                # in the -1..1 the other axes share
-                reported = reported * 2.0 - 1.0
+                # reported 0..1 in the opposite sense to the command, which
+                # is in the -1..1 the other axes share
+                reported = 1.0 - reported * 2.0
             probe.sample(axis, reported, command)
         probe.poll()
 

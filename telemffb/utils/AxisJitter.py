@@ -1,39 +1,21 @@
-"""Jitter measurement on the sim's control-input axes.
+"""Detection of a second writer on the sim's control-input axes.
 
-A second writer on an axis TelemFFB drives - a binding left mapped in the
-simulator's own controls - does not show up as a steady offset between what
-was commanded and what the sim reports.  Both writers update the axis at
-frame rate, so the sampled position alternates between them and the mean
-sits somewhere unremarkable in between.  The signature is in the sample to
-sample motion, not in the magnitude.
+A binding left mapped in the simulator's own controls competes with
+TelemFFB for the axis.  What that looks like, in every capture of one, is
+the other writer holding the axis while TelemFFB's writes get through now
+and then - each one yanking the reported position a large step in a single
+frame before the simulator's own input pulls it back.  That is the flop a
+user sees on the controls, and it is what is counted here.
 
-The rate at which the first difference changes sign measures that, but not
-on the reported position alone: a vibration effect - propeller or engine
-rumble above all - physically shakes the control, so the axis really does
-turn around on almost every frame and reads identically to contention.
-
-What separates them is the residual against what TelemFFB commanded.  Both
-writers derive from the same shaking control, TelemFFB sending the physical
-position less its virtual offset and the simulator's own binding sending
-its curve of that position, so the vibration is common to both and cancels
-when the command is subtracted.  What survives is the difference between
-the two writers, which is the virtual offset - smooth, and near zero only
-when nothing else is writing.  Residual statistics are therefore the ones
-to read; position statistics are kept beside them because a capture is
-worth more when it shows both.
-
-The command's sign convention and its lag behind the reported value are
-resolved by trying each and keeping the closest fit, rather than assuming a
-convention this module has no way to verify.
-
-Measurement only: nothing here decides whether a conflict exists, and the
-thresholds that would make that decision are meant to come from comparing
-captures of a known-clean and a deliberately contested configuration.
+Everything a simulator does to an axis on its own moves the reported
+position smoothly: reporting it scaled, a fraction of a frame early or
+late, lagging behind with no hydraulic pressure, settling after an aircraft
+loads.  None of it produces a jump the command did not make, which is why
+this measures jumps rather than positions.
 """
 from collections import deque
 from typing import Dict, Optional, Tuple
 import logging
-import math
 import time
 
 
@@ -151,34 +133,37 @@ def forget_axis_commands() -> None:
 
 
 class AxisJitterMonitor:
-    """Rolling per-axis jitter statistics, logged at an interval.
+    """Counts jolts on each driven axis and judges, over a few windows,
+    whether the controls are flopping.
 
-    ``window_s`` bounds the sample history each statistic is computed over,
-    and ``report_s`` how often a line is emitted.  ``deadband`` is the
-    smallest move counted as a direction change, in the units of the
-    sampled value (control positions are -1..1), and exists so that
-    quantization noise on a stationary axis does not read as a high
-    reversal rate.  It applies against a moving reference rather than the
-    previous sample, so a slow drift still registers once it has travelled
-    far enough instead of being discarded a sample at a time.
+    A jolt is a frame in which the reported position moved at least
+    ``JOLT`` of travel and that move was at least ``JOLT`` away from what
+    the command moved in that frame or the one before.  A window of
+    ``window_s`` holding ``JOLTS_PER_WINDOW`` of them is flickering, and an
+    axis with ``FLICKERING_WINDOWS`` of its last ``WINDOWS_SEEN`` windows
+    flickering is contended: a binding flops the control for as long as it
+    is bound, while a hitch or a crash jolts once.
     """
 
-    #: Travel a control must show before its mapping can be judged.
-    #:
-    #: A reported variable stuck at zero agrees perfectly with a command
-    #: that is also near zero, so a still control makes a wrong mapping look
-    #: right - which is how a helicopter's collective and tail rotor first
-    #: read as confirmed while barely moving.  Nothing is concluded until
-    #: the control has actually been worked.
-    MAPPING_TRAVEL = 0.2
+    #: A tenth of full travel.  The captured bindings jolted by about 0.35;
+    #: nothing the simulator did on its own in a clean capture came close.
+    JOLT = 0.1
 
-    #: Reports between one sighting of an unconfirmed axis and the next.
-    #:
-    #: Those axes exist to be checked, so they have to be visible without
-    #: turning on debug logging - which on a normal flight is far too much
-    #: to read.  At the usual cadence this is about a line a minute per
-    #: axis, enough to confirm a mapping over a short flight and few enough
-    #: not to bury anything.
+    JOLTS_PER_WINDOW = 3
+    FLICKERING_WINDOWS = 3
+    WINDOWS_SEEN = 5
+
+    #: Frames further apart than this are not compared: across a stall
+    #: both writers have moved, and the jump is not evidence of either.
+    MAX_FRAME_GAP_S = 0.1
+
+    #: Commands at or beyond this are clamped by the simulator, which
+    #: reports its limit instead, so the move there says nothing.
+    CLAMP_AT = 0.999
+
+    #: Reports between one sighting of an unconfirmed axis and the next,
+    #: so those axes stay visible without debug logging and without
+    #: burying anything: about a line a minute each.
     PROVISIONAL_EVERY = 12
 
     #: Rows a raw capture will write before closing itself.  At a frame per
@@ -187,34 +172,22 @@ class AxisJitterMonitor:
     RAW_ROW_LIMIT = 120000
 
     def __init__(self, window_s: float = 2.0, report_s: float = 5.0,
-                 deadband: float = 0.001, raw_path: Optional[str] = None,
-                 check_s: float = 1.0) -> None:
+                 raw_path: Optional[str] = None) -> None:
         self.window_s = window_s
         self.report_s = report_s
-        # Evaluation runs on its own cadence, shorter than the window, so
-        # consecutive evaluations overlap and every sample is examined by at
-        # least one.  Evaluating only when reporting would leave the samples
-        # between reports to be evicted unseen, and a burst of contention
-        # falling in that gap would never be judged.
-        self.check_s = min(check_s, window_s)
-        self.deadband = deadband
-        self._samples: Dict[str, deque] = {}
-        # Sign and lag settle for a session; remembered per axis so the
-        # search is not repeated on every window.
-        self._fit_cache: Dict[str, tuple] = {}
-        self._fit_ceiling: Dict[str, float] = {}
-        self._next_check: Optional[float] = None
-        self._next_report: Optional[float] = None
-        self._peak: Dict[str, float] = {}
-        self._travel: Dict[str, float] = {}
-        self._seen: Dict[str, bool] = {}
+        # axis -> the previous two samples, (time, reported, commanded)
+        self._recent: Dict[str, deque] = {}
+        self._jolts: Dict[str, int] = {}          # in the window under way
+        self._driven: set = set()                 # axes commanded in that window
+        self._history: Dict[str, deque] = {}      # flickering or not, per window
+        self._largest: Dict[str, float] = {}      # since the last report
+        self._frames: Dict[str, int] = {}         # commanded frames since the last report
+        self._seen: Dict[str, bool] = {}          # contended since the last report
         # Axes whose reported variable is not yet confirmed against a
-        # flight.  Measured and logged like any other, but never allowed to
-        # reach a verdict: a wrong mapping leaves a standing residual that
-        # reads exactly like a second writer.
+        # flight: measured and logged, never judged.
         self._provisional: set = set()
-        self._latest: Dict[str, dict] = {}
-        self._checks = 0
+        self._next_window: Optional[float] = None
+        self._next_report: Optional[float] = None
         self._reports = 0
         self._raw_path = raw_path
         self._raw = None
@@ -331,332 +304,50 @@ class AxisJitterMonitor:
         available what TelemFFB last commanded on it.
 
         A value of None (simvar absent for this aircraft) is skipped rather
-        than treated as zero, which would read as a full-scale excursion.
+        than treated as zero.
         """
         value = self._number(value)
         if value is None:
             return
         now = time.perf_counter() if now is None else now
-        buf = self._samples.get(axis)
-        if buf is None:
-            buf = self._samples[axis] = deque()
         commanded = self._number(commanded)
-        buf.append((now, value, commanded))
         self._write_raw(axis, now, value, commanded)
-        horizon = now - self.window_s
-        while buf and buf[0][0] < horizon:
-            buf.popleft()
+        recent = self._recent.get(axis)
+        if recent is None:
+            recent = self._recent[axis] = deque(maxlen=3)
+        recent.append((now, value, commanded))
+        if commanded is None:
+            return
+        self._driven.add(axis)
+        self._frames[axis] = self._frames.get(axis, 0) + 1
+        jolt = self._jolt(recent)
+        if jolt is not None:
+            self._jolts[axis] = self._jolts.get(axis, 0) + 1
+            self._largest[axis] = max(self._largest.get(axis, 0.0), jolt)
 
-    def _measure(self, values) -> Tuple[int, float, list]:
-        """(direction reversals, peak-to-peak, spacing between reversals).
-
-        The spacing is in samples, and is what separates a driven effect
-        from a race.  A vibration effect turns the control around on a
-        period, so its gaps are all alike; which of two writers lands last
-        in a frame is a matter of scheduling, so its gaps are not.
-        """
-        reversals = 0
-        last_sign = 0
-        reference = values[0]
-        last_turn = 0
-        spacing = []
-        for index, value in enumerate(values[1:], start=1):
-            delta = value - reference
-            if abs(delta) < self.deadband:
-                continue
-            sign = 1 if delta > 0 else -1
-            if last_sign and sign != last_sign:
-                reversals += 1
-                spacing.append(index - last_turn)
-                last_turn = index
-            last_sign = sign
-            reference = value
-        return reversals, max(values) - min(values), spacing
-
-    #: How many recent commands the reported value is allowed to have come
-    #: from.  The simulator sometimes reports from between two consecutive
-    #: commands rather than from the latest, so a span of a few frames
-    #: covers the delivery race without being wide enough to hide a gap.
-    SPAN_FRAMES = 3
-
-    #: Commands at or beyond this are clamped by the simulator, which
-    #: reports its limit instead.  Those frames say nothing about a second
-    #: writer and are left out - a large virtual offset pushes the command
-    #: past full scale routinely.
-    CLAMP_AT = 0.999
-
-    def _excursion(self, buf, sign: int) -> Optional[dict]:
-        """How far the reported position falls outside the range the command
-        has recently visited.
-
-        This is the measurement that survived the captures.  Everything the
-        simulator does to an axis on its own - reporting from between two
-        commands, lagging a fraction of a frame, shaking hard enough to make
-        either large - keeps the reported value somewhere the command has
-        just been.  Only a second writer can report a position the command
-        never took, and the distance it lands outside is the gap between
-        them.
-
-        Unlike amplitude, turn rate or bias, none of which separated the two
-        in the field, this does not move with how fast the control is
-        shaking or where it is being held.
-        """
-        commanded = [sign * c for _, _, c in buf]
-        reported = [v for _, v, _ in buf]
-        span = self.SPAN_FRAMES
-        values = []
-        clamped = 0
-        for i in range(span, len(buf)):
-            if abs(commanded[i]) >= self.CLAMP_AT:
-                clamped += 1
-                continue
-            window = commanded[i - span:i + 1]
-            low, high = min(window), max(window)
-            if reported[i] > high:
-                values.append(reported[i] - high)
-            elif reported[i] < low:
-                values.append(low - reported[i])
-            else:
-                values.append(0.0)
-        if len(values) < 10:
+    def _jolt(self, recent) -> Optional[float]:
+        """How far the latest report jumped beyond the command's own move,
+        or None when it did not jolt."""
+        if len(recent) < 2:
             return None
-        values.sort()
-        return {
-            'median': values[len(values) // 2],
-            # The verdict reads this rather than the median.  Which writer
-            # lands last is a race, and the median would need the simulator
-            # to win more frames than not; a quarter is enough here, and
-            # since a clean axis measures the same either way - a ten
-            # thousandth of travel at both - the reach costs nothing.
-            'p75': values[int(0.75 * len(values))],
-            'p99': values[int(0.99 * len(values))],
-            'max': values[-1],
-            'clamped_frac': clamped / max(1, len(buf) - span),
-        }
-
-    @staticmethod
-    def _regularity(spacing) -> Tuple[Optional[float], Optional[float]]:
-        """(mean gap between turns, how much those gaps vary).
-
-        Variation is the spread over the mean, so it does not move with the
-        rate itself: an evenly driven oscillation sits near zero however
-        fast it runs, while gaps drawn at random sit near one.
-        """
-        if len(spacing) < 3:
-            return None, None
-        mean = sum(spacing) / len(spacing)
-        if mean <= 0:
-            return None, None
-        variance = sum((s - mean) ** 2 for s in spacing) / len(spacing)
-        return mean, math.sqrt(variance) / mean
-
-    #: Sign conventions and frame lags tried when fitting the residual.  The
-    #: reported position may invert what the axis event carries and may trail
-    #: it by a frame; both are properties of the simulator, not of a fault.
-    _FITS = ((1, 0), (1, 1), (-1, 0), (-1, 1))
-
-    #: A window's median excursion beyond this reads as a second writer.
-    #:
-    #: Placed from paired captures of the same aircraft and rumble settings,
-    #: one with the axes bound in the simulator and one without.  Every
-    #: clean window measured at or under 0.000065 and every contested
-    #: elevator window at or over 0.010, leaving the threshold two orders of
-    #: magnitude clear on each side.
-    #:
-    #: The aileron was bound in that same run and reads clean, which is a
-    #: miss and not a correct acquittal.  It carries almost no trim, so the
-    #: gap between the two writers - a median of 0.008 - is smaller than the
-    #: command's own travel between frames, and nothing lands outside the
-    #: span to be seen.  That is also the case with no flicker to feel, and
-    #: an axis bound alone is not a configuration anyone arrives at, so in
-    #: practice the elevator carries the finding.
-    #:
-    #: Three earlier rules were tried and each convicted a clean axis:
-    #: position turn rate (a rumble effect turns the control at frame rate
-    #: exactly as a second writer does), residual size (a hard-driven rumble
-    #: reached the amplitude and turn rate of a contested axis carrying
-    #: little trim) and residual bias (predicted near zero for an artifact,
-    #: measured at 0.33 to 0.41 - a control held off centre against a small
-    #: gain error produces it on its own).  None of those failures was
-    #: visible in a summary; all three were obvious in the waveform, which
-    #: is what the raw capture is for.
-    CONTENDED_EXCURSION = 0.005
-
-    #: How little the reported position may move, while the command is
-    #: travelling, before the variable is treated as not reporting this
-    #: axis at all.
-    #:
-    #: Some aircraft never populate the variable an axis is read from -
-    #: an external flight model computes its own controls and leaves the
-    #: stock one at rest.  Differenced against a moving command that
-    #: produces a residual the size of the command itself, which is the
-    #: largest possible excursion and would convict on every flight.
-    #:
-    #: A second writer MOVES the reported value; it cannot hold it
-    #: still.  So a frozen variable is an absent one, and saying so is
-    #: the alternative to maintaining a list of aircraft that misreport.
-    UNRESPONSIVE_TRAVEL = 0.005
-
-    #: Frames arriving later than this multiple of the window's usual
-    #: interval are counted as stalled, and the share is reported.  It is
-    #: measured rather than acted on.
-    #:
-    #: A stuttering simulator could in principle answer from a command older
-    #: than the span covers, which would put the reported value outside it
-    #: for reasons unrelated to a second writer.  Against that: commands go
-    #: out in response to frames arriving, so when frames stall the commands
-    #: stall with them and the two stay in step.  Captures of real flights
-    #: agree, holding at a ten-thousandth of travel through stalls of a
-    #: third of a second and frame intervals varying more than a modelled
-    #: stutter does.
-    #:
-    #: Two guards were tried and neither survived.  Counting frames against
-    #: the window's own median fails exactly when stalling is pervasive,
-    #: because the median is then itself a stalled frame; interval spread
-    #: reads higher on real flights than on a modelled stutter.  A guard
-    #: that cannot separate the two would only trade this risk for a worse
-    #: one, so the share is logged and the verdict left alone until a
-    #: capture of a genuinely stuttering sim says one is needed.
-    STALL_MULTIPLE = 3.0
-
-    def _residual(self, axis: str, buf, span: float) -> Optional[dict]:
-        """Reported position against what was commanded, on the closest-
-        fitting sign and lag.  None when any sample lacks a command, which
-        is the case whenever TelemFFB is not driving the axis - and then
-        there is nothing for a second writer to contend with anyway."""
-        commanded = [c for _, _, c in buf]
-        if any(c is None for c in commanded):
+        (t0, rep0, cmd0), (t1, rep1, cmd1) = recent[-2], recent[-1]
+        if (cmd0 is None or t1 - t0 > self.MAX_FRAME_GAP_S
+                or abs(cmd0) >= self.CLAMP_AT or abs(cmd1) >= self.CLAMP_AT):
             return None
-        reported = [v for _, v, _ in buf]
-
-        def fit(sign, lag):
-            series = [reported[i] - sign * commanded[i - lag]
-                      for i in range(lag, len(buf))]
-            if len(series) < 3:
-                return None
-            rms = math.sqrt(sum(x * x for x in series) / len(series))
-            return (rms, sign, lag, series)
-
-        # Which sign and lag the simulator answers with is a property of its
-        # axis handling, settled for the session, so searching every one of
-        # them on every window is most of this method's cost for an answer
-        # that does not change.  The remembered pair is retried alone and
-        # only rejected when it stops fitting - which a contested axis does
-        # not cause, its residual being a gap rather than a misalignment.
-        remembered = self._fit_cache.get(axis)
-        if remembered is not None:
-            best = fit(*remembered)
-            if best is not None and best[0] <= self._fit_ceiling.get(axis, 0.0):
-                return self._describe(best, buf, axis, span, commanded)
-
-        best = None
-        for sign, lag in self._FITS:
-            candidate = fit(sign, lag)
-            if candidate is None:
-                continue
-            if best is None or candidate[0] < best[0]:
-                best = candidate
-        if best is None:
+        moved = rep1 - rep0
+        if abs(moved) < self.JOLT:
             return None
-        self._fit_cache[axis] = (best[1], best[2])
-        # What the remembered pair is allowed to drift to before the search
-        # is run again.  Generous, because a contested axis legitimately
-        # carries a large residual on a correct fit.
-        self._fit_ceiling[axis] = max(best[0] * 4.0, 0.01)
-        return self._describe(best, buf, axis, span, commanded)
-
-    def _describe(self, best, buf, axis, span, commanded) -> dict:
-        rms, sign, lag, series = best
-        reversals, peak_to_peak, spacing = self._measure(series)
-        gap, gap_variation = self._regularity(spacing)
-        excursion = self._excursion(buf, sign)
-        stalled = self._stalled_fraction(buf)
-        reversals_hz = reversals / span
-        mean = sum(series) / len(series)
-        # How one-sided the residual is.  A second writer can only push the
-        # reported value to one side of the command - toward its own idea of
-        # the axis - so its residual lies between zero and the gap and
-        # averages to about half of it.  A residual that is really the
-        # command's own motion seen a fraction of a frame out is symmetric
-        # about zero and averages away, whatever its amplitude.
-        bias = abs(mean) / rms if rms else 0.0
-        # ...and how large it is next to that motion.  A lag artifact cannot
-        # exceed the distance the command travels between frames; a genuine
-        # gap is unrelated to it.
-        command_travel = max(commanded) - min(commanded)
-        # A variable that stays put while the command travels is not
-        # reporting this axis, whatever the residual says.
-        seen = [v for _, v, _ in buf]
-        reported_travel = max(seen) - min(seen)
-        unresponsive = (command_travel >= self.MAPPING_TRAVEL
-                        and reported_travel <= self.UNRESPONSIVE_TRAVEL)
-        steps = [commanded[i] - commanded[i - 1] for i in range(1, len(buf))]
-        step_rms = math.sqrt(sum(s * s for s in steps) / len(steps)) if steps else 0.0
-        return {
-            'rms': rms,
-            'mean': mean,
-            'bias': bias,
-            'step_rms': step_rms,
-            'command_travel': command_travel,
-            'vs_step': (rms / step_rms) if step_rms else float('inf'),
-            'sign': sign,
-            'lag': lag,
-            'reversals_hz': reversals_hz,
-            'peak_to_peak': peak_to_peak,
-            'gap': gap,
-            'gap_variation': gap_variation,
-            'excursion': excursion,
-            'stalled_frac': stalled,
-            'reported_travel': reported_travel,
-            'unresponsive': unresponsive,
-            'contended': (excursion is not None
-                          and not unresponsive
-                          and excursion['p75'] >= self.CONTENDED_EXCURSION),
-        }
-
-    def _stalled_fraction(self, buf) -> float:
-        """Share of this window's frames that arrived late enough to have
-        let the simulator answer from a command the span no longer covers."""
-        intervals = [buf[i][0] - buf[i - 1][0] for i in range(1, len(buf))]
-        if len(intervals) < 3:
-            return 0.0
-        usual = sorted(intervals)[len(intervals) // 2]
-        if usual <= 0:
-            return 0.0
-        return sum(1 for x in intervals
-                   if x > self.STALL_MULTIPLE * usual) / len(intervals)
-
-    def stats(self, axis: str) -> Optional[dict]:
-        """Current statistics for one axis, or None without enough history
-        to span a measurable interval.
-
-        The top-level figures describe the reported position, which a
-        vibration effect moves as readily as a second writer does.  The
-        'residual' block is the one that separates them, and is absent when
-        TelemFFB is not commanding the axis.
-        """
-        buf = self._samples.get(axis)
-        if not buf or len(buf) < 3:
-            return None
-        span = buf[-1][0] - buf[0][0]
-        if span <= 0:
-            return None
-        values = [v for _, v, _ in buf]
-        reversals, peak_to_peak, _ = self._measure(values)
-        return {
-            'axis': axis,
-            'samples': len(buf),
-            'span_s': span,
-            'sample_hz': (len(buf) - 1) / span,
-            'reversals_hz': reversals / span,
-            'peak_to_peak': peak_to_peak,
-            'residual': self._residual(axis, buf, span),
-        }
+        # the report may take the command's move a frame late
+        command_moves = [cmd1 - cmd0]
+        if len(recent) == 3 and recent[0][2] is not None:
+            command_moves.append(cmd0 - recent[0][2])
+        beyond = min(abs(moved - m) for m in command_moves)
+        return beyond if beyond >= self.JOLT else None
 
     def due(self, now: Optional[float] = None) -> bool:
         """Whether the report interval has elapsed.  The first call arms the
         interval rather than reporting, so a report always covers a settled
-        window."""
+        stretch."""
         now = time.perf_counter() if now is None else now
         if self._next_report is None:
             self._next_report = now + self.report_s
@@ -667,127 +358,62 @@ class AxisJitterMonitor:
         return True
 
     def check(self, now: Optional[float] = None) -> None:
-        """Judge the current window, keeping the worst seen since the last
-        report.
-
-        Separate from reporting so that detection is continuous while the
-        log stays readable: a verdict reached here is remembered and carried
-        into the next report even if the window it came from is long gone by
-        then.
-        """
+        """Close the window under way, once it has run its length: record
+        whether each driven axis flickered in it, and whether that makes
+        the axis contended."""
         now = time.perf_counter() if now is None else now
-        if self._next_check is None:
-            self._next_check = now + self.check_s
+        if self._next_window is None:
+            self._next_window = now + self.window_s
             return
-        if now < self._next_check:
+        if now < self._next_window:
             return
-        self._next_check = now + self.check_s
-        self._checks += 1
-        for axis in self._samples:
-            stats = self.stats(axis)
-            if stats is None:
-                continue
-            self._latest[axis] = stats
-            residual = stats['residual']
-            if residual is None:
-                continue
-            excursion = residual['excursion']
-            if excursion is None:
-                continue
-            self._peak[axis] = max(self._peak.get(axis, 0.0),
-                                   excursion['p75'])
-            self._travel[axis] = max(self._travel.get(axis, 0.0),
-                                     residual['command_travel'])
-            if residual['contended'] and axis not in self._provisional:
+        self._next_window = now + self.window_s
+        for axis in self._driven:
+            history = self._history.get(axis)
+            if history is None:
+                history = self._history[axis] = deque(maxlen=self.WINDOWS_SEEN)
+            history.append(self._jolts.get(axis, 0) >= self.JOLTS_PER_WINDOW)
+            if (sum(history) >= self.FLICKERING_WINDOWS
+                    and axis not in self._provisional):
                 self._seen[axis] = True
+        self._driven.clear()
+        self._jolts.clear()
 
     def contended_axes(self) -> list:
-        """Axes judged contested since the last report.  What a notification
-        would be raised from."""
+        """Axes judged contended since the last report."""
         return sorted(a for a, hit in self._seen.items() if hit)
 
     def poll(self, now: Optional[float] = None) -> None:
-        """Advance the probe: judge on the check cadence, report on the
-        report cadence.  Called every frame."""
+        """Advance the probe.  Called every frame."""
         now = time.perf_counter() if now is None else now
         self.check(now)
         self.log_if_due(now)
 
     def log_if_due(self, now: Optional[float] = None) -> None:
-        """Emit one line per driven axis, at the report interval.
-
-        Axes TelemFFB is not commanding are skipped: with no command there
-        is nothing to difference against, and nothing for a second writer to
-        contend with either.  The line carries measurements and draws no
-        conclusion - the position figures in particular read the same either
-        way, since a rumble effect turns the axis around as briskly as a
-        second writer does and on a propeller aircraft does so all flight.
-        """
+        """One line per axis driven since the last report: at INFO for a
+        finding, and now and then for an axis awaiting confirmation; at
+        DEBUG otherwise."""
         if not self.due(now):
             return
-        checks = self._checks
         self._reports += 1
         show_provisional = (self._reports == 1
                             or self._reports % self.PROVISIONAL_EVERY == 0)
-        for axis in sorted(self._latest):
-            s = self._latest[axis]
-            r = s['residual']
-            if r is None:
-                continue        # not commanded: nothing to contend with
-            fmt = (lambda v: '  n/a' if v is None else '%5.2f' % v)
-            x = r['excursion']
-            # A finding is worth a normal log line, and so is an occasional
-            # sighting of an axis waiting to be confirmed - that one cannot
-            # be checked at all if it is only visible under debug.  The rest
-            # is the background they were read against and belongs at debug.
+        for axis in sorted(self._frames):
             provisional = axis in self._provisional
+            contended = self._seen.get(axis, False)
             emit = (logging.info
-                    if self._seen.get(axis) or (provisional and show_provisional)
+                    if contended or (provisional and show_provisional)
                     else logging.debug)
-            # An unconfirmed axis is being looked at to settle whether its
-            # reported variable follows the control at all, so it says so
-            # rather than leaving a number to be interpreted.  Read with
-            # nothing bound: a mapping that holds sits at the same
-            # hundred-thousandth of travel a clean axis does, while one that
-            # does not carries the whole command as error.
-            note = ''
-            # Said out loud rather than passed over in silence: an axis
-            # that reads dead looks identical to one nobody is fighting
-            # over, and only this line distinguishes them.
-            if r.get('unresponsive'):
-                note = ('  <- reported variable never moved; this '
-                        'aircraft does not populate it, so nothing '
-                        'can be judged')
-            elif provisional:
-                if self._travel.get(axis, 0.0) < self.MAPPING_TRAVEL:
-                    note = ('  <- inconclusive; work this control through '
-                            'its range to tell')
-                elif self._peak.get(axis, 0.0) < self.CONTENDED_EXCURSION:
-                    note = '  <- mapping holds'
-                else:
-                    note = ('  <- mapping does NOT hold; nothing can be '
-                            'judged against this variable')
-            emit(
-                "axis contention: %-9s %s worst outside=%.5f over %d checks "
-                "| stalled=%2.0f%% latest p99=%s clamped=%2.0f%% "
-                "residual rms=%.4f p2p=%.4f "
-                "turns=%.1f/s gap=%s var=%s bias=%.2f  (step rms=%.4f; "
-                "position turns=%.1f/s p2p=%.4f; fit sign=%+d lag=%d; "
-                "sampled %.1f/s n=%d)%s",
-                s['axis'],
-                'CONTENDED' if self._seen.get(axis) else
-                ('unverified' if provisional else 'clean    '),
-                self._peak.get(axis, 0.0), checks,
-                100 * r['stalled_frac'],
-                'n/a' if x is None else '%.5f' % x['p99'],
-                0.0 if x is None else 100 * x['clamped_frac'],
-                r['rms'], r['peak_to_peak'], r['reversals_hz'],
-                fmt(r['gap']), fmt(r['gap_variation']), r['bias'],
-                r['step_rms'],
-                s['reversals_hz'], s['peak_to_peak'], r['sign'], r['lag'],
-                s['sample_hz'], s['samples'], note)
-        self._peak.clear()
-        self._travel.clear()
+            history = self._history.get(axis, ())
+            emit("axis contention: %-10s %s flickering windows=%d/%d "
+                 "largest jolt=%.3f frames=%d%s",
+                 axis,
+                 'CONTENDED' if contended else
+                 ('unverified' if provisional else 'clean    '),
+                 sum(history), len(history),
+                 self._largest.get(axis, 0.0), self._frames[axis],
+                 '  <- reported variable not yet confirmed for this axis; '
+                 'not judged' if provisional else '')
         self._seen.clear()
-        self._latest.clear()
-        self._checks = 0
+        self._largest.clear()
+        self._frames.clear()
