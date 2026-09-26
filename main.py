@@ -1216,6 +1216,8 @@ def _convert_user_config():
         xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
         xmlutils.update_roots()
         utils.convert_legacy_userconfig(G.userconfig_path)
+        utils.migrate_il2_korea_userconfig(G.userconfig_path, G.defaults_path)
+        xmlutils.update_roots()
 
 
 def _initialize_settings_manager():

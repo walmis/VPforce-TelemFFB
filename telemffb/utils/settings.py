@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 
+import copy
 import logging
 import os
 import re
@@ -25,6 +26,8 @@ from PyQt6.QtWidgets import QFileDialog
 
 import telemffb.globals as G
 import telemffb.xmlutils as xmlutils
+from telemffb.namedmutex import FileLock
+from telemffb.xml.store import consolidate_sort_and_write
 from .filesystem import get_install_path, get_resource_path
 
 __all__ = [
@@ -32,6 +35,7 @@ __all__ = [
     "read_all_system_settings",
     "SystemSettings",
     "convert_legacy_userconfig",
+    "migrate_il2_korea_userconfig",
     "copy_legacy_config_to_new",
     "create_empty_userxml_file",
     "load_custom_userconfig",
@@ -573,3 +577,72 @@ def get_legacy_override_file():
             logging.warning(f"Override file {G.args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
 
     return _legacy_override_file
+
+
+def _korea_model_patterns(defaults_path) -> set:
+    """The model patterns defaults.xml files under the IL2K sim."""
+    tree = xmlutils.try_parse(defaults_path)
+    if tree is None:
+        return set()
+    return {e.findtext("model") for e in tree.getroot().findall('models[sim="IL2K"][name="type"]')
+            if e.findtext("model")}
+
+
+def migrate_il2_korea_userconfig(userconfig_path, defaults_path) -> bool:
+    """Copy a user's IL-2 Korea settings to the IL2K sim, once.
+
+    User rows are keyed by sim and never fall back to another sim, so when
+    Korea became its own sim its aircraft would have loaded with shipped
+    defaults while the user's rows sat under IL2.  Rows are COPIED, never
+    moved: the IL2 rows stay for a release build that knows only IL2, and
+    from then on each version keeps its own.
+
+    - <models> and <profileMappings> rows for the Korea aircraft patterns
+      (those defaults.xml lists under IL2K) get an IL2K twin.
+    - <simSettings> and <classSettings> rows under IL2 are copied too, but
+      only alongside aircraft rows: they applied to both games before the
+      split, and the aircraft rows are the evidence that Korea was flown.
+
+    It runs only while the file has no IL2K rows at all - the first start
+    of a build that knows the new sim.  After that each sim's rows are
+    its own, so nothing edited under IL2 later reaches IL2K.  No marker is
+    kept, and a file with nothing to copy is not rewritten.  A backup is
+    written beside the file the first time it is changed.
+
+    Returns True when rows were copied.
+    """
+    if not os.path.isfile(userconfig_path):
+        return False
+    tree = xmlutils.try_parse(userconfig_path)
+    if tree is None:
+        logging.error(f"IL-2 Korea migration: failed to parse {userconfig_path}")
+        return False
+    root = tree.getroot()
+    if any(e.findtext("sim") == "IL2K" for e in root):
+        return False
+    korea = _korea_model_patterns(defaults_path)
+
+    def copy_rows(tag, wanted) -> int:
+        rows = [e for e in root.findall(tag) if e.findtext("sim") == "IL2" and wanted(e)]
+        for e in rows:
+            twin = copy.deepcopy(e)
+            twin.find("sim").text = "IL2K"
+            root.append(twin)
+        return len(rows)
+
+    def korea_aircraft(e) -> bool:
+        return e.findtext("model") in korea
+
+    aircraft = copy_rows("models", korea_aircraft) + copy_rows("profileMappings", korea_aircraft)
+    if not aircraft:
+        return False
+    shared = copy_rows("simSettings", lambda e: True) + copy_rows("classSettings", lambda e: True)
+
+    backup = os.path.join(os.path.dirname(userconfig_path), "userconfig_v2_pre-il2k_backup.xml")
+    if not os.path.exists(backup):
+        shutil.copy2(userconfig_path, backup)
+    with FileLock(userconfig_path):
+        consolidate_sort_and_write(tree, userconfig_path)
+    logging.info(f"IL-2 Korea migration: {aircraft} aircraft rows and {shared} sim/class rows "
+                 f"copied to IL2K")
+    return True
