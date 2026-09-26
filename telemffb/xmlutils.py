@@ -110,17 +110,17 @@ def _setting_is_hidden(name: str) -> bool:
     """Whether an application policy says this setting does not apply.
 
     Supplied to ConfigResolver so the XML layer never reaches up for it
-    (see its ``hidden`` parameter).  Today the only such setting is the
-    per-aircraft device selection, which means nothing until the
-    joystick role holds more than one device; a stored preference goes
-    inert, not lost - it resurfaces when a second device is configured
-    again.  The import is local because telemffb.utils imports this
-    module: the cycle is real, and this is the layer that should carry
-    it rather than the parser.
+    (see its ``hidden`` parameter).  A hidden setting's stored value goes
+    inert, not lost - it resurfaces when the condition holds again.  The
+    import is local because telemffb.utils imports this module.
     """
     if name in ('device_group', 'joystick_device'):
         from telemffb.utils import multiple_joystick_devices
         return not multiple_joystick_devices()
+    if name in ('tap_axis_group', 'tap_gain_group', 'tap_effects_group'):
+        import telemffb.globals as G
+        mgr = getattr(G, 'settings_mgr', None)
+        return mgr is not None and not mgr.tap_mode_offered()
     return False
 
 

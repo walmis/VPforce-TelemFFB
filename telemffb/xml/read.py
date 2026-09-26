@@ -23,7 +23,8 @@ from telemffb.xml.store import XmlStore
 
 #: Settings whose visibility is an application policy question rather
 #: than an XML one - see ConfigResolver's ``hidden`` parameter.
-POLICY_GATED = ('device_group', 'joystick_device')
+POLICY_GATED = ('device_group', 'joystick_device',
+                'tap_axis_group', 'tap_gain_group', 'tap_effects_group')
 
 
 class ConfigResolver:

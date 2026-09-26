@@ -62,8 +62,8 @@ def rendered(qapp, tmp_path):
             # borrow the real resolver, bound to this stand-in
             resolve_enum_list=lambda name, value='': (
                 SettingsManager.resolve_enum_list(G.settings_mgr, name, value)),
-            _tap_mode_offered=lambda: (
-                SettingsManager._tap_mode_offered(G.settings_mgr)),
+            tap_mode_offered=lambda: (
+                SettingsManager.tap_mode_offered(G.settings_mgr)),
             TAP_SIM_KEYS=SettingsManager.TAP_SIM_KEYS)
         from telemffb import xmlutils
         import telemffb.ui.widgets.SettingsLayout as SLmod

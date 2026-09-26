@@ -46,6 +46,11 @@ def test_offered_when_sim_tap_enabled(monkeypatch):
     assert SpringModeEnum.DINPUT_TAP in mgr.resolve_enum_list(LIST)
 
 
+def test_dcs_fix_only_mode_taps_nothing(monkeypatch):
+    mgr = make_mgr('DCS', monkeypatch, enableTapDCS=True, tapFixOnlyDCS=True)
+    assert SpringModeEnum.DINPUT_TAP not in mgr.resolve_enum_list(LIST)
+
+
 def test_other_sims_toggle_does_not_offer(monkeypatch):
     mgr = make_mgr('DCS', monkeypatch, enableTapBMS=True)
     assert SpringModeEnum.DINPUT_TAP not in mgr.resolve_enum_list(LIST)

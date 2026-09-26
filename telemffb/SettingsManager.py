@@ -89,17 +89,19 @@ class SettingsManager(QObject):
             return label_dict
         if (SpringModeEnum.DINPUT_TAP in label_dict
                 and current_value != SpringModeEnum.DINPUT_TAP.name
-                and not self._tap_mode_offered()):
+                and not self.tap_mode_offered()):
             label_dict = {k: v for k, v in label_dict.items()
                           if k is not SpringModeEnum.DINPUT_TAP}
         return label_dict
 
-    def _tap_mode_offered(self):
+    def tap_mode_offered(self):
+        """Whether the tap captures in the current sim (see TAP_SIM_KEYS):
+        the gate for the tap spring mode and for the tap settings groups."""
         try:
             from telemffb.tap.tap_install import SIMS_BY_KEY
-            from telemffb.tap.tap_reconcile import tap_is_enabled
+            from telemffb.tap.tap_reconcile import tap_captures
             return any(
-                tap_is_enabled(SIMS_BY_KEY[key], G.system_settings)
+                tap_captures(SIMS_BY_KEY[key], G.system_settings)
                 for key in self.TAP_SIM_KEYS.get(self.current_sim, ()))
         except Exception:
             # settings display must never break on tap plumbing; offer the

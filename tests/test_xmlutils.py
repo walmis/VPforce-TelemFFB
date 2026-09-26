@@ -1991,6 +1991,22 @@ class TestInjectedVisibilityPolicy:
         import telemffb.xmlutils as xu
         assert xu._setting_is_hidden('spring_mode') is False
 
+    def test_tap_groups_follow_the_sims_tap_toggle(self, monkeypatch):
+        import telemffb.globals as G
+        import telemffb.xmlutils as xu
+        from telemffb.SettingsManager import SettingsManager
+
+        class Settings(dict):
+            def get(self, name, default=None, instance=None):
+                return dict.get(self, name, default)
+        mgr = SettingsManager()
+        mgr.current_sim = 'DCS'
+        monkeypatch.setattr(G, 'settings_mgr', mgr, raising=False)
+        monkeypatch.setattr(G, 'system_settings', Settings(), raising=False)
+        assert xu._setting_is_hidden('tap_axis_group') is True
+        monkeypatch.setattr(G, 'system_settings', Settings(enableTapDCS=True), raising=False)
+        assert xu._setting_is_hidden('tap_gain_group') is False
+
 
 class TestSliderFactors:
     """A setting's stored value is its slider position scaled by this, so

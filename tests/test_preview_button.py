@@ -94,8 +94,8 @@ def _render(qapp, tmp_path, *, offline, blockers=(), running=None, running_slot=
             offline_mode=offline, offline_scope='MODEL', timed_out=True, active_profile=None,
             resolve_enum_list=lambda name, value='': (
                 SettingsManager.resolve_enum_list(G.settings_mgr, name, value)),
-            _tap_mode_offered=lambda: (
-                SettingsManager._tap_mode_offered(G.settings_mgr)),
+            tap_mode_offered=lambda: (
+                SettingsManager.tap_mode_offered(G.settings_mgr)),
             TAP_SIM_KEYS=SettingsManager.TAP_SIM_KEYS)
         from telemffb import xmlutils
         import telemffb.ui.widgets.SettingsLayout as SLmod

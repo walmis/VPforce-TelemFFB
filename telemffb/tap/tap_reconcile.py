@@ -117,6 +117,16 @@ def tap_is_enabled(sim: TapSim, settings) -> bool:
     return bool(settings.get(sim.tap_enable_key, False))
 
 
+def tap_captures(sim: TapSim, settings) -> bool:
+    """Whether the tap is set to capture in this sim: enabled, and not
+    installed as the FFB fix alone (DCS), which taps nothing."""
+    if not tap_is_enabled(sim, settings):
+        return False
+    if sim.fix_only_key and settings.get(sim.fix_only_key, False):
+        return False
+    return True
+
+
 def pending_reconcile(changes: Sequence[DeviceChange], settings,
                       statuses: Optional[Sequence[SimStatus]] = None
                       ) -> List[ReconcileItem]:

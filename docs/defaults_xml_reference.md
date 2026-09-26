@@ -592,7 +592,7 @@ Child settings reference this group's `name` via their `prereq` field.
 A group that carries its own `prereq` is a *nested* sub-header — it renders as an ordinary
 indented row and its children indent one level further. Nested groups let a set of related
 settings collapse together without inventing a dummy `bool` toggle to hang them under.
-Example: `tap_axis_group` (`prereq=spring_mode.DINPUT_TAP`) collecting the three tap axis
+Example: `tap_axis_group` (`prereq=spring_mode.DINPUT_TAP.ADVANCED`) collecting the three tap axis
 correction toggles.
 
 **Whether a group collapses is decided by `order`:**
