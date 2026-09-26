@@ -2371,6 +2371,20 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 return False
         return True
 
+    def validate_il2_ports(self):
+        """The two IL-2 titles must send to different ports: the port is the
+        only thing that tells their telemetry apart."""
+        def port(field):
+            text = field.text().strip()
+            return int(text) if text.isdigit() else text
+        if port(self.portIL2) == port(self.portIL2_K):
+            QMessageBox.warning(
+                self, "Config Error",
+                "IL-2 Sturmovik and IL-2 Korea need different telemetry ports.\n\n"
+                "The port is how TelemFFB tells the two games apart.")
+            return False
+        return True
+
     def _add_il2_fwd_row(self, addr, port, telem, motion, ffb):
         ip_item = QStandardItem(str(addr))
         port_item = QStandardItem(str(port))
@@ -2514,6 +2528,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         if self.enableIL2.isChecked():
             if not self.validate_il2_path():
+                return False
+            if not self.validate_il2_ports():
                 return False
 
         if self.il2_fwd_enable.isChecked() and self.il2_fwd_model.rowCount() == 0:
