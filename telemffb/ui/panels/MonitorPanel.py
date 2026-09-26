@@ -75,6 +75,7 @@ from PyQt6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QHeaderView,
                              QWidget)
 
 import telemffb.globals as G
+from telemffb.SettingsManager import SettingsManager
 from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
                                    EFFECT_DAMPER, EFFECT_DETENT,
                                    EFFECT_FRICTION, EFFECT_INERTIA,
@@ -558,23 +559,15 @@ class MonitorPanel(QWidget):
     # ---- pre-telemetry status ----------------------------------------------
 
     def refresh_waiting_status(self) -> None:
-        dcs_enabled = G.system_settings.get('enableDCS')
-        il2_enabled = G.system_settings.get('enableIL2')
-        msfs_enabled = G.system_settings.get('enableMSFS')
-        xplane_enabled = G.system_settings.get('enableXPLANE')
-        bms_enabled = G.system_settings.get('enableBMS')
-
-        def status(enabled):
-            return "Enabled" if enabled else "Disabled"
-
+        sims = list(SettingsManager.SIM_LABELS)
+        width = max(len(SettingsManager.sim_label(sim)) for sim in sims)
+        lines = [f"{SettingsManager.sim_label(sim):<{width}} : "
+                 f"{'Enabled' if SettingsManager.sim_enabled(sim) else 'Disabled'}"
+                 for sim in sims]
         self._telem_waiting_label.setText(
-            f"Waiting for data...\n\n"
-            f"DCS     : {status(dcs_enabled)}\n"
-            f"IL2     : {status(il2_enabled)}\n"
-            f"MSFS    : {status(msfs_enabled)}\n"
-            f"X-Plane : {status(xplane_enabled)}\n"
-            f"BMS     : {status(bms_enabled)}\n\n"
-            "Enable or Disable in System -> System Settings"
+            "Waiting for data...\n\n"
+            + "\n".join(lines)
+            + "\n\nEnable or Disable in System -> System Settings"
         )
         self._telem_stack.setCurrentWidget(self._telem_waiting_label)
         self._hide_effects_pane()

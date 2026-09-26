@@ -66,11 +66,11 @@ class SettingsManager(QObject):
     #: the value everywhere else (config rows, telemetry src, IPC).
     SIM_LABELS = {
         "DCS": "DCS World",
-        "BMS": "Falcon BMS",
-        "MSFS": "MSFS 20/24",
-        "XPLANE": "X-Plane 11/12",
         "IL2": "IL-2 Sturmovik",
         "IL2K": "IL-2 Korea",
+        "MSFS": "MSFS 20/24",
+        "XPLANE": "X-Plane 11/12",
+        "BMS": "Falcon BMS",
     }
 
     @classmethod

@@ -19,6 +19,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication
 
 import telemffb.globals as G
+from telemffb.SettingsManager import SettingsManager
 from telemffb.ui.panels.MonitorPanel import (_KEY_COL, _STAR_COL, _VALUE_COL,
                                             MonitorPanel)
 
@@ -79,11 +80,23 @@ def panel(qapp, mainwindow):
     return MonitorPanel(mainwindow=mainwindow)
 
 
+def _waiting_status(panel):
+    """The waiting page's sim lines as {sim key: shown status}."""
+    shown = {}
+    for line in panel._telem_waiting_label.text().splitlines():
+        label, sep, status = line.partition(" : ")
+        if sep:
+            shown[label.strip()] = status.strip()
+    return {sim: shown.get(SettingsManager.sim_label(sim)) for sim in SettingsManager.SIM_LABELS}
+
+
 class TestWaitingState:
     def test_starts_on_waiting_page(self, panel):
         assert panel._telem_stack.currentWidget() is panel._telem_waiting_label
-        assert 'DCS     : Enabled' in panel._telem_waiting_label.text()
-        assert 'IL2     : Disabled' in panel._telem_waiting_label.text()
+        status = _waiting_status(panel)
+        assert status['DCS'] == 'Enabled'
+        assert status['IL2'] == 'Disabled'
+        assert None not in status.values()       # every sim has its line
 
     def test_telemetry_keys_before_first_frame(self, panel):
         assert panel.telemetry_keys() == ['Sim not running']
@@ -92,7 +105,7 @@ class TestWaitingState:
         monkeypatch.setattr(G, 'system_settings', _FakeSettings({'enableDCS': False}),
                              raising=False)
         panel.refresh_waiting_status()
-        assert 'DCS     : Disabled' in panel._telem_waiting_label.text()
+        assert _waiting_status(panel)['DCS'] == 'Disabled'
 
 
 class TestTelemetryRows:
