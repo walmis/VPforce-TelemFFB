@@ -25,6 +25,7 @@ from PyQt6 import QtCore
 
 import telemffb.globals as G
 import telemffb.utils as utils
+from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.IL2Manager import IL2TelemParser
 from telemffb.telem.NetworkThread import NetworkThread
 from telemffb.telem.UDPForwarder import IL2PacketForwarder
@@ -82,7 +83,7 @@ class SimTelemListener(QtCore.QObject):
         # Managed)' spring mode).  Without the wrapper, the game taking
         # foreground FFB priority surfaces as an actionable error in the
         # exception tracker (see ffb_dinput's DIB_ERR_ACQUISITION handling).
-        return bool(G.system_settings.get(f'enable{self.name}') or G.args.sim == self.name)
+        return bool(SettingsManager.sim_enabled(self.name) or G.args.sim == self.name)
 
     @property
     def port_udp(self):
@@ -169,12 +170,6 @@ class SimIL2K(_SimIL2Base):
 
     def __init__(self) -> None:
         super().__init__("IL2K")
-
-    @property
-    def is_enabled(self) -> bool:
-        if G.args.sim == self.name:
-            return True
-        return bool(G.system_settings.get('enableIL2') and G.system_settings.get('pathIL2_K'))
 
     @property
     def port_udp(self):

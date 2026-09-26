@@ -77,6 +77,17 @@ class SettingsManager(QObject):
     def sim_label(cls, sim: str) -> str:
         return cls.SIM_LABELS.get(sim, sim)
 
+    @staticmethod
+    def sim_enabled(sim: str) -> bool:
+        """Whether the user has a sim switched on in System Settings.
+
+        IL-2 Korea has no toggle of its own: it shares the IL2 tab and
+        counts as on when IL2 is on and a Korea install path is set.
+        """
+        if sim == "IL2K":
+            return bool(G.system_settings.get('enableIL2') and G.system_settings.get('pathIL2_K'))
+        return bool(G.system_settings.get(f'enable{sim}', False))
+
     #: Settings-tab sim -> the DirectInput Tap sims whose enable toggle
     #: offers the DINPUT_TAP spring mode there.  IL-2 Great Battles and
     #: Korea are separate sims (their listeners tag frames IL2 / IL2K),
