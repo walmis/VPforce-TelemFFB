@@ -62,6 +62,21 @@ class SettingsManager(QObject):
     def set_sim(self, sim):
         self.current_sim = sim
 
+    #: Sim key -> the name shown wherever a user picks a sim.  Keys stay
+    #: the value everywhere else (config rows, telemetry src, IPC).
+    SIM_LABELS = {
+        "DCS": "DCS World",
+        "BMS": "Falcon BMS",
+        "MSFS": "MSFS 20/24",
+        "XPLANE": "X-Plane 11/12",
+        "IL2": "IL-2 Sturmovik",
+        "IL2K": "IL-2 Korea",
+    }
+
+    @classmethod
+    def sim_label(cls, sim: str) -> str:
+        return cls.SIM_LABELS.get(sim, sim)
+
     #: Settings-tab sim -> the DirectInput Tap sims whose enable toggle
     #: offers the DINPUT_TAP spring mode there.  IL-2 Great Battles and
     #: Korea are separate sims (their listeners tag frames IL2 / IL2K),

@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSi
 from telemffb import globals as G
 from telemffb import utils
 from telemffb import xmlutils
+from telemffb.SettingsManager import SettingsManager
 from telemffb.xml import match as xmatch
 from telemffb.ui.generated.Ui_NewAircraftWizard import Ui_NewAircraftWizard
 from telemffb.ui.theme.tokens import current_tokens, FIELD_REQUIRED_BG, FIELD_MATCH_BG, FIELD_NO_MATCH_BG
@@ -53,14 +54,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         """
 
 
-    friendly_sim_names = {  # Build list to get friendly names from internal names
-        "DCS": "DCS World",
-        "BMS": "Falcon BMS",
-        "MSFS": "Microsoft Flight Simulator 20/24",
-        "XPLANE": "X-Plane 11/12",
-        "IL2": "IL-2 Sturmovik",
-        "IL2K": "IL-2 Korea"
-    }
+    friendly_sim_names = SettingsManager.SIM_LABELS
     internal_sim_names = {v: k for k, v in friendly_sim_names.items()}  # Build reverse lookup table
 
     friendly_class_names = {
@@ -174,7 +168,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             self.cb_clone.setEnabled(False)
             # self.lbl_autodiscovery.setVisible(True)
         else:
-            self.setWindowTitle(f"New Aircraft Wizard - {self.auto_sim} {self.auto_name}")
+            self.setWindowTitle(f"New Aircraft Wizard - {SettingsManager.sim_label(self.auto_sim)} {self.auto_name}")
             self.rb_suggested.setChecked(True)
             self.lbl_autodiscovery.setVisible(False)
             self.cb_sim.setCurrentText(self.friendly_sim_names.get(self.auto_sim))

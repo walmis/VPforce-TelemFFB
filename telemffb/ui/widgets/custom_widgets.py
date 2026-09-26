@@ -39,6 +39,7 @@ from PyQt6.QtCore import QAbstractListModel, QModelIndex
 import numpy as np
 
 import telemffb.globals as G
+from telemffb.SettingsManager import SettingsManager
 from telemffb.ui.layout_utils import invalidate_ancestor_layouts
 from telemffb.ui.theme.tokens import PURPLE, ACTIVE_GREEN
 from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
@@ -837,9 +838,9 @@ class AppStatusWidget(QWidget):
         disabled = [s for s, enabled in self._sim_states.items() if not enabled]
 
         tooltip = "Enabled Sims:\n"
-        tooltip += "".join(f"  {s}\n" for s in sorted(enabled)) if enabled else "  (None)\n"
+        tooltip += "".join(f"  {SettingsManager.sim_label(s)}\n" for s in sorted(enabled)) if enabled else "  (None)\n"
         tooltip += "\nDisabled Sims:\n"
-        tooltip += "".join(f"  {s}\n" for s in sorted(disabled)) if disabled else "  (None)"
+        tooltip += "".join(f"  {SettingsManager.sim_label(s)}\n" for s in sorted(disabled)) if disabled else "  (None)"
 
         # Set the updated tooltip
         self.findChild(InfoLabel).setToolTip(tooltip)

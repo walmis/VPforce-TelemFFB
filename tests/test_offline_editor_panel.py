@@ -136,7 +136,7 @@ class TestConstruction:
 
 class TestSimCascade:
     def test_choosing_a_sim_populates_classes_and_sets_scope(self, panel, fake_settings_mgr):
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         assert [panel.offline_class.itemText(i) for i in range(panel.offline_class.count())] == \
             ['', 'JetAircraft', 'PropellerAircraft']
         assert fake_settings_mgr.offline_scope == 'SIM'
@@ -146,20 +146,20 @@ class TestSimCascade:
         assert panel.mainwindow.notes_refreshes
 
     def test_clearing_the_sim_resets_everything(self, panel):
-        panel.offline_sim.setCurrentText('DCS')
-        panel.offline_sim.setCurrentText('')
+        panel.select_sim('DCS')
+        panel.select_sim('')
         assert panel.offline_class.count() == 0
         assert panel.offline_scope_label.text() == 'None'
         assert not panel.offline_name_filter.isEnabled()
 
     def test_master_instance_broadcasts_the_selection(self, panel, monkeypatch, broadcasts):
         monkeypatch.setattr(G, 'master_instance', True, raising=False)
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         assert any(m.startswith('OFFLINE_SIM:DCS') for m in broadcasts)
 
     def test_child_instance_does_not_broadcast(self, panel, broadcasts):
         # panel fixture already sets G.master_instance False
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         assert broadcasts == []
 
 
@@ -173,18 +173,18 @@ class TestMirrorMethods:
         assert panel.offline_class.count() == 3
 
     def test_mirror_class(self, panel, fake_settings_mgr):
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         panel.mirror_class('JetAircraft')
         assert fake_settings_mgr.offline_scope == 'CLASS'
 
     def test_mirror_aircraft(self, panel):
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         panel.offline_class.setCurrentText('JetAircraft')
         panel.mirror_aircraft('F-16C')
         assert panel.offline_name.currentText() == 'F-16C'
 
     def test_mirror_profile(self, panel, fake_settings_mgr):
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         panel.offline_class.setCurrentText('JetAircraft')
         panel.offline_name.setCurrentText('F-16C')
         panel.mirror_profile('Auto User')
@@ -193,9 +193,9 @@ class TestMirrorMethods:
 
 class TestResetForEntry:
     def test_clears_combos_and_repopulates_sims(self, panel):
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         panel.reset_for_entry()
-        assert [panel.offline_sim.itemText(i) for i in range(panel.offline_sim.count())] == \
+        assert [panel.offline_sim.itemData(i) for i in range(panel.offline_sim.count())] == \
             ['', 'DCS', 'MSFS']
         assert panel.offline_class.count() == 0
         assert panel.offline_name.count() == 0
@@ -204,7 +204,7 @@ class TestResetForEntry:
         """With no sim selected, clearing offline_sim emits nothing, so only
         reset_for_entry itself can clear a profile left from last time."""
         panel.offline_profile.addItem('Stale Profile')
-        assert panel.offline_sim.currentText() == ''
+        assert panel.selected_sim == ''
         panel.reset_for_entry()
         assert panel.offline_profile.count() == 0
         assert not panel.offline_profile.signalsBlocked()
@@ -212,7 +212,7 @@ class TestResetForEntry:
 
 class TestFilterNameList:
     def test_a_single_match_auto_selects_and_drills_down(self, panel, fake_settings_mgr):
-        panel.offline_sim.setCurrentText('DCS')
+        panel.select_sim('DCS')
         panel.offline_class.setCurrentText('JetAircraft')
         panel.offline_name_filter.setText('F-16')
         assert panel.offline_name.currentText() == 'F-16C'
@@ -244,7 +244,7 @@ class TestLoadSingleOfflineModel:
     def test_populates_the_full_selection_and_enters_offline_mode(self, panel, fake_settings_mgr):
         panel.load_single_offline_model('DCS', 'JetAircraft', 'F-16C', 'Auto User')
         assert panel.mainwindow.toggle_calls == [(True, False)]
-        assert panel.offline_sim.currentText() == 'DCS'
+        assert panel.selected_sim == 'DCS'
         assert panel.offline_class.currentText() == 'JetAircraft'
         assert panel.offline_name.currentText() == 'F-16C'
         assert panel.offline_profile.currentText() == 'Auto User'

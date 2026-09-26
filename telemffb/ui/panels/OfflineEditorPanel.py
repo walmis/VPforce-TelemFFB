@@ -62,6 +62,7 @@ from PyQt6.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
 
 import telemffb.globals as G
 import telemffb.xmlutils as xmlutils
+from telemffb.SettingsManager import SettingsManager
 
 
 class OfflineEditorPanel(QWidget):
@@ -138,11 +139,14 @@ class OfflineEditorPanel(QWidget):
 
         # --- ComboBoxes ---
         self.offline_sim = QComboBox()
-        self.offline_sim.addItems([''] + xmlutils.get_sims())
+        self._fill_sims()
         self.offline_sim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.offline_sim.setMinimumContentsLength(10)
         self.offline_sim.setEditable(False)
-        self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
+        # index, not text: the visible text is the sim's label, the key is
+        # the item data (see selected_sim)
+        self.offline_sim.currentIndexChanged.connect(
+            lambda _index: self.offline_sim_changed(self.selected_sim))
 
         self.offline_class = QComboBox()
         self.offline_class.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
@@ -233,10 +237,27 @@ class OfflineEditorPanel(QWidget):
 
     # ---- IPC mirroring (child instances replicate the master's selection) --
 
+    def _fill_sims(self) -> None:
+        """The sim combo: a blank entry, then every sim by label with its
+        key as item data."""
+        self.offline_sim.clear()
+        self.offline_sim.addItem('', '')
+        for sim in xmlutils.get_sims():
+            self.offline_sim.addItem(SettingsManager.sim_label(sim), sim)
+
+    @property
+    def selected_sim(self) -> str:
+        """The selected sim's key ("" when nothing is selected)."""
+        return self.offline_sim.currentData() or ''
+
+    def select_sim(self, sim: str) -> None:
+        """Select a sim by key; an unknown key selects the blank entry."""
+        self.offline_sim.setCurrentIndex(max(0, self.offline_sim.findData(sim)))
+
     def mirror_sim(self, sim: str) -> None:
         """Replicate the master's 'Sim' selection - child instances only,
         driven by IPCNetworkThread.set_offline_sim_signal."""
-        self.offline_sim.setCurrentText(sim)
+        self.select_sim(sim)
 
     def mirror_class(self, class_name: str) -> None:
         """Replicate the master's 'Class' selection - child instances only."""
@@ -278,9 +299,7 @@ class OfflineEditorPanel(QWidget):
         self.offline_class.blockSignals(False)
         self.offline_profile.blockSignals(False)
 
-        # build sim list
-        sims = [''] + xmlutils.get_sims()
-        self.offline_sim.addItems(sims)
+        self._fill_sims()
 
     def back_to_profile_mgr(self):
         self.back_to_profile_mgr_button.setVisible(False)
@@ -309,10 +328,9 @@ class OfflineEditorPanel(QWidget):
             cb.addItem('')
 
         try:
-            sim_list = xmlutils.get_sims()
-            for s in sim_list:
-                self.offline_sim.addItem(s)
-            self.offline_sim.setCurrentText(sim)
+            for s in xmlutils.get_sims():
+                self.offline_sim.addItem(SettingsManager.sim_label(s), s)
+            self.select_sim(sim)
 
             cls_list = xmlutils.get_classes_for_sim(sim)
             for c in cls_list:
@@ -425,7 +443,7 @@ class OfflineEditorPanel(QWidget):
 
         if G.master_instance:
             # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.offline_sim.currentText()}")
+            G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.selected_sim}")
 
         G.settings_mgr.offline_scope = 'SIM'  # set config scope to SIM
         self.offline_scope_label.setText(f"Editing SIM Defaults ({sim})")
@@ -437,7 +455,7 @@ class OfflineEditorPanel(QWidget):
         self.offline_name_filter.blockSignals(True)
         self.offline_name_filter.clear()
         self.offline_name_filter.blockSignals(False)
-        model_list = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
+        model_list = xmlutils.read_models(self.selected_sim, class_name)  # get all available models based on sim and class
         self.all_offline_models = model_list
         self.offline_name.clear()  # clear the aircraft selection combobox
         self.offline_profile.clear()
@@ -448,7 +466,7 @@ class OfflineEditorPanel(QWidget):
             G.ipc_instance.send_broadcast_message(f"OFFLINE_CLASS:{self.offline_class.currentText()}")
         if class_name == '':
             # reset back to sim mode if class field is cleared
-            self.offline_sim_changed(self.offline_sim.currentText())
+            self.offline_sim_changed(self.selected_sim)
         else:
             G.settings_mgr.offline_scope = 'CLASS' # set config scope to CLASS
             self.offline_scope_label.setText(f"Editing Class Defaults ({class_name})")
@@ -457,8 +475,8 @@ class OfflineEditorPanel(QWidget):
         self.force_sim_aircraft() # load settings based on class and currently selected sim
 
     def offline_aircraft_changed(self, ac_name=None):
-        cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.offline_sim.currentText()) # get class based on selected aircraft
-        profiles = xmlutils.get_available_profiles(self.offline_sim.currentText(), self.offline_class.currentText(), ac_name)
+        cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.selected_sim) # get class based on selected aircraft
+        profiles = xmlutils.get_available_profiles(self.selected_sim, self.offline_class.currentText(), ac_name)
         self.offline_profile.setEnabled(True)
         self.offline_profile.clear()
 
@@ -468,7 +486,7 @@ class OfflineEditorPanel(QWidget):
 
         if not self.offline_profile.count() and ac_name:
             self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
-            xmlutils.update_active_profile_entry(sim=self.offline_sim.currentText(), cls=cls, model=ac_name, new_profile="Auto User")
+            xmlutils.update_active_profile_entry(sim=self.selected_sim, cls=cls, model=ac_name, new_profile="Auto User")
         self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
         self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
         self.offline_class.blockSignals(False)  # unblock signals
@@ -512,7 +530,7 @@ class OfflineEditorPanel(QWidget):
         self.offline_profile.blockSignals(False)
 
     def force_sim_aircraft(self):
-        G.settings_mgr.current_sim = self.offline_sim.currentText()
+        G.settings_mgr.current_sim = self.selected_sim
         G.settings_mgr.current_class = self.offline_class.currentText()
         G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
         G.settings_mgr.active_profile = self.offline_profile.currentText()
