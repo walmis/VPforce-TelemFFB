@@ -17,11 +17,13 @@
 #
 
 
+import json
 import logging
 import os
 from typing import List, Optional, override
 
 from PyQt6 import QtCore
+from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -33,6 +35,7 @@ from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.telem.BMSTelemManager import BMSManager
+from telemffb.tap import msfs_panel_install
 
 
 class SimTelemListener(QtCore.QObject):
@@ -324,11 +327,19 @@ class SimMSFS(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("MSFS")
         self.telem : Optional[SimConnectSock] = None
+        self._panel_checked = False
 
     @override
     def start(self):
         if not self.is_enabled:
             return
+
+        if not self._panel_checked and G.master_instance:
+            self._panel_checked = True
+            try:
+                self._offer_panel_update()
+            except Exception:
+                logging.exception("MSFS panel version check failed")
 
         self.telem = SimConnectSock(G.telem_manager)
 
@@ -346,6 +357,61 @@ class SimMSFS(SimTelemListener):
     @override
     def validate(self):
         return
+
+    @staticmethod
+    def _panel_community_paths() -> list:
+        """The Community folders System Settings > MSFS lists, with the
+        user's own paths in place of the detected ones."""
+        try:
+            overrides = json.loads(G.system_settings.get('msfsCommunityOverrides', '{}') or '{}')
+        except ValueError:
+            overrides = {}
+        if not isinstance(overrides, dict):
+            overrides = {}
+        installs = msfs_panel_install.find_msfs_installs()
+        paths = [overrides.get(f"{i['version']}|{i['edition']}", i['community_path'])
+                 for i in installs]
+        if not installs:
+            paths.append(overrides.get('manual'))
+        return [p for p in paths if p]
+
+    def _offer_panel_update(self):
+        """Offer to update the in-sim panel wherever an installed copy
+        differs from the one this TelemFFB ships.  A folder without the
+        panel is left alone: installing it is the user's choice."""
+        if not G.system_settings.get('enableMsfsApiServer', True):
+            return
+        bundled = msfs_panel_install.get_bundled_panel_version()
+        if not bundled:
+            return
+        stale = []
+        for path in self._panel_community_paths():
+            installed = msfs_panel_install.installed_panel_version(path)
+            if installed and installed != bundled:
+                stale.append((path, installed))
+        if not stale:
+            return
+        logging.info(f"MSFS panel {bundled} is bundled; installed: {stale}")
+        listing = "\n".join(f"{path}  ({installed})" for path, installed in stale)
+        ans = QMessageBox.question(
+            G.main_window, "MSFS Panel Update",
+            f"The VPforce settings panel installed for MSFS differs from the one "
+            f"this version of TelemFFB ships ({bundled}):\n\n{listing}\n\nUpdate it now?")
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        failed = []
+        for path, _ in stale:
+            try:
+                msfs_panel_install.install_panel(path)
+            except OSError as e:
+                logging.exception(f"Failed to update the MSFS panel in {path}")
+                failed.append(f"{path}: {e}")
+        if failed:
+            QMessageBox.warning(G.main_window, "MSFS Panel Update",
+                                "Couldn't update the panel:\n\n" + "\n".join(failed))
+        else:
+            QMessageBox.information(G.main_window, "MSFS Panel Update",
+                                    "Panel updated.  Restart MSFS if it is running to load it.")
 
 class SimListenerManager(QtCore.QObject):
     simStarted = QtCore.pyqtSignal(object)

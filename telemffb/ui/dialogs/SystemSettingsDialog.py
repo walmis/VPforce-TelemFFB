@@ -1547,7 +1547,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if community_path == row.detected_path:
             installed_version = row.detected_installed_version
         else:
-            installed_version = self._msfs_installed_panel_version(community_path)
+            installed_version = msfs_panel_install.installed_panel_version(community_path)
 
         if not community_path:
             row.status_label.setText("")
@@ -1579,22 +1579,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self._msfs_community_overrides[override_key] = typed
             else:
                 self._msfs_community_overrides.pop(override_key, None)
-
-    @staticmethod
-    def _msfs_installed_panel_version(community_path):
-        """Installed panel version at a Community path, read the same way
-        find_msfs_installs() reads it for a detected path. Kept here rather
-        than in msfs_panel_install.py so that module stays free of the
-        override concept (see its module docstring) - this is only needed
-        for a path the user picked, which that module never sees."""
-        if not community_path:
-            return None
-        manifest = os.path.join(community_path, 'vpforce-telemffb-panel', 'manifest.json')
-        try:
-            with open(manifest, 'r', encoding='utf-8') as f:
-                return json.load(f).get('package_version')
-        except (OSError, ValueError):
-            return None
 
     def _browse_msfs_community(self, override_key, current_path):
         """Browse for a Community folder to override detection with (or to

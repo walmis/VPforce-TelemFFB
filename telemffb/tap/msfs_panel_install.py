@@ -82,6 +82,15 @@ def get_bundled_panel_version() -> Optional[str]:
     return _read_manifest_version(os.path.join(src, 'manifest.json'))
 
 
+def installed_panel_version(community_path: Optional[str]) -> Optional[str]:
+    """package_version of the panel installed in a Community folder, or
+    None when there is none."""
+    if not community_path:
+        return None
+    return _read_manifest_version(
+        os.path.join(community_path, 'vpforce-telemffb-panel', 'manifest.json'))
+
+
 def _community_path_from_usercfg(usercfg_path: str) -> Optional[str]:
     """The last non-empty line of UserCfg.opt is InstalledPackagesPath "<path>"."""
     try:
@@ -174,10 +183,7 @@ def find_msfs_installs() -> list:
     couldn't be found/parsed - the caller should fall back to a manual path."""
     installs = _find_store_installs() + _find_steam_installs()
     for install in installs:
-        install['installed_panel_version'] = None
-        if install['community_path']:
-            manifest = os.path.join(install['community_path'], 'vpforce-telemffb-panel', 'manifest.json')
-            install['installed_panel_version'] = _read_manifest_version(manifest)
+        install['installed_panel_version'] = installed_panel_version(install['community_path'])
     return installs
 
 

@@ -74,6 +74,11 @@ class SimStatusTracker:
         exception tracker)."""
         return set(self._error_seen)
 
+    @property
+    def held_errors(self) -> list:
+        """The same messages, oldest first: the order they are shown in."""
+        return list(self._error_seen)
+
     def push_status(self, source: Optional[str], paused: bool = False,
                      error: bool = False, message: Optional[str] = None) -> None:
         """Report (source, paused, error, message) to AppState - the sole

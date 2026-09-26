@@ -60,9 +60,18 @@ body {
     font-weight: 700;
     color: #b988ff;
 }
+#headerBrand > #panelVersion {
+    margin-left: 8px;
+    font-size: 13px;
+    color: #9aa0ac;
+}
 #headerSub {
     font-size: 16px;
     color: #9aa0ac;
+}
+#deviceTabs {
+    display: none;
+    flex-wrap: wrap;
 }
 
 #scaleControl {
@@ -146,6 +155,15 @@ body.disconnected #settingsList { display: none; }
     line-height: 1.4;
 }
 
+#flagErrors {
+    flex: 0 0 auto;
+    padding: 0 12px;
+}
+#flagErrors .errorBanner {
+    margin: 10px 0 0 0;
+    white-space: pre-line;
+}
+
 .group {
     margin-top: 18px;
 }
@@ -190,6 +208,32 @@ body.disconnected #settingsList { display: none; }
 }
 .rowControl > * + * {
     margin-left: 14px;
+}
+.eraseBtn {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+.eraseBtn img {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+.eraseBtn:active {
+    opacity: 0.6;
+}
+/* close to the control it clears */
+.rowControl > .eraseBtn {
+    margin-left: 8px;
+}
+.row--choice .rowLabel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 /* Choice rows stack the pills under the label on their own row - with
@@ -262,6 +306,10 @@ body.disconnected #settingsList { display: none; }
     font-size: 14px;
     cursor: pointer;
     white-space: nowrap;
+}
+.pill.bindButton {
+    min-width: 130px;
+    text-align: center;
 }
 .pill.selected {
     background: #6a2fb0;

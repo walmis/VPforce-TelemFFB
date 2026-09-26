@@ -17,72 +17,55 @@
 #
 
 
-from PyQt6.QtCore import QThread, pyqtSignal
 import time
+
+from PyQt6.QtCore import QThread, pyqtSignal
+
 import telemffb.globals as G
+from telemffb.hw.ffb_rhino import HapticEffect
+
+
+def wait_for_button_press(target_device=None, timeout=5.0, on_tick=None) -> int:
+    """The first button newly pressed within ``timeout`` seconds, or 0.
+
+    Watches this instance's device together with the buttons reported over
+    IPC: every child's (the master's button list) or, with
+    ``target_device``, that child's alone.  A button already held when the
+    wait starts does not count.  ``on_tick`` is given the whole seconds
+    left, about ten times a second.
+    """
+    def own():
+        report = HapticEffect.get_device_input()
+        return set(report.getPressedButtons()) if report is not None else set()
+
+    def reported():
+        if target_device is not None:
+            return set(G.child_buttons.get(target_device, []))
+        return set(G.master_buttons)
+
+    held_own, held_reported = own(), reported()
+    start = time.time()
+    while time.time() - start < timeout:
+        if on_tick is not None:
+            on_tick(int(timeout - (time.time() - start)))
+        for pressed, held in ((own(), held_own), (reported(), held_reported)):
+            for button in pressed - held:
+                return button
+        time.sleep(0.1)
+    return 0
 
 
 class ButtonPressThread(QThread):
     button_pressed = pyqtSignal(str, int)
 
-    def __init__(self, device, button_obj, target_device, timeout=5):
-        button_name = button_obj.objectName().replace('pb_', '')
-        self.button_obj = button_obj
+    def __init__(self, button_obj, target_device, timeout=5):
         super(ButtonPressThread, self).__init__()
-        self.device = device
-        self.button_name = button_name
+        self.button_obj = button_obj
+        self.button_name = button_obj.objectName().replace('pb_', '')
         self.target_device = target_device
         self.timeout = timeout
-        self.prev_button_state = None
 
     def run(self):
-        start_time = time.time()
-        emit_sent = 0
-        input_data = self.device.device.get_input()
-        if self.target_device is not None:
-            # button context for non-master device..  listen to both self and device
-            # inputs from IPC
-            initial_self_buttons = input_data.getPressedButtons()
-            initial_target_buttons = G.child_buttons.get(self.target_device, [])
-            # initial_buttons = list(set(self_buttons + target_buttons))
-        else:
-            initial_buttons = input_data.getPressedButtons()
-            initial_master_buttons = G.master_buttons
-
-        while not emit_sent and time.time() - start_time < self.timeout:
-            input_data = self.device.device.get_input()
-            if self.target_device is not None:
-                # Get latest results for self and target device inputs
-                self_buttons = input_data.getPressedButtons()
-                target_buttons = G.child_buttons.get(self.target_device, [])
-                # current_buttons = list(set(self_buttons + target_buttons))
-            else:
-                current_buttons = set(input_data.getPressedButtons())
-                current_master_buttons = set(G.master_buttons)
-            countdown = int(self.timeout - (time.time() - start_time))
-            self.button_obj.setText(f"Push a button! {countdown}..")
-            # Check for new button press
-            if self.target_device is not None:
-                # check self buttons and target device buttons independently to look for new presses
-                for btn in self_buttons:
-                    if btn not in initial_self_buttons:
-                        self.button_pressed.emit(self.button_name, btn)
-                        emit_sent = 1
-                for btn in target_buttons:
-                    if btn not in initial_target_buttons:
-                        self.button_pressed.emit(self.button_name, btn)
-                        emit_sent = 1
-            else:
-                for btn in current_buttons:
-                    if btn not in initial_buttons:
-                        self.button_pressed.emit(self.button_name, btn)
-                        emit_sent = 1
-                for btn in current_master_buttons:
-                    if btn not in initial_master_buttons:
-                        self.button_pressed.emit(self.button_name, btn)
-                        emit_sent = 1
-            time.sleep(0.1)
-
-        # Emit signal for timeout with value 0
-        if not emit_sent:
-            self.button_pressed.emit(self.button_name, 0)
+        self.button_pressed.emit(self.button_name, wait_for_button_press(
+            self.target_device, self.timeout,
+            on_tick=lambda left: self.button_obj.setText(f"Push a button! {left}..")))

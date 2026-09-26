@@ -5,6 +5,8 @@
 // here is: poll for connectivity, render whatever it currently offers, and
 // don't fight the user while they're mid-drag on a control.
 
+// Stamped from manifest.json's package_version by build_layout.py.
+const PANEL_VERSION = "0.3.0";
 const API_BASE = "http://127.0.0.1:9873";
 const STATUS_POLL_MS = 2000;
 const SETTINGS_POLL_MS = 3000;
@@ -62,15 +64,84 @@ function apiPost(name, value, unit) {
     });
 }
 
+const DEVICE_LABELS = {
+    joystick: "Joystick",
+    pedals: "Pedals",
+    collective: "Collective",
+    trimwheel: "Trim Wheel",
+};
+
 function setConnected(connected, statusPayload) {
     state.connected = connected;
     document.body.classList.toggle("disconnected", !connected);
     const sub = document.getElementById("headerSub");
+    const devices = (connected && statusPayload && statusPayload.devices) || [];
     if (connected && statusPayload) {
         const name = statusPayload.pattern || statusPayload.aircraft || "?";
-        sub.textContent = statusPayload.device ? name + " - " + statusPayload.device : name;
+        // with more than one device, the device tabs say which one is shown
+        sub.textContent = statusPayload.device && devices.length < 2
+            ? name + " - " + statusPayload.device : name;
     } else {
         sub.textContent = "Not connected";
+    }
+    renderDevices(devices, statusPayload ? statusPayload.device : null);
+}
+
+// One tab per device this TelemFFB drives (its own and its children's);
+// the settings below are the selected device's.
+function renderDevices(devices, current) {
+    const root = document.getElementById("deviceTabs");
+    const shown = devices.length > 1 ? devices.join(",") + "|" + current : "";
+    if (root.dataset.shown === shown) return;
+    root.dataset.shown = shown;
+    root.innerHTML = "";
+    root.style.display = shown ? "flex" : "none";
+    if (!shown) return;
+    for (const device of devices) {
+        const pill = document.createElement("button");
+        pill.className = "pill" + (device === current ? " selected" : "");
+        pill.textContent = DEVICE_LABELS[device] || device;
+        pill.addEventListener("click", () => {
+            pill.blur();
+            if (device !== current) selectDevice(device);
+        });
+        root.appendChild(pill);
+    }
+}
+
+function selectDevice(device) {
+    fetch(API_BASE + "/api/device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device: device }),
+    }).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+    }).then(
+        (s) => {
+            setConnected(!!s.connected, s);
+            refreshSettingsNow();
+        },
+        (err) => {
+            log("device switch failed:", err && err.message);
+        }
+    );
+}
+
+// The configuration errors TelemFFB is showing. TelemFFB holds each one
+// until it has been gone for a few seconds, so this mirrors its list
+// rather than keeping any of its own.
+function renderFlagErrors(messages) {
+    const root = document.getElementById("flagErrors");
+    const text = messages.join("\n\n");
+    if (root.dataset.shown === text) return;
+    root.dataset.shown = text;
+    root.innerHTML = "";
+    for (const message of messages) {
+        const el = document.createElement("div");
+        el.className = "errorBanner";
+        el.textContent = message;
+        root.appendChild(el);
     }
 }
 
@@ -78,11 +149,13 @@ function pollStatus() {
     apiGet("/api/status").then(
         (s) => {
             setConnected(!!s.connected, s);
+            renderFlagErrors(s.connected && s.errors ? s.errors : []);
             setTimeout(pollStatus, STATUS_POLL_MS);
         },
         (err) => {
             log("status poll failed:", err && err.message);
             setConnected(false, null);
+            renderFlagErrors([]);
             setTimeout(pollStatus, STATUS_POLL_MS);
         }
     );
@@ -239,8 +312,12 @@ function renderRow(item, bumpChild) {
 
     const label = document.createElement("div");
     label.className = "rowLabel";
-    label.textContent = item.displayname;
+    const labelText = document.createElement("span");
+    labelText.textContent = item.displayname;
+    label.appendChild(labelText);
     if (item.info) label.title = item.info; // already plain text - server strips HTML
+    // a choice row's pills sit under the label, so its erase ends the label line
+    if (item.control === "choice") label.appendChild(renderErase(item, row));
     row.appendChild(label);
 
     const control = document.createElement("div");
@@ -252,21 +329,58 @@ function renderRow(item, bumpChild) {
         control.appendChild(renderChoice(item, row));
     } else if (item.control === "range") {
         control.appendChild(renderRange(item, row));
+    } else if (item.control === "button") {
+        control.appendChild(renderBind(item, row));
     }
+    if (item.control !== "choice") control.appendChild(renderErase(item, row));
 
     if (bumpChild) {
         const bumpEl = renderBumpControl(bumpChild, row);
-        if (bumpEl) control.appendChild(bumpEl);
+        if (bumpEl) {
+            control.appendChild(bumpEl);
+            control.appendChild(renderErase(bumpChild, row));
+        }
     }
 
     row.appendChild(control);
     return row;
 }
 
+// The desktop form's erase button, right of the control it clears: shown on
+// a setting the user has changed, and the default comes back. Every control
+// keeps the space so the buttons line up down the panel.
+function renderErase(item, row) {
+    const btn = document.createElement("button");
+    btn.className = "eraseBtn";
+    const icon = document.createElement("img");
+    icon.src = "erase.svg";
+    icon.alt = "";
+    btn.appendChild(icon);
+    if (!item.erasable) {
+        btn.style.visibility = "hidden";
+        btn.disabled = true;
+        return btn;
+    }
+    btn.title = "Reset to default";
+    btn.addEventListener("click", () => {
+        btn.blur();
+        markUpdating(row, fetch(API_BASE + "/api/erase", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: item.name }),
+        }).then((r) => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+        }));
+    });
+    return btn;
+}
+
 function renderBumpControl(item, row) {
     if (item.control === "bool") return renderBool(item, row);
     if (item.control === "choice") return renderChoice(item, row);
     if (item.control === "range") return renderRange(item, row);
+    if (item.control === "button") return renderBind(item, row);
     return null;
 }
 
@@ -298,6 +412,66 @@ function markUpdating(row, promise) {
             log("write failed:", err && err.message);
             row.classList.add("writeFailed");
             setTimeout(() => row.classList.remove("writeFailed"), 2000);
+        }
+    );
+}
+
+// Button bindings.  Clicking asks TelemFFB to wait a few seconds for a
+// button press on the device; the row counts down until the capture
+// settles.  The list re-renders every few seconds, so the capture in
+// progress is kept here rather than in the row.
+const bind = { name: null, remaining: 0 };
+
+function bindLabel(item) {
+    if (bind.name === item.name) return "Push a button... " + bind.remaining;
+    return item.value ? "Button " + item.value : "Click to bind";
+}
+
+function renderBind(item, row) {
+    const btn = document.createElement("button");
+    btn.className = "pill bindButton" + (bind.name === item.name ? " selected" : "");
+    btn.dataset.name = item.name;
+    btn.textContent = bindLabel(item);
+    btn.addEventListener("click", () => {
+        btn.blur();
+        if (bind.name) return;   // one capture at a time
+        fetch(API_BASE + "/api/bind", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: item.name }),
+        }).then((r) => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            bind.name = item.name;
+            bind.remaining = 5;
+            btn.classList.add("selected");
+            btn.textContent = bindLabel(item);
+            pollBind();
+        }).then(null, (err) => {
+            log("bind failed:", err && err.message);
+            row.classList.add("writeFailed");
+            setTimeout(() => row.classList.remove("writeFailed"), 2000);
+        });
+    });
+    return btn;
+}
+
+function pollBind() {
+    apiGet("/api/bind").then(
+        (s) => {
+            if (s.state === "waiting") {
+                bind.remaining = s.remaining;
+                const el = document.querySelector('.bindButton[data-name="' + bind.name + '"]');
+                if (el) el.textContent = "Push a button... " + bind.remaining;
+                setTimeout(pollBind, 250);
+                return;
+            }
+            bind.name = null;
+            refreshSettingsNow();
+        },
+        (err) => {
+            log("bind status failed:", err && err.message);
+            bind.name = null;
+            refreshSettingsNow();
         }
     );
 }
@@ -515,6 +689,7 @@ window.addEventListener("unhandledrejection", (e) => {
 
 log("panel.js loaded, starting poll loops");
 document.getElementById("settingsList").textContent = "Loading...";
+document.getElementById("panelVersion").textContent = "v" + PANEL_VERSION;
 
 initScaleControl();
 pollStatus();

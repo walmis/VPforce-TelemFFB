@@ -20,6 +20,7 @@ adapter uses - to get a start()/shutdown() pair to call from Qt.
 import logging
 import re
 import threading
+import time
 from socketserver import ThreadingMixIn
 from typing import Any, Optional
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
@@ -28,6 +29,8 @@ from bottle import Bottle, request, response
 
 import telemffb.globals as G
 from telemffb import xmlutils
+from telemffb.ButtonPressThread import wait_for_button_press
+from telemffb.utils.device import DEVICE_ROLES
 from telemffb.xml.merge import visible_rows
 
 app = Bottle()
@@ -86,6 +89,11 @@ def _strip_html(text: str, max_len: Optional[int] = None) -> str:
     return text
 
 
+def _edit_scope() -> str:
+    sm = _settings_mgr
+    return (sm.offline_scope or "model").lower() if sm.offline_mode else "model"
+
+
 def _build_control(item: dict) -> Optional[dict]:
     """Turn one settings row into a JSON-friendly control spec, or None to
     exclude it (group headers, dialogs, free-text fields)."""
@@ -106,7 +114,17 @@ def _build_control(item: dict) -> Optional[dict]:
         # parent's own row instead of as a separate row - the panel mirrors
         # that (see extractBumpChildren() in panel.js).
         "prereq": item.get("prereq") or "",
+        # the desktop form's erase rule: the value is the user's own, at
+        # the scope being edited
+        "erasable": (item.get("replaced") or "").lower() == f"{_edit_scope()} (user)",
     }
+
+    if datatype == "button":
+        # the number of the bound button, 0 when unbound; bound from the
+        # panel through /api/bind
+        base["control"] = "button"
+        base["value"] = int(_parse_raw_value(item.get("value") or "0"))
+        return base
 
     if datatype in _BOOL_TYPES:
         base["control"] = "bool"
@@ -201,6 +219,22 @@ def _is_vr() -> bool:
         return str(is_in_vr).strip().lower() in ("1", "true")
 
 
+# The device whose settings the panel shows and edits: this instance's own
+# or a child's, chosen in the panel independently of the desktop form.
+_scope = {"device": None}
+
+
+def _devices() -> list:
+    """This instance's device, then its children's, in role order."""
+    own = _settings_mgr.device
+    return [own] + [r for r in DEVICE_ROLES if r != own and r in G.launched_instances]
+
+
+def _device() -> str:
+    device = _scope["device"]
+    return device if device in _devices() else _settings_mgr.device
+
+
 def _current_state() -> dict:
     sm = _settings_mgr
     return {
@@ -208,8 +242,12 @@ def _current_state() -> dict:
         "aircraft": sm.current_aircraft_name,
         "pattern": sm.current_pattern,
         "class": sm.current_class,
-        "device": sm.device,
+        "device": _device(),
+        "devices": _devices(),
         "connected": sm.current_sim == "MSFS" and not sm.timed_out,
+        # the configuration errors TelemFFB is showing, held and cleared by
+        # its status tracker
+        "errors": G.main_window.sim_status.held_errors,
     }
 
 
@@ -241,6 +279,16 @@ def root():
 
 @app.get("/api/status")
 def get_status():
+    return _current_state()
+
+
+@app.post("/api/device")
+def set_device():
+    device = (request.json or {}).get("device")
+    if device not in _devices():
+        response.status = 400
+        return {"detail": f"No configured device '{device}'"}
+    _scope["device"] = device
     return _current_state()
 
 
@@ -281,7 +329,7 @@ def get_settings():
         return {**_current_state(), "settings": []}
 
     _cls, _pattern, result = xmlutils.read_single_model(
-        sm.current_sim, sm.current_aircraft_name, sm.current_class, sm.device,
+        sm.current_sim, sm.current_aircraft_name, sm.current_class, _device(),
         active_profile=sm.active_profile,
     )
 
@@ -315,8 +363,35 @@ def set_setting():
     else:
         value = str(raw_value)
 
-    sm.write_to_xml(sm.current_sim, sm.current_class, sm.current_pattern, value, name, unit=unit)
+    _write_setting(name, value, _device(), unit)
+    return {"ok": True}
 
+
+def _write_setting(name: str, value: str, device: str, unit: str = "") -> None:
+    sm = _settings_mgr
+    sm.write_to_xml(sm.current_sim, sm.current_class, sm.current_pattern, value, name,
+                    unit=unit, the_device=device)
+    _refresh_active_profile()
+
+
+@app.post("/api/erase")
+def erase_setting():
+    name = (request.json or {}).get("name")
+    if not name:
+        response.status = 400
+        return {"detail": "Request body must include 'name'"}
+    sm = _settings_mgr
+    if not sm.current_sim or sm.current_sim == "nothing":
+        response.status = 409
+        return {"detail": "No sim/aircraft is currently active"}
+    sm.erase_from_xml(sm.current_sim, sm.current_class, sm.current_pattern, name,
+                      the_device=_device())
+    _refresh_active_profile()
+    return {"ok": True}
+
+
+def _refresh_active_profile() -> None:
+    sm = _settings_mgr
     # Writing to a 'Built-In' profile forks it into a new 'Auto User' profile
     # (see ConfigWriter.write_models_to_xml). TelemManager normally re-derives
     # active_profile from disk on the next telemetry frame, but refresh it here
@@ -326,7 +401,53 @@ def set_setting():
         if new_profile != sm.active_profile:
             sm.update_state_vars(active_profile=new_profile)
 
+
+# --- button binding ---------------------------------------------------------
+# One capture at a time: the panel starts it, then polls for the outcome.
+
+BIND_TIMEOUT_S = 5.0
+_bind_lock = threading.Lock()
+_bind = {"name": None, "state": "idle", "value": 0, "until": 0.0}
+
+
+def _capture_binding(name: str, device: str) -> None:
+    value = wait_for_button_press(None if device == G.device_type else device, BIND_TIMEOUT_S)
+    if value:
+        try:
+            _write_setting(name, str(value), device)
+        except Exception:
+            logging.exception(f"api_server: could not save the binding for '{name}'")
+            value = 0
+    with _bind_lock:
+        _bind.update(state="captured" if value else "timeout", value=value)
+
+
+@app.post("/api/bind")
+def start_bind():
+    data = request.json or {}
+    name = data.get("name")
+    if not name:
+        response.status = 400
+        return {"detail": "Request body must include 'name'"}
+    sm = _settings_mgr
+    if not sm.current_sim or sm.current_sim == "nothing":
+        response.status = 409
+        return {"detail": "No sim/aircraft is currently active"}
+    with _bind_lock:
+        if _bind["state"] == "waiting":
+            response.status = 409
+            return {"detail": f"Already waiting for a button for '{_bind['name']}'"}
+        _bind.update(name=name, state="waiting", value=0, until=time.time() + BIND_TIMEOUT_S)
+    threading.Thread(target=_capture_binding, args=(name, _device()),
+                     name="panel-bind", daemon=True).start()
     return {"ok": True}
+
+
+@app.get("/api/bind")
+def bind_status():
+    with _bind_lock:
+        return {"name": _bind["name"], "state": _bind["state"], "value": _bind["value"],
+                "remaining": max(0, int(round(_bind["until"] - time.time())))}
 
 
 class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):

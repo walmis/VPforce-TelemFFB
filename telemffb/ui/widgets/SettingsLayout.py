@@ -2229,7 +2229,7 @@ class SettingsLayout(QGridLayout):
         the_button.setText("Push a button! ")
         # listen for button loop
         # Start a thread to fetch button press with a timeout
-        self.thread = ButtonPressThread(self.device, self.sender(), target_device)
+        self.thread = ButtonPressThread(self.sender(), target_device)
         self.thread.button_pressed.connect(self.update_button)
         self.thread.start()
 
