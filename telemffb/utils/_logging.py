@@ -475,8 +475,6 @@ class DedupHandler(logging.Handler):
             exc_info=None,
             func=base_record.funcName,
         )
-        # preserve timestamp
-        new_rec.created = base_record.created
         return new_rec
 
     def _make_cycle_summary_record(self, keys, periodic: bool = False) -> logging.LogRecord:
@@ -486,7 +484,7 @@ class DedupHandler(logging.Handler):
         the current window. The summary lists up to ``MAX_LISTED_TYPES``
         messages and reports per-type occurrence counts, for example::
 
-            Cycle detected: 24 messages across 2 types over the last 5s.
+            Cycle detected: 24 messages across 2 types since 14:03:36.
                 - Start effect 8 (Sine) ("flapsmovement"): 12
                 - Stop effect 8 (Sine) ("flapsmovement"): 12
                 (see DEBUG for details)
@@ -497,8 +495,12 @@ class DedupHandler(logging.Handler):
         extra = len(keys) - len(listed)
         total = sum(self._counts.get(k, 0) for k in keys)
         suffix = " so far" if periodic else ""
+        # the counts run for the whole episode, which lasts until the log
+        # has been quiet for period_seconds - not for the last period
+        since = time.strftime('%H:%M:%S', time.localtime(
+            min(self._records[k].created for k in keys)))
 
-        lines = [f"Cycle detected: {total} messages across {len(keys)} types over the last {self.period_seconds:g}s{suffix}."]
+        lines = [f"Cycle detected: {total} messages across {len(keys)} types since {since}{suffix}."]
         for k in listed:
             lines.append(f"    - {self._normalize_message(self._records[k])}: {self._counts[k]}")
         if extra > 0:
@@ -518,8 +520,6 @@ class DedupHandler(logging.Handler):
             exc_info=None,
             func=ref.funcName,
         )
-        # preserve the original record's wall-clock timestamp
-        new_rec.created = ref.created
         return new_rec
 
     def _prune_window(self, now):

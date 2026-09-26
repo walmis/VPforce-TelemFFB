@@ -45,6 +45,7 @@ class ConfigResolver:
         self._store = store
         self._hidden = hidden
         self._shadow_logged: set = set()   # (sim, aircraft) already warned about
+        self._pattern_logged: dict = {}    # (sim, aircraft) -> pattern last logged
 
     # ── Main entry point ──────────────────────────────────────
 
@@ -738,6 +739,11 @@ class ConfigResolver:
                         col['user'] if col['winner'] == 'user' else col['curated'])
 
     def _log_pattern_match(self, sim: str, name: str, pattern: str) -> None:
+        """Log which pattern names an aircraft, when that changes - resolution
+        runs on every settings poll, and the answer rarely moves."""
+        if self._pattern_logged.get((sim, name)) == pattern:
+            return
+        self._pattern_logged[(sim, name)] = pattern
         legacy = self.first_match_pattern(sim, name)
         if legacy and legacy != pattern:
             logging.info("Reading from XML: Pattern Match: %s (the first-match rule would have chosen %s)",
