@@ -278,17 +278,17 @@ class TestFlagErrorAccumulates:
         ac = self._aircraft()
         ac.flag_error("first problem")
         ac.flag_error("second problem")
-        assert ac.telem_data["error"] == ERROR_SEPARATOR.join(["first problem", "second problem"])
+        assert ac.telem_data["error"] == ERROR_SEPARATOR.join(["Joystick: first problem", "Joystick: second problem"])
 
     def test_the_same_error_twice_is_not_duplicated(self):
         ac = self._aircraft()
         ac.flag_error("same problem")
         ac.flag_error("same problem")
-        assert ac.telem_data["error"] == "same problem"
+        assert ac.telem_data["error"] == "Joystick: same problem"
 
     def test_the_first_error_reads_cleanly(self):
         """'error' is not a declared telemetry field, so the accumulator has
         to reach it by item access or the first call would raise."""
         ac = self._aircraft()
         ac.flag_error("only problem")
-        assert ac.telem_data["error"] == "only problem"
+        assert ac.telem_data["error"] == "Joystick: only problem"

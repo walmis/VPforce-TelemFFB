@@ -216,7 +216,9 @@ class AircraftEffectUtilsBase(object):
         Args:
             message (str): Error message to display
         """
-        dev = (self.telem_data.FFBType or 'joystick').capitalize()
+        # Named for the device that raised it: a child's errors are shown by
+        # the master alongside its own.
+        message = f"{utils.device_display_name(self.telem_data.FFBType or 'joystick')}: {message}"
         # item access, not attribute: 'error' is not a declared field, so
         # reading it before anything set it would raise.
         current = self.telem_data['error']
@@ -227,7 +229,7 @@ class AircraftEffectUtilsBase(object):
         if not master_instance:
             # Rebuilt from the frame's full list rather than appended to:
             # _ipc_telem belongs to the aircraft and outlives the frame.
-            self._ipc_telem['error'] = ERROR_SEPARATOR.join(f"{dev}: {m}" for m in messages)
+            self._ipc_telem['error'] = self.telem_data.error
 
     def is_joystick(self):
         """Check if the current FFB device is a joystick.
