@@ -424,7 +424,7 @@ SIMS: Tuple[TapSim, ...] = (
     TapSim(
         key="IL2_K",
         tap_enable_key="enableTapIL2_K",
-        enable_key="enableIL2",
+        enable_key="enableIL2K",
         name="IL-2 Korea",
         # Same relative layout as Great Battles, but the standalone release
         # nests it under <root>/game.  il2_korea_game_root already resolves

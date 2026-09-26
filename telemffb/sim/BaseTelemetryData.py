@@ -34,7 +34,7 @@ class BaseTelemetryData:
     src: Optional[str]
     """Simulator source identifier.  
     Sims: All.  Set by each telem manager before submit_frame().  
-    Values: "DCS", "MSFS", "IL2", "BMS", "XPLANE"  
+    Values: "DCS", "MSFS", "IL2", "IL2K", "BMS", "XPLANE"  
     """
 
     N: Optional[str]

@@ -77,7 +77,10 @@ import telemffb.globals as G
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.utils.conversions import kt2ms
 
-SIMS = ("DCS", "MSFS", "XPLANE", "IL2", "BMS")
+SIMS = ("DCS", "MSFS", "XPLANE", "IL2", "IL2K", "BMS")
+#: Sims whose specs are another sim's: IL-2 Korea runs IL-2's effect code
+#: on IL-2's telemetry fields, so every IL-2 spec covers it.
+SPEC_SIM = {"IL2K": "IL2"}
 KINDS = ("hold", "ramp", "edge")
 FRAME_RATE_HZ = 30.0
 # The spring a constant-force preview plays against: deliberately weak.
@@ -244,10 +247,11 @@ class PreviewSpec:
         object.__setattr__(self, 'schedule', segments)
 
     def supports(self, sim: str) -> bool:
-        return sim in self.sims
+        return SPEC_SIM.get(sim, sim) in self.sims
 
     def method_for(self, sim: str):
         """The method name, or the recipe callable, for ``sim``."""
+        sim = SPEC_SIM.get(sim, sim)
         if isinstance(self.method, dict):
             name = self.method.get(sim, self.method.get('*'))
             if name is None:
@@ -279,7 +283,7 @@ class PreviewSpec:
         if sim not in SIMS:
             raise ValueError(f"unknown sim {sim!r}")
         merged: Dict[str, FieldValue] = dict(self.fields.get('*', {}))
-        merged.update(self.fields.get(sim, {}))
+        merged.update(self.fields.get(SPEC_SIM.get(sim, sim), {}))
         progress = self.stimulus_progress(progress)
         return {name: self._resolve(value, aircraft, progress)
                 for name, value in merged.items()}

@@ -326,12 +326,13 @@ class AircraftEffectUtilsBase(object):
         return self._telem_data.src == "BMS"
 
     def _sim_is_il2(self, *unused):
-        """Check if the current simulator is IL2 Sturmovik..
+        """Check if the current simulator is IL-2, either title: Great
+        Battles and Korea share the protocol and the effect code.
 
                 Returns:
-                    bool: True if IL2, False otherwise
+                    bool: True if IL2 or IL2K, False otherwise
                 """
-        return self._telem_data.src == "IL2"
+        return self._telem_data.src in ("IL2", "IL2K")
 
     def _sim_is(self, sim, *unused):
         """Check if the current simulator matches the specified name.

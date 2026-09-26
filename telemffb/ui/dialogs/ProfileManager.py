@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, 
 
 import telemffb.globals as G
 from telemffb import utils
+from telemffb.SettingsManager import SettingsManager
 from telemffb.ui.generated.Ui_ProfileManagerDialog import Ui_ProfileManagerDialog
 from telemffb.ui.dialogs.ProfileImportDialog import ProfileImportDialog
 from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
@@ -165,7 +166,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.treeWidget.clear()
 
         for sim in result_data:
-            sim_item = QTreeWidgetItem([sim["name"]])
+            sim_item = QTreeWidgetItem([SettingsManager.sim_label(sim["name"])])
             sim_item.setFlags(sim_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             sim_item.setData(0, Qt.ItemDataRole.UserRole, {
                 "type": "sim",
@@ -410,7 +411,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
     def get_enabled_sims(self):
         enabled_sims = []
         for sim in xmlutils.get_sims():
-            if G.system_settings.get(f'enable{sim}', False):
+            if SettingsManager.sim_enabled(sim):
                 enabled_sims.append(sim)
         return sorted(enabled_sims)
 
@@ -1086,7 +1087,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
             # Handle single active profile deletion
             active_item = items[0]
-            sim = active_item.parent().parent().text(0)
+            sim = self.get_metadata(active_item, "sim_name")
             cls = self.get_metadata(active_item, "cls_name")
             model = active_item.text(self.COL_AIRCRAFT)
             profile = active_item.text(self.COL_PROFILE)
@@ -1173,7 +1174,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             return
 
         for item in items:
-            sim = item.parent().parent().text(0)
+            sim = self.get_metadata(item, "sim_name")
             model = item.text(self.COL_AIRCRAFT)
             profile = item.text(self.COL_PROFILE)
             xmlutils.erase_model_profile(sim, model, profile)
@@ -1673,7 +1674,7 @@ class TreePopulationWorker(QObject):
     def get_enabled_sims(self):
         enabled_sims = []
         for sim in xmlutils.get_sims():
-            if G.system_settings.get(f'enable{sim}', False):
+            if SettingsManager.sim_enabled(sim):
                 enabled_sims.append(sim)
         return sorted(enabled_sims)
 

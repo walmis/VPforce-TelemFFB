@@ -299,6 +299,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.focus_pauseIL2.setChecked(False)
         self.focus_pauseIL2.setVisible(False)
 
+        self.portIL2_K.setToolTip('UDP port IL-2 Korea sends telemetry to; kept apart from the IL-2 Sturmovik port so TelemFFB can tell the two games apart')
+
         # Add tooltips
         self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
         self.enableMsfsApiServer.setToolTip('If enabled, the master instance starts a local HTTP server while MSFS is the active sim, letting the VPforce Settings in-sim toolbar panel view and edit the current aircraft\'s settings')
@@ -427,6 +429,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_logPrune.stateChanged.connect(self.toggle_log_prune_widgets)
         self.enableDCS.stateChanged.connect(self.toggle_dcs_widgets)
         self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
+        self.enableIL2K.stateChanged.connect(self.toggle_il2_widgets)
         self.enableMSFS.stateChanged.connect(self.toggle_msfs_widgets)
         self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
         self.enableBMS.stateChanged.connect(self.toggle_bms_widgets)
@@ -1127,7 +1130,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def select_enabled_sim(self):
         for sim in ('DCS', 'MSFS', 'XPLANE', 'IL2', 'BMS'):
             cb = getattr(self, f'enable{sim}')
-            if cb.isChecked():
+            if cb.isChecked() or (sim == 'IL2' and self.enableIL2K.isChecked()):
                 # Find first enabled sim in the list and make that the default selected tab
                 tab_index = getattr(self, f'{sim}_TAB')
                 self.simTabWidget.setCurrentIndex(tab_index)
@@ -1709,7 +1712,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # kept so the tap code can read the sim switches as they stand in
         # the dialog rather than as they were last saved
         self._sim_enable_boxes = {}
-        for name in ('enableDCS', 'enableIL2', 'enableBMS'):
+        for name in ('enableDCS', 'enableIL2', 'enableIL2K', 'enableBMS'):
             try:
                 widget = getattr(self, name)
             except (AttributeError, RuntimeError):
@@ -1768,6 +1771,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # last enabled, so their effect on IL-2's shared path fields is
         # applied once the restored state is known.
         self.refresh_il2_path_fields()
+        self.refresh_tap_controls()
+
+    #: Taps whose controls follow their title's enable switch.  IL-2's two
+    #: titles share one tab, so each title's tap is greyed with its own
+    #: switch; other sims' taps stay usable with the sim off (installing
+    #: is about the game folder, not the switch).
+    SWITCHED_TAP_KEYS = ('IL2', 'IL2_K')
+
+    def refresh_tap_controls(self):
+        """An IL-2 title's tap controls - opt-in switch, status panel - are
+        usable only while that title is switched on."""
+        switches = getattr(self, '_sim_enable_boxes', {})
+        panels = getattr(self, 'tap_panels', {})
+        for key, box in getattr(self, 'tap_enable_boxes', {}).items():
+            if key not in self.SWITCHED_TAP_KEYS:
+                continue
+            switch = switches.get(SIMS_BY_KEY[key].enable_key)
+            on = switch is None or switch.isChecked()
+            box.setEnabled(on)
+            if key in panels:
+                panels[key].setEnabled(on)
 
     def tap_settings(self):
         """Settings with the dialog's unsaved sim switches over the top.
@@ -1786,9 +1810,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return _LiveSettings(G.system_settings, overrides)
 
     def _on_sim_enabled(self, state, setting_name):
-        """A sim switch moved.  One switch can cover more than one title -
-        IL-2's two share theirs - so both are considered."""
+        """A sim switch moved: refresh the tap panels and their controls,
+        and offer to take the tap out of every title the switch covers."""
         self.refresh_tap_panels()
+        self.refresh_tap_controls()
         if state:
             self._raise_tap_gaps()
             return
@@ -2120,24 +2145,18 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.setTabIcon(self.DCS_TAB, icon)
 
     def toggle_il2_widgets(self):
-        # Show/hide IL-2 related widgets based on checkbox state
-        il2_enabled = self.enableIL2.isChecked()
-        # self.il2_sub_layout.setEnabled(il2_enabled)
-        self.validateIL2.setEnabled(il2_enabled)
-        self.focus_pauseIL2.setEnabled(il2_enabled)
-        self.lab_pathIL2.setEnabled(il2_enabled)
-        self.pathIL2.setEnabled(il2_enabled)
-        self.browseIL2.setEnabled(il2_enabled)
-        self.lab_portIL2.setEnabled(il2_enabled)
-        self.portIL2.setEnabled(il2_enabled)
-        icon = self.IL2_ICON_ENABLED if il2_enabled else self.IL2_ICON_DISABLED
+        # each title's widgets follow its own switch; the tab is lit when
+        # either title is on
+        sturmovik = self.enableIL2.isChecked()
+        korea = self.enableIL2K.isChecked()
+        for name in ('validateIL2', 'focus_pauseIL2', 'lab_pathIL2', 'pathIL2', 'browseIL2',
+                     'lab_portIL2', 'portIL2'):
+            getattr(self, name).setEnabled(sturmovik)
+        for name in ('validateIL2_K', 'lab_pathIL2_2', 'pathIL2_K', 'browseIL2_K',
+                     'lab_portIL2_K', 'portIL2_K'):
+            getattr(self, name).setEnabled(korea)
+        icon = self.IL2_ICON_ENABLED if (sturmovik or korea) else self.IL2_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.IL2_TAB, icon)
-        self.lab_pathIL2_2.setEnabled(il2_enabled)
-        self.pathIL2_K.setEnabled(il2_enabled)
-        self.browseIL2_K.setEnabled(il2_enabled)
-        self.validateIL2_K.setEnabled(il2_enabled)
-        self.lab_IL2_S.setEnabled(il2_enabled)
-        self.lab_IL2_K.setEnabled(il2_enabled)
 
         self.refresh_il2_path_fields()
 
@@ -2150,6 +2169,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         ('validateIL2_K', 'enableTap_IL2_K', 'lab_pathIL2_2', 'pathIL2_K',
          'browseIL2_K'),
     )
+    #: Each IL-2 title's path field -> that title's enable switch.
+    IL2_PATH_SWITCHES = {'pathIL2': 'enableIL2', 'pathIL2_K': 'enableIL2K'}
 
     def refresh_il2_path_fields(self):
         """Let a path be edited when anything needs it.
@@ -2160,8 +2181,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         has - and a user who sets telemetry up by hand was left with the
         one control that could point the tap at the game greyed out.
         """
-        sim_on = self.enableIL2.isChecked()
         for auto_name, tap_name, label_name, field_name, browse_name in self.IL2_PATH_FIELDS:
+            sim_on = getattr(self, self.IL2_PATH_SWITCHES[field_name]).isChecked()
             auto = getattr(self, auto_name, None)
             tap = getattr(self, tap_name, None)
             wanted = ((auto is not None and auto.isChecked())
@@ -2343,7 +2364,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def validate_il2_path(self):
         for field_name, toggle in (('pathIL2', self.validateIL2),
                                    ('pathIL2_K', self.validateIL2_K)):
-            if not toggle.isChecked():
+            if not (toggle.isChecked()
+                    and getattr(self, self.IL2_PATH_SWITCHES[field_name]).isChecked()):
                 continue
             if not self._il2_path_holds_the_game(
                     field_name, getattr(self, field_name).text()):
@@ -2353,6 +2375,20 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     f"\n\n{self.IL2_STARTUP_CFG[field_name][1]} not found "
                     "at the configured path")
                 return False
+        return True
+
+    def validate_il2_ports(self):
+        """The two IL-2 titles must send to different ports: the port is the
+        only thing that tells their telemetry apart."""
+        def port(field):
+            text = field.text().strip()
+            return int(text) if text.isdigit() else text
+        if port(self.portIL2) == port(self.portIL2_K):
+            QMessageBox.warning(
+                self, "Config Error",
+                "IL-2 Sturmovik and IL-2 Korea need different telemetry ports.\n\n"
+                "The port is how TelemFFB tells the two games apart.")
+            return False
         return True
 
     def _add_il2_fwd_row(self, addr, port, telem, motion, ffb):
@@ -2496,8 +2532,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if not self.validate_instance_settings():
             return False
 
-        if self.enableIL2.isChecked():
+        if self.enableIL2.isChecked() or self.enableIL2K.isChecked():
             if not self.validate_il2_path():
+                return False
+        if self.enableIL2.isChecked() and self.enableIL2K.isChecked():
+            if not self.validate_il2_ports():
                 return False
 
         if self.il2_fwd_enable.isChecked() and self.il2_fwd_model.rowCount() == 0:
@@ -2529,11 +2568,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "validateXPLANE": self.validateXPLANE.isChecked(),
             "pathXPLANE": self.pathXPLANE.text(),
             "enableIL2": self.enableIL2.isChecked(),
+            "enableIL2K": self.enableIL2K.isChecked(),
             "validateIL2": self.validateIL2.isChecked(),
             "validateIL2_K": self.validateIL2_K.isChecked(),
             "focus_pauseIL2": self.focus_pauseIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
             "portIL2": str(self.portIL2.text()),
+            "portIL2_K": str(self.portIL2_K.text()),
             "pathIL2_K": self.pathIL2_K.text(),
             "il2_fwd_enable": self.il2_fwd_enable.isChecked(),
             "il2_fwd_destinations": json.dumps(self.get_il2_fwd_destinations()),
@@ -3362,6 +3403,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.pathXPLANE.setText(settings_dict.get('pathXPLANE', ''))
 
         self.enableIL2.setChecked(settings_dict.get('enableIL2', False))
+        self.enableIL2K.setChecked(settings_dict.get('enableIL2K', False))
         self.toggle_il2_widgets()
 
         self.validateIL2.setChecked(settings_dict.get('validateIL2', False))
@@ -3376,6 +3418,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.toggle_il2_fwd_widgets()
 
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
+        self.portIL2_K.setText(str(settings_dict.get('portIL2_K', 34386)))
 
         self.enableBMS.setChecked(settings_dict.get('enableBMS', False))
         self.pathBMS.setText(settings_dict.get('pathBMS', ''))

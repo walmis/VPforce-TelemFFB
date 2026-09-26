@@ -147,13 +147,15 @@ class TestWhenToSpeakUp:
         assert pending_reconcile(change, self.on, [dcs_status()]) == []
 
 
-class TestSharedEnableKeys:
-    def test_il2_korea_rides_on_the_il2_toggle(self):
-        """There is one IL-2 switch in the UI, and Korea has no separate
-        setting - so enabling Great Battles enables Korea here too."""
-        korea = SIMS_BY_KEY["IL2_K"]
-        assert sim_is_enabled(korea, Settings({"enableIL2": True}))
-        assert not sim_is_enabled(korea, Settings({"enableIL2": False}))
+class TestIl2EnableKeys:
+    def test_each_il2_title_follows_its_own_switch(self):
+        """IL-2 Great Battles and IL-2 Korea have separate switches; neither
+        enables the other's tap."""
+        gb, korea = SIMS_BY_KEY["IL2"], SIMS_BY_KEY["IL2_K"]
+        only_gb = Settings({"enableIL2": True, "enableIL2K": False})
+        only_korea = Settings({"enableIL2": False, "enableIL2K": True})
+        assert sim_is_enabled(gb, only_gb) and not sim_is_enabled(korea, only_gb)
+        assert sim_is_enabled(korea, only_korea) and not sim_is_enabled(gb, only_korea)
 
 
 

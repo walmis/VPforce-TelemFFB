@@ -58,7 +58,7 @@ class DecelerationEffectMixIn(AircraftEffectUtilsBase):
         y_gs = 0
         last_y_gs = 0
 
-        if self._sim_is("IL2") or self._sim_is("BMS"):
+        if self._sim_is_il2() or self._sim_is("BMS"):
             # IL2/BMS provide body-frame acceleration directly — valid both on the ground and airborne
             y_gs = (telem_data.ACCs or [0, 0, 0])[0]
             last_y_gs = (self._last_telem_data.ACCs or [0, 0, 0])[0]

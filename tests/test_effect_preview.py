@@ -2354,3 +2354,16 @@ class TestHydraulicLossPreview(BaseTelemetryEffectTestCase):
         frame = BaseTelemetryData()
         HydraulicLossMixIn.on_telemetry(ac, frame)
         assert seen == [frame]
+
+
+def test_korea_previews_as_il2(monkeypatch):
+    """IL-2 Korea runs IL-2's effect code on IL-2's telemetry fields, so
+    every preview that covers IL-2 covers Korea, the same way."""
+    from telemffb.preview.engine import PreviewSpec
+    monkeypatch.setattr(PreviewSpec, "_resolve", lambda self, value, aircraft, progress: value)
+    il2_specs = [spec for spec in PREVIEW_SPECS.values() if spec.supports("IL2")]
+    assert il2_specs
+    for spec in il2_specs:
+        assert spec.supports("IL2K"), spec.name
+        assert spec.method_for("IL2K") == spec.method_for("IL2"), spec.name
+        assert spec.resolve_fields(None, "IL2K", 0.5) == spec.resolve_fields(None, "IL2", 0.5), spec.name

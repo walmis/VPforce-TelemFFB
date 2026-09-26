@@ -99,6 +99,7 @@ def aircraft_module_for_source(data_source):
         "MSFS": aircrafts_msfs_xp,
         "XPLANE": aircrafts_msfs_xp,
         "IL2": aircrafts_il2,
+        "IL2K": aircrafts_il2,
         "DCS": aircrafts_dcs,
         "BMS": aircrafts_dcs,
     }.get(data_source)
@@ -1231,7 +1232,11 @@ class TelemManager(QObject, threading.Thread):
     # Matching in _check_sim_process() is case-insensitive via psutil.process_iter().
     _SIM_PROCESS_NAMES: dict = {
         'DCS':    ['DCS.exe', 'DCS'],
+        # IL2 keeps watching Korea's executable too: a Korea install whose
+        # startup.cfg still names the shared port arrives as IL2, and must
+        # not be declared exited while IL2Series.exe is running
         'IL2':    ['IL-2.exe', 'IL-2', 'IL2Series.exe'],
+        'IL2K':   ['IL2Series.exe'],
         'MSFS':   ['FlightSimulator.exe', 'FlightSimulator2024.exe'],
         'BMS':    ['Falcon BMS.exe', 'falcon'],
         'XPLANE': ['X-Plane.exe', 'X-Plane-x86_64', 'X-Plane'],

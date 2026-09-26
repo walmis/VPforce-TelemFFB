@@ -156,7 +156,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
                 ACCs    - List[float] ([x, y, z] in g); index [1] = normal G (gs),
                           index [0] = lateral/longitudinal G (y_gs)
         """
-        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
+        if self._sim_is("DCS") or self._sim_is_il2() or self._sim_is('BMS'):
             accs = telem_data.ACCs
             if not accs:
                 return None, None, None, None

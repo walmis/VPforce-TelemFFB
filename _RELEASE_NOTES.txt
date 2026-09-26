@@ -85,6 +85,11 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Backed by a local HTTP server that only runs while MSFS is the active sim; can be turned off in System Settings > MSFS > Options if you don't use the panel
 
 ## IL-2
+- **NEW: IL-2 Korea is now its own sim**
+  - Korea sends its telemetry on its own port (34386, System Settings > IL2 > IL-2 Korea Port), so TelemFFB can tell it apart from Great Battles. With config validation on, the Korea startup.cfg is updated on the next start
+  - IL-2 Sturmovik and IL-2 Korea have separate enable switches (System Settings > IL2). Korea's starts on if you were already using it
+  - Korea aircraft profiles and settings now live under the new sim. Your existing Korea settings are copied to the new sim automatically the first time this version starts (a backup is written beside the config as userconfig_v2_pre-il2k_backup.xml)
+  - BETA NOTE: the current release version does not know the new sim and keeps using its own copy of the Korea settings. Changes made to IL-2 Korea aircraft profiles on either version are not reflected on the other. The current release also has a single IL-2 switch for both games, so switching IL-2 Sturmovik off in this beta switches IL-2 Korea off there too
 - Fix: the runway rumble effect never played - its enable toggle was not being honored.  It now runs when enabled, so expect a rumble on the ground if you have it switched on
 
 ---

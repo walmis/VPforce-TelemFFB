@@ -172,7 +172,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         max_g = self.touchdown_effect_max_gs
         if self.is_collective() or self.is_pedals():
             return
-        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
+        if self._sim_is("DCS") or self._sim_is_il2() or self._sim_is('BMS'):
             gs = round((telem_data.ACCs or [0, 0])[1] - 1, 2)
         elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
             gs = round((telem_data.AccBody or [0, 0])[1], 2)

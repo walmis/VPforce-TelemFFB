@@ -62,13 +62,34 @@ class SettingsManager(QObject):
     def set_sim(self, sim):
         self.current_sim = sim
 
+    #: Sim key -> the name shown wherever a user picks a sim.  Keys stay
+    #: the value everywhere else (config rows, telemetry src, IPC).
+    SIM_LABELS = {
+        "DCS": "DCS World",
+        "IL2": "IL-2 Sturmovik",
+        "IL2K": "IL-2 Korea",
+        "MSFS": "MSFS 20/24",
+        "XPLANE": "X-Plane 11/12",
+        "BMS": "Falcon BMS",
+    }
+
+    @classmethod
+    def sim_label(cls, sim: str) -> str:
+        return cls.SIM_LABELS.get(sim, sim)
+
+    @staticmethod
+    def sim_enabled(sim: str) -> bool:
+        """Whether the user has a sim switched on in System Settings."""
+        return bool(G.system_settings.get(f'enable{sim}', False))
+
     #: Settings-tab sim -> the DirectInput Tap sims whose enable toggle
     #: offers the DINPUT_TAP spring mode there.  IL-2 Great Battles and
-    #: Korea are indistinguishable at the telemetry/profile level (both
-    #: arrive as 'IL2'), so either toggle offers the mode for IL2.
+    #: Korea are separate sims (their listeners tag frames IL2 / IL2K),
+    #: each offered by its own tap toggle.
     TAP_SIM_KEYS = {
         'DCS': ('DCS',),
-        'IL2': ('IL2', 'IL2_K'),
+        'IL2': ('IL2',),
+        'IL2K': ('IL2_K',),
         'BMS': ('BMS',),
     }
 
@@ -256,10 +277,11 @@ class SettingsManager(QObject):
         SpringModeEnum.FORCETRIM: "Force Trim",
     }
 
+    # IL-2 Great Battles renders no pedal FFB and publishes no ffbdevice
+    # records, so its lists carry neither the pedal tap nor the
+    # FFB-telemetry mode; both belong to Korea's lists below.
     IL2_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
-        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
-        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap, Korea Only)",
         SpringModeEnum.STATIC: "Static Spring",
         SpringModeEnum.DYNAMIC: "Dynamic Spring",
         SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
@@ -268,7 +290,24 @@ class SettingsManager(QObject):
 
     IL2_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
-        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
+        SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    IL2K_PEDAL_SPRING_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
+        SpringModeEnum.STATIC: "Static Spring",
+        SpringModeEnum.DYNAMIC: "Dynamic Spring",
+        SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    IL2K_JOYSTICK_SPRING_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed)",
         SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"

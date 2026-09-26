@@ -385,10 +385,31 @@ class TestOptingASimBackOut:
         assert "harmless" in cleanup["asked"][0]
 
 
+class TestTapControlsFollowTheSimSwitch:
+    class Widget:
+        def __init__(self, on=True):
+            self.on, self.enabled = on, None
+
+        def isChecked(self):
+            return self.on
+
+        def setEnabled(self, enabled):
+            self.enabled = enabled
+
+    def test_each_title_s_tap_controls_follow_its_own_switch(self, dialog):
+        W = self.Widget
+        dialog._sim_enable_boxes = {'enableIL2': W(True), 'enableIL2K': W(False)}
+        dialog.tap_enable_boxes = {'IL2': W(), 'IL2_K': W()}
+        dialog.tap_panels = {'IL2': W(), 'IL2_K': W()}
+        dialog.refresh_tap_controls()
+        assert dialog.tap_enable_boxes['IL2'].enabled and dialog.tap_panels['IL2'].enabled
+        assert dialog.tap_enable_boxes['IL2_K'].enabled is False
+        assert dialog.tap_panels['IL2_K'].enabled is False
+
+
 class TestTurningASimOff:
     """Disabling a sim leaves its tap set up for a sim that will not run.
-    Offered, not done - and the IL-2 switch covers two titles, so one
-    action can strand two installs."""
+    Offered, not done."""
 
     class Box(TestOptingASimBackOut.Box):
         pass
@@ -413,6 +434,8 @@ class TestTurningASimOff:
         monkeypatch.setattr(module.SystemSettingsDialog, '_tap_status',
                             status_for)
         monkeypatch.setattr(module.SystemSettingsDialog, 'refresh_tap_panels',
+                            lambda self: None)
+        monkeypatch.setattr(module.SystemSettingsDialog, 'refresh_tap_controls',
                             lambda self: None)
         monkeypatch.setattr(ti, 'plan_tap_cleanup', plan_for)
         monkeypatch.setattr(ti, 'apply_tap_cleanup', lambda plans: [])
@@ -439,12 +462,11 @@ class TestTurningASimOff:
         dialog._on_sim_enabled(2, 'enableDCS')
         assert cleanup["asked"] == []
 
-    def test_the_il2_switch_covers_both_titles(self, dialog, cleanup):
-        """One switch, two installs, two configs - asking about only one
-        would leave the other stranded with no sign of it."""
-        dialog._on_sim_enabled(0, 'enableIL2')
-        assert sorted(cleanup["keys"]) == ["IL2", "IL2_K"]
-        assert len(cleanup["asked"]) == 2
+    def test_each_il2_switch_covers_its_own_title(self, dialog, cleanup):
+        """Switching one IL-2 title off asks about that title's tap only."""
+        dialog._on_sim_enabled(0, 'enableIL2K')
+        assert cleanup["keys"] == ["IL2_K"]
+        assert len(cleanup["asked"]) == 1
 
     def test_agreeing_opts_the_sim_out_of_the_tap(self, dialog, cleanup):
         """Otherwise the removal at save, which keys off that switch, would

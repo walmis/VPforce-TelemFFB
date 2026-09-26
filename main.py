@@ -1216,6 +1216,8 @@ def _convert_user_config():
         xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
         xmlutils.update_roots()
         utils.convert_legacy_userconfig(G.userconfig_path)
+        utils.migrate_il2_korea_userconfig(G.userconfig_path, G.defaults_path)
+        xmlutils.update_roots()
 
 
 def _initialize_settings_manager():
@@ -1626,6 +1628,9 @@ def main():
     G.system_settings = utils.SystemSettings()
     _check_directinput_support()
     migrated = G.system_settings.migrate_instance_scoped_globals()
+    if G.system_settings.migrate_il2_korea_enable():
+        logging.info(f"IL-2 Korea enable switch set from the IL2 switch and the Korea path: "
+                     f"{bool(G.system_settings.get('enableIL2K'))}")
     if migrated:
         logging.info(f"Migrated instance-scoped copies of global settings to "
                      f"global: {', '.join(migrated)}")
