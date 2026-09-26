@@ -42,7 +42,7 @@ import threading
 import logging
 import os
 import telemffb.globals as G
-from telemffb.utils.AxisJitter import AxisJitterMonitor, record_axis_command
+from telemffb.utils.AxisJitter import record_axis_command
 from enum import IntEnum
 
 surface_types = {
@@ -504,6 +504,7 @@ class SimConnectManager(threading.Thread):
         self._b_enum_retry_at = None     # time to ask again after an empty answer
         self._b_enum_sent_at = 0.0
         self._b_enum_retries = 0
+        self._b_enum_packet = None       # packet id of that request, to recognize its rejection
         self._b_get_reqs = {}            # request id -> SimVar, initial value reads
         self._b_req_iter = itertools.count(self.req_id + 0x10000)
         self._last_title = None
@@ -874,14 +875,6 @@ class SimConnectManager(threading.Thread):
                 logging.debug(f"UnsubscribeInputEvent({h}) failed: {e}")
             self._b_hash_to_vars.pop(h)
         if not self._b_vars:
-            # Nothing needs a B: variable, so nothing would normally ask the
-            # aircraft what it has.  Ask anyway while axis capture is on:
-            # listing them is the only way to find a reported position for a
-            # control the simulator describes nowhere else, the helicopter
-            # cyclic being the one that needs it.
-            if self._input_events or not AxisJitterMonitor.capture_enabled():
-                return
-            self._request_input_event_enumeration()
             return
         if self._input_events:
             self._resolve_input_events()
@@ -902,6 +895,26 @@ class SimConnectManager(threading.Thread):
         except Exception as e:
             logging.warning(f"EnumerateInputEvents failed: {e}")
             self._b_enum_req = None
+            return
+        try:
+            pid = DWORD()
+            self.sc.GetLastSentPacketID(byref(pid))
+            self._b_enum_packet = pid.value
+        except Exception:
+            self._b_enum_packet = None
+
+    def _on_input_event_enumeration_refused(self):
+        """The simulator answered the enumeration with an exception: it will
+        not list this aircraft's input events, so asking again is pointless
+        until the aircraft changes."""
+        logging.warning("SimConnect: the simulator refused to list this "
+                        "aircraft's input events; B: variables are unavailable "
+                        "on it")
+        self._b_enum_req = None
+        self._b_enum_packet = None
+        self._b_enum_found = {}
+        self._b_enum_retry_at = None
+        self._b_enum_retries = 3
 
     #: An enumeration a sim without the API never answers; past this it
     #: is given up so an aircraft change can ask again.
@@ -1064,6 +1077,11 @@ class SimConnectManager(threading.Thread):
         """Act on one dispatched message; False once the sim said Quit."""
         #print(f"got {recv.__class__.__name__}")
         if isinstance(recv, RECV_EXCEPTION):
+            if (self._b_enum_req is not None
+                    and self._b_enum_packet is not None
+                    and recv.dwSendID == self._b_enum_packet):
+                self._on_input_event_enumeration_refused()
+                return True
             logging.warning(f"SimConnect exception [magenta]{self._exception_name(recv.dwException)}[/magenta], sendID {recv.dwSendID}, index {recv.dwIndex}{self._exception_detail(recv)}")
         elif isinstance(recv, RECV_QUIT):
             logging.info("Quit received")
