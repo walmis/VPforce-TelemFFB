@@ -1335,6 +1335,8 @@ class MainWindow(QMainWindow):
         self.tray.build()
         order, configured = self._device_display_order()
         self.device_panel.set_devices(order, configured=configured)
+        # children that reported in before these icons existed
+        G.ipc_instance.republish_child_status()
         self.device_panel.set_device_status(G.device_type, device_status_state())
         self.device_panel.DeviceClicked.connect(self.change_config_scope)
         self.device_panel.set_active_device(G.device_type)

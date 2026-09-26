@@ -174,6 +174,17 @@ class IPCNetworkThread(QObject, threading.Thread):
     def _check_child_dev_status(self):
         pass
 
+    def republish_child_status(self):
+        """Report every child's state again on the next keepalive check.
+
+        ACTIVE goes out once per child. A listener whose widgets did not
+        exist yet when it went out - the master's device panel, built after
+        a startup dialog's event loop let the first child keepalives
+        through - would otherwise never see it.
+        """
+        for dev in self._child_active:
+            self._child_active[dev] = None
+
     def _check_missed_keepalives(self):
         now = time.time()
 
@@ -183,7 +194,7 @@ class IPCNetworkThread(QObject, threading.Thread):
                 is_connected = info["connected"]
                 delta = now - ts
                 if delta > self._keepalive_sec * self._missed_keepalive:
-                    if self._child_active.get(dev):
+                    if self._child_active.get(dev) is not False:
                         self.child_keepalive_signal.emit(dev, "TIMEOUT")
                         self._child_active[dev] = False
                 else:
