@@ -62,16 +62,6 @@ def test_only_the_shared_port_config_is_treated_as_the_port_change():
     assert not _il2_config_on_port(partial, 34385)                             # a section is missing
 
 
-def test_korea_listens_only_once_a_path_is_set(settings):
-    settings(enableIL2=True, pathIL2_K="")
-    assert SimIL2().is_enabled
-    assert not SimIL2K().is_enabled
-    settings(enableIL2=True, pathIL2_K="C:/Korea")
-    assert SimIL2K().is_enabled
-    settings(enableIL2=False, pathIL2_K="C:/Korea")
-    assert not SimIL2K().is_enabled
-
-
 def test_an_aircraft_change_keeps_the_source():
     """The parser starts over on a new aircraft; the source it was given
     must survive that, or Korea's frames revert to IL2 mid-session."""

@@ -431,8 +431,9 @@ class TestIL2SharedPathFields:
 
         holder = type('Holder', (), dict(
             IL2_PATH_FIELDS=D.IL2_PATH_FIELDS,
+            IL2_PATH_SWITCHES=D.IL2_PATH_SWITCHES,
             refresh_il2_path_fields=D.refresh_il2_path_fields))()
-        holder.enableIL2 = Box(sim_on)
+        holder.enableIL2 = holder.enableIL2K = Box(sim_on)
         for auto, tap, label, field, browse in D.IL2_PATH_FIELDS:
             setattr(holder, auto, Box(auto_on))
             setattr(holder, tap, Box(tap_on))

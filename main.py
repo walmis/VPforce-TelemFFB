@@ -1628,6 +1628,9 @@ def main():
     G.system_settings = utils.SystemSettings()
     _check_directinput_support()
     migrated = G.system_settings.migrate_instance_scoped_globals()
+    if G.system_settings.migrate_il2_korea_enable():
+        logging.info(f"IL-2 Korea enable switch set from the IL2 switch and the Korea path: "
+                     f"{bool(G.system_settings.get('enableIL2K'))}")
     if migrated:
         logging.info(f"Migrated instance-scoped copies of global settings to "
                      f"global: {', '.join(migrated)}")

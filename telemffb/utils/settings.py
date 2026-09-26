@@ -114,6 +114,7 @@ class SystemSettings(QSettings):
     validateXPLANE: bool
     pathXPLANE: str
     validateIL2: bool
+    enableIL2K: bool
     pathIL2: str
     pathIL2_K: str
     portIL2: int
@@ -171,6 +172,7 @@ class SystemSettings(QSettings):
         'validateXPLANE': False,
         'pathXPLANE': '',
         'enableIL2': False,
+        'enableIL2K': False,
         'validateIL2': True,
         'focus_pauseIL2': True,
         'validateDCS': True,
@@ -246,6 +248,23 @@ class SystemSettings(QSettings):
                 self.remove(key)
             moved.append(name)
         return moved
+
+    def migrate_il2_korea_enable(self):
+        """Give IL-2 Korea its own enable switch, once.
+
+        Korea used to run under the IL2 switch whenever its install path
+        was set, so its own switch starts from exactly that and the first
+        start that has it behaves like the last one without.  ``value()``
+        rather than ``get()`` for the check: get() would answer with the
+        default and store it, making the switch look already set.
+
+        Returns:
+            bool: True when the switch was set from the old rule.
+        """
+        if self.value('enableIL2K') is not None:
+            return False
+        super().setValue('enableIL2K', bool(self.get('enableIL2') and self.get('pathIL2_K')))
+        return True
 
     @property
     def defaults(self):

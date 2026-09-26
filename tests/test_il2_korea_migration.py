@@ -6,7 +6,8 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from telemffb.utils.settings import migrate_il2_korea_userconfig
+import telemffb.globals as G
+from telemffb.utils.settings import SystemSettings, migrate_il2_korea_userconfig
 
 pytestmark = [pytest.mark.unit]
 
@@ -101,3 +102,30 @@ def test_later_il2_edits_do_not_reach_korea(paths):
     assert not migrate_il2_korea_userconfig(str(user), defaults)
     assert rows_of(user, "models", "IL2K") == korea_before
     assert rows_of(user, "simSettings", "IL2K") == []
+
+
+@pytest.mark.parametrize("il2_on, korea_path, expected", [
+    (True, "C:/Korea", True),      # Korea was running under the IL2 switch
+    (True, "", False),             # IL2 on, but Korea never set up
+    (False, "C:/Korea", False),    # IL2 off: Korea was off too
+])
+def test_korea_switch_starts_from_the_old_rule(tmp_path, monkeypatch, il2_on, korea_path, expected):
+    monkeypatch.setattr(G, "device_type", "joystick", raising=False)
+    store = SystemSettings(path=str(tmp_path / "settings.ini"))
+    store.setValue("enableIL2", il2_on)
+    store.setValue("pathIL2_K", korea_path)
+    assert store.migrate_il2_korea_enable()
+    assert bool(store.get("enableIL2K")) is expected
+
+
+def test_korea_switch_is_derived_only_once(tmp_path, monkeypatch):
+    """Once set, the switch is the user's: a later start never re-derives
+    it, whatever the IL2 switch and the Korea path say."""
+    monkeypatch.setattr(G, "device_type", "joystick", raising=False)
+    store = SystemSettings(path=str(tmp_path / "settings.ini"))
+    store.setValue("enableIL2", True)
+    store.setValue("pathIL2_K", "C:/Korea")
+    store.migrate_il2_korea_enable()
+    store.setValue("enableIL2K", False)             # the user switches Korea off
+    assert not store.migrate_il2_korea_enable()
+    assert not store.get("enableIL2K")

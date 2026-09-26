@@ -94,7 +94,7 @@ class SimTelemListener(QtCore.QObject):
 
 class _SimIL2Base(SimTelemListener):
     """IL-2 Great Battles and IL-2 Korea speak the same telemetry protocol
-    and share the IL2 tab, its enable toggle and the forwarder settings.
+    and share the IL2 tab and the forwarder settings.
     Nothing in the packets says which game sent them, so the config
     validator gives each game its own UDP port and each gets its own
     listener; frames are tagged with the listener's source key.
@@ -164,9 +164,8 @@ class SimIL2(_SimIL2Base):
 
 
 class SimIL2K(_SimIL2Base):
-    """IL-2 Korea.  Shares the IL2 tab: enabled by the IL2 toggle once a
-    Korea path is set, validated by its own checkbox, listening on its own
-    port (portIL2_K).  A Korea install whose startup.cfg still names the
+    """IL-2 Korea.  Shares the IL2 tab, with its own enable switch
+    (enableIL2K), validation toggle and port (portIL2_K).  A Korea install whose startup.cfg still names the
     shared port keeps working through SimIL2, just not as IL2K.
     """
     label = "IL-2 Korea"
