@@ -61,6 +61,10 @@ NUMERIC_DATATYPES = {
 # Values the runtime treats as unset / ignore rather than a number.
 NUMERIC_VALUE_SENTINELS = {"", "-", "none"}
 
+#: Classes this build ships the code and class rows for but does not register, so no
+#: user can select or discover them.  Their rows are inert until the class is registered.
+MASKED_CLASSES = {"FFBApiHelicopter"}
+
 
 def _is_placeholder_default(elem):
     """Return True if elem is an order-only placeholder <defaults> entry."""
@@ -388,6 +392,7 @@ class TestClassDefaultsConsistency:
                     allowed |= cs
             else:
                 allowed = sim_classes.get(parent_sim, set()) | {"AllSettings"}
+            allowed |= MASKED_CLASSES
             for elem in defaults_root.findall(f".//{tag}"):
                 typ = elem.findtext("type", "")
                 if typ.startswith("!"):
