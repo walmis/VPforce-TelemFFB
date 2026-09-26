@@ -42,7 +42,7 @@ from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
 import telemffb.globals as G
 from telemffb.state.app_state import AppState
-from telemffb.utils import exit_application
+from telemffb.utils import ALL_ROLES, exit_application
 
 
 class TrayController:
@@ -142,7 +142,7 @@ class TrayController:
         if G.launched_instances:
             show_menu = QMenu("Instances", mw)
             show_child_window_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
+            for d in ALL_ROLES:
                 if d in G.launched_instances:
                     def do_show_child_window(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW WINDOW:{child}')

@@ -90,6 +90,12 @@ class BaseEffectHandle:
     """
     effect_id = None
     type = None
+    #: The name the effect dispenser gave the owning effect ("gunfire",
+    #: "prop_rpm0-1"), set by HapticEffect once the handle exists.
+    #: Advisory metadata: how an effect renders never depends on it, and
+    #: the hardware backends ignore it.  It is what a backend logs and
+    #: what a per-effect setting (placement on a shaker) is keyed by.
+    label: Optional[str] = None
 
     def __init__(self) -> None:
         self._magnitude = None

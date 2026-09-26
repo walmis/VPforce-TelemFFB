@@ -86,7 +86,8 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._ipc_telem_effects = {}
         self._child_keepalive_info = {}
         self._child_addrs = {}
-        self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
+        self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None,
+                              'shaker': None}
         # A child's whole telemetry frame, for the master's Monitor tab while
         # its config scope is that child's device. Master: which child is
         # being asked, and what it sent. Child: until when it was asked, and
@@ -375,6 +376,17 @@ class IPCNetworkThread(QObject, threading.Thread):
         elif msg.startswith("LOADCONFIG:"):
             path = msg.removeprefix("LOADCONFIG:")
             load_custom_userconfig(path)
+        elif msg == "REAPPLY_SHAKER":
+            # the master saved shaker settings; the instance driving the
+            # shaker takes them live, every other instance has nothing to
+            # apply and ignores this
+            from telemffb.hw.ffb_rhino import HapticEffect
+            apply = getattr(HapticEffect.device, 'apply_settings', None)
+            if apply:
+                try:
+                    apply(G.system_settings)
+                except Exception:
+                    logging.exception("shaker settings could not be applied live")
         elif msg == "REAPPLY_AXIS_MAP":
             # a settings save changed an FFB axis mapping somewhere; each
             # instance re-reads ITS OWN settings, so an unchanged map is

@@ -8,6 +8,21 @@ distpath = PyInstaller.config.CONF['distpath'] + "/VPforce-TelemFFB"
 block_cipher = None
 
 
+def _collect_portaudio_datas():
+    """The PortAudio DLL the bass shaker plays through, where sounddevice
+    looks for it (the _sounddevice_data package beside the module).
+    PyInstaller's contributed hook collects it too; naming it here keeps
+    the dependency visible in the spec and pins the 64-bit build."""
+    try:
+        import _sounddevice_data
+    except ImportError:
+        return []
+    import glob
+    root = next(iter(_sounddevice_data.__path__))
+    files = glob.glob(os.path.join(root, 'portaudio-binaries', 'libportaudio64bit.dll'))
+    return [(f, os.path.join('_sounddevice_data', 'portaudio-binaries')) for f in files]
+
+
 def _collect_msfs_panel_datas():
     # Bundles the panel source (minus Build/ and the dev helper script) into
     # the frozen app's own resources, at the same relative location
@@ -35,7 +50,7 @@ a = Analysis(
     # ffb_tap: data rather than a binary, because TelemFFB never loads it -
     # it is copied into a game folder. A subdirectory keeps a file named
     # dinput8.dll out of TelemFFB's own DLL search path.
-    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.'), ('dll/ffb_tap/*', 'ffb_tap')] + _collect_msfs_panel_datas(),
+    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.'), ('dll/ffb_tap/*', 'ffb_tap'), ('telemffb/data/*.json', 'telemffb/data')] + _collect_msfs_panel_datas() + _collect_portaudio_datas(),
     hiddenimports=[
         'numpy._core._exceptions',
         'numpy._core.multiarray',

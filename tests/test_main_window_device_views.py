@@ -172,11 +172,11 @@ class TestWhichViewIsInEffect:
 
     def test_everyone_starts_on_the_frame(self, build_window):
         """One device or several: it is what the older window had, and it is
-        never a panel for one icon - all four roles are always on it, the
+        never a panel for one icon - every role is always on it, the
         ones with no instance greyed out."""
         window = build_window(children=())
         assert window._device_view() == DEVICE_VIEW_FRAME
-        assert window.device_panel.get_device_names() == ['joystick', 'pedals', 'collective', 'trimwheel']
+        assert window.device_panel.get_device_names() == ['joystick', 'pedals', 'collective', 'trimwheel', 'shaker']
         assert build_window()._device_view() == DEVICE_VIEW_FRAME
 
     def test_picking_a_view_saves_it_for_new_and_old_builds_alike(self, build_window):

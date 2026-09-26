@@ -43,11 +43,12 @@ both work without theme-specific rules here.
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
+from telemffb.utils import HiDpiPixmap
 from telemffb.ui.widgets.custom_widgets import LabeledToggle, Toggle
 from PyQt6.QtWidgets import (
-    QButtonGroup, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QPushButton, QRadioButton, QSizePolicy, QToolButton,
-    QVBoxLayout, QWidget,
+    QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QGridLayout,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton, QSizePolicy,
+    QToolButton, QVBoxLayout, QWidget,
 )
 
 #: Device icon choices for the joystick role's devices: settings value ->
@@ -76,7 +77,13 @@ ROLES = (
     ('pedals', 'p', 'Pedals', ':/image/icon_pedals.png'),
     ('collective', 'c', 'Collective', ':/image/icon_collective.png'),
     ('trimwheel', 't', 'Trim Wheel', ':/image/icon_trimwheel.png'),
+    ('shaker', 's', 'Shaker', ':/image/icon_shaker.png'),
 )
+
+#: roles whose effects address one logical axis, so a DirectInput device
+#: in them gets an FFB axis chooser (the joystick stays native X/Y; a
+#: shaker has no axes at all)
+AXIS_ROLES = ('pedals', 'collective', 'trimwheel')
 
 def _card_qss(palette) -> str:
     """Card chrome with computed contrast: the palette's own alternate-base
@@ -113,6 +120,29 @@ def _icon_tint(palette) -> QColor:
     if palette.color(QPalette.ColorRole.Window).lightness() < 128:
         tint = tint.lighter(150)
     return tint
+
+
+def _link_button(text: str, palette, tooltip: str = '') -> QPushButton:
+    """A quiet link-style action: the family purple text, no box -
+    bordered variants read as a broken widget, and the theme paints a
+    flat QPushButton as a filled one.  Hover stays in the family: a step
+    brighter, not a jump to grey."""
+    button = QPushButton(text)
+    button.setFlat(True)
+    base = _icon_tint(palette)
+    dark_theme = palette.color(QPalette.ColorRole.Window).lightness() < 128
+    hover = base.lighter(130) if dark_theme else base.darker(120)
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
+    button.setStyleSheet(
+        'QPushButton { border: none; background: transparent;'
+        ' padding: 1px 6px; text-align: left;'
+        ' color: %s; }'
+        'QPushButton:hover { color: %s; }'
+        % (base.name(), hover.name()))
+    button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+    if tooltip:
+        button.setToolTip(tooltip)
+    return button
 
 
 def _tinted_icon(path, color) -> QIcon:
@@ -316,8 +346,14 @@ class DeviceRow(QWidget):
         device = self.selector.currentData()
         vid = getattr(device, 'vendor_id', None)
         pid = getattr(device, 'product_id', None)
+        channels = getattr(device, 'channels', None)
         if vid and pid is not None:
             self.ids_label.setText(f'{vid:04X}:{pid:04X}')
+        elif device is not None and channels:
+            # an audio output has no USB identity; its channel count is
+            # what tells two 'Speakers' apart, and it reads 2 until
+            # Windows has the card's layout set to more
+            self.ids_label.setText(f'{int(channels)} ch')
         else:
             self.ids_label.setText('')
         if self.marker is not None:
@@ -326,6 +362,361 @@ class DeviceRow(QWidget):
             self.marker.setEnabled(device is not None
                                    or self.marker.isChecked())
 
+
+#: Behind the Speaker layout link and its info icon.  Explicit line
+#: breaks: a plain-text tooltip only wraps where told to.
+MULTICHANNEL_HELP = (
+    "Setting up a 5.1 or 7.1 sound card for several transducers\n"
+    "\n"
+    "1. Plug the card in and press Rescan.  If it lists as 2 ch, Windows\n"
+    "   has it set up as a stereo pair; the extra outputs are switched off.\n"
+    "2. Press Speaker layout... to open the Windows Sound control panel.\n"
+    "   On the Playback tab select the card, press Configure, choose\n"
+    "   7.1 Surround (or 5.1), press Next through the pages, then Finish.\n"
+    "   The Test button there plays each output in turn, which shows\n"
+    "   which jack is which.\n"
+    "   If Configure is greyed out, the card's driver does not offer\n"
+    "   multi-channel output to Windows; install the maker's own driver.\n"
+    "   Prefer 5.1 or 7.1 over 3.1: some cards leave the center/sub jack\n"
+    "   silent in a 3.1 configuration, even for the Windows test tone.\n"
+    "   On the pages that follow, tick every optional speaker and mark\n"
+    "   them all full-range: Windows folds an absent speaker's channel\n"
+    "   into the others, and moves the bass off a satellite to the sub.\n"
+    "   Then in the card's Properties, Enhancements tab, disable all\n"
+    "   enhancements; each one rewrites channels on the way to the jacks.\n"
+    "3. Press Rescan again.  The count beside the card should read 8 (or 6).\n"
+    "4. Give each transducer its channel and press the row's play button\n"
+    "   to confirm.  Channel numbers follow the Windows layout:\n"
+    "   1 front left, 2 front right, 3 center, 4 subwoofer,\n"
+    "   5 rear left, 6 rear right, 7 side left, 8 side right.\n"
+    "   Jack colors differ between cards; the play button is the sure way.\n"
+    "\n"
+    "To rename a card, use Settings > System > Sound; the new name shows\n"
+    "here after a Rescan.")
+
+
+class TransducerRow(QWidget):
+    """One transducer on the shaker card: name, output channel, position,
+    gain, calibration profile, a play button that sounds this row alone
+    (how a user tells three transducers apart) and a remove button."""
+
+    removed = pyqtSignal()
+    test_requested = pyqtSignal()
+    changed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText('Name')
+        self.name_edit.setFixedWidth(110)
+        self.name_edit.setToolTip('What this transducer is called in the list')
+        row.addWidget(self.name_edit)
+
+        row.addWidget(QLabel('Ch:'))
+        self.channel_combo = QComboBox()
+        self.channel_combo.setToolTip(
+            "Which of the output's channels this transducer is wired to.\n"
+            'On a stereo card 1 is left and 2 is right; a 7.1 card counts\n'
+            'front L/R, center, subwoofer, rear L/R, side L/R.')
+        row.addWidget(self.channel_combo)
+
+        self.position_combo = QComboBox()
+        self.position_combo.setToolTip('Where the transducer sits')
+        row.addWidget(self.position_combo)
+
+        row.addWidget(QLabel('Gain:'))
+        self.gain_spin = QDoubleSpinBox()
+        self.gain_spin.setRange(0.0, 10.0)
+        self.gain_spin.setSingleStep(0.1)
+        self.gain_spin.setDecimals(1)
+        self.gain_spin.setValue(1.0)
+        self.gain_spin.setToolTip("This transducer's level, under the master gain")
+        row.addWidget(self.gain_spin)
+
+        self.profile_combo = QComboBox()
+        self.profile_combo.setToolTip(
+            'How this transducer wants its pulses driven: resonance, band, '
+            'pulse edges, brake.')
+        row.addWidget(self.profile_combo)
+
+        self.test_button = QToolButton()
+        self.test_button.setText('\u25b6')
+        self.test_button.setAutoRaise(True)
+        self.test_button.setToolTip('Play a pulse and a tone through this transducer only, '
+                                    'at the level of a typical effect through the master gain')
+        self.test_button.clicked.connect(self.test_requested.emit)
+        row.addWidget(self.test_button)
+
+        self.remove_button = QToolButton()
+        self.remove_button.setText('\u2715')
+        self.remove_button.setAutoRaise(True)
+        self.remove_button.setToolTip('Remove this transducer')
+        self.remove_button.clicked.connect(self.removed.emit)
+        row.addWidget(self.remove_button)
+        row.addStretch(1)
+
+        self._channels = 0
+        self._layout_width = 0
+        self._layout_names = ()
+        self.set_channel_count(2)
+        for w in (self.name_edit, self.channel_combo, self.position_combo,
+                  self.gain_spin, self.profile_combo):
+            sig = getattr(w, 'currentIndexChanged', None) or getattr(w, 'valueChanged', None) \
+                or getattr(w, 'textChanged', None)
+            sig.connect(lambda *_: self.changed.emit())
+
+    def set_channel_count(self, count: int) -> None:
+        """Offer channels 1..count; a stored channel beyond that is kept
+        on the list (marked) rather than lost, since the output may be
+        reconfigured or reselected."""
+        current = self.channel()
+        count = max(1, int(count), current + 1)
+        if count == self._channels:
+            return
+        self._channels = count
+        from telemffb.hw.ffb_shaker import channel_label
+        self.channel_combo.blockSignals(True)
+        self.channel_combo.clear()
+        for i in range(count):
+            self.channel_combo.addItem(channel_label(i, self._layout_width or count, self._layout_names), i)
+        self.channel_combo.setCurrentIndex(min(current, count - 1))
+        self.channel_combo.blockSignals(False)
+
+    def set_layout_width(self, width: int, names=()) -> None:
+        """The output's own channel count, and the speaker each channel
+        drives when the platform says: these name the channels even when
+        a stored channel has stretched the list beyond them."""
+        width = max(1, int(width))
+        names = tuple(names)
+        if width == self._layout_width and names == self._layout_names:
+            return
+        self._layout_width, self._layout_names = width, names
+        count, self._channels = self._channels, 0
+        self.set_channel_count(count)
+
+    def set_profiles(self, names) -> None:
+        current = self.profile_combo.currentText()
+        self.profile_combo.blockSignals(True)
+        self.profile_combo.clear()
+        for name in names:
+            self.profile_combo.addItem(name)
+        idx = self.profile_combo.findText(current)
+        self.profile_combo.setCurrentIndex(max(0, idx))
+        self.profile_combo.blockSignals(False)
+
+    def set_positions(self, positions) -> None:
+        current = self.position_combo.currentText()
+        self.position_combo.blockSignals(True)
+        self.position_combo.clear()
+        for p in positions:
+            self.position_combo.addItem(p)
+        idx = self.position_combo.findText(current)
+        self.position_combo.setCurrentIndex(max(0, idx))
+        self.position_combo.blockSignals(False)
+
+    def channel(self) -> int:
+        data = self.channel_combo.currentData()
+        return int(data) if data is not None else 0
+
+    def value(self):
+        from telemffb.hw.ffb_shaker import Transducer
+        return Transducer(self.name_edit.text().strip() or 'Shaker', self.channel(),
+                          round(self.gain_spin.value(), 2),
+                          self.profile_combo.currentText(), self.position_combo.currentText())
+
+    def set_value(self, t) -> None:
+        self.name_edit.setText(t.name)
+        self.set_channel_count(max(self._channels, t.channel + 1))
+        self.channel_combo.setCurrentIndex(self.channel_combo.findData(t.channel))
+        self.gain_spin.setValue(float(t.gain))
+        idx = self.profile_combo.findText(t.profile)
+        self.profile_combo.setCurrentIndex(max(0, idx))
+        idx = self.position_combo.findText(t.position)
+        self.position_combo.setCurrentIndex(max(0, idx))
+
+
+class ShakerControls(QWidget):
+    """The shaker's own controls under its output selector: master gain,
+    the transducer rows, a row adder and a test button for the whole
+    rig.  The dialog supplies the profile names and the output's channel
+    count, wires the buttons, and reads the rows back at Save.
+    """
+
+    row_test_requested = pyqtSignal(int)
+    rows_changed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 2, 0, 0)
+        outer.setSpacing(3)
+
+        head = QHBoxLayout()
+        self.head = head
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(8)
+        head.addWidget(QLabel('Master gain:'))
+        self.gain_spin = QDoubleSpinBox()
+        self.gain_spin.setObjectName('shaker_gain')
+        self.gain_spin.setRange(0.0, 10.0)
+        self.gain_spin.setSingleStep(0.1)
+        self.gain_spin.setDecimals(1)
+        self.gain_spin.setToolTip(
+            "Master gain for everything the shaker plays.\nTelemFFB's effect "
+            "intensities are tuned for a stick; a transducer needs several "
+            "times that, and the test buttons play through this gain so it "
+            "can be set by feel.  Each channel is limited, never clipped, so "
+            "a high gain is safe.")
+        head.addWidget(self.gain_spin)
+        head.addStretch(1)
+        # the output's own actions; the card places them on the selector row
+        self.rescan_button = _link_button(
+            'Rescan', self.palette(),
+            'Look for sound cards plugged in since TelemFFB started.')
+        self.rescan_button.setObjectName('shaker_rescan')
+        self.layout_button = _link_button(
+            'Speaker layout...', self.palette(), MULTICHANNEL_HELP)
+        self.layout_button.setObjectName('shaker_layout')
+        # the link's name does not say there are instructions behind it;
+        # the icon does, and carries the same tooltip
+        self.layout_info = QLabel()
+        self.layout_info.setObjectName('shaker_layout_info')
+        pixmap = HiDpiPixmap(':/image/info_icon.png').scaled(
+            16, 16, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+        if pixmap.isNull():
+            self.layout_info.setText('(?)')      # no compiled resources: still a cue
+        else:
+            self.layout_info.setPixmap(pixmap)
+        self.layout_info.setToolTip(MULTICHANNEL_HELP)
+        self.layout_info.setCursor(Qt.CursorShape.WhatsThisCursor)
+        self.add_button = _link_button('+ add transducer', self.palette(),
+                                       'Another transducer on this sound card')
+        self.add_button.setObjectName('shaker_add')
+        head.insertWidget(2, self.add_button)
+        outer.addLayout(head)
+
+        self.rows_host = QWidget()
+        self.rows_layout = QVBoxLayout(self.rows_host)
+        self.rows_layout.setContentsMargins(0, 0, 0, 0)
+        self.rows_layout.setSpacing(2)
+        outer.addWidget(self.rows_host)
+
+        # shown when a row names a channel the selected output does not
+        # report: the usual cause is a multi-channel card that Windows
+        # still has set to stereo
+        self.hint = QLabel('')
+        self.hint.setObjectName('shakerHint')
+        self.hint.setWordWrap(True)
+        self.hint.setForegroundRole(QPalette.ColorRole.PlaceholderText)
+        self.hint.setVisible(False)
+        outer.addWidget(self.hint)
+
+        # the one real button on the card, bottom right
+        foot = QHBoxLayout()
+        foot.setContentsMargins(0, 2, 0, 0)
+        foot.addStretch(1)
+        self.test_button = QPushButton('Test all')
+        self.test_button.setObjectName('shaker_test')
+        self.test_button.setToolTip(
+            'Play a pulse and a short tone through every transducer at once, '
+            'with these settings, saved or not.  The level is that of a typical '
+            'effect through the master gain, so what feels right here feels '
+            'right in flight.')
+        foot.addWidget(self.test_button)
+        outer.addLayout(foot)
+
+        self._profiles = []
+        self._positions = []
+        self._channels = 2
+        self.rows = []
+        self.add_button.clicked.connect(lambda: self.add_row())
+
+    def set_profiles(self, names) -> None:
+        self._profiles = list(names)
+        for row in self.rows:
+            row.set_profiles(self._profiles)
+
+    def set_positions(self, positions) -> None:
+        self._positions = list(positions)
+        for row in self.rows:
+            row.set_positions(self._positions)
+
+    def set_channel_count(self, count: int, names=()) -> None:
+        """How many channels the selected output has, and what each one
+        drives when known."""
+        self._channels = max(1, int(count))
+        self._channel_names = tuple(names)
+        for row in self.rows:
+            row.set_layout_width(self._channels, self._channel_names)
+            row.set_channel_count(self._channels)
+        self.refresh_hint()
+
+    def refresh_hint(self) -> None:
+        """Say which rows the selected output cannot drive as it stands."""
+        beyond = [row.value().name for row in self.rows if row.channel() >= self._channels]
+        if beyond:
+            self.hint.setText(
+                f"This output reports {self._channels} channel"
+                f"{'' if self._channels == 1 else 's'}, so {', '.join(beyond)} "
+                f"cannot be driven yet.  If the card has more, set its speaker "
+                f"layout in Windows (Speaker layout...), then Rescan outputs.")
+        self.hint.setVisible(bool(beyond))
+
+    def add_row(self, transducer=None):
+        row = TransducerRow(self.rows_host)
+        row.set_profiles(self._profiles)
+        row.set_positions(self._positions)
+        row.set_layout_width(self._channels, getattr(self, '_channel_names', ()))
+        row.set_channel_count(self._channels)
+        if transducer is not None:
+            row.set_value(transducer)
+        else:
+            row.name_edit.setText(f'Transducer {len(self.rows) + 1}')
+            # a new row takes the first channel nobody else is on
+            taken = {r.channel() for r in self.rows}
+            free = next((c for c in range(self._channels) if c not in taken), 0)
+            row.channel_combo.setCurrentIndex(row.channel_combo.findData(free))
+        row.removed.connect(lambda r=row: self.remove_row(r))
+        row.test_requested.connect(lambda r=row: self.row_test_requested.emit(self.rows.index(r)))
+        row.changed.connect(self.rows_changed.emit)
+        row.changed.connect(self.refresh_hint)
+        self.rows.append(row)
+        self.rows_layout.addWidget(row)
+        self.refresh_hint()
+        self.rows_changed.emit()
+        return row
+
+    def remove_row(self, row) -> None:
+        if row not in self.rows:
+            return
+        self.rows.remove(row)
+        self.rows_layout.removeWidget(row)
+        row.setParent(None)
+        row.deleteLater()
+        self.refresh_hint()
+        self.rows_changed.emit()
+
+    def clear_rows(self) -> None:
+        for row in list(self.rows):
+            self.remove_row(row)
+
+    def transducers(self):
+        return [row.value() for row in self.rows]
+
+    def set_transducers(self, transducers) -> None:
+        self.clear_rows()
+        for t in transducers:
+            self.add_row(t)
+
+    def set_test_enabled(self, enabled: bool) -> None:
+        self.test_button.setEnabled(enabled and bool(self.rows))
+        for row in self.rows:
+            row.test_button.setEnabled(enabled)
 
 class RoleCard(QFrame):
     """One role: header (icon, name, master radio) over its device row(s).
@@ -444,7 +835,7 @@ class RoleCard(QFrame):
         # rest; the marker may move to an alternate within a session)
         self.primary_row = DeviceRow(f'cb_select_{suffix}',
                                      alternates=alternates, primary=True,
-                                     axis_choice=(role != 'joystick'))
+                                     axis_choice=(role in AXIS_ROLES))
         self.body.addWidget(self.primary_row)
         self.selector = self.primary_row.selector
         self.marker_group = None
@@ -455,28 +846,23 @@ class RoleCard(QFrame):
             self.primary_row.make_active.connect(
                 lambda: self.activate_requested.emit(1))
 
+        # the shaker's controls live under its selector; the dialog
+        # reaches them through the panel's shaker_controls
+        self.shaker = None
+        if role == 'shaker':
+            self.shaker = ShakerControls()
+            # the output's actions sit at the right end of the output's
+            # own row, not among the transducer controls
+            row = self.primary_row.layout()
+            row.insertWidget(2, self.shaker.rescan_button)
+            row.insertWidget(3, self.shaker.layout_button)
+            row.insertWidget(4, self.shaker.layout_info)
+            self.body.addWidget(self.shaker)
+
         self.alt_rows = []               # DeviceRow, slots 2..MAX
         self.add_button = None
         if alternates:
-            self.add_button = QPushButton('+ add device')
-            self.add_button.setFlat(True)
-            # a quiet link-style action: the family purple text, no box -
-            # bordered variants read as a broken widget.  Hover stays in
-            # the family: a step brighter, not a jump to grey.
-            base = _icon_tint(self.palette())
-            dark_theme = self.palette().color(
-                QPalette.ColorRole.Window).lightness() < 128
-            hover = base.lighter(130) if dark_theme else base.darker(120)
-            self.add_button.setCursor(
-                Qt.CursorShape.PointingHandCursor)
-            self.add_button.setStyleSheet(
-                'QPushButton { border: none; background: transparent;'
-                ' padding: 1px 6px; text-align: left;'
-                ' color: %s; }'
-                'QPushButton:hover { color: %s; }'
-                % (base.name(), hover.name()))
-            self.add_button.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                          QSizePolicy.Policy.Fixed)
+            self.add_button = _link_button('+ add device', self.palette())
             self.add_button.clicked.connect(self.add_requested.emit)
             wrap = QHBoxLayout()
             wrap.setContentsMargins(24, 1, 0, 0)
@@ -584,13 +970,13 @@ class DeviceCardsPanel(QWidget):
 
     #: attribute names the dialog re-binds onto itself for compatibility
     LEGACY_WIDGETS = (
-        'cb_select_j', 'cb_select_p', 'cb_select_c', 'cb_select_t',
+        'cb_select_j', 'cb_select_p', 'cb_select_c', 'cb_select_t', 'cb_select_s',
         'cb_axis_p', 'cb_axis_c', 'cb_axis_t',
-        'rb_master_j', 'rb_master_p', 'rb_master_c', 'rb_master_t',
+        'rb_master_j', 'rb_master_p', 'rb_master_c', 'rb_master_t', 'rb_master_s',
         'cb_al_enable',
-        'cb_al_enable_j', 'cb_al_enable_p', 'cb_al_enable_c', 'cb_al_enable_t',
-        'cb_min_enable_j', 'cb_min_enable_p', 'cb_min_enable_c', 'cb_min_enable_t',
-        'cb_headless_j', 'cb_headless_p', 'cb_headless_c', 'cb_headless_t',
+        'cb_al_enable_j', 'cb_al_enable_p', 'cb_al_enable_c', 'cb_al_enable_t', 'cb_al_enable_s',
+        'cb_min_enable_j', 'cb_min_enable_p', 'cb_min_enable_c', 'cb_min_enable_t', 'cb_min_enable_s',
+        'cb_headless_j', 'cb_headless_p', 'cb_headless_c', 'cb_headless_t', 'cb_headless_s',
         'labelLaunch', 'lab_auto_launch', 'lab_start_min', 'lab_start_headless',
     )
 
@@ -627,10 +1013,18 @@ class DeviceCardsPanel(QWidget):
             self.cards[role] = card
             layout.addWidget(card)
             setattr(self, f'cb_select_{suffix}', card.selector)
-            if role != 'joystick':
+            if role in AXIS_ROLES:
                 setattr(self, f'cb_axis_{suffix}', card.primary_row.axis_combo)
             setattr(self, f'rb_master_{suffix}', card.master_radio)
+            if role == 'shaker':
+                # the master coordinates the force feedback instances;
+                # a shaker is always a child of one
+                card.master_radio.setEnabled(False)
+                card.master_radio.setToolTip(
+                    'A shaker runs as a child instance; a force feedback '
+                    'device is the master.')
         self.joystick_card = self.cards['joystick']
+        self.shaker_controls = self.cards['shaker'].shaker
 
         # For the first launch with no VPforce hardware: the cards sit
         # empty and the one switch that would list a DirectInput stick

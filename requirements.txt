@@ -9,6 +9,8 @@ stransi
 libusb1
 pygetwindow
 numpy==2.3.0
+# the bass shaker plays through a sound card; sounddevice bundles PortAudio
+sounddevice>=0.5
 akima
 bottle
 stackprinter

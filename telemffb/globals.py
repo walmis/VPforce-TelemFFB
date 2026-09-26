@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from telemffb.hw.ffb_rhino import FFBReport_Get_Gains_Feature_Data
     from telemffb.state.app_state import AppState
 
-DeviceTypeLiteral = Literal["joystick", "pedals", "collective", "trimwheel"]
+DeviceTypeLiteral = Literal["joystick", "pedals", "collective", "trimwheel", "shaker"]
 
 # Application state
 is_exe: bool = False
@@ -56,7 +56,7 @@ beta_build : bool = False
 
 beta_build_str: str = "BETA - 07-02-26"
 
-dev_build : bool = False 
+dev_build : bool = True
 """when True, build versions will use 'dev_build_str', will use a dev branded logo and will not look for updates"""
 
 dev_userconfig: bool = True
@@ -99,7 +99,7 @@ current_device_config_scope: Optional[DeviceTypeLiteral] = None
 
 # Device information
 device_type : DeviceTypeLiteral = "joystick"
-"""device type: joystick, pedals, collective, trimwheel"""
+"""device type: joystick, pedals, collective, trimwheel, shaker"""
 
 device_info : Optional['DeviceInfo'] = None
 """DeviceInfo object representing the connected device. This attribute is redundant, since HapticEffect.device provides the same information."""
@@ -111,6 +111,11 @@ device_di_guid : Optional[str] = None
 """DirectInput instance GUID when this instance drives a generic DI FFB
 device (stored as 'dinput:{GUID}' in the devpath_* setting). None = native
 VPforce device."""
+
+device_audio_output : Optional[str] = None
+"""Audio output name when this instance drives a bass shaker (stored as
+'audio:{name}' in the devpath_* setting; '' = the system default).  None
+= a force feedback device."""
 
 device_capabilities = None
 """ffb_backend.DeviceCapabilities of the connected device; feature-bearing

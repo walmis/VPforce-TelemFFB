@@ -177,7 +177,8 @@ class EffectPreviewController:
             return False
         if self._refuse_unmet(spec, [G.device_type], interactive=confirm):
             return False
-        if confirm and spec.constant_force and not self.confirm_constant_force(spec):
+        if (confirm and spec.constant_force and self._axis_could_move([G.device_type])
+                and not self.confirm_constant_force(spec)):
             return False
         sim, model, cls = resolve_preview_target(G.settings_mgr)
         # the settings as they are now: a child re-reads userconfig only
@@ -221,6 +222,14 @@ class EffectPreviewController:
             preview.stop()
         self._preview = None
 
+    @staticmethod
+    def _axis_could_move(devices):
+        """Whether a constant-force preview on ``devices`` could move an
+        axis at all.  A shaker has no axis - a constant force is a thump
+        through a seat - so a run that plays only on shakers has nothing
+        to warn about."""
+        return any(dev != 'shaker' for dev in devices)
+
     def confirm_constant_force(self, spec):
         """The heads-up before a constant-force preview: an unattended axis
         can be driven to its stops.  Asked every time, on purpose.  The
@@ -257,7 +266,8 @@ class EffectPreviewController:
             return False
         if self._refuse_unmet(spec, devices):
             return False
-        if spec.constant_force and not self.confirm_constant_force(spec):
+        if (spec.constant_force and self._axis_could_move(devices)
+                and not self.confirm_constant_force(spec)):
             return False
         children = [d for d in devices if d != G.device_type]
         local = G.device_type in devices

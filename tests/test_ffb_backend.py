@@ -16,6 +16,10 @@ class TestConformance:
         assert issubclass(FFBRhino, BaseFFBDevice)
         assert issubclass(FFBEffectHandle, BaseEffectHandle)
 
+    def test_handles_carry_an_advisory_label(self):
+        assert BaseEffectHandle.label is None
+        assert FFBEffectHandle.label is None
+
     def test_signals_come_from_the_base(self):
         for sig in ("buttonPressed", "buttonReleased", "deviceConnected"):
             assert hasattr(BaseFFBDevice, sig)
@@ -81,8 +85,12 @@ class TestIntrospection:
 
     def test_every_backend_inherits_the_readouts(self):
         from telemffb.hw.ffb_dinput import DInputEffectHandle
+        from telemffb.hw.ffb_shaker import ShakerEffectHandle
         for cls in (FFBEffectHandle, DInputEffectHandle):
             assert cls.intensity is BaseEffectHandle.intensity, cls
+        # the shaker answers intensity itself (its AC-coupled drive) and
+        # renders no conditions, so the base's None is its axis_gains
+        for cls in (FFBEffectHandle, DInputEffectHandle, ShakerEffectHandle):
             assert cls.axis_gains is BaseEffectHandle.axis_gains, cls
 
     def test_a_fresh_handle_shows_nothing(self):

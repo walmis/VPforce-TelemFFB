@@ -59,7 +59,7 @@ class BaseTelemetryData:
     FFBType: Optional[str]
     """Device type this telemetry frame targets.  
     Set by TelemManager from G.device_type.  
-    Values: "joystick", "pedals", "collective", "trimwheel"  
+    Values: "joystick", "pedals", "collective", "trimwheel", "shaker"  
     """
 
     ACisFBW: Optional[bool]

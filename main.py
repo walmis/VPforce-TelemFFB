@@ -108,6 +108,7 @@ def _launch_children():
         utils.check_launch_instance("pedals", master_port)
         utils.check_launch_instance("collective", master_port)
         utils.check_launch_instance("trimwheel", master_port)
+        utils.check_launch_instance("shaker", master_port)
 
     except Exception:
         logging.exception("Error during Auto-Launch sequence")
@@ -198,7 +199,8 @@ def _setup_device_configuration():
     3. Set global device variables for use throughout application
     """
     if G.args.device is None:
-        dev_mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
+        dev_mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel",
+                       5: "shaker"}
         master_rb = G.system_settings.masterInstance
         devname = dev_mapping.get(master_rb, "joystick")
             
@@ -208,9 +210,7 @@ def _setup_device_configuration():
         devpath = G.system_settings.get(f'devpath_{devname}', None)
         if devpath:
             G.device_devpath = devpath
-            # a DirectInput device selection is stored as 'dinput:{GUID}'
-            if str(devpath).startswith('dinput:'):
-                G.device_di_guid = str(devpath)[len('dinput:'):]
+            _identity_from_devpath(devpath)
 
         G.device_usbpid = str(G.system_settings.get(utils.device_pid_key(devname), "2055"))
         G.device_type = devname
@@ -229,11 +229,22 @@ def _setup_device_configuration():
 
         devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
         G.device_devpath = devpath
-        if devpath and str(devpath).startswith('dinput:'):
-            G.device_di_guid = str(devpath)[len('dinput:'):]
+        if devpath:
+            _identity_from_devpath(devpath)
         G.device_usbpid = G.args.device.split(":")[1]
         
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
+
+def _identity_from_devpath(devpath):
+    """Set the backend identity a stored device path names: a DirectInput
+    selection is 'dinput:{GUID}', a shaker's is 'audio:{output name}'; a
+    HID path sets neither and opens as a VPforce device."""
+    devpath = str(devpath)
+    if devpath.startswith('dinput:'):
+        G.device_di_guid = devpath[len('dinput:'):]
+    elif devpath.startswith(utils.AUDIO_PREFIX):
+        G.device_audio_output = devpath[len(utils.AUDIO_PREFIX):]
+
 
 def _check_directinput_support():
     """Turn DirectInput support off if the bridge DLL is not usable.
@@ -358,13 +369,15 @@ def _determine_master_instance_status():
         'joystick': 1,
         'pedals': 2,
         'collective': 3,
-        'trimwheel': 4
+        'trimwheel': 4,
+        'shaker': 5,
     }
     master_index = G.system_settings.get('masterInstance', 1)
-    if index_dict[G.device_type] == master_index:
-        G.master_instance = True
-    else:
-        G.master_instance = False
+    # any role can lead, the shaker included: everything the master does
+    # (children, IPC, the sim sockets, settings, the tray) is the same
+    # whatever device it drives, and a rig with no force feedback device
+    # has nothing else to put in charge
+    G.master_instance = index_dict[G.device_type] == master_index
 
 def _setup_config_paths():
     """
@@ -532,6 +545,26 @@ def _initialize_device_connection():
     return dev, dev_serial, dev_firmware_version
 
 
+def _open_shaker():
+    """This instance's shaker on the audio output its settings name, with
+    the gain and transducer rows stored for it.  Where each effect plays
+    is read from the aircraft's settings as effects start."""
+    from telemffb import shaker_placement
+    from telemffb.hw.ffb_shaker import shaker_settings
+    return HapticEffect.open_shaker(G.device_audio_output or None,
+                                    placement_resolver=shaker_placement.resolve,
+                                    **shaker_settings(G.system_settings))
+
+
+def _forget_shaker_placements():
+    """A new aircraft, or new settings on the running one, may place effects
+    elsewhere; the shaker (when this instance is one) re-asks per effect."""
+    from telemffb import shaker_placement
+    shaker_placement.forget_placements(HapticEffect.device)
+
+
+
+
 def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
     """Open the device named by the identity globals and derive the rest.
 
@@ -546,7 +579,9 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
     dev_serial = None
     dev_firmware_version = 'ERROR'
     try:
-        if G.device_di_guid:
+        if G.device_audio_output is not None:
+            dev = _open_shaker()
+        elif G.device_di_guid:
             dev = HapticEffect.open_dinput(G.device_di_guid)
         else:
             # By exact path when one is known - a PID-only open cannot
@@ -720,6 +755,12 @@ def _configured_device_present() -> bool:
             guid = devpath[len('dinput:'):]
             from telemffb.hw.ffb_dinput import DInputFFBDevice
             return any(d.guid == guid for d in DInputFFBDevice.enumerate())
+        if devpath.startswith(utils.AUDIO_PREFIX):
+            name = devpath[len(utils.AUDIO_PREFIX):].lower()
+            if not name:
+                return True          # the system default is always there
+            from telemffb.hw.shaker_synth import SoundDeviceOutput
+            return any(name in d.name.lower() for d in SoundDeviceOutput.list_devices())
         pid = int(str(G.system_settings.get(
             utils.device_pid_key(G.device_type), '') or '2055'), 16)
         return any(d.product_id == pid for d in FFBRhino.enumerate())
@@ -952,8 +993,9 @@ def switch_to_device(devpath=None, show_error=True) -> bool:
                 utils.device_pid_key(G.device_type), '') or '2055')
         G.device_devpath = devpath
         G.device_di_guid = None
-        if devpath and str(devpath).startswith('dinput:'):
-            G.device_di_guid = str(devpath)[len('dinput:'):]
+        G.device_audio_output = None
+        if devpath:
+            _identity_from_devpath(devpath)
         G.device_usbpid = pid
 
         # 4. Open through the same core as startup.
@@ -1330,6 +1372,7 @@ def _sim_connected_events():
     G.telem_manager.sim_exited.connect(api_server.on_sim_exited)
     G.telem_manager.sim_exited.connect(dcs_settings.on_sim_exited)
     G.telem_manager.aircraftUpdated.connect(dcs_settings.on_aircraft_updated)
+    G.telem_manager.aircraftUpdated.connect(_forget_shaker_placements)
 
 def _handle_window_display(headless_mode):
     """Handle initial window display based on configuration."""
@@ -1374,7 +1417,7 @@ def _check_system_settings_required():
 
     if G.device_devpath is None:
         QMessageBox.information(None, "System Settings Required",
-                                f"VPforce Device for {G.device_type} is not assigned.  Please assign a device in System Settings.")
+                                f"No device is assigned to the {G.device_type} instance.  Please assign one in System Settings.")
         if G.child_instance:
             G.ipc_instance.send_message("SHOW SETTINGS")
         else:

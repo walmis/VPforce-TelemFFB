@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QHBoxLayout, QLabel,
                              QLineEdit, QMessageBox, QPushButton, QSizePolicy, QStyleOption, QTabWidget,
@@ -44,6 +44,7 @@ from telemffb.ui.panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 from telemffb.utils import (
+    AUDIO_PREFIX, audio_selection_devices,
     device_display_name, device_ident_key, device_ids_key, device_pid_key,
     directinput_selection_devices, format_usb_ids, recover_device_identity,
     validate_vpconf_profile, HiDpiPixmap,
@@ -274,6 +275,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.device_cards = DeviceCardsPanel(self)
         self.deviceCardsHostLayout.addWidget(self.device_cards)
         self.device_cards.bind_to(self)
+        self._setup_shaker_card()
         joy_card = self.device_cards.joystick_card
         joy_card.add_requested.connect(self._on_add_joystick_alt)
         joy_card.activate_requested.connect(self._on_activate_joystick_row)
@@ -284,7 +286,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # the visible switches sync through the hidden legacy checkboxes;
         # a changed auto-launch state re-derives the card states (collapse,
         # master-radio gating, window-mode enabling)
-        for suffix in 'jpct':
+        for suffix in 'jpcts':
             getattr(self, f'cb_al_enable_{suffix}').toggled.connect(
                 self.toggle_device_launch_widgets)
 
@@ -294,6 +296,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.addButton(self.rb_master_p, id=2)
         self.master_button_group.addButton(self.rb_master_c, id=3)
         self.master_button_group.addButton(self.rb_master_t, id=4)
+        self.master_button_group.addButton(self.rb_master_s, id=5)
 
         # depreciate this option
         self.focus_pauseIL2.setChecked(False)
@@ -519,6 +522,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_min_enable_c.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_min_enable_t.setObjectName('minimize_t')
         self.cb_min_enable_t.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_min_enable_s.setObjectName('minimize_s')
+        self.cb_min_enable_s.clicked.connect(self.toggle_launchmode_cbs)
 
         self.cb_headless_j.setObjectName('headless_j')
         self.cb_headless_j.clicked.connect(self.toggle_launchmode_cbs)
@@ -528,6 +533,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_headless_t.setObjectName('headless_t')
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_headless_s.setObjectName('headless_s')
+        self.cb_headless_s.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
 
 
@@ -535,16 +542,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_select_p._autolaunch_cb = self.cb_al_enable_p
         self.cb_select_c._autolaunch_cb = self.cb_al_enable_c
         self.cb_select_t._autolaunch_cb = self.cb_al_enable_t
+        self.cb_select_s._autolaunch_cb = self.cb_al_enable_s
 
         self.cb_select_j._startmin_cb = self.cb_min_enable_j
         self.cb_select_p._startmin_cb = self.cb_min_enable_p
         self.cb_select_c._startmin_cb = self.cb_min_enable_c
         self.cb_select_t._startmin_cb = self.cb_min_enable_t
+        self.cb_select_s._startmin_cb = self.cb_min_enable_s
 
         self.cb_select_j._headless_cb = self.cb_headless_j
         self.cb_select_p._headless_cb = self.cb_headless_p
         self.cb_select_c._headless_cb = self.cb_headless_c
         self.cb_select_t._headless_cb = self.cb_headless_t
+        self.cb_select_s._headless_cb = self.cb_headless_s
 
 
 
@@ -592,11 +602,155 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """
         return directinput_selection_devices(G.system_settings, enabled)
 
+    # ------------------------------------------------------------------
+    # The shaker card: its own controls under the output selector
+    # ------------------------------------------------------------------
+
+    _shaker_preview = None
+    _shaker_profiles = ()
+
+    def _setup_shaker_card(self):
+        from telemffb.hw.ffb_shaker import POSITIONS, default_profiles_path, load_profiles
+        controls = self.device_cards.shaker_controls
+        self._shaker_profiles, _active = load_profiles(default_profiles_path())
+        controls.set_profiles([p.name for p in self._shaker_profiles])
+        controls.set_positions(POSITIONS)
+        controls.test_button.clicked.connect(lambda: self._shaker_test_clicked())
+        controls.row_test_requested.connect(self._shaker_test_clicked)
+        controls.rows_changed.connect(self._sync_shaker_test_button)
+        controls.rescan_button.clicked.connect(self._rescan_audio_outputs)
+        controls.layout_button.clicked.connect(lambda: self._open_speaker_layout())
+        self.cb_select_s.currentIndexChanged.connect(self._sync_shaker_output)
+        self._sync_shaker_output()
+
+    @staticmethod
+    def _open_speaker_layout():
+        """The Windows Sound control panel, Playback tab, where a card's
+        speaker layout (and so its channel count) is set.  The new
+        Settings app has no such page."""
+        import subprocess
+        try:
+            subprocess.Popen(['control.exe', 'mmsys.cpl'])
+        except Exception:
+            logging.exception("could not open the Sound control panel")
+
+    @staticmethod
+    def _rescan_audio_library():
+        """A seam like _enumerate_audio_outputs: tests stub it, the real
+        one re-initializes the audio library."""
+        from telemffb.hw.shaker_synth import SoundDeviceOutput
+        return SoundDeviceOutput.rescan()
+
+    def _rescan_audio_outputs(self):
+        """A sound card plugged in after TelemFFB started: re-initialize
+        the audio library, then re-list every selector the way the
+        DirectInput toggle does, keeping the current picks.  Refused
+        while a preview holds a stream, which the re-initialization would
+        pull out from under it."""
+        if self._shaker_preview is not None:
+            return
+        if not self._rescan_audio_library():
+            QMessageBox.warning(self, "Shaker",
+                                "The audio outputs could not be rescanned; see the log.")
+            return
+        self.populateUSBSelectors()
+        self._sync_shaker_output()
+
+    def _sync_shaker_output(self, *_):
+        """The selected output decides how many channels the rows can
+        pick from, and whether a test can play at all."""
+        controls = self.device_cards.shaker_controls
+        device = self.selected_device('shaker')
+        controls.set_channel_count(int(getattr(device, 'channels', 2) or 2) if device else 2,
+                                   getattr(device, 'positions', ()) if device else ())
+        self._sync_shaker_test_button()
+
+    def _sync_shaker_test_button(self, *_):
+        controls = self.device_cards.shaker_controls
+        controls.set_test_enabled(
+            self.selected_device('shaker') is not None and self._shaker_preview is None)
+        if self.isVisible():
+            self._grow_to_fit()
+
+    def shaker_settings_values(self):
+        """The shaker card's controls as the settings they are stored as."""
+        from telemffb.hw.ffb_shaker import (SETTING_GAIN, SETTING_TRANSDUCERS,
+                                            transducers_to_json)
+        controls = self.device_cards.shaker_controls
+        return {
+            SETTING_GAIN: round(controls.gain_spin.value(), 2),
+            SETTING_TRANSDUCERS: transducers_to_json(controls.transducers()),
+        }
+
+    def _load_shaker_settings(self, settings_dict):
+        from telemffb.hw.ffb_shaker import shaker_settings
+        values = shaker_settings(settings_dict)
+        controls = self.device_cards.shaker_controls
+        controls.gain_spin.setValue(values['gain'])
+        controls.set_transducers(values['transducers'])
+
+    def _shaker_test_clicked(self, only=None):
+        """A second of sound through the selected output with the rows as
+        they stand on the card, saved or not; ``only`` plays one row."""
+        from telemffb.hw.ffb_shaker import ShakerPreview
+        device = self.selected_device('shaker')
+        if device is None or self._shaker_preview is not None:
+            return
+        controls = self.device_cards.shaker_controls
+        rows = controls.transducers()
+        if not rows:
+            return
+        try:
+            preview = ShakerPreview(
+                getattr(device, 'name', '') or None, transducers=rows,
+                profiles=self._shaker_profiles, gain=controls.gain_spin.value(),
+                only=only if isinstance(only, int) else None)
+            preview.start()
+        except Exception as e:
+            logging.exception("shaker test could not play")
+            QMessageBox.warning(self, "Shaker Test",
+                                f"The test could not play through the selected output.\n\n{e}")
+            return
+        self._shaker_preview = preview
+        self._sync_shaker_test_button()
+        QTimer.singleShot(int(ShakerPreview.TONE_START_S * 1000), preview.cue_tone)
+        QTimer.singleShot(int(ShakerPreview.LENGTH_S * 1000) + 200, self._shaker_test_finished)
+
+    def _shaker_test_finished(self):
+        preview, self._shaker_preview = self._shaker_preview, None
+        if preview is not None:
+            try:
+                preview.stop()
+            except Exception:
+                logging.exception("shaker test could not stop cleanly")
+        self._sync_shaker_test_button()
+
+    @staticmethod
+    def _request_shaker_reapply_everywhere():
+        """Saved shaker settings apply live: this instance directly, the
+        children over IPC (the one driving the shaker acts, the rest have
+        nothing to apply)."""
+        from telemffb.hw.ffb_rhino import HapticEffect
+        apply = getattr(HapticEffect.device, 'apply_settings', None)
+        if apply:
+            apply(G.system_settings)
+        ipc = getattr(G, 'ipc_instance', None)
+        if G.master_instance and ipc and G.launched_instances:
+            ipc.send_broadcast_message('REAPPLY_SHAKER')
+
+    @staticmethod
+    def _enumerate_audio_outputs():
+        """Audio outputs for the shaker's selector - a seam like
+        _enumerate_dinput_devices: tests stub it, the real one asks the
+        audio library."""
+        return audio_selection_devices()
+
     def populateUSBSelectors(self, dinput_enabled=None):
         # Populate the USB device selectors with currently connected devices
         devices = FFBRhino.enumerate()
 
-        combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
+        combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t,
+                       self.cb_select_s]
         # kept so the tap code can ask what is connected without knowing
         # which widget holds which role
         self._device_combos = combo_boxes
@@ -609,8 +763,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # addresses.
         extended_model = FFBDeviceListModel(
             list(devices) + self._enumerate_dinput_devices(dinput_enabled))
+        # the shaker drives a sound card: its selector lists audio outputs
+        # and nothing else, so a stick and a shaker can never be confused
+        audio_model = FFBDeviceListModel(self._enumerate_audio_outputs())
         for cb in combo_boxes:
-            cb_model = extended_model
+            cb_model = audio_model if cb is self.cb_select_s else extended_model
             # Swapping the model emits currentIndexChanged with nothing
             # selected yet.  On a repopulate (the DirectInput toggle) that
             # reaches the handler connected below, which reads it as "device
@@ -638,6 +795,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_select_p: 'pedals',
             self.cb_select_c: 'collective',
             self.cb_select_t: 'trimwheel',
+            self.cb_select_s: 'shaker',
         }
 
         for cb, short in dev_map.items():
@@ -694,6 +852,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_select_p: 'pedals',
                 self.cb_select_c: 'collective',
                 self.cb_select_t: 'trimwheel',
+                self.cb_select_s: 'shaker',
             }
             # when model includes dummy at 0, index 0 means None
             if changed_cb is None:
@@ -770,6 +929,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_select_p: 'pedals',
                 self.cb_select_c: 'collective',
                 self.cb_select_t: 'trimwheel',
+                self.cb_select_s: 'shaker',
             }
 
             role = cb_role_map.get(changed_cb, None)
@@ -784,6 +944,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # restores above ran with signals blocked; bring the ids
         # readouts in line with what is actually selected
         self.device_cards.refresh_ids_labels()
+        # and the shaker's channel count and hint with its restored output
+        if hasattr(self, '_shaker_profiles'):
+            self._sync_shaker_output()
 
         # First-launch guidance for the non-VPforce user: their stick can
         # only appear through the DirectInput listing, and that switch
@@ -1149,6 +1312,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # active in a game folder, with the opt-in never saved and nothing
         # in TelemFFB saying a tap was live.
         self._discard_tap_writes()
+        self._shaker_test_finished()
         self.hide()
         event.ignore()
 
@@ -1335,7 +1499,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     #: Device roles by the id their master-instance radio carries.
     MASTER_ROLE_IDS = {1: 'joystick', 2: 'pedals', 3: 'collective',
-                       4: 'trimwheel'}
+                       4: 'trimwheel', 5: 'shaker'}
 
     #: Per device: the master radio, then auto-launch, start minimized
     #: and start headless.
@@ -1344,6 +1508,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         'pedals': ('rb_master_p', 'cb_al_enable_p', 'cb_min_enable_p', 'cb_headless_p'),
         'collective': ('rb_master_c', 'cb_al_enable_c', 'cb_min_enable_c', 'cb_headless_c'),
         'trimwheel': ('rb_master_t', 'cb_al_enable_t', 'cb_min_enable_t', 'cb_headless_t'),
+        'shaker': ('rb_master_s', 'cb_al_enable_s', 'cb_min_enable_s', 'cb_headless_s'),
     }
 
     def toggle_device_launch_widgets(self):
@@ -2314,6 +2479,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             case 'minimize_t':
                 self.cb_headless_t.setChecked(False)
                 self.cb_startToTray.setChecked(False)
+            case 'headless_s':
+                self.cb_min_enable_s.setChecked(False)
+            case 'minimize_s':
+                self.cb_headless_s.setChecked(False)
+                self.cb_startToTray.setChecked(False)
         logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
 
     #: What proves a path is one of the IL-2 titles: where startup.cfg sits
@@ -2436,7 +2606,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     #: Which auto-launch toggle belongs to which device.
     AUTOLAUNCH_TOGGLES = {'joystick': 'cb_al_enable_j', 'pedals': 'cb_al_enable_p',
-                          'collective': 'cb_al_enable_c', 'trimwheel': 'cb_al_enable_t'}
+                          'collective': 'cb_al_enable_c', 'trimwheel': 'cb_al_enable_t',
+                          'shaker': 'cb_al_enable_s'}
 
     #: The Window Mode tri-state, stored as windowMode{Role}.  The legacy
     #: booleans (startMin/startHeadless) are still written in step - the
@@ -2469,7 +2640,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def validate_settings(self):
         master_role = self.MASTER_ROLE_IDS.get(
             self.master_button_group.checkedId())
-        if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()  or self.cb_al_enable_t.isChecked()):
+        if self.cb_al_enable.isChecked() and not any(
+                getattr(self, toggle).isChecked() for toggle in self.AUTOLAUNCH_TOGGLES.values()):
             QMessageBox.warning(self, "Config Error", "Auto Launching is enabled but no devices are configured for auto launch.  Please enable a device or disable auto launching")
             return False
         # An instance is launched against a device; without one picked there
@@ -2549,22 +2721,28 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'autolaunchPedals': self.cb_al_enable_p.isChecked(),
             'autolaunchCollective': self.cb_al_enable_c.isChecked(),
             'autolaunchTrimWheel': self.cb_al_enable_t.isChecked(),
+            'autolaunchShaker': self.cb_al_enable_s.isChecked(),
             'startMinJoystick': self.cb_min_enable_j.isChecked(),
             'startMinPedals': self.cb_min_enable_p.isChecked(),
             'startMinCollective': self.cb_min_enable_c.isChecked(),
             'startMinTrimWheel': self.cb_min_enable_t.isChecked(),
+            'startMinShaker': self.cb_min_enable_s.isChecked(),
             'startHeadlessJoystick': self.cb_headless_j.isChecked(),
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
+            'startHeadlessShaker': self.cb_headless_s.isChecked(),
             'windowModeJoystick': self._window_mode_value('j'),
             'windowModePedals': self._window_mode_value('p'),
             'windowModeCollective': self._window_mode_value('c'),
             'windowModeTrimWheel': self._window_mode_value('t'),
+            'windowModeShaker': self._window_mode_value('s'),
             'pidJoystick': self.instance_pid('joystick'),
             'pidPedals': self.instance_pid('pedals'),
             'pidCollective': self.instance_pid('collective'),
             'pidTrimWheel': self.instance_pid('trimwheel'),
+            'pidShaker': self.instance_pid('shaker'),
+            **self.shaker_settings_values(),
             'pruneLogs': self.cb_logPrune.isChecked(),
             'pruneLogsNum': self.tb_logPrune.text(),
             'pruneLogsUnit': self.combo_logPrune.currentText(),
@@ -2668,6 +2846,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self._request_axis_map_reapply_everywhere()
         except Exception:
             logging.exception('Failed to request live axis-map re-apply')
+
+        # the shaker's gain, channel mode, pan and profile apply live too
+        try:
+            self._request_shaker_reapply_everywhere()
+        except Exception:
+            logging.exception('Failed to request live shaker re-apply')
 
         # A swapped device leaves any tap config pointing at hardware that is
         # no longer there, which fails silently in both directions.  Compared
@@ -3394,9 +3578,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_al_enable_p.setChecked(settings_dict.get('autolaunchPedals', False))
         self.cb_al_enable_c.setChecked(settings_dict.get('autolaunchCollective', False))
         self.cb_al_enable_t.setChecked(settings_dict.get('autolaunchTrimWheel', False))
+        self.cb_al_enable_s.setChecked(settings_dict.get('autolaunchShaker', False))
+        self._load_shaker_settings(settings_dict)
 
         for suffix, role_cap in (('j', 'Joystick'), ('p', 'Pedals'),
-                                 ('c', 'Collective'), ('t', 'TrimWheel')):
+                                 ('c', 'Collective'), ('t', 'TrimWheel'),
+                                 ('s', 'Shaker')):
             self._load_window_mode(suffix, role_cap, settings_dict)
 
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
@@ -3423,18 +3610,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startMinPedals': self.cb_min_enable_p.isChecked(),
             'startMinCollective': self.cb_min_enable_c.isChecked(),
             'startMinTrimWheel': self.cb_min_enable_t.isChecked(),
+            'startMinShaker': self.cb_min_enable_s.isChecked(),
             'startHeadlessJoystick': self.cb_headless_j.isChecked(),
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
+            'startHeadlessShaker': self.cb_headless_s.isChecked(),
             'windowModeJoystick': self._window_mode_value('j'),
             'windowModePedals': self._window_mode_value('p'),
             'windowModeCollective': self._window_mode_value('c'),
             'windowModeTrimWheel': self._window_mode_value('t'),
+            'windowModeShaker': self._window_mode_value('s'),
             'pidJoystick': self.instance_pid('joystick'),
             'pidPedals': self.instance_pid('pedals'),
             'pidCollective': self.instance_pid('collective'),
             'pidTrimWheel': self.instance_pid('trimwheel'),
+            'pidShaker': self.instance_pid('shaker'),
             'masterInstance': self.master_button_group.checkedId(),
             'themeId': self.themeButtonGroup.checkedId(),
         }
@@ -3530,11 +3721,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 G.ipc_instance.send_broadcast_message(f'REACQUIRE:{role}')
 
     #: Device roles, in the order their tabs appear.
-    INSTANCE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel')
+    INSTANCE_ROLES = ('joystick', 'pedals', 'collective', 'trimwheel', 'shaker')
 
     #: The device selector for each role.
     DEVICE_SELECTORS = {'joystick': 'cb_select_j', 'pedals': 'cb_select_p',
-                        'collective': 'cb_select_c', 'trimwheel': 'cb_select_t'}
+                        'collective': 'cb_select_c', 'trimwheel': 'cb_select_t',
+                        'shaker': 'cb_select_s'}
 
     def selected_device(self, role):
         """The device currently picked for a role, if any.
@@ -3557,9 +3749,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return model.data(model.index(combo.currentIndex(), 0),
                           Qt.ItemDataRole.UserRole)
 
-    #: Shown on the Configurator settings a DirectInput device cannot use.
+    #: Shown on the Configurator settings a device without VPforce firmware
+    #: cannot use.
     VPCONF_BLOCKED_REASON = (
-        'Not available: VPforce Configurator profiles do not apply to a generic DirectInput device')
+        'Not available: VPforce Configurator profiles only apply to VPforce devices')
 
     def device_is_dinput(self, role):
         """True when the device picked for a role is a generic DirectInput one.
@@ -3572,6 +3765,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         path = getattr(device, 'path', None) or b''
         return bytes(path).startswith(b'dinput:')
 
+    def device_is_audio(self, role):
+        """True when the device picked for a role is an audio output (the
+        shaker's), keyed on the selection like device_is_dinput."""
+        device = self.selected_device(role)
+        path = getattr(device, 'path', None) or b''
+        return bytes(path).startswith(AUDIO_PREFIX.encode())
+
     def _update_vpconf_gates(self):
         """Grey out Configurator settings for any device that cannot use them.
 
@@ -3583,7 +3783,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         for (section, role), panel in self.instance_panels.items():
             if section != 'startup':
                 continue
-            blocked = self.device_is_dinput(role)
+            blocked = self.device_is_dinput(role) or self.device_is_audio(role)
             panel.set_vpforce_features_enabled(
                 not blocked, self.VPCONF_BLOCKED_REASON)
 
