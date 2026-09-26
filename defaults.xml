@@ -457,7 +457,6 @@
 		<name>spring_mode</name>
 		<displayname>Joystick Spring Mode</displayname>
 		<IL2>true</IL2>
-		<IL2K>true</IL2K>
 		<joystick>true</joystick>
 		<validvalues>IL2_JOYSTICK_SPRING_MODE</validvalues>
 		<datatype>enumlist</datatype>
@@ -468,11 +467,34 @@
 		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
 		<name>spring_mode</name>
+		<displayname>Joystick Spring Mode</displayname>
+		<IL2K>true</IL2K>
+		<joystick>true</joystick>
+		<validvalues>IL2K_JOYSTICK_SPRING_MODE</validvalues>
+		<datatype>enumlist</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.0</order>
+		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<IL2>true</IL2>
-		<IL2K>true</IL2K>
 		<pedals>true</pedals>
 		<validvalues>IL2_PEDAL_SPRING_MODE</validvalues>
+		<datatype>enumlist</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>700.0</order>
+		<name>spring_mode</name>
+		<displayname>Pedal Spring Mode</displayname>
+		<IL2K>true</IL2K>
+		<pedals>true</pedals>
+		<validvalues>IL2K_PEDAL_SPRING_MODE</validvalues>
 		<datatype>enumlist</datatype>
 	</defaults>
 	<defaults>

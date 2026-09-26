@@ -1093,10 +1093,12 @@ class TestPedalTap:
         inst._telem_data["FFBType"] = "collective"
         assert not inst.ffb_tap_spring()
 
-    def test_il2_pedal_spring_modes_offer_the_tap(self):
+    def test_korea_pedal_spring_modes_offer_the_tap(self):
+        """Korea drives native FFB pedals through the tap; Great Battles
+        renders no pedal FFB, so its pedal list has no tap mode."""
         from telemffb.SettingsManager import SettingsManager, SpringModeEnum
-        assert SpringModeEnum.DINPUT_TAP in \
-            SettingsManager.IL2_PEDAL_SPRING_MODE
+        assert SpringModeEnum.DINPUT_TAP in SettingsManager.IL2K_PEDAL_SPRING_MODE
+        assert SpringModeEnum.DINPUT_TAP not in SettingsManager.IL2_PEDAL_SPRING_MODE
 
     def test_pedal_tap_settings_are_scoped_for_one_axis(self):
         """Pedals get the tap rows that mean something on a single axis;

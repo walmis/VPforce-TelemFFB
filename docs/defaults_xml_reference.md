@@ -510,6 +510,10 @@ Dropdown populated from a named Python enum dict in `SettingsManager`.
   | `MSFS_XP_FT_ONLY_JOYSTICK_SPRING_MODE` | MSFS/XP joystick (force-trim only) |
   | `MSFS_XP_FT_ONLY_COLLECTIVE_SPRING_MODE` | MSFS/XP collective (force-trim only) |
   | `MSFS_XP_FT_ONLY_PEDAL_SPRING_MODE` | MSFS/XP pedals (force-trim only) |
+  | `IL2_JOYSTICK_SPRING_MODE` | IL-2 Great Battles joystick |
+  | `IL2_PEDAL_SPRING_MODE` | IL-2 Great Battles pedals |
+  | `IL2K_JOYSTICK_SPRING_MODE` | IL-2 Korea joystick (adds the FFB-telemetry mode) |
+  | `IL2K_PEDAL_SPRING_MODE` | IL-2 Korea pedals (adds the FFB-telemetry and tap modes) |
   | `DCS_IL2_PEDAL_SPRING_MODE` | DCS/IL-2 pedals |
   | `DCS_IL2_JOYSTICK_SPRING_MODE` | DCS/IL-2 joystick (fixed-wing) |
   | `DCS_HELI_JOYSTICK_SPRING_MODE` | DCS joystick (helicopter) |

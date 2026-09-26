@@ -272,10 +272,11 @@ class SettingsManager(QObject):
         SpringModeEnum.FORCETRIM: "Force Trim",
     }
 
+    # IL-2 Great Battles renders no pedal FFB and publishes no ffbdevice
+    # records, so its lists carry neither the pedal tap nor the
+    # FFB-telemetry mode; both belong to Korea's lists below.
     IL2_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
-        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
-        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap, Korea Only)",
         SpringModeEnum.STATIC: "Static Spring",
         SpringModeEnum.DYNAMIC: "Dynamic Spring",
         SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
@@ -284,7 +285,24 @@ class SettingsManager(QObject):
 
     IL2_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
-        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed, Korea Only)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
+        SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    IL2K_PEDAL_SPRING_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed)",
+        SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
+        SpringModeEnum.STATIC: "Static Spring",
+        SpringModeEnum.DYNAMIC: "Dynamic Spring",
+        SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    IL2K_JOYSTICK_SPRING_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.TELEM: "FFB Telemetry (Game Managed)",
         SpringModeEnum.DINPUT_TAP: "Game Managed (DirectInput Tap)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
