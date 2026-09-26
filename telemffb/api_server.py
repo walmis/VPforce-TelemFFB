@@ -28,6 +28,7 @@ from bottle import Bottle, request, response
 
 import telemffb.globals as G
 from telemffb import xmlutils
+from telemffb.xml.merge import visible_rows
 
 app = Bottle()
 
@@ -285,7 +286,7 @@ def get_settings():
     )
 
     settings = []
-    for item in result or []:
+    for item in visible_rows(result or []):
         control = _build_control(item)
         if control is not None:
             settings.append(control)

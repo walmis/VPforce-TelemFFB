@@ -17,8 +17,8 @@ of satisfied parents up to a root.
 from telemffb.xmlutils import eliminate_no_prereq
 
 
-def _item(name, prereq='', value='true', order='100'):
-    return {'name': name, 'prereq': prereq, 'value': value, 'order': order}
+def _item(name, prereq='', value='true', order='100', **extra):
+    return {'name': name, 'prereq': prereq, 'value': value, 'order': order, **extra}
 
 
 def _names(result):
@@ -80,3 +80,47 @@ def test_self_match_via_dotted_prereq_excluded():
         _item('foo', prereq='foo.BAR', value='true', order='400.2'),
     ]
     assert eliminate_no_prereq(data) == []
+
+
+class TestVisibleRows:
+    """What the settings form would show with every section open - the rows
+    the MSFS toolbar panel is sent."""
+
+    def _visible(self, data):
+        from telemffb.xml.merge import visible_rows
+        return _names(visible_rows(data))
+
+    def _spring_tree(self, mode):
+        return [
+            _item('basic_group', order='50.0', datatype='group'),
+            _item('spring_mode', prereq='basic_group', value=mode, order='200.0'),
+            _item('aileron_spring_gain', prereq='spring_mode.CENTER.CNTR_FT', value='0.3', order='550.2'),
+            _item('fbw_aileron_gain', prereq='spring_mode.FBW', value='0.6', order='600.2'),
+            _item('cyclic_spring_gain', prereq='spring_mode.FORCETRIM', value='0.65', order='700.2'),
+        ]
+
+    def test_only_the_selected_modes_settings_show(self):
+        """The H145 on Force Trim was shown Spring Center and Fly-By-Wire."""
+        assert self._visible(self._spring_tree('FORCETRIM')) == {
+            'basic_group', 'spring_mode', 'cyclic_spring_gain'}
+
+    def test_a_setting_listed_for_several_modes_shows_in_each(self):
+        assert 'aileron_spring_gain' in self._visible(self._spring_tree('CNTR_FT'))
+
+    def test_a_child_of_a_hidden_parent_is_hidden(self):
+        data = self._spring_tree('FBW') + [
+            _item('fbw_trim', prereq='fbw_aileron_gain', value='true', order='600.3')]
+        data[3]['value'] = 'true'
+        assert 'fbw_trim' in self._visible(data)
+        data[1]['value'] = 'FORCETRIM'
+        assert 'fbw_trim' not in self._visible(data)
+
+    def test_a_failing_render_gate_hides_a_row(self):
+        data = [_item('curve', value='false'),
+                _item('detail', value='0.5', render_prereq='curve'),
+                _item('fallback', value='0.5', render_prereq='!curve')]
+        assert self._visible(data) == {'curve', 'fallback'}
+
+    def test_legacy_convert_rows_never_show(self):
+        assert self._visible([_item('aircraft_is_fbw', value='true', datatype='convert')]) == set()
+

@@ -169,6 +169,59 @@ def eliminate_no_prereq(datalist: list[DefaultDataRow]) -> list[DefaultDataRow]:
     return working
 
 
+def render_gate_passes(expr: str, values: dict) -> bool:
+    """Whether a ``render_prereq`` expression holds: comma-separated setting
+    names, each required true, or false when prefixed with ``!``.  A name
+    absent from ``values`` counts as false."""
+    for token in (expr or '').split(','):
+        token = token.strip()
+        if not token:
+            continue
+        want_true = not token.startswith('!')
+        ref = token.lstrip('!').strip()
+        if (str(values.get(ref, '')).strip().lower() == 'true') != want_true:
+            return False
+    return True
+
+
+def visible_rows(data_list: list[DefaultDataRow]) -> list[DefaultDataRow]:
+    """The rows the settings form would show, with every section expanded.
+
+    A row is visible when its ``prereq`` holds and its parent is itself
+    visible: ``name`` needs that setting true, ``name.V1.V2`` needs it to
+    hold one of the listed values.  A failing ``render_prereq`` hides it, and
+    ``convert`` rows - legacy values translated into a mode - never show.
+    eliminate_no_prereq leaves the values of an enum parent unchecked, so a
+    resolved list still holds every spring mode's settings.
+    """
+    by_name = {row['name']: row for row in data_list}
+    values = {row['name']: row.get('value') or '' for row in data_list}
+    decided: dict[str, bool] = {}
+
+    def visible(row) -> bool:
+        name = row['name']
+        if name in decided:
+            return decided[name]
+        decided[name] = False           # a cyclic chain stays hidden
+        shown = row.get('datatype') != 'convert'
+        prereq = (row.get('prereq') or '').strip()
+        if prereq:
+            parent_name, _, wanted = prereq.partition('.')
+            parent = by_name.get(parent_name)
+            if not shown or parent is None or not visible(parent):
+                shown = False
+            elif wanted:
+                shown = (parent.get('value') or '') in wanted.split('.')
+            else:
+                shown = (parent.get('value') or '').lower() == 'true'
+        if shown and not render_gate_passes(row.get('render_prereq') or '', values):
+            shown = False
+        decided[name] = shown
+        return shown
+
+    return [row for row in data_list if visible(row)]
+
+
 def filter_rows(data_list: list[DefaultDataRow]) -> list[DefaultDataRow]:
     """Recursive prerequisite chain filtering."""
     valid: list[DefaultDataRow] = []
