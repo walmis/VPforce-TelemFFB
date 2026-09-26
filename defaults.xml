@@ -4048,6 +4048,73 @@
 		<effecttype>constant</effecttype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
+		<order>20110.22</order>
+		<datatype>float</datatype>
+		<name>gforce_effect_max_intensity</name>
+		<displayname>Max Intensity</displayname>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
+		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>1.0</value>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
+		<order>20110.23</order>
+		<datatype>d_float</datatype>
+		<name>gforce_effect_curvature</name>
+		<displayname>G Force Curvature</displayname>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Affects the onset characteristics of the overall effect&lt;br&gt;&lt;img src=":/image/g-force-curve.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
+		<value>2.2</value>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
+		<order>20110.24</order>
+		<datatype>d_float</datatype>
+		<name>gforce_min_gs</name>
+		<displayname>Minimum Gs</displayname>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
+		<info>G loading where effect will start</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
+		<value>1.5</value>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
+		<order>20110.25</order>
+		<datatype>d_float</datatype>
+		<name>gforce_max_gs</name>
+		<displayname>Maximum Gs</displayname>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
+		<info>G loading where effect will max out</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>40,100</validvalues>
+		<value>5.0</value>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
 		<order>20120.2</order>
 		<datatype>float</datatype>
 		<name>new_gforce_effect_max_intensity</name>
