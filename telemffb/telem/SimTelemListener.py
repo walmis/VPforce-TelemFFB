@@ -103,6 +103,9 @@ class _SimIL2Base(SimTelemListener):
     #: the game also publishes ffbdevice records, whose config section the
     #: validator maintains alongside telemetry and motion
     ffb_stream = False
+    #: a port this game's config may still name from before it had its own;
+    #: the validator explains that change instead of calling the file broken
+    legacy_port = None
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
@@ -136,7 +139,8 @@ class _SimIL2Base(SimTelemListener):
     def validate(self):
         logging.info(f"Validating {self.label} Telemetry Config")
         utils.analyze_il2_config(self.startup_cfg, port=self.port_udp, window=G.main_window,
-                                 sim_name=self.label, korea=self.ffb_stream)
+                                 sim_name=self.label, korea=self.ffb_stream,
+                                 legacy_port=self.legacy_port)
 
     @override
     def stop(self):
@@ -176,6 +180,11 @@ class SimIL2K(_SimIL2Base):
         port = int(G.system_settings.get('portIL2_K'))
         assert port
         return port
+
+    @property
+    def legacy_port(self):
+        """IL-2 Sturmovik's port, which Korea shared before the split."""
+        return int(G.system_settings.get('portIL2'))
 
     @override
     def do_validate(self) -> bool:

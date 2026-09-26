@@ -132,7 +132,16 @@ def resolve_il2_ffb_device_ordinal(il2_korea_path, vendor_id, product_id):
     return None
 
 
-def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2", korea=False):
+def _il2_config_on_port(config_data, port) -> bool:
+    """Whether startup.cfg's telemetry, motion and FFB sections are exactly
+    TelemFFB's own setup sending to ``port`` - IL-2 Korea's config from
+    before it had its own port, when it shared IL-2 Sturmovik's."""
+    expected = {'addr': '127.255.255.255', 'decimation': '1', 'enable': 'true', 'port': str(port)}
+    return all({k: v.strip("\'\"") for k, v in config_data.get(section, {}).items()} == expected
+               for section in ('telemetrydevice', 'motiondevice', 'ffbdevice'))
+
+
+def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2", korea=False, legacy_port=None):
     config_data = defaultdict(dict)
 
     # file_path = os.path.join(path, "data\\startup.cfg")
@@ -327,7 +336,25 @@ def analyze_il2_config(file_path, port=34385, window=None, sim_name="IL-2", kore
         telem_message.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         telem_message.setWindowTitle(f"TelemFFB {sim_name} Config")
 
-        if not telem_match or not motion_match or not ffb_match:
+        if legacy_port is not None and _il2_config_on_port(config_data, legacy_port):
+            # the only difference is IL-2 Korea still sending to IL-2
+            # Sturmovik's port: explain the change rather than call it broken
+            pop = f"""
+            <p><b>The IL-2 Korea Telemetry Configuration Needs an Update</b></p>
+            <p>TelemFFB now treats IL-2 Korea and IL-2 Sturmovik separately.
+            To tell the games apart, IL-2 Korea needs to be configured to send its telemetry to
+            port <b>{port}</b>.</p>
+            <p>Update it to port {port}?</p>
+            <p>If you choose No, IL-2 Korea will not be correctly detected and this will be asked again on the next
+            TelemFFB startup.</p>
+            <p style='color:#d9534f; font-weight:bold; margin-top:12px;'>Please close IL-2 Korea before selecting 'Yes'</p>
+            """
+            telem_message.setDefaultButton(QMessageBox.StandardButton.Yes)
+            telem_message.setDetailedText(
+                f"File: {file_path}\n\n"
+                + "\n".join(f"{section}: port {legacy_port} -> {port}"
+                            for section in ('telemetrydevice', 'motiondevice', 'ffbdevice')))
+        elif not telem_match or not motion_match or not ffb_match:
             pop = f"""
             <p>The telemetry, motion and/or FFB device configuration in the <b>{html.escape(sim_name)}</b> <b>startup.cfg</b>
             is missing or incorrect and may prohibit TelemFFB from receiving data.</p>
