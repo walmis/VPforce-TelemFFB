@@ -74,6 +74,7 @@ import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.ui.widgets.LogWindow import LogWindow
+from telemffb.ui.widgets.TooltipWrapFilter import TooltipWrapFilter
 from telemffb.MainWindow import MainWindow
 from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
@@ -1620,6 +1621,8 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
     app.setFont(QFont('Segoe UI', 10))
+    # long plain tooltips wrap, wherever they are set (parented: lives with the app)
+    app.installEventFilter(TooltipWrapFilter(app))
 
     # ============================================================================
     # PHASE 2: Command Line Arguments and Instance Management

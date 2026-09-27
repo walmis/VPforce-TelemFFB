@@ -55,6 +55,8 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
+from telemffb.ui.widgets.TooltipWrapFilter import rich_tooltip
+
 
 class KeyValueTableModel(QAbstractTableModel):
     """Generic ordered row model, diffed by a caller-supplied row key.
@@ -65,7 +67,7 @@ class KeyValueTableModel(QAbstractTableModel):
     updates.
 
     ``unselectable_columns`` names columns that hold a marker rather than a
-    value - the telemetry table's favourite-star gutter, whose cell text is
+    value - the telemetry table's favorite-star gutter, whose cell text is
     always empty and whose look comes from a delegate. Dropping
     ``ItemIsSelectable`` keeps them out of a rubber-band selection and so
     out of ``CopyableTableView``'s Ctrl+C, which would otherwise prefix
@@ -111,10 +113,12 @@ class KeyValueTableModel(QAbstractTableModel):
             return None
         key = self._keys[index.row()]
         if role == Qt.ItemDataRole.ToolTipRole:
+            # the application's tooltip filter never sees a view's tooltips
             tips = self._tooltips.get(key)
             if tips is not None and tips[index.column()] is not None:
-                return tips[index.column()]
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
+                return rich_tooltip(tips[index.column()])
+            return rich_tooltip(str(self._values[key][index.column()]))
+        if role == Qt.ItemDataRole.DisplayRole:
             return self._values[key][index.column()]
         return None
 
