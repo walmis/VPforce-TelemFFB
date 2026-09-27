@@ -127,6 +127,89 @@ def classify_http_exception(exc):
     return {"error": str(exc), "traceback": traceback.format_exc()}
 
 
+#: The most log material a bundle carries, counted uncompressed so the zip
+#: can never exceed it; the service that processes submitted bundles
+#: refuses anything over 1 GB.
+BUNDLE_LOG_BUDGET = 250 * 1024 * 1024
+
+_ARCHIVE_RE = re.compile(r'^TelemFFB_Log_Archive_(\d{8})\.zip$')
+
+
+def _bundle_log_files(log_folder, budget=BUNDLE_LOG_BUDGET):
+    """The log files a bundle carries, as ``(path, arcname)``.
+
+    Every instance's current log, always and whole.  Then, only as far as
+    they fit in what ``budget`` has left: the tap wrapper logs and the daily
+    archives, newest first.  Nothing else in the folder is carried.
+    """
+    def entries(folder, keep):
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            return []
+        paths = [os.path.join(folder, n) for n in names if keep(n)]
+        return [p for p in paths if os.path.isfile(p)]
+
+    def newest_first(paths):
+        return sorted(paths, key=os.path.getmtime, reverse=True)
+
+    current = newest_first(entries(log_folder, lambda n: n.endswith('.log')))
+    tap = newest_first(entries(os.path.join(log_folder, 'tap'), lambda n: n.endswith('.log')))
+    archives = sorted(entries(log_folder, _ARCHIVE_RE.match),
+                      key=lambda p: _ARCHIVE_RE.match(os.path.basename(p))[1],
+                      reverse=True)
+
+    def arcname(path):
+        return os.path.relpath(path, os.path.dirname(log_folder))
+
+    chosen = [(path, arcname(path)) for path in current]
+    left = budget - sum(os.path.getsize(p) for p in current)
+    for path in tap + archives:
+        size = os.path.getsize(path)
+        if size <= left:
+            chosen.append((path, arcname(path)))
+            left -= size
+    return chosen
+
+
+def _tap_setup(settings):
+    """The DirectInput tap's setup in every game it can serve: each
+    dinput8.ini as ``(arcname, bytes)``, and a report of what is installed
+    where.  A game that cannot be examined is named in the report rather
+    than holding up the bundle."""
+    import ntpath
+    from telemffb.tap import tap_install as ti
+
+    bundled = ti.bundled_version()
+    configs = []
+    report = [f"DirectInput tap wrapper bundled with TelemFFB: {bundled or 'none'}", ""]
+    for sim in ti.SIMS:
+        try:
+            configured = settings.get(sim.settings_key) if sim.settings_key else None
+            status = ti.sim_status(sim, configured or None)
+            tapping = settings.get(sim.tap_enable_key) if sim.tap_enable_key else None
+            where = f"{status.root} ({status.provenance})" if status.root else "not found"
+            report.append(f"{sim.name} [{sim.key}]: {where}"
+                          + (f", tap enabled in TelemFFB: {tapping}" if tapping is not None else ""))
+            if status.rejected_configured:
+                report.append(f"  configured folder not recognized: {status.rejected_configured}")
+            for target in status.targets:
+                wrapper = target.state + (f" {target.version}" if target.version else "")
+                if target.state == ti.WrapperState.TAP and ti.version_is_newer(bundled, target.version):
+                    wrapper += " (outdated)"
+                report.append(f"  {target.directory}: wrapper {wrapper}, "
+                              f"dinput8.ini {'present' if target.has_config else 'absent'}")
+            for path in ti.config_paths(status):
+                folder = ntpath.relpath(ntpath.dirname(path), status.root)
+                arcname = ntpath.join("tap", sim.key, "" if folder == "." else folder,
+                                      ti.WRAPPER_CONFIG).replace("\\", "/")
+                with open(path, 'rb') as f:
+                    configs.append((arcname, f.read()))
+        except Exception as e:
+            report.append(f"{sim.name} [{sim.key}]: could not be examined: {e}")
+    return configs, "\n".join(report) + "\n"
+
+
 def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=None, user_info=None):
     """Internal helper to create a support bundle zip file.
 
@@ -176,18 +259,28 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
         if os.path.exists(history_path):
             support_zip.write(history_path, "match_history.json")
 
-        # Add log files
+        # Add the recent logs
         log_folder = os.path.join(userconfig_rootpath, "log")
-        if os.path.exists(log_folder):
-            for folder_name, subfolders, filenames in os.walk(log_folder):
-                for filename in filenames:
-                    file_path = os.path.join(folder_name, filename)
-                    arcname = os.path.relpath(file_path, userconfig_rootpath)
-                    support_zip.write(file_path, arcname)
-        
+        for file_path, arcname in _bundle_log_files(log_folder):
+            try:
+                support_zip.write(file_path, arcname)
+            except OSError as e:
+                # a log still being written by another instance, or gone
+                logging.warning(f"Support bundle: skipped {arcname}: {e}")
+
         # Add system settings
         cfg_content = "\n".join(f"{key}={value}" for key, value in sys_dict.items())
         support_zip.writestr("system_settings.cfg", cfg_content)
+
+        # The tap's setup in each game: what it was told, beside the wrapper
+        # logs above that say what it did
+        try:
+            tap_configs, tap_report = _tap_setup(G.system_settings)
+            for arcname, data in tap_configs:
+                support_zip.writestr(arcname, data)
+            support_zip.writestr("tap/tap_status.txt", tap_report)
+        except Exception:
+            logging.exception("Support bundle: could not collect the tap setup")
         
         # Add exception details if provided
         if exceptions:
