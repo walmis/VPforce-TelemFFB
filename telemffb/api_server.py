@@ -30,6 +30,13 @@ from bottle import Bottle, request, response
 import telemffb.globals as G
 from telemffb import xmlutils
 from telemffb.ButtonPressThread import wait_for_button_press
+from telemffb.hw.ffb_rhino import effect_names
+from telemffb.telem.telem_format import (BADGE_LETTERS, BADGE_SHAPES,
+                                         SignedKeys, axes_text,
+                                         format_telemetry_value,
+                                         grouped_effects, load_favorites,
+                                         ordered_telemetry, toggle_favorite)
+from telemffb.utils import schedule_on_main_thread
 from telemffb.utils.device import DEVICE_ROLES
 from telemffb.xml.merge import visible_rows
 
@@ -417,6 +424,77 @@ def _refresh_active_profile() -> None:
         new_profile = xmlutils.get_active_profile_for_model(sm.current_sim, sm.current_class, sm.current_pattern)
         if new_profile != sm.active_profile:
             sm.update_state_vars(active_profile=new_profile)
+
+
+# --- monitor ----------------------------------------------------------------
+# What the desktop Monitor tab shows, for the panel's selected device, with
+# every value already formatted as the desktop formats it.
+
+#: A child sends its telemetry only while something watches it, and a
+#: closed panel says nothing: the panel's watch lapses this long after its
+#: last poll.
+MONITOR_LEASE_S = 5.0
+
+_monitor = {"latest": (None, [])}   # this instance's frame and effects
+_signed = {}                        # device -> SignedKeys
+
+
+def publish_monitor(frame, effects) -> None:
+    """Main window: this instance's latest frame and active effects."""
+    _monitor["latest"] = (frame, effects)
+
+
+def _effect_row(effect: dict) -> dict:
+    intensity = effect.get("intensity")
+    gains = effect.get("gains")
+    if intensity is not None:
+        shown = f"{round(intensity * 100)}%"
+    elif gains:
+        shown = axes_text(gains)
+    else:
+        shown = "-"
+    effect_type = effect.get("type")
+    return {"label": effect.get("label", ""), "type": effect_names.get(effect_type, ""),
+            # the desktop's badge: a waveform file, or else a letter
+            "shape": BADGE_SHAPES.get(effect_type), "letter": BADGE_LETTERS.get(effect_type),
+            "intensity": intensity, "shown": shown}
+
+
+@app.get("/api/monitor")
+def get_monitor():
+    device = _device()
+    ipc = getattr(G, "ipc_instance", None)
+    if device == _settings_mgr.device:
+        if ipc is not None:
+            ipc.request_child_view(None, viewer="panel")
+        frame, effects = _monitor["latest"]
+    elif ipc is not None:
+        ipc.request_child_view(device, viewer="panel", lease=MONITOR_LEASE_S)
+        raw = ipc.child_view.frame(device)
+        frame = ordered_telemetry(raw) if raw else None
+        effects = ipc.child_effects(device)
+    else:
+        frame, effects = None, []
+    favorites = load_favorites()
+    signed = _signed.setdefault(device, SignedKeys())
+    rows = [{"key": key, "value": format_telemetry_value(v, signed.is_signed(frame, key, v)),
+             "favorite": key in favorites}
+            for key, v in frame.items()] if frame else []
+    return {"device": device, "telemetry": rows,
+            "effects": [_effect_row(e) for e in grouped_effects(effects)]}
+
+
+@app.post("/api/monitor/favorite")
+def set_favorite():
+    key = (request.json or {}).get("key")
+    if not key:
+        response.status = 400
+        return {"detail": "Request body must include 'key'"}
+    starred = toggle_favorite(key)
+    window = getattr(G, "main_window", None)
+    if window is not None:
+        schedule_on_main_thread(window.monitor_panel.reload_favorites)
+    return {"key": key, "favorite": starred}
 
 
 # --- button binding ---------------------------------------------------------

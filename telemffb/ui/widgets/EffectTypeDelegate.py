@@ -43,13 +43,7 @@ from PyQt6.QtWidgets import QStyledItemDelegate
 
 import telemffb.globals as G
 from telemffb.ui.theme.tokens import PURPLE, PURPLE_HOVER
-from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
-                                   EFFECT_DAMPER, EFFECT_DETENT,
-                                   EFFECT_FRICTION, EFFECT_INERTIA,
-                                   EFFECT_RAMP, EFFECT_SAWTOOTHDOWN,
-                                   EFFECT_SAWTOOTHUP, EFFECT_SINE,
-                                   EFFECT_SPRING, EFFECT_SPRING_ADJUSTER,
-                                   EFFECT_SQUARE, EFFECT_TRIANGLE)
+from telemffb.telem.telem_format import BADGE_LETTERS, BADGE_SHAPES
 
 #: Badge box, and the gap between it and the name it belongs to. Reserved
 #: on every row so the names line up whatever is (or is not) drawn in it.
@@ -73,30 +67,6 @@ def badge_color():
     the link colours make (see TeleplotSetupDialog).
     """
     return QColor(PURPLE_HOVER if G.useDarkMode else PURPLE)
-
-#: The periodic waveforms, by the file each is drawn from.
-SHAPES = {
-    EFFECT_SQUARE: "wave-square.svg",
-    EFFECT_SINE: "wave-sine.svg",
-    EFFECT_TRIANGLE: "wave-triangle.svg",
-    EFFECT_SAWTOOTHUP: "wave-sawtooth-up.svg",
-    EFFECT_SAWTOOTHDOWN: "wave-sawtooth-down.svg",
-}
-
-#: Everything else, lettered. Distinct letters throughout, so Damper and
-#: Detent cannot be read for one another; the hover carries the full name,
-#: which is what the letter is a reminder of rather than a code to learn.
-LETTERS = {
-    EFFECT_CONSTANT: "C",
-    EFFECT_RAMP: "R",
-    EFFECT_SPRING: "S",
-    EFFECT_SPRING_ADJUSTER: "A",
-    EFFECT_DETENT: "T",
-    EFFECT_DAMPER: "D",
-    EFFECT_INERTIA: "I",
-    EFFECT_FRICTION: "F",
-    EFFECT_CUSTOM: "X",
-}
 
 
 def _svg_bytes(name):
@@ -148,7 +118,7 @@ class EffectTypeDelegate(QStyledItemDelegate):
             return self._pixmaps[key]
 
         from PyQt6.QtSvg import QSvgRenderer
-        data = _svg_bytes(SHAPES[effect_type])
+        data = _svg_bytes(BADGE_SHAPES[effect_type])
         pixmap = None
         if data:
             renderer = QSvgRenderer(data.replace(b"currentColor",
@@ -182,7 +152,7 @@ class EffectTypeDelegate(QStyledItemDelegate):
         super().paint(painter, shifted, index)
 
         color = badge_color()
-        if effect_type in SHAPES:
+        if effect_type in BADGE_SHAPES:
             height = min(BADGE_WIDTH, max(option.rect.height() - 6, 8))
             pixmap = self._pixmap(effect_type, color, height)
             if pixmap is not None:
@@ -191,7 +161,7 @@ class EffectTypeDelegate(QStyledItemDelegate):
                     option.rect.center().y() - height // 2, pixmap)
             return
 
-        letter = LETTERS.get(effect_type)
+        letter = BADGE_LETTERS.get(effect_type)
         if letter is None:
             return
         font = QFont(option.font)

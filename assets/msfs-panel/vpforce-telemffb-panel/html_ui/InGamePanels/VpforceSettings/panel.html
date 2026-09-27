@@ -21,10 +21,24 @@
         </div>
         <div id="headerSub">-</div>
         <div id="deviceTabs"></div>
+        <div id="viewTabs">
+            <button class="pill selected" data-view="settings">Settings</button>
+            <button class="pill" data-view="monitor">Monitor</button>
+        </div>
     </header>
     <div id="flagErrors"></div>
     <div id="waiting">Waiting for TelemFFB / MSFS aircraft...</div>
     <main id="settingsList"></main>
+    <main id="monitorView">
+        <div id="monitorBar">
+            <button class="pill selected" data-filter="favorites">Favorites</button>
+            <button class="pill" data-filter="all">All</button>
+        </div>
+        <div class="groupTitle">Active Effects</div>
+        <div id="effectsList"></div>
+        <div class="groupTitle">Telemetry</div>
+        <div id="telemList"></div>
+    </main>
     <script src="panel.js"></script>
 </body>
 </html>

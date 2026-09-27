@@ -138,3 +138,29 @@ class TestCounting:
         view.accept('pedals', 1, '{"TAS": 1.0}')
         view.accept('pedals', 2, '{"TAS": 2.0}')
         assert view.frame('pedals') == {'TAS': 2.0}
+
+
+class TestSeveralViewers:
+    """The Monitor tab and the in-sim panel may each watch a child."""
+
+    def test_every_child_watched_is_asked(self, master):
+        ipc, sent = master
+        ipc.request_child_view('pedals')
+        ipc.request_child_view('collective', viewer='panel', lease=5)
+        assert "VIEW TELEM:collective,pedals" in {m for m, _ in sent}
+
+    def test_a_child_is_asked_by_name_in_a_list(self, child):
+        ipc, sent = child
+        ipc._handle_message("VIEW TELEM:collective,pedals", MASTER)
+        ipc.send_ipc_view(_frame())
+        assert len(sent) == 1
+
+    def test_a_viewer_that_stops_renewing_is_dropped(self, master):
+        ipc, sent = master
+        ipc.request_child_view('pedals', viewer='panel', lease=5)
+        with ipc._view_lock:
+            ipc._view_wanted['panel'] = ('pedals', time.monotonic() - 1)
+        del sent[:]
+        ipc._send_keepalive()
+        assert "VIEW TELEM:" in {m for m, _ in sent}
+

@@ -76,14 +76,11 @@ from PyQt6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QHeaderView,
 
 import telemffb.globals as G
 from telemffb.SettingsManager import SettingsManager
-from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_CUSTOM,
-                                   EFFECT_DAMPER, EFFECT_DETENT,
-                                   EFFECT_FRICTION, EFFECT_INERTIA,
-                                   EFFECT_RAMP, EFFECT_SAWTOOTHDOWN,
-                                   EFFECT_SAWTOOTHUP, EFFECT_SINE,
-                                   EFFECT_SPRING, EFFECT_SPRING_ADJUSTER,
-                                   EFFECT_SQUARE, EFFECT_TRIANGLE,
-                                   PERIODIC_EFFECTS, effect_names)
+from telemffb.hw.ffb_rhino import PERIODIC_EFFECTS, effect_names
+from telemffb.telem.telem_format import (SignedKeys, axes_text,
+                                         format_telemetry_value,
+                                         grouped_effects, load_favorites,
+                                         toggle_favorite)
 from telemffb.ui.panels.DevicePanel import DEVICE_ICONS, tint_pixmap
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
 from telemffb.ui.widgets.EffectTypeDelegate import EffectTypeDelegate
@@ -107,12 +104,6 @@ INTENSITY_COLUMN_WIDTH = 72
 #: is told it holds no selectable value (see KeyValueTableModel).
 _STAR_COL, _KEY_COL, _VALUE_COL = 0, 1, 2
 
-#: Where the favourite keys live: one registry value, deliberately global
-#: rather than instance-scoped (SystemSettings.setValue without an
-#: `instance`), so starring a key on the joystick instance stars it for the
-#: pedals and collective too - the interesting telemetry is a property of
-#: the sim, not of the device watching it.
-_FAVORITES_KEY = 'monitorFavoriteKeys'
 _FAVORITES_ONLY_KEY = 'monitorFavoritesOnly'
 
 #: The scoped device's icon in the page header: the height of the text it
@@ -122,24 +113,6 @@ _SCOPE_ICON_PX = 16
 #: The telemetry pane's share of the monitor splitter, in percent - the rest
 #: goes to the active-effects pane.
 _TELEM_SHARE_PCT = 55
-
-#: The order the active-effects list is grouped into, by PID effect type.
-#: Periodics first - magnitude and shape both mean something for them -
-#: then the forces that have a magnitude but no shape, then the conditions
-#: with the spring-shaped ones ahead of the rest. It puts every effect that
-#: reports a dash together at the foot of the list, so the intensity column
-#: reads as one scale at a time instead of alternating down the page.
-_EFFECT_GROUPS = {
-    EFFECT_SQUARE: 0, EFFECT_SINE: 0, EFFECT_TRIANGLE: 0,
-    EFFECT_SAWTOOTHUP: 0, EFFECT_SAWTOOTHDOWN: 0,
-    EFFECT_CONSTANT: 1, EFFECT_RAMP: 1,
-    EFFECT_SPRING: 2, EFFECT_SPRING_ADJUSTER: 2, EFFECT_DETENT: 2,
-    EFFECT_DAMPER: 3, EFFECT_INERTIA: 3, EFFECT_FRICTION: 3,
-    EFFECT_CUSTOM: 3,
-}
-#: Anything unrecognised sorts last rather than silently joining a group.
-_UNGROUPED = max(_EFFECT_GROUPS.values()) + 1
-
 
 def _name_tooltip(label, effect_type):
     """What the name cell says on hover: the effect, and what kind it is.
@@ -156,15 +129,6 @@ def _name_tooltip(label, effect_type):
         return None
     kind = f"Periodic {name}" if effect_type in PERIODIC_EFFECTS else name
     return f"{label}\n{kind} effect"
-
-
-def _axes_text(gains):
-    """A condition's cell text: ``"X 50% Y 30%"``, a dash for an axis that
-    was never written. Labelled rather than positional so a copied row still
-    says which is which, and it is what IntensityBarDelegate splits on."""
-    x, y = (list(gains) + [None, None])[:2]
-    pct = lambda g: '-' if g is None else f"{round(g * 100)}%"
-    return f"X {pct(x)} Y {pct(y)}"
 
 
 def _gains_tooltip(gains):
@@ -207,73 +171,6 @@ def _intensity_tooltip(intensity, configured, factor):
     return text
 
 
-#: Telemetry keys that can swing negative, keyed on the ORIGINAL telemetry
-#: key rather than the debug simvar display name - the display name is
-#: MSFS-only and only exists when Alt+D is toggled, so deciding sign off it
-#: would make the same field flip formatting depending on a debug setting.
-#: Casing matches BaseTelemetryData's own attribute names.
-_SIGNED_EXACT_KEYS = frozenset({
-    'AoA', 'SideSlip', 'Pitch', 'Roll', 'G', 'Gaxil', 'VerticalSpeed',
-    'Incidence', 'X', 'Y', 'MSL', 'AGL', 'TRIM_DELTA',
-    # Control-input positions, named individually because "...Pos" is not
-    # a signed suffix: the control axes run -1..1 about a neutral, but
-    # CollectivePos runs 0..1 ("unlike the other control axes" - see
-    # BaseTelemetryData), as do GearPos, NozzlePos and SpeedbrakePos.
-    'ElevPos', 'AileronPos', 'RudderPos', 'TailRotorPos',
-    'TailRotorPedalPos', 'YokeXLinearPos', 'YokeYPos',
-    # Steering angle off centre, signed left/right, and named here
-    # because its "Pct" spelling matches nothing else signed.
-    'CenterSteerAnglePct',
-})
-
-#: Case-insensitive substrings that mark a key as signed by convention:
-#: trims, deflections, positions, accelerations, velocities and the like
-#: are offsets from a zero point rather than magnitudes, so they cross
-#: zero routinely (this is what makes ACCs/VelWorld/StickXY jitter worst).
-_SIGNED_KEY_PATTERNS = (
-    'trim', 'defl', 'acc', 'vel', 'wind', 'force', 'stick', 'joy',
-    'phys_', 'sema', 'cp_xy', 'vib', 'target_', 'rot_',
-)
-
-
-def _key_is_statically_signed(key: str) -> bool:
-    """Layers 1-2 of the signed-key decision: an exact key known to go
-    negative, or a name matching one of the signed-by-convention
-    substrings (checked case-insensitively; the exact set above is not,
-    since it is quoting BaseTelemetryData's own attribute spelling)."""
-    if key in _SIGNED_EXACT_KEYS:
-        return True
-    key_cf = key.lower()
-    return any(pattern in key_cf for pattern in _SIGNED_KEY_PATTERNS)
-
-
-def _value_is_negative(v) -> bool:
-    """True when `v` itself, or any float element of it, is negative -
-    layer 3's trigger for sticky-learning a key that layers 1-2 miss."""
-    if isinstance(v, float):
-        return v < 0
-    if isinstance(v, list):
-        return any(isinstance(x, float) and x < 0 for x in v)
-    return False
-
-
-def _format_telemetry_value(v, signed: bool) -> str:
-    """Renders one telemetry cell. Unchanged from the pre-sign-flag
-    rendering except a float - scalar, or a list's float elements - gets
-    an explicit '+' when `signed` and non-negative, so its digits don't
-    shift horizontally as the value crosses zero. Non-float list elements
-    and ints are untouched either way."""
-    if isinstance(v, float):
-        return f"{v:+.3f}" if signed else f"{v:.3f}"
-    if isinstance(v, list):
-        return "[" + ", ".join(
-            (f"{x:+.3f}" if signed else f"{x:.3f}") if isinstance(x, float)
-            else str(x) if x is not None else "None"
-            for x in v
-        ) + "]"
-    return str(v)
-
-
 class MonitorPanel(QWidget):
     """The Monitor tab: telemetry table + active-effects table, the filter
     box and the detach-to-window toolbar button."""
@@ -282,18 +179,13 @@ class MonitorPanel(QWidget):
         super().__init__(parent)
         self.mainwindow = mainwindow
         self.show_simvars = False
-        # Sign-formatting state for `_build_telemetry_rows` (see
-        # `_is_signed_key`): keys known to render signed - either always
-        # (layers 1-2) or learned sticky after going negative once (layer
-        # 3) - and the (src, N) pair last seen, so a new sim/aircraft
-        # starts clean instead of inheriting another aircraft's negatives.
-        self._signed_keys: Set[str] = set()
-        self._signed_session: Tuple[Optional[str], Optional[str]] = (None, None)
+        # which keys render with an explicit sign, shared with the in-sim panels
+        self._signed = SignedKeys()
         # Starred telemetry keys, by their ORIGINAL key rather than the
         # MSFS simvar display name - the display name only exists while the
         # Alt+D debug rename is on, so a favourite made with it on has to
         # survive it going off again.
-        self._favorites: Set[str] = self._load_favorites()
+        self._favorites: Set[str] = load_favorites()
         # The last frame rendered, so toggling a star or the Favorites box
         # redraws the list now rather than at whatever point the next frame
         # arrives (which, with the sim closed, is never).
@@ -597,15 +489,6 @@ class MonitorPanel(QWidget):
         tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
         favorites_only = self.favorites_check.isChecked()
 
-        # A new sim/aircraft (src or the aircraft name "N" changed since
-        # the last frame) starts the sticky-learned signed keys clean -
-        # otherwise a key one aircraft happened to push negative would
-        # render signed forever after for every aircraft that follows.
-        session = (data.get("src"), data.get("N"))
-        if session != self._signed_session:
-            self._signed_session = session
-            self._signed_keys.clear()
-
         rows: List[Tuple[str, Tuple[str, str, str]]] = []
         for key, v in data.items():
             # Favourites are keyed on the raw telemetry key, so this is
@@ -627,7 +510,7 @@ class MonitorPanel(QWidget):
                 if not any(tok in k_cf for tok in tokens):
                     continue
 
-            value_str = _format_telemetry_value(v, self._is_signed_key(key, v))
+            value_str = format_telemetry_value(v, self._signed.is_signed(data, key, v))
 
             # Keyed by the ORIGINAL telemetry key (always unique in `data`)
             # rather than the display key, so two keys that happen to
@@ -639,38 +522,22 @@ class MonitorPanel(QWidget):
 
     # ---- favourites ---------------------------------------------------------
 
-    @staticmethod
-    def _load_favorites() -> Set[str]:
-        """The starred keys from the registry, as written by
-        ``_save_favorites``. Telemetry keys carry no commas, so one comma-
-        separated value keeps this to a single registry entry."""
-        raw = G.system_settings.get(_FAVORITES_KEY, '')
-        return {key.strip() for key in str(raw or '').split(',') if key.strip()}
-
-    def _save_favorites(self) -> None:
-        G.system_settings.setValue(_FAVORITES_KEY,
-                                   ','.join(sorted(self._favorites)))
-
     def _on_telem_clicked(self, index) -> None:
         """A click in the star gutter toggles that row's favourite. Handled
         from the view rather than inside the delegate so the favourites set
-        is only ever mutated by the object that owns and persists it."""
+        is only ever mutated by the object that owns it."""
         if index.column() != _STAR_COL:
             return
-        key = self._telem_model.row_key(index.row())
-        # Re-read before toggling: every instance shares this one registry
-        # value but each holds only the copy it read at startup, so writing
-        # a stale set back would silently drop whatever another instance
-        # has starred since - and this instance would go on not showing it
-        # until restarted. Mutated in place, never rebound:
-        # FavoriteStarDelegate paints from this very set.
+        toggle_favorite(self._telem_model.row_key(index.row()))
+        self.reload_favorites()
+
+    def reload_favorites(self) -> None:
+        """Show the stars as saved now, after a change here or in the in-sim
+        panel."""
+        # Mutated in place, never rebound: FavoriteStarDelegate paints from
+        # this very set.
         self._favorites.clear()
-        self._favorites.update(self._load_favorites())
-        if key in self._favorites:
-            self._favorites.discard(key)
-        else:
-            self._favorites.add(key)
-        self._save_favorites()
+        self._favorites.update(load_favorites())
         # The row's values have not changed, so set_rows would see nothing
         # to emit and the star would keep its old colour until some other
         # value moved - repaint the column outright.
@@ -680,23 +547,6 @@ class MonitorPanel(QWidget):
     def _on_favorites_only_toggled(self, checked: bool) -> None:
         G.system_settings.setValue(_FAVORITES_ONLY_KEY, int(checked))
         self._refresh_rows()
-
-    def _is_signed_key(self, key: str, v) -> bool:
-        """Whether `key` renders with an explicit sign this frame.
-
-        `self._signed_keys` memoizes the decision per (session, key), so a
-        key already known signed - by the static layers or learned below -
-        costs one set lookup. A key not yet in it still has to be checked
-        against this frame's value: layer 3 (sticky learning) has to catch
-        a key going negative on the very frame it first does so, or that
-        frame renders unsigned and only the next one picks up the sign.
-        """
-        if key in self._signed_keys:
-            return True
-        if _key_is_statically_signed(key) or _value_is_negative(v):
-            self._signed_keys.add(key)
-            return True
-        return False
 
     def update_effects(self, active_effects) -> None:
         """``active_effects`` is the list of ``{'label', 'intensity'}`` dicts
@@ -716,9 +566,7 @@ class MonitorPanel(QWidget):
         # effect's type is fixed for its lifetime and the sort is stable.
         # Sorting on anything that moves (intensity, say) would silently
         # produce a wrongly ordered list rather than an error.
-        ordered = sorted(active_effects,
-                         key=lambda e: _EFFECT_GROUPS.get(e.get('type'),
-                                                          _UNGROUPED))
+        ordered = grouped_effects(active_effects)
         rows, tooltips, types = [], {}, {}
         for effect in ordered:
             label = effect.get('label', '')
@@ -731,7 +579,7 @@ class MonitorPanel(QWidget):
                                                effect.get('configured'),
                                                effect.get('factor'))
             elif gains:
-                shown = _axes_text(gains)
+                shown = axes_text(gains)
                 value_tip = _gains_tooltip(gains)
             else:
                 shown = '-'

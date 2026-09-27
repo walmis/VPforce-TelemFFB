@@ -617,7 +617,7 @@ class TestEffectTypeBadge:
 
     def test_a_periodic_effect_gets_its_shape(self, panel):
         from telemffb.hw.ffb_rhino import EFFECT_SQUARE
-        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        from telemffb.telem.telem_format import BADGE_SHAPES as SHAPES
         panel.update_effects([{'label': 'ID:1 Rumble', 'intensity': 0.5,
                                'type': EFFECT_SQUARE}])
         assert panel._type_delegate._types['ID:1 Rumble'] == EFFECT_SQUARE
@@ -625,7 +625,7 @@ class TestEffectTypeBadge:
 
     def test_every_periodic_type_has_a_shape(self):
         from telemffb.hw.ffb_rhino import PERIODIC_EFFECTS
-        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        from telemffb.telem.telem_format import BADGE_SHAPES as SHAPES
         assert set(PERIODIC_EFFECTS) == set(SHAPES)
 
     def test_constant_effects_are_given_no_shape(self):
@@ -634,7 +634,7 @@ class TestEffectTypeBadge:
         direction modulator and an envelope, that would read as "doing
         nothing"."""
         from telemffb.hw.ffb_rhino import EFFECT_CONSTANT, EFFECT_SPRING
-        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        from telemffb.telem.telem_format import BADGE_SHAPES as SHAPES
         assert EFFECT_CONSTANT not in SHAPES
         assert EFFECT_SPRING not in SHAPES
 
@@ -642,7 +642,8 @@ class TestEffectTypeBadge:
         """Tinting is a substitution of currentColor. Artwork exported with
         a hardcoded fill renders black, which on the dark theme is an
         invisible badge rather than an obvious mistake."""
-        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES, _svg_bytes
+        from telemffb.telem.telem_format import BADGE_SHAPES as SHAPES
+        from telemffb.ui.widgets.EffectTypeDelegate import _svg_bytes
         for name in SHAPES.values():
             assert b"currentColor" in _svg_bytes(name), name
 
@@ -651,7 +652,7 @@ class TestEffectTypeBadge:
         resources.qrc passes every other test here and fails only once the
         app is built."""
         from pathlib import Path
-        from telemffb.ui.widgets.EffectTypeDelegate import SHAPES
+        from telemffb.telem.telem_format import BADGE_SHAPES as SHAPES
         qrc = (Path(__file__).parents[1] / 'resources.qrc').read_text()
         for name in SHAPES.values():
             assert f'image/{name}' in qrc, f"{name} missing from resources.qrc"
@@ -662,7 +663,7 @@ class TestEffectTypeBadge:
         from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_DAMPER,
                                            EFFECT_FRICTION, EFFECT_INERTIA,
                                            EFFECT_SPRING)
-        from telemffb.ui.widgets.EffectTypeDelegate import LETTERS
+        from telemffb.telem.telem_format import BADGE_LETTERS as LETTERS
         assert LETTERS[EFFECT_CONSTANT] == 'C'
         assert LETTERS[EFFECT_SPRING] == 'S'
         assert LETTERS[EFFECT_DAMPER] == 'D'
@@ -682,7 +683,7 @@ class TestConditionAxes:
         """MonitorPanel writes the text and IntensityBarDelegate parses it
         back. If the two drift, the cell quietly falls back to plain text
         rather than failing."""
-        from telemffb.ui.panels.MonitorPanel import _axes_text
+        from telemffb.telem.telem_format import axes_text as _axes_text
         from telemffb.ui.widgets.IntensityBarDelegate import parse_axes
         assert parse_axes(_axes_text([1.0, 0.6])) == ('100%', '60%')
         assert parse_axes(_axes_text([0.08, None])) == ('8%', '-')

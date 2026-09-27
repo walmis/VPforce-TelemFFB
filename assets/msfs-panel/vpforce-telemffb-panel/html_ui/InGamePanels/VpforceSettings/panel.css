@@ -73,6 +73,96 @@ body {
     display: none;
     flex-wrap: wrap;
 }
+#viewTabs {
+    display: flex;
+}
+
+/* Monitor: the desktop Monitor tab's active effects and telemetry */
+#monitorView {
+    display: none;
+}
+#monitorBar {
+    display: flex;
+    padding: 4px 6px 0 6px;
+}
+.monitorHint {
+    padding: 10px 8px;
+    color: #9aa0ac;
+    font-size: 15px;
+}
+.effectRow,
+.telemRow {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-bottom: 1px solid #22252c;
+    font-size: 15px;
+}
+/* The desktop's badge: a waveform, or a letter set bold in monospace at 1.4x
+   the row's text (monospace serifs the I, which a sans draws as a bare bar) */
+.effectBadge {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-weight: bold;
+    font-size: 21px;
+    line-height: 20px;
+    color: #c473d9;
+}
+.effectBadge img {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+.effectLabel,
+.telemKey {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.effectBar {
+    flex: 0 0 auto;
+    width: 70px;
+    height: 8px;
+    margin: 0 8px;
+    border-radius: 4px;
+    background: #2a2e38;
+}
+.effectFill {
+    height: 8px;
+    border-radius: 4px;
+    background: #6a2fb0;
+}
+.effectValue {
+    flex: 0 0 auto;
+    min-width: 96px;
+    text-align: right;
+    font-family: "Cascadia Mono", Consolas, monospace;
+}
+.telemValue {
+    flex: 0 0 auto;
+    max-width: 55%;
+    margin-left: 8px;
+    text-align: right;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.star {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    cursor: pointer;
+}
 
 #scaleControl {
     display: flex;
@@ -115,9 +205,11 @@ body {
     color: #9aa0ac;
 }
 body.disconnected #waiting { display: block; }
-body.disconnected #settingsList { display: none; }
+body.disconnected #settingsList,
+body.disconnected #monitorView { display: none; }
 
-#settingsList {
+#settingsList,
+#monitorView {
     display: block;
     flex: 1 1 auto;
     min-height: 60px;
@@ -129,18 +221,22 @@ body.disconnected #settingsList { display: none; }
 /* Explicit scrollbar styling - default OS/engine scrollbar chrome may not
    render (or renders effectively invisible) in Coherent GT, so this is
    drawn to match the theme rather than left to chance. */
-#settingsList::-webkit-scrollbar {
+#settingsList::-webkit-scrollbar,
+#monitorView::-webkit-scrollbar {
     width: 12px;
 }
-#settingsList::-webkit-scrollbar-track {
+#settingsList::-webkit-scrollbar-track,
+#monitorView::-webkit-scrollbar-track {
     background: #1c1f26;
 }
-#settingsList::-webkit-scrollbar-thumb {
+#settingsList::-webkit-scrollbar-thumb,
+#monitorView::-webkit-scrollbar-thumb {
     background: #444a58;
     border-radius: 6px;
     border: 2px solid #1c1f26;
 }
-#settingsList::-webkit-scrollbar-thumb:hover {
+#settingsList::-webkit-scrollbar-thumb:hover,
+#monitorView::-webkit-scrollbar-thumb:hover {
     background: #6a2fb0;
 }
 

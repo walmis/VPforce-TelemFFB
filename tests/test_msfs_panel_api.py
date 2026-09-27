@@ -116,3 +116,82 @@ class TestNotInPanel:
         _, data = call("GET", "/api/settings")
         assert [s["name"] for s in data["settings"]] == ["telemffb_controls_axes", "x_axis_scale"]
 
+
+class Settings(dict):
+    def get(self, name, default=None, instance=None):
+        return super().get(name, default)
+
+    def setValue(self, key, value, instance=None):
+        self[key] = value
+
+
+class FakeIpc:
+    def __init__(self):
+        self.watching = {}
+        self.frames = {}
+        self.effects = {}
+        self.child_view = SimpleNamespace(frame=lambda device: self.frames.get(device))
+
+    def request_child_view(self, device, viewer='desktop', lease=None):
+        self.watching[viewer] = (device, lease)
+
+    def child_effects(self, device):
+        return self.effects.get(device, [])
+
+
+class TestMonitor:
+    """The desktop Monitor tab's content, for the panel's selected device."""
+
+    @pytest.fixture
+    def monitor(self, server, monkeypatch):
+        settings = Settings(monitorFavoriteKeys="TAS")
+        ipc = FakeIpc()
+        monkeypatch.setattr(G, "system_settings", settings, raising=False)
+        monkeypatch.setattr(G, "ipc_instance", ipc, raising=False)
+        monkeypatch.setattr(api_server, "_monitor", {"latest": (None, [])})
+        monkeypatch.setattr(api_server, "_signed", {})
+        return SimpleNamespace(settings=settings, ipc=ipc)
+
+    def test_this_instances_telemetry_and_effects(self, monitor):
+        api_server.publish_monitor({"N": "H145", "TAS": 61.5, "Pitch": 2.0},
+                                   [{"label": "ID:3 Engine Rumble", "type": 3, "intensity": 0.25}])
+        _, data = call("GET", "/api/monitor")
+        assert data["telemetry"] == [
+            {"key": "N", "value": "H145", "favorite": False},
+            {"key": "TAS", "value": "61.500", "favorite": True},
+            {"key": "Pitch", "value": "+2.000", "favorite": False}]
+        (effect,) = data["effects"]
+        assert (effect["label"], effect["intensity"], effect["shown"]) == ("ID:3 Engine Rumble", 0.25, "25%")
+        assert monitor.ipc.watching["panel"] == (None, None)
+
+    def test_a_childs_device_is_watched_on_a_lease(self, monitor):
+        call("POST", "/api/device", {"device": "pedals"})
+        monitor.ipc.frames["pedals"] = {"TAS": 61.5}
+        monitor.ipc.effects["pedals"] = [{"label": "ID:1 Spring", "type": 8, "intensity": None,
+                                          "gains": [0.5, None]}]
+        _, data = call("GET", "/api/monitor")
+        device, lease = monitor.ipc.watching["panel"]
+        assert device == "pedals" and lease
+        assert data["telemetry"] == [{"key": "TAS", "value": "61.500", "favorite": True}]
+        assert data["effects"][0]["shown"] == "X 50% Y -"
+
+    def test_starring_a_key_saves_it_where_the_desktop_reads_it(self, monitor, monkeypatch):
+        reloads = []
+        monkeypatch.setattr(G, "main_window", SimpleNamespace(
+            sim_status=SimpleNamespace(held_errors=[]),
+            monitor_panel=SimpleNamespace(reload_favorites=lambda: reloads.append(1))), raising=False)
+        monkeypatch.setattr(api_server, "schedule_on_main_thread", lambda fn: fn())
+        _, res = call("POST", "/api/monitor/favorite", {"key": "Pitch"})
+        assert res["favorite"] is True
+        assert set(monitor.settings["monitorFavoriteKeys"].split(",")) == {"TAS", "Pitch"}
+        assert reloads == [1]
+
+    def test_each_effect_carries_the_desktops_badge(self, monitor):
+        from telemffb.hw.ffb_rhino import EFFECT_SINE, EFFECT_SPRING
+        api_server.publish_monitor({"N": "H145"}, [
+            {"label": "ID:3 Engine Rumble", "type": EFFECT_SINE, "intensity": 0.25},
+            {"label": "ID:1 Spring", "type": EFFECT_SPRING, "intensity": None, "gains": [0.5, 0.5]}])
+        _, data = call("GET", "/api/monitor")
+        badges = [(e["shape"], e["letter"]) for e in data["effects"]]
+        assert badges == [("wave-sine.svg", None), (None, "S")]
+

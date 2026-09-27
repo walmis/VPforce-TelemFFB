@@ -42,6 +42,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QDialog, QStatusBar)
 
 import telemffb.globals as G
+import telemffb.api_server as api_server
 from telemffb import match_history
 from telemffb.ui.dialogs.ProfileOfferDialog import ProfileOfferDialog
 import telemffb.utils as utils
@@ -75,6 +76,7 @@ from telemffb.preview.controller import EffectPreviewController
 # from telemffb.ui.dialogs.UserModelDialog import UserModelDialog
 from telemffb.ui.dialogs.NewAircraftWizard import NewAircraftWizard
 from telemffb.telem.SimTelemListener import SimTelemListener
+from telemffb.telem.telem_format import ordered_telemetry
 from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.ui.dialogs.ProfileManager import ProfileManagerDialog, NewProfileDialog
@@ -2071,32 +2073,6 @@ class MainWindow(QMainWindow):
         G.app_state.set_prompt('profile_change', None)
         self._profile_change_prompt_active = False
 
-    @staticmethod
-    def _ordered_telemetry(datadict) -> OrderedDict:
-        """A frame as the Monitor tab lists it: alphabetical, the identifying
-        keys first."""
-        data = OrderedDict(sorted(datadict.items()))  # Alphabetize telemetry data
-        keys = data.keys()
-        try:
-            # use ordereddict and move some telemetry to the top
-            # Items to move to the beginning (reverse order)
-            if 'SimconnectCategory' in keys: data.move_to_end('SimconnectCategory', last=False)
-            if 'AircraftClass' in keys: data.move_to_end('AircraftClass', last=False)
-            if 'msfs_vers' in keys: data.move_to_end('msfs_vers', last=False)
-            if 'src' in keys: data.move_to_end('src', last=False)
-            if 'N' in keys: data.move_to_end('N', last=False)
-            if 'FFBType' in keys: data.move_to_end('FFBType', last=False)
-            if 'perf' in keys: data.move_to_end('perf', last=False)
-            if 'avgFrameTime' in keys: data.move_to_end('avgFrameTime', last=False)
-            if 'maxFrameTime' in keys: data.move_to_end('maxFrameTime', last=False)
-            if 'frameTimes' in keys: data.move_to_end('frameTimes', last=False)
-            if 'T' in keys: data.move_to_end('T', last=False)
-
-            # Items to move to the end
-        except Exception:
-            pass
-        return data
-
     def _scoped_telemetry(self, own: OrderedDict) -> OrderedDict:
         """The frame of the device in scope, which is what the Monitor tab
         lists and the settings page's live sliders read: this instance's, or
@@ -2109,13 +2085,51 @@ class MainWindow(QMainWindow):
             return own
         frame = G.ipc_instance.child_view.frame(scope)
         self._refresh_monitor_scope(sending=frame is not None)
-        return own if frame is None else self._ordered_telemetry(frame)
+        return own if frame is None else ordered_telemetry(frame)
 
     def _refresh_monitor_scope(self, sending: bool = True) -> None:
         """The Monitor tab's "Device:" indicator: the device in scope, on a
         master with children to choose between - and nothing otherwise."""
         chosen = G.master_instance and G.launched_instances
         self.monitor_panel.set_scope_device(G.current_device_config_scope if chosen else None, sending)
+
+    def _own_active_effects(self):
+        """This instance's started effects as the monitors list them, and the
+        settings driving them."""
+        active_effects = []
+        active_settings = []
+        effect : HapticEffect
+        for key, effect in G.effects.dict.items():
+            if effect.started:
+                descr, settingname = utils.EffectTranslator.get_translation(effect.name)
+
+                # One dict per started effect, JSON over IPC as-is.
+                # 'intensity' is None for conditions, whose force
+                # depends on stick position rather than on any
+                # parameter this side can read. 'configured' is the
+                # value of the setting driving the effect and
+                # 'factor' its slider factor, so the monitor can say
+                # what the intensity is as a share of what the user
+                # asked for. Resolved here because this is where the
+                # effect's setting name and the aircraft are both in
+                # hand; a child's effects reach the master done.
+                active_effects.append({
+                    'label': "ID:{} {}".format(effect.id, descr),
+                    'intensity': effect.intensity,
+                    'configured': self._configured_value(settingname),
+                    'factor': self._slider_factor(settingname),
+                    # The PID effect type, which the monitor groups
+                    # the list by and draws the waveform glyph from.
+                    'type': effect.type_id,
+                    # A condition's [x, y] gain, shown where it has
+                    # no intensity. A list rather than a tuple only
+                    # because that is what JSON gives back.
+                    'gains': (list(effect.axis_gains)
+                              if effect.axis_gains else None),
+                })
+                if settingname not in active_settings and settingname != '':
+                    active_settings.append(settingname)
+        return active_effects, active_settings
 
     def on_update_telemetry(self, datadict: dict):
         if utils.millis() - self.last_telemetry_refresh < 50:
@@ -2125,7 +2139,7 @@ class MainWindow(QMainWindow):
         if G.child_instance:
             G.ipc_instance.send_ipc_view(datadict)  # only while the master is watching
 
-        data = self._ordered_telemetry(datadict)
+        data = ordered_telemetry(datadict)
         try:
 
             scoped = self._scoped_telemetry(data)
@@ -2134,42 +2148,21 @@ class MainWindow(QMainWindow):
             active_effects = []
             active_settings = []
 
+            own_effects = None
             if G.master_instance and G.current_device_config_scope != G.device_type:
                 dev = G.current_device_config_scope
                 active_effects = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_effects', [])
                 active_settings = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:
-                effect : HapticEffect
-                for key, effect in G.effects.dict.items():
-                    if effect.started:
-                        descr, settingname = utils.EffectTranslator.get_translation(effect.name)
+                active_effects, active_settings = self._own_active_effects()
+                own_effects = active_effects
 
-                        # One dict per started effect, JSON over IPC as-is.
-                        # 'intensity' is None for conditions, whose force
-                        # depends on stick position rather than on any
-                        # parameter this side can read. 'configured' is the
-                        # value of the setting driving the effect and
-                        # 'factor' its slider factor, so the monitor can say
-                        # what the intensity is as a share of what the user
-                        # asked for. Resolved here because this is where the
-                        # effect's setting name and the aircraft are both in
-                        # hand; a child's effects reach the master done.
-                        active_effects.append({
-                            'label': "ID:{} {}".format(effect.id, descr),
-                            'intensity': effect.intensity,
-                            'configured': self._configured_value(settingname),
-                            'factor': self._slider_factor(settingname),
-                            # The PID effect type, which the monitor groups
-                            # the list by and draws the waveform glyph from.
-                            'type': effect.type_id,
-                            # A condition's [x, y] gain, shown where it has
-                            # no intensity. A list rather than a tuple only
-                            # because that is what JSON gives back.
-                            'gains': (list(effect.axis_gains)
-                                      if effect.axis_gains else None),
-                        })
-                        if settingname not in active_settings and settingname != '':
-                            active_settings.append(settingname)
+            # the in-sim panel's monitor shows this instance's device whatever
+            # the desktop is looking at
+            if G.master_instance and api_server.is_running():
+                if own_effects is None:
+                    own_effects, _ = self._own_active_effects()
+                api_server.publish_monitor(data, own_effects)
 
             # The scoped device-status indicators (vpconf profile / gain
             # override) are no longer polled here - AppState is updated

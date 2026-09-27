@@ -6,7 +6,7 @@
 // don't fight the user while they're mid-drag on a control.
 
 // Stamped from manifest.json's package_version by build_layout.py.
-const PANEL_VERSION = "0.3.0";
+const PANEL_VERSION = "0.3.1";
 const API_BASE = "http://127.0.0.1:9873";
 const STATUS_POLL_MS = 2000;
 const SETTINGS_POLL_MS = 3000;
@@ -676,6 +676,179 @@ function initScaleControl() {
         }
     );
 }
+
+// --- Monitor -------------------------------------------------------------
+// The desktop Monitor tab: active effects and telemetry for the selected
+// device. Polled only while shown; rows are updated in place and rebuilt
+// only when the set of keys changes, since rebuilding a hundred rows several
+// times a second is costly on the sim's UI thread.
+
+const MONITOR_POLL_MS = 300;
+const monitor = { view: "settings", favoritesOnly: true, generation: 0 };
+const listKeys = {};    // list element id -> the keys it last showed, joined
+const listRows = {};    // list element id -> { key: row element }
+
+function setView(name) {
+    monitor.view = name;
+    monitor.generation += 1;
+    document.getElementById("settingsList").style.display = name === "settings" ? "block" : "none";
+    document.getElementById("monitorView").style.display = name === "monitor" ? "block" : "none";
+    document.querySelectorAll("#viewTabs .pill").forEach((p) =>
+        p.classList.toggle("selected", p.dataset.view === name));
+    if (name === "monitor") pollMonitor(monitor.generation);
+}
+
+function setMonitorFilter(filter) {
+    monitor.favoritesOnly = filter === "favorites";
+    document.querySelectorAll("#monitorBar .pill").forEach((p) =>
+        p.classList.toggle("selected", p.dataset.filter === filter));
+    listKeys.telemList = null;          // rebuild on the next poll
+}
+
+function pollMonitor(generation) {
+    if (generation !== monitor.generation) return;
+    apiGet("/api/monitor").then(
+        (data) => { renderMonitor(data); },
+        (err) => { log("monitor poll failed:", err && err.message); }
+    ).then(() => {
+        if (generation === monitor.generation) {
+            setTimeout(() => pollMonitor(generation), MONITOR_POLL_MS);
+        }
+    });
+}
+
+// Show ``items`` in the list ``id``: rebuilt through ``build`` when its keys
+// change, otherwise each row brought up to date through ``update``.
+function syncList(id, items, keyOf, build, update, emptyText) {
+    const root = document.getElementById(id);
+    const keys = items.map(keyOf).join("\u0001");
+    if (listKeys[id] !== keys) {
+        listKeys[id] = keys;
+        listRows[id] = {};
+        root.innerHTML = "";
+        if (!items.length) {
+            const hint = document.createElement("div");
+            hint.className = "monitorHint";
+            hint.textContent = emptyText;
+            root.appendChild(hint);
+        }
+        for (const item of items) {
+            const row = build(item);
+            listRows[id][keyOf(item)] = row;
+            root.appendChild(row);
+        }
+    }
+    for (const item of items) update(listRows[id][keyOf(item)], item);
+}
+
+function setText(el, text) {
+    if (el.textContent !== text) el.textContent = text;
+}
+
+function buildEffectRow(effect) {
+    const row = document.createElement("div");
+    row.className = "effectRow";
+    // the desktop's badge: the waveform for a periodic, a letter otherwise,
+    // in a box every row keeps so the labels line up
+    const type = document.createElement("span");
+    type.className = "effectBadge";
+    type.title = effect.type;
+    if (effect.shape) {
+        const glyph = document.createElement("img");
+        glyph.src = effect.shape;
+        glyph.alt = "";
+        type.appendChild(glyph);
+    } else if (effect.letter) {
+        type.textContent = effect.letter;
+    }
+    const label = document.createElement("span");
+    label.className = "effectLabel";
+    label.textContent = effect.label;
+    const bar = document.createElement("div");
+    bar.className = "effectBar";
+    const fill = document.createElement("div");
+    fill.className = "effectFill";
+    bar.appendChild(fill);
+    const value = document.createElement("span");
+    value.className = "effectValue";
+    row.appendChild(type);
+    row.appendChild(label);
+    row.appendChild(bar);
+    row.appendChild(value);
+    return row;
+}
+
+function updateEffectRow(row, effect) {
+    const bar = row.children[2];
+    const shown = effect.intensity === null || effect.intensity === undefined ? "hidden" : "visible";
+    if (bar.style.visibility !== shown) bar.style.visibility = shown;
+    if (shown === "visible") {
+        const width = Math.max(0, Math.min(100, effect.intensity * 100)).toFixed(0) + "%";
+        if (bar.firstChild.style.width !== width) bar.firstChild.style.width = width;
+    }
+    setText(row.children[3], effect.shown);
+}
+
+function buildTelemRow(item) {
+    const row = document.createElement("div");
+    row.className = "telemRow";
+    const star = document.createElement("img");
+    star.className = "star";
+    star.alt = "";
+    star.addEventListener("click", () => toggleFavorite(item.key, star));
+    const key = document.createElement("span");
+    key.className = "telemKey";
+    key.textContent = item.key;
+    const value = document.createElement("span");
+    value.className = "telemValue";
+    row.appendChild(star);
+    row.appendChild(key);
+    row.appendChild(value);
+    return row;
+}
+
+function updateTelemRow(row, item) {
+    const src = item.favorite ? "star_on.svg" : "star_off.svg";
+    if (row.dataset.star !== src) {
+        row.dataset.star = src;
+        row.firstChild.src = src;
+    }
+    setText(row.children[2], item.value);
+}
+
+function toggleFavorite(key, star) {
+    fetch(API_BASE + "/api/monitor/favorite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: key }),
+    }).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+    }).then(
+        (res) => {
+            const src = res.favorite ? "star_on.svg" : "star_off.svg";
+            star.parentNode.dataset.star = src;
+            star.src = src;
+            if (monitor.favoritesOnly) listKeys.telemList = null;
+        },
+        (err) => { log("favorite failed:", err && err.message); }
+    );
+}
+
+function renderMonitor(data) {
+    syncList("effectsList", data.effects || [], (e) => e.label,
+        buildEffectRow, updateEffectRow, "No effects are active.");
+    const all = data.telemetry || [];
+    const rows = monitor.favoritesOnly ? all.filter((r) => r.favorite) : all;
+    const empty = !all.length ? "Waiting for telemetry..."
+        : "No favorites yet: show All and tap a star to add one.";
+    syncList("telemList", rows, (r) => r.key, buildTelemRow, updateTelemRow, empty);
+}
+
+document.querySelectorAll("#viewTabs .pill").forEach((p) =>
+    p.addEventListener("click", () => { p.blur(); setView(p.dataset.view); }));
+document.querySelectorAll("#monitorBar .pill").forEach((p) =>
+    p.addEventListener("click", () => { p.blur(); setMonitorFilter(p.dataset.filter); }));
 
 window.addEventListener("error", (e) => {
     log("uncaught error:", e.message, "at", e.filename + ":" + e.lineno);

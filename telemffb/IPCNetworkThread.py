@@ -87,12 +87,14 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._child_keepalive_info = {}
         self._child_addrs = {}
         self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
-        # A child's whole telemetry frame, for the master's Monitor tab while
-        # its config scope is that child's device. Master: which child is
-        # being asked, and what it sent. Child: until when it was asked, and
-        # how many frames it has sent - see request_child_view.
+        # A child's whole telemetry frame, for a monitor on the master showing
+        # that child's device. Master: which child each viewer watches, what
+        # was last asked, and what the children sent. Child: until when it
+        # was asked, and how many frames it has sent - see request_child_view.
         self.child_view = ChildTelemView()
-        self._view_device = None
+        self._view_wanted = {}              # viewer -> (device, until)
+        self._view_devices = frozenset()    # the children last asked
+        self._view_lock = threading.Lock()
         self._view_lease_until = 0.0
         self._view_seq = 0
         self._view_oversize_logged = False
@@ -221,8 +223,7 @@ class IPCNetworkThread(QObject, threading.Thread):
     def _send_keepalive(self):
         if self._master:
             self.send_broadcast_message("Keepalive")
-            if self._view_device:
-                self.send_broadcast_message(f"VIEW TELEM:{self._view_device}")
+            self._announce_view(repeat=True)
         else:
             self.send_message(f"Child Keepalive:{G.device_type}:{G.device_connection_status}")
             self.send_ipc_status()
@@ -342,7 +343,7 @@ class IPCNetworkThread(QObject, threading.Thread):
             except ValueError:
                 pass
         elif msg.startswith('VIEW TELEM:'):
-            if msg.removeprefix('VIEW TELEM:') == G.device_type:
+            if G.device_type in msg.removeprefix('VIEW TELEM:').split(','):
                 self._view_lease_until = time.monotonic() + VIEW_LEASE_SEC
             else:
                 self._view_lease_until = 0.0
@@ -468,24 +469,43 @@ class IPCNetworkThread(QObject, threading.Thread):
     def send_ipc_telem(self, telem):
         self.send_message(f"telem:{json.dumps(telem)}")
 
-    # --- a child's telemetry view in the master's Monitor tab ---
+    # --- a child's telemetry view in a monitor on the master ---
     #
-    #   master -> children   VIEW TELEM:<device>     (that child starts sending;
-    #                                                 any other stops)
+    #   master -> children   VIEW TELEM:<device>[,<device>]   (those children
+    #                                                         send; others stop)
     #   child  -> master     view:<device>:<seq>:<json frame>
     #
-    # Only the child being watched sends, and only as often as the display
-    # refreshes, so the traffic is one child's 20 Hz however many there are.
+    # Only the children being watched send, and only as often as the display
+    # refreshes: the Monitor tab and the in-sim panel each watch one at most.
 
-    def request_child_view(self, device):
-        """Master: watch ``device``'s telemetry, or nobody's when None. Said
-        at once, then again on each keepalive tick while it holds."""
-        if device == self._view_device:
-            return
-        if self._view_device:
-            self.child_view.end(self._view_device)
-        self._view_device = device
-        self.send_broadcast_message(f"VIEW TELEM:{device or ''}")
+    def request_child_view(self, device, viewer='desktop', lease=None):
+        """Master: ``viewer`` watches ``device``'s telemetry, or nothing when
+        None; every child some viewer watches is asked.  With ``lease``
+        seconds the request lapses unless renewed, for a viewer that can go
+        away without saying so.  Said at once, then again on each keepalive
+        tick while it holds."""
+        until = time.monotonic() + lease if lease else float('inf')
+        with self._view_lock:
+            if device:
+                self._view_wanted[viewer] = (device, until)
+            else:
+                self._view_wanted.pop(viewer, None)
+        self._announce_view()
+
+    def _announce_view(self, repeat=False):
+        """Ask the children now watched, when that changed, or again on a
+        keepalive tick while any are."""
+        now = time.monotonic()
+        with self._view_lock:
+            for viewer in [v for v, (_, until) in self._view_wanted.items() if until <= now]:
+                del self._view_wanted[viewer]
+            devices = frozenset(device for device, _ in self._view_wanted.values())
+            changed = devices != self._view_devices
+            for device in self._view_devices - devices:
+                self.child_view.end(device)
+            self._view_devices = devices
+        if changed or (repeat and devices):
+            self.send_broadcast_message(f"VIEW TELEM:{','.join(sorted(devices))}")
 
     @property
     def view_requested(self):
@@ -505,6 +525,10 @@ class IPCNetworkThread(QObject, threading.Thread):
             return
         self._view_seq += 1
         self.send_message(message)
+
+    def child_effects(self, device) -> list:
+        """Master: the active effects ``device``'s instance last reported."""
+        return self._ipc_telem_effects.get(f'{device}_active_effects', [])
 
     def send_ipc_effects(self, active_effects, active_settings):
         payload = {

@@ -12,18 +12,28 @@
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/panel.css",
-      "size": 8286,
-      "date": 134349246854151056
+      "size": 10401,
+      "date": 134349965874500464
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/panel.html",
-      "size": 991,
-      "date": 134349241526894912
+      "size": 1606,
+      "date": 134349958141547296
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/panel.js",
-      "size": 25590,
-      "date": 134349246783023200
+      "size": 32408,
+      "date": 134349965874172464
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/star_off.svg",
+      "size": 233,
+      "date": 134349958141214128
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/star_on.svg",
+      "size": 236,
+      "date": 134349958140895584
     },
     {
       "path": "html_ui/InGamePanels/VpforceSettings/vpforcelogo.svg",
@@ -44,6 +54,31 @@
       "path": "html_ui/InGamePanels/VpforceSettings/VpforceSettings.js",
       "size": 2036,
       "date": 134339724602558400
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/wave-sawtooth-down.svg",
+      "size": 1755,
+      "date": 134349965731987872
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/wave-sawtooth-up.svg",
+      "size": 1738,
+      "date": 134349965731997888
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/wave-sine.svg",
+      "size": 2686,
+      "date": 134349965731997888
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/wave-square.svg",
+      "size": 983,
+      "date": 134349965731997888
+    },
+    {
+      "path": "html_ui/InGamePanels/VpforceSettings/wave-triangle.svg",
+      "size": 2843,
+      "date": 134349965732007888
     },
     {
       "path": "InGamePanels/vpforce-telemffb-panel.spb",
