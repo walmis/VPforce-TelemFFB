@@ -29,7 +29,7 @@ from typing import Optional
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIntValidator, QIcon, QPixmap, QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QHBoxLayout, QLabel,
+from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDialog, QGroupBox, QHBoxLayout, QLabel,
                              QLineEdit, QMessageBox, QPushButton, QSizePolicy, QStyleOption, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget)
 
@@ -50,7 +50,7 @@ from telemffb.utils import (
     validate_vpconf_profile, HiDpiPixmap,
 )
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
-from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle
+from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle, svg_icon
 from telemffb.ui.theme.tokens import (
     ATTENTION_AMBER_DARK, ATTENTION_AMBER_LIGHT, LINK_BLUE_DARK, LINK_BLUE_LIGHT,
 )
@@ -259,8 +259,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # refresh_msfs_panel_installs() - see _MsfsInstallRow.
         self._msfs_install_rows = {}
         # X-Plane installs added by hand; detected ones are found afresh on
-        # every refresh_xplane_installs(). Saved as xplaneInstalls.
+        # every refresh_xplane_installs(). Saved as xplaneInstalls, and the
+        # detected ones removed from the list as xplaneHiddenInstalls.
         self._xplane_added = []
+        self._xplane_hidden = []
         self._validating_path = False
         # while an import is populating the form, panels created on the fly
         # read the imported values instead of the store
@@ -2207,62 +2209,67 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if item.widget():
                 item.widget().deleteLater()
 
-        detected = xplane_install.detected_installs()
-        installs = list(detected)
-        for folder in self._xplane_added:
-            if not any(os.path.normcase(folder) == os.path.normcase(d) for d in installs):
-                installs.append(folder)
+        installs = xplane_install.listed_installs(
+            xplane_install.detected_installs(), self._xplane_added, self._xplane_hidden)
         if not installs:
-            empty = QLabel("No X-Plane install found. Add its folder below.")
+            empty = QLabel("No X-Plane install listed. Add its folder below.")
             empty.setWordWrap(True)
             layout.addWidget(empty)
             return
         for root in installs:
-            layout.addWidget(self._xplane_install_row(root, added=root not in detected))
+            layout.addWidget(self._xplane_install_row(root))
 
-    def _xplane_install_row(self, root, added):
-        row = QWidget(self.xplaneInstallsContainer)
-        row_layout = QVBoxLayout(row)
-        row_layout.setContentsMargins(0, 4, 0, 4)
-        row_layout.setSpacing(2)
+    def _xplane_install_row(self, root):
+        """One install as a box of its own, titled with its version. A
+        plugin gets a button only when there is something to do - a
+        matching checksum means there is nothing to reinstall."""
+        box = QGroupBox(xplane_install.sim_version(root) or "X-Plane", self.xplaneInstallsContainer)
+        box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(8, 10, 8, 6)
+        box_layout.setSpacing(2)
 
         heading = QHBoxLayout()
-        title = QLabel(f"<b>{xplane_install.sim_version(root) or 'X-Plane'}</b>")
-        heading.addWidget(title)
-        heading.addStretch(1)
-        if added:
-            remove = QPushButton("Remove")
-            remove.setToolTip("Stop listing this folder. Nothing in it is changed.")
-            remove.clicked.connect(lambda checked=False, r=root: self._remove_xplane_install(r))
-            heading.addWidget(remove)
-        row_layout.addLayout(heading)
-
         folder = QLabel(root)
         folder.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         folder.setEnabled(False)            # the muted look of secondary text
-        row_layout.addWidget(folder)
+        heading.addWidget(folder)
+        heading.addStretch(1)
+        remove = QToolButton()
+        remove.setIcon(svg_icon("delete.svg", color="#d0d0d0" if G.useDarkMode else "#505050"))
+        remove.setIconSize(QSize(18, 18))
+        remove.setAutoRaise(True)
+        remove.setCursor(Qt.CursorShape.PointingHandCursor)
+        remove.setToolTip("Remove this install from the list and stop offering its plugin updates. "
+                          "Nothing in the folder is changed, and adding the folder again brings it back.")
+        remove.clicked.connect(lambda checked=False, r=root: self._remove_xplane_install(r))
+        heading.addWidget(remove)
+        box_layout.addLayout(heading)
 
         for plugin in xplane_install.PLUGINS:
             line = QHBoxLayout()
+            line.setSpacing(8)
             name = xplane_install.PLUGIN_NAMES[plugin]
             state = xplane_install.plugin_state(root, plugin)
             bundled = xplane_install.bundled_plugin(plugin) is not None
             text, action = {
                 xplane_install.ABSENT: ("not installed", "Install"),
-                xplane_install.OUTDATED: ("installed, update available", "Update"),
-                xplane_install.CURRENT: ("installed (up to date)", "Reinstall"),
+                xplane_install.OUTDATED: ("update available", "Update"),
+                xplane_install.CURRENT: ("up to date", None),
             }[state]
-            status = QLabel(f"{name}: {text}")
-            line.addWidget(status)
+            line.addWidget(QLabel(name))
             line.addStretch(1)
-            button = QPushButton(action)
-            button.setEnabled(bundled)
-            if not bundled:
-                button.setToolTip(f"This TelemFFB does not include the {name.lower()}")
-            button.clicked.connect(lambda checked=False, r=root, p=plugin: self._install_xplane_plugin(r, p))
-            line.addWidget(button)
-            row_layout.addLayout(line)
-        return row
+            status = QLabel(text)
+            if state == xplane_install.OUTDATED:
+                status.setStyleSheet(f"color: {self._attention_color().name()};")
+            elif state == xplane_install.CURRENT:
+                status.setEnabled(False)
+            line.addWidget(status)
+            if action and bundled:
+                button = QPushButton(action)
+                button.clicked.connect(lambda checked=False, r=root, p=plugin: self._install_xplane_plugin(r, p))
+                line.addWidget(button)
+            box_layout.addLayout(line)
+        return box
 
     def _install_xplane_plugin(self, root, plugin):
         name = xplane_install.PLUGIN_NAMES[plugin]
@@ -2294,12 +2301,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 "Resources\\plugins folder).\n\nAdd it anyway?")
             if answer != QMessageBox.StandardButton.Yes:
                 return
-        if not any(os.path.normcase(directory) == os.path.normcase(f) for f in self._xplane_added):
+        self._xplane_hidden = [f for f in self._xplane_hidden if not xplane_install.contains([f], directory)]
+        if not xplane_install.contains(self._xplane_added, directory):
             self._xplane_added.append(directory)
         self.refresh_xplane_installs()
 
     def _remove_xplane_install(self, root):
-        self._xplane_added = [f for f in self._xplane_added if os.path.normcase(f) != os.path.normcase(root)]
+        self._xplane_added = [f for f in self._xplane_added if not xplane_install.contains([f], root)]
+        if (xplane_install.contains(xplane_install.detected_installs(), root)
+                and not xplane_install.contains(self._xplane_hidden, root)):
+            self._xplane_hidden.append(root)
         self.refresh_xplane_installs()
 
     def select_il2_directory(self):
@@ -2653,6 +2664,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "validateXPLANE": self.validateXPLANE.isChecked(),
             "enableXplaneApiServer": self.enableXplaneApiServer.isChecked(),
             "xplaneInstalls": json.dumps(self._xplane_added),
+            "xplaneHiddenInstalls": json.dumps(self._xplane_hidden),
             "enableIL2": self.enableIL2.isChecked(),
             "enableIL2K": self.enableIL2K.isChecked(),
             "validateIL2": self.validateIL2.isChecked(),
@@ -3494,6 +3506,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableXplaneApiServer.setChecked(settings_dict.get('enableXplaneApiServer', True))
 
         self._xplane_added = xplane_install.added_installs(settings_dict)
+        self._xplane_hidden = xplane_install.hidden_installs(settings_dict)
         self.refresh_xplane_installs()
 
         self.enableIL2.setChecked(settings_dict.get('enableIL2', False))

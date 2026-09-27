@@ -50,6 +50,19 @@ class TestWhichInstalls:
         settings = {"pathXPLANE": r"D:\XP12", "xplaneInstalls": json.dumps([])}
         assert xi.added_installs(settings) == []
 
+    def test_a_removed_detected_install_is_not_listed(self):
+        detected = [os.path.normpath(r"C:\XP11"), os.path.normpath(r"D:\XP12")]
+        hidden = xi.hidden_installs({"xplaneHiddenInstalls": json.dumps([r"c:\xp11\\"])})
+        assert xi.listed_installs(detected, [], hidden) == [os.path.normpath(r"D:\XP12")]
+
+    def test_adding_a_hidden_folder_lists_it_again(self):
+        detected = [os.path.normpath(r"C:\XP11")]
+        assert xi.listed_installs(detected, detected, detected) == detected
+
+    def test_added_folders_follow_the_detected_ones_once_each(self):
+        xp11, xp12, e = (os.path.normpath(p) for p in (r"C:\XP11", r"D:\XP12", r"E:\XP12b"))
+        assert xi.listed_installs([xp11, xp12], [e, xp12.lower()], []) == [xp11, xp12, e]
+
 
 class TestPluginState:
     def test_absent_current_and_outdated(self, tmp_path, bundled):

@@ -11,7 +11,8 @@
 
 Installs come from X-Plane's own record of them - its installer writes one
 per version to %LOCALAPPDATA%\\x-plane_install_<version>.txt, a path a line -
-plus any folder the user added. Installing is each install's own choice, as
+plus any folder the user added, less any detected one the user removed from
+the list. Installing is each install's own choice, as
 with the MSFS panel: what is there is kept up to date, and a folder without a
 plugin is left alone. The one exception is the telemetry plugin when no
 install has it at all, which is offered everywhere, since without it there
@@ -37,6 +38,8 @@ PLUGIN_NAMES = {TELEMETRY: "Telemetry plugin", PANEL: "Panel"}
 ADDED_SETTING = "xplaneInstalls"
 #: The single folder TelemFFB used to know; the first added install, once
 LEGACY_SETTING = "pathXPLANE"
+#: Detected installs the user removed from the list, as a JSON list of folders
+HIDDEN_SETTING = "xplaneHiddenInstalls"
 
 ABSENT, CURRENT, OUTDATED = "absent", "current", "outdated"
 
@@ -79,6 +82,16 @@ def detected_installs() -> List[str]:
     return found
 
 
+def _folder_list(raw) -> List[str]:
+    try:
+        folders = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(folders, list):
+        return []
+    return [os.path.normpath(f) for f in folders if isinstance(f, str) and f.strip()]
+
+
 def added_installs(settings) -> List[str]:
     """The folders the user added by hand. The old single X-Plane folder
     counts as the first, until the list is first saved."""
@@ -86,20 +99,31 @@ def added_installs(settings) -> List[str]:
     if raw in (None, ""):
         legacy = str(settings.get(LEGACY_SETTING, "") or "").strip()
         return [os.path.normpath(legacy)] if legacy else []
-    try:
-        folders = json.loads(raw)
-    except (TypeError, ValueError):
-        return []
-    return [os.path.normpath(f) for f in folders if isinstance(f, str) and f.strip()]
+    return _folder_list(raw)
+
+
+def hidden_installs(settings) -> List[str]:
+    """The detected installs the user removed from the list."""
+    return _folder_list(settings.get(HIDDEN_SETTING, "[]"))
+
+
+def contains(folders: List[str], folder: str) -> bool:
+    return any(_same_folder(folder, known) for known in folders)
+
+
+def listed_installs(detected: List[str], added: List[str], hidden: List[str]) -> List[str]:
+    """The installs to list and look after: the detected ones not hidden,
+    then the ones added. A folder added by hand is listed even if hidden."""
+    installs = [root for root in detected if not contains(hidden, root) or contains(added, root)]
+    for folder in added:
+        if not contains(installs, folder):
+            installs.append(folder)
+    return installs
 
 
 def all_installs(settings) -> List[str]:
-    """Every install TelemFFB knows: detected ones, then the ones added."""
-    installs = detected_installs()
-    for folder in added_installs(settings):
-        if not any(_same_folder(folder, known) for known in installs):
-            installs.append(folder)
-    return installs
+    """Every install TelemFFB lists, from the saved settings."""
+    return listed_installs(detected_installs(), added_installs(settings), hidden_installs(settings))
 
 
 def sim_version(root: str) -> Optional[str]:
