@@ -159,6 +159,18 @@ class SettingsManager(QObject):
             ]
         }
 
+    def clear_aircraft(self):
+        """Forget the loaded aircraft once its sim has exited.  With the
+        offline editor open its own selection stays, and going back online
+        returns to nothing loaded rather than to the aircraft that left."""
+        cleared = dict(current_sim="nothing", current_class="", current_aircraft_name="",
+                       current_pattern="", active_profile=None)
+        self.profile_change = None
+        if self._online_mode_backup is not None:
+            self._online_mode_backup.update(cleared)
+        else:
+            self.update_state_vars(**cleared)
+
     def go_online(self):
         """Restores the previously saved state, if available."""
         G.telem_manager.set_paused(False)

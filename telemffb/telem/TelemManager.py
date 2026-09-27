@@ -278,6 +278,7 @@ class TelemManager(QObject, threading.Thread):
 
     currentAircraft: Optional['AircraftBase'] = None
     currentAircraftName: Optional[str] = None
+    currentDataSource: Optional[str] = None
     currentAircraftConfig: dict
 
     timed_out: bool = True
@@ -1210,7 +1211,7 @@ class TelemManager(QObject, threading.Thread):
         process-check deadline so _check_sim_process() is called periodically until
         telemetry resumes or the sim process disappears."""
         if self.currentAircraft and not self.timed_out:
-            src = self.currentAircraft._telem_data.get('src', 'unknown')
+            src = self._loaded_sim() or 'unknown'
             logging.info(
                 f"Telemetry timeout from {src} — no data received for {self.timeout_sec * 1000:.0f}ms. "
                 f"Process status will be checked every {self._PROCESS_CHECK_INTERVAL:.0f}s."
@@ -1244,6 +1245,17 @@ class TelemManager(QObject, threading.Thread):
     _PROCESS_CHECK_INTERVAL = 5.0   # seconds between successive process checks while telemetry is timed out
     _PROCESS_CHECK_DELAY    = 5.0   # grace period (seconds) after the first timeout before the first check fires
 
+    def _loaded_sim(self) -> Optional[str]:
+        """The sim the current aircraft came from.  An aircraft loaded while
+        the sim sat paused has processed no frame yet, so its source falls
+        back to the one it was resolved from."""
+        if not self.currentAircraft:
+            return None
+        src = self.currentAircraft._telem_data.get('src')
+        if not src and self.currentDataSource:
+            src = self.currentDataSource.split('.', 1)[0].replace('2020', '')
+        return src or None
+
     def _check_sim_process(self) -> None:
         """Universal sim-exit detector, called periodically by the run() loop while
         telemetry is timed out.
@@ -1264,9 +1276,7 @@ class TelemManager(QObject, threading.Thread):
         """
         if self._sim_exit_signaled:
             return
-        src = None
-        if self.currentAircraft:
-            src = self.currentAircraft._telem_data.get('src')
+        src = self._loaded_sim()
         if not src:
             return
         process_names = self._SIM_PROCESS_NAMES.get(src)

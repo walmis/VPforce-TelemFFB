@@ -2045,17 +2045,31 @@ class MainWindow(QMainWindow):
         """Called when a sim sends a clean exit notification (STATUS=EXIT).
         Resets the Application Status area and settings tab to the waiting state
         so stale aircraft info and the 'Paused' badge are cleared before the
-        next sim connects."""
+        next sim connects.
+
+        With the offline editor open, the header and settings tab show the
+        profile being edited and are left alone; leaving the editor comes
+        back to nothing loaded."""
         logging.info(f"Application Status: clearing display after {src} exit")
         self.monitor_panel.clear_effects()
         G.app_state.set_active_settings(())
-        self.header_panel.reset_sim_state(src)
-        # reset_sim_state disabled the notes button; drop the dedupe context
-        # so the next aircraft load re-evaluates it even if identical.
-        self._profile_notes_shown = None
-        self.settings_layout.clear_layout()
+        G.settings_mgr.clear_aircraft()
+        if not G.settings_mgr.offline_mode:
+            self.header_panel.reset_sim_state(src)
+            # reset_sim_state disabled the notes button; drop the dedupe context
+            # so the next aircraft load re-evaluates it even if identical.
+            self._profile_notes_shown = None
+            self.settings_layout.clear_layout()
         self.sim_status.on_sim_exited()
         self.refresh_offline_editor_button()      # nothing loaded to edit any more
+        # The prompts belong to the aircraft that left, and only telemetry
+        # frames re-evaluate them; the next load raises them afresh.
+        G.app_state.set_prompt('trim_cal', None)
+        G.app_state.set_prompt('new_craft', None)
+        self._new_craft_prompt_active = False
+        self._new_craft_target = None
+        G.app_state.set_prompt('profile_change', None)
+        self._profile_change_prompt_active = False
 
     @staticmethod
     def _ordered_telemetry(datadict) -> OrderedDict:
