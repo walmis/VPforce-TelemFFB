@@ -59,6 +59,7 @@ import telemffb.utils as utils
 from telemffb import match_history
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
+from telemffb.ui.dialogs.restart_offer import ask_to_restart
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
@@ -99,6 +100,21 @@ class MainMenu:
             system_settings_action = QAction('System Settings', mw)
             system_settings_action.triggered.connect(mw.open_system_settings_dialog)
             system_menu.addAction(system_settings_action)
+
+            # A global setting, read at startup: a change goes through a restart.
+            theme_menu = system_menu.addMenu('Theme')
+            theme_group = QActionGroup(mw)
+            theme_group.setExclusive(True)
+            self.theme_actions = {}
+            for theme_id, label in self.THEMES:
+                action = QAction(label, mw)
+                action.setCheckable(True)
+                action.triggered.connect(lambda _checked, i=theme_id: self._choose_theme(i))
+                theme_group.addAction(action)
+                theme_menu.addAction(action)
+                self.theme_actions[theme_id] = action
+            # the dialog changes it too, so read as the menu opens
+            theme_menu.aboutToShow.connect(self._mark_saved_theme)
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', mw)
         def do_open_cfg_dir():
@@ -307,6 +323,25 @@ class MainMenu:
         self.support_action = QAction("Create support bundle", mw)
         self.support_action.triggered.connect(lambda: utils.create_support_bundle(G.userconfig_rootpath))
         help_menu.addAction(self.support_action)
+
+    #: themeId values, labelled as the System Settings dialog labels them
+    THEMES = ((0, 'Light'), (1, 'Dark'), (2, 'System'))
+
+    @staticmethod
+    def _saved_theme() -> int:
+        return int(G.system_settings.get('themeId', 2))
+
+    def _mark_saved_theme(self):
+        action = self.theme_actions.get(self._saved_theme())
+        if action is not None:
+            action.setChecked(True)
+
+    def _choose_theme(self, theme_id: int):
+        if theme_id == self._saved_theme():
+            return
+        G.system_settings.setValue('themeId', theme_id)
+        if ask_to_restart(self.mw, "The theme changed."):
+            utils.request_restart()
 
     def add_instance_log_menu(self):
         self.log_menu.addAction(self.log_window_action)

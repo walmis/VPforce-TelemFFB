@@ -38,6 +38,7 @@ from telemffb.tap import msfs_panel_install
 from telemffb import utils
 from telemffb.app_events import events as app_events
 from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
+from telemffb.ui.dialogs.restart_offer import ask_to_restart
 from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
 from telemffb.tap.tap_install import SIMS_BY_KEY, matches_signature, sim_status
 from telemffb.ui.panels.InstanceSettingsPanel import (
@@ -2764,10 +2765,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             what = ", ".join(changed)
             what = f"{what[0].upper()}{what[1:]} changed."
             if G.master_instance:
-                restart = QMessageBox.question(
-                    self, "Restart Required",
-                    f"{what} TelemFFB needs to restart for this to take effect.\n\n"
-                    "Restart now?") == QMessageBox.StandardButton.Yes
+                restart = ask_to_restart(self, what)
             else:
                 QMessageBox.information(
                     self, "Restart Required",
