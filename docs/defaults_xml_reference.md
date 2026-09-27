@@ -75,6 +75,7 @@ and per-sim `validvalues` lists are handled.
 | `render_prereq` | No | Cross-tree gate: **hide** this setting when the condition (based on other bool settings' values) fails. See [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields). |
 | `enable_prereq` | No | Cross-tree gate: render but **disable** this setting (with an auto-generated explanatory tooltip) when the condition fails. See [The `render_prereq` and `enable_prereq` Fields](#the-render_prereq-and-enable_prereq-fields). |
 | `debug_only` | No | If `true`, the setting is only parsed/shown when the app is in debug mode (`G.system_settings.get('debug', False)`). See [The `debug_only` Field](#the-debug_only-field). |
+| `in_sim_panel` | No | If `false`, the setting and every setting under it are left out of the MSFS toolbar panel. See [The `in_sim_panel` Field](#the-in_sim_panel-field). |
 | `order` | Yes | Float; controls row position and layout behavior. See [The `order` Field](#the-order-field). |
 | `unit` | No | If present, adds a unit dropdown next to the value field. Supported unit groups: speed (`m/s`, `ft/s`, `km/h`, `kts`, `mph`) and length (`m`, `ft`, `km`, `mi`, `nm`). Switching units auto-converts the stored value. |
 | `sliderfactor` | No | Scaling factor between slider position and stored value. Required for slider-based datatypes. See [Datatypes](#datatypes). |
@@ -671,6 +672,27 @@ debug_only = true
 
 `debug_only` can be combined with `prereq` on the same entry; both conditions must be
 satisfied for the setting to appear.
+
+---
+
+## The `in_sim_panel` Field
+
+The `in_sim_panel` field keeps a setting out of the MSFS toolbar panel (the API server it
+talks to skips it). It is for settings that belong to setting an aircraft up rather than to
+adjusting it in flight, such as naming a custom SimConnect variable.
+
+### Syntax
+
+```
+in_sim_panel = false
+```
+
+- `in_sim_panel=false` — the setting is not offered in the panel, and neither is any setting
+  under it through its `prereq` chain, so one entry covers a whole branch.
+- Omitted (or anything other than `false`) — the setting is offered wherever the panel can
+  render its datatype.
+
+The settings form in TelemFFB itself is unaffected.
 
 ---
 

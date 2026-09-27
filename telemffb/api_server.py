@@ -322,6 +322,14 @@ def set_panel_zoom():
     return {"ok": True, "vr": vr}
 
 
+def _not_in_panel() -> set:
+    root = xmlutils.auto_defaults_root
+    if root is None:
+        return set()
+    return {d.findtext("name") for d in root.iter("defaults")
+            if (d.findtext("in_sim_panel") or "").strip().lower() == "false"}
+
+
 @app.get("/api/settings")
 def get_settings():
     sm = _settings_mgr
@@ -333,8 +341,17 @@ def get_settings():
         active_profile=sm.active_profile,
     )
 
+    # Settings marked <in_sim_panel>false</in_sim_panel> in defaults.xml are
+    # left out, and so is everything under them: rows come in order, so a
+    # parent is always decided before its children.
+    skipped = _not_in_panel()
     settings = []
     for item in visible_rows(result or []):
+        parent = (item.get("prereq") or "").partition(".")[0]
+        if parent in skipped:
+            skipped.add(item["name"])
+        if item["name"] in skipped:
+            continue
         control = _build_control(item)
         if control is not None:
             settings.append(control)

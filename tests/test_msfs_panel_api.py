@@ -100,3 +100,19 @@ class TestErase:
     def test_erase_needs_a_setting_name(self, server):
         assert call("POST", "/api/erase", {})[0] == 400
         assert server.erases == []
+
+
+class TestNotInPanel:
+    def test_a_marked_setting_and_everything_under_it_stay_out(self, server, monkeypatch):
+        import xml.etree.ElementTree as ET
+        monkeypatch.setattr(xmlutils, "auto_defaults_root", ET.fromstring(
+            "<TelemFFB><defaults><name>enable_custom_x_axis</name>"
+            "<in_sim_panel>false</in_sim_panel></defaults></TelemFFB>"))
+        server.rows[:] = [
+            dict(row("telemffb_controls_axes", "Sim Default"), order="2000"),
+            dict(row("enable_custom_x_axis", "Sim Default"), prereq="telemffb_controls_axes", order="2200"),
+            dict(row("custom_x_axis", "Sim Default"), prereq="enable_custom_x_axis", order="2200.2"),
+            dict(row("x_axis_scale", "Sim Default"), prereq="telemffb_controls_axes", order="2400")]
+        _, data = call("GET", "/api/settings")
+        assert [s["name"] for s in data["settings"]] == ["telemffb_controls_axes", "x_axis_scale"]
+
