@@ -862,8 +862,10 @@ window.addEventListener("unhandledrejection", (e) => {
 
 log("panel.js loaded, starting poll loops");
 document.getElementById("settingsList").textContent = "Loading...";
-document.getElementById("panelVersion").textContent = "v" + PANEL_VERSION;
+// the panel's own version, not TelemFFB's
+document.getElementById("panelVersion").textContent = "MSFS Panel v" + PANEL_VERSION;
 
 initScaleControl();
+setView("settings");     // the lists share their CSS; only one shows
 pollStatus();
 pollSettings();
