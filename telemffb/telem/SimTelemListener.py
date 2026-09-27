@@ -35,7 +35,7 @@ from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.telem.BMSTelemManager import BMSManager
-from telemffb.tap import msfs_panel_install
+from telemffb.tap import msfs_panel_install, xplane_install
 
 
 class SimTelemListener(QtCore.QObject):
@@ -291,6 +291,7 @@ class SimXPLANE(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("XPLANE")
         self.telem : Optional[NetworkThread] = None
+        self._plugins_checked = False
 
     @override
     def start(self):
@@ -299,7 +300,12 @@ class SimXPLANE(SimTelemListener):
 
         self.telem = NetworkThread(G.telem_manager, host='127.0.0.1', port=34390)
 
-        self.do_validate()
+        if not self._plugins_checked and G.master_instance:
+            self._plugins_checked = True
+            try:
+                self._offer_plugins()
+            except Exception:
+                logging.exception("X-Plane plugin check failed")
 
         if self.telem is None:
             return
@@ -311,9 +317,47 @@ class SimXPLANE(SimTelemListener):
 
     @override
     def validate(self):
-        logging.info("Checking XPlane Plugin")
-        xplane_path = G.system_settings.get('pathXPLANE', '')
-        utils.install_xplane_plugin(xplane_path, G.main_window)
+        return
+
+    @staticmethod
+    def _offer_plugins():
+        """TelemFFB's X-Plane plugins, in one prompt across every install:
+        updates where a plugin is installed, and the telemetry plugin where no
+        install has it yet. The telemetry plugin is looked after with Auto
+        X-Plane setup on, the panel with its panel server switch on."""
+        offers = xplane_install.startup_offers(
+            xplane_install.all_installs(G.system_settings),
+            telemetry=bool(G.system_settings.get('validateXPLANE', False)),
+            panel=bool(G.system_settings.get('enableXplaneApiServer', True)))
+        if not offers:
+            return
+
+        def listing(pending):
+            return "\n".join(f"{o.root}: {xplane_install.PLUGIN_NAMES[o.plugin]} "
+                             f"({'install' if o.missing else 'update'})" for o in pending)
+
+        logging.info(f"X-Plane plugins to offer: {listing(offers)}")
+        answer = QMessageBox.question(
+            G.main_window, "X-Plane Plugins",
+            f"TelemFFB's X-Plane plugins are out of date in the following managed installs:\n\n{listing(offers)}\n\n"
+            "Update the plugins? Close any running X-Plane before proceeding.")
+        pending = list(offers)
+        while pending and answer == QMessageBox.StandardButton.Yes:
+            failed = []
+            for offer in pending:
+                try:
+                    xplane_install.install_plugin(offer.root, offer.plugin)
+                except OSError:
+                    logging.exception(f"Could not install the X-Plane {offer.plugin} into {offer.root}")
+                    failed.append(offer)
+            pending = failed
+            if pending:
+                answer = QMessageBox.warning(
+                    G.main_window, "X-Plane Plugins",
+                    f"Failed to update the following instance(s):\n\n{listing(pending)}\n\n"
+                    "Close X-Plane and try again?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No)
 
     @override
     def stop(self):

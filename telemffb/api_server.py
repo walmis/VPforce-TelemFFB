@@ -1,11 +1,12 @@
-"""HTTP API for the MSFS in-sim toolbar panel.
+"""HTTP API for the in-sim panels: the MSFS toolbar panel and the X-Plane
+TelemFFB Panel plugin.
 
 Serves the current aircraft's editable settings (as read by SettingsManager /
 xmlutils) over a small local HTTP API, and accepts writes back to the same
 user config XML the desktop Settings panel writes to.
 
-Lifecycle: only meaningful while MSFS is the connected sim, so main.py starts
-this on the first MSFS telemetry frame and stops it on sim exit (see
+Lifecycle: only meaningful while a sim with a panel is connected, so main.py
+starts this on that sim's first telemetry frame and stops it on sim exit (see
 _maybe_start_api_server / _maybe_stop_api_server in main.py). start/stop are
 idempotent and safe to call from the Qt thread.
 
@@ -41,6 +42,11 @@ from telemffb.utils.device import DEVICE_ROLES
 from telemffb.xml.merge import visible_rows
 
 app = Bottle()
+
+#: The sims with an in-sim panel talking to this server, and each one's own
+#: switch for it in System Settings (on by default).
+PANEL_SWITCHES = {"MSFS": "enableMsfsApiServer", "XPLANE": "enableXplaneApiServer"}
+PANEL_SIMS = tuple(PANEL_SWITCHES)
 
 _settings_mgr = None  # injected by start_api_server()
 
@@ -251,7 +257,7 @@ def _current_state() -> dict:
         "class": sm.current_class,
         "device": _device(),
         "devices": _devices(),
-        "connected": sm.current_sim == "MSFS" and not sm.timed_out,
+        "connected": sm.current_sim in PANEL_SIMS and not sm.timed_out,
         # the configuration errors TelemFFB is showing, held and cleared by
         # its status tracker
         "errors": G.main_window.sim_status.held_errors,
@@ -605,21 +611,22 @@ def is_running() -> bool:
 
 
 def on_first_frame(src):
-    """Qt signal handler: start the panel when MSFS first sends a frame.
+    """Qt signal handler: start the server when a sim with a panel first
+    sends a frame.
 
     Self-gating so main.py stays pure wiring: only the master instance's
-    SettingsManager reflects a device worth exposing, and the panel has
-    nothing to serve for other sims, so gate on both - plus the System
-    Settings > Simulator Setup > MSFS > Options toggle (default on).
+    SettingsManager reflects a device worth exposing, and there is no panel
+    to serve for other sims, so gate on both - plus that sim's own in-sim
+    panel switch in System Settings (default on).
     """
-    if src != "MSFS" or not G.master_instance:
+    if src not in PANEL_SWITCHES or not G.master_instance:
         return
-    if not G.system_settings.get('enableMsfsApiServer', True):
+    if not G.system_settings.get(PANEL_SWITCHES[src], True):
         return
     start_api_server(G.settings_mgr)
 
 
 def on_sim_exited(src):
-    """Qt signal handler: stop the panel when MSFS exits."""
-    if src == "MSFS":
+    """Qt signal handler: stop the server when that sim exits."""
+    if src in PANEL_SIMS:
         stop_api_server()

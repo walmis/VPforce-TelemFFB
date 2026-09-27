@@ -31,7 +31,7 @@ print(distpath)
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', '.'), ('simconnect/simconnect.dll', 'simconnect')],
+    binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('xplane-plugin/TelemFFB-Panel/64/win.xpl', 'xplane-plugin/TelemFFB-Panel/64'), ('dll/hidapi.dll', '.'), ('simconnect/simconnect.dll', 'simconnect')],
     # ffb_tap: data rather than a binary, because TelemFFB never loads it -
     # it is copied into a game folder. A subdirectory keeps a file named
     # dinput8.dll out of TelemFFB's own DLL search path.

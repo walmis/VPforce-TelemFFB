@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (QAbstractItemView, QButtonGroup, QDialog, QFileDial
                              QToolButton, QVBoxLayout, QWidget)
 
 from telemffb import globals as G
-from telemffb.tap import msfs_panel_install
+from telemffb.tap import msfs_panel_install, xplane_install
 from telemffb import utils
 from telemffb.app_events import events as app_events
 from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
@@ -258,6 +258,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Live per-row widgets, keyed the same way, rebuilt on every
         # refresh_msfs_panel_installs() - see _MsfsInstallRow.
         self._msfs_install_rows = {}
+        # X-Plane installs added by hand; detected ones are found afresh on
+        # every refresh_xplane_installs(). Saved as xplaneInstalls.
+        self._xplane_added = []
         self._validating_path = False
         # while an import is populating the form, panels created on the fly
         # read the imported values instead of the store
@@ -300,12 +303,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.focus_pauseIL2.setChecked(False)
         self.focus_pauseIL2.setVisible(False)
 
-        self.portIL2_K.setToolTip('UDP port IL-2 Korea sends telemetry to; kept apart from the IL-2 Sturmovik port so TelemFFB can tell the two games apart')
+        self.portIL2_K.setToolTip('<qt>UDP port IL-2 Korea sends telemetry to; kept apart from the IL-2 Sturmovik port so TelemFFB can tell the two games apart</qt>')
 
         # Add tooltips
-        self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
-        self.enableMsfsApiServer.setToolTip('If enabled, the master instance starts a local HTTP server while MSFS is the active sim, letting the VPforce Settings in-sim toolbar panel view and edit the current aircraft\'s settings')
-        self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
+        self.validateDCS.setToolTip('<qt>If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file</qt>')
+        # <qt>: Qt wraps only rich-text tooltips; a long plain one runs off as one line
+        self.enableMsfsApiServer.setToolTip('<qt>If enabled, the master instance starts a local HTTP server while MSFS is the active sim, letting the VPforce Settings in-sim toolbar panel view and edit the current aircraft\'s settings</qt>')
+        self.validateIL2.setToolTip('<qt>If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export</qt>')
         # self.focus_pauseIL2.setToolTip('When enabled, TelemFFB will enter a pause state when focus is lost on the IL2 game window. (Enabled by default)\n\nNote: While disabling can aid in adjusting effects in real time, when the IL2 window loses focus, it also loses all inputs.\nThis may result in odd behavior and stuck effects while the window is out of focus.')
         tap_path_tip = ('Only needed if TelemFFB cannot find the install itself.  '
                         'Leave empty to detect it automatically; set it to the '
@@ -321,9 +325,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.lab_pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
         self.pathIL2_K.setToolTip('The root path where IL-2 Korea is installed')
         self.lab_pathIL2_2.setToolTip('The root path where IL-2 Korea is installed')
-        self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
-        self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
-        self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
+        self.validateXPLANE.setToolTip('<qt>If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes</qt>')
+        self.enableXplaneApiServer.setToolTip('<qt>If enabled, the master instance starts a local HTTP server while X-Plane is the active sim, letting the TelemFFB Panel plugin view and edit the current aircraft\'s settings</qt>')
+        self.addXplaneInstall.setToolTip('<qt>Add an X-Plane install that is not listed: one X-Plane did not record, such as a copied or moved folder</qt>')
         self.cb_logPrune.setToolTip('Auto delete archived logs after time frame')
         from telemffb.hw.ffb_dinput import BRIDGE_DOWNLOAD_LOCATION
         # The address is plain text here on purpose: a tooltip closes the
@@ -434,7 +438,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableMSFS.stateChanged.connect(self.toggle_msfs_widgets)
         self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
         self.enableBMS.stateChanged.connect(self.toggle_bms_widgets)
-        self.browseXPLANE.clicked.connect(self.select_xplane_directory)
+        self.addXplaneInstall.clicked.connect(self.add_xplane_install)
         self.browseIL2.clicked.connect(self.select_il2_directory)
         self.browseIL2_K.clicked.connect(self.select_il2_directory)
         self.browseDCS.clicked.connect(self.select_dcs_directory)
@@ -1511,7 +1515,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # A bare "..." here, where the block-level browse used to spell out
         # "Browse...": this one sits against the line edit it fills, the
-        # way browseXPLANE does against pathXPLANE.
+        # way the IL-2 path's does.
         browse_button = QToolButton()
         browse_button.setText("...")
         browse_button.clicked.connect(
@@ -1651,9 +1655,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def toggle_xplane_widgets(self):
         xplane_enabled = self.enableXPLANE.isChecked()
         self.validateXPLANE.setEnabled(xplane_enabled)
-        self.lab_pathXPLANE.setEnabled(xplane_enabled)
-        self.pathXPLANE.setEnabled(xplane_enabled)
-        self.browseXPLANE.setEnabled(xplane_enabled)
+        self.enableXplaneApiServer.setEnabled(xplane_enabled)
+        self.label_xplane_installs.setEnabled(xplane_enabled)
+        self.xplaneInstallsContainer.setEnabled(xplane_enabled)
+        self.addXplaneInstall.setEnabled(xplane_enabled)
         icon = self.XPLANE_ICON_ENABLED if xplane_enabled else self.XPLANE_ICON_DISABLED
         self.simTabWidget.setTabIcon(self.XPLANE_TAB, icon)
 
@@ -2191,11 +2196,111 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.tb_logPrune.setEnabled(prune)
         self.combo_logPrune.setEnabled(prune)
 
-    def select_xplane_directory(self):
-        # Open a directory dialog and set the result in the pathIL2 QLineEdit
-        directory = QFileDialog.getExistingDirectory(self, "Select X-Plane Install Path", "")
-        if directory:
-            self.pathXPLANE.setText(directory)
+    def refresh_xplane_installs(self):
+        """(Re)build the X-Plane tab's rows: one per install, detected or
+        added, each with both of TelemFFB's plugins and a button to install
+        or update either. Reads the folders, so it runs when the dialog loads
+        and after a change, never continuously."""
+        layout = self.xplaneInstallsLayout
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        detected = xplane_install.detected_installs()
+        installs = list(detected)
+        for folder in self._xplane_added:
+            if not any(os.path.normcase(folder) == os.path.normcase(d) for d in installs):
+                installs.append(folder)
+        if not installs:
+            empty = QLabel("No X-Plane install found. Add its folder below.")
+            empty.setWordWrap(True)
+            layout.addWidget(empty)
+            return
+        for root in installs:
+            layout.addWidget(self._xplane_install_row(root, added=root not in detected))
+
+    def _xplane_install_row(self, root, added):
+        row = QWidget(self.xplaneInstallsContainer)
+        row_layout = QVBoxLayout(row)
+        row_layout.setContentsMargins(0, 4, 0, 4)
+        row_layout.setSpacing(2)
+
+        heading = QHBoxLayout()
+        title = QLabel(f"<b>{xplane_install.sim_version(root) or 'X-Plane'}</b>")
+        heading.addWidget(title)
+        heading.addStretch(1)
+        if added:
+            remove = QPushButton("Remove")
+            remove.setToolTip("Stop listing this folder. Nothing in it is changed.")
+            remove.clicked.connect(lambda checked=False, r=root: self._remove_xplane_install(r))
+            heading.addWidget(remove)
+        row_layout.addLayout(heading)
+
+        folder = QLabel(root)
+        folder.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        folder.setEnabled(False)            # the muted look of secondary text
+        row_layout.addWidget(folder)
+
+        for plugin in xplane_install.PLUGINS:
+            line = QHBoxLayout()
+            name = xplane_install.PLUGIN_NAMES[plugin]
+            state = xplane_install.plugin_state(root, plugin)
+            bundled = xplane_install.bundled_plugin(plugin) is not None
+            text, action = {
+                xplane_install.ABSENT: ("not installed", "Install"),
+                xplane_install.OUTDATED: ("installed, update available", "Update"),
+                xplane_install.CURRENT: ("installed (up to date)", "Reinstall"),
+            }[state]
+            status = QLabel(f"{name}: {text}")
+            line.addWidget(status)
+            line.addStretch(1)
+            button = QPushButton(action)
+            button.setEnabled(bundled)
+            if not bundled:
+                button.setToolTip(f"This TelemFFB does not include the {name.lower()}")
+            button.clicked.connect(lambda checked=False, r=root, p=plugin: self._install_xplane_plugin(r, p))
+            line.addWidget(button)
+            row_layout.addLayout(line)
+        return row
+
+    def _install_xplane_plugin(self, root, plugin):
+        name = xplane_install.PLUGIN_NAMES[plugin]
+        answer = QMessageBox.question(
+            self, "Install X-Plane Plugin",
+            f"Install the {name.lower()} into:\n\n{root}\n\nX-Plane must be closed. Continue?")
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            xplane_install.install_plugin(root, plugin)
+        except OSError as e:
+            logging.exception(f"Failed to install the X-Plane {name} into {root}")
+            QMessageBox.warning(self, "Install Failed",
+                                f"Couldn't install the {name.lower()}:\n\n{e}\n\nIs X-Plane running?")
+            return
+        QMessageBox.information(self, "Plugin Installed",
+                                f"Installed into:\n{root}\n\n")
+        self.refresh_xplane_installs()
+
+    def add_xplane_install(self):
+        directory = QFileDialog.getExistingDirectory(self, "Select an X-Plane Folder", "")
+        if not directory:
+            return
+        directory = os.path.normpath(directory)
+        if not xplane_install.is_install(directory):
+            answer = QMessageBox.question(
+                self, "Not an X-Plane folder?",
+                f"{directory}\n\nThis doesn't look like an X-Plane install (it has no "
+                "Resources\\plugins folder).\n\nAdd it anyway?")
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        if not any(os.path.normcase(directory) == os.path.normcase(f) for f in self._xplane_added):
+            self._xplane_added.append(directory)
+        self.refresh_xplane_installs()
+
+    def _remove_xplane_install(self, root):
+        self._xplane_added = [f for f in self._xplane_added if os.path.normcase(f) != os.path.normcase(root)]
+        self.refresh_xplane_installs()
 
     def select_il2_directory(self):
         """Browse for an IL-2 title's folder, keeping it only if it is one.
@@ -2509,11 +2614,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     f"Please select a device for the "
                     f"{device_display_name(role)} or disable its auto-launch")
                 return False
-        if self.validateXPLANE.isChecked():
-            pth = os.path.join(self.pathXPLANE.text(), 'resources')
-            if not os.path.isdir(pth):
-                QMessageBox.warning(self, "Config Error", 'Please enter the root X-Plane install path or disable auto X-plane setup')
-                return False
         if not self.validate_instance_settings():
             return False
 
@@ -2551,7 +2651,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "msfsCommunityOverrides": json.dumps(self._msfs_community_overrides),
             "enableXPLANE": self.enableXPLANE.isChecked(),
             "validateXPLANE": self.validateXPLANE.isChecked(),
-            "pathXPLANE": self.pathXPLANE.text(),
+            "enableXplaneApiServer": self.enableXplaneApiServer.isChecked(),
+            "xplaneInstalls": json.dumps(self._xplane_added),
             "enableIL2": self.enableIL2.isChecked(),
             "enableIL2K": self.enableIL2K.isChecked(),
             "validateIL2": self.validateIL2.isChecked(),
@@ -3390,8 +3491,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.toggle_xplane_widgets()
 
         self.validateXPLANE.setChecked(settings_dict.get('validateXPLANE', False))
+        self.enableXplaneApiServer.setChecked(settings_dict.get('enableXplaneApiServer', True))
 
-        self.pathXPLANE.setText(settings_dict.get('pathXPLANE', ''))
+        self._xplane_added = xplane_install.added_installs(settings_dict)
+        self.refresh_xplane_installs()
 
         self.enableIL2.setChecked(settings_dict.get('enableIL2', False))
         self.enableIL2K.setChecked(settings_dict.get('enableIL2K', False))

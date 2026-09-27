@@ -54,7 +54,7 @@ _VDF_PATH_RE = re.compile(r'"path"\s+"([^"]+)"')
 def _panel_source_dir() -> Optional[str]:
     """Directory containing the bundled panel's manifest.json - works both
     running from source (repo root/assets/msfs-panel/...) and frozen
-    (matches how install_dcs_export_module/install_xplane_plugin resolve
+    (matches how install_dcs_export_module and xplane_install resolve
     their own bundled resources via get_resource_path(prefer_root=True))."""
     manifest_path = get_resource_path(
         os.path.join('assets', 'msfs-panel', 'vpforce-telemffb-panel', 'manifest.json'),

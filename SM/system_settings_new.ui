@@ -1020,39 +1020,69 @@
             </widget>
            </item>
            <item row="5" column="0" colspan="2">
-            <layout class="QHBoxLayout" name="horizontalLayout_9">
+            <widget class="LabeledToggle" name="enableXplaneApiServer">
+             <property name="text">
+              <string>Start in-sim settings panel server</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0" colspan="2">
+            <widget class="Line" name="line_xplane_installs">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0" colspan="2">
+            <widget class="QLabel" name="label_xplane_installs">
+             <property name="text">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=" font-weight:700;"&gt;X-Plane installs:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item row="8" column="0" colspan="2">
+            <widget class="QWidget" name="xplaneInstallsContainer" native="true">
+             <layout class="QVBoxLayout" name="xplaneInstallsLayout">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+             </layout>
+            </widget>
+           </item>
+           <item row="9" column="0" colspan="2">
+            <layout class="QHBoxLayout" name="horizontalLayout_xplane_add">
              <item>
-              <widget class="QLabel" name="lab_pathXPLANE">
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
+              <widget class="QPushButton" name="addXplaneInstall">
+               <property name="text">
+                <string>Add X-Plane folder...</string>
                </property>
-               <property name="minimumSize">
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_xplane_add">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
                 <size>
-                 <width>98</width>
-                 <height>0</height>
+                 <width>40</width>
+                 <height>20</height>
                 </size>
                </property>
-               <property name="text">
-                <string>X-Plane Install Path:</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="pathXPLANE" />
-             </item>
-             <item>
-              <widget class="QToolButton" name="browseXPLANE">
-               <property name="text">
-                <string>...</string>
-               </property>
-              </widget>
+              </spacer>
              </item>
             </layout>
            </item>
-           <item row="6" column="1">
+           <item row="10" column="1">
             <spacer name="verticalSpacer_3">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1060,7 +1090,7 @@
              <property name="sizeHint" stdset="0">
               <size>
                <width>20</width>
-               <height>249</height>
+               <height>40</height>
               </size>
              </property>
             </spacer>
@@ -1915,8 +1945,6 @@
   <tabstop>cb_motion</tabstop>
   <tabstop>cb_ffb</tabstop>
   <tabstop>pb_add_dest</tabstop>
-  <tabstop>pathXPLANE</tabstop>
-  <tabstop>browseXPLANE</tabstop>
   <tabstop>tb_logPrune</tabstop>
   <tabstop>enableDCS</tabstop>
   <tabstop>enableMSFS</tabstop>
@@ -1924,6 +1952,8 @@
   <tabstop>validateDCS</tabstop>
   <tabstop>enableXPLANE</tabstop>
   <tabstop>validateXPLANE</tabstop>
+  <tabstop>enableXplaneApiServer</tabstop>
+  <tabstop>addXplaneInstall</tabstop>
   <tabstop>enableBMS</tabstop>
   <tabstop>il2_fwd_table</tabstop>
  </tabstops>

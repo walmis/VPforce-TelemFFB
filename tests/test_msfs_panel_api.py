@@ -195,3 +195,28 @@ class TestMonitor:
         badges = [(e["shape"], e["letter"]) for e in data["effects"]]
         assert badges == [("wave-sine.svg", None), (None, "S")]
 
+
+class TestEachSimsSwitch:
+    """The server starts for a sim's panel only when that sim's own switch,
+    on its tab of System Settings, is on."""
+
+    @pytest.fixture
+    def starts(self, monkeypatch):
+        started = []
+        monkeypatch.setattr(api_server, "start_api_server", lambda sm: started.append(sm))
+        monkeypatch.setattr(G, "master_instance", True, raising=False)
+        monkeypatch.setattr(G, "settings_mgr", object(), raising=False)
+        return started
+
+    @pytest.mark.parametrize("sim, switches, expected", [
+        ("MSFS", {"enableXplaneApiServer": False}, 1),
+        ("XPLANE", {"enableMsfsApiServer": False}, 1),
+        ("XPLANE", {"enableXplaneApiServer": False}, 0),
+        ("MSFS", {"enableMsfsApiServer": False}, 0),
+        ("DCS", {}, 0),
+    ])
+    def test_the_connected_sims_switch_decides(self, starts, monkeypatch, sim, switches, expected):
+        monkeypatch.setattr(G, "system_settings", Settings(switches), raising=False)
+        api_server.on_first_frame(sim)
+        assert len(starts) == expected
+

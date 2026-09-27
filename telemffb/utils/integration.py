@@ -38,7 +38,6 @@ __all__ = [
     "resolve_il2_ffb_device_ordinal",
     "analyze_il2_config",
     "write_il2_config",
-    "install_xplane_plugin",
     "get_dcs_variant",
     "install_dcs_export_module_lua",
     "install_dcs_export_module_dll",
@@ -402,41 +401,6 @@ def write_il2_config(file_path, config_data):
                     config_file.write(f"\t{key} = {value}\n")
             config_file.write("[END]\n\n")
 
-
-def install_xplane_plugin(path, window):
-    src_path = get_resource_path('xplane-plugin/TelemFFB-XPP/64/win.xpl', prefer_root=True)
-    dst_path = os.path.join(path, 'resources', 'plugins', 'TelemFFB-XPP', '64', 'win.xpl')
-
-    ans = QMessageBox.StandardButton.No
-    if not os.path.exists(dst_path):
-        ans = QMessageBox.question(window, "X-Plane Plugin Installer", "X-plane plugin is not installed, install now?\n\nNote: X-Plane must not be running for this operation to succeed")
-    else:
-        src_crc = calculate_crc(src_path)
-        dst_crc = calculate_crc(dst_path)
-        if src_crc != dst_crc:
-            ans = QMessageBox.question(window, "X-Plane Plugin Installer", "X-plane plugin is out of date, update now?\n\nNote: X-Plane must not be running for this operation to succeed")
-        else:
-            return True
-
-    if ans == QMessageBox.StandardButton.Yes:
-        tryloop = True
-        while tryloop:
-            try:
-                if not os.path.exists(os.path.dirname(dst_path)):
-                    os.makedirs(os.path.dirname(dst_path))
-                print(os.path.isdir(os.path.dirname(dst_path)))
-                shutil.copy(src_path, dst_path)
-                tryloop = False
-                return True
-            except Exception as e:
-                print(f"ERROR:{e}")
-                retry = QMessageBox.warning(window, "X-Plane Plugin Error", "There was an error copying the file.  Please ensure X-Plane is not running.\n\nWould you like to re-try?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
-                if retry == QMessageBox.StandardButton.No:
-                    tryloop = False
-                    return False
-    else:
-        return False
-    return True
 
 def get_dcs_variant():
     """
