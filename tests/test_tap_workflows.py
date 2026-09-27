@@ -268,6 +268,12 @@ class World:
         monkeypatch.setattr(panel_module, 'confirm_legacy_upgrade',
                             self.policy.overwrite)
         monkeypatch.setattr(panel_module, 'ask_for_devices', self.policy.devices)
+        # a yes to the restart notice quits the app: recorded instead
+        self.restarts = 0
+
+        def restart():
+            self.restarts += 1
+        monkeypatch.setattr('telemffb.utils.request_restart', restart)
         # the live device-switch primitive lives in main.py and is registered
         # on G when the app starts; a save with a changed device calls it.
         # Recorded here so tests can assert on it - and so a test run that

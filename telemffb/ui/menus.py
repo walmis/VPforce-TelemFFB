@@ -110,26 +110,11 @@ class MainMenu:
         cfg_log_folder_action.triggered.connect(do_open_cfg_dir)
         system_menu.addAction(cfg_log_folder_action)
 
-        reset_geometry = QAction('Reset Window Size/Position', mw)
-
-        def do_reset_window_size():
-            match G.device_type:
-                case 'joystick':
-                    x_pos = 150
-                    y_pos = 130
-                case 'pedals':
-                    x_pos = 100
-                    y_pos = 100
-                case 'collective':
-                    x_pos = 50
-                    y_pos = 70
-                case 'trimwheel':
-                    x_pos = 40
-                    y_pos = 30
-            mw.setGeometry(x_pos, y_pos, 530, 700)
-
-        reset_geometry.triggered.connect(do_reset_window_size)
-        system_menu.addAction(reset_geometry)
+        if G.master_instance:
+            # the whole application, children included, so the master's alone
+            restart_action = QAction('Restart TelemFFB', mw)
+            restart_action.triggered.connect(utils.request_restart)
+            system_menu.addAction(restart_action)
 
         # Quitting a child ends that instance; only the master takes the
         # whole application down with it.
@@ -232,12 +217,12 @@ class MainMenu:
         tap_monitor_action.triggered.connect(mw.open_tap_monitor)
         utilities_menu.addAction(tap_monitor_action)
 
+        self.window_menu = self.menu.addMenu('Window')
+
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             """
-            Add Window menu to manage child instances if it is a master instance
+            Manage the child instances' windows from the master
             """
-            self.window_menu = self.menu.addMenu('Window')
-
             def do_toggle_child_windows(toggle):
                 if toggle == 'show':
                     G.ipc_instance.send_broadcast_message("SHOW WINDOW")
@@ -252,10 +237,6 @@ class MainMenu:
             self.window_menu.addAction(self.hide_children_action)
 
         if G.child_instance:
-            """
-            Add Child instance window menu
-            """
-            self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
             def do_hide_window():
                 try:
@@ -264,6 +245,29 @@ class MainMenu:
                     logging.error(f"EXCEPTION: {e}")
             self.hide_window_action.triggered.connect(do_hide_window)
             self.window_menu.addAction(self.hide_window_action)
+
+        reset_geometry = QAction('Reset Window Size/Position', mw)
+
+        def do_reset_window_size():
+            match G.device_type:
+                case 'joystick':
+                    x_pos = 150
+                    y_pos = 130
+                case 'pedals':
+                    x_pos = 100
+                    y_pos = 100
+                case 'collective':
+                    x_pos = 50
+                    y_pos = 70
+                case 'trimwheel':
+                    x_pos = 40
+                    y_pos = 30
+            mw.setGeometry(x_pos, y_pos, 530, 700)
+
+        reset_geometry.triggered.connect(do_reset_window_size)
+        if self.window_menu.actions():
+            self.window_menu.addSeparator()
+        self.window_menu.addAction(reset_geometry)
 
 
         """ Add Log Menu """
@@ -326,12 +330,8 @@ class MainMenu:
         called with the pick; a line is ruled above each key in
         ``group_starts``. With ``on_side_chosen``, a checkable item under
         the views says which side the side panels are on, and calls it with
-        True for the right. Lazily creates the Window menu if this instance
-        hasn't needed one yet (a solo master/child never gets one
-        otherwise)."""
-        if not hasattr(self, 'window_menu'):
-            self.window_menu = self.menu.addMenu('Window')
-        elif self.window_menu.actions():
+        True for the right."""
+        if self.window_menu.actions():
             self.window_menu.addSeparator()
         submenu = self.window_menu.addMenu('Devices')
         self.device_view_actions = {}

@@ -92,6 +92,11 @@ class TestTheChildsMenu:
         guards = guards_of(main_window, "system_settings_action = QAction")
         assert any('G.master_instance' in g for g in guards), guards
 
+    def test_restart_is_the_masters(self, main_window):
+        """It restarts the whole application, children included."""
+        guards = guards_of(main_window, "restart_action = QAction")
+        assert any('G.master_instance' in g for g in guards), guards
+
     @pytest.mark.parametrize("item", [
         "cfg_log_folder_action = QAction('Open Config/Log Directory'",
         "reset_geometry = QAction('Reset Window Size/Position'",

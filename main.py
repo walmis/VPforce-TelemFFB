@@ -1514,6 +1514,40 @@ def _cleanup_on_exit(dev_serial):
         except Exception:
             logging.error("Unable to release the device on exit")
 
+    if G.restart_requested:
+        _relaunch_when_released()
+
+
+#: How long a restart waits for the children to exit before starting anyway.
+#: One that missed the quit message exits on its own after three missed
+#: keepalives, about three seconds.
+RESTART_CHILD_WAIT_S = 10.0
+
+
+def _relaunch_when_released():
+    """Start TelemFFB again once the new copy can take everything over: the
+    device went back above, the children have exited, and the master mutex
+    is let go here rather than at process exit.  The new copy then starts
+    exactly as one launched by hand, with nothing to wait for."""
+    deadline = time.monotonic() + RESTART_CHILD_WAIT_S
+    for role, proc in list(G.launched_instances.items()):
+        try:
+            proc.wait(timeout=max(0.0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            logging.warning(f"Restart: the {role} instance has not exited; starting anyway")
+        except Exception:
+            logging.exception(f"Restart: unable to wait for the {role} instance")
+    if mutex is not None:
+        try:
+            mutex.release()
+            mutex.close()
+        except OSError:
+            logging.exception("Restart: unable to release the master instance mutex")
+    try:
+        utils.relaunch()
+    except Exception:
+        logging.exception("Restart: unable to start TelemFFB again")
+
 def _init_excepthooks():
     orig_stdout = sys.stdout
     # Configure global exception handler for better error reporting

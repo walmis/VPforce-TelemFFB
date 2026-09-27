@@ -39,6 +39,8 @@ __all__ = [
     "format_dict",
     "get_install_path",
     "exit_application",
+    "request_restart",
+    "relaunch",
     "ChildPopen",
     "check_launch_instance",
     "hexdump",
@@ -275,6 +277,41 @@ def exit_application():
         telem_manager.on_shutdown()
     G.main_window.save_main_window_geometry()
     QCoreApplication.instance().quit()
+
+def request_restart():
+    """Quit, and start again once this instance has shut down.  The new
+    copy is started at the very end of the exit cleanup (main.py), after
+    the device, the children and the master mutex have been let go, so it
+    starts exactly as one launched by hand would."""
+    G.restart_requested = True
+    exit_application()
+
+
+def relaunch():
+    """Start a fresh copy of TelemFFB with this one's arguments, independent
+    of this process so it outlives it."""
+    if getattr(sys, 'frozen', False):
+        args = [sys.executable] + sys.argv[1:]
+    else:
+        args = [sys.executable] + sys.argv
+    # A frozen build started from itself would otherwise inherit the
+    # bootloader's private environment and not set itself up afresh.
+    env = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
+    kwargs = dict(env=env, close_fds=True, stdin=subprocess.DEVNULL,
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    logging.info(f"Restart: starting {args}")
+    if sys.platform != 'win32':
+        subprocess.Popen(args, start_new_session=True, **kwargs)
+        return
+    flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+    try:
+        # out of any job the launcher (an IDE, a shortcut runner) put this
+        # process in, which may end its members when this one exits
+        subprocess.Popen(args, creationflags=flags | subprocess.CREATE_BREAKAWAY_FROM_JOB, **kwargs)
+    except OSError:
+        # the job does not allow breaking away
+        subprocess.Popen(args, creationflags=flags, **kwargs)
+
 
 class ChildPopen(subprocess.Popen):
     udp_port : int

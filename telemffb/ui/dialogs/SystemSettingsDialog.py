@@ -2759,16 +2759,25 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # dialog compares against this save rather than the one it opened with.
         changed = self._restart_worthy_changes(saved_al_dict)
         self.current_al_dict = saved_al_dict
+        restart = False
         if changed:
             what = ", ".join(changed)
-            QMessageBox.information(
-                self, "Restart Required",
-                f"{what[0].upper()}{what[1:]} changed. Restart TelemFFB for "
-                "this to take effect.")
+            what = f"{what[0].upper()}{what[1:]} changed."
+            if G.master_instance:
+                restart = QMessageBox.question(
+                    self, "Restart Required",
+                    f"{what} TelemFFB needs to restart for this to take effect.\n\n"
+                    "Restart now?") == QMessageBox.StandardButton.Yes
+            else:
+                QMessageBox.information(
+                    self, "Restart Required",
+                    f"{what} Restart TelemFFB for this to take effect.")
 
         self._apply_log_levels()
 
         self.accept()
+        if restart:
+            utils.request_restart()
 
     #: Which devices need the tap, and for what.  Stated wherever the tap
     #: comes up, because the distinction decides whether a missing rule is a

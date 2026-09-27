@@ -108,6 +108,30 @@ class TestWhenItFires:
         assert world.device_switches == 0
 
 
+class TestRestartNow:
+    """The master offers to restart right away."""
+
+    def _change_master(self, tmp_path, monkeypatch, answer):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED,
+                      question=answer)
+        world.dialog.master_button_group.button(2).click()   # pedals as master
+        assert world.save()
+        return world
+
+    def test_yes_restarts(self, app, tmp_path, monkeypatch):
+        assert self._change_master(tmp_path, monkeypatch, True).restarts == 1
+
+    def test_no_leaves_it_for_later(self, app, tmp_path, monkeypatch):
+        assert self._change_master(tmp_path, monkeypatch, False).restarts == 0
+
+    def test_nothing_restart_worthy_never_restarts(self, app, tmp_path, monkeypatch):
+        world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED,
+                      question=True)
+        world.tap("DCS", True)
+        assert world.save()
+        assert world.restarts == 0
+
+
 class TestMasterChangeKeepsLaunchFlags:
     def test_exploring_the_master_choice_and_back_loses_nothing(
             self, app, tmp_path, monkeypatch):

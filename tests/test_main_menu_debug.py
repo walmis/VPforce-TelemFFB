@@ -40,6 +40,7 @@ def main_menu(qapp, monkeypatch):
     mw = FakeMainWindow()
     mm = MainMenu(mw)
     mm.menu = QMenuBar()
+    mm.window_menu = mm.menu.addMenu('Window')   # build() always makes one
     return mm
 
 
