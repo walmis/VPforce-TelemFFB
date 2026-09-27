@@ -23,7 +23,7 @@ LEADING_KEYS = ('T', 'frameTimes', 'maxFrameTime', 'avgFrameTime', 'perf', 'FFBT
                 'N', 'src', 'msfs_vers', 'AircraftClass', 'SimconnectCategory')
 
 
-#: Where the favourite keys live: one registry value, deliberately global
+#: Where the favorite keys live: one registry value, deliberately global
 #: rather than instance-scoped (SystemSettings.setValue without an
 #: `instance`), so starring a key on the joystick instance stars it for the
 #: pedals and collective too - the interesting telemetry is a property of

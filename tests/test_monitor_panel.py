@@ -33,13 +33,13 @@ def qapp():
 
 class _FakeSettings:
     """Minimal stand-in for G.system_settings: the .get(key, default) read
-    and the global (un-scoped) .setValue the favourites list is saved with."""
+    and the global (un-scoped) .setValue the favorites list is saved with."""
 
     def __init__(self, values=None):
         self.values = dict(values or {})
         #: Every setValue as (key, value, instance) - the real
         #: SystemSettings scopes a write under `{instance}/` when one is
-        #: passed, so what a favourites write does NOT pass is the whole
+        #: passed, so what a favorites write does NOT pass is the whole
         #: point of it being common to all devices.
         self.writes = []
 
@@ -248,7 +248,7 @@ class TestTelemetryRows:
 
 
 class TestFavorites:
-    """The star gutter: click a row's star to favourite its telemetry key,
+    """The star gutter: click a row's star to favorite its telemetry key,
     tick "Favorites" to list only those. The set is saved to one global
     registry value, so it is the same list on every device instance."""
 
@@ -348,7 +348,7 @@ class TestFavorites:
 
     def test_it_is_not_restored_with_nothing_starred(self, qapp, mainwindow, monkeypatch):
         """An empty Monitor tab is a poor way to be told the box was left
-        ticked on a machine whose favourites have since been cleared."""
+        ticked on a machine whose favorites have since been cleared."""
         monkeypatch.setattr(G, 'system_settings', _FakeSettings({
             'monitorFavoritesOnly': 1, 'monitorFavoriteKeys': '',
         }), raising=False)

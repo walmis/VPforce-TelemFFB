@@ -41,7 +41,7 @@ closest faithful option for a table view:
   drag-selecting arbitrary runs of free text out of a QLabel.
 
 The telemetry table's leading column is a star gutter: click a row's star
-to favourite that telemetry key, tick "Favorites" beside the filter to
+to favorite that telemetry key, tick "Favorites" beside the filter to
 list only those. The set is kept here and saved to one *global* registry
 value - not an instance-scoped one - so it is the same list whichever
 device's instance you star a key from; what the interesting telemetry is
@@ -99,7 +99,7 @@ _MONOSPACE_STYLE = """
 #: enough to leave the effect names the rest of a half-split pane.
 INTENSITY_COLUMN_WIDTH = 72
 
-#: The telemetry table's columns. The favourite star sits in a gutter ahead
+#: The telemetry table's columns. The favorite star sits in a gutter ahead
 #: of the key, the way a starred row reads in a mail client - and the model
 #: is told it holds no selectable value (see KeyValueTableModel).
 _STAR_COL, _KEY_COL, _VALUE_COL = 0, 1, 2
@@ -183,7 +183,7 @@ class MonitorPanel(QWidget):
         self._signed = SignedKeys()
         # Starred telemetry keys, by their ORIGINAL key rather than the
         # MSFS simvar display name - the display name only exists while the
-        # Alt+D debug rename is on, so a favourite made with it on has to
+        # Alt+D debug rename is on, so a favorite made with it on has to
         # survive it going off again.
         self._favorites: Set[str] = load_favorites()
         # The last frame rendered, so toggling a star or the Favorites box
@@ -253,7 +253,7 @@ class MonitorPanel(QWidget):
             "Favorites are shared by all devices and kept between sessions.")
         # Restored, but only when there is something starred to show for it:
         # an empty Monitor tab is a poor way to be reminded the box was left
-        # ticked on a machine whose favourites have since been cleared.
+        # ticked on a machine whose favorites have since been cleared.
         self.favorites_check.setChecked(
             bool(self._favorites) and bool(G.system_settings.get(_FAVORITES_ONLY_KEY, 0)))
         self.favorites_check.toggled.connect(self._on_favorites_only_toggled)
@@ -478,7 +478,7 @@ class MonitorPanel(QWidget):
 
     def _refresh_rows(self) -> None:
         """Re-render the last frame under whatever the filter, the Favorites
-        box and the favourites set now say. Does not touch the stacked
+        box and the favorites set now say. Does not touch the stacked
         widget: while the "waiting for data" page is up there is no frame to
         re-render anyway."""
         if self._last_data is not None:
@@ -491,7 +491,7 @@ class MonitorPanel(QWidget):
 
         rows: List[Tuple[str, Tuple[str, str, str]]] = []
         for key, v in data.items():
-            # Favourites are keyed on the raw telemetry key, so this is
+            # Favorites are keyed on the raw telemetry key, so this is
             # settled before the debug rename and costs one set lookup.
             if favorites_only and key not in self._favorites:
                 continue
@@ -520,11 +520,11 @@ class MonitorPanel(QWidget):
             rows.append((str(key), ('', str(display_key), value_str)))
         return rows
 
-    # ---- favourites ---------------------------------------------------------
+    # ---- favorites ---------------------------------------------------------
 
     def _on_telem_clicked(self, index) -> None:
-        """A click in the star gutter toggles that row's favourite. Handled
-        from the view rather than inside the delegate so the favourites set
+        """A click in the star gutter toggles that row's favorite. Handled
+        from the view rather than inside the delegate so the favorites set
         is only ever mutated by the object that owns it."""
         if index.column() != _STAR_COL:
             return

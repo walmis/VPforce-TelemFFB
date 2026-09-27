@@ -17,11 +17,11 @@
 #
 
 """The star cell in the Monitor page's telemetry table: click it to make a
-telemetry key a favourite.
+telemetry key a favorite.
 
 The column carries no text - the model stores an empty string for it - so
 the star is painted rather than stored: filled yellow for a key in the
-favourites set, a hollow outline otherwise, and a half-lit preview under
+favorites set, a hollow outline otherwise, and a half-lit preview under
 the cursor. Which keys those are lives with the panel (``MonitorPanel``
 loads and saves them), and this delegate is handed the set itself rather
 than a copy, so a toggle shows on the very next repaint without anything
@@ -29,7 +29,7 @@ having to be pushed back into it.
 
 Clicking is the *view's* business, not this delegate's: MonitorPanel
 connects ``QTableView.clicked``. The delegate only draws, which keeps the
-one thing that needs the favourites set to be mutated in the one place
+one thing that needs the favorites set to be mutated in the one place
 that owns it.
 
 Drawn rather than widgeted, for the same reason as ``IntensityBarDelegate``:
@@ -58,7 +58,7 @@ _INNER_RATIO = 0.44
 
 _POINTS = 5
 
-#: Favourite. A yellow that holds up on both themes' row backgrounds.
+#: Favorite. A yellow that holds up on both themes' row backgrounds.
 _GOLD = QColor("#f5c518")
 
 #: The hollow star's outline, and the hover preview's fill, as fractions of
@@ -67,13 +67,13 @@ _GOLD = QColor("#f5c518")
 _IDLE_ALPHA = 0.35
 _HOVER_ALPHA = 0.45
 
-TOOLTIP = ("Favourite this telemetry item.\n"
-           "Favourites are shared by all devices and kept between sessions;\n"
+TOOLTIP = ("Favorite this telemetry item.\n"
+           "Favorites are shared by all devices and kept between sessions;\n"
            "tick 'Favorites' beside the filter to list only these.")
 
 
 class FavoriteStarDelegate(QStyledItemDelegate):
-    """Paints the favourite star for a row, by its model row key."""
+    """Paints the favorite star for a row, by its model row key."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -85,7 +85,7 @@ class FavoriteStarDelegate(QStyledItemDelegate):
         self._path_size = None
 
     def set_favorites(self, favorites: Set[str]) -> None:
-        """Adopt the panel's favourites set. Mutations to it are picked up
+        """Adopt the panel's favorites set. Mutations to it are picked up
         on the next repaint - nothing has to be handed back here."""
         self._favorites = favorites
 
