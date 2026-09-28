@@ -38,16 +38,35 @@ resolves it.
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
 
 from PyQt6.QtCore import QCoreApplication, QObject, Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QMessageBox, QProgressDialog
+from PyQt6.QtWidgets import QCheckBox, QMessageBox, QProgressDialog
 
 import telemffb.globals as G
 import telemffb.utils as utils
+from telemffb.hw import ffb_dinput
 from telemffb.utils import exit_application
+
+
+def _version_tuple(version):
+    """The numeric parts of a version, padded so 0.9.6 and 0.9.6.0 compare
+    equal; empty for anything without a number."""
+    parts = tuple(int(n) for n in re.findall(r"\d+", str(version or "")))
+    return parts + (0,) * (4 - len(parts)) if parts else ()
+
+
+def directlink_update_available(installed, latest, ignored):
+    """Whether the site's latest version should be offered: newer than the
+    installed bridge, and not the version the user dismissed.  An unknown
+    installed version offers nothing."""
+    have, new = _version_tuple(installed), _version_tuple(latest)
+    if not have or not new or new <= have:
+        return False
+    return new != _version_tuple(ignored)
 
 
 class UpdateChecker(QObject):
@@ -61,6 +80,12 @@ class UpdateChecker(QObject):
         self._version_check_resolved = False
         self._version_check_dialog = None
         self.update_action = None
+        #: The DirectLink site's latest.json, kept for the settings page;
+        #: the dialog it may deserve waits until the TelemFFB check has
+        #: resolved so the two never put up dialogs at the same time.
+        self.directlink_latest = None
+        self._directlink_pending = False
+        self._directlink_installed = ""
 
     def bind_action(self, action):
         """Wire the 'Install Latest TelemFFB' menu action built in MainMenu;
@@ -72,6 +97,7 @@ class UpdateChecker(QObject):
         startup sequence in main.py used to gate it inline. When checking is
         disabled for this build/instance, emit completion immediately so
         sim listeners (gated on version_check_complete) still start."""
+        self._start_directlink_check()
         if G.master_instance and not G.release_version and not (G.dev_build or G.beta_build) and getattr(sys, 'frozen', False):
             logging.info("Checking for version updates...")
             dlg = QProgressDialog("Checking for updates...", "Skip", 0, 0, self.mw)
@@ -176,6 +202,71 @@ class UpdateChecker(QObject):
         if not self._version_check_resolved:
             self._version_check_resolved = True
             self.version_check_complete.emit()
+        self._show_directlink_update()
+
+    # --- DirectLink -------------------------------------------------------------
+
+    def _start_directlink_check(self):
+        """Runs for every build, from source or frozen, with no progress
+        dialog: only the master, only with the integration on, and only for
+        a release bridge (a fused beta comes from the developer, not the
+        site).  Never for a bridge with a problem: below the minimum
+        version, the startup's required-update prompt already points at
+        the same download."""
+        # Nothing here may raise: this runs inside startup, and a failed
+        # check is not an error the user can do anything about.
+        try:
+            if not G.master_instance or not G.system_settings.get('enableDirectInput', False):
+                return
+            status = ffb_dinput.bridge_status()
+            if not status.installed or not status.version or status.expires or status.problem:
+                return
+            self._directlink_installed = status.version
+            utils.FetchLatestDirectLink(self._directlink_result, self._directlink_error)
+        except Exception as e:
+            logging.info(f"DirectLink version check skipped: {e}")
+
+    def _directlink_result(self, latest):
+        self.directlink_latest = latest
+        self._directlink_pending = True
+        if self._version_check_resolved:
+            self._show_directlink_update()
+
+    def _directlink_error(self, error_message):
+        # already logged by the fetch; the signal exists for a listener that wants it
+        pass
+
+    def _show_directlink_update(self):
+        """Offer the site's version once the TelemFFB check is out of the way.
+        Never reached when a TelemFFB update is being installed: that path
+        exits without resolving the check.  A Qt slot: it must not raise."""
+        latest = self.directlink_latest
+        if not latest or not self._directlink_pending:
+            return
+        self._directlink_pending = False
+        try:
+            version = str(latest.get('version', ''))
+            ignored = G.system_settings.get('ignoreDirectLinkVersion', '')
+            if not directlink_update_available(self._directlink_installed, version, ignored):
+                return
+            shown = re.sub(r'\.0$', '', version)
+            logging.info(f"DirectLink {shown} is available; {self._directlink_installed} is installed")
+            page = latest.get('page') or ffb_dinput.BRIDGE_DOWNLOAD_LOCATION
+            notes = latest.get('notes') or page
+            box = QMessageBox(self.mw)
+            box.setWindowTitle("DirectLink update")
+            box.setTextFormat(Qt.TextFormat.RichText)
+            box.setText(f"DirectLink {shown} is available (Installed: {self._directlink_installed})<br><br>"
+                        f"<a href='{page}'>Download</a> &nbsp;&middot;&nbsp; <a href='{notes}'>Release notes</a><br><br>"
+                        "Close TelemFFB before running the installer.")
+            remind = QCheckBox(f"Don't show this again for {shown}")
+            box.setCheckBox(remind)
+            box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            box.exec()
+            if remind.isChecked():
+                G.system_settings.setValue('ignoreDirectLinkVersion', version)
+        except Exception as e:
+            logging.info(f"DirectLink update prompt skipped: {e}")
 
     def update_from_menu(self):
         if self.perform_update(auto=False):

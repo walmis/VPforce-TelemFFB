@@ -48,6 +48,7 @@ __all__ = [
     "create_support_bundle",
     "sock_readable",
     "FetchLatestVersion",
+    "FetchLatestDirectLink",
 ]
 
 
@@ -64,8 +65,8 @@ def open_url(url, data=None, headers=None, timeout=30, method=None):
     return urllib.request.urlopen(request, context=create_ssl_context(), timeout=timeout)
 
 
-def fetch_json_url(url, timeout=30):
-    with open_url(url, timeout=timeout) as response:
+def fetch_json_url(url, timeout=30, headers=None):
+    with open_url(url, headers=headers, timeout=timeout) as response:
         return json.loads(_decode_http_response(response))
 
 
@@ -758,6 +759,49 @@ class FetchLatestVersion(QThread):
                     self.version_result_signal.emit("dev", "dev")
 
         except Exception as e:
+            self.error_signal.emit(str(e))
+        finally:
+            self.__class__.workers.remove(self)
+
+
+#: Written by the DirectLink site's build from the installer it publishes.
+#: Keys are a contract with that build: version, filename, url, sha256,
+#: size, published, notes (release notes for that version), page.
+DIRECTLINK_LATEST_URL = "https://directlink.flyfrisby.com/latest.json"
+
+
+class FetchLatestDirectLink(QThread):
+    """Fetches the DirectLink site's latest.json and hands back the parsed
+    document.  Whether it is newer than the installed bridge, and what to
+    show, is the caller's decision."""
+    workers = []
+
+    result_signal = pyqtSignal(dict)
+    error_signal = pyqtSignal(str)
+
+    def __init__(self, on_fetch, on_error) -> None:
+        super().__init__()
+        if on_fetch:
+            self.result_signal.connect(on_fetch)
+        if on_error:
+            self.error_signal.connect(on_error)
+        self.__class__.workers.append(self)
+        self.start()
+
+    def run(self):
+        from .integration import get_version
+        try:
+            # The site sits behind Cloudflare, whose bot protection refuses
+            # urllib's default user agent outright (403); a user agent naming
+            # the application is let through.
+            headers = {"User-Agent": f"TelemFFB/{get_version()} (+https://directlink.flyfrisby.com)"}
+            latest = fetch_json_url(DIRECTLINK_LATEST_URL, timeout=10, headers=headers)
+            if not isinstance(latest, dict) or not latest.get("version"):
+                raise ValueError("latest.json carries no version")
+            self.result_signal.emit(latest)
+        except Exception as e:
+            # A failed check is nothing the user can act on: informational only
+            logging.info(f"DirectLink version check skipped: {e}")
             self.error_signal.emit(str(e))
         finally:
             self.__class__.workers.remove(self)

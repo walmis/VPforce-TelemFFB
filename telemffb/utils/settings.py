@@ -105,6 +105,7 @@ class SystemSettings(QSettings):
     pruneLogsNum: int
     pruneLogsUnit: str
     ignoreUpdate: bool
+    ignoreDirectLinkVersion: str
     startToTray: bool
     closeToTray: bool
     enableDCS: bool
@@ -160,6 +161,9 @@ class SystemSettings(QSettings):
         'pruneLogsNum': 1,
         'pruneLogsUnit': 'Week(s)',
         'ignoreUpdate': False,
+        # the one DirectLink version the user asked not to be told about
+        # again; a newer one is offered regardless
+        'ignoreDirectLinkVersion': '',
         'startToTray': False,
         'closeToTray': False,
         'enableDCS': False,
