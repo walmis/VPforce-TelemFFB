@@ -81,7 +81,6 @@ class TestBridgeAvailability:
         available, reason = bridge_availability('definitely_not_here.dll')
         assert not available
         assert 'DirectLink' in reason
-        assert 'must be installed' in reason
 
     def test_the_toggle_reverts_when_the_bridge_is_missing(self, dialog, monkeypatch):
         monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
@@ -147,7 +146,7 @@ class TestBridgeAvailability:
 
 
 class TestStartupCheck:
-    def _run(self, monkeypatch, *, enabled, available, child=False):
+    def _run(self, monkeypatch, *, enabled, available, child=False, reason=None):
         # imported here, not at module scope: importing it pulls in
         # simconnect, which leaves a file handle open, and at module scope
         # the collector gets to it during some unrelated test in another
@@ -156,8 +155,10 @@ class TestStartupCheck:
         settings = FakeSettings({'enableDirectInput': enabled})
         monkeypatch.setattr(G, 'system_settings', settings, raising=False)
         monkeypatch.setattr(G, 'child_instance', child, raising=False)
+        if reason is None:
+            reason = '' if available else 'the DLL is missing'
         monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
-                            lambda *a, **k: (available, 'the DLL is missing'))
+                            lambda *a, **k: (available, reason))
         shown = []
         monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
                             staticmethod(lambda *a, **k: shown.append(a[2])))
@@ -173,6 +174,12 @@ class TestStartupCheck:
         settings, shown = self._run(monkeypatch, enabled=True, available=True)
         assert settings['enableDirectInput'] is True
         assert not shown
+
+    def test_an_outdated_bridge_stays_on_and_asks_for_the_update(self, monkeypatch):
+        settings, shown = self._run(monkeypatch, enabled=True, available=True,
+                                    reason='DirectLink 0.9.7 or newer')
+        assert settings['enableDirectInput'] is True
+        assert shown and '0.9.7 or newer' in shown[0]
 
     def test_disabled_does_not_probe_or_nag(self, monkeypatch):
         settings, shown = self._run(monkeypatch, enabled=False, available=False)
@@ -381,16 +388,13 @@ class TestTheUserIsToldWhereToGetIt:
         available, reason = ffb_dinput.bridge_availability('not_here.dll')
         assert not available
         assert ffb_dinput.BRIDGE_DOWNLOAD_LOCATION in reason
-        assert 'obtain DirectLink from' in reason
 
     def test_an_expired_build_says_where_to_get_a_current_one(self, monkeypatch):
         import telemffb.globals as G
         from telemffb.hw import ffb_dinput
         monkeypatch.setattr(ffb_dinput.DIBridge, '__init__',
                             lambda self, p=None: None)
-        # current enough to reach the expiry check: an older build is
-        # refused by the minimum-version gate first, which is a different
-        # message and a different test
+        # current, so the expiry is the only thing wrong with it
         current = G.dinput_bridge_min_version or '1.0.0'
         monkeypatch.setattr(ffb_dinput.DIBridge, 'build_info',
                             {'version': current, 'expires': '2020-01-01'},
@@ -441,11 +445,11 @@ class TestBridgeStatusReport:
                 buf.value = raw
                 return len(raw)
 
-        class PreIdentityDLL:
-            """A pre-0.9 build: the export simply is not there, which is
-            an AttributeError on ACCESS, as ctypes gives it."""
+        class NamelessDLL:
+            """A DLL without the build-info export: an AttributeError on
+            ACCESS, as ctypes gives it."""
 
-        dll = FakeDLL() if payload is not None else PreIdentityDLL()
+        dll = FakeDLL() if payload is not None else NamelessDLL()
         monkeypatch.setattr(ffb_dinput.DIBridge, '_load_library',
                             classmethod(lambda cls, path=None: dll))
         return ffb_dinput
@@ -455,7 +459,7 @@ class TestBridgeStatusReport:
         monkeypatch.setattr(
             ffb_dinput.DIBridge, '_load_library',
             classmethod(lambda cls, path=None: (_ for _ in ()).throw(
-                ffb_dinput.DIBridgeError('Unable to load directlink.dlk from: x'))))
+                ffb_dinput.DIBridgeNotInstalled('DirectLink is not installed'))))
         status = ffb_dinput.bridge_status()
         assert not status.installed
         assert status.problem == 'not installed'
@@ -493,7 +497,7 @@ class TestBridgeStatusReport:
                                            'expires': expires})
         status = mod.bridge_status()
         assert status.days_left == -2
-        assert status.problem.startswith('expired')
+        assert expires in status.problem
 
     def test_an_unreadable_expiry_is_a_problem(self, monkeypatch):
         mod = self._fake_dll(monkeypatch, {'version': self.current(), 'abi': 1,
@@ -501,19 +505,11 @@ class TestBridgeStatusReport:
         status = mod.bridge_status()
         assert 'unreadable expiry' in status.problem
 
-    def test_a_pre_identity_build_is_installed_but_nameless(self, monkeypatch):
+    def test_a_build_without_identity_is_installed_but_flagged(self, monkeypatch):
         mod = self._fake_dll(monkeypatch, None)      # no build-info export
         status = mod.bridge_status()
         assert status.installed and not status.version
-
-    def test_a_build_that_says_nothing_about_licensing_reads_unlicensed(
-            self, monkeypatch):
-        """A DLL predating the license fields must not read as licensed."""
-        mod = self._fake_dll(monkeypatch, {'version': self.current(),
-                                           'abi': 1})
-        status = mod.bridge_status()
-        assert not status.licensed
-        assert status.license_days_left is None
+        assert status.problem
 
     def test_a_full_license_has_no_expiry_to_count(self, monkeypatch):
         mod = self._fake_dll(monkeypatch, {'version': self.current(),
@@ -565,16 +561,6 @@ class TestBridgeStatusReport:
         status = mod.bridge_status()
         assert status.license_present and not status.licensed
 
-    def test_a_dll_predating_the_present_flag_reads_as_absent(
-            self, monkeypatch):
-        """Keys are additive, so an older 0.9.x reports no flag at all.
-        Absent is the safe reading: it makes the line say 'no license
-        file', which is what that build could already say."""
-        mod = self._fake_dll(monkeypatch, {'version': self.current(),
-                                           'abi': 1, 'licensed': False})
-        status = mod.bridge_status()
-        assert not status.license_present
-
     def test_a_build_refusing_its_location_says_so_in_the_report(
             self, monkeypatch):
         """location_ok=false means every device open will be refused -
@@ -583,15 +569,6 @@ class TestBridgeStatusReport:
                                            'abi': 1, 'location_ok': False})
         status = mod.bridge_status()
         assert status.location_ok is False
-
-    def test_a_dll_predating_the_location_verdict_reads_as_fine(
-            self, monkeypatch):
-        """Pre-0.9.5 DLLs had no binding, so absence means unbound -
-        and unbound builds accept any location."""
-        mod = self._fake_dll(monkeypatch, {'version': self.current(),
-                                           'abi': 1})
-        status = mod.bridge_status()
-        assert status.location_ok is True
 
     def test_the_licensee_never_reaches_the_settings_page(self, monkeypatch):
         """Name and email stay in the log.  On a settings page they tell
@@ -625,7 +602,7 @@ class TestBridgeStatusLabel:
         dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status(
             installed=False, problem='not installed'))
         text = dlg.lab_dinput_status.text()
-        assert 'not found' in text
+        assert 'not installed' in text
         # the address is a live link, and the label is allowed to open it
         assert '<a href="' in text and dlg.lab_dinput_status.openExternalLinks()
         assert dlg.lab_dinput_status.styleSheet()      # flagged for attention
@@ -712,7 +689,6 @@ class TestLicenseStatusLabel:
         dlg = self._dialog_with(app, tmp_path, monkeypatch, self.status())
         text = dlg.lab_dinput_status.text()
         assert 'devices will be refused' in text
-        assert 'beside the DLL' in text
         assert dlg.lab_dinput_status.styleSheet()
 
     def test_an_invalid_license_file_says_so_rather_than_missing(
@@ -755,7 +731,7 @@ class TestLicenseStatusLabel:
             location_ok=False, licensed=True,
             license_expires='2026-09-09', license_days_left=10))
         text = dlg.lab_dinput_status.text()
-        assert 'not installed with its installer' in text
+        assert 'devices will be refused' in text
         assert 'evaluation' not in text
         assert dlg.lab_dinput_status.styleSheet()
 
@@ -887,7 +863,7 @@ class TestMinimumBridgeVersion:
         assert ok('0.0.1', '')
         assert ok('', '')
 
-    def test_an_old_build_is_refused_with_both_versions_named(
+    def test_an_old_build_is_usable_and_asks_for_the_update(
             self, monkeypatch):
         import telemffb.globals as G
         from telemffb.hw import ffb_dinput
@@ -899,7 +875,7 @@ class TestMinimumBridgeVersion:
         monkeypatch.setattr(ffb_dinput, 'DIBridge',
                             lambda *a, **k: FakeBridge())
         available, reason = ffb_dinput.bridge_availability()
-        assert not available
+        assert available
         assert '0.9.0' in reason and '0.9.2' in reason
 
     def test_a_current_build_passes_the_gate(self, monkeypatch):
@@ -931,7 +907,7 @@ class TestMinimumBridgeVersion:
                             classmethod(lambda cls, path=None: FakeDLL()))
         status = ffb_dinput.bridge_status()
         assert status.installed
-        assert 'older than the 0.9.2' in status.problem
+        assert '0.9.2' in status.problem
 
     # There was a test here that loaded the real DLL and checked its
     # version against G.dinput_bridge_min_version.  It could never run

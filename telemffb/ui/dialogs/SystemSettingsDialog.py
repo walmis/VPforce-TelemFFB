@@ -22,6 +22,7 @@ import json
 import html
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -38,6 +39,7 @@ from telemffb.tap import msfs_panel_install, xplane_install
 from telemffb import utils
 from telemffb.app_events import events as app_events
 from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
+from telemffb.ui.dialogs.directlink_notice import with_download_link
 from telemffb.ui.dialogs.restart_offer import ask_to_restart
 from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
 from telemffb.tap.tap_install import SIMS_BY_KEY, matches_signature, sim_status
@@ -52,7 +54,7 @@ from telemffb.utils import (
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle, svg_icon
 from telemffb.ui.theme.tokens import (
-    ATTENTION_AMBER_DARK, ATTENTION_AMBER_LIGHT, LINK_BLUE_DARK, LINK_BLUE_LIGHT,
+    ATTENTION_AMBER_DARK, ATTENTION_AMBER_LIGHT,
 )
 
 
@@ -157,27 +159,9 @@ DINPUT_TOOLTIP = (
     "before this can be enabled.</p>"
 
     "<p>DirectInput device support for <b>DCS</b>, <b>IL-2</b> and <b>BMS</b> "
-    "also requires configuration of the <b>DirectInput Tap</b>.  It can be configured "
-    "in each respective simulators 'Simulator Setup' tab section.</p>"
+    "also requires the <b>DirectInput Tap</b>, set up on each simulator's page "
+    "of the <b>Simulator Setup</b> tab.</p>"
 )
-
-
-def _with_download_link(text):
-    """Rich-text form of a message that names DirectLink's address, with
-    the address as a live link.  The messages themselves stay plain text:
-    they are also logged and asserted on, and a QLabel or QMessageBox in
-    rich-text mode is the only place the link can be clicked."""
-    from telemffb.hw.ffb_dinput import BRIDGE_DOWNLOAD_LOCATION
-    url = BRIDGE_DOWNLOAD_LOCATION
-    # The app stylesheet's link color is one purple for both themes, and it
-    # all but disappears on the dark one.  The anchor is colored inline for
-    # the theme in use, which leaves the stylesheet alone.
-    app = QtWidgets.QApplication.instance()
-    window = app.palette().color(QtGui.QPalette.ColorRole.Window) if app else None
-    color = LINK_BLUE_DARK if window is not None and window.lightness() < 128 else LINK_BLUE_LIGHT
-    link = (f'<a href="{html.escape(url, quote=True)}" style="color: {color}">'
-            f'{html.escape(url)}</a>')
-    return html.escape(text).replace('\n', '<br>').replace(html.escape(url), link)
 
 
 class _LiveSettings:
@@ -1962,17 +1946,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         QtCore.QTimer.singleShot(0, self._grow_to_fit)
 
     def _grow_to_fit(self):
-        """Make the window at least as tall as its content needs.
-
-        The .ui's opening size is a preference, not a promise: with real
-        font metrics the Devices tab can need more height than it, and a
-        programmatic resize below the layout minimum is allowed - the
-        layout then compresses the tallest card and paints its selector
-        clipped, until the user drags the frame and the window system
-        enforces the real minimum.  Enforce it up front (and again when
-        the content grows, e.g. cards expanding), capped to the screen.
-        Never shrinks the window.
-        """
+        """Make the window at least as tall as its content needs."""
         need = self.minimumSizeHint()
         width, height = self.width(), self.height()
         grown_w = max(width, need.width())
@@ -1985,13 +1959,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if (grown_w, grown_h) != (width, height):
             self.resize(grown_w, grown_h)
 
-    #: A beta fuse or an evaluation this close is worth flagging before
-    #: the day it runs out.
     BRIDGE_EXPIRY_WARN_DAYS = 14
 
-    #: An evaluation is shorter than the fuse and is *expected* to be
-    #: counting down, so warning on the same 14 days would paint it amber
-    #: from the moment it was installed and say nothing by the last day.
     EVALUATION_WARN_DAYS = 3
 
     @staticmethod
@@ -2024,35 +1993,23 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         try:
             status = bridge_status()
         except Exception:
-            logging.exception('DInput bridge status check failed')
+            logging.exception('DirectLink status check failed')
             self.lab_dinput_status.setVisible(False)
             return
         attention = True
         if not status.installed:
-            text = _with_download_link(
-                f"DirectLink: not found - available from {BRIDGE_DOWNLOAD_LOCATION}")
+            text = with_download_link(
+                f"DirectLink not installed - download it from {BRIDGE_DOWNLOAD_LOCATION}")
         elif status.problem:
-            text = _with_download_link(
-                f"DirectLink {status.version or '(unknown build)'}"
-                f": {status.problem} - a current build is available from "
+            name = f"DirectLink {status.version}" if status.version else "DirectLink"
+            text = with_download_link(
+                f"{name}: {status.problem} - download the current build from "
                 f"{BRIDGE_DOWNLOAD_LOCATION}")
-        elif not status.version:
-            text = "DirectLink: installed (build identity unavailable)"
-            attention = False
         else:
-            # One clock, never two.  A build with a fuse is a beta and
-            # goes to testers; a build without one is a release and goes
-            # to buyers.  They overlap only in a build made during this
-            # pre-release window, and there the fuse wins: it is the one
-            # that actually refuses to open a device.
             head = f"DirectLink {status.version}: "
             if not status.location_ok:
-                # It loads and reports fine from here, but will refuse
-                # every device open - the one fact that outranks all the
-                # clocks below, because none of them matter until the
-                # build runs where its installer put it.
-                text = (head + "not installed with its installer - "
-                        "devices will be refused until it is")
+                text = (head + "not in the folder it was installed to - "
+                        "reinstall DirectLink; devices will be refused until then")
                 attention = True
             elif status.days_left is not None:
                 text = head + "beta build, " + self._expiry_phrase(
@@ -2061,34 +2018,45 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             elif status.license_days_left is not None:
                 text = head + "evaluation, " + self._expiry_phrase(
                     status.license_expires, status.license_days_left)
-                # Worth flagging even while nothing enforces it: what
-                # the user has to do about it takes longer than the
-                # last day.
                 attention = (status.license_days_left
                              <= self.EVALUATION_WARN_DAYS)
             elif status.licensed:
                 text = head + "licensed"
                 attention = False
             elif status.license_present:
-                # A file that is there and will not verify sends the
-                # user somewhere different from no file at all: replace
-                # this one, rather than go find one.
-                text = (head + "license file is not valid - devices "
-                        "will be refused; replace the file or reinstall")
+                text = (head + "license file is not valid - reinstall "
+                        "DirectLink; devices will be refused until then")
                 attention = True
             else:
-                # Amber since enforcement: every release build this
-                # TelemFFB accepts (the min-version gate guarantees
-                # 0.9.5+, and 0.9.5 enforces) will refuse device opens
-                # without a license, so a calm line here would describe
-                # a setup that fails at the first connect.  Fused betas
-                # never reach this branch - the fuse clause above wins.
-                text = (head + "no license file - devices will be "
-                        "refused until one is placed beside the DLL")
+                text = (head + "no license file - reinstall DirectLink; "
+                        "devices will be refused until then")
                 attention = True
+            text += self._dinput_update_line(status.version)
         self.lab_dinput_status.setText(text)
         self.lab_dinput_status.setStyleSheet(
             f"color: {self._attention_color().name()};" if attention else "")
+
+    def _dinput_update_line(self, installed):
+        """A second line naming a newer DirectLink the startup check found,
+        with its release notes and download; empty when there is none or
+        the check has not answered yet.  Shown regardless of the startup
+        dialog's dismissal: here the user is asking."""
+        from telemffb.ui.updates import directlink_update_available
+        try:
+            latest = getattr(getattr(G.main_window, 'updates', None), 'directlink_latest', None)
+            if not latest:
+                return ""
+            version = str(latest.get('version', ''))
+            if not directlink_update_available(installed, version, ''):
+                return ""
+            shown = re.sub(r'\.0$', '', version)
+            page = latest.get('page') or 'https://directlink.flyfrisby.com/'
+            notes = latest.get('notes') or page
+            return (f"<br>DirectLink {shown} is available: "
+                    f"<a href='{notes}'>release notes</a> &middot; <a href='{page}'>download</a>")
+        except Exception:
+            # a status line, never worth an error
+            return ""
 
     def _attention_color(self):
         """An amber that reads on either theme (the palette has no
@@ -2115,13 +2083,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 # The static warning() is the seam the tests replace, and its
                 # label auto-detects the markup, so the address is a live
                 # link without building a box by hand.
-                QMessageBox.warning(self, "DirectLink not found", _with_download_link(reason))
+                QMessageBox.warning(self, "DirectLink Unavailable", with_download_link(reason))
                 # Toggle defers a set made from inside its own signal, so
                 # this lands one event-loop pass from now and re-enters
                 # here with the box off - which is what runs the repopulate
                 # below, for the settled state.  Hence the return.
                 self.cb_enable_dinput.setChecked(False)
                 return
+            if reason:
+                QMessageBox.warning(self, "DirectLink Update Required", with_download_link(reason))
 
         self.populateUSBSelectors(dinput_enabled=self.cb_enable_dinput.isChecked())
         # the toggle is the moment a user who just installed the

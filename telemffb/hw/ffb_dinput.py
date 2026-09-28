@@ -158,6 +158,10 @@ class DIBridgeError(Exception):
     pass
 
 
+class DIBridgeNotInstalled(DIBridgeError):
+    """No DirectLink was found where it is looked for."""
+
+
 def _trace_enabled() -> bool:
     """Bridge call tracing: DIB_TRACE=1 environment variable (dev runs), or
     registry value 'dinput_trace' = 1 under HKCU\\Software\\VPforce\\TelemFFB
@@ -258,7 +262,9 @@ def bridge_availability(dll_path: Optional[str] = None):
     """Whether the DInput bridge DLL can actually be used.
 
     Returns (available, reason).  `reason` is written for a message box, not
-    a log line, and is empty when available.  The bridge is separately
+    a log line.  It is empty when the bridge is available and current; an
+    available bridge older than the minimum still works, and its reason
+    asks for the update.  The bridge is separately
     distributed, so "missing" is an ordinary state rather than an error -
     but one worth explaining rather than leaving the user with an
     unexplained empty device list.
@@ -268,40 +274,18 @@ def bridge_availability(dll_path: Optional[str] = None):
         # current truth (paths, expiry), not a user of the bridge - the
         # shared instance is for the device and enumeration paths
         bridge = DIBridge(dll_path)
-    except Exception as e:                    # DIBridgeError, OSError, ...
-        # The searched paths are deliberately not shown.  DirectLink is
-        # installed by its own installer, so a list of folders TelemFFB
-        # looked in answers a question the user cannot act on - and reads
-        # as an invitation to drop a file into one of them.  They are in
-        # the log for support.
-        logging.info("DirectLink not loaded: %s", e)
-        # An ABI mismatch or a Windows load error says something the user
-        # can act on ("wrong version", "missing dependency"); a plain
-        # not-found only repeats the first line, so it is dropped.
-        # An ABI mismatch or a Windows load error says something the user
-        # can act on ("wrong version", "missing dependency"); a plain
-        # not-found only repeats the first line, so it is dropped.
-        detail = "" if str(e).startswith("Unable to load") else "\n\n" + str(e)
-        # The product is named once at the start and once at the end - a
-        # sentence apiece opening with "DirectLink" reads like a form
-        # letter.  The gap before the last line separates the diagnosis
-        # from what to do about it.
+    except DIBridgeNotInstalled:
         return False, (
-            "DirectLink could not be loaded. It must be installed in order "
-            "to enable the integration.{}\n\n\n"
-            "You can obtain DirectLink from {}.".format(
-                detail, BRIDGE_DOWNLOAD_LOCATION))
-
-    minimum = getattr(G, 'dinput_bridge_min_version', '') or ''
-    if minimum:
-        version = (bridge.build_info or {}).get("version", "")
-        if not version_is_at_least(version, minimum):
-            return False, (
-                "The installed DirectLink is too old for this version of "
-                "TelemFFB.\n\nInstalled: {}\nRequired: {} or newer\n\n"
-                "You can obtain the current build from {}.".format(
-                    version or "an unidentified build predating 0.9",
-                    minimum, BRIDGE_DOWNLOAD_LOCATION))
+            "DirectLink is not installed.\n\n"
+            "You can download DirectLink from {}.".format(BRIDGE_DOWNLOAD_LOCATION))
+    except Exception as e:                    # DIBridgeError, OSError, ...
+        # An interface mismatch or a Windows load error says something
+        # the user can act on ("wrong version", "missing dependency").
+        logging.info("DirectLink not loaded: %s", e)
+        return False, (
+            "DirectLink could not be loaded.\n\n{}\n\n"
+            "You can download the current build from {}.".format(
+                e, BRIDGE_DOWNLOAD_LOCATION))
 
     expires = (bridge.build_info or {}).get("expires")
     if expires:
@@ -312,11 +296,22 @@ def bridge_availability(dll_path: Optional[str] = None):
             days_left = None
         if days_left is not None and days_left < 0:
             return False, (
-                "The DirectLink build expired on {}.\n\n"
-                "Beta builds carry a time limit; the device connection will "
-                "be refused until a current build is installed.\n\n"
-                "You can obtain the current build from {}.".format(
+                "This DirectLink beta build expired on {}.  DirectInput "
+                "devices will not connect until a current build is "
+                "installed.\n\n"
+                "You can download the current build from {}.".format(
                     expires, BRIDGE_DOWNLOAD_LOCATION))
+
+    minimum = getattr(G, 'dinput_bridge_min_version', '') or ''
+    if minimum:
+        version = (bridge.build_info or {}).get("version", "")
+        if not version_is_at_least(version, minimum):
+            return True, (
+                "This version of TelemFFB requires a newer version of DirectLink.\n\n"
+                "Installed: {}\nRequired: {} or newer\n\n"
+                "You can download the current build from {}.".format(
+                    version or "unknown",
+                    minimum, BRIDGE_DOWNLOAD_LOCATION))
     return True, ""
 
 
@@ -339,9 +334,8 @@ def _version_tuple(version: str):
 def version_is_at_least(version: str, minimum: str) -> bool:
     """Whether a bridge version meets the minimum this TelemFFB needs.
 
-    An unreadable or absent version fails the check: builds predating
-    the identity export cannot be shown to be new enough, and the point
-    of a minimum is to refuse what cannot be vouched for.
+    An unreadable or absent version fails the check: it cannot be shown
+    to be new enough.
     """
     if not minimum:
         return True
@@ -396,33 +390,29 @@ def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
     bridge = DIBridge.__new__(DIBridge)
     try:
         bridge._dll = DIBridge._load_library(dll_path)
+    except DIBridgeNotInstalled:
+        return BridgeStatus(installed=False, problem="not installed")
     except Exception as e:
-        detail = str(e)
-        return BridgeStatus(
-            installed=False,
-            problem=("not installed" if detail.startswith("Unable to load")
-                     else detail or "not installed"))
+        # it is there, but this TelemFFB cannot use it
+        logging.info("DirectLink not loaded: %s", e)
+        return BridgeStatus(installed=True,
+                            problem="not compatible with this version of TelemFFB")
     try:
         info = bridge._read_build_info()
     except Exception:
         # the library loaded, so it IS installed - only its identity is
-        # unreadable, which is what a pre-identity build looks like
+        # unreadable
         info = {}
     minimum = getattr(G, 'dinput_bridge_min_version', '') or ''
     if not info:
-        # pre-0.9 DLLs predate the build-info export, so they cannot be
-        # shown to meet a minimum
-        return BridgeStatus(
-            installed=True, version="",
-            problem=("too old for this TelemFFB, which needs DirectLink "
-                     f"{minimum} or newer" if minimum else ""))
+        return BridgeStatus(installed=True, version="",
+                            problem="build information unreadable")
     status = BridgeStatus(installed=True,
                           version=str(info.get("version", "")),
                           built=str(info.get("built", "")),
                           expires=str(info.get("expires", "") or ""))
     if not version_is_at_least(status.version, minimum):
-        status.problem = (f"version {status.version or '(unknown)'} is older "
-                          f"than the {minimum} this TelemFFB needs")
+        status.problem = f"update required ({minimum} or newer)"
         return status
     if status.expires:
         try:
@@ -430,16 +420,14 @@ def bridge_status(dll_path: Optional[str] = None) -> BridgeStatus:
             status.days_left = (date.fromisoformat(status.expires)
                                 - date.today()).days
         except ValueError:
-            status.problem = f"unreadable expiry date '{status.expires}'"
+            status.problem = "beta build with an unreadable expiry date"
             return status
         if status.days_left < 0:
-            status.problem = f"expired {status.expires}"
+            status.problem = f"beta build expired {status.expires}"
 
     # License state, kept out of `problem`: that one is about the build
     # itself, and its wording points at downloading a current one, which
-    # is not what an expired evaluation needs.  A DLL that predates the
-    # license fields simply reports neither and reads as unlicensed.
-    # absent on pre-0.9.5 DLLs, which had no binding to report
+    # is not what an expired evaluation needs.
     status.location_ok = bool(info.get("location_ok", True))
     status.license_present = bool(info.get("license_present"))
     status.licensed = bool(info.get("licensed"))
@@ -582,11 +570,16 @@ class DIBridge:
             except OSError:
                 pass
         if not dll:
-            raise DIBridgeError(f"Unable to load directlink.dlk from: {', '.join(paths)}")
+            # the folders searched are for support; the user installs
+            # DirectLink with its installer, not by dropping a file in one
+            logging.info(f"DirectLink not found in: {', '.join(paths)}")
+            raise DIBridgeNotInstalled("DirectLink is not installed")
 
         abi = dll.dib_abi_version()
         if abi != DIB_ABI_VERSION:
-            raise DIBridgeError(f"directlink.dlk ABI version {abi}, expected {DIB_ABI_VERSION}")
+            raise DIBridgeError(
+                "The installed DirectLink does not match this version of "
+                f"TelemFFB (interface {abi}, expected {DIB_ABI_VERSION}).")
         return dll
 
     def __init__(self, dll_path: Optional[str] = None):
@@ -597,26 +590,19 @@ class DIBridge:
         self._trace = _trace_enabled()
         self._effect_types: Dict[int, int] = {}
         if self._trace:
-            logging.info("DInput bridge trace enabled: logging all bridge effect calls")
+            logging.info("DirectLink trace enabled: logging all bridge effect calls")
 
         self.build_info = self._read_build_info()
         self._log_build_identity()
 
     def _read_build_info(self) -> dict:
-        """Version/built/expires of the loaded DLL.  The export is additive
-        in ABI 1, so older DLLs simply don't have it - and so are
-        individual keys, so a missing one is not an error either."""
-        try:
-            fn = self._dll.dib_build_info
-        except AttributeError:
-            return {}
+        """Version/built/expires and license state of the loaded DLL."""
         # 512, not 256: the fixed keys are ~150 bytes and the licensee
         # runs to 128 characters, so a long name overflows a 256-byte
         # buffer.  The DLL returns DIB_ERR_BAD_ARG rather than truncating,
-        # which arrives here as no build info at all - and a DLL with no
-        # build info reads as too old for this TelemFFB.
+        # which arrives here as no build info at all.
         buf = ctypes.create_string_buffer(512)
-        if fn(buf, len(buf)) <= 0:
+        if self._dll.dib_build_info(buf, len(buf)) <= 0:
             return {}
         try:
             return json.loads(buf.value.decode(errors="replace"))
@@ -627,12 +613,12 @@ class DIBridge:
         """Log the DLL's identity for support, and warn ahead of a beta
         build's expiry fuse instead of cliff-edge failing on launch day."""
         if not self.build_info:
-            logging.info("DInput bridge loaded (no build info export - pre-0.9 build)")
+            logging.info("DirectLink loaded (no build info)")
             return
         version = self.build_info.get("version", "?")
         built = self.build_info.get("built", "?")
         expires = self.build_info.get("expires")
-        logging.info(f"DInput bridge {version} (ABI {self.build_info.get('abi', '?')}, built {built})")
+        logging.info(f"DirectLink {version} (ABI {self.build_info.get('abi', '?')}, built {built})")
 
         # Who the license names, in the log only.  The settings page says
         # no more than "licensed": a licensee's own name tells them
@@ -648,9 +634,7 @@ class DIBridge:
             # a file is there and did not verify - worth an actual
             # warning, unlike an absent one: someone put it there
             logging.warning("DirectLink license file found but not valid")
-        elif "licensed" in self.build_info:
-            # the DLL reports license state and found none - normal
-            # today, since nothing is enforced yet
+        else:
             logging.info("DirectLink: no license file found beside the DLL")
         if not expires:
             return
@@ -658,16 +642,16 @@ class DIBridge:
             from datetime import date
             days_left = (date.fromisoformat(expires) - date.today()).days
         except ValueError:
-            logging.warning(f"DInput bridge BETA build with unparseable expiry '{expires}'")
+            logging.warning(f"DirectLink beta build with unparseable expiry '{expires}'")
             return
         if days_left < 0:
-            logging.error(f"DInput bridge BETA build EXPIRED {expires} - "
+            logging.error(f"DirectLink beta build expired {expires} - "
                           "device connection will be refused; download the current build")
         elif days_left <= 14:
-            logging.warning(f"DInput bridge BETA build expires in {days_left} day(s) "
+            logging.warning(f"DirectLink beta build expires in {days_left} day(s) "
                             f"({expires}) - download the current build soon")
         else:
-            logging.info(f"DInput bridge BETA build, expires {expires}")
+            logging.info(f"DirectLink beta build, expires {expires}")
 
     def last_error(self) -> str:
         buf = ctypes.create_string_buffer(512)
@@ -678,13 +662,14 @@ class DIBridge:
         buf = ctypes.create_string_buffer(65536)
         n = self._dll.dib_enumerate(buf, len(buf))
         if n < 0:
-            raise DIBridgeError(f"enumerate failed: {self.last_error()}")
+            raise DIBridgeError(f"DirectLink could not list devices: {self.last_error()}")
         return json.loads(buf.value.decode(errors="replace"))
 
     def open(self, guid: str) -> int:
         h = self._dll.dib_open(guid.encode())
         if h < 0:
-            raise DIBridgeError(f"open {guid} failed: {self.last_error()}")
+            logging.info(f"DirectLink could not open {guid}")
+            raise DIBridgeError(f"DirectLink could not open the device: {self.last_error()}")
         return h
 
     def release(self, device: int):
@@ -698,12 +683,8 @@ class DIBridge:
 
     def autocenter_state(self, device: int) -> int:
         """How the autocenter handover went for an open device, as
-        DIB_AC_* bits - or a negative DIB_ERR_*.  Absent in pre-0.9.2
-        DLLs."""
-        fn = getattr(self._dll, 'dib_autocenter_state', None)
-        if fn is None:
-            return DIB_ERR_UNSUPPORTED
-        return fn(device)
+        DIB_AC_* bits - or a negative DIB_ERR_*."""
+        return self._dll.dib_autocenter_state(device)
 
     #: DIB_AXIS_* codes, in DIJOYSTATE2 order (dinput_bridge.h)
     AXIS_NAMES = ('X', 'Y', 'Z', 'RX', 'RY', 'RZ', 'SL0', 'SL1')
@@ -711,21 +692,15 @@ class DIBridge:
 
     def ffb_axes(self, device: int):
         """The open device's force-actuator axes, as names from
-        AXIS_NAMES.  Empty when the DLL predates 0.9.3 or errors."""
-        fn = getattr(self._dll, 'dib_ffb_axes', None)
-        if fn is None:
-            return []
-        return self._axis_names(fn(device))
+        AXIS_NAMES.  Empty when the DLL errors."""
+        return self._axis_names(self._dll.dib_ffb_axes(device))
 
     def query_ffb_axes(self, guid: str):
         """The same, for a device that is NOT open - the settings dialog
         asks before anything is held.  Safe while another process holds
         the device (object enumeration needs no acquisition), and a
         device held by THIS process answers from its open-time record."""
-        fn = getattr(self._dll, 'dib_query_ffb_axes', None)
-        if fn is None:
-            return []
-        return self._axis_names(fn(guid.encode()))
+        return self._axis_names(self._dll.dib_query_ffb_axes(guid.encode()))
 
     @classmethod
     def _axis_names(cls, mask: int):
@@ -739,29 +714,23 @@ class DIBridge:
         """Point logical X/Y at native axes (AXIS_NAMES indexes, or
         AXIS_NONE), optionally inverting a logical axis's direction -
         effects mirrored and the input reading negated, as if the
-        hardware ran the other way.  Absent in pre-0.9.3 DLLs."""
-        fn = getattr(self._dll, 'dib_set_axis_map', None)
-        if fn is None:
-            return DIB_ERR_UNSUPPORTED
-        return fn(device, x_axis, y_axis, int(invert_x), int(invert_y))
+        hardware ran the other way."""
+        return self._dll.dib_set_axis_map(device, x_axis, y_axis,
+                                          int(invert_x), int(invert_y))
 
     def device_reset(self, device: int) -> int:
         """Device-level reset: destroy every effect the DEVICE holds -
         reachable through a handle or not - and free the bridge's effect
-        entries for it.  Absent in pre-0.9.1 DLLs; reported as a general
-        failure there."""
+        entries for it."""
         if self._trace:
             logging.info(f"DIB device_reset dev#{device}")
-        fn = getattr(self._dll, 'dib_device_reset', None)
-        if fn is None:
-            return DIB_ERR_UNSUPPORTED
-        return fn(device)
+        return self._dll.dib_device_reset(device)
 
     def poll(self, device: int) -> DibDeviceState:
         state = DibDeviceState()
         rc = self._dll.dib_poll(device, ctypes.byref(state))
         if rc != DIB_OK:
-            raise DIBridgeError(f"poll failed ({rc}): {self.last_error()}")
+            raise DIBridgeError(f"DirectLink could not read the device ({rc}): {self.last_error()}")
         return state
 
     def effect_create(self, device: int, effect_type: int, params: DibEffectParams) -> int:
@@ -1296,8 +1265,8 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         X, collective Y, trim wheel Y - but third-party hardware puts its
         force feedback wherever it likes (pedals on Rz, typically).  The
         resolved map is handed to DirectLink only when it DIFFERS from
-        what the device is running - so an identity map is never sent
-        and old DLLs stay quiet.  With ``recover`` (a live settings
+        what the device is running - so an identity map is never sent.
+        With ``recover`` (a live settings
         change), the device's effects are recreated afterwards:
         DirectInput fixes an effect's axes at creation, so the ones
         already downloaded would otherwise keep the old map forever.
@@ -1308,12 +1277,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         if desired == self._axis_map_state:
             return
         rc = self.bridge.set_axis_map(self._handle, *desired)
-        if rc == DIB_ERR_UNSUPPORTED:
-            logging.warning(
-                f"DirectInput axis map ({role}): this DirectLink build "
-                f"has no axis mapping (0.9.3 adds it) - wanted {described}, "
-                "effects stay on native X/Y")
-        elif rc < 0:
+        if rc < 0:
             logging.warning(f"DirectInput axis map ({role}) refused: "
                             f"{self.bridge.last_error()}")
         else:
@@ -1343,7 +1307,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         except Exception:
             return
         if state < 0:
-            return          # pre-0.9.2 bridge: nothing to report
+            return          # the bridge could not tell
         if state & DIBridge.AC_OFF_APPLIED:
             verified = ('device-confirmed'
                         if state & DIBridge.AC_OFF_VERIFIED

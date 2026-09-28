@@ -55,7 +55,7 @@ FIELD_NO_MATCH_BG = "rgba(255, 0, 0, 0.2)"    # pattern does not match
 WARNING_LABEL_BG = "rgba(255, 50, 50, 30)"    # excluded-defaults warning label tint
 
 # Keyed off the widget's own palette lightness rather than G.useDarkMode
-# (see SystemSettingsDialog._with_download_link / _attention_color), so
+# (see directlink_notice.with_download_link / SystemSettingsDialog._attention_color), so
 # these stay standalone constants instead of ThemeTokens fields.
 LINK_BLUE_DARK = "#8ab4f8"
 LINK_BLUE_LIGHT = "#1a5fb4"

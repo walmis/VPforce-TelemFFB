@@ -641,14 +641,11 @@ class DeviceCardsPanel(QWidget):
         # reports a one-line minimum height, which let the dialog open
         # too short and crush the tallest card (the joystick selector
         # painted clipped until the frame was dragged).
-        lines = ['No VPforce devices were found.  DirectInput support for '
-                 'other force feedback devices',
-                 'can be enabled on the System page.']
+        lines = ['No VPforce devices were found.  To enable support for DirectInput devices,',
+                 'turn on DirectLink integration in System Settings.']
         if DINPUT_BRIDGE_URL:
-            lines[-1] += (f'  Visit <a href="{DINPUT_BRIDGE_URL}">'
-                          f'{DINPUT_BRIDGE_URL}</a> to get your copy of')
-            lines.append('DirectLink for TelemFFB if you do not '
-                         'already have it.')
+            lines.append(f'DirectLink is a free download from '
+                         f'<a href="{DINPUT_BRIDGE_URL}">{DINPUT_BRIDGE_URL}</a>.')
             hint = '<br/>'.join(lines)     # rich text: the link needs it
         else:
             hint = '\n'.join(lines)

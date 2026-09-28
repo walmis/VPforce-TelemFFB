@@ -79,6 +79,7 @@ from telemffb.MainWindow import MainWindow
 from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
+from telemffb.ui.dialogs.directlink_notice import with_download_link
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.state.app_state import AppState
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
@@ -87,6 +88,7 @@ from telemffb.namedmutex import NamedMutex
 import telemffb.api_server as api_server
 import telemffb.telem.DcsSettingsChannel as dcs_settings
 import styles
+from telemffb.ui.theme import tokens
 resources # used
 mutex = None
 
@@ -237,13 +239,15 @@ def _setup_device_configuration():
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
 
 def _check_directinput_support():
-    """Turn DirectInput support off if the bridge DLL is not usable.
+    """Turn DirectInput support off if the bridge DLL is not usable, and
+    ask for an update when it works but is older than this TelemFFB needs.
 
     The DLL is distributed separately from TelemFFB, so an install can lose
-    it - to an update, a move, or a beta build reaching its expiry. Leaving
-    the setting on would list no devices and explain nothing, and any
-    instance already assigned a [DI] device would fail to connect with no
-    obvious cause. Better to switch it off and say why.
+    it - to an update, a move, or a beta build reaching its expiry. The
+    setting only lists DirectInput devices in System Settings, and without
+    the DLL that list is empty with nothing to say why. An instance already
+    assigned a [DI] device fails to connect whatever the setting says, and
+    connects again once the DLL is usable.
     """
     if G.child_instance:
         # one report per launch: the master owns the setting, and four
@@ -254,16 +258,19 @@ def _check_directinput_support():
     from telemffb.hw.ffb_dinput import bridge_availability
     available, reason = bridge_availability()
     if available:
+        if reason:
+            logging.warning(f"DirectLink update required: {reason.splitlines()[0]}")
+            QMessageBox.warning(getattr(G, 'main_window', None), "DirectLink Update Required", with_download_link(reason))
         return
 
     G.system_settings.setValue('enableDirectInput', False)
-    logging.error(f"DirectInput support disabled: {reason.splitlines()[0]}")
+    logging.error(f"DirectLink for TelemFFB turned off: {reason.splitlines()[0]}")
     QMessageBox.warning(
-        None, "DirectInput Support Disabled",
-        "DirectInput support was enabled, but has been automatically turned off.\n\n"
-        + reason
-        + "\n\nAny instance assigned a [DI] device will not connect until "
-        "this is resolved and the setting is re-enabled in System Settings.")
+        getattr(G, 'main_window', None), "DirectLink Disabled", with_download_link(
+            reason
+            + "\n\nDirectLink integration has been disabled.  A [DI] device that "
+            "is already assigned will not be able to connect until DirectLink is renistalled.\n\n"
+            "Re-enable in System Settings > System > Integrations after installing."))
 
 
 def _setup_theme_and_styling(app):
@@ -319,6 +326,11 @@ def _apply_dark_mode_palette(app, palette):
     # Base colors with updated ColorRole enums
     palette.setColor(QtGui.QPalette.ColorRole.Window, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor("#dddddd"))
+    # Rich-text links in labels and message boxes take this role: the
+    # accent itself sinks into the dark ground, so they get the lightened
+    # accent the stylesheet's link-style labels already use.
+    palette.setColor(QtGui.QPalette.ColorRole.Link, QtGui.QColor(tokens.PURPLE_HOVER))
+    palette.setColor(QtGui.QPalette.ColorRole.LinkVisited, QtGui.QColor(tokens.PURPLE_HOVER))
     palette.setColor(QtGui.QPalette.ColorRole.Base, QColor(35, 35, 35))
     palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('#dddddd'))
@@ -1621,6 +1633,7 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
     app.setFont(QFont('Segoe UI', 10))
+    app.setWindowIcon(QIcon(':/image/vpforceicon.png'))
     # long plain tooltips wrap, wherever they are set (parented: lives with the app)
     app.installEventFilter(TooltipWrapFilter(app))
 
@@ -1663,7 +1676,6 @@ def main():
     # Set child instance flag and load system-wide settings
     G.child_instance = G.args.child
     G.system_settings = utils.SystemSettings()
-    _check_directinput_support()
     migrated = G.system_settings.migrate_instance_scoped_globals()
     if G.system_settings.migrate_il2_korea_enable():
         logging.info(f"IL-2 Korea enable switch set from the IL2 switch and the Korea path: "
@@ -1845,11 +1857,13 @@ def main():
     # Prompt for system settings if no devices are configured
     _check_system_settings_required()
 
-    # The tap files live in game folders, not per instance, so both offers
-    # are master only.  A game update empties its folders and takes the
-    # wrapper and config with it: offer to put them back first, then offer
-    # to bring whatever survived up to the bundled build.
+    # DirectLink's setting and the tap files are not per instance, so the
+    # check and both offers are master only
     if G.master_instance:
+        try:
+            _check_directinput_support()
+        except Exception:
+            logging.exception("DirectLink: startup check failed")
         try:
             from telemffb.ui.dialogs.TapRepairDialog import offer_wrapper_repairs
             offer_wrapper_repairs(G.main_window)

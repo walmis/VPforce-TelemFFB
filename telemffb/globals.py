@@ -69,15 +69,9 @@ allow_multi_instance: bool = False
 restart_requested: bool = False
 """set by utils.request_restart(): the exit cleanup starts TelemFFB again once it has let go of everything"""
 
-dinput_bridge_min_version: str = "0.9.5"
+dinput_bridge_min_version: str = "0.9.6"
 """Oldest DInput bridge build this TelemFFB accepts, as the bridge's own
-'x.y.z' version string ('' disables the check).
-
-Raised when TelemFFB starts depending on bridge behavior an older build
-does not have - and, being the version pairing that was actually tested
-together, it doubles as a light gate on redistributed builds.  A soft
-one: anyone running from source can edit this line, which is inherent to
-a GPL client and deliberately not fought here."""
+'x.y.z' version string ('' disables the check)."""
 
 vpf_logo: str = ":/image/TelemFFB_Logo.png"
 

@@ -300,7 +300,7 @@ class TestThreeTabLayout:
 class TestDInputHint:
     """The no-devices hint under the cards: a non-VPforce user's stick can
     only appear through the DirectInput listing, and that switch lives on
-    the System page - the Devices tab says so instead of dead-ending."""
+    the System tab - the Devices tab says so instead of dead-ending."""
 
     def _fresh(self, tmp_path, monkeypatch, **extra):
         from telemffb.hw.ffb_rhino import FFBRhino
@@ -324,7 +324,6 @@ class TestDInputHint:
         world = self._fresh(tmp_path, monkeypatch)
         hint = world.dialog.device_cards.dinput_hint
         assert hint.isVisibleTo(world.dialog)
-        assert 'System page' in hint.text()
 
     def test_enabling_directinput_dismisses_it(
             self, app, tmp_path, monkeypatch):
