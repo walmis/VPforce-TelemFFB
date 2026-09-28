@@ -191,6 +191,18 @@ class TestReadGameSpring:
         assert state.x.offset == 512                          # (3072*1024 + 1024*-1024) / 4096
         assert state.y.positive_coefficient == 4096          # 4096 + 4096, clamped
 
+    def test_the_spring_takes_the_effect_gain(self, tap_mapping):
+        """A game that sets DIEFFECT gain below full means a weaker
+        spring: slope and ceiling scale, the center does not."""
+        shm = make_shm(spring_kwargs=dict(coef=(10000, 10000), sat=(10000, 5000),
+                                          offset=(2500, 0), deadband=(0, 0)))
+        shm.devices[0].effects[0].gain = 5000
+        state = self._read(tap_mapping, shm)
+        assert (state.x.positive_coefficient, state.x.positive_saturation, state.x.offset) == (2048, 2048, 1024)
+        assert state.y.positive_saturation == 1024      # half of the game's half-scale cap
+        shm.devices[0].effects[0].gain = 0               # never set: full
+        assert self._read(tap_mapping, shm).x.positive_coefficient == 4096
+
     def test_units_translated_to_rhino_scale(self, tap_mapping):
         state = self._read(tap_mapping, make_shm())
         assert state is not None
@@ -239,6 +251,18 @@ class TestScaling:
         assert di_to_rhino(10000) == 4096
         assert di_to_rhino(-10000) == -4096
         assert di_to_rhino(0) == 0
+
+    def test_scaled_keeps_the_curve_shape(self):
+        """A gain moves the whole force curve, ceiling included, so a
+        spring that saturates at half travel still saturates at half
+        travel; positions do not move."""
+        from telemffb.hw.ffb_tap import TapAxisCondition
+        c = TapAxisCondition(offset=1024, positive_coefficient=4096, negative_coefficient=2048,
+                             positive_saturation=2048, negative_saturation=4096, deadband=100)
+        h = c.scaled(0.5)
+        assert (h.positive_coefficient, h.positive_saturation) == (2048, 1024)   # corner stays at 50% travel
+        assert (h.negative_coefficient, h.negative_saturation) == (1024, 2048)
+        assert (h.offset, h.deadband) == (1024, 100)
 
     def test_saturation_zero_means_unlimited(self):
         assert di_to_rhino_sat(0) == 4096
@@ -667,13 +691,14 @@ class TestReadGameEffects:
         assert by_slot[1].direction_deg == 0.0     # +Y ray
         assert by_slot[2].direction_deg == 270.0   # +X ray
 
-    def test_damper_gain_scales_coefficients_not_offsets(self, tap_mapping):
+    def test_damper_gain_scales_force_not_positions(self, tap_mapping):
         shm = make_shm()
         add_effect(shm, 1, ffb_tap.ET_DAMPER, gain=5000,
                    coef=(10000, 10000), offset=(5000, 0))
         state = self._read(tap_mapping, shm)
         fx = state.effects[0]
         assert fx.x.positive_coefficient == 2048   # halved by gain
+        assert fx.x.positive_saturation == 2048    # the cap is force too
         assert fx.x.offset == 2048                 # position: gain-free
         assert fx.y.positive_coefficient == 2048
 

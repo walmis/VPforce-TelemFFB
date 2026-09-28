@@ -257,17 +257,18 @@ class TapAxisCondition:
             deadband=self.deadband)
 
     def scaled(self, gain: float) -> "TapAxisCondition":
-        """The condition with a user gain applied to its force output:
-        the coefficients scale (clamped to Rhino range); positions (offset,
-        deadband) and the saturation caps are untouched."""
+        """The condition with a gain applied to its force output: the
+        coefficients and the saturation caps scale together (clamped to
+        Rhino range), so the force curve keeps its shape at a new height;
+        positions (offset, deadband) are untouched."""
         def s(v: int) -> int:
             return max(-4096, min(4096, round(v * gain)))
         return TapAxisCondition(
             offset=self.offset,
             positive_coefficient=s(self.positive_coefficient),
             negative_coefficient=s(self.negative_coefficient),
-            positive_saturation=self.positive_saturation,
-            negative_saturation=self.negative_saturation,
+            positive_saturation=s(self.positive_saturation),
+            negative_saturation=s(self.negative_saturation),
             deadband=self.deadband)
 
 
@@ -316,13 +317,22 @@ class TapSpringState:
     update_count: int
 
 
+def _effect_gain(e) -> float:
+    """The effect's DIEFFECT gain as a factor.  0 (never set) and
+    FFB_TAP_UNKNOWN both mean no gain was observed: full."""
+    return 1.0 if e.gain in (0, DI_INFINITE) else min(e.gain / 10000.0, 1.0)
+
+
 def _translate_axis(c, i: int, gain: float = 1.0) -> TapAxisCondition:
+    """One condition block in Rhino units, with the effect's gain
+    applied the way the device would: to the force, so coefficients and
+    saturation caps alike; never to positions."""
     return TapAxisCondition(
         offset=max(-4096, min(4096, di_to_rhino(c.offset[i]))),
         positive_coefficient=round(di_to_rhino(c.positiveCoefficient[i]) * gain),
         negative_coefficient=round(di_to_rhino(c.negativeCoefficient[i]) * gain),
-        positive_saturation=di_to_rhino_sat(c.positiveSaturation[i]),
-        negative_saturation=di_to_rhino_sat(c.negativeSaturation[i]),
+        positive_saturation=round(di_to_rhino_sat(c.positiveSaturation[i]) * gain),
+        negative_saturation=round(di_to_rhino_sat(c.negativeSaturation[i]) * gain),
         deadband=min(di_to_rhino(abs(c.deadBand[i])), 4096),
     )
 
@@ -405,8 +415,7 @@ def _direction_degrees(e) -> float:
 
 
 def _translate_effect(e, slot: int) -> TapGameEffect:
-    # 0 (never set) and FFB_TAP_UNKNOWN both mean "no gain observed": full.
-    gain = 1.0 if e.gain in (0, DI_INFINITE) else min(e.gain / 10000.0, 1.0)
+    gain = _effect_gain(e)
     fx = TapGameEffect(
         slot=slot,
         effect_type=e.effectType,
@@ -656,10 +665,11 @@ class FfbTapReader:
             if e.slotUsed and e.effectType == ET_SPRING and e.playing:
                 c = e.u.condition
                 n = min(c.count, 2)
+                gain = _effect_gain(e)
                 if n >= 1:
-                    x_parts.append(_translate_axis(c, 0))
+                    x_parts.append(_translate_axis(c, 0, gain))
                 if n >= 2:
-                    y_parts.append(_translate_axis(c, 1))
+                    y_parts.append(_translate_axis(c, 1, gain))
                 updates += e.updateCount
         if not (x_parts or y_parts):
             return None   # tapped device present, no playing spring

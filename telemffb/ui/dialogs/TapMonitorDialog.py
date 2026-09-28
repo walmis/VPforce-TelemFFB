@@ -75,16 +75,19 @@ def fmt_direction(e) -> str:
 
 
 def fmt_params(e) -> str:
-    """One line of the parameters that matter for this effect type."""
+    """One line of the parameters that matter for this effect type, ending
+    with the effect's gain: 0 means the game never set it (DirectInput
+    then applies full gain)."""
     t = e.effectType
+    gain = f"gain={e.gain:5d}"
     if t == 1:
-        return f"mag={e.u.constant.magnitude:+6d} {fmt_direction(e)}"
+        return f"mag={e.u.constant.magnitude:+6d} {fmt_direction(e)} {gain}"
     if t == 2:
-        return f"start={e.u.ramp.start:+d} end={e.u.ramp.end:+d}"
+        return f"start={e.u.ramp.start:+d} end={e.u.ramp.end:+d} {gain}"
     if t in _PERIODIC:
         p = e.u.periodic
         return (f"mag={p.magnitude:5d} off={p.offset:+6d} "
-                f"period={p.period / 1000:.0f}ms")
+                f"period={p.period / 1000:.0f}ms {gain}")
     if t in _CONDITION:
         c = e.u.condition
         parts = []
@@ -92,8 +95,9 @@ def fmt_params(e) -> str:
             parts.append(f"ax{i}[off={c.offset[i]:+6d} "
                          f"coef={c.positiveCoefficient[i]:+5d}/"
                          f"{c.negativeCoefficient[i]:+5d} "
-                         f"sat={c.positiveSaturation[i]:5d}]")
-        return " ".join(parts) or "(no condition data)"
+                         f"sat={c.positiveSaturation[i]:5d} "
+                         f"dead={c.deadBand[i]:5d}]")
+        return " ".join(parts + [gain]) if parts else "(no condition data)"
     return ""
 
 
