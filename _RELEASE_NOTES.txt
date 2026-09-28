@@ -8,27 +8,27 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - An optional integration that lets TelemFFB drive any device exposing force feedback through DirectInput
   - Enabled in System Settings > Integrations; DirectLink is a separate free download
 - **NEW: The DirectInput Tap (DCS / IL-2 / Falcon BMS)**
-  - "The tap" intercepts the games own FFB effects and lets TelemFFB render them locally.  The game is unaware
+  - "The tap" intercepts the games own FFB effects and lets TelemFFB render them locally
     - **Game Managed (DirectInput Tap)** spring mode re-renders the game's spring: trim center follow and force-trim collapse reproduce exactly
-    - **Advanced Dynamic** spring mode renders through the tap as well - on a DirectLink device, and on a VPforce device while the tap is capturing it - so the airspeed curve works on the game's own spring on any hardware
-    - Per-sim setup in System Settings finds your sims, installs the wrapper and keeps its config in step with your devices. An existing community ffb-fix install is recognized and upgraded in place; DCS can also run the wrapper in **FFB-Fix only mode**, without the tap
+    - **Advanced Dynamic** spring mode renders through the tap as well (for a DirectLink device or a VPforce device with the tap installed)
+    - Per-sim setup in System Settings finds your sims, installs the wrapper and keeps its config in step with your devices
+    - Required for DirectLink devices, optional for VPforce devices
 - **NEW: "DCS FFB Fix" installer (DCS)**
+  - A sub-mode of the DirectInput Tap installation for DCS
   - Installs the DirectInput Tap wrapper without the tap - in the same way the "dcs-force-feedback-fix" wrapper is used today
-  - An option inside the DirectInput Tap configuration section on the DCS settings page
-- **NEW: Effect previews - feel and tune an effect in isolation**
-  - Accessible via Offline Editor only - use the new Offline/Preview mode button to quickly enter offline mode for an actively loaded aircraft.
+- **NEW: Effect previews - feel and tune an effects in isolation**
+  - Accessible via Offline Editor - use the new Offline/Preview mode button to quickly enter offline mode for an actively loaded aircraft.
   - A play button (>) next to each effect's intensity slider in the offline editor plays that effect on the device from synthesized telemetry. Tune most effects in isolation, without needing to replicate flying conditions where they occur.
   - A play-all button (>>) appears when more than one running device carries the setting and plays the effect on all of them (joystick, pedals, collective) together
   - Hover the mouse over the play button for a description of the preview conditions
 - **NEW: Improved aircraft profile matching**
   - Previously the first profile that matched in file order won
-  - Now the most specific match wins. When two match equally the built-in profile wins, so a curated profile that ships for an aircraft you already had covered gets noticed instead of being quietly shadowed
-- **NEW: Overlapping aircraft profile resolution**
+  - Now the most specific match wins. When two match equally the built-in profile wins, so a new default profile that ships for an aircraft you already have gets noticed instead of being quietly shadowed
+- **NEW: Overlapping profile resolution**
   - The main window shows "Multiple matching profiles detected" and offers to resolve it.  This happens when a curated profile ships for an aircraft you had already made a profile for
-- **NEW: Profile Fork button - give the loaded aircraft a profile of its own**
-  - A new button sits beside the Matched Model row.  It forks the matched profile for the aircraft you are flying into a more specific match string of its own
+- **NEW: Profile Fork button - create a new, more specific profile**
+  - A new button sits beside the Matched Model row.  It forks the matched profile for the currently matched aircraft into a more specific match string
   - Until now the New Aircraft Wizard only appeared for unmatched aircraft.  An aircraft that mistakenly matched a broader profile had no way to be separated from it without hand-editing the config
-- **NEW: "Offline/Preview Mode" button** in the corner of the Settings tab opens the offline editor on the aircraft currently loaded in the sim, so its effects can be previewed and tuned without leaving the flight
 
 ## UI
 - **NEW: Redesigned Main UI**
@@ -39,19 +39,18 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Device cards with pull-down selection of detected devices
   - More logical integration of the old "auto launch" configuration options
 - **NEW: All settings (master and child instances) are now configurable through the master instance system settings**
-  - The master's System Settings now carries a panel for each configured device (joystick, pedals, collective, trim wheel) - per-device options are set there and written to that device's settings directly
-  - Child instances no longer need (or have) a settings page of their own; they exist to drive their device and process telemetry
-  - VPforce Configurator (.vpconf) profiles are validated against the device they are selected for, not against whichever instance you happened to open the dialog from
-  - The USB Product ID column is gone; the device selector is the source. A slot with no device assigned can no longer be made the master or given launch options
+  - You are no longer required to open a child instance to configure its local system settings
 - **NEW: Backup and restore system settings**, from a new File menu on the System Settings dialog
 - **NEW: TelemFFB can restart itself when a change requires it**
 
 ## MSFS / X-Plane
 - **NEW: In-sim settings panel**
   - View and change the current aircraft's TelemFFB settings from a window inside the sim
+  - Both the settings and monitor tabs are available in the in-sim panels
+  - Installed via the individual sim configurations in System Settings
 - **NEW: Multiple joystick devices, with per-aircraft switching (MSFS / X-Plane)**
   - Configure more than one joystick - a stick and a yoke, for example.  Switch between them by changing the primary device in the settings
-- The Exponential Curve G-force mode is selectable again, with its settings.  It was already the default for any aircraft whose G-force mode was never changed, while the settings showed it as Disabled
+- Fix: The Exponential Curve G-force mode is selectable again, with its settings.  It was already the default for any aircraft whose G-force mode was never changed, while the settings showed it as Disabled
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
 
@@ -66,8 +65,8 @@ This is not an exhaustive change log (see github for that).  This file only outl
 
 ## IL-2
 - **NEW: IL-2 Korea is now its own sim**
-  - Korea sends its telemetry on its own port (34386, System Settings > IL2 > IL-2 Korea Port), so TelemFFB can tell it apart from Great Battles. With config validation on, the Korea startup.cfg is updated on the next start
-  - IL-2 Sturmovik and IL-2 Korea have separate enable switches (System Settings > IL2). Korea's starts on if you were already using it
+  - Korea sends its telemetry on its own port, so TelemFFB can tell it apart from Great Battles. With config validation on, the Korea startup.cfg is updated on the next start
+  - IL-2 Sturmovik and IL-2 Korea have separate enable switches (System Settings > IL2)
   - Korea aircraft profiles and settings now live under the new sim. Your existing Korea settings are copied to the new sim automatically the first time this version starts (a backup is written beside the config as userconfig_v2_pre-il2k_backup.xml)
 - Fix: the runway rumble effect never played - its enable toggle was not being honored.  It now runs when enabled, so expect a rumble on the ground if you have it switched on
 
