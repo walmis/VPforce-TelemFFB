@@ -1474,6 +1474,9 @@ class HapticEffect(Destroyable):
         self.modulator : Optional[FFBReport_SetCondition] = None
         self.effect_type : Optional[int] = None
         self._defer_start_logged : bool = False  # rate-limit the offline no-op debug log
+        # a fault that escaped a handle call (native bridge fault, a bug):
+        # report it once, then stay quiet until the effect creates cleanly
+        self._start_fault_logged : bool = False
         # Lazy initialization state
         self._pending_create = None  # function for creating the effect (lazy initialization)
         self._pending_conditions = {} # functions for setting condition (lazy initialization)
@@ -1587,6 +1590,7 @@ class HapticEffect(Destroyable):
             # single INFO-level anchor for an effect's device lifecycle; a
             # re-allocation after destroy() logs again here.
             if self._h_effect:
+                self._start_fault_logged = False
                 name = f" (\"{self.name}\")" if self.name else ""
                 logging.info(f"Effect created {self._h_effect.effect_id} ({self._h_effect.name}){name}")
 
@@ -2089,14 +2093,21 @@ class HapticEffect(Destroyable):
         # Ensure effect is created before starting
         try:
             self._ensure_effect_created()
-        except HIDDisconnectedError:
-            # The handle was dropped mid-creation; its block is gone with
-            # it, so drop the half-configured handle and replay from the
-            # pending creation on the next live frame.
+        except Exception:
+            # HIDDisconnectedError: the handle was dropped mid-creation; its
+            # block is gone with it.  Anything else (an OSError from a
+            # native bridge fault, a bug): the device layer has already
+            # reported it once and is recovering.  Either way drop the
+            # half-configured handle and replay from the pending creation
+            # on the next live frame - this method must not raise into the
+            # 60-120 Hz telemetry path, and a per-frame traceback is the
+            # storm that fills the log file when it does.
             self._h_effect = None
             self._envelope_applied = False
-            logging.debug(
-                f"HapticEffect.start: device disconnected during creation, effect {self.name!r} will replay")
+            if not self._start_fault_logged:
+                self._start_fault_logged = True
+                logging.exception(
+                    f"HapticEffect.start: {self.name!r} faulted during creation; will replay after recovery")
             return self
 
         if self._h_effect and (not self.started or force):
@@ -2108,10 +2119,17 @@ class HapticEffect(Destroyable):
             logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             try:
                 self._h_effect.start(**kw)
-            except HIDDisconnectedError:
-                # Lost the handle between the liveness check and the
-                # write; recreate on the next live frame.  The one-time
-                # envelope stays pending so the re-created block gets it.
+            except Exception:
+                # HIDDisconnectedError: lost the handle between the liveness
+                # check and the write.  An OSError: the bridge faulted
+                # natively mid-call and the device layer is re-opening the
+                # device.  Either way drop the handle and recreate on the
+                # next live frame; the one-time envelope stays pending so
+                # the re-created block gets it.
+                if not self._start_fault_logged:
+                    self._start_fault_logged = True
+                    logging.exception(
+                        f"HapticEffect.start: {self.name!r} faulted during start; will replay after recovery")
                 self._h_effect = None
                 self._envelope_applied = False
                 return self
@@ -2143,8 +2161,21 @@ class HapticEffect(Destroyable):
                 # the next live start, matching live stop() semantics.
                 logging.debug(
                     f"HapticEffect.stop: device disconnected, stopping effect {self._h_effect.effect_id} in-memory only")
-            # FFBEffectHandle.stop() is itself offline-safe.
-            self._h_effect.stop()
+            try:
+                # FFBEffectHandle.stop() is itself offline-safe.
+                self._h_effect.stop()
+            except Exception:
+                # A native bridge fault mid-stop (or a bug): the device
+                # layer has already reported it once and is re-opening the
+                # device.  Drop the handle so the next live frame
+                # re-creates; the one-time envelope re-applies from
+                # _pending_envelope, so skip the clear below.
+                if not self._start_fault_logged:
+                    self._start_fault_logged = True
+                    logging.exception(
+                        f"HapticEffect.stop: {self.name!r} faulted during stop; dropping the handle")
+                self._h_effect = None
+                return self
 
             # Clear envelope if it was marked as one-time use (and the
             # device can actually receive the clear).

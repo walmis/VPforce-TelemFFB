@@ -39,6 +39,9 @@ class FakeDIBridge:
         self.state.hats = 0xFFFF
         self.poll_error = None
         self.open_error = None
+        # if set, EVERY native call raises this instead of doing anything -
+        # models a native fault inside the DLL/driver (access violation)
+        self.fault = None
         self._next_id = 1
         self.devices = [{
             "guid": "{FAKE-GUID}", "name": "Fake FFB Stick", "vid": 0x1234,
@@ -47,10 +50,16 @@ class FakeDIBridge:
             "effects": ["constant", "sine", "spring", "damper"],
         }]
 
+    def _maybe_fault(self):
+        if self.fault is not None:
+            raise self.fault
+
     def enumerate(self):
+        self._maybe_fault()
         return self.devices
 
     def open(self, guid):
+        self._maybe_fault()
         if self.open_error:
             raise self.open_error
         return 1
@@ -73,16 +82,19 @@ class FakeDIBridge:
         return 0
 
     def release(self, device):
+        self._maybe_fault()
         self.effects.clear()
         self.started.clear()
 
     def device_reset(self, device):
+        self._maybe_fault()
         self.reset_calls = getattr(self, 'reset_calls', 0) + 1
         self.effects.clear()
         self.started.clear()
         return DIB_OK
 
     def poll(self, device):
+        self._maybe_fault()
         if self.poll_error:
             raise self.poll_error
         return self.state
@@ -94,6 +106,7 @@ class FakeDIBridge:
         return "fake bridge error detail"
 
     def effect_create(self, device, effect_type, params):
+        self._maybe_fault()
         if self.create_error is not None:
             return self.create_error
         if len(self.effects) >= self.capacity:
@@ -104,6 +117,7 @@ class FakeDIBridge:
         return effect_id
 
     def effect_update(self, effect, params):
+        self._maybe_fault()
         if effect not in self.effects:
             return -2
         self.effects[effect]["params"] = self._copy_params(params)
@@ -111,16 +125,19 @@ class FakeDIBridge:
         return DIB_OK
 
     def effect_start(self, effect, iterations=1):
+        self._maybe_fault()
         if effect not in self.effects:
             return -2
         self.started.add(effect)
         return DIB_OK
 
     def effect_stop(self, effect):
+        self._maybe_fault()
         self.started.discard(effect)
         return DIB_OK
 
     def effect_destroy(self, effect):
+        self._maybe_fault()
         self.started.discard(effect)
         self.effects.pop(effect, None)
         return DIB_OK
@@ -1293,3 +1310,202 @@ class TestForgetPlayback:
             assert handle.effect_id is not None  # the id stays
         finally:
             HapticEffect.device = orig
+
+
+class TestNativeFaultRecovery:
+    """A native fault inside the bridge/driver arrives at Python as an
+    OSError from ctypes (an access violation in the field: the MOZA driver
+    hit by a poll on one thread while an effect call ran on another).
+    The device must not keep hammering the suspect state at telemetry
+    rate: it invalidates every handle, asks the main thread's poll timer
+    to release and re-open the device, and reports the fault once."""
+
+    @staticmethod
+    def _fault():
+        return OSError("exception: access violation reading 0x0000021F8D2B0010")
+
+    def test_update_fault_invalidates_and_requests_reopen(
+            self, device, bridge, caplog):
+        handle = device.create_effect(EFFECT_SINE)
+        handle.start()
+        assert handle._device_playing and handle.effect_id
+
+        # a telemetry frame changes the force -> effect_update inside the
+        # DLL faults natively
+        bridge.fault = self._fault()
+        handle.params.periodic_magnitude = 100
+        with caplog.at_level(logging.ERROR):
+            handle.start()                     # must not raise
+        assert device._native_fault is True
+        assert device._reconnect_requested is True
+        assert handle.effect_id == 0           # invalidated, id no longer usable
+
+        # the next frame tries to re-create: it faults too, but latches -
+        # no second ERROR, no per-frame storm, request stays armed
+        with caplog.at_level(logging.ERROR):
+            handle2 = device.create_effect(EFFECT_SINE)
+        assert handle2 is None
+        assert device._reconnect_requested is True
+
+        errors = [r for r in caplog.records
+                  if r.levelno == logging.ERROR and "native fault" in r.getMessage()]
+        assert len(errors) == 1, [r.getMessage() for r in errors]
+
+    def test_start_fault_reports(self, device, bridge, caplog):
+        handle = device.create_effect(EFFECT_SINE)
+        handle._pushed_hash = bytes(handle.params)   # isolate effect_start from _push
+        bridge.fault = self._fault()
+        with caplog.at_level(logging.ERROR):
+            handle.start()                     # must not raise
+        assert device._native_fault is True
+        assert device._reconnect_requested is True
+        assert handle._started is False
+        assert handle.effect_id == 0
+
+    def test_stop_and_destroy_faults_report(self, device, bridge, caplog):
+        handle = device.create_effect(EFFECT_SINE)
+        handle.start()
+        assert handle._device_playing
+
+        bridge.fault = self._fault()
+        with caplog.at_level(logging.ERROR):
+            handle.stop()                      # effect_stop
+        assert device._native_fault is True
+        assert device._reconnect_requested is True
+        assert handle._device_playing is False
+
+        with caplog.at_level(logging.ERROR):
+            handle.destroy()                   # effect_destroy; also called from __del__
+        assert not handle.effect_id            # dead either way: invalidated or cleared
+        assert handle._started is False
+
+    def test_device_reset_fault_reports_and_invalidates(self, device, bridge, caplog):
+        handle = device.create_effect(EFFECT_SINE)
+        handle.start()
+
+        bridge.fault = self._fault()
+        with caplog.at_level(logging.ERROR):
+            device.recover_effects("test")     # -> device_reset
+        assert device._reconnect_requested is True
+        assert handle.effect_id == 0
+
+    def test_timer_event_drains_the_reopen_request(self, device, bridge):
+        from PyQt6 import QtWidgets
+        try:
+            app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        except Exception as e:
+            pytest.skip(f"cannot create QApplication: {e}")
+
+        device._reconnect_requested = True
+        device._native_fault = True
+        device.timerEvent(None)
+
+        assert device._reconnect_requested is False
+        assert device._reconnecting is True
+        assert device._handle is None
+        assert device.connected is False
+
+        bridge.fault = None                           # the driver is fine again
+        device._try_reconnect()
+        assert device._reconnecting is False
+        assert device._handle == 1
+        assert device._native_fault is False          # latch cleared by the re-open
+        assert device.connected is True
+
+
+class TestDIBridgeThreadSafety:
+    """The real DIBridge must serialize its native calls.  ctypes releases
+    the GIL around DLL calls, and the DirectInput driver behind them is not
+    thread-safe - the field failure was a poll on the main thread sitting
+    inside the driver while an effect call from the telemetry thread was in
+    it.  The fake DLL below counts overlapping native calls."""
+
+    def _fake_dll(self):
+        class FakeDll:
+            def __init__(self):
+                self.active = 0
+                self.overlaps = 0
+
+            def dib_abi_version(self):
+                return 1
+
+            def dib_build_info(self, buf, n):
+                return 0
+
+            def dib_last_error(self, buf, n):
+                return 0
+
+            def _call(self, fn):
+                self.active += 1
+                if self.active > 1:
+                    self.overlaps += 1
+                time.sleep(0.002)                    # force overlap if unsynchronized
+                fn()
+                self.active -= 1
+
+            def dib_enumerate(self, buf, n):
+                self._call(lambda: None)
+                return 0
+
+            def dib_open(self, guid):
+                self._call(lambda: None)
+                return 1
+
+            def dib_release(self, device):
+                self._call(lambda: None)
+                return 0
+
+            def dib_poll(self, device, state):
+                self._call(lambda: None)
+                return 0
+
+            def dib_device_reset(self, device):
+                self._call(lambda: None)
+                return 0
+
+            def dib_effect_create(self, device, effect_type, params):
+                self._call(lambda: None)
+                return 1
+
+            def dib_effect_update(self, effect, params):
+                self._call(lambda: None)
+                return 0
+
+            def dib_effect_start(self, effect, iterations, override_start):
+                self._call(lambda: None)
+                return 0
+
+            def dib_effect_stop(self, effect):
+                self._call(lambda: None)
+                return 0
+
+            def dib_effect_destroy(self, effect):
+                self._call(lambda: None)
+                return 0
+
+        return FakeDll()
+
+    def test_concurrent_native_calls_never_overlap(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import DIBridge
+        dll = self._fake_dll()
+        monkeypatch.setattr(DIBridge, "_load_library", staticmethod(lambda path: dll))
+        bridge = DIBridge()
+
+        import threading
+
+        def hammer():
+            params = DibEffectParams()
+            for _ in range(10):
+                bridge.poll(1)
+                bridge.effect_create(1, 1, params)
+                bridge.effect_update(1, params)
+                bridge.effect_start(1)
+                bridge.effect_stop(1)
+
+        threads = [threading.Thread(target=hammer) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert dll.overlaps == 0, f"{dll.overlaps} overlapping native calls"
