@@ -13,6 +13,9 @@ This is not an exhaustive change log (see github for that).  This file only outl
     - **Advanced Dynamic** spring mode renders through the tap as well (for a DirectLink device or a VPforce device with the tap installed)
     - Per-sim setup in System Settings finds your sims, installs the wrapper and keeps its config in step with your devices
     - Required for DirectLink devices, optional for VPforce devices
+- **FIX: DirectLink (DirectInput) devices center the stick when telemetry stops**
+  - TelemFFB turns the device's own centering spring off when it takes it over - on a pause the stick used to be left with no centering force at all, holding its deflection
+  - TelemFFB now pulls the stick back to center for the duration of the pause instead, and the log says whether the native spring was switched off at connect and reconnect
 - **NEW: "DCS FFB Fix" installer (DCS)**
   - A sub-mode of the DirectInput Tap installation for DCS
   - Installs the DirectInput Tap wrapper without the tap - in the same way the "dcs-force-feedback-fix" wrapper is used today
@@ -53,6 +56,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: The Exponential Curve G-force mode is selectable again, with its settings.  It was already the default for any aircraft whose G-force mode was never changed, while the settings showed it as Disabled
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
+- Fix: the log now names what stopped MSFS telemetry when the sim pauses (paused, parked, slewed, avatar, cinematic, in menus) and says when it resumes - before, a stuck stop was indistinguishable from a dead connection
 
 ## X-Plane
 - **NEW: Multiple X-Plane installs**
@@ -71,6 +75,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: the runway rumble effect never played - its enable toggle was not being honored.  It now runs when enabled, so expect a rumble on the ground if you have it switched on
 
 ## General fixes
+- Fix: keep-forces-on-pause is honored for the flight-control spring on MSFS / X-Plane aircraft (a timeout used to stop it one call after the keep-forces protection ran)
 - Fix: effects are now properly freed when the sim exits and when TelemFFB exits preventing scenarios that may result in hung effects on the device
 - Fix: resetting the device's effects no longer strands the effects
 - Fix: the gear, flaps, speedbrake, canopy, tailhook, fuel boom and wing fold motion effects and the stick shakers had all been rendering as a plain sine wave - their intended square and sawtooth waveforms were silently dropped on the way to the device.  They now play as designed.  This changes the feel of those effects; retune their intensity if they come across harsher than before
