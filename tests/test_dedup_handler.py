@@ -292,6 +292,32 @@ class TestLoopGatedCollapse:
         assert out == ["K", "A", "B", "C", "X",
                        "X (message repeated 2 times)", "K"], out
 
+    def test_four_type_burst_is_not_a_loop(self):
+        # Exactly 4 distinct types: one above MAX_LOOP_TYPES (3) and far
+        # below the floor - the other side of the type boundary.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        for i in range(8):
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(1.0)
+        out = [r.getMessage() for r in rec.records]
+        assert out == [f"t{i}" for i in range(4)] * 2, out
+        assert not any("Cycle detected" in m for m in out), out
+
+    def test_ninety_nine_occurrences_do_not_reach_the_floor(self):
+        # 6 distinct types, 99 total occurrences: one below
+        # LOOP_TOTAL_FLOOR (100) - the other side of the rate boundary.
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        for _ in range(93):
+            dedup.emit(make_record("A"))
+            advance(0.5)
+        for t in ["b", "c", "d", "e", "f"]:
+            dedup.emit(make_record(t))
+            advance(0.5)
+        dedup.emit(make_record("A"))
+        out = [r.getMessage() for r in rec.records]
+        assert out[-1] == "A", out
+        assert not any("Cycle detected" in m for m in out), out
+
 
 # ---------------------------------------------------------------------------
 # Stale keys: a seen key that aged out of the window must rejoin it
