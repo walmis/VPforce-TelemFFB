@@ -59,6 +59,7 @@ import logging
 import json
 import os
 import sys
+import threading
 import time
 import weakref
 from dataclasses import dataclass, field
@@ -248,13 +249,21 @@ BRIDGE_DOWNLOAD_LOCATION = "https://directlink.flyfrisby.com/"
 #: and waste an init - and every construction historically ran a fresh
 #: availability probe.
 _shared_bridge: Optional["DIBridge"] = None
+_bridge_ctor_lock = threading.Lock()
 
 
 def shared_bridge() -> "DIBridge":
-    """The process's DIBridge, created on first use."""
+    """The process's DIBridge, created on first use.
+
+    The DLL's state is process-global, so exactly one binding may exist:
+    two instances would each hold their own call lock while addressing the
+    same tables - the first-use race (open from one thread, enumerate from
+    another) is closed here."""
     global _shared_bridge
     if _shared_bridge is None:
-        _shared_bridge = DIBridge()
+        with _bridge_ctor_lock:
+            if _shared_bridge is None:
+                _shared_bridge = DIBridge()
     return _shared_bridge
 
 
@@ -585,6 +594,17 @@ class DIBridge:
     def __init__(self, dll_path: Optional[str] = None):
         self._dll = self._load_library(dll_path)
 
+        # Every native call is serialized by this lock.  ctypes releases
+        # the GIL around DLL calls, and DirectInput - and the device's
+        # driver behind it - is not thread-safe: a dib_poll from the
+        # main thread must never sit inside the driver while another
+        # thread's dib_effect_create is in it (access violations and
+        # multi-second stalls in the field).  The DLL's own mutex guards
+        # only its effect table, and its poll/open paths do not take it,
+        # so this side keeps the whole call atomic regardless of which
+        # DLL version is installed.
+        self._lock = threading.RLock()
+
         # trace logs every effect call with decoded parameters - the ground
         # truth of what the device is actually told to render
         self._trace = _trace_enabled()
@@ -654,26 +674,31 @@ class DIBridge:
             logging.info(f"DirectLink beta build, expires {expires}")
 
     def last_error(self) -> str:
+        # Unlocked on purpose: the DLL keeps it thread_local, so this
+        # always reads the calling thread's own last failure.
         buf = ctypes.create_string_buffer(512)
         self._dll.dib_last_error(buf, len(buf))
         return buf.value.decode(errors="replace")
 
     def enumerate(self) -> List[dict]:
         buf = ctypes.create_string_buffer(65536)
-        n = self._dll.dib_enumerate(buf, len(buf))
+        with self._lock:
+            n = self._dll.dib_enumerate(buf, len(buf))
         if n < 0:
             raise DIBridgeError(f"DirectLink could not list devices: {self.last_error()}")
         return json.loads(buf.value.decode(errors="replace"))
 
     def open(self, guid: str) -> int:
-        h = self._dll.dib_open(guid.encode())
+        with self._lock:
+            h = self._dll.dib_open(guid.encode())
         if h < 0:
             logging.info(f"DirectLink could not open {guid}")
             raise DIBridgeError(f"DirectLink could not open the device: {self.last_error()}")
         return h
 
     def release(self, device: int):
-        self._dll.dib_release(device)
+        with self._lock:
+            self._dll.dib_release(device)
 
     #: dib_autocenter_state bits (dinput_bridge.h)
     AC_OFF_APPLIED = 0x1
@@ -684,7 +709,8 @@ class DIBridge:
     def autocenter_state(self, device: int) -> int:
         """How the autocenter handover went for an open device, as
         DIB_AC_* bits - or a negative DIB_ERR_*."""
-        return self._dll.dib_autocenter_state(device)
+        with self._lock:
+            return self._dll.dib_autocenter_state(device)
 
     #: DIB_AXIS_* codes, in DIJOYSTATE2 order (dinput_bridge.h)
     AXIS_NAMES = ('X', 'Y', 'Z', 'RX', 'RY', 'RZ', 'SL0', 'SL1')
@@ -693,14 +719,18 @@ class DIBridge:
     def ffb_axes(self, device: int):
         """The open device's force-actuator axes, as names from
         AXIS_NAMES.  Empty when the DLL errors."""
-        return self._axis_names(self._dll.dib_ffb_axes(device))
+        with self._lock:
+            mask = self._dll.dib_ffb_axes(device)
+        return self._axis_names(mask)
 
     def query_ffb_axes(self, guid: str):
         """The same, for a device that is NOT open - the settings dialog
         asks before anything is held.  Safe while another process holds
         the device (object enumeration needs no acquisition), and a
         device held by THIS process answers from its open-time record."""
-        return self._axis_names(self._dll.dib_query_ffb_axes(guid.encode()))
+        with self._lock:
+            mask = self._dll.dib_query_ffb_axes(guid.encode())
+        return self._axis_names(mask)
 
     @classmethod
     def _axis_names(cls, mask: int):
@@ -715,8 +745,9 @@ class DIBridge:
         AXIS_NONE), optionally inverting a logical axis's direction -
         effects mirrored and the input reading negated, as if the
         hardware ran the other way."""
-        return self._dll.dib_set_axis_map(device, x_axis, y_axis,
-                                          int(invert_x), int(invert_y))
+        with self._lock:
+            return self._dll.dib_set_axis_map(device, x_axis, y_axis,
+                                              int(invert_x), int(invert_y))
 
     def device_reset(self, device: int) -> int:
         """Device-level reset: destroy every effect the DEVICE holds -
@@ -724,11 +755,13 @@ class DIBridge:
         entries for it."""
         if self._trace:
             logging.info(f"DIB device_reset dev#{device}")
-        return self._dll.dib_device_reset(device)
+        with self._lock:
+            return self._dll.dib_device_reset(device)
 
     def poll(self, device: int) -> DibDeviceState:
         state = DibDeviceState()
-        rc = self._dll.dib_poll(device, ctypes.byref(state))
+        with self._lock:
+            rc = self._dll.dib_poll(device, ctypes.byref(state))
         if rc != DIB_OK:
             raise DIBridgeError(f"DirectLink could not read the device ({rc}): {self.last_error()}")
         return state
@@ -736,7 +769,8 @@ class DIBridge:
     def effect_create(self, device: int, effect_type: int, params: DibEffectParams) -> int:
         """Returns a positive effect id, or a negative DIB_ERR_* code
         (DEVICE_FULL is expected and drives eviction, so no exception)."""
-        effect_id = self._dll.dib_effect_create(device, effect_type, ctypes.byref(params))
+        with self._lock:
+            effect_id = self._dll.dib_effect_create(device, effect_type, ctypes.byref(params))
         if self._trace:
             self._effect_types[effect_id] = effect_type
             logging.info(f"DIB create #{effect_id} {effect_names.get(effect_type, effect_type)}: "
@@ -744,7 +778,8 @@ class DIBridge:
         return effect_id
 
     def effect_update(self, effect: int, params: DibEffectParams) -> int:
-        rc = self._dll.dib_effect_update(effect, ctypes.byref(params))
+        with self._lock:
+            rc = self._dll.dib_effect_update(effect, ctypes.byref(params))
         if self._trace:
             effect_type = self._effect_types.get(effect, 0)
             logging.info(f"DIB update #{effect} {effect_names.get(effect_type, effect_type)} rc={rc}: "
@@ -752,7 +787,8 @@ class DIBridge:
         return rc
 
     def effect_start(self, effect: int, iterations: int = 1) -> int:
-        rc = self._dll.dib_effect_start(effect, iterations, 0)
+        with self._lock:
+            rc = self._dll.dib_effect_start(effect, iterations, 0)
         if self._trace:
             logging.info(f"DIB start #{effect} rc={rc}")
         return rc
@@ -760,13 +796,15 @@ class DIBridge:
     def effect_stop(self, effect: int) -> int:
         if self._trace:
             logging.info(f"DIB stop #{effect}")
-        return self._dll.dib_effect_stop(effect)
+        with self._lock:
+            return self._dll.dib_effect_stop(effect)
 
     def effect_destroy(self, effect: int) -> int:
         if self._trace:
             logging.info(f"DIB destroy #{effect}")
             self._effect_types.pop(effect, None)
-        return self._dll.dib_effect_destroy(effect)
+        with self._lock:
+            return self._dll.dib_effect_destroy(effect)
 
 
 # ---------------------------------------------------------------------------
@@ -963,7 +1001,11 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         h = hash(bytes(self.params))
         if h == self._pushed_hash:
             return
-        rc = self.device.bridge.effect_update(self.effect_id, self.params)
+        try:
+            rc = self.device.bridge.effect_update(self.effect_id, self.params)
+        except OSError:
+            self.device._note_native_fault("effect_update")
+            return
         if rc == DIB_OK:
             self._pushed_hash = h
             self._consecutive_failures = 0
@@ -1008,7 +1050,11 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             return
         should_play = self._started and not self._is_zero_condition()
         if should_play and not self._device_playing:
-            rc = self.device.bridge.effect_start(self.effect_id, 1)
+            try:
+                rc = self.device.bridge.effect_start(self.effect_id, 1)
+            except OSError:
+                self.device._note_native_fault("effect_start")
+                return
             if rc == DIB_OK:
                 self._device_playing = True
             elif rc == DIB_ERR_ACQUISITION:
@@ -1032,7 +1078,11 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             self.device.note_effect_started(self)
             self._sync_device_playing()
             return self
-        rc = self.device.bridge.effect_start(self.effect_id, loopCount)
+        try:
+            rc = self.device.bridge.effect_start(self.effect_id, loopCount)
+        except OSError:
+            self.device._note_native_fault("effect_start")
+            return self
         if rc == DIB_OK:
             self._started = True
             self._device_playing = True
@@ -1049,7 +1099,10 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
 
     def stop(self):
         if self.effect_id and self._device_playing:
-            self.device.bridge.effect_stop(self.effect_id)
+            try:
+                self.device.bridge.effect_stop(self.effect_id)
+            except OSError:
+                self.device._note_native_fault("effect_stop")
         self._started = False
         self._device_playing = False
         return self
@@ -1057,7 +1110,12 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
     def destroy(self):
         if self.effect_id:
             logging.debug(f"Destroying effect {self.effect_id} ({self.name})")
-            self.device.bridge.effect_destroy(self.effect_id)
+            try:
+                self.device.bridge.effect_destroy(self.effect_id)
+            except OSError:
+                # also called from __del__, where a raise would be
+                # reported but the bridge recovery must still happen
+                self.device._note_native_fault("effect_destroy")
             self.type = 0
             self.effect_id = None
             self._started = False
@@ -1188,6 +1246,14 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._start_seq = 0
         self._last_started: Dict[int, int] = {}  # id(handle) -> sequence
         self._reconnecting = False
+        # a native fault reported from a NON-main thread (the telemetry
+        # thread mostly): the release/re-open it asks for must run on the
+        # main thread, so the request is latched here and this instance's
+        # poll timer drains it
+        self._reconnect_requested = False
+        # latched: one native-fault report per recovery cycle, not one per
+        # frame of a wedged driver (the re-open clears it)
+        self._native_fault = False
         # latch: log the FFB-priority-lost condition once instead of every
         # frame (the lazy effect re-create retries continuously)
         self._acquisition_warned = False
@@ -1371,6 +1437,13 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
     def timerEvent(self, a0: QTimerEvent) -> None:
         if self._reconnecting or self._shutdown:
             return
+        if self._reconnect_requested:
+            # set by another thread after a native bridge fault: the
+            # release and re-open must happen here - this thread owns the
+            # timer that drives the retry
+            self._reconnect_requested = False
+            self._begin_reconnect()
+            return
         if self._axis_map_reapply:
             self._axis_map_reapply = False
             try:
@@ -1484,6 +1557,8 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                 logging.warning(f"device_reset failed ({rc}: "
                                 f"{self.bridge.last_error()}); "
                                 "continuing with handle invalidation")
+        except OSError:
+            self._note_native_fault("device_reset")
         except Exception:
             logging.exception("device_reset failed")
         self._invalidate_effects()
@@ -1524,6 +1599,30 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._next_priority_recovery = now + self._priority_retry_gap
         self._reset_and_invalidate("FFB priority lost")
 
+    def _note_native_fault(self, where: str) -> None:
+        """A bridge call faulted inside the DLL or the driver (an access
+        violation arrives at Python as an OSError from ctypes).  The
+        DirectInput state on this device is now untrustworthy: its effect
+        table may alias, and the driver may stall or refuse further calls
+        until the device is released and re-opened.
+
+        Every handle is invalidated so nothing keeps addressing the
+        suspect table, and a re-open is requested.  The caller may be any
+        thread - the request is drained by this instance's poll timer on
+        the main thread, which is where the release/re-open and its
+        single-shot retry must run.  Called from within an ``except``
+        block; the report latches until the re-open succeeds, so a wedged
+        driver cannot re-fault and re-log at telemetry rate.
+        """
+        if not self._native_fault:
+            self._native_fault = True
+            logging.exception(f"DirectLink native fault in {where} - reopening the device")
+        else:
+            logging.debug(f"DirectLink native fault in {where} (re-open pending)")
+        self._invalidate_effects()
+        if not self._reconnecting:
+            self._reconnect_requested = True
+
     def _begin_reconnect(self):
         self._reconnecting = True
         try:
@@ -1546,6 +1645,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                 if effect:
                     effect.invalidate()
             self._reconnecting = False
+            self._native_fault = False
             logging.info("DirectInput device reconnected")
             self.deviceConnected.emit(True)
         except Exception:
@@ -1605,7 +1705,15 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
         params = _default_params(type)
         while True:
-            effect_id = self.bridge.effect_create(self._handle, type, params)
+            try:
+                effect_id = self.bridge.effect_create(self._handle, type, params)
+            except OSError:
+                # the bridge or driver faulted natively mid-create (an
+                # access violation): the effect table and the driver state
+                # on this device are suspect - recover by re-opening, do
+                # not re-hammer this call at telemetry rate
+                self._note_native_fault("effect_create")
+                return None
             if effect_id > 0:
                 break
             if effect_id == DIB_ERR_DEVICE_FULL:
