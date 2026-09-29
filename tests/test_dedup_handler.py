@@ -228,6 +228,173 @@ class TestCycleDetection:
 
 
 # ---------------------------------------------------------------------------
+# Loop-gated collapse: a duplicate alone must not prove a cycle
+# ---------------------------------------------------------------------------
+
+class TestLoopGatedCollapse:
+
+    def test_diverse_burst_with_one_duplicate_is_not_collapsed(self):
+        # The 11:39:55 startup shape: ~8-13 distinct messages, one of them
+        # repeated non-adjacently. That is not a loop - every message stays
+        # visible, including the repeat.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        msgs_in = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m1", "m9"]
+        for msg in msgs_in:
+            dedup.emit(make_record(msg))
+            advance(0.2)
+        out = [r.getMessage() for r in rec.records]
+        assert not any("Cycle detected" in m for m in out), out
+        assert out == msgs_in
+
+    def test_diverse_storm_collapses_after_rate_floor(self):
+        # 10 distinct types at 60 Hz: far more than MAX_LOOP_TYPES different
+        # messages, but the rate can only be a fault loop, so the window
+        # collapses once it carries LOOP_TOTAL_FLOOR occurrences.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        types = [f"t{i}" for i in range(10)]
+        for i in range(1000):
+            dedup.emit(make_record(types[i % 10]))
+            advance(1.0 / 60.0)
+        out = [r.getMessage() for r in rec.records]
+        assert any("Cycle detected" in m for m in out), out
+        first_cycle_idx = next(i for i, m in enumerate(out)
+                               if "Cycle detected" in m)
+        # the window holds 300 msgs at 60 Hz; the floor (100) is reached at
+        # the 101st message, so the summary must land by message ~105
+        assert first_cycle_idx <= 105, out[:first_cycle_idx + 1]
+        # no type was lost before the collapse
+        for t in types:
+            assert t in out[:first_cycle_idx], t
+
+    def test_periodic_refresh_holds_interval_under_sustained_storm(self):
+        # Regression for the pre-0926 bug: a 60 Hz storm used to re-emit the
+        # cycle summary on nearly every message ("39 summaries in 26 ms").
+        # 30 s of storm at period 5 s: collapse at t=1.65 s, then exactly
+        # one refresh per period -> 5 refreshes (t=6.65, 11.65, ..., 26.65).
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        types = [f"t{i}" for i in range(10)]
+        for i in range(1800):
+            dedup.emit(make_record(types[i % 10]))
+            advance(1.0 / 60.0)
+        out = [r.getMessage() for r in rec.records]
+        refreshes = [m for m in out if "so far" in m]
+        assert len(refreshes) == 5, out
+
+
+# ---------------------------------------------------------------------------
+# Summary content: ordering, severity, truthfulness, exceptions
+# ---------------------------------------------------------------------------
+
+def _six_type_storm(period_seconds=10.0):
+    """Drive a 6-type storm past the rate floor and return the summary text.
+
+    94× A, then five one-off types, then one more A: the repeat of A finds a
+    window of 6 distinct types with exactly 100 occurrences (the floor), so
+    the collapse fires with A heavily weighted.
+    """
+    dedup, rec, advance = make_handler(period_seconds=period_seconds)
+    for _ in range(94):
+        dedup.emit(make_record("A"))
+        advance(0.5)
+    for t in ["b", "c", "d", "e", "f"]:
+        dedup.emit(make_record(t))
+        advance(0.5)
+    dedup.emit(make_record("A"))
+    return next(m for m in (r.getMessage() for r in rec.records)
+                if "Cycle detected" in m)
+
+
+class TestSummaryContent:
+
+    def test_cycle_summary_lists_most_frequent_first(self):
+        summary = _six_type_storm()
+        listed = [ln for ln in summary.splitlines() if ln.strip().startswith("-")]
+        assert listed[0].startswith("    - A:"), summary
+        # the least frequent type (seen last) is the one folded away
+        assert "+1 more" in summary, summary
+        assert "    - f: 1" not in summary, summary
+
+    def test_non_debug_level_lists_at_most_max_types_and_no_false_promise(self):
+        summary = _six_type_storm()
+        listed = [ln for ln in summary.splitlines() if ln.strip().startswith("-")]
+        assert len(listed) <= 5, summary
+        assert "see DEBUG" not in summary, summary
+
+    def test_debug_level_lists_every_type(self):
+        root = logging.getLogger()
+        saved = root.level
+        root.setLevel(logging.DEBUG)
+        try:
+            summary = _six_type_storm()
+        finally:
+            root.setLevel(saved)
+        listed = [ln for ln in summary.splitlines() if ln.strip().startswith("-")]
+        assert len(listed) == 6, summary
+        assert "+1 more" not in summary, summary
+        assert "see DEBUG" not in summary, summary
+
+    def test_cycle_summary_level_is_max_of_members(self):
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        dedup.emit(make_record("A", level=logging.INFO))
+        advance(1.0)
+        dedup.emit(make_record("B", level=logging.ERROR))
+        advance(1.0)
+        dedup.emit(make_record("A", level=logging.INFO))
+        summary = [r for r in rec.records if "Cycle detected" in r.getMessage()]
+        assert summary, "no cycle summary emitted"
+        assert summary[0].levelno == logging.ERROR
+
+    def test_cycle_narrowing_to_one_type_uses_repeat_form(self):
+        # A B A collapses (2 types). B then ages out of the window while A
+        # keeps coming: the periodic refresh must read as the familiar
+        # "(message repeated N times so far)", not "across 1 types".
+        dedup, rec, advance = make_handler(period_seconds=2.0)
+        for msg in ["A", "B", "A"]:          # t=0.0, 0.5, 1.0 -> collapse
+            dedup.emit(make_record(msg))
+            advance(0.5)
+        for _ in range(4):                   # t=1.5, 2.0, 2.5, 3.0
+            dedup.emit(make_record("A"))
+            advance(0.5)
+        last = rec.records[-1].getMessage()
+        assert "message repeated" in last, last
+        assert "so far" in last, last
+        assert "Cycle detected" not in last, last
+
+    def test_repeat_summary_carries_exception(self):
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        for _ in range(3):
+            rec_in = make_record("boom")
+            rec_in.exc_info = OSError("0xe06d7363")
+            dedup.emit(rec_in)
+            advance(0.5)
+        dedup.emit(make_record("done"))      # interrupts the run -> final summary
+        out = [r.getMessage() for r in rec.records]
+        assert any("repeated 3 times" in m and "OSError: 0xe06d7363" in m
+                   for m in out), out
+
+    def test_cycle_summary_line_carries_latest_exception(self):
+        # The DInput fault shape: the exception evolves across the storm
+        # (access violation, then 0xe06d7363); the summary must show the
+        # latest, not the first.
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        first = make_record("A")
+        first.exc_info = (OSError,
+                          OSError("access violation reading 0x0000021F8D2B0010"),
+                          None)
+        dedup.emit(first)
+        advance(1.0)
+        dedup.emit(make_record("B"))
+        advance(1.0)
+        latest = make_record("A")
+        latest.exc_info = (OSError, OSError("0xe06d7363"), None)
+        dedup.emit(latest)
+        summary = next(m for m in (r.getMessage() for r in rec.records)
+                       if "Cycle detected" in m)
+        assert "OSError: 0xe06d7363" in summary, summary
+        assert "access violation" not in summary, summary
+
+
+# ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
 
