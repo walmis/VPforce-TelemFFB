@@ -643,8 +643,9 @@ class DedupHandler(logging.Handler):
         A small number of distinct recurring types is a classic loop
         (A B A B, A B C A).  A large number of distinct types is not -
         that is usually a one-off burst of different messages (startup, a
-        load) - unless the window carries so many occurrences that it can
-        only be a storm, regardless of how many types it contains.
+        load) - unless the window's types carry at least
+        ``LOOP_TOTAL_FLOOR`` episode-cumulative occurrences, no matter how
+        many types it contains.
         """
         keys = self._distinct_keys_in_window()
         total = sum(self._counts.get(k, 0) for k in keys)
