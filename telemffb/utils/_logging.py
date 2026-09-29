@@ -387,7 +387,8 @@ class DedupHandler(logging.Handler):
     - *Repeating cycles*: a message that was already seen earlier in the
       window confirms a cycle only when the window itself looks like a
       loop - at most ``MAX_LOOP_TYPES`` distinct recurring types, or at
-      least ``LOOP_TOTAL_FLOOR`` occurrences no matter how many types.
+      least ``LOOP_TOTAL_FLOOR`` episode-cumulative occurrences (see
+      ``LOOP_TOTAL_FLOOR``) no matter how many types.
       The whole cycle is then summarized in a single line and subsequent
       repetitions of its members are suppressed (with a periodic update)
       until the log goes quiet for ``period_seconds`` or a genuinely
@@ -400,8 +401,11 @@ class DedupHandler(logging.Handler):
     #: a window of at most this many distinct types that recurs is a loop;
     #: a lone repeat inside a more diverse window is forwarded, not collapsed
     MAX_LOOP_TYPES = 3
-    #: a window carrying at least this many occurrences is collapsed no
-    #: matter how many distinct types it contains (a storm is a storm)
+    #: when the window's distinct types carry at least this many
+    #: episode-cumulative occurrences - _counts reset only after the log
+    #: has been quiet for period_seconds, never when a type ages out of
+    #: the window - the window is collapsed no matter how many types it
+    #: contains (a storm is a storm)
     LOOP_TOTAL_FLOOR = 100
 
     def __init__(self, handlers=None, period_seconds: float = 5.0):
