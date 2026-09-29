@@ -680,6 +680,12 @@ class DedupHandler(logging.Handler):
 
                 if key in self._seen:
                     self._counts[key] = self._counts.get(key, 0) + 1
+                    if key not in self._key_last_ts:
+                        # the window dropped this key when it went quiet, but
+                        # the episode is still alive (no full reset): re-add it
+                        # so the loop gate and any summary this recurrence
+                        # triggers include it
+                        self._window.append((now, key))
                     self._key_last_ts[key] = now
                     self._latest_record[key] = record
                     if self._collapsed:

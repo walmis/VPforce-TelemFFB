@@ -294,6 +294,54 @@ class TestLoopGatedCollapse:
 
 
 # ---------------------------------------------------------------------------
+# Stale keys: a seen key that aged out of the window must rejoin it
+# ---------------------------------------------------------------------------
+
+class TestStaleKeyWindowReappend:
+
+    def test_stale_key_recurrence_appears_in_the_cycle_summary(self):
+        # A at t=0, then B/C alternating at 1 Hz: the log never goes quiet for
+        # a period, so the episode (and _seen) stays alive while A ages out of
+        # the window. B/C alone look like a loop (2 <= MAX_LOOP_TYPES), so the
+        # window collapses early (t=3) and the refreshes stop listing A. Two
+        # more B/C after A's t=31 recurrence put the next periodic refresh at
+        # t=33: with the re-joined A, it must list A with its full count.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("A"))
+        advance(1.0)
+        for i in range(30):
+            dedup.emit(make_record("B" if i % 2 == 0 else "C"))
+            advance(1.0)
+        dedup.emit(make_record("A"))
+        advance(1.0)
+        dedup.emit(make_record("B"))
+        advance(1.0)
+        dedup.emit(make_record("C"))
+        summaries = [m for m in (r.getMessage() for r in rec.records)
+                     if "Cycle detected" in m]
+        lines = summaries[-1].splitlines()
+        assert any(ln.strip() == "- A: 2" for ln in lines), summaries[-1]
+        assert any("- B:" in ln for ln in lines), summaries[-1]
+        assert any("- C:" in ln for ln in lines), summaries[-1]
+
+    def test_stale_key_recurrence_is_forwarded_in_a_diverse_window(self):
+        # Regression guard for the re-append: with the stale key re-joined the
+        # window holds 5 distinct types and only 42 occurrences - above
+        # MAX_LOOP_TYPES and far below the floor, so the recurrence must stay
+        # a lone one: forwarded, not swallowed by a collapse.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("stale"))
+        advance(1.0)
+        for i in range(1, 41):
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(1.0)
+        dedup.emit(make_record("stale"))
+        out = [r.getMessage() for r in rec.records]
+        assert out[-1] == "stale", out
+        assert not any("Cycle detected" in m for m in out), out
+
+
+# ---------------------------------------------------------------------------
 # Summary content: ordering, severity, truthfulness, exceptions
 # ---------------------------------------------------------------------------
 
