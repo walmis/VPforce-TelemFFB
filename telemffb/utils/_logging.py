@@ -705,7 +705,17 @@ class DedupHandler(logging.Handler):
                     # yet: forward it like a fresh occurrence and stop - it is
                     # already registered in the window, so do not fall through
                     # to the first-time-seen block (which would re-forward it
-                    # and reset its count)
+                    # and reset its count).  But first close any pending
+                    # consecutive run with its final summary, as the
+                    # first-time-seen block does (the not-collapsed clause is
+                    # redundant here - this branch is reached only when the
+                    # window is not collapsed).
+                    if self._repeat_count > 1 and self._repeat_record is not None:
+                        self._emit_summary_record(
+                            self._make_summary_record(
+                                self._repeat_record, self._repeat_count, periodic=False
+                            )
+                        )
                     self._last_key = key
                     self._repeat_count = 1
                     self._repeat_record = record

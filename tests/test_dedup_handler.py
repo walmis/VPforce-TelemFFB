@@ -280,6 +280,18 @@ class TestLoopGatedCollapse:
         refreshes = [m for m in out if "so far" in m]
         assert len(refreshes) == 5, out
 
+    def test_lone_recurrence_closes_the_pending_run_with_a_final_summary(self):
+        # K A B C X X K: when the recurring K arrives, the pending two-X run
+        # must be closed by its final "(message repeated 2 times)" summary
+        # before K is forwarded.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        for msg in ["K", "A", "B", "C", "X", "X", "K"]:
+            dedup.emit(make_record(msg))
+            advance(0.2)
+        out = [r.getMessage() for r in rec.records]
+        assert out == ["K", "A", "B", "C", "X",
+                       "X (message repeated 2 times)", "K"], out
+
 
 # ---------------------------------------------------------------------------
 # Summary content: ordering, severity, truthfulness, exceptions
