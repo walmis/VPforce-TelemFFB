@@ -13,7 +13,6 @@ import pytest
 
 from telemffb.hw.ffb_dinput import (
     DIB_ERR_ACQUISITION, DIB_ERR_DEVICE_FULL, DIB_ERR_GENERAL, DIB_OK,
-    DINPUT_CAPABILITIES,
     DibDeviceState, DibEffectParams,
     DIDeviceInfo, DInputEffectHandle, DInputFFBDevice,
 )
@@ -163,12 +162,14 @@ def make_condition(axis=0, **kw):
 class TestDeviceBasics:
     def test_capabilities(self, device):
         caps = device.caps
-        assert caps is DINPUT_CAPABILITIES
         assert caps.has_cp_telemetry           # emulated, same contract
         assert not caps.has_gains
         assert not caps.has_spring_adjuster
         assert not caps.has_axis_override
         assert not caps.has_force_telemetry
+        # the fake bridge reports a completed handover (default 0xF), so
+        # the per-device copy carries the one runtime-determined flag
+        assert caps.autocenter_disabled
         assert device.supports_axis_override() is False
 
     def test_info_from_enumeration(self, device):
@@ -1051,6 +1052,50 @@ class TestAutocenterHandover:
             DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
         assert not any('centering spring' in r.message
                        for r in caplog.records)
+
+    def test_the_capability_flag_tracks_the_handover_outcome(self, bridge):
+        """autocenter_disabled is the capability a timed-out device is
+        judged by: True only when the bridge says the device's own
+        centering spring is OFF (applied, verified or not)."""
+        for bits, expected in ((0, False),          # driver refused
+                               (0x1, True),         # applied, unverified
+                               (0x1 | 0x8, True),   # applied, verified
+                               (0x2 | 0x4, False),  # known+on, not applied
+                               ):
+            bridge.autocenter = bits
+            device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+            assert device._autocenter_off is expected
+            assert device.caps.autocenter_disabled is expected, bits
+
+    def test_a_bridge_that_cannot_tell_keeps_the_flag_off(self, bridge):
+        """An error answer is 'unknown', not 'refused': the flag stays
+        off, so the device is treated as still self-centering."""
+        from telemffb.hw.ffb_dinput import DIB_ERR_UNSUPPORTED
+        bridge.autocenter = DIB_ERR_UNSUPPORTED
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        assert device.caps.autocenter_disabled is False
+
+    def test_the_flag_is_requeried_when_the_device_reopens(self, device, bridge):
+        """The handover is re-done on every open: a driver that refused
+        may cooperate after a reconnect (or vice versa), and the
+        capability must follow the latest outcome."""
+        from PyQt6 import QtWidgets
+        try:
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+        except Exception as e:
+            pytest.skip(f"cannot create QApplication: {e}")
+
+        assert device.caps.autocenter_disabled is True  # the fixture's 0xF open
+        bridge.autocenter = 0                            # the driver now refuses
+        device._handle = None
+        device._try_reconnect()
+        assert device._handle == 1
+        assert device.caps.autocenter_disabled is False
+
+        bridge.autocenter = 0x1 | 0x2 | 0x4 | 0x8        # and cooperates again
+        device._handle = None
+        device._try_reconnect()
+        assert device.caps.autocenter_disabled is True
 
 
 class TestAxisMapResolution:

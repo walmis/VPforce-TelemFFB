@@ -62,6 +62,13 @@ class DeviceCapabilities:
     has_gains: bool = False             # Configurator gain sliders (get/set)
     has_deadzone: bool = False          # device-side axis deadzone
     has_firmware_version: bool = False  # queryable firmware version
+    #: The device's own centering spring was switched off while it was
+    #: opened (the DirectInput handover).  With it off, TelemFFB's effects
+    #: are the stick's only centering force - a timed-out device must not
+    #: be left with none of them, or the stick holds its deflection.
+    #: Only the DInput backend can set this; it is runtime-determined
+    #: (per open, from the bridge), not a backend-class constant.
+    autocenter_disabled: bool = False
     effect_slots_hint: Optional[int] = None  # None = unknown / firmware-managed
 
 

@@ -69,8 +69,19 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         self.rudder_pos_dampener = utils.Dampener()
 
     def on_timeout(self):
+        """Stop the flight-control spring with the rest of the effects.
+
+        The AircraftBase timeout keeps condition effects alive when the
+        user's keep_forces_on_pause setting is on, and this private
+        handle must obey the same rule: stopping it unconditionally
+        undid that protection one call later, leaving a DirectInput
+        device (whose own centering spring TelemFFB switched off at
+        open) with no centering force at all - a force-free stick that
+        holds its deflection and the aircraft follows it.
+        """
         super().on_timeout()
-        self._spring_handle.stop()    
+        if not getattr(self, 'keep_forces_on_pause', False):
+            self._spring_handle.stop()
 
 
     def update_fbw_flight_controls(self, telem_data: BaseTelemetryData, ap=False):

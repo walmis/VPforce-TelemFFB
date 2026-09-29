@@ -62,7 +62,7 @@ import sys
 import threading
 import time
 import weakref
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, override
 
 from PyQt6.QtCore import QTimer, QTimerEvent
@@ -1224,7 +1224,11 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
     @property
     def caps(self) -> ffb_backend.DeviceCapabilities:
-        return DINPUT_CAPABILITIES
+        # Built once per open (not a class constant): the autocenter
+        # handover outcome is runtime-determined - a driver may refuse to
+        # switch the device's own centering spring off, which changes
+        # whether TelemFFB is the stick's only centering force.
+        return self._caps if self._caps is not None else DINPUT_CAPABILITIES
 
     @property
     def connected(self) -> bool:
@@ -1269,9 +1273,15 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._axis_map_state = self._IDENTITY_MAP
         self._axis_map_reapply = False
 
+        self._autocenter_off = False
+        self._caps = None
         self._handle = self.bridge.open(guid)
         self._apply_axis_map()
         self._log_autocenter_state()
+        # the handover outcome only exists after the open: build the
+        # per-device capability set now, once
+        self._caps = replace(DINPUT_CAPABILITIES,
+                             autocenter_disabled=self._autocenter_off)
 
         super().__init__()
         self._timer_id = None
@@ -1362,11 +1372,16 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._axis_map_reapply = True
 
     def _log_autocenter_state(self):
-        """Say whether the device's own centering spring was switched off.
+        """Record and say whether the device's own centering spring was
+        switched off.
 
-        A driver that refuses leaves that spring fighting every rendered
-        force - which looks exactly like TelemFFB rendering nothing, so
-        it is worth a warning rather than silence.
+        The flag matters beyond logging: with the native spring off,
+        TelemFFB's effects are the stick's only centering force, so a
+        timed-out device must not be left with none of them (it becomes
+        the autocenter_disabled capability).  A driver that refuses
+        leaves that spring fighting every rendered force - which looks
+        exactly like TelemFFB rendering nothing, so it is worth a
+        warning rather than silence.
         """
         try:
             state = self.bridge.autocenter_state(self._handle)
@@ -1374,7 +1389,8 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
             return
         if state < 0:
             return          # the bridge could not tell
-        if state & DIBridge.AC_OFF_APPLIED:
+        self._autocenter_off = bool(state & DIBridge.AC_OFF_APPLIED)
+        if self._autocenter_off:
             verified = ('device-confirmed'
                         if state & DIBridge.AC_OFF_VERIFIED
                         else 'not reported back by this driver')
@@ -1646,6 +1662,11 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                     effect.invalidate()
             self._reconnecting = False
             self._native_fault = False
+            # the handover is re-done on every open: a driver that
+            # refused (or cooperated) may do otherwise this time
+            self._log_autocenter_state()
+            self._caps = replace(DINPUT_CAPABILITIES,
+                                 autocenter_disabled=self._autocenter_off)
             logging.info("DirectInput device reconnected")
             self.deviceConnected.emit(True)
         except Exception:

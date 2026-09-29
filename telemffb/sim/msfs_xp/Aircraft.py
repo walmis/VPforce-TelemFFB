@@ -294,7 +294,7 @@ class Aircraft(
 
         self.cyclic_spring_init = 0
 
-        if self.center_spring_on_pause:
+        if self._center_on_pause():
             self.spring_x.set_coefficient(1.0)
             self.spring_y.set_coefficient(1.0)
             self.spring_x.set_offset(0.0)
@@ -304,3 +304,19 @@ class Aircraft(
             pause_spring.setCondition(self.spring_x)
             pause_spring.setCondition(self.spring_y)
             pause_spring.start()
+
+    def _center_on_pause(self) -> bool:
+        """Whether a timeout should leave a centering spring on the stick.
+
+        Normally the user's center_spring_on_pause setting decides.  On a
+        device whose own centering spring TelemFFB switched off at open
+        (the DirectInput handover), it is on regardless: with every
+        effect stopped and no native spring left, the stick would be
+        force-free, hold whatever deflection it was left in, and the
+        aircraft would follow that deflected stick - the user's
+        "no controls after pause".
+        """
+        if self.center_spring_on_pause:
+            return True
+        caps = getattr(HapticEffect.device, 'caps', None)
+        return bool(caps and caps.autocenter_disabled)
