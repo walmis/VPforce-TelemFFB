@@ -112,3 +112,28 @@ class TestApplySettingsIsResilient:
 
         assert inst.spring_mode == SpringModeEnum.NONE
         assert inst.damper_force == 0.5      # the rest of the config still applied
+
+
+class TestApplySettingsLogNoise:
+    """An aircraft load applies dozens of settings; each used to be its own
+    INFO line, which is what fed the "129 types / 412 messages" cycle
+    summaries. One summary pair of INFO lines plus DEBUG details."""
+
+    def test_per_setting_lines_are_debug(self, caplog):
+        subject = TestApplySettingsIsResilient._Subject()
+        with caplog.at_level(logging.DEBUG):
+            subject.apply_settings({"before": "x", "after": "y"})
+
+        infos = [r.message for r in caplog.records if r.levelno == logging.INFO]
+        assert infos == ["Applying settings...", "Applied 2 settings"], infos
+        debugs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert len(debugs) == 2, debugs
+        assert any("before" in d for d in debugs)
+
+    def test_default_level_sees_only_two_lines(self, caplog):
+        """At the default WARNING-level capture only the ERROR backstop
+        could ever show; INFO summary lines never drown the log."""
+        subject = TestApplySettingsIsResilient._Subject()
+        with caplog.at_level(logging.INFO):
+            subject.apply_settings({"before": "x", "after": "y"})
+        assert len(caplog.records) == 2, [r.message for r in caplog.records]
