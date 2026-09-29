@@ -131,8 +131,8 @@ class TestApplySettingsLogNoise:
         assert any("before" in d for d in debugs)
 
     def test_default_level_sees_only_two_lines(self, caplog):
-        """At the default WARNING-level capture only the ERROR backstop
-        could ever show; INFO summary lines never drown the log."""
+        """An INFO-level capture shows exactly the two summary lines; the
+        per-setting details stay at DEBUG and stay invisible below INFO."""
         subject = TestApplySettingsIsResilient._Subject()
         with caplog.at_level(logging.INFO):
             subject.apply_settings({"before": "x", "after": "y"})
