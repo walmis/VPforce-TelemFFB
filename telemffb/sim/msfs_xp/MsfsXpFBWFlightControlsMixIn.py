@@ -69,8 +69,21 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         self.rudder_pos_dampener = utils.Dampener()
 
     def on_timeout(self):
+        """Stop the flight-control spring, except when hold-forces says to
+        keep it and the user is not asking for the centering spring.
+
+        ``AircraftBase.on_timeout`` keeps spring-type effects alive while
+        ``keep_forces_on_pause`` is on, so this handle must not be stopped in
+        that case or the protection is undone one call later.  But when
+        ``center_spring_on_pause`` is also on, ``Aircraft.on_timeout`` starts
+        the centering spring right after the super() chain, so the
+        flight-control spring must be stopped to be replaced rather than
+        stacked on top of it.
+        """
         super().on_timeout()
-        self._spring_handle.stop()    
+        if not (getattr(self, 'keep_forces_on_pause', False)
+                and not getattr(self, 'center_spring_on_pause', False)):
+            self._spring_handle.stop()
 
 
     def update_fbw_flight_controls(self, telem_data: BaseTelemetryData, ap=False):
