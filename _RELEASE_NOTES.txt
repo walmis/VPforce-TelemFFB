@@ -53,6 +53,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: The Exponential Curve G-force mode is selectable again, with its settings.  It was already the default for any aircraft whose G-force mode was never changed, while the settings showed it as Disabled
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
+- Fix: the log now names what stopped MSFS telemetry when the sim pauses (paused, parked, slewed, avatar, cinematic, in menus) and says when it resumes - before, a stuck stop was indistinguishable from a dead connection
 
 ## X-Plane
 - **NEW: Multiple X-Plane installs**

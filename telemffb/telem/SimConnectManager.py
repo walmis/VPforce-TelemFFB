@@ -1162,11 +1162,36 @@ class SimConnectManager(threading.Thread):
                     data['_num_simvars'] = len(data)
                     data['msfs_vers'] = self.connected_version
                     if not self._stop_state:
+                        # Say WHICH condition latched: while the state is held,
+                        # every packet is dropped, so without this a stuck stop
+                        # leaves the log with no clue as to why telemetry
+                        # stopped.  FS2024 is the tricky case - during a menu
+                        # cinematic it reports Pause=0 while IS IN RTC stays 1,
+                        # so the gate correctly stays closed but the log alone
+                        # looks like an unpause with no matching "resumed".
+                        reasons = []
+                        if self._sim_paused:
+                            reasons.append("paused")
+                        if data.get("Parked", 0):
+                            reasons.append("parked")
+                        if data.get("Slew", 0):
+                            reasons.append("slew")
+                        if avatar:
+                            reasons.append("avatar")
+                        if rtc:
+                            reasons.append("rtc")
+                        if in_menus:
+                            reasons.append(f"in_menus (camera state {data.get('CameraState')})")
+                        logging.info(
+                            f"MSFS telemetry stopped ({', '.join(reasons)}): "
+                            "packets are suppressed until all of these clear")
                         self.emit_event("STOP")
                         self.emit_packet(data) # emit last packet
                         self._stop_state = True
                 else:
                 # print(f"!#$!#$!#$!#$ EMITTING PACKET LEN: {len(data)}")
+                    if self._stop_state:
+                        logging.info("MSFS telemetry resumed: stop condition cleared")
                     self._stop_state = False
                     self.emit_packet(data)
             else:
