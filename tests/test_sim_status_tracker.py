@@ -17,12 +17,18 @@ pytestmark = pytest.mark.unit
 class FakeAppState:
     def __init__(self):
         self.calls = []  # list of (state, source, message)
+        self._current = None
 
     def set_sim_status(self, state, source, message=None):
         self.calls.append((state, source, message))
+        self._current = (state, source, message or '')
 
     def reset_sim_status(self):
         self.calls.append(('reset', None, None))
+        self._current = None
+
+    def current_sim_status(self):
+        return self._current or ('', '', '')
 
 
 class FakeExceptionTracker:
@@ -128,6 +134,22 @@ class TestOnFirstFrame:
     def test_flips_waiting_to_running(self, tracker, app_state):
         tracker.on_first_frame('DCS')
         assert app_state.calls == [('running', 'DCS', None)]
+
+    def test_a_stopped_first_frame_is_paused_and_keeps_the_timeout_state(self, tracker, app_state):
+        # MSFS paused or in its menus: one STOP frame, then nothing
+        tracker.on_first_frame('MSFS', stopped=True)
+        assert app_state.calls == [('paused', 'MSFS', None)]
+        assert tracker.telemetry_timed_out is True
+        tracker.on_frame({'src': 'MSFS'})
+        assert app_state.calls[-1] == ('running', 'MSFS', None)
+        assert tracker.telemetry_timed_out is False
+
+    def test_the_frame_and_first_frame_paths_report_one_status(self, tracker, app_state):
+        # process_data emits telemetryReceived, then first_frame_received,
+        # for the same frame
+        tracker.on_frame({'src': 'MSFS', 'STOP': 1})
+        tracker.on_first_frame('MSFS', stopped=True)
+        assert app_state.calls == [('paused', 'MSFS', None)]
 
     def test_guarded_while_in_error_state(self, tracker, app_state):
         tracker.on_frame({'src': 'DCS', 'error': 'bad config'})
