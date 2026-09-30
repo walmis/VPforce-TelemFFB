@@ -545,6 +545,23 @@ def _initialize_device_connection():
     return dev, dev_serial, dev_firmware_version
 
 
+def _prime_device_input(dev, context: str) -> None:
+    """Read input reports from ``dev`` until ``get_input()`` returns one, or
+    500 ms pass.  For callers that hold the main thread, where the device's
+    read timer cannot run.  Uses ``pump_input``, which raises no button
+    events.
+    """
+    try:
+        deadline = time.perf_counter() + 0.5
+        while dev.get_input() is None and time.perf_counter() < deadline:
+            dev.pump_input()
+            time.sleep(0.005)
+        if dev.get_input() is None:
+            logging.warning(f"{context}: no input report within 500ms of open")
+    except Exception:
+        logging.exception(f"{context}: input pump failed")
+
+
 def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
     """Open the device named by the identity globals and derive the rest.
 
@@ -738,6 +755,92 @@ def _configured_device_present() -> bool:
         return any(d.product_id == pid for d in FFBRhino.enumerate())
     except Exception:
         return False
+
+
+class _StartupGate:
+    """Starts the sim listeners once the version check has resolved and the
+    device is ready: open, first input report delivered, startup device init
+    finished.  No device counts as ready.  If the gate has not resolved
+    after READY_FALLBACK_MS the listeners start anyway, with a warning.
+    """
+    INPUT_POLL_MS = 5
+    INPUT_WAIT_MS = 500
+    READY_FALLBACK_MS = 15000       # beyond the startup vpconf push's own wait
+
+    def __init__(self):
+        self._version_checked = False
+        self._device_ready = False
+        self._started = False
+        self._input_timer = None
+        self._input_deadline = 0.0
+        self._fallback = None
+
+    def arm_fallback(self):
+        self._fallback = QTimer()
+        self._fallback.setSingleShot(True)
+        self._fallback.timeout.connect(self._fallback_fired)
+        self._fallback.start(self.READY_FALLBACK_MS)
+
+    def version_checked(self):
+        self._version_checked = True
+        self._maybe_start()
+
+    def device_init_done(self, dev):
+        """Main thread.  Marks the device ready once ``get_input()`` returns
+        a report, polling for up to INPUT_WAIT_MS; ``None`` is ready at once."""
+        if dev is None:
+            self._device_ready = True
+            self._maybe_start()
+            return
+        self._input_deadline = time.perf_counter() + self.INPUT_WAIT_MS / 1000.0
+        self._check_input(dev)
+        if not self._device_ready:
+            self._input_timer = QTimer()
+            self._input_timer.timeout.connect(lambda: self._check_input(dev))
+            self._input_timer.start(self.INPUT_POLL_MS)
+
+    def _check_input(self, dev):
+        try:
+            have_input = dev.get_input() is not None
+        except Exception:
+            have_input = True          # a device that cannot answer is not worth a wait
+        if not have_input and time.perf_counter() < self._input_deadline:
+            return
+        if self._input_timer is not None:
+            self._input_timer.stop()
+            self._input_timer = None
+        if not have_input:
+            logging.warning(f"Startup: no input report from the device within "
+                            f"{self.INPUT_WAIT_MS}ms; starting the sim listeners anyway")
+        self._device_ready = True
+        self._maybe_start()
+
+    def _fallback_fired(self):
+        if self._started:
+            return
+        logging.warning("Startup: readiness gate did not resolve "
+                        f"(version check {self._version_checked}, device {self._device_ready}); "
+                        "starting the sim listeners anyway")
+        self._start()
+
+    def _maybe_start(self):
+        if self._version_checked and self._device_ready:
+            self._start()
+
+    def _start(self):
+        if self._started:
+            return
+        self._started = True
+        if self._fallback is not None:
+            self._fallback.stop()
+        if self._input_timer is not None:
+            self._input_timer.stop()
+            self._input_timer = None
+        logging.info("Startup: application ready, starting the sim listeners")
+        G.sim_listeners.start_all()
+
+
+startup_gate = _StartupGate()
 
 
 class _DeviceRetryTicker:
@@ -984,24 +1087,10 @@ def switch_to_device(devpath=None, show_error=True) -> bool:
             return False
         device_retry_ticker.stop()
 
-        # A freshly opened device has no input snapshot until its first
-        # report arrives, and the aircraft mixins read input every frame
-        # assuming it is always there.  The read timer cannot fire while
-        # this stack holds the main thread, so pump the backend's input
-        # intake directly (pump_input: part of the device contract, and
-        # input only - no button events mid-teardown); the frame-level
-        # guard in TelemManager covers whatever window remains.
-        try:
-            deadline = time.perf_counter() + 0.5
-            while (dev.get_input() is None
-                    and time.perf_counter() < deadline):
-                dev.pump_input()
-                time.sleep(0.005)
-            if dev.get_input() is None:
-                logging.warning("Device switch: no input report within "
-                                "500ms of open")
-        except Exception:
-            logging.exception("Device switch: input pump failed")
+        # this stack holds the main thread, so the read timer cannot
+        # deliver the first input report; the frame guard in TelemManager
+        # covers whatever window remains
+        _prime_device_input(dev, "Device switch")
 
         # 5. Beacon for the new device (additive; see docstring), UI, and
         #    the loaded aircraft's capability gates.
@@ -1400,50 +1489,59 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
     @utils.threaded()
     def init_async():
         try:
+            _init_device_async(dev)
+        finally:
+            # on failure too, or the sim listeners never start
+            utils.schedule_on_main_thread(lambda: startup_gate.device_init_done(dev))
+
+    init_async()
+
+
+def _init_device_async(dev):
+    """Worker thread.  Reads the Configurator gains and pushes the startup
+    vpconf profile.  The sim listeners wait for this (see _StartupGate)."""
+    try:
+        if dev:
+            G.startup_configurator_gains = dev.get_gains()
+            utils.log_device_gains("startup", G.startup_configurator_gains)
+    except Exception:
+        logging.exception("Unable to get configurator slider values from device")
+
+    device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
+    pushed_startup_vpconf = False
+    if G.system_settings.enableVPConfStartup:
+        if not device_has_gains:
+            logging.info("Startup vpconf profile configured but this device has no Configurator gains; skipping")
+        else:
+            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
+            try:
+                # wait: the push has its own thread, and the gate treats
+                # this init as finished only once the profile is on the device
+                upload_vpconf_profile(G.system_settings.pathVPConfStartup,
+                                      getattr(G, 'device_serial', None), wait=True)
+                pushed_startup_vpconf = True
+            except Exception:
+                logging.exception("Unable to set VPConfigurator startup profile")
+
+    # A push latches these itself when the Configurator has applied the
+    # profile; reading here would race it and store pre-push values.
+    if not pushed_startup_vpconf:
+        try:
             if dev:
-                G.startup_configurator_gains = dev.get_gains()
-                utils.log_device_gains("startup", G.startup_configurator_gains)
+                G.vpconf_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
-        device_has_gains = G.device_capabilities is None or G.device_capabilities.has_gains
-        pushed_startup_vpconf = False
-        if G.system_settings.enableVPConfStartup:
-            if not device_has_gains:
-                logging.info("Startup vpconf profile configured but this device has no Configurator gains; skipping")
-            else:
-                logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
-                try:
-                    upload_vpconf_profile(G.system_settings.pathVPConfStartup,
-                                          getattr(G, 'device_serial', None))
-                    pushed_startup_vpconf = True
-                except Exception:
-                    logging.exception("Unable to set VPConfigurator startup profile")
+    # Reachable only if the gate's fallback started the listeners before
+    # this init finished: reload the aircraft so its vpconf / configurator
+    # overrides land on top of the startup push.
+    tm = G.telem_manager
+    if tm is not None and tm.currentAircraftName is not None:
+        logging.info("Async device init finished after an aircraft was already "
+                     "loaded; forcing a config reload to re-apply its settings/overrides")
+        G.force_reload_aircraft_trigger = True
+        tm.currentAircraftName = None
 
-        # A push latches these itself when the Configurator has applied the
-        # profile; reading here would race it and store pre-push values.
-        if not pushed_startup_vpconf:
-            try:
-                if dev:
-                    G.vpconf_configurator_gains = dev.get_gains()
-            except Exception:
-                logging.exception("Unable to get configurator slider values from device")
-
-        # Startup race: when the sim is already running with an aircraft loaded,
-        # the sim-listener thread loads that aircraft and applies its vpconf /
-        # configurator-override layer BEFORE this async init establishes the
-        # device's startup state — and the startup vpconf push above can wipe it.
-        # If an aircraft is already loaded, force a clean reload so its config is
-        # re-applied on top, exactly as the normal aircraft-change path does.
-        # No-op when nothing is loaded yet (the common start-before-sim case).
-        tm = G.telem_manager
-        if tm is not None and tm.currentAircraftName is not None:
-            logging.info("Async device init finished after an aircraft was already "
-                         "loaded; forcing a config reload to re-apply its settings/overrides")
-            G.force_reload_aircraft_trigger = True
-            tm.currentAircraftName = None
-
-    init_async()
 
 def _cleanup_on_exit(dev_serial):
     """
@@ -1843,9 +1941,10 @@ def main():
     # Show main window based on configuration (minimized, tray, normal)
     _handle_window_display(headless_mode)
 
-    # Sim listeners start only after version check resolves (or is skipped),
-    # preventing plugin dialogs from racing with the app-update prompt.
-    G.main_window.updates.version_check_complete.connect(G.sim_listeners.start_all)
+    # The sim listeners start from the gate: version check resolved (or
+    # skipped) and device ready, which phase 14's async init reports.
+    startup_gate.arm_fallback()
+    G.main_window.updates.version_check_complete.connect(startup_gate.version_checked)
 
     # Check for version updates in background (non-release builds)
     _check_version_update()
@@ -1890,7 +1989,7 @@ def main():
     # ============================================================================
     # PHASE 15: Service Startup and Event Loop
     # ============================================================================
-    # replaced by G.main_window.updates.version_check_complete.connect(G.sim_listeners.start_all) above
+    # The sim listeners start from startup_gate (phase 12) once the loop runs.
 
     # Enter Qt application event loop - application runs until user exits.
     # The watchdog tells a native modal loop from a stall by whether the
