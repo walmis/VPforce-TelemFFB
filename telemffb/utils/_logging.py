@@ -384,11 +384,11 @@ class DedupHandler(logging.Handler):
       once, then a "(message repeated N times)" summary every ``period_seconds``
       and a final summary when a different message arrives. Same as the
       original single-message dedup.
-    - *Repeating cycles*: a message that was already seen earlier in the
-      window confirms a cycle only when the window itself looks like a
-      loop - at most ``MAX_LOOP_TYPES`` distinct recurring types, or at
-      least ``LOOP_TOTAL_FLOOR`` episode-cumulative occurrences (see
-      ``LOOP_TOTAL_FLOOR``) no matter how many types.
+     - *Repeating cycles*: a message that was already seen earlier in the
+       window confirms a cycle only when the window itself looks like a
+       loop - at most ``MAX_LOOP_TYPES`` distinct recurring types, or at
+       least ``LOOP_TOTAL_FLOOR`` episode-cumulative repeats (see
+       ``LOOP_TOTAL_FLOOR``) no matter how many types.
       The whole cycle is then summarized in a single line and subsequent
       repetitions of its members are suppressed (with a periodic update)
       until the log goes quiet for ``period_seconds`` or a genuinely
@@ -402,10 +402,12 @@ class DedupHandler(logging.Handler):
     #: a lone repeat inside a more diverse window is forwarded, not collapsed
     MAX_LOOP_TYPES = 3
     #: when the window's distinct types carry at least this many
-    #: episode-cumulative occurrences - _counts reset only after the log
-    #: has been quiet for period_seconds, never when a type ages out of
-    #: the window - the window is collapsed no matter how many types it
-    #: contains (a storm is a storm)
+    #: episode-cumulative repeats (occurrences beyond the first, per type)
+    #: - _counts reset only after the log has been quiet for
+    #: period_seconds, never when a type ages out of the window - the
+    #: window is collapsed no matter how many types it contains (a storm
+    #: is a storm).  Repeats rather than total occurrences, so a diverse
+    #: one-off burst with a few duplicated lines does not trip it
     LOOP_TOTAL_FLOOR = 100
 
     def __init__(self, handlers=None, period_seconds: float = 5.0):
@@ -644,12 +646,16 @@ class DedupHandler(logging.Handler):
         (A B A B, A B C A).  A large number of distinct types is not -
         that is usually a one-off burst of different messages (startup, a
         load) - unless the window's types carry at least
-        ``LOOP_TOTAL_FLOOR`` episode-cumulative occurrences, no matter how
-        many types it contains.
+        ``LOOP_TOTAL_FLOOR`` episode-cumulative repeats (occurrences
+        beyond the first, per type), no matter how many types it contains.
+        Counting repeats rather than total occurrences keeps a burst of
+        mostly-unique lines (a few of them duplicated) from tripping the
+        floor, while a genuine high-rate fault loop - which repeats the
+        same few messages over and over - still does.
         """
         keys = self._distinct_keys_in_window()
-        total = sum(self._counts.get(k, 0) for k in keys)
-        return len(keys) <= self.MAX_LOOP_TYPES or total >= self.LOOP_TOTAL_FLOOR
+        repeats = sum(max(0, self._counts.get(k, 0) - 1) for k in keys)
+        return len(keys) <= self.MAX_LOOP_TYPES or repeats >= self.LOOP_TOTAL_FLOOR
 
     def emit(self, record: logging.LogRecord):
         try:

@@ -246,10 +246,25 @@ class TestLoopGatedCollapse:
         assert not any("Cycle detected" in m for m in out), out
         assert out == msgs_in
 
+    def test_diverse_burst_with_one_recurrence_does_not_collapse(self):
+        # The PR #101 review shape: a burst of ~107 distinct one-off lines
+        # (an aircraft load) with a single line repeated once.  Under the
+        # old total-occurrences floor that crossed 100 and collapsed; the
+        # repeats floor (1 repeat here) keeps all 108 messages visible.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        msgs_in = [f"m{i}" for i in range(107)]
+        msgs_in.append("m0")
+        for msg in msgs_in:
+            dedup.emit(make_record(msg))
+            advance(0.01)
+        out = [r.getMessage() for r in rec.records]
+        assert not any("Cycle detected" in m for m in out), out
+        assert out == msgs_in
+
     def test_diverse_storm_collapses_after_rate_floor(self):
         # 10 distinct types at 60 Hz: far more than MAX_LOOP_TYPES different
         # messages, but the rate can only be a fault loop, so the window
-        # collapses once it carries LOOP_TOTAL_FLOOR occurrences.
+        # collapses once it carries LOOP_TOTAL_FLOOR repeats.
         dedup, rec, advance = make_handler(period_seconds=5.0)
         types = [f"t{i}" for i in range(10)]
         for i in range(1000):
@@ -259,9 +274,10 @@ class TestLoopGatedCollapse:
         assert any("Cycle detected" in m for m in out), out
         first_cycle_idx = next(i for i, m in enumerate(out)
                                if "Cycle detected" in m)
-        # the window holds 300 msgs at 60 Hz; the floor (100) is reached at
-        # the 101st message, so the summary must land by message ~105
-        assert first_cycle_idx <= 105, out[:first_cycle_idx + 1]
+        # the floor is 100 repeats; with 10 evenly cycling types, repeats =
+        # total - 10, so the first repeat crossing it is the 110th message
+        # (index 109): 11 occurrences per type, i.e. 10 repeats each
+        assert first_cycle_idx == 109, out[:first_cycle_idx + 1]
         # no type was lost before the collapse
         for t in types:
             assert t in out[:first_cycle_idx], t
@@ -303,11 +319,13 @@ class TestLoopGatedCollapse:
         assert out == [f"t{i}" for i in range(4)] * 2, out
         assert not any("Cycle detected" in m for m in out), out
 
-    def test_ninety_nine_occurrences_do_not_reach_the_floor(self):
-        # 6 distinct types, 99 total occurrences: one below
-        # LOOP_TOTAL_FLOOR (100) - the other side of the rate boundary.
+    def test_ninety_nine_repeats_do_not_reach_the_floor(self):
+        # 6 distinct types, 99 repeats: one below LOOP_TOTAL_FLOOR (100) -
+        # the other side of the rate boundary.  A 100 times (99 repeats)
+        # plus five one-off types (0 repeats each) keeps the window below
+        # the floor, so the final A is forwarded, not collapsed.
         dedup, rec, advance = make_handler(period_seconds=10.0)
-        for _ in range(93):
+        for _ in range(99):
             dedup.emit(make_record("A"))
             advance(0.5)
         for t in ["b", "c", "d", "e", "f"]:
@@ -352,9 +370,9 @@ class TestStaleKeyWindowReappend:
 
     def test_stale_key_recurrence_is_forwarded_in_a_diverse_window(self):
         # Regression guard for the re-append: with the stale key re-joined the
-        # window holds 5 distinct types and only 42 occurrences - above
-        # MAX_LOOP_TYPES and far below the floor, so the recurrence must stay
-        # a lone one: forwarded, not swallowed by a collapse.
+        # window holds 5 distinct types and only 37 repeats (42 occurrences) -
+        # above MAX_LOOP_TYPES and far below the floor, so the recurrence
+        # must stay a lone one: forwarded, not swallowed by a collapse.
         dedup, rec, advance = make_handler(period_seconds=5.0)
         dedup.emit(make_record("stale"))
         advance(1.0)
@@ -374,12 +392,13 @@ class TestStaleKeyWindowReappend:
 def _six_type_storm(period_seconds=10.0):
     """Drive a 6-type storm past the rate floor and return the summary text.
 
-    94× A, then five one-off types, then one more A: the repeat of A finds a
-    window of 6 distinct types with exactly 100 occurrences (the floor), so
-    the collapse fires with A heavily weighted.
+    100× A, then five one-off types, then one more A: the repeat of A finds
+    a window of 6 distinct types with 100 repeats (the floor - A carries
+    101 occurrences, i.e. 100 repeats, and the one-offs 0), so the collapse
+    fires with A heavily weighted.
     """
     dedup, rec, advance = make_handler(period_seconds=period_seconds)
-    for _ in range(94):
+    for _ in range(100):
         dedup.emit(make_record("A"))
         advance(0.5)
     for t in ["b", "c", "d", "e", "f"]:
