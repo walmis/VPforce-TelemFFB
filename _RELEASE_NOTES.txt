@@ -72,6 +72,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: the runway rumble effect never played - its enable toggle was not being honored.  It now runs when enabled, so expect a rumble on the ground if you have it switched on
 
 ## General fixes
+- Fix: keep-forces-on-pause is honored for the flight-control spring on MSFS / X-Plane aircraft - a timeout used to stop it one call after the keep-forces protection ran.  When center-spring-on-pause is also on, the flight-control spring is now replaced by the centering spring on a pause instead of left riding on top of it
 - Fix: effects are now properly freed when the sim exits and when TelemFFB exits preventing scenarios that may result in hung effects on the device
 - Fix: resetting the device's effects no longer strands the effects
 - Fix: the gear, flaps, speedbrake, canopy, tailhook, fuel boom and wing fold motion effects and the stick shakers had all been rendering as a plain sine wave - their intended square and sawtooth waveforms were silently dropped on the way to the device.  They now play as designed.  This changes the feel of those effects; retune their intensity if they come across harsher than before

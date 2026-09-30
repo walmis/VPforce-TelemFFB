@@ -866,5 +866,48 @@ class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
         assert self._settled_y(instance, telem) == pytest.approx(0.25 * 4096, abs=40)
 
 
+class TestMsfsXpFBWFlightControlsTimeout(BaseTelemetryEffectTestCase):
+    """The on_timeout guard over the private flight-control spring.
+
+    ``AircraftBase`` keeps spring-type effects alive when
+    ``keep_forces_on_pause`` is on, so the guard must not stop the spring in
+    that case.  But when ``center_spring_on_pause`` is on as well,
+    ``Aircraft.on_timeout`` starts the centering spring right after the
+    super() chain, so the flight-control spring must stop to be replaced
+    rather than ride on top of it.  ``MsfsXpFlightControlsMixIn`` inherits
+    this mixin, so the guard covers every MSFS/X-Plane fixed wing.
+    """
+
+    def _timeout_stops(self, keep_forces, center_spring):
+        instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
+        if keep_forces is not None:
+            instance.keep_forces_on_pause = keep_forces
+        if center_spring is not None:
+            instance.center_spring_on_pause = center_spring
+        spring = instance._spring_handle
+        spring.start()
+        instance.on_timeout()
+        return not spring.started
+
+    def test_both_off_stops_the_flight_spring(self):
+        assert self._timeout_stops(False, False)
+
+    def test_keep_forces_off_center_on_stops_the_flight_spring(self):
+        assert self._timeout_stops(False, True)
+
+    def test_keep_forces_on_center_off_holds_the_flight_spring(self):
+        assert not self._timeout_stops(True, False)
+
+    def test_keep_forces_on_center_on_stops_the_flight_spring(self):
+        # both on: the centering spring replaces the flight spring, so this
+        # one must stop here rather than stack on top of it
+        assert self._timeout_stops(True, True)
+
+    def test_missing_settings_behave_like_off(self):
+        # a fresh instance with neither setting present must not raise and
+        # falls back to the pre-fix (stop) behavior
+        assert self._timeout_stops(None, None)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
