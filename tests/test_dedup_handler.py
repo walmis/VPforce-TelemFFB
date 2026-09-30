@@ -338,6 +338,64 @@ class TestLoopGatedCollapse:
 
 
 # ---------------------------------------------------------------------------
+# Non-loop members: a one-off that merely co-occurs with a collapsed loop must
+# stay visible when it recurs - only genuine loop members are suppressed
+# ---------------------------------------------------------------------------
+
+class TestNonLoopMemberRecurrence:
+
+    def test_oneoff_after_collapse_is_forwarded_on_recurrence(self):
+        # Issue 103 repro: a 2-type fault loop collapses the window; a distinct
+        # one-off that appears afterwards recurs and must stay visible (0 of its
+        # recurrences reached the log before the fix).
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("A")); advance(1.0)   # t=0
+        dedup.emit(make_record("B")); advance(1.0)   # t=1
+        dedup.emit(make_record("A")); advance(1.0)   # t=2 -> collapse (2 types)
+        dedup.emit(make_record("P")); advance(1.0)   # t=3 one-off first -> forwarded
+        dedup.emit(make_record("B")); advance(1.0)   # t=4 loop member suppressed
+        dedup.emit(make_record("A")); advance(1.0)   # t=5 loop member suppressed
+        for _ in range(5):
+            dedup.emit(make_record("P")); advance(1.0)   # t=6..10 one-off recurrences
+        out = [r.getMessage() for r in rec.records]
+        # first sight + 5 recurrences all visible
+        assert out.count("P") == 6, out
+
+    def test_loop_members_stay_suppressed(self):
+        # Guard: the fix must not start forwarding genuine loop members.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("A")); advance(1.0)
+        dedup.emit(make_record("B")); advance(1.0)
+        dedup.emit(make_record("A")); advance(1.0)   # collapse
+        for _ in range(10):
+            dedup.emit(make_record("A")); advance(1.0)
+            dedup.emit(make_record("B")); advance(1.0)
+        out = [r.getMessage() for r in rec.records]
+        assert out.count("A") == 1, out
+        assert out.count("B") == 1, out
+
+    def test_floor_collapse_oneoff_in_window_is_forwarded(self):
+        # More than MAX_LOOP_TYPES types, so the collapse can only come from the
+        # rate floor. A one-off that sits in the window with a single occurrence
+        # does not drive the floor, so it is not a loop member: its recurrence is
+        # forwarded while the high-repeat storm types stay suppressed.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        for i in range(100):
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(0.1)
+        dedup.emit(make_record("Q")); advance(0.1)     # one-off, inside the window
+        for i in range(100, 112):                      # crosses the floor mid-run
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(0.1)
+        for _ in range(3):                             # one-off recurrences
+            dedup.emit(make_record("Q")); advance(0.1)
+        out = [r.getMessage() for r in rec.records]
+        assert any("Cycle detected" in m for m in out), out
+        # first sight + 3 recurrences all forwarded
+        assert out.count("Q") == 4, out
+
+
+# ---------------------------------------------------------------------------
 # Stale keys: a seen key that aged out of the window must rejoin it
 # ---------------------------------------------------------------------------
 

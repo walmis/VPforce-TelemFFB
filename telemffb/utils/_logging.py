@@ -422,8 +422,12 @@ class DedupHandler(logging.Handler):
         # keys already seen in the current window generation
         self._seen: set = set()
         # True once a cycle summary has been emitted for the current generation;
-        # while set, cycle members are suppressed instead of forward-checked
+        # while set, loop members are suppressed instead of forward-checked
         self._collapsed = False
+        # keys that are actual members of the collapsed cycle, snapshotted when
+        # the collapse fires; a seen key outside this set is a one-off that
+        # merely co-occurred with the loop and is forwarded on recurrence
+        self._loop_members: set = set()
         # per-key bookkeeping for summaries (last record, occurrence count,
         # first-seen timestamp, most-recent-seen timestamp)
         # _key_last_ts drives window-pruning so long-running cycles stay alive
@@ -609,6 +613,7 @@ class DedupHandler(logging.Handler):
         self._window.clear()
         self._seen.clear()
         self._collapsed = False
+        self._loop_members.clear()
         self._records.clear()
         self._counts.clear()
         self._first_ts.clear()
@@ -657,6 +662,21 @@ class DedupHandler(logging.Handler):
         repeats = sum(max(0, self._counts.get(k, 0) - 1) for k in keys)
         return len(keys) <= self.MAX_LOOP_TYPES or repeats >= self.LOOP_TOTAL_FLOOR
 
+    def _loop_member_keys(self):
+        """The keys that are actual members of the collapsed cycle.
+
+        A snapshot of the window at the moment the collapse fires.  A small
+        (``MAX_LOOP_TYPES``) window is the classic loop, so every type in it is
+        a member.  A window that collapsed only because it carried enough
+        repeats (the rate floor) also contains one-off types that never repeat;
+        there, only the types that actually recur (a count beyond their first
+        occurrence) are members - a one-off seen exactly once is not.
+        """
+        keys = self._distinct_keys_in_window()
+        if len(keys) <= self.MAX_LOOP_TYPES:
+            return set(keys)
+        return {k for k in keys if self._counts.get(k, 0) >= 2}
+
     def emit(self, record: logging.LogRecord):
         try:
             key = self._make_key(record)
@@ -700,13 +720,21 @@ class DedupHandler(logging.Handler):
                     self._key_last_ts[key] = now
                     self._latest_record[key] = record
                     if self._collapsed:
-                        # cycle already summarized: refresh it periodically only;
-                        # the interval is measured from the last emitted summary
-                        if (now - self._last_cycle_ts) >= self.period_seconds:
-                            self._emit_summary_record(
-                                self._make_cycle_summary_record(self._distinct_keys_in_window(), periodic=True)
-                            )
-                            self._last_cycle_ts = now
+                        if key in self._loop_members:
+                            # loop member, already summarized: refresh it
+                            # periodically only; the interval is measured from
+                            # the last emitted summary
+                            if (now - self._last_cycle_ts) >= self.period_seconds:
+                                self._emit_summary_record(
+                                    self._make_cycle_summary_record(self._distinct_keys_in_window(), periodic=True)
+                                )
+                                self._last_cycle_ts = now
+                            return
+                        # seen but not a loop member: a one-off that merely
+                        # co-occurred with the loop - forward it rather than
+                        # fold it into the cycle summary, so its identity
+                        # survives in the log
+                        self._forward(record)
                         return
                     if self._is_loop():
                         # a previously-seen message recurring inside a
@@ -715,6 +743,7 @@ class DedupHandler(logging.Handler):
                         self._emit_summary_record(
                             self._make_cycle_summary_record(self._distinct_keys_in_window())
                         )
+                        self._loop_members = self._loop_member_keys()
                         self._collapsed = True
                         self._last_cycle_ts = now
                         return
