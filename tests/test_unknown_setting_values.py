@@ -114,26 +114,34 @@ class TestApplySettingsIsResilient:
         assert inst.damper_force == 0.5      # the rest of the config still applied
 
 
-class TestApplySettingsLogNoise:
-    """An aircraft load applies dozens of settings; each used to be its own
-    INFO line, which is what fed the "129 types / 412 messages" cycle
-    summaries. One summary pair of INFO lines plus DEBUG details."""
+class TestApplySettingsLogging:
+    """An aircraft load applies dozens of settings, and each one is logged
+    at INFO: these lines are the only record of the effective (post-merge)
+    values in the support log, which runs at INFO.  A load cannot trip the
+    cyclic dedup's loop floor, because that floor counts repeats and a
+    load is mostly unique lines."""
 
-    def test_per_setting_lines_are_debug(self, caplog):
+    def test_per_setting_lines_are_info(self, caplog):
         subject = TestApplySettingsIsResilient._Subject()
         with caplog.at_level(logging.DEBUG):
             subject.apply_settings({"before": "x", "after": "y"})
 
         infos = [r.message for r in caplog.records if r.levelno == logging.INFO]
-        assert infos == ["Applying settings...", "Applied 2 settings"], infos
-        debugs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
-        assert len(debugs) == 2, debugs
-        assert any("before" in d for d in debugs)
+        assert infos == [
+            "Applying settings...",
+            " [cyan]set[/cyan]: before = x",
+            " [cyan]set[/cyan]: after = y",
+            "Applied 2 settings",
+        ], infos
+        assert not [r for r in caplog.records
+                    if r.levelno == logging.DEBUG]
 
-    def test_default_level_sees_only_two_lines(self, caplog):
-        """An INFO-level capture shows exactly the two summary lines; the
-        per-setting details stay at DEBUG and stay invisible below INFO."""
+    def test_info_level_sees_every_line(self, caplog):
+        """The support log runs at INFO and must see the whole load,
+        per-setting values included."""
         subject = TestApplySettingsIsResilient._Subject()
         with caplog.at_level(logging.INFO):
             subject.apply_settings({"before": "x", "after": "y"})
-        assert len(caplog.records) == 2, [r.message for r in caplog.records]
+        assert len(caplog.records) == 4, [r.message for r in caplog.records]
+        assert any("before = x" in r.message for r in caplog.records)
+        assert any("after = y" in r.message for r in caplog.records)

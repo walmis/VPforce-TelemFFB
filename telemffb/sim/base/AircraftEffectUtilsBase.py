@@ -142,10 +142,12 @@ class AircraftEffectUtilsBase(object):
             settings_dict (dict): Dictionary containing configuration key-value pairs.
                                 Keys should match aircraft attribute names.
 
-        Logs one summary pair of INFO lines per call and a warning per
-        unknown parameter; the individual settings are logged at DEBUG,
-        because a load applies dozens of them and the per-setting flood
-        used to drown real events in the cyclic-dedup summaries.
+        Logs one summary pair of INFO lines per call, a warning per
+        unknown parameter, and an INFO line per applied setting: the
+        per-setting lines are the only record of the effective
+        (post-merge) values in the support log, which runs at INFO.  A
+        load's burst of mostly-unique lines cannot trip the cyclic
+        dedup's loop floor, because that floor counts repeats.
         """
         logging.info("Applying settings...")
         applied = 0
@@ -155,7 +157,7 @@ class AircraftEffectUtilsBase(object):
             if hasattr(self, k) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
                 logging.warning(f"Trying to assign unknown parameter {k} ")
                 continue
-            logging.debug(f" [cyan]set[/cyan]: {k} = {v}")
+            logging.info(f" [cyan]set[/cyan]: {k} = {v}")
             try:
                 setattr(self, k, v)
                 applied += 1
