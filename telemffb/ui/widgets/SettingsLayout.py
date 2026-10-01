@@ -2386,6 +2386,20 @@ class SettingsLayout(QGridLayout):
             "joystick_trim_follow_stick_position")
         self.reload_caller()
 
+    def save_trimwheel_setting(self, name: str, value: str):
+        """Persist one of the calibration dialog's trim write settings under
+        the TRIMWHEEL device scope of the current aircraft's active profile —
+        the rows a trimwheel instance flies with (a Built-In profile forks to
+        Auto User, as for any edit). A running trimwheel child picks the
+        change up through its own config-change reload."""
+        self.trigger_form_reload = True
+        logging.info(f"Trimwheel setting {name} set to '{value}' for "
+                     f"'{G.settings_mgr.current_pattern}'")
+        G.settings_mgr.write_to_xml(
+            G.settings_mgr.current_sim, G.settings_mgr.current_class,
+            G.settings_mgr.current_pattern, value, name, the_device="trimwheel")
+        self.reload_caller()
+
     def update_advanced_spring_gains(self, spring_gain_curves: str, scale: str, units: str):
         self.trigger_form_reload = True
         """

@@ -443,11 +443,16 @@ class TrimCalibrator:
         # pre-derate the leveling loop for known-sensitive/pitchy aircraft
         # instead of waiting for the oscillation watchdog to discover it.
         self.initial_gain_scale = 1.0
-        # Run option: MSFS trim write method — "direct" (default) writes the
-        # ELEVATOR TRIM POSITION SimVar; "axis" sends AXIS_ELEV_TRIM_SET.
-        # Selectable only via the dialog's debug-mode pulldown (see _set_trim
-        # for why direct is primary).
-        self.trim_write_method = "direct"
+        # Run options: MSFS trim write method, mirroring the aircraft's
+        # TRIMWHEEL-scope settings (trimwheel_use_axis, trimwheel_axis_invert,
+        # custom_y_axis / raw_y_axis_scale when enable_custom_y_axis) — the
+        # dialog resolves and sets them before every start. Direct (default)
+        # writes the ELEVATOR TRIM POSITION SimVar; axis sends trim_axis_var
+        # scaled to ±trim_axis_range (see _set_trim for why direct is primary).
+        self.trim_use_axis = False
+        self.trim_axis_invert = False
+        self.trim_axis_var = "AXIS_ELEV_TRIM_SET"
+        self.trim_axis_range = 16384
         # Run option: per-frame diagnostic CSV trace (debug-mode checkbox).
         self.trace_enabled = False
         # Run mode (start(assist=True)): stop after neutralization and hold
@@ -2771,9 +2776,9 @@ class TrimCalibrator:
         SimVar, mapping pct per-side through the reported travel limits (like
         the trimwheel's direct mode). Direct is self-referential — it writes
         the read-back's own quantity — so a hold-in-place command is a true
-        no-op on any aircraft. The AXIS method (debug-mode selection, and the
-        fallback when no usable travel limits are reported) sends
-        AXIS_ELEV_TRIM_SET and assumes the sim maps the event value 1:1 onto
+        no-op on any aircraft. The AXIS method (the aircraft's trimwheel
+        ``trimwheel_use_axis`` setting, and the fallback when no usable travel
+        limits are reported) sends AXIS_ELEV_TRIM_SET and assumes the sim maps the event value 1:1 onto
         the read-back; field testing found aircraft that mishandle the event
         (Just Flight Arrow III/IV and Hawk T1 apply it raw/32766 UNNEGATED,
         relocating trim to -cmd/2 on every write — measured in
@@ -2782,13 +2787,20 @@ class TrimCalibrator:
         the trimwheel mixin's ``pos_y_pos = -int(pos_y_pos)``), hence the
         negation. ``_trim_sign`` is a runtime correction on top of either
         method, flipped by :meth:`_advance_trim` for aircraft with inverted
-        trim response (cf. the ``trimwheel_axis_invert`` user setting).
+        trim response.
+
+        The axis method follows the aircraft's trimwheel settings exactly as
+        the trimwheel mixin does: ``trim_axis_var`` (AXIS_ELEV_TRIM_SET or a
+        custom event / L:var) scaled to ±``trim_axis_range``, sent as a
+        negated int — or, for a ±1 range, an un-negated float — and negated
+        once more when ``trim_axis_invert`` is set. ``DO_NOT_SEND`` writes
+        nothing (the read-back check then aborts the run as unresponsive).
         """
         pct = clamp(pct * self._trim_sign, -1.0, 1.0)
         if self.ac._sim_is_msfs():
             limits = None
             telem = getattr(self.ac, "_telem_data", None)
-            if self.trim_write_method == "direct":
+            if not self.trim_use_axis:
                 get_limits = getattr(self.ac, "_trimwheel_trim_limits", None)
                 if get_limits is not None and telem is not None:
                     limits = get_limits(telem)
@@ -2830,13 +2842,24 @@ class TrimCalibrator:
                     "ELEVATOR TRIM POSITION", math.radians(deg), units="radians"
                 )
                 return
+            var = self.trim_axis_var or "AXIS_ELEV_TRIM_SET"
+            rng = self.trim_axis_range or 16384
+            if rng == 16384:
+                rng = self.TRIM_AXIS_RANGE   # -16383..16384: keep -out in range
             self._log_trim_method(
-                "AXIS_ELEV_TRIM_SET (debug selection)"
-                if self.trim_write_method == "axis"
-                else "AXIS_ELEV_TRIM_SET (no usable trim-limit telemetry for direct)")
-            out = -int(pct * self.TRIM_AXIS_RANGE)
+                f"{var} ±{rng}{' inverted' if self.trim_axis_invert else ''} "
+                + ("(trimwheel use-axis setting)" if self.trim_use_axis
+                   else "(no usable trim-limit telemetry for direct)"))
+            if var == "DO_NOT_SEND":
+                return
+            if rng != 1:
+                out = -int(pct * rng)
+            else:
+                out = round(pct, 5)
+            if self.trim_axis_invert:
+                out = -out
             self._trace_trim_write = out
-            self.ac._simconnect.send_event_to_msfs("AXIS_ELEV_TRIM_SET", out)
+            self.ac._simconnect.send_event_to_msfs(var, out)
         elif self.ac._sim_is_xplane():
             # Write the pilot-control-level trim (float ratio -1..1); the FM
             # propagates it to sim/flightmodel2/controls/elevator_trim, which

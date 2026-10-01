@@ -67,6 +67,23 @@ class TrimCalibrationDialog(QDialog):
     # Emitted when the trimmed-stick-position pulldown changes — persisted
     # standalone so the mode is adjustable post-calibration without a run.
     position_mode_changed = pyqtSignal(str)
+    # Emitted when a debug trim-write control changes: (setting name, value),
+    # persisted under the TRIMWHEEL device scope of the active profile.
+    trim_write_setting_changed = pyqtSignal(str, str)
+
+    # The aircraft's trimwheel-scope trim write settings the calibration
+    # honors, with the trimwheel mixin's defaults (MsfsXpTrimwheelMixIn /
+    # MsfsXpFBWFlightControlsMixIn) for rows the aircraft does not set.
+    TRIM_WRITE_DEFAULTS = {
+        "trimwheel_use_axis": False,
+        "trimwheel_axis_invert": False,
+        "enable_custom_y_axis": False,
+        "custom_y_axis": "AXIS_ELEV_TRIM_SET",
+        "raw_y_axis_scale": 16384,
+    }
+    # defaults.xml validvalues for the trimwheel's custom_y_axis / raw_y_axis_scale.
+    TW_VAR_CHOICES = ("AXIS_ELEV_TRIM_SET", "L:INPUT_TRIM_AXIS", "DO_NOT_SEND")
+    TW_RANGE_CHOICES = ("1", "100", "256", "4096", "16384")
 
     STICK_POSITION_MODES = ("Follows Trim", "Stays Centered")
     # Export-file header for the shareable calibration-set format.
@@ -316,40 +333,52 @@ class TrimCalibrationDialog(QDialog):
         self._is_glider = False
         self._set_glider_row_visible(False)
 
-        # Debug-only controls: trim write method override + per-run
-        # diagnostic trace, for problem-aircraft reports. Direct SimVar
-        # writes are the tested-primary method; the axis event stays
-        # selectable in case an aircraft ever requires it. Visible when
-        # debug mode is active by EITHER route: the registry 'debug' flag
-        # or the session Debug menu summoned with Alt+D — so a remote
-        # tester can be talked through enabling the trace without editing
-        # the registry. Evaluated at construction; the dialog destroys on
-        # close, so Alt+D followed by reopening the tool picks it up.
+        # Debug-only controls: the aircraft's trim write settings + per-run
+        # diagnostic trace, for problem-aircraft reports. Visible when debug
+        # mode is active by EITHER route: the registry 'debug' flag or the
+        # session Debug menu summoned with Alt+D — so a remote tester can be
+        # talked through enabling the trace without editing the registry.
+        # Evaluated at construction; the dialog destroys on close, so Alt+D
+        # followed by reopening the tool picks it up.
+        #
+        # The trim write settings are the aircraft's TRIMWHEEL-scope settings
+        # (the same rows a trimwheel owner edits on the Settings tab) and are
+        # ALWAYS honored by a run, debug or not — an aircraft that needs axis
+        # / custom-variable trim writes ships them in defaults.xml. The debug
+        # controls only expose them for editing.
         debug_flag = bool(getattr(G, "system_settings", None)
                           and G.system_settings.get("debug", False))
         main_menu = getattr(getattr(G, "main_window", None), "menu", None)
         debug_menu_active = bool(main_menu) and any(
             a.text() == "Debug" for a in main_menu.actions())
         self._debug = debug_flag or debug_menu_active
-        self.cmb_trim_method = None
         self.chk_trace = None
+        self.chk_tw_use_axis = None
+        self._tw_last_var = None
         if self._debug:
             debug_row = QHBoxLayout()
+            # MSFS-only trim write settings, in their own container so the
+            # whole group hides for other sims while the trace stays.
+            self._tw_box = QFrame()
+            tw_lay = QHBoxLayout(self._tw_box)
+            tw_lay.setContentsMargins(0, 0, 0, 0)
             lbl_trim_method = InfoLabel(
-                text="Trim write method:",
+                text="Trim write:",
                 tooltip=(
                     "Debug options — this row is visible when debug mode is "
                     "active: either the Debug Mode system setting, or the Debug "
                     "menu shown with Alt+D (reopen this dialog after pressing "
                     "it).\n\n"
-                    "Trim write method: how calibration commands the sim's elevator "
-                    "trim (MSFS).\n"
+                    "Trim write: how calibration commands the sim's elevator "
+                    "trim (MSFS). These are this aircraft's TRIM WHEEL settings\n"
+                    "(saved under the trim wheel device, active profile) — the "
+                    "calibration always uses them, whether or not this row is "
+                    "shown.\n"
                     "• Direct (default) — writes the ELEVATOR TRIM POSITION SimVar "
                     "itself; the most reliable method across tested aircraft.\n"
-                    "• Axis event — sends AXIS_ELEV_TRIM_SET instead, which assumes "
-                    "the aircraft maps the event 1:1 onto its trim. Some addons "
-                    "mishandle the event (e.g. Just Flight); use this only to test "
-                    "an aircraft that misbehaves with the direct method.\n\n"
+                    "• Use Axis — sends AXIS_ELEV_TRIM_SET, or the custom Y "
+                    "variable scaled to its ± range, for aircraft whose systems "
+                    "ignore direct trim writes.\n\n"
                     "Record diagnostic trace: writes a per-frame CSV of everything "
                     "the calibration commands and observes (trimcal_trace_*.csv in "
                     "the TelemFFB log folder) — attach it when reporting a problem "
@@ -357,22 +386,72 @@ class TrimCalibrationDialog(QDialog):
             # InfoLabel's internal minimum is broken (width pinned to text
             # HEIGHT), so it truncates under squeeze — enforce content width.
             lbl_trim_method.setMinimumWidth(lbl_trim_method.sizeHint().width())
-            debug_row.addWidget(lbl_trim_method)
-            self.cmb_trim_method = QComboBox()
-            self.cmb_trim_method.addItems([
-                "Direct (ELEVATOR TRIM POSITION)",
-                "Axis event (AXIS_ELEV_TRIM_SET)",
-            ])
-            debug_row.addWidget(self.cmb_trim_method)
+            tw_lay.addWidget(lbl_trim_method)
+            self.chk_tw_use_axis = QCheckBox("Use Axis instead of Direct")
+            self.chk_tw_use_axis.setToolTip(
+                "Enable to use Axis control (vs direct trim surface manipulating)")
+            self.chk_tw_use_axis.toggled.connect(
+                lambda c: self._on_tw_bool("trimwheel_use_axis", c))
+            tw_lay.addWidget(self.chk_tw_use_axis)
+            self.chk_tw_invert = QCheckBox("Axis Invert")
+            self.chk_tw_invert.setToolTip(
+                "Enable if trim wheel axis moves the wrong way")
+            self.chk_tw_invert.toggled.connect(
+                lambda c: self._on_tw_bool("trimwheel_axis_invert", c))
+            tw_lay.addWidget(self.chk_tw_invert)
+            self.chk_tw_custom = QCheckBox("Custom Variable")
+            self.chk_tw_custom.setToolTip(
+                'Custom Simconnect Variable - use "VARNAME" for simvars or '
+                '"L:VARNAME" for LVARS')
+            self.chk_tw_custom.toggled.connect(
+                lambda c: self._on_tw_bool("enable_custom_y_axis", c))
+            tw_lay.addWidget(self.chk_tw_custom)
+            debug_row.addWidget(self._tw_box)
+            # The trace rides the Control response row (before its stretch),
+            # so it stays put while the MSFS-only trim write group hides.
             self.chk_trace = QCheckBox("Record diagnostic trace")
             self.chk_trace.setChecked(False)
             self.chk_trace.setToolTip(
                 "Write a per-frame CSV of everything the calibration commands and\n"
                 "observes to the TelemFFB log folder (trimcal_trace_*.csv).\n"
                 "Attach it when reporting a problem aircraft.")
-            debug_row.addWidget(self.chk_trace)
+            response_row.insertSpacing(response_row.count() - 1, 12)
+            response_row.insertWidget(response_row.count() - 1, self.chk_trace)
             debug_row.addStretch(1)
             root.addLayout(debug_row)
+
+            # Custom-variable details: shown only while Use Axis AND Custom Y
+            # Variable are on (the defaults.xml prereq chain).
+            self._tw_custom_w = QFrame()
+            cv_lay = QHBoxLayout(self._tw_custom_w)
+            cv_lay.setContentsMargins(0, 0, 0, 0)
+            cv_lay.addSpacing(20)
+            cv_lay.addWidget(QLabel("Trim Axis Var:"))
+            self.cmb_tw_var = NoWheelComboBox()
+            self.cmb_tw_var.setEditable(True)
+            self.cmb_tw_var.addItems(list(self.TW_VAR_CHOICES))
+            self.cmb_tw_var.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToContents)
+            self.cmb_tw_var.setMinimumWidth(180)
+            self.cmb_tw_var.setToolTip(self.chk_tw_custom.toolTip())
+            self.cmb_tw_var.activated.connect(
+                lambda _i: self._on_tw_var_committed())
+            self.cmb_tw_var.lineEdit().editingFinished.connect(
+                self._on_tw_var_committed)
+            cv_lay.addWidget(self.cmb_tw_var)
+            cv_lay.addSpacing(10)
+            cv_lay.addWidget(QLabel("+/- Range:"))
+            self.cmb_tw_range = NoWheelComboBox()
+            self.cmb_tw_range.addItems(list(self.TW_RANGE_CHOICES))
+            self.cmb_tw_range.setToolTip("+/- Value Range to send to sim")
+            self.cmb_tw_range.activated.connect(
+                lambda _i: self._on_tw_setting(
+                    "raw_y_axis_scale", self.cmb_tw_range.currentText()))
+            cv_lay.addWidget(self.cmb_tw_range)
+            cv_lay.addStretch(1)
+            root.addWidget(self._tw_custom_w)
+            for w in (self.chk_tw_invert, self.chk_tw_custom, self._tw_custom_w):
+                w.setVisible(False)
 
         # ---- guided calibration controls ----
         # The action pair sits directly above the status cluster —
@@ -995,8 +1074,7 @@ class TrimCalibrationDialog(QDialog):
             state_name = getattr(cal.state, "name", "")
             self.cmb_response.setEnabled(
                 not running or state_name in self.RESPONSE_LIVE_STATES)
-            if self.cmb_trim_method is not None:
-                self.cmb_trim_method.setEnabled(not running)
+            self._set_trim_write_enabled(not running)
             if self.chk_trace is not None:
                 self.chk_trace.setEnabled(not running)
 
@@ -1069,6 +1147,8 @@ class TrimCalibrationDialog(QDialog):
         # Aircraft changed: last aircraft's speed suggestions are stale;
         # the next live frame recomputes them for the new one.
         self._set_suggest_visible(False)
+        # New aircraft: show ITS trim write settings.
+        self._sync_trim_write_widgets()
         if cal is not None and cal.active:
             # A run is in progress on this engine: the live view owns the
             # graph — re-rendering the stored family here would put its
@@ -1759,6 +1839,141 @@ class TrimCalibrationDialog(QDialog):
             logger.info(f"Glider sink target changed live: "
                         f"{self.spn_glider_vs.value()} fpm")
 
+    # ---- trim write settings (trimwheel scope) --------------------------------
+
+    @staticmethod
+    def _current_sim_is_msfs():
+        sm = G.settings_mgr
+        return sm is not None and getattr(sm, "current_sim", None) == "MSFS"
+
+    def _read_trim_write_settings(self):
+        """The current aircraft's trimwheel-scope trim write settings.
+
+        Resolved through the full config cascade for the TRIMWHEEL device and
+        the active profile (a profile is shared by every device), so the
+        values are exactly those a trimwheel instance would fly with —
+        including per-model rows shipped in defaults.xml. Prereq filtering
+        drops rows whose prereq is off, which then read as their defaults.
+        Returns :attr:`TRIM_WRITE_DEFAULTS` when there is no MSFS aircraft.
+        """
+        s = dict(self.TRIM_WRITE_DEFAULTS)
+        sm = G.settings_mgr
+        if not self._current_sim_is_msfs() or not sm.current_aircraft_name:
+            return s
+        if self._offline_editing() and not self._offline_target_valid():
+            return s
+        try:
+            _, _, rows = xmlutils.read_single_model(
+                sm.current_sim, sm.current_aircraft_name, sm.current_class,
+                "trimwheel", active_profile=sm.active_profile)
+        except Exception as e:
+            logger.warning(f"Trim write settings read failed: {e}")
+            return s
+        for row in rows:
+            name = row.get("name")
+            raw = row.get("value")
+            if name not in s or raw in (None, "-"):
+                continue
+            if name == "custom_y_axis":
+                s[name] = str(raw).strip() or s[name]
+            elif name == "raw_y_axis_scale":
+                try:
+                    s[name] = int(float(raw))
+                except (TypeError, ValueError):
+                    pass
+            else:
+                s[name] = str(raw).strip().lower() == "true"
+        return s
+
+    @staticmethod
+    def _apply_trim_write(cal, s):
+        """Set a calibrator's trim write run options from trimwheel settings,
+        with the trimwheel mixin's semantics: invert and the custom variable
+        only apply in axis mode."""
+        use_axis = bool(s["trimwheel_use_axis"])
+        custom = use_axis and bool(s["enable_custom_y_axis"])
+        cal.trim_use_axis = use_axis
+        cal.trim_axis_invert = use_axis and bool(s["trimwheel_axis_invert"])
+        cal.trim_axis_var = s["custom_y_axis"] if custom else "AXIS_ELEV_TRIM_SET"
+        cal.trim_axis_range = s["raw_y_axis_scale"] if custom else 16384
+        logger.info(
+            "Trim calibration write settings (trimwheel scope): "
+            + (f"axis {cal.trim_axis_var} ±{cal.trim_axis_range}"
+               f"{' inverted' if cal.trim_axis_invert else ''}"
+               if use_axis else "direct"))
+
+    def _sync_trim_write_widgets(self, s=None):
+        """Show the aircraft's saved trim write settings in the debug row."""
+        if self.chk_tw_use_axis is None:
+            return
+        if s is None:
+            s = self._read_trim_write_settings()
+        var = s["custom_y_axis"]
+        rng = str(s["raw_y_axis_scale"])
+        for w in (self.chk_tw_use_axis, self.chk_tw_invert, self.chk_tw_custom,
+                  self.cmb_tw_var, self.cmb_tw_range):
+            w.blockSignals(True)
+        try:
+            self.chk_tw_use_axis.setChecked(bool(s["trimwheel_use_axis"]))
+            self.chk_tw_invert.setChecked(bool(s["trimwheel_axis_invert"]))
+            self.chk_tw_custom.setChecked(bool(s["enable_custom_y_axis"]))
+            if self.cmb_tw_var.findText(var) < 0:
+                self.cmb_tw_var.addItem(var)
+            self.cmb_tw_var.setCurrentText(var)
+            if self.cmb_tw_range.findText(rng) < 0:
+                self.cmb_tw_range.addItem(rng)
+            self.cmb_tw_range.setCurrentText(rng)
+        finally:
+            for w in (self.chk_tw_use_axis, self.chk_tw_invert, self.chk_tw_custom,
+                      self.cmb_tw_var, self.cmb_tw_range):
+                w.blockSignals(False)
+        self._tw_last_var = var
+        self._update_trim_write_visibility()
+
+    def _update_trim_write_visibility(self):
+        """MSFS only; invert / custom variable follow Use Axis, the variable
+        details follow Custom Y Variable (the defaults.xml prereq chain)."""
+        if self.chk_tw_use_axis is None:
+            return
+        msfs = self._current_sim_is_msfs()
+        use_axis = msfs and self.chk_tw_use_axis.isChecked()
+        custom = use_axis and self.chk_tw_custom.isChecked()
+        changed = False
+        for w, vis in ((self._tw_box, msfs), (self.chk_tw_invert, use_axis),
+                       (self.chk_tw_custom, use_axis), (self._tw_custom_w, custom)):
+            if w.isVisibleTo(self) != vis:
+                w.setVisible(vis)
+                changed = True
+        if changed and self.isVisible():
+            self._refit()
+
+    def _set_trim_write_enabled(self, enabled):
+        """Editable only while idle and online — the offline editor view is
+        read-only here, like the other airframe controls."""
+        if self.chk_tw_use_axis is None:
+            return
+        enabled = enabled and not self._offline_editing()
+        for w in (self._tw_box, self._tw_custom_w):
+            if w.isEnabled() != enabled:
+                w.setEnabled(enabled)
+
+    def _on_tw_setting(self, name, value):
+        if self._offline_editing() or not self._current_sim_is_msfs():
+            return
+        logger.info(f"Trim write setting {name} = {value} (trimwheel scope)")
+        self.trim_write_setting_changed.emit(name, value)
+
+    def _on_tw_bool(self, name, checked):
+        self._on_tw_setting(name, "true" if checked else "false")
+        self._update_trim_write_visibility()
+
+    def _on_tw_var_committed(self):
+        text = self.cmb_tw_var.currentText().strip()
+        if not text or text == self._tw_last_var:
+            return
+        self._tw_last_var = text
+        self._on_tw_setting("custom_y_axis", text)
+
     def _arm_and_start(self, cal, assist):
         ac = G.telem_manager.currentAircraft
         telem = getattr(ac, "telem_data", None)
@@ -1776,13 +1991,13 @@ class TrimCalibrationDialog(QDialog):
         self._clear_result_labels()
         cal.initial_gain_scale = self.RESPONSE_SCALES.get(
             self.cmb_response.currentIndex(), 1.0)
-        if self._debug:
-            cal.trim_write_method = \
-                "axis" if self.cmb_trim_method.currentIndex() == 1 else "direct"
-            cal.trace_enabled = self.chk_trace.isChecked()
-        else:
-            cal.trim_write_method = "direct"
-            cal.trace_enabled = False
+        # Trim write settings come from the aircraft's saved trimwheel-scope
+        # config on EVERY run (read fresh — a Settings-tab edit since the
+        # dialog opened must apply), debug controls shown or not.
+        tw = self._read_trim_write_settings()
+        self._apply_trim_write(cal, tw)
+        self._sync_trim_write_widgets(tw)
+        cal.trace_enabled = self._debug and self.chk_trace.isChecked()
         cal.start(assist=assist)
 
     def _on_stop(self):
@@ -2052,8 +2267,8 @@ class TrimCalibrationDialog(QDialog):
             cal_pre is not None and cal_pre.state == CalState.DONE
             and cal_pre.result is not None))
         self.cmb_response.setEnabled(True)
-        if self.cmb_trim_method is not None:
-            self.cmb_trim_method.setEnabled(True)
+        self._set_trim_write_enabled(not (cal_pre is not None and cal_pre.active))
+        self._sync_trim_write_widgets()
         if self.chk_trace is not None:
             self.chk_trace.setEnabled(True)
         cal = self._calibrator()

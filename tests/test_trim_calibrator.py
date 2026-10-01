@@ -102,6 +102,13 @@ class FakePlantAircraft:
         self.trim_response_sign = 1.0  # -1 models an inverted trim response
         self.simvar_trim_writes = 0    # trim writes received (even if ignored)
         self.axis_trim_events = 0
+        # The trim axis this aircraft listens on: event/var name, the value
+        # that means full trim, and whether (like MSFS AXIS_* events) the
+        # value is sign-inverted relative to the SimVar read-back.
+        self.axis_event_name = "AXIS_ELEV_TRIM_SET"
+        self.axis_event_full = 16383.0
+        self.axis_event_negated = True
+        self.events_seen = []          # (name, value) of every event sent
         self._telem_data = None        # set per frame by telem(), like TelemManager
 
         # calibrator-read settings / flags
@@ -185,7 +192,8 @@ class FakePlantAircraft:
     def _apply_trim_event(self, data):
         # MSFS AXIS_* events are sign-inverted relative to the SimVar
         # read-backs, so the "sim" negates the received value.
-        return -data / 16383.0
+        v = data / self.axis_event_full
+        return -v if self.axis_event_negated else v
 
     def _apply_trim_simvar(self, radians):
         # ElevTrimPct read-back normalized per-side against the travel limits
@@ -203,7 +211,8 @@ class FakePlantAircraft:
         # trim is applied by the "sim": the last commanded value on whichever
         # write method this aircraft honors.
         for event, data in self._simconnect.events:
-            if event == "AXIS_ELEV_TRIM_SET":
+            self.events_seen.append((event, data))
+            if event == self.axis_event_name:
                 self.axis_trim_events += 1
                 if self.responds_to_axis:
                     self._apply_new_trim(self._apply_trim_event(data))
@@ -438,13 +447,75 @@ class TestClosedLoop:
     def test_axis_event_method_selectable(self, clock):
         ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
         cal = TrimCalibrator(ac)
-        cal.trim_write_method = "axis"
+        cal.trim_use_axis = True
         cal.start()
         state = run_to_completion(cal, ac, clock)
         assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
         assert ac.axis_trim_events > 0
         assert ac.simvar_trim_writes == 0
         assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_custom_axis_var_with_unit_range(self, clock):
+        # Trimwheel custom Y variable at a ±1 range: the value goes out as an
+        # UN-negated float (the trimwheel mixin's convention), never the
+        # default event.
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        ac.axis_event_name = "L:INPUT_TRIM_AXIS"
+        ac.axis_event_full = 1.0
+        ac.axis_event_negated = False
+        cal = TrimCalibrator(ac)
+        cal.trim_use_axis = True
+        cal.trim_axis_var = "L:INPUT_TRIM_AXIS"
+        cal.trim_axis_range = 1
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        sent = [v for e, v in ac.events_seen if e == "L:INPUT_TRIM_AXIS"]
+        assert sent and all(isinstance(v, float) and -1.0 <= v <= 1.0 for v in sent)
+        assert not any(e == "AXIS_ELEV_TRIM_SET" for e, _ in ac.events_seen)
+        assert ac.simvar_trim_writes == 0
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_custom_axis_var_with_int_range(self, clock):
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        ac.axis_event_name = "CUSTOM_TRIM_SET"
+        ac.axis_event_full = 4096.0
+        cal = TrimCalibrator(ac)
+        cal.trim_use_axis = True
+        cal.trim_axis_var = "CUSTOM_TRIM_SET"
+        cal.trim_axis_range = 4096
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        sent = [v for e, v in ac.events_seen if e == "CUSTOM_TRIM_SET"]
+        assert sent and all(isinstance(v, int) and abs(v) <= 4096 for v in sent)
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_axis_invert_negates_the_written_value(self, clock):
+        # An aircraft whose trim axis runs the other way, compensated by the
+        # trimwheel_axis_invert setting: the run needs no runtime sign flip.
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        ac.axis_event_negated = False
+        cal = TrimCalibrator(ac)
+        cal.trim_use_axis = True
+        cal.trim_axis_invert = True
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal._trim_sign == 1.0
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+
+    def test_do_not_send_writes_nothing(self, clock):
+        ac = FakePlantAircraft(coupling=0.5, physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        cal.trim_use_axis = True
+        cal.trim_axis_var = "DO_NOT_SEND"
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        assert state == CalState.ABORT
+        assert not any(e in ("DO_NOT_SEND", "AXIS_ELEV_TRIM_SET")
+                       for e, _ in ac.events_seen)
+        assert ac.simvar_trim_writes == 0
 
     def test_direct_without_limits_falls_back_to_axis_event(self, clock):
         # No usable travel limits in telemetry: direct cannot map pct to
@@ -3251,6 +3322,7 @@ class TestTrimCalDialogGate:
                 opened.append(parent)
                 self.result_saved = Mock()
                 self.position_mode_changed = Mock()
+                self.trim_write_setting_changed = Mock()
                 self.destroyed = Mock()
 
             raise_ = activateWindow = show = staticmethod(lambda: None)
@@ -3261,7 +3333,8 @@ class TestTrimCalDialogGate:
         import telemffb.ui.dialogs.TrimCalibrationDialog as TCD
         monkeypatch.setattr(TCD, "TrimCalibrationDialog", FakeDialog)
         me.settings_layout = types.SimpleNamespace(
-            save_trim_calibration=Mock(), save_trim_position_mode=Mock())
+            save_trim_calibration=Mock(), save_trim_position_mode=Mock(),
+            save_trimwheel_setting=Mock())
 
         MW.MainWindow.open_trim_calibration_dialog(me)
         return shown, opened
@@ -3321,3 +3394,73 @@ class TestTrimCalDialogGate:
         MW.MainWindow.open_trim_calibration_dialog(
             types.SimpleNamespace(trim_cal_dialog=None))
         assert len(shown) == 1
+
+
+class TestTrimWriteSettings:
+    """The dialog resolves the aircraft's TRIMWHEEL-scope trim write settings
+    and hands them to every run, debug controls shown or not."""
+
+    @staticmethod
+    def _read(monkeypatch, rows, sim="MSFS"):
+        import types
+        import telemffb.ui.dialogs.TrimCalibrationDialog as TCD
+        calls = []
+
+        def fake_read(*a, **k):
+            calls.append((a, k))
+            return "PropellerAircraft", "DA40.*", rows
+
+        monkeypatch.setattr(TCD.xmlutils, "read_single_model", fake_read)
+        monkeypatch.setattr(G, "settings_mgr", types.SimpleNamespace(
+            current_sim=sim, current_class="PropellerAircraft",
+            current_aircraft_name="DA40 NG", current_pattern="DA40.*",
+            active_profile="Auto User", offline_mode=False, offline_scope=None),
+            raising=False)
+        dlg = TCD.TrimCalibrationDialog
+        # class-level call: the resolver only touches class attrs/staticmethods
+        return dlg._read_trim_write_settings(dlg), calls
+
+    def test_reads_trimwheel_scope_of_the_active_profile(self, monkeypatch):
+        s, calls = self._read(monkeypatch, [
+            {"name": "trimwheel_use_axis", "value": "true", "unit": None},
+            {"name": "trimwheel_axis_invert", "value": "true", "unit": None},
+            {"name": "enable_custom_y_axis", "value": "true", "unit": None},
+            {"name": "custom_y_axis", "value": "L:INPUT_TRIM_AXIS", "unit": None},
+            {"name": "raw_y_axis_scale", "value": "1", "unit": None},
+            {"name": "unrelated", "value": "5", "unit": None},
+        ])
+        (args, kwargs), = calls
+        assert args[3] == "trimwheel"
+        assert kwargs["active_profile"] == "Auto User"
+        assert s == {"trimwheel_use_axis": True, "trimwheel_axis_invert": True,
+                     "enable_custom_y_axis": True,
+                     "custom_y_axis": "L:INPUT_TRIM_AXIS", "raw_y_axis_scale": 1}
+
+    def test_missing_rows_fall_back_to_direct(self, monkeypatch):
+        import telemffb.ui.dialogs.TrimCalibrationDialog as TCD
+        s, _ = self._read(monkeypatch, [])
+        assert s == TCD.TrimCalibrationDialog.TRIM_WRITE_DEFAULTS
+
+    def test_non_msfs_is_not_read(self, monkeypatch):
+        _, calls = self._read(monkeypatch, [], sim="XPLANE")
+        assert calls == []
+
+    def test_apply_follows_the_trimwheel_prereq_chain(self):
+        import types
+        import telemffb.ui.dialogs.TrimCalibrationDialog as TCD
+        apply = TCD.TrimCalibrationDialog._apply_trim_write
+        base = dict(TCD.TrimCalibrationDialog.TRIM_WRITE_DEFAULTS,
+                    trimwheel_axis_invert=True, enable_custom_y_axis=True,
+                    custom_y_axis="L:INPUT_TRIM_AXIS", raw_y_axis_scale=1)
+
+        cal = types.SimpleNamespace()
+        apply(cal, base)            # use_axis off: direct, nothing else applies
+        assert (cal.trim_use_axis, cal.trim_axis_invert, cal.trim_axis_var,
+                cal.trim_axis_range) == (False, False, "AXIS_ELEV_TRIM_SET", 16384)
+
+        apply(cal, dict(base, trimwheel_use_axis=True))
+        assert (cal.trim_use_axis, cal.trim_axis_invert, cal.trim_axis_var,
+                cal.trim_axis_range) == (True, True, "L:INPUT_TRIM_AXIS", 1)
+
+        apply(cal, dict(base, trimwheel_use_axis=True, enable_custom_y_axis=False))
+        assert (cal.trim_axis_var, cal.trim_axis_range) == ("AXIS_ELEV_TRIM_SET", 16384)
