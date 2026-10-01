@@ -338,16 +338,21 @@ class TestLoopGatedCollapse:
 
 
 # ---------------------------------------------------------------------------
-# Non-loop members: a one-off that merely co-occurs with a collapsed loop must
-# stay visible when it recurs - only genuine loop members are suppressed
+# Non-loop members: a seen key that is not part of the collapsed loop keeps its
+# identity when it recurs (forwarded once), then joins the collapsed cycle so
+# its further repeats fold into the periodic summary instead of flooding the
+# log - only genuine loop members are suppressed from the outset
 # ---------------------------------------------------------------------------
 
 class TestNonLoopMemberRecurrence:
 
-    def test_oneoff_after_collapse_is_forwarded_on_recurrence(self):
-        # Issue 103 repro: a 2-type fault loop collapses the window; a distinct
-        # one-off that appears afterwards recurs and must stay visible (0 of its
-        # recurrences reached the log before the fix).
+    def test_oneoff_after_collapse_forwarded_once_then_adopted(self):
+        # Issue 103, refined: a 2-type fault loop collapses the window and a
+        # distinct one-off that appears afterwards recurs.  Its first
+        # recurrence is forwarded (identity survives in the log) and it is then
+        # adopted into the collapsed cycle: later recurrences are not forwarded
+        # individually but fold into the periodic summary, which lists the key
+        # with its accumulated count.
         dedup, rec, advance = make_handler(period_seconds=5.0)
         dedup.emit(make_record("A")); advance(1.0)   # t=0
         dedup.emit(make_record("B")); advance(1.0)   # t=1
@@ -358,8 +363,12 @@ class TestNonLoopMemberRecurrence:
         for _ in range(5):
             dedup.emit(make_record("P")); advance(1.0)   # t=6..10 one-off recurrences
         out = [r.getMessage() for r in rec.records]
-        # first sight + 5 recurrences all visible
-        assert out.count("P") == 6, out
+        # first sight + first recurrence forwarded (identity); the rest folded
+        assert out.count("P") == 2, out
+        # the adopted key keeps its identity and count in the periodic summary
+        summaries = [m for m in out if "Cycle detected" in m and "so far" in m]
+        assert summaries, out
+        assert any(ln.strip().startswith("- P:") for ln in summaries[-1].splitlines()), summaries[-1]
 
     def test_loop_members_stay_suppressed(self):
         # Guard: the fix must not start forwarding genuine loop members.
@@ -374,11 +383,12 @@ class TestNonLoopMemberRecurrence:
         assert out.count("A") == 1, out
         assert out.count("B") == 1, out
 
-    def test_floor_collapse_oneoff_in_window_is_forwarded(self):
+    def test_floor_collapse_oneoff_in_window_forwarded_once_then_adopted(self):
         # More than MAX_LOOP_TYPES types, so the collapse can only come from the
-        # rate floor. A one-off that sits in the window with a single occurrence
-        # does not drive the floor, so it is not a loop member: its recurrence is
-        # forwarded while the high-repeat storm types stay suppressed.
+        # rate floor.  A one-off that sits in the window with a single
+        # occurrence does not drive the floor, so it is not a loop member: its
+        # first recurrence is forwarded (identity), then it is adopted and its
+        # further recurrences fold into the summary with the storm types.
         dedup, rec, advance = make_handler(period_seconds=5.0)
         for i in range(100):
             dedup.emit(make_record(f"t{i % 4}"))
@@ -391,8 +401,88 @@ class TestNonLoopMemberRecurrence:
             dedup.emit(make_record("Q")); advance(0.1)
         out = [r.getMessage() for r in rec.records]
         assert any("Cycle detected" in m for m in out), out
-        # first sight + 3 recurrences all forwarded
-        assert out.count("Q") == 4, out
+        # first sight + first recurrence forwarded; the rest folded
+        assert out.count("Q") == 2, out
+        # the adopted one-off keeps its identity in the cycle summary
+        assert any("- Q:" in m for m in out if "Cycle detected" in m), out
+
+    def test_pruned_oneoff_repeating_after_collapse_is_bounded(self):
+        # Regression (review of the 288af86 fix): a one-off X is logged once,
+        # then ages out of the window while the episode stays alive (the log
+        # never goes quiet for a period).  A 2-type loop A/B collapses while X
+        # is out of the window, so X is not in the member snapshot.  When X
+        # then repeats at a high rate it must NOT be forwarded on every repeat:
+        # it is forwarded once (identity), adopted into the collapsed cycle, and
+        # its further repeats fold into the periodic summary, which lists it.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        timeline = [
+            (0.0, "X"),
+            (1.0, "A"),
+            (2.0, "B"),
+            (6.0, "A"),      # collapse; X (t=0) is pruned from the window here
+            (6.5, "X"),      # first recurrence -> forwarded, adopted
+            (7.0, "A"),
+            (7.5, "X"),
+            (8.0, "B"),
+            (8.5, "X"),
+            (9.0, "A"),
+            (9.5, "X"),
+            (10.0, "B"),
+            (10.5, "X"),
+            (11.0, "A"),     # periodic summary; window still carries X
+            (12.0, "B"),
+        ]
+        now = 0.0
+        for ts, msg in timeline:
+            advance(ts - now)
+            now = ts
+            dedup.emit(make_record(msg))
+        out = [r.getMessage() for r in rec.records]
+        # X is forwarded on first sight and first recurrence only; the rest fold
+        assert out.count("X") == 2, out
+        # a periodic summary is emitted (not a raw flood) and lists X
+        summaries = [m for m in out if "Cycle detected" in m and "so far" in m]
+        assert summaries, out
+        assert any(ln.strip().startswith("- X:") for ln in summaries[-1].splitlines()), summaries[-1]
+
+    def test_second_fault_loop_after_collapse_is_folded(self):
+        # A second, distinct fault loop (C/D) that starts after the first one
+        # (A/B) collapsed must be folded into the (growing) cycle summary, not
+        # forwarded at full rate.  Each of C and D is forwarded on first sight
+        # and on its first recurrence (when it joins the collapsed cycle); all
+        # further repeats fold into the periodic summary.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        timeline = [
+            (0.0, "A"),
+            (1.0, "B"),
+            (2.0, "A"),      # collapse (A/B)
+            (3.0, "C"),      # second loop: C first -> forwarded
+            (4.0, "D"),      # D first -> forwarded
+            (5.0, "C"),      # C first recurrence -> forwarded, adopted
+            (6.0, "D"),      # D first recurrence -> forwarded, adopted
+            (7.0, "C"),
+            (8.0, "D"),
+            (9.0, "C"),
+            (10.0, "D"),
+            (11.0, "C"),
+            (12.0, "D"),
+        ]
+        now = 0.0
+        for ts, msg in timeline:
+            advance(ts - now)
+            now = ts
+            dedup.emit(make_record(msg))
+        out = [r.getMessage() for r in rec.records]
+        # each second-loop type is forwarded twice (first sight + adoption), not
+        # on every repeat
+        assert out.count("C") == 2, out
+        assert out.count("D") == 2, out
+        # and the periodic summary lists both of them
+        summaries = [m for m in out if "Cycle detected" in m and "so far" in m]
+        assert summaries, out
+        last = summaries[-1]
+        assert any(ln.strip().startswith("- C:") for ln in last.splitlines()), last
+        assert any(ln.strip().startswith("- D:") for ln in last.splitlines()), last
 
 
 # ---------------------------------------------------------------------------

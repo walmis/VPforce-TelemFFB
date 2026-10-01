@@ -389,10 +389,15 @@ class DedupHandler(logging.Handler):
        loop - at most ``MAX_LOOP_TYPES`` distinct recurring types, or at
        least ``LOOP_TOTAL_FLOOR`` episode-cumulative repeats (see
        ``LOOP_TOTAL_FLOOR``) no matter how many types.
-      The whole cycle is then summarized in a single line and subsequent
-      repetitions of its members are suppressed (with a periodic update)
-      until the log goes quiet for ``period_seconds`` or a genuinely
-      different message arrives.
+       The whole cycle is then summarized in a single line and subsequent
+       repetitions of its members are suppressed (with a periodic update)
+       until the log goes quiet for ``period_seconds`` or a genuinely
+       different message arrives.  A seen key that was not a member when the
+       collapse fired but later recurs is adopted into the cycle on that
+       recurrence - forwarded once so its identity survives, then suppressed
+       like the other members - so a second fault loop that starts after the
+       first one collapsed is folded into the same summary rather than
+       flooding the log at full rate.
     """
 
     #: max distinct messages listed in a cycle summary (more are folded into a
@@ -424,9 +429,10 @@ class DedupHandler(logging.Handler):
         # True once a cycle summary has been emitted for the current generation;
         # while set, loop members are suppressed instead of forward-checked
         self._collapsed = False
-        # keys that are actual members of the collapsed cycle, snapshotted when
-        # the collapse fires; a seen key outside this set is a one-off that
-        # merely co-occurred with the loop and is forwarded on recurrence
+        # keys that are actual members of the collapsed cycle.  Snapshotted when
+        # the collapse fires; a seen key that was not in that snapshot but later
+        # recurs is adopted into this set on that recurrence (forwarded once for
+        # identity, then suppressed like the other members)
         self._loop_members: set = set()
         # per-key bookkeeping for summaries (last record, occurrence count,
         # first-seen timestamp, most-recent-seen timestamp)
@@ -730,10 +736,18 @@ class DedupHandler(logging.Handler):
                                 )
                                 self._last_cycle_ts = now
                             return
-                        # seen but not a loop member: a one-off that merely
-                        # co-occurred with the loop - forward it rather than
-                        # fold it into the cycle summary, so its identity
-                        # survives in the log
+                        # seen but not a loop member at collapse time.  By the
+                        # time a key reaches this branch it has now recurred, so
+                        # its episode count is at least 2 - it is actually
+                        # repeating, not a genuine one-off.  Forward it once so
+                        # its identity survives in the log (the point of issue
+                        # 103), then adopt it into the collapsed cycle: further
+                        # repeats fold into the periodic summary like any other
+                        # member instead of flooding the log at full rate, and
+                        # the summary (window-driven) refreshes to include it.
+                        # A key that never recurs past its first sight never
+                        # reaches here, so true one-offs are unaffected.
+                        self._loop_members.add(key)
                         self._forward(record)
                         return
                     if self._is_loop():
