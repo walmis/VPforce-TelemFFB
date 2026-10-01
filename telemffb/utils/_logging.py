@@ -384,16 +384,36 @@ class DedupHandler(logging.Handler):
       once, then a "(message repeated N times)" summary every ``period_seconds``
       and a final summary when a different message arrives. Same as the
       original single-message dedup.
-    - *Repeating cycles*: a message that was already seen earlier in the window
-      (e.g. A, B, A, B) confirms a cycle; the whole cycle is then summarized in
-      a single line and subsequent repetitions of its members are suppressed
-      (with a periodic update) until the log goes quiet for ``period_seconds``
-      or a genuinely different message arrives.
+     - *Repeating cycles*: a message that was already seen earlier in the
+       window confirms a cycle only when the window itself looks like a
+       loop - at most ``MAX_LOOP_TYPES`` distinct recurring types, or at
+       least ``LOOP_TOTAL_FLOOR`` episode-cumulative repeats (see
+       ``LOOP_TOTAL_FLOOR``) no matter how many types.
+       The whole cycle is then summarized in a single line and subsequent
+       repetitions of its members are suppressed (with a periodic update)
+       until the log goes quiet for ``period_seconds`` or a genuinely
+       different message arrives.  A seen key that was not a member when the
+       collapse fired but later recurs is adopted into the cycle on that
+       recurrence - forwarded once so its identity survives, then suppressed
+       like the other members - so a second fault loop that starts after the
+       first one collapsed is folded into the same summary rather than
+       flooding the log at full rate.
     """
 
     #: max distinct messages listed in a cycle summary (more are folded into a
     #: "+N more" count)
     MAX_LISTED_TYPES = 5
+    #: a window of at most this many distinct types that recurs is a loop;
+    #: a lone repeat inside a more diverse window is forwarded, not collapsed
+    MAX_LOOP_TYPES = 3
+    #: when the window's distinct types carry at least this many
+    #: episode-cumulative repeats (occurrences beyond the first, per type)
+    #: - _counts reset only after the log has been quiet for
+    #: period_seconds, never when a type ages out of the window - the
+    #: window is collapsed no matter how many types it contains (a storm
+    #: is a storm).  Repeats rather than total occurrences, so a diverse
+    #: one-off burst with a few duplicated lines does not trip it
+    LOOP_TOTAL_FLOOR = 100
 
     def __init__(self, handlers=None, period_seconds: float = 5.0):
         super().__init__()
@@ -407,8 +427,13 @@ class DedupHandler(logging.Handler):
         # keys already seen in the current window generation
         self._seen: set = set()
         # True once a cycle summary has been emitted for the current generation;
-        # while set, cycle members are suppressed instead of forward-checked
+        # while set, loop members are suppressed instead of forward-checked
         self._collapsed = False
+        # keys that are actual members of the collapsed cycle.  Snapshotted when
+        # the collapse fires; a seen key that was not in that snapshot but later
+        # recurs is adopted into this set on that recurrence (forwarded once for
+        # identity, then suppressed like the other members)
+        self._loop_members: set = set()
         # per-key bookkeeping for summaries (last record, occurrence count,
         # first-seen timestamp, most-recent-seen timestamp)
         # _key_last_ts drives window-pruning so long-running cycles stay alive
@@ -416,6 +441,9 @@ class DedupHandler(logging.Handler):
         self._counts: dict = {}
         self._first_ts: dict = {}
         self._key_last_ts: dict = {}
+        # per-key most recent record: exceptions and details evolve across a
+        # storm, while _records keeps the first-seen record for "since" times
+        self._latest_record: dict = {}
         self._last_key = None
         self._last_entry_ts = 0.0
         # consecutive-repetition bookkeeping (preserves the original
@@ -460,11 +488,15 @@ class DedupHandler(logging.Handler):
         # Key by level, logger name and normalized message
         return (record.levelno, record.name, self._normalize_message(record))
 
-    def _make_summary_record(self, base_record: logging.LogRecord, repeated_count: int, periodic: bool = False) -> logging.LogRecord:
+    def _make_summary_record(self, base_record: logging.LogRecord, repeated_count: int,
+                             periodic: bool = False,
+                             latest: "logging.LogRecord | None" = None) -> logging.LogRecord:
+        msg = f"{self._normalize_message(base_record)} (message repeated {repeated_count} times)"
         if periodic:
-            msg = f"{self._normalize_message(base_record)} (message repeated {repeated_count} times so far)"
-        else:
-            msg = f"{self._normalize_message(base_record)} (message repeated {repeated_count} times)"
+            msg += " so far"
+        excerpt = self._exception_excerpt(latest if latest is not None else base_record)
+        if excerpt:
+            msg += f"  [{excerpt}]"
         new_rec = logging.LogRecord(
             name=base_record.name,
             level=base_record.levelno,
@@ -477,21 +509,63 @@ class DedupHandler(logging.Handler):
         )
         return new_rec
 
+    @staticmethod
+    def _exception_excerpt(record: "logging.LogRecord | None") -> str:
+        """A short one-line extract (``ExceptionType: message``) of the
+        record's exception, or ``""`` when there is none worth quoting.
+
+        Handles the three shapes ``LogRecord.exc_info`` takes in practice:
+        an exception instance, the ``(type, value, tb)`` tuple
+        (e.g. from ``logging.exception``), and ``True`` (filled in by
+        logging itself at format time - cannot be quoted here).
+        """
+        if record is None:
+            return ""
+        exc = record.exc_info
+        if isinstance(exc, BaseException):
+            exc_type, exc_value = type(exc), exc
+        elif isinstance(exc, tuple) and len(exc) >= 2 and exc[1] is not None:
+            exc_type, exc_value = exc[0], exc[1]
+        else:
+            return ""
+        if not isinstance(exc_type, type):
+            return ""
+        name = exc_type.__name__
+        text = " ".join(str(exc_value).split())
+        return f"{name}: {text}"[:80] if text else name
+
     def _make_cycle_summary_record(self, keys, periodic: bool = False) -> logging.LogRecord:
         """Build one record summarizing an entire repeated message cycle.
 
-        ``keys`` is the list of distinct message keys (in first-seen order) in
-        the current window. The summary lists up to ``MAX_LISTED_TYPES``
-        messages and reports per-type occurrence counts, for example::
+        ``keys`` is the list of distinct message keys (in first-seen order)
+        in the current window. The summary lists up to ``MAX_LISTED_TYPES``
+        messages - most frequent first, so ``+N more`` folds away the least
+        interesting types - and reports per-type occurrence counts, for
+        example::
 
             Cycle detected: 24 messages across 2 types since 14:03:36.
                 - Start effect 8 (Sine) ("flapsmovement"): 12
                 - Stop effect 8 (Sine) ("flapsmovement"): 12
-                (see DEBUG for details)
+
+        With the effective log level at DEBUG, every type is listed instead
+        of the top few. The record's level is the highest level of its
+        members, and a type that carried an exception shows a one-line
+        extract of its most recent one.
         """
         if not keys:
             raise ValueError("no keys to summarize")
-        listed = keys[:self.MAX_LISTED_TYPES]
+        # a cycle that has narrowed to a single message type reads better as
+        # the familiar "(message repeated N times)" form
+        if len(keys) == 1:
+            return self._make_summary_record(
+                self._records[keys[0]], self._counts[keys[0]],
+                periodic, self._latest_record.get(keys[0]))
+
+        # most frequent first; first-seen order breaks ties
+        order = {k: i for i, k in enumerate(keys)}
+        ranked = sorted(keys, key=lambda k: (-self._counts.get(k, 0), order[k]))
+        full_detail = logging.getLogger().getEffectiveLevel() <= logging.DEBUG
+        listed = ranked if full_detail else ranked[:self.MAX_LISTED_TYPES]
         extra = len(keys) - len(listed)
         total = sum(self._counts.get(k, 0) for k in keys)
         suffix = " so far" if periodic else ""
@@ -502,17 +576,21 @@ class DedupHandler(logging.Handler):
 
         lines = [f"Cycle detected: {total} messages across {len(keys)} types since {since}{suffix}."]
         for k in listed:
-            lines.append(f"    - {self._normalize_message(self._records[k])}: {self._counts[k]}")
+            line = f"    - {self._normalize_message(self._records[k])}: {self._counts[k]}"
+            excerpt = self._exception_excerpt(self._latest_record.get(k, self._records[k]))
+            if excerpt:
+                line += f"  [{excerpt}]"
+            lines.append(line)
         if extra > 0:
             lines.append(f"    \u2026 +{extra} more")
-        if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
-            lines.append("    (see DEBUG for details)")
         msg = "\n".join(lines)
 
         ref = self._records[keys[0]]
         new_rec = logging.LogRecord(
             name=ref.name,
-            level=ref.levelno,
+            # as loud as the loudest message it stands for, not whatever
+            # happened to be first in the window
+            level=max(self._records[k].levelno for k in keys),
             pathname=ref.pathname,
             lineno=ref.lineno,
             msg=msg,
@@ -541,10 +619,12 @@ class DedupHandler(logging.Handler):
         self._window.clear()
         self._seen.clear()
         self._collapsed = False
+        self._loop_members.clear()
         self._records.clear()
         self._counts.clear()
         self._first_ts.clear()
         self._key_last_ts.clear()
+        self._latest_record.clear()
         self._last_key = None
         self._last_entry_ts = 0.0
         self._repeat_count = 0
@@ -570,6 +650,39 @@ class DedupHandler(logging.Handler):
     def _distinct_keys_in_window(self):
         return list(dict.fromkeys(k for _, k in self._window))
 
+    def _is_loop(self) -> bool:
+        """Whether the current window looks like a loop.
+
+        A small number of distinct recurring types is a classic loop
+        (A B A B, A B C A).  A large number of distinct types is not -
+        that is usually a one-off burst of different messages (startup, a
+        load) - unless the window's types carry at least
+        ``LOOP_TOTAL_FLOOR`` episode-cumulative repeats (occurrences
+        beyond the first, per type), no matter how many types it contains.
+        Counting repeats rather than total occurrences keeps a burst of
+        mostly-unique lines (a few of them duplicated) from tripping the
+        floor, while a genuine high-rate fault loop - which repeats the
+        same few messages over and over - still does.
+        """
+        keys = self._distinct_keys_in_window()
+        repeats = sum(max(0, self._counts.get(k, 0) - 1) for k in keys)
+        return len(keys) <= self.MAX_LOOP_TYPES or repeats >= self.LOOP_TOTAL_FLOOR
+
+    def _loop_member_keys(self):
+        """The keys that are actual members of the collapsed cycle.
+
+        A snapshot of the window at the moment the collapse fires.  A small
+        (``MAX_LOOP_TYPES``) window is the classic loop, so every type in it is
+        a member.  A window that collapsed only because it carried enough
+        repeats (the rate floor) also contains one-off types that never repeat;
+        there, only the types that actually recur (a count beyond their first
+        occurrence) are members - a one-off seen exactly once is not.
+        """
+        keys = self._distinct_keys_in_window()
+        if len(keys) <= self.MAX_LOOP_TYPES:
+            return set(keys)
+        return {k for k in keys if self._counts.get(k, 0) >= 2}
+
     def emit(self, record: logging.LogRecord):
         try:
             key = self._make_key(record)
@@ -591,31 +704,84 @@ class DedupHandler(logging.Handler):
                         self._repeat_first_ts = now
                     self._repeat_count += 1
                     self._repeat_record = record
+                    self._counts[key] = self._counts.get(key, 0) + 1
+                    self._key_last_ts[key] = now
+                    self._latest_record[key] = record
                     if (now - self._repeat_periodic_ts) >= self.period_seconds:
                         self._emit_summary_record(
-                            self._make_summary_record(record, self._repeat_count, periodic=True)
+                            self._make_summary_record(record, self._repeat_count,
+                                                      periodic=True, latest=record)
                         )
                         self._repeat_periodic_ts = now
                     return
 
                 if key in self._seen:
                     self._counts[key] = self._counts.get(key, 0) + 1
+                    if key not in self._key_last_ts:
+                        # the window dropped this key when it went quiet, but
+                        # the episode is still alive (no full reset): re-add it
+                        # so the loop gate and any summary this recurrence
+                        # triggers include it
+                        self._window.append((now, key))
                     self._key_last_ts[key] = now
+                    self._latest_record[key] = record
                     if self._collapsed:
-                        # cycle already summarized: refresh it periodically only;
-                        # the interval is measured from the last emitted summary
-                        if (now - self._last_cycle_ts) >= self.period_seconds:
-                            self._emit_summary_record(
-                                self._make_cycle_summary_record(self._distinct_keys_in_window(), periodic=True)
-                            )
-                            self._last_cycle_ts = now
+                        if key in self._loop_members:
+                            # loop member, already summarized: refresh it
+                            # periodically only; the interval is measured from
+                            # the last emitted summary
+                            if (now - self._last_cycle_ts) >= self.period_seconds:
+                                self._emit_summary_record(
+                                    self._make_cycle_summary_record(self._distinct_keys_in_window(), periodic=True)
+                                )
+                                self._last_cycle_ts = now
+                            return
+                        # seen but not a loop member at collapse time.  By the
+                        # time a key reaches this branch it has now recurred, so
+                        # its episode count is at least 2 - it is actually
+                        # repeating, not a genuine one-off.  Forward it once so
+                        # its identity survives in the log (the point of issue
+                        # 103), then adopt it into the collapsed cycle: further
+                        # repeats fold into the periodic summary like any other
+                        # member instead of flooding the log at full rate, and
+                        # the summary (window-driven) refreshes to include it.
+                        # A key that never recurs past its first sight never
+                        # reaches here, so true one-offs are unaffected.
+                        self._loop_members.add(key)
+                        self._forward(record)
                         return
-                    # this arrival means a previously-seen message is recurring,
-                    # i.e. a genuine multi-message cycle: summarize it once and
-                    # stop forwarding its individual repetitions from here on
-                    self._emit_summary_record(self._make_cycle_summary_record(self._distinct_keys_in_window()))
-                    self._collapsed = True
-                    self._last_cycle_ts = now
+                    if self._is_loop():
+                        # a previously-seen message recurring inside a
+                        # loop-shaped window: summarize the whole cycle once
+                        # and stop forwarding its individual repetitions
+                        self._emit_summary_record(
+                            self._make_cycle_summary_record(self._distinct_keys_in_window())
+                        )
+                        self._loop_members = self._loop_member_keys()
+                        self._collapsed = True
+                        self._last_cycle_ts = now
+                        return
+                    # a lone recurrence inside a diverse window is not a loop
+                    # yet: forward it like a fresh occurrence and stop - it is
+                    # already registered in the window, so do not fall through
+                    # to the first-time-seen block (which would re-forward it
+                    # and reset its count).  But first close any pending
+                    # consecutive run with its final summary, as the
+                    # first-time-seen block does (the not-collapsed clause is
+                    # redundant here - this branch is reached only when the
+                    # window is not collapsed).
+                    if self._repeat_count > 1 and self._repeat_record is not None:
+                        self._emit_summary_record(
+                            self._make_summary_record(
+                                self._repeat_record, self._repeat_count, periodic=False
+                            )
+                        )
+                    self._last_key = key
+                    self._repeat_count = 1
+                    self._repeat_record = record
+                    self._repeat_first_ts = now
+                    self._repeat_periodic_ts = now
+                    self._forward(record)
                     return
 
                 # first time this key is seen within this episode

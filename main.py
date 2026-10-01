@@ -2057,7 +2057,7 @@ def _init_logging(log_widget : QPlainTextEdit):
     console_handler.setFormatter(formatter)
 
     # Create a FileHandler to log messages to the log file
-    file_handler = logging.FileHandler(log_file, mode='a')
+    file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter_file)
 

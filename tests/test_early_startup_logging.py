@@ -13,6 +13,8 @@ a registry - nothing here touches any of them.
 """
 
 import logging
+import re
+from pathlib import Path
 
 import pytest
 
@@ -178,3 +180,15 @@ class TestReplayIsOnce:
 
         assert messages(first) == ["once"]
         assert second.records == []
+
+
+class TestLogFileEncoding:
+    """The log file must be opened with an explicit UTF-8 encoding, or
+    Windows' cp1252 default mangles the "…" and "–" the log text uses
+    into "?" mojibake (visible throughout TelemFFB_joystick_*.log)."""
+
+    def test_file_handler_declares_utf8(self):
+        src = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+        match = re.search(r"logging\.FileHandler\([^)]*\)", src)
+        assert match, "FileHandler construction not found in main.py"
+        assert "encoding='utf-8'" in match.group(0), match.group(0)

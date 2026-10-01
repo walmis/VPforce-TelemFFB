@@ -142,9 +142,15 @@ class AircraftEffectUtilsBase(object):
             settings_dict (dict): Dictionary containing configuration key-value pairs.
                                 Keys should match aircraft attribute names.
 
-        Logs warnings for unknown parameters and info for each applied setting.
+        Logs one summary pair of INFO lines per call, a warning per
+        unknown parameter, and an INFO line per applied setting: the
+        per-setting lines are the only record of the effective
+        (post-merge) values in the support log, which runs at INFO.  A
+        load's burst of mostly-unique lines cannot trip the cyclic
+        dedup's loop floor, because that floor counts repeats.
         """
-        logging.info(f"Applying settings...")
+        logging.info("Applying settings...")
+        applied = 0
         for k, v in settings_dict.items():
             if k in ["type"]: continue
             if k.endswith("_group"): continue
@@ -154,6 +160,7 @@ class AircraftEffectUtilsBase(object):
             logging.info(f" [cyan]set[/cyan]: {k} = {v}")
             try:
                 setattr(self, k, v)
+                applied += 1
             except Exception:
                 # A setting that refuses its stored value must not take the
                 # rest of the aircraft down with it: the exception would
@@ -165,6 +172,8 @@ class AircraftEffectUtilsBase(object):
                     "aircraft configuration.",
                     exc_info=True,
                 )
+        if applied:
+            logging.info(f"Applied {applied} settings")
 
     def has_changed(self, item: str, delta_ms=0, data=None) -> bool:
         """Check if a telemetry data item has changed since last call.

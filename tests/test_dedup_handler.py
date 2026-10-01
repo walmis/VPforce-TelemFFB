@@ -228,6 +228,426 @@ class TestCycleDetection:
 
 
 # ---------------------------------------------------------------------------
+# Loop-gated collapse: a duplicate alone must not prove a cycle
+# ---------------------------------------------------------------------------
+
+class TestLoopGatedCollapse:
+
+    def test_diverse_burst_with_one_duplicate_is_not_collapsed(self):
+        # The 11:39:55 startup shape: ~8-13 distinct messages, one of them
+        # repeated non-adjacently. That is not a loop - every message stays
+        # visible, including the repeat.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        msgs_in = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m1", "m9"]
+        for msg in msgs_in:
+            dedup.emit(make_record(msg))
+            advance(0.2)
+        out = [r.getMessage() for r in rec.records]
+        assert not any("Cycle detected" in m for m in out), out
+        assert out == msgs_in
+
+    def test_diverse_burst_with_one_recurrence_does_not_collapse(self):
+        # The PR #101 review shape: a burst of ~107 distinct one-off lines
+        # (an aircraft load) with a single line repeated once.  Under the
+        # old total-occurrences floor that crossed 100 and collapsed; the
+        # repeats floor (1 repeat here) keeps all 108 messages visible.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        msgs_in = [f"m{i}" for i in range(107)]
+        msgs_in.append("m0")
+        for msg in msgs_in:
+            dedup.emit(make_record(msg))
+            advance(0.01)
+        out = [r.getMessage() for r in rec.records]
+        assert not any("Cycle detected" in m for m in out), out
+        assert out == msgs_in
+
+    def test_diverse_storm_collapses_after_rate_floor(self):
+        # 10 distinct types at 60 Hz: far more than MAX_LOOP_TYPES different
+        # messages, but the rate can only be a fault loop, so the window
+        # collapses once it carries LOOP_TOTAL_FLOOR repeats.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        types = [f"t{i}" for i in range(10)]
+        for i in range(1000):
+            dedup.emit(make_record(types[i % 10]))
+            advance(1.0 / 60.0)
+        out = [r.getMessage() for r in rec.records]
+        assert any("Cycle detected" in m for m in out), out
+        first_cycle_idx = next(i for i, m in enumerate(out)
+                               if "Cycle detected" in m)
+        # the floor is 100 repeats; with 10 evenly cycling types, repeats =
+        # total - 10, so the first repeat crossing it is the 110th message
+        # (index 109): 11 occurrences per type, i.e. 10 repeats each
+        assert first_cycle_idx == 109, out[:first_cycle_idx + 1]
+        # no type was lost before the collapse
+        for t in types:
+            assert t in out[:first_cycle_idx], t
+
+    def test_periodic_refresh_holds_interval_under_sustained_storm(self):
+        # Regression for the pre-0926 bug: a 60 Hz storm used to re-emit the
+        # cycle summary on nearly every message ("39 summaries in 26 ms").
+        # 30 s of storm at period 5 s: collapse at t=1.65 s, then exactly
+        # one refresh per period -> 5 refreshes (t=6.65, 11.65, ..., 26.65).
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        types = [f"t{i}" for i in range(10)]
+        for i in range(1800):
+            dedup.emit(make_record(types[i % 10]))
+            advance(1.0 / 60.0)
+        out = [r.getMessage() for r in rec.records]
+        refreshes = [m for m in out if "so far" in m]
+        assert len(refreshes) == 5, out
+
+    def test_lone_recurrence_closes_the_pending_run_with_a_final_summary(self):
+        # K A B C X X K: when the recurring K arrives, the pending two-X run
+        # must be closed by its final "(message repeated 2 times)" summary
+        # before K is forwarded.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        for msg in ["K", "A", "B", "C", "X", "X", "K"]:
+            dedup.emit(make_record(msg))
+            advance(0.2)
+        out = [r.getMessage() for r in rec.records]
+        assert out == ["K", "A", "B", "C", "X",
+                       "X (message repeated 2 times)", "K"], out
+
+    def test_four_type_burst_is_not_a_loop(self):
+        # Exactly 4 distinct types: one above MAX_LOOP_TYPES (3) and far
+        # below the floor - the other side of the type boundary.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        for i in range(8):
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(1.0)
+        out = [r.getMessage() for r in rec.records]
+        assert out == [f"t{i}" for i in range(4)] * 2, out
+        assert not any("Cycle detected" in m for m in out), out
+
+    def test_ninety_nine_repeats_do_not_reach_the_floor(self):
+        # 6 distinct types, 99 repeats: one below LOOP_TOTAL_FLOOR (100) -
+        # the other side of the rate boundary.  A 100 times (99 repeats)
+        # plus five one-off types (0 repeats each) keeps the window below
+        # the floor, so the final A is forwarded, not collapsed.
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        for _ in range(99):
+            dedup.emit(make_record("A"))
+            advance(0.5)
+        for t in ["b", "c", "d", "e", "f"]:
+            dedup.emit(make_record(t))
+            advance(0.5)
+        dedup.emit(make_record("A"))
+        out = [r.getMessage() for r in rec.records]
+        assert out[-1] == "A", out
+        assert not any("Cycle detected" in m for m in out), out
+
+
+# ---------------------------------------------------------------------------
+# Non-loop members: a seen key that is not part of the collapsed loop keeps its
+# identity when it recurs (forwarded once), then joins the collapsed cycle so
+# its further repeats fold into the periodic summary instead of flooding the
+# log - only genuine loop members are suppressed from the outset
+# ---------------------------------------------------------------------------
+
+class TestNonLoopMemberRecurrence:
+
+    def test_oneoff_after_collapse_forwarded_once_then_adopted(self):
+        # Issue 103, refined: a 2-type fault loop collapses the window and a
+        # distinct one-off that appears afterwards recurs.  Its first
+        # recurrence is forwarded (identity survives in the log) and it is then
+        # adopted into the collapsed cycle: later recurrences are not forwarded
+        # individually but fold into the periodic summary, which lists the key
+        # with its accumulated count.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("A")); advance(1.0)   # t=0
+        dedup.emit(make_record("B")); advance(1.0)   # t=1
+        dedup.emit(make_record("A")); advance(1.0)   # t=2 -> collapse (2 types)
+        dedup.emit(make_record("P")); advance(1.0)   # t=3 one-off first -> forwarded
+        dedup.emit(make_record("B")); advance(1.0)   # t=4 loop member suppressed
+        dedup.emit(make_record("A")); advance(1.0)   # t=5 loop member suppressed
+        for _ in range(5):
+            dedup.emit(make_record("P")); advance(1.0)   # t=6..10 one-off recurrences
+        out = [r.getMessage() for r in rec.records]
+        # first sight + first recurrence forwarded (identity); the rest folded
+        assert out.count("P") == 2, out
+        # the adopted key keeps its identity and count in the periodic summary
+        summaries = [m for m in out if "Cycle detected" in m and "so far" in m]
+        assert summaries, out
+        assert any(ln.strip().startswith("- P:") for ln in summaries[-1].splitlines()), summaries[-1]
+
+    def test_loop_members_stay_suppressed(self):
+        # Guard: the fix must not start forwarding genuine loop members.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("A")); advance(1.0)
+        dedup.emit(make_record("B")); advance(1.0)
+        dedup.emit(make_record("A")); advance(1.0)   # collapse
+        for _ in range(10):
+            dedup.emit(make_record("A")); advance(1.0)
+            dedup.emit(make_record("B")); advance(1.0)
+        out = [r.getMessage() for r in rec.records]
+        assert out.count("A") == 1, out
+        assert out.count("B") == 1, out
+
+    def test_floor_collapse_oneoff_in_window_forwarded_once_then_adopted(self):
+        # More than MAX_LOOP_TYPES types, so the collapse can only come from the
+        # rate floor.  A one-off that sits in the window with a single
+        # occurrence does not drive the floor, so it is not a loop member: its
+        # first recurrence is forwarded (identity), then it is adopted and its
+        # further recurrences fold into the summary with the storm types.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        for i in range(100):
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(0.1)
+        dedup.emit(make_record("Q")); advance(0.1)     # one-off, inside the window
+        for i in range(100, 112):                      # crosses the floor mid-run
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(0.1)
+        for _ in range(3):                             # one-off recurrences
+            dedup.emit(make_record("Q")); advance(0.1)
+        out = [r.getMessage() for r in rec.records]
+        assert any("Cycle detected" in m for m in out), out
+        # first sight + first recurrence forwarded; the rest folded
+        assert out.count("Q") == 2, out
+        # the adopted one-off keeps its identity in the cycle summary
+        assert any("- Q:" in m for m in out if "Cycle detected" in m), out
+
+    def test_pruned_oneoff_repeating_after_collapse_is_bounded(self):
+        # Regression (review of the 288af86 fix): a one-off X is logged once,
+        # then ages out of the window while the episode stays alive (the log
+        # never goes quiet for a period).  A 2-type loop A/B collapses while X
+        # is out of the window, so X is not in the member snapshot.  When X
+        # then repeats at a high rate it must NOT be forwarded on every repeat:
+        # it is forwarded once (identity), adopted into the collapsed cycle, and
+        # its further repeats fold into the periodic summary, which lists it.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        timeline = [
+            (0.0, "X"),
+            (1.0, "A"),
+            (2.0, "B"),
+            (6.0, "A"),      # collapse; X (t=0) is pruned from the window here
+            (6.5, "X"),      # first recurrence -> forwarded, adopted
+            (7.0, "A"),
+            (7.5, "X"),
+            (8.0, "B"),
+            (8.5, "X"),
+            (9.0, "A"),
+            (9.5, "X"),
+            (10.0, "B"),
+            (10.5, "X"),
+            (11.0, "A"),     # periodic summary; window still carries X
+            (12.0, "B"),
+        ]
+        now = 0.0
+        for ts, msg in timeline:
+            advance(ts - now)
+            now = ts
+            dedup.emit(make_record(msg))
+        out = [r.getMessage() for r in rec.records]
+        # X is forwarded on first sight and first recurrence only; the rest fold
+        assert out.count("X") == 2, out
+        # a periodic summary is emitted (not a raw flood) and lists X
+        summaries = [m for m in out if "Cycle detected" in m and "so far" in m]
+        assert summaries, out
+        assert any(ln.strip().startswith("- X:") for ln in summaries[-1].splitlines()), summaries[-1]
+
+    def test_second_fault_loop_after_collapse_is_folded(self):
+        # A second, distinct fault loop (C/D) that starts after the first one
+        # (A/B) collapsed must be folded into the (growing) cycle summary, not
+        # forwarded at full rate.  Each of C and D is forwarded on first sight
+        # and on its first recurrence (when it joins the collapsed cycle); all
+        # further repeats fold into the periodic summary.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        timeline = [
+            (0.0, "A"),
+            (1.0, "B"),
+            (2.0, "A"),      # collapse (A/B)
+            (3.0, "C"),      # second loop: C first -> forwarded
+            (4.0, "D"),      # D first -> forwarded
+            (5.0, "C"),      # C first recurrence -> forwarded, adopted
+            (6.0, "D"),      # D first recurrence -> forwarded, adopted
+            (7.0, "C"),
+            (8.0, "D"),
+            (9.0, "C"),
+            (10.0, "D"),
+            (11.0, "C"),
+            (12.0, "D"),
+        ]
+        now = 0.0
+        for ts, msg in timeline:
+            advance(ts - now)
+            now = ts
+            dedup.emit(make_record(msg))
+        out = [r.getMessage() for r in rec.records]
+        # each second-loop type is forwarded twice (first sight + adoption), not
+        # on every repeat
+        assert out.count("C") == 2, out
+        assert out.count("D") == 2, out
+        # and the periodic summary lists both of them
+        summaries = [m for m in out if "Cycle detected" in m and "so far" in m]
+        assert summaries, out
+        last = summaries[-1]
+        assert any(ln.strip().startswith("- C:") for ln in last.splitlines()), last
+        assert any(ln.strip().startswith("- D:") for ln in last.splitlines()), last
+
+
+# ---------------------------------------------------------------------------
+# Stale keys: a seen key that aged out of the window must rejoin it
+# ---------------------------------------------------------------------------
+
+class TestStaleKeyWindowReappend:
+
+    def test_stale_key_recurrence_appears_in_the_cycle_summary(self):
+        # A at t=0, then B/C alternating at 1 Hz: the log never goes quiet for
+        # a period, so the episode (and _seen) stays alive while A ages out of
+        # the window. B/C alone look like a loop (2 <= MAX_LOOP_TYPES), so the
+        # window collapses early (t=3) and the refreshes stop listing A. Two
+        # more B/C after A's t=31 recurrence put the next periodic refresh at
+        # t=33: with the re-joined A, it must list A with its full count.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("A"))
+        advance(1.0)
+        for i in range(30):
+            dedup.emit(make_record("B" if i % 2 == 0 else "C"))
+            advance(1.0)
+        dedup.emit(make_record("A"))
+        advance(1.0)
+        dedup.emit(make_record("B"))
+        advance(1.0)
+        dedup.emit(make_record("C"))
+        summaries = [m for m in (r.getMessage() for r in rec.records)
+                     if "Cycle detected" in m]
+        lines = summaries[-1].splitlines()
+        assert any(ln.strip() == "- A: 2" for ln in lines), summaries[-1]
+        assert any("- B:" in ln for ln in lines), summaries[-1]
+        assert any("- C:" in ln for ln in lines), summaries[-1]
+
+    def test_stale_key_recurrence_is_forwarded_in_a_diverse_window(self):
+        # Regression guard for the re-append: with the stale key re-joined the
+        # window holds 5 distinct types and only 37 repeats (42 occurrences) -
+        # above MAX_LOOP_TYPES and far below the floor, so the recurrence
+        # must stay a lone one: forwarded, not swallowed by a collapse.
+        dedup, rec, advance = make_handler(period_seconds=5.0)
+        dedup.emit(make_record("stale"))
+        advance(1.0)
+        for i in range(1, 41):
+            dedup.emit(make_record(f"t{i % 4}"))
+            advance(1.0)
+        dedup.emit(make_record("stale"))
+        out = [r.getMessage() for r in rec.records]
+        assert out[-1] == "stale", out
+        assert not any("Cycle detected" in m for m in out), out
+
+
+# ---------------------------------------------------------------------------
+# Summary content: ordering, severity, truthfulness, exceptions
+# ---------------------------------------------------------------------------
+
+def _six_type_storm(period_seconds=10.0):
+    """Drive a 6-type storm past the rate floor and return the summary text.
+
+    100× A, then five one-off types, then one more A: the repeat of A finds
+    a window of 6 distinct types with 100 repeats (the floor - A carries
+    101 occurrences, i.e. 100 repeats, and the one-offs 0), so the collapse
+    fires with A heavily weighted.
+    """
+    dedup, rec, advance = make_handler(period_seconds=period_seconds)
+    for _ in range(100):
+        dedup.emit(make_record("A"))
+        advance(0.5)
+    for t in ["b", "c", "d", "e", "f"]:
+        dedup.emit(make_record(t))
+        advance(0.5)
+    dedup.emit(make_record("A"))
+    return next(m for m in (r.getMessage() for r in rec.records)
+                if "Cycle detected" in m)
+
+
+class TestSummaryContent:
+
+    def test_cycle_summary_lists_most_frequent_first(self):
+        summary = _six_type_storm()
+        listed = [ln for ln in summary.splitlines() if ln.strip().startswith("-")]
+        assert listed[0].startswith("    - A:"), summary
+        # the least frequent type (seen last) is the one folded away
+        assert "+1 more" in summary, summary
+        assert "    - f: 1" not in summary, summary
+
+    def test_non_debug_level_lists_at_most_max_types_and_no_false_promise(self):
+        summary = _six_type_storm()
+        listed = [ln for ln in summary.splitlines() if ln.strip().startswith("-")]
+        assert len(listed) <= 5, summary
+        assert "see DEBUG" not in summary, summary
+
+    def test_debug_level_lists_every_type(self):
+        root = logging.getLogger()
+        saved = root.level
+        root.setLevel(logging.DEBUG)
+        try:
+            summary = _six_type_storm()
+        finally:
+            root.setLevel(saved)
+        listed = [ln for ln in summary.splitlines() if ln.strip().startswith("-")]
+        assert len(listed) == 6, summary
+        assert "+1 more" not in summary, summary
+        assert "see DEBUG" not in summary, summary
+
+    def test_cycle_summary_level_is_max_of_members(self):
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        dedup.emit(make_record("A", level=logging.INFO))
+        advance(1.0)
+        dedup.emit(make_record("B", level=logging.ERROR))
+        advance(1.0)
+        dedup.emit(make_record("A", level=logging.INFO))
+        summary = [r for r in rec.records if "Cycle detected" in r.getMessage()]
+        assert summary, "no cycle summary emitted"
+        assert summary[0].levelno == logging.ERROR
+
+    def test_cycle_narrowing_to_one_type_uses_repeat_form(self):
+        # A B A collapses (2 types). B then ages out of the window while A
+        # keeps coming: the periodic refresh must read as the familiar
+        # "(message repeated N times so far)", not "across 1 types".
+        dedup, rec, advance = make_handler(period_seconds=2.0)
+        for msg in ["A", "B", "A"]:          # t=0.0, 0.5, 1.0 -> collapse
+            dedup.emit(make_record(msg))
+            advance(0.5)
+        for _ in range(4):                   # t=1.5, 2.0, 2.5, 3.0
+            dedup.emit(make_record("A"))
+            advance(0.5)
+        last = rec.records[-1].getMessage()
+        assert "message repeated" in last, last
+        assert "so far" in last, last
+        assert "Cycle detected" not in last, last
+
+    def test_repeat_summary_carries_exception(self):
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        for _ in range(3):
+            rec_in = make_record("boom")
+            rec_in.exc_info = OSError("0xe06d7363")
+            dedup.emit(rec_in)
+            advance(0.5)
+        dedup.emit(make_record("done"))      # interrupts the run -> final summary
+        out = [r.getMessage() for r in rec.records]
+        assert any("repeated 3 times" in m and "OSError: 0xe06d7363" in m
+                   for m in out), out
+
+    def test_cycle_summary_line_carries_latest_exception(self):
+        # The DInput fault shape: the exception evolves across the storm
+        # (access violation, then 0xe06d7363); the summary must show the
+        # latest, not the first.
+        dedup, rec, advance = make_handler(period_seconds=10.0)
+        first = make_record("A")
+        first.exc_info = (OSError,
+                          OSError("access violation reading 0x0000021F8D2B0010"),
+                          None)
+        dedup.emit(first)
+        advance(1.0)
+        dedup.emit(make_record("B"))
+        advance(1.0)
+        latest = make_record("A")
+        latest.exc_info = (OSError, OSError("0xe06d7363"), None)
+        dedup.emit(latest)
+        summary = next(m for m in (r.getMessage() for r in rec.records)
+                       if "Cycle detected" in m)
+        assert "OSError: 0xe06d7363" in summary, summary
+        assert "access violation" not in summary, summary
+
+
+# ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
 
