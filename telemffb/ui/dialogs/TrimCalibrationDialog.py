@@ -45,6 +45,7 @@ from telemffb.ui.widgets.custom_widgets import (
     IasTrendWidget, InfoLabel, NoWheelComboBox, TrimCurveWidget, svg_icon,
     vpf_purple,
 )
+from telemffb.sim.msfs_xp.MsfsXpTrimwheelMixIn import MsfsXpTrimwheelMixIn
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState, TrimCalibrator
 from telemffb.ui.theme.tokens import (
     BORDER_GRAY, DISABLED_GRAY, DIVIDER_GRAY, ERROR_RED, INFO_BLUE, OK_GREEN,
@@ -1894,8 +1895,8 @@ class TrimCalibrationDialog(QDialog):
         custom = use_axis and bool(s["enable_custom_y_axis"])
         cal.trim_use_axis = use_axis
         cal.trim_axis_invert = use_axis and bool(s["trimwheel_axis_invert"])
-        cal.trim_axis_var = s["custom_y_axis"] if custom else "AXIS_ELEV_TRIM_SET"
-        cal.trim_axis_range = s["raw_y_axis_scale"] if custom else 16384
+        cal.trim_axis_var, cal.trim_axis_range = MsfsXpTrimwheelMixIn.trim_axis_target(
+            custom, s["custom_y_axis"], s["raw_y_axis_scale"])
         logger.info(
             "Trim calibration write settings (trimwheel scope): "
             + (f"axis {cal.trim_axis_var} ±{cal.trim_axis_range}"

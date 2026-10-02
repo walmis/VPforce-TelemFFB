@@ -3464,3 +3464,70 @@ class TestTrimWriteSettings:
 
         apply(cal, dict(base, trimwheel_use_axis=True, enable_custom_y_axis=False))
         assert (cal.trim_axis_var, cal.trim_axis_range) == ("AXIS_ELEV_TRIM_SET", 16384)
+
+
+def _shipped_custom_axis_cases():
+    """(pattern, device, axis) for every MSFS model row in the shipped
+    defaults.xml that sets a custom axis variable, with the aircraft name
+    the pattern matches (the pattern minus its trailing ``.*``)."""
+    import re
+    import xml.etree.ElementTree as ET
+    from pathlib import Path
+    root = ET.parse(Path(__file__).parents[1] / "defaults.xml").getroot()
+    cases = set()
+    for row in root.findall("models"):
+        m = re.fullmatch(r"custom_([xy])_axis", row.findtext("name") or "")
+        pattern = row.findtext("model") or ""
+        name = pattern[:-2] if pattern.endswith(".*") else pattern
+        if m and row.findtext("sim") == "MSFS" and not re.search(r"[\^$.|?*+()\[\]{}]", name):
+            cases.add((name, row.findtext("device"), m.group(1)))
+    return sorted(cases)
+
+
+@pytest.fixture
+def shipped_defaults(tmp_path):
+    """Resolve against the real defaults.xml and an empty userconfig."""
+    from pathlib import Path
+    from telemffb import xmlutils
+    defaults = str(Path(__file__).parents[1] / "defaults.xml")
+    userconfig = tmp_path / "userconfig.xml"
+    userconfig.write_text("<TelemFFB_v2>\n</TelemFFB_v2>\n", encoding="utf-8")
+    saved = (getattr(G, "userconfig_path", None), getattr(G, "defaults_path", None))
+    G.userconfig_path, G.defaults_path = str(userconfig), defaults
+    xmlutils.update_vars("joystick", str(userconfig), defaults)
+    xmlutils.update_roots()
+    yield xmlutils
+    G.userconfig_path, G.defaults_path = saved
+
+
+class TestShippedCustomAxisRows:
+    """Shipped custom axis rows must survive the resolver's prereq
+    filtering: a custom_*_axis row without its enable row (or, on the
+    trimwheel, without trimwheel_use_axis) is silently dropped, and the
+    device - and the trim calibrator - fall back to the stock event."""
+
+    @pytest.mark.parametrize("name,device,axis", _shipped_custom_axis_cases())
+    def test_custom_axis_resolves(self, shipped_defaults, name, device, axis):
+        _, _, rows = shipped_defaults.read_single_model("MSFS", name, "", device)
+        s = {r["name"]: r["value"] for r in rows}
+        assert s.get(f"enable_custom_{axis}_axis") == "true"
+        assert s.get(f"custom_{axis}_axis") not in (None, "", "-")
+        if device == "trimwheel":
+            assert s.get("trimwheel_use_axis") == "true"
+
+    @pytest.mark.parametrize("name", [n for n, d, _ in _shipped_custom_axis_cases()
+                                      if d == "trimwheel"])
+    def test_calibrator_writes_through_the_shipped_trim_axis(
+            self, shipped_defaults, monkeypatch, name):
+        import types
+        import telemffb.ui.dialogs.TrimCalibrationDialog as TCD
+        monkeypatch.setattr(G, "settings_mgr", types.SimpleNamespace(
+            current_sim="MSFS", current_class="", current_aircraft_name=name,
+            active_profile=None, offline_mode=False, offline_scope=None),
+            raising=False)
+        dlg = TCD.TrimCalibrationDialog
+        s = dlg._read_trim_write_settings(dlg)
+        cal = types.SimpleNamespace()
+        dlg._apply_trim_write(cal, s)
+        assert cal.trim_use_axis
+        assert cal.trim_axis_var != "AXIS_ELEV_TRIM_SET"
