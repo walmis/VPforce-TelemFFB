@@ -20885,9 +20885,93 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>custom_x_axis</name>
+		<model>DA40-NG.*</model>
+		<value>L:INPUT_AILERON</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_x_axis</name>
+		<model>DA40-NG.*</model>
+		<value>L:INPUT_RUDDER</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>DA40-NG.*</model>
+		<value>L:INPUT_ELEVATOR</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>DA40-NG.*</model>
+		<value>L:INPUT_TRIM_AXIS</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>damper_force</name>
+		<model>DA40-NG.*</model>
+		<value>0.44</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>DA40-NG.*</model>
+		<value>{"curves": [{"points": [{"t": -0.48, "offs": -0.2531}, {"t": -0.42, "offs": -0.2201}, {"t": -0.3599, "offs": -0.191}, {"t": -0.3, "offs": -0.158}, {"t": -0.24, "offs": -0.1266}, {"t": -0.1799, "offs": -0.0927}, {"t": -0.1193, "offs": -0.064}, {"t": -0.06, "offs": -0.0327}, {"t": 0.0, "offs": 0.0}, {"t": 0.0594, "offs": 0.0279}, {"t": 0.1197, "offs": 0.0585}, {"t": 0.1799, "offs": 0.0901}, {"t": 0.24, "offs": 0.1196}, {"t": 0.3, "offs": 0.1522}, {"t": 0.3599, "offs": 0.1814}], "t0": -0.06, "ias_kt": 82.2, "date": "2026-10-02"}, {"points": [{"t": -0.94, "offs": -0.7333}, {"t": -0.88, "offs": -0.6915}, {"t": -0.8199, "offs": -0.6366}, {"t": -0.76, "offs": -0.6068}, {"t": -0.7, "offs": -0.5601}, {"t": -0.64, "offs": -0.4925}, {"t": -0.58, "offs": -0.4232}, {"t": -0.52, "offs": -0.3825}, {"t": -0.46, "offs": -0.321}, {"t": -0.4, "offs": -0.2796}, {"t": -0.34, "offs": -0.2372}, {"t": -0.28, "offs": -0.1953}], "t0": -0.7, "ias_kt": 131.6, "date": "2026-10-02"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>DA40-NG.*</model>
 		<value>-0.11</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -20905,6 +20989,48 @@
 		<unit>m</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>DA40-NG.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>DA40-NG.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>raw_y_axis_scale</name>
+		<model>DA40-NG.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_y_axis_scale</name>
+		<model>DA40-NG.*</model>
+		<value>100</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>trimwheel_axis_invert</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>trimwheel_use_axis</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -20954,6 +21080,13 @@
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>DA40-XLS.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>enable_custom_y_axis</name>
@@ -21019,13 +21152,6 @@
 		<device>trimwheel</device>
 	</models>
 	<models>
-		<name>trim_following</name>
-		<model>DA40-XLS.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
 		<name>trimwheel_axis_invert</name>
 		<model>DA40-XLS.*</model>
 		<value>true</value>
@@ -21049,7 +21175,7 @@
 	<models>
 		<name>joystick_trim_follow_curve_y</name>
 		<model>DA40-XLS.*</model>
-		<value>{"curves": [{"points": [{"t": -0.78, "offs": 0.0006}, {"t": -0.72, "offs": -0.0024}, {"t": -0.66, "offs": -0.0073}, {"t": -0.6, "offs": 0.0033}, {"t": -0.54, "offs": -0.0015}, {"t": -0.48, "offs": -0.0036}, {"t": -0.42, "offs": -0.0011}, {"t": -0.36, "offs": -0.0149}, {"t": -0.3, "offs": -0.0048}, {"t": -0.24, "offs": 0.0052}, {"t": -0.18, "offs": 0.0112}, {"t": -0.12, "offs": 0.0002}, {"t": -0.06, "offs": 0.001}, {"t": -0.0, "offs": -0.0}, {"t": 0.06, "offs": 0.0037}], "t0": -0.36, "ias_kt": 128.8, "date": "2026-07-20"}]}</value>
+		<value>{"curves": [{"points": [{"t": -0.37, "offs": -0.1877}, {"t": -0.3099, "offs": -0.1574}, {"t": -0.2497, "offs": -0.1252}, {"t": -0.1899, "offs": -0.0938}, {"t": -0.1299, "offs": -0.0622}, {"t": -0.0699, "offs": -0.0295}, {"t": -0.0093, "offs": -0.0037}, {"t": 0.05, "offs": 0.0198}, {"t": 0.11, "offs": 0.0504}, {"t": 0.17, "offs": 0.0837}, {"t": 0.23, "offs": 0.1138}, {"t": 0.29, "offs": 0.1455}, {"t": 0.35, "offs": 0.1778}, {"t": 0.41, "offs": 0.2099}, {"t": 0.47, "offs": 0.2413}], "t0": 0.05, "ias_kt": 78.6, "date": "2026-10-02"}, {"points": [{"t": -0.9, "offs": -0.6431}, {"t": -0.84, "offs": -0.6007}, {"t": -0.78, "offs": -0.5581}, {"t": -0.72, "offs": -0.5173}, {"t": -0.66, "offs": -0.4679}, {"t": -0.6, "offs": -0.4339}, {"t": -0.54, "offs": -0.387}, {"t": -0.48, "offs": -0.3302}, {"t": -0.42, "offs": -0.2737}, {"t": -0.36, "offs": -0.2317}, {"t": -0.3, "offs": -0.1867}, {"t": -0.24, "offs": -0.1457}, {"t": -0.18, "offs": -0.1072}, {"t": -0.12, "offs": -0.0715}], "t0": -0.54, "ias_kt": 129.8, "date": "2026-10-02"}]}</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -21061,6 +21187,13 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>raw_x_axis_scale</name>
+		<model>DA40-XLS.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>custom_x_axis</name>
 		<model>DA42-TDI.*</model>
 		<value>L:INPUT_AILERON</value>
@@ -21111,6 +21244,20 @@
 	</models>
 	<models>
 		<name>enable_custom_y_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_curve_y</name>
+		<model>DA42-TDI.*</model>
+		<value>{"curves": [{"points": [{"t": -0.49, "offs": -0.3597}, {"t": -0.4299, "offs": -0.3221}, {"t": -0.37, "offs": -0.2847}, {"t": -0.31, "offs": -0.2471}, {"t": -0.2499, "offs": -0.2072}, {"t": -0.1897, "offs": -0.1688}, {"t": -0.1294, "offs": -0.1351}, {"t": -0.07, "offs": -0.0286}, {"t": -0.01, "offs": -0.0042}, {"t": 0.0487, "offs": 0.0203}, {"t": 0.1099, "offs": 0.0463}, {"t": 0.17, "offs": 0.0708}, {"t": 0.23, "offs": 0.0973}, {"t": 0.2899, "offs": 0.1238}, {"t": 0.35, "offs": 0.1493}], "t0": -0.07, "ias_kt": 99.8, "date": "2026-09-30"}, {"points": [{"t": -0.8699, "offs": -1.1811}, {"t": -0.81, "offs": -1.1103}, {"t": -0.75, "offs": -1.0267}, {"t": -0.6899, "offs": -0.9269}, {"t": -0.63, "offs": -0.8832}, {"t": -0.57, "offs": -0.787}, {"t": -0.51, "offs": -0.6891}, {"t": -0.45, "offs": -0.609}, {"t": -0.39, "offs": -0.4759}, {"t": -0.33, "offs": -0.4393}, {"t": -0.27, "offs": -0.2853}, {"t": -0.21, "offs": -0.2219}], "t0": -0.51, "ias_kt": 152.9, "date": "2026-09-30"}]}</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_use_curve_y</name>
 		<model>DA42-TDI.*</model>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -21287,7 +21434,7 @@
 	<models>
 		<name>joystick_trim_follow_curve_y</name>
 		<model>DA42-VI.*</model>
-		<value>{"curves": [{"points": [{"t": -0.56, "offs": -0.0015}, {"t": -0.5, "offs": 0.0073}, {"t": -0.44, "offs": 0.0193}, {"t": -0.38, "offs": 0.0028}, {"t": -0.32, "offs": 0.0064}, {"t": -0.26, "offs": 0.02}, {"t": -0.2, "offs": 0.0096}, {"t": -0.14, "offs": -0.0061}, {"t": -0.08, "offs": 0.0006}, {"t": -0.02, "offs": 0.0002}, {"t": 0.04, "offs": -0.0004}, {"t": 0.1, "offs": -0.0051}, {"t": 0.16, "offs": 0.0092}, {"t": 0.22, "offs": 0.0031}, {"t": 0.28, "offs": 0.0058}], "t0": -0.14, "ias_kt": 154.9, "date": "2026-07-20"}]}</value>
+		<value>{"curves": [{"points": [{"t": -0.43, "offs": -0.2917}, {"t": -0.37, "offs": -0.2563}, {"t": -0.31, "offs": -0.2207}, {"t": -0.25, "offs": -0.1848}, {"t": -0.19, "offs": -0.1479}, {"t": -0.13, "offs": -0.1115}, {"t": -0.069, "offs": -0.0788}, {"t": -0.01, "offs": -0.004}, {"t": 0.0488, "offs": 0.0194}, {"t": 0.1099, "offs": 0.0532}, {"t": 0.17, "offs": 0.0788}, {"t": 0.23, "offs": 0.108}, {"t": 0.2899, "offs": 0.137}, {"t": 0.35, "offs": 0.1664}, {"t": 0.41, "offs": 0.1956}], "t0": -0.01, "ias_kt": 104.3, "date": "2026-09-30"}, {"points": [{"t": -0.92, "offs": -1.242}, {"t": -0.86, "offs": -1.1707}, {"t": -0.8, "offs": -1.091}, {"t": -0.74, "offs": -0.9847}, {"t": -0.68, "offs": -0.9401}, {"t": -0.62, "offs": -0.8429}, {"t": -0.56, "offs": -0.751}, {"t": -0.5, "offs": -0.6676}, {"t": -0.44, "offs": -0.5114}, {"t": -0.38, "offs": -0.4377}, {"t": -0.32, "offs": -0.3331}, {"t": -0.26, "offs": -0.2706}], "t0": -0.56, "ias_kt": 166.8, "date": "2026-09-30"}]}</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
