@@ -9966,15 +9966,12 @@
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
-		<!-- Elevator trim-curve calibration is fixed-wing only: exclude the
-		     curve settings (NOT trim_following itself - helicopters use
-		     cyclic trim-following) for every helicopter class. These
-		     exclusions also drive the main-window calibration prompt. -->
 		<classdefaults_MSFS>
 			<name>joystick_trim_follow_curve_y</name>
 			<type>!Helicopter</type>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+			<notes>Elevator trim-curve calibration is fixed-wing only: exclude the curve settings (NOT trim_following itself - helicopters use cyclic trim-following) for every helicopter class. These exclusions also drive the main-window calibration prompt.</notes>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>joystick_trim_follow_curve_y</name>
@@ -11557,13 +11554,12 @@
 			<sim>XPLANE</sim>
 			<device>joystick</device>
 		</classdefaults_XPLANE>
-		<!-- Elevator trim-curve calibration is fixed-wing only: exclude the
-		     curve settings for the helicopter classes (see MSFS section). -->
 		<classdefaults_XPLANE>
 			<name>joystick_trim_follow_curve_y</name>
 			<type>!Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>joystick</device>
+			<notes>Elevator trim-curve calibration is fixed-wing only: exclude the curve settings for the helicopter classes (see MSFS section).</notes>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>joystick_trim_follow_use_curve_y</name>
@@ -24619,7 +24615,6 @@
 		<device>joystick</device>
 		<notes>All-electric fly-by-wire eVTOL; classed PropellerAircraft for propulsion-effect defaults (no afterburner), but the trim feel is FBW-centered, not tab/cable.</notes>
 	</models>
-	<!-- Blade slap per-model tuning: band center by disc loading, G-factor by mission character -->
 	<models>
 		<name>blade_slap_band_center</name>
 		<model>FlyInside B206.*</model>
@@ -24627,6 +24622,7 @@
 		<unit>kt</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
+		<notes>Blade slap per-model tuning: band center by disc loading, G-factor by mission character</notes>
 	</models>
 	<models>
 		<name>blade_slap_g_factor</name>
