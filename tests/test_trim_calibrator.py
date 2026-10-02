@@ -3531,3 +3531,41 @@ class TestShippedCustomAxisRows:
         dlg._apply_trim_write(cal, s)
         assert cal.trim_use_axis
         assert cal.trim_axis_var != "AXIS_ELEV_TRIM_SET"
+
+
+class TestTrimCalibrationSaveDevice:
+    """Calibration results are joystick settings. The settings window's
+    config scope (which the XML writer defaults to) may be a child device
+    such as the trimwheel; the save must still land on the joystick."""
+
+    @staticmethod
+    def _layout(monkeypatch):
+        import types
+        writes = []
+        monkeypatch.setattr(G, "settings_mgr", types.SimpleNamespace(
+            current_sim="MSFS", current_class="PropellerAircraft",
+            current_pattern="DA40-NG.*",
+            write_to_xml=lambda *a, **k: writes.append((a, k))), raising=False)
+        layout = types.SimpleNamespace(trigger_form_reload=False,
+                                       show_erase_button=lambda *a: None,
+                                       reload_caller=lambda: None)
+        return layout, writes
+
+    def test_curve_save_targets_joystick(self, monkeypatch):
+        import json
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
+        layout, writes = self._layout(monkeypatch)
+        SettingsLayout.save_trim_calibration(layout, json.dumps(
+            {"curves": [{"points": [], "ias_kt": 100}], "use_curve": True,
+             "stick_position": "Trimmed"}))
+        assert [a[4] for a, _ in writes] == [
+            "joystick_trim_follow_curve_y", "joystick_trim_follow_use_curve_y",
+            "joystick_trim_follow_stick_position"]
+        assert all(k.get("the_device") == "joystick" for _, k in writes)
+
+    def test_position_mode_save_targets_joystick(self, monkeypatch):
+        from telemffb.ui.widgets.SettingsLayout import SettingsLayout
+        layout, writes = self._layout(monkeypatch)
+        SettingsLayout.save_trim_position_mode(layout, "Trimmed")
+        (_, k), = writes
+        assert k.get("the_device") == "joystick"
