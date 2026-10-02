@@ -2452,7 +2452,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.86</order>
+		<order>2100.80</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_var_enabled</name>
 		<displayname>Custom Autopilot Variable</displayname>
@@ -2527,9 +2527,9 @@
 		<order>2200.3</order>
 		<datatype>list</datatype>
 		<name>raw_x_axis_scale</name>
-		<displayname>Bit Range X Scaling</displayname>
+		<displayname>+/- Range X Scaling</displayname>
 		<prereq>enable_custom_x_axis</prereq>
-		<info>Bit Range Scaling</info>
+		<info>+/- Value Range to send to sim</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -2612,9 +2612,9 @@
 		<order>2300.3</order>
 		<datatype>list</datatype>
 		<name>raw_y_axis_scale</name>
-		<displayname>Bit Range Y Scaling</displayname>
+		<displayname>+/- Range Y Scaling</displayname>
 		<prereq>enable_custom_y_axis</prereq>
-		<info>Bit Range Scaling</info>
+		<info>+/- Value Range to send to sim</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
