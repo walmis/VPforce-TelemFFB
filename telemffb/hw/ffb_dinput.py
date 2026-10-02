@@ -656,6 +656,11 @@ class DIBridge:
             logging.warning("DirectLink license file found but not valid")
         else:
             logging.info("DirectLink: no license file found beside the DLL")
+        # Registry switches turn off a DirectLink behavior for support; a
+        # log has to show which are in effect.  Older builds report none.
+        switches = self.build_info.get("switches") or []
+        if switches:
+            logging.warning(f"DirectLink switches set: {', '.join(switches)}")
         if not expires:
             return
         try:
@@ -1060,7 +1065,8 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             elif rc == DIB_ERR_ACQUISITION:
                 self._note_call_failed(rc)
             else:
-                logging.warning(f"effect_start failed ({rc}) for {self!r}")
+                logging.warning(f"effect_start failed ({rc}) for {self!r}: "
+                                f"{self.device.bridge.last_error()}")
         elif not should_play and self._device_playing:
             self.device.bridge.effect_stop(self.effect_id)
             self._device_playing = False
@@ -1093,7 +1099,8 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         else:
             log = (logging.warning if self._consecutive_failures == 0
                    else logging.debug)
-            log(f"effect_start failed ({rc}) for {self!r}")
+            log(f"effect_start failed ({rc}) for {self!r}: "
+                f"{self.device.bridge.last_error()}")
             self._note_call_failed(rc)
         return self
 
@@ -1246,6 +1253,8 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._start_seq = 0
         self._last_started: Dict[int, int] = {}  # id(handle) -> sequence
         self._reconnecting = False
+        # the last reason a re-open failed, logged once per distinct reason
+        self._reconnect_error: Optional[str] = None
         # a native fault reported from a NON-main thread (the telemetry
         # thread mostly): the release/re-open it asks for must run on the
         # main thread, so the request is latched here and this instance's
@@ -1630,6 +1639,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         except Exception:
             pass
         self._handle = None
+        self._reconnect_error = None
         self.deviceConnected.emit(False)
         logging.warning("Reconnecting DirectInput device in 1s")
         QTimer.singleShot(1000, self._try_reconnect)
@@ -1648,8 +1658,16 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
             self._native_fault = False
             logging.info("DirectInput device reconnected")
             self.deviceConnected.emit(True)
-        except Exception:
-            logging.warning("Reconnecting DirectInput device in 1s")
+        except Exception as e:
+            # The bridge's reason - a driver fault, a rest after one, an
+            # unplugged device - is the diagnosis; it repeats every retry,
+            # so only a new reason is a warning.
+            reason = str(e)
+            if reason != self._reconnect_error:
+                self._reconnect_error = reason
+                logging.warning(f"DirectInput device did not reopen, retrying every 1s: {reason}")
+            else:
+                logging.debug(f"DirectInput device did not reopen: {reason}")
             QTimer.singleShot(1000, self._try_reconnect)
 
     # --- input ------------------------------------------------------------
@@ -1712,22 +1730,25 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                 # access violation): the effect table and the driver state
                 # on this device are suspect - recover by re-opening, do
                 # not re-hammer this call at telemetry rate
-                self._note_native_fault("effect_create")
+                self._note_native_fault(f"effect_create ({effect_names.get(type, type)})")
                 return None
             if effect_id > 0:
                 break
             if effect_id == DIB_ERR_DEVICE_FULL:
+                # read before an eviction makes other bridge calls
+                detail = self.bridge.last_error()
                 # tier 0 (conditions/constant = force model) may displace
                 # tier 1 (periodic cues); a periodic may displace an older cue
                 if self._evict_one_periodic():
                     continue
                 # a refused cue is only missing; a refused force-model
                 # effect changes what the stick does, and for a constant
-                # force nothing else reports it
+                # force nothing else reports it.  The bridge's text says
+                # whether the device or a cap it set refused.
                 logging.log(
                     logging.WARNING if type in PERIODIC_EFFECTS else logging.ERROR,
                     "Effects pool full, cannot create "
-                    f"{effect_names.get(type, type)} effect")
+                    f"{effect_names.get(type, type)} effect [bridge: {detail}]")
                 return None
             if effect_id == DIB_ERR_ACQUISITION:
                 # read before the rebuild below replaces it
