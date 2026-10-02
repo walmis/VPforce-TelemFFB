@@ -82,6 +82,7 @@ from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.directlink_notice import with_download_link
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.state.app_state import AppState
+from telemffb.state.effect_levels_controller import EffectLevelsController
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             upload_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
@@ -1327,6 +1328,13 @@ def _setup_ipc_and_connections():
     G.ipc_instance.preview_signal.connect(G.main_window.preview.start_child)
     G.ipc_instance.preview_stop_signal.connect(G.main_window.preview.stop)
     G.ipc_instance.preview_done_signal.connect(G.main_window.preview.on_child_done)
+    # effect levels and mute come from the master; only a child's IPC
+    # thread emits these
+    G.ipc_instance.effect_levels_signal.connect(G.effect_levels.apply_master_levels)
+    G.ipc_instance.effect_mute_signal.connect(G.effect_levels.apply_master_mute)
+    # the master's mute button binding sees each child's buttons and status
+    G.ipc_instance.child_buttons_signal.connect(G.effect_levels.on_device_buttons)
+    G.ipc_instance.child_keepalive_signal.connect(G.effect_levels.on_device_status)
     G.ipc_instance.start()
 
 
@@ -1776,6 +1784,10 @@ def main():
 
     # Set logging level based on system settings
     _setup_logging_level()
+
+    # Effect levels: this instance's own levels are in place before the
+    # device opens, so the first effect created is already scaled
+    G.effect_levels = EffectLevelsController()
 
     # ============================================================================
     # PHASE 9: Device Connection and Firmware Validation

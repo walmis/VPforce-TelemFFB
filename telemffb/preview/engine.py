@@ -74,6 +74,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import telemffb.globals as G
+from telemffb.hw import effect_levels
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.utils.conversions import kt2ms
 
@@ -344,6 +345,7 @@ class PreviewRunner:
         self.steps_total = self.frames_total + self.tail_frames
         self.frame_index = 0
         self.finished = False
+        self._mute_suspended = False
         # stimuli that run on seconds rather than progress (Gusts) read
         # the run length off the throwaway
         aircraft._preview_duration = spec.duration
@@ -380,6 +382,9 @@ class PreviewRunner:
         if self.finished:
             return False
         ac = self.aircraft
+        if self.frame_index == 0:
+            # a preview plays through the mute; the levels still apply
+            self._mute_suspended = effect_levels.levels.set_mute_suspended(True)
         if self.frame_index == 0 and self.spec.constant_force:
             ac.effects['preview_spring'].spring(REFERENCE_SPRING, REFERENCE_SPRING).start()
         frame = self.build_frame(self.progress)
@@ -412,6 +417,14 @@ class PreviewRunner:
             self.aircraft.effects.clear()
         except Exception:
             logging.exception(f"Preview {self.spec.name}: cleanup failed")
+        if self._mute_suspended:
+            self._mute_suspended = False
+            levels = effect_levels.levels
+            levels.set_mute_suspended(False)
+            # a replay during the run re-sent held effects unmuted
+            manager = getattr(G, 'telem_manager', None)
+            if levels.mute_mode != effect_levels.MUTE_OFF and manager is not None:
+                manager.request_effect_levels_reapply()
 
     def run(self, sleep: Callable[[float], None] = time.sleep) -> None:
         """Blocking playback at ``frame_rate`` - for scripts and bench checks."""

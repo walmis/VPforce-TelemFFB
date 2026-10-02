@@ -212,6 +212,18 @@ class SystemSettings(QSettings):
         'startHeadlessPedals': True,
         'startHeadlessCollective': True,
         'startHeadlessTrimwheel': True,
+        # the effect mute function (what, where) and its hardware button,
+        # app-wide: the master owns the mute for every device
+        'effectMuteMode': 'keep_spring',
+        'effectMuteScope': 'device',
+        'effectMuteButtonDevice': '',
+        'effectMuteButtonNumber': 0,
+        'effectMuteButtonBehavior': 'toggle',
+        # effect level sliders shown above the settings list, comma
+        # separated; the same set for every device in scope
+        'effectLevelsPinned': 'master',
+        # whether those controls show at all (View menu)
+        'effectLevelsShown': True,
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
     }
 

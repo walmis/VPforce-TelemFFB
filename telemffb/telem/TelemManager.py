@@ -276,6 +276,9 @@ class TelemManager(QObject, threading.Thread):
     #: attribute so a manager built without __init__ still answers
     _reapply_overrides_pending = False
 
+    #: set by request_effect_levels_reapply(), drained with the frame queue
+    _levels_reapply_pending = False
+
     currentAircraft: Optional['AircraftBase'] = None
     currentAircraftName: Optional[str] = None
     currentDataSource: Optional[str] = None
@@ -310,6 +313,7 @@ class TelemManager(QObject, threading.Thread):
         self._simconnect : Optional[SimConnectManager] = None
         self._gain_overrides_active = False
         self._reapply_overrides_pending = False
+        self._levels_reapply_pending = False
         self.stop_state = False
         self.pause_state = False
         self._vpconf_deferred_frame = None   # single-slot buffer for a frame arriving during the startup vpconf push
@@ -578,6 +582,19 @@ class TelemManager(QObject, threading.Thread):
         # wake the loop rather than wait out its timeout: a paused sim sends no
         # frames, and until this runs the device holds the profile's gains
         with self._cond:
+            self._cond.notify()
+
+    def request_effect_levels_reapply(self) -> None:
+        """Ask the loop to re-send every live effect through the current
+        effect levels (``HapticEffect.reapply_levels``).  Any thread.
+
+        The flag is part of the loop's wait condition, so the loop wakes
+        at once whether or not telemetry is flowing, and a request made
+        while a pass is running gets a pass of its own.  Requests made
+        before the loop gets to them share one replay.
+        """
+        with self._cond:
+            self._levels_reapply_pending = True
             self._cond.notify()
 
     def _reapply_configurator_overrides(self) -> None:
@@ -1343,7 +1360,7 @@ class TelemManager(QObject, threading.Thread):
         self._run = True
         while self._run:
             with self._cond:
-                if not self._events and not self._data:
+                if not self._events and not self._data and not self._levels_reapply_pending:
                     # Nothing pending: sleep until work arrives or the
                     # telemetry timeout elapses.  wait() releases _cond, so
                     # producers and frame_hold callers are never blocked by
@@ -1358,6 +1375,8 @@ class TelemManager(QObject, threading.Thread):
                 self._data = None
                 events = self._events
                 self._events = []
+                levels_reapply = self._levels_reapply_pending
+                self._levels_reapply_pending = False
 
             with self._processing_lock:
                 # Every loop pass, not just the ones carrying a frame: gains live
@@ -1367,6 +1386,8 @@ class TelemManager(QObject, threading.Thread):
                 # happens here.
                 self._safe_call("_reapply_configurator_overrides",
                                 self._reapply_configurator_overrides)
+                if levels_reapply:
+                    self._safe_call("reapply_levels", HapticEffect.reapply_levels)
                 if not wait_returned:
                     # A paused sim sends no frames, and a profile edit
                     # (the new-aircraft wizard included) must not wait

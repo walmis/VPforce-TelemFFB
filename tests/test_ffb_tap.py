@@ -395,6 +395,26 @@ class TestTapSpringMode:
         assert inst._telem_data['_pct_tap_y'] == 82 / 4096
         assert inst._ipc_telem['_pct_tap_y'] == 82 / 4096
 
+    def test_live_force_pct_is_after_the_effect_levels(self):
+        """The readout is what reaches the device: the spring level and
+        Master scale it; a mute that keeps springs leaves it alone."""
+        import unittest.mock as mock
+        from telemffb.hw import effect_levels
+        from telemffb.hw.effect_levels import MUTE_KEEP_SPRING
+        case, inst = self._make_instance("DINPUT_TAP")
+        effect_levels.levels.set_levels({'master': 0.5, 'spring': 0.5})
+        with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
+                        return_value=self._state()):
+            inst.ffb_tap_spring()
+        assert inst._telem_data['_pct_tap_x'] == 0.25
+        assert inst._ipc_telem['_pct_tap_x'] == 0.25
+        effect_levels.levels.set_levels({'master': 1.0, 'spring': 1.0})
+        effect_levels.levels.set_mute(MUTE_KEEP_SPRING)
+        with mock.patch("telemffb.hw.ffb_tap.read_game_spring",
+                        return_value=self._state()):
+            inst.ffb_tap_spring()
+        assert inst._telem_data['_pct_tap_x'] == 1.0
+
     def test_axis_gain_applies_after_swap(self):
         """The X slider scales whatever lands on the X axis: with swap
         enabled that is the game's Y condition."""
@@ -920,6 +940,25 @@ class TestTapGameEffectsMode:
         assert inst._telem_data['_pct_tap_periodic'] == 0.0
         assert inst._telem_data['_pct_tap_damper'] == 0.0
         assert inst._ipc_telem['_pct_tap_const'] == 0.8
+
+    def test_family_pcts_are_after_the_effect_levels(self):
+        """Each family's readout is multiplied by that type's level factor;
+        a muted type reads 0."""
+        from telemffb.hw import effect_levels
+        from telemffb.hw.effect_levels import MUTE_KEEP_SPRING
+        case, inst = self._make_instance()
+        effect_levels.levels.set_levels({'master': 0.5, 'constant': 0.5})
+        self._frame(inst, self._state(
+            self._fx(1, 1, constant_magnitude=0.8),
+            self._fx(2, 4, periodic_magnitude=0.6, periodic_freq=20.0)))
+        assert inst._telem_data['_pct_tap_const'] == pytest.approx(0.2)
+        assert inst._telem_data['_pct_tap_periodic'] == pytest.approx(0.3)
+        effect_levels.levels.set_mute(MUTE_KEEP_SPRING)
+        self._frame(inst, self._state(
+            self._fx(1, 1, constant_magnitude=0.8),
+            self._fx(2, 4, periodic_magnitude=0.6, periodic_freq=20.0)))
+        assert inst._telem_data['_pct_tap_const'] == 0.0
+        assert inst._telem_data['_pct_tap_periodic'] == 0.0
 
     def test_family_peaks_zero_when_idle(self):
         case, inst = self._make_instance()

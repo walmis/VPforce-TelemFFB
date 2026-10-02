@@ -440,6 +440,20 @@ class TestPreviewRunnerMechanics(BaseTelemetryEffectTestCase):
         assert len(ac.calls) == 2
         assert clears == [1]
 
+    def test_a_preview_plays_through_the_mute(self, monkeypatch):
+        from telemffb.hw.effect_levels import MUTE_ALL, levels
+        from telemffb.hw.ffb_rhino import EFFECT_CONSTANT
+        replays = []
+        monkeypatch.setattr(G, 'telem_manager', SimpleNamespace(
+            request_effect_levels_reapply=lambda: replays.append(1)), raising=False)
+        levels.set_mute(MUTE_ALL)
+        _, runner = self._runner(frame_rate=2.0)           # 2 frames
+        runner.step()
+        assert levels.factor(EFFECT_CONSTANT) == 1.0
+        runner.step()                                      # last frame finishes
+        assert levels.factor(EFFECT_CONSTANT) == 0.0
+        assert replays == [1]
+
     def test_a_raising_effect_stops_and_cleans_up(self):
         ac, runner = self._runner(dict(method='boom'))
         self.mock_effects['slot'].start()
