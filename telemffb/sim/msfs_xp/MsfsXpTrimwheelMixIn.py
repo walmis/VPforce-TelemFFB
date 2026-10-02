@@ -179,12 +179,8 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                     self.send_xp_command(f"AXIS:cy={round(pos_y_pos, 5)}")
 
             if self._sim_is_msfs():
-                if self.enable_custom_y_axis:
-                    y_var = self.custom_y_axis
-                    y_range = self.raw_y_axis_scale
-                else:
-                    y_var = "AXIS_ELEV_TRIM_SET"
-                    y_range = 16384
+                y_var, y_range = self.trim_axis_target(
+                    self.enable_custom_y_axis, self.custom_y_axis, self.raw_y_axis_scale)
 
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
                 telem_data._tw_phys_y_pos = phys_y
@@ -234,6 +230,19 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
 
             self._spring_handle.setCondition(self.spring_y)
             self._spring_handle.start(override=True)
+
+    @staticmethod
+    def trim_axis_target(enable_custom: bool, custom_var: str, custom_range: int) -> tuple[str, int]:
+        """The ``(event or variable, ±range)`` an MSFS axis-mode trim write goes to.
+
+        The custom Y-axis variable and its range when ``enable_custom_y_axis``
+        is set, else AXIS_ELEV_TRIM_SET at ±16384. Shared with
+        :class:`TrimCalibrationDialog` so a calibration run writes trim exactly
+        where the trim wheel does.
+        """
+        if enable_custom:
+            return custom_var, custom_range
+        return "AXIS_ELEV_TRIM_SET", 16384
 
     def _trimwheel_trim_limits(self, telem_data: BaseTelemetryData):
         """Elevator trim travel ``(min_deg, max_deg)`` for direct-mode writes.

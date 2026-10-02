@@ -1696,6 +1696,8 @@ class MainWindow(QMainWindow):
             self.trim_cal_dialog.result_saved.connect(self.settings_layout.save_trim_calibration)
             self.trim_cal_dialog.position_mode_changed.connect(
                 self.settings_layout.save_trim_position_mode)
+            self.trim_cal_dialog.trim_write_setting_changed.connect(
+                self.settings_layout.save_trimwheel_setting)
             self.trim_cal_dialog.destroyed.connect(
                 lambda: setattr(self, 'trim_cal_dialog', None))
         self.trim_cal_dialog.raise_()

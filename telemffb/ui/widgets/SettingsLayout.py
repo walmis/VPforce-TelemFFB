@@ -2336,6 +2336,10 @@ class SettingsLayout(QGridLayout):
         the curve is the product, and the gain is entangled with the
         physical-gain setting at solve time. Mirrors the write + reload
         pattern of the advanced spring editor.
+
+        Always written to the JOYSTICK device scope: the curve settings are
+        joystick-only, and the default device is the settings window's
+        current config scope, which may be a child device (e.g. trimwheel).
         """
         try:
             payload = json.loads(payload_json)
@@ -2359,15 +2363,16 @@ class SettingsLayout(QGridLayout):
         G.settings_mgr.write_to_xml(
             sim, cls, pattern,
             json.dumps({"curves": curves}) if curves else "none",
-            "joystick_trim_follow_curve_y")
+            "joystick_trim_follow_curve_y", the_device="joystick")
         G.settings_mgr.write_to_xml(
             sim, cls, pattern,
             "true" if payload.get("use_curve") else "false",
-            "joystick_trim_follow_use_curve_y")
+            "joystick_trim_follow_use_curve_y", the_device="joystick")
         if payload.get("stick_position"):
             G.settings_mgr.write_to_xml(
                 sim, cls, pattern,
-                payload["stick_position"], "joystick_trim_follow_stick_position")
+                payload["stick_position"], "joystick_trim_follow_stick_position",
+                the_device="joystick")
         # Reveal the erase-override button on the curve row: with shipped
         # default calibrations, erasing the user override means "revert to
         # the factory calibration".
@@ -2383,7 +2388,21 @@ class SettingsLayout(QGridLayout):
         G.settings_mgr.write_to_xml(
             G.settings_mgr.current_sim, G.settings_mgr.current_class,
             G.settings_mgr.current_pattern, value,
-            "joystick_trim_follow_stick_position")
+            "joystick_trim_follow_stick_position", the_device="joystick")
+        self.reload_caller()
+
+    def save_trimwheel_setting(self, name: str, value: str):
+        """Persist one of the calibration dialog's trim write settings under
+        the TRIMWHEEL device scope of the current aircraft's active profile —
+        the rows a trimwheel instance flies with (a Built-In profile forks to
+        Auto User, as for any edit). A running trimwheel child picks the
+        change up through its own config-change reload."""
+        self.trigger_form_reload = True
+        logging.info(f"Trimwheel setting {name} set to '{value}' for "
+                     f"'{G.settings_mgr.current_pattern}'")
+        G.settings_mgr.write_to_xml(
+            G.settings_mgr.current_sim, G.settings_mgr.current_class,
+            G.settings_mgr.current_pattern, value, name, the_device="trimwheel")
         self.reload_caller()
 
     def update_advanced_spring_gains(self, spring_gain_curves: str, scale: str, units: str):
