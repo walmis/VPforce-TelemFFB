@@ -43,6 +43,7 @@ for p in paths:
     except:
         pass
 
+import telemffb.hw.effect_levels as effect_levels
 import telemffb.hw.ffb_backend as ffb_backend
 import telemffb.hw.hid as hid
 from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
@@ -1483,6 +1484,10 @@ class HapticEffect(Destroyable):
         self._pending_envelope : Optional[FFBReport_SetEnvelope] = None  # envelope to apply once on creation
         self._envelope_applied : bool = False  # track if envelope has been applied
         self._envelope_once : bool = False  # track if envelope should be cleared after first use  # track if envelope was explicitly set via .envelope()  # track if envelope has been applied
+        # last unscaled requests, replayed by reapply_levels()
+        self._last_periodic : Optional[tuple] = None
+        self._last_constant : Optional[tuple] = None
+        self._level_conditions : dict = {}  # axis -> FFBReport_SetCondition copy
 
     def __repr__(self):
         """Return a short representation including the underlying handle."""
@@ -1576,6 +1581,7 @@ class HapticEffect(Destroyable):
                     f"HapticEffect._ensure_effect_created: device not connected, deferring {self.name!r}")
                 return
             # Execute the pending create function
+            self._level_conditions.clear()
             self._pending_create()
             # If there are pending conditions to set, do it now
             for val in self._pending_conditions.values():
@@ -1583,7 +1589,7 @@ class HapticEffect(Destroyable):
             self._pending_conditions.clear()
             # Apply envelope if pending and not yet applied
             if self._h_effect and self._pending_envelope and not self._envelope_applied:
-                self._h_effect.setEnvelope(self._pending_envelope)
+                self._send_envelope(self._pending_envelope)
                 self._envelope_applied = True
             # Log a one-shot allocation line.  Start/stop playback logging is
             # DEBUG-only (it can fire every telemetry frame), so this is the
@@ -1618,11 +1624,11 @@ class HapticEffect(Destroyable):
         ]
 
         if self._h_effect:
-            self._h_effect.setCondition(cond)
+            self._send_condition(cond)
         else:
             # Queued per axis: the block index is 0 until the device assigns
             # one, so it cannot tell the axes apart.
-            self._pending_conditions[cond.parameterBlockOffset] = lambda: self._h_effect.setCondition(cond)
+            self._pending_conditions[cond.parameterBlockOffset] = lambda: self._send_condition(cond)
 
         return self
 
@@ -1665,7 +1671,7 @@ class HapticEffect(Destroyable):
                                                 negativeCoefficient=_to_device_units(coef_x),
                                                 positiveSaturation=_to_device_units(sat_x),
                                                 negativeSaturation=_to_device_units(sat_x))
-                self._h_effect.setCondition(cond_x)
+                self._send_condition(cond_x)
 
             if coef_y is not None or sat_y is not None:
                 cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
@@ -1673,7 +1679,7 @@ class HapticEffect(Destroyable):
                                                 negativeCoefficient=_to_device_units(coef_y),
                                                 positiveSaturation=_to_device_units(sat_y),
                                                 negativeSaturation=_to_device_units(sat_y))
-                self._h_effect.setCondition(cond_y)
+                self._send_condition(cond_y)
 
         if not self._h_effect:
             # Store the creation function
@@ -1869,7 +1875,7 @@ class HapticEffect(Destroyable):
                     negativeSaturation=_to_device_units(gate_neg_x),   # e->saturation.neg.x
                     deadBand=_to_device_units(deadband_x)           # e->deadband.x
                 )
-                self._h_effect.setCondition(cond_x)
+                self._send_condition(cond_x)
 
             # Y-axis configuration
             if peak_y is not None or range_y is not None or gate_pos_y is not None or gate_neg_y is not None or deadband_y is not None:
@@ -1882,7 +1888,7 @@ class HapticEffect(Destroyable):
                     negativeSaturation=_to_device_units(gate_neg_y),   # e->saturation.neg.y
                     deadBand=_to_device_units(deadband_y)           # e->deadband.y
                 )
-                self._h_effect.setCondition(cond_y)
+                self._send_condition(cond_y)
 
         if not self._h_effect:
             # Store the creation function for lazy initialization
@@ -1941,13 +1947,13 @@ class HapticEffect(Destroyable):
                 self.effect_type = effect_type
                 if not self._h_effect: 
                     return False
-                self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+                self._send_periodic(frequency, magnitude, direction, duration, kwargs)
                 return True
             
             self._pending_create = create_and_setup
         else:
             # Effect exists, update it directly
-            self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+            self._send_periodic(frequency, magnitude, direction, duration, kwargs)
 
         return self
 
@@ -1980,13 +1986,13 @@ class HapticEffect(Destroyable):
                 self.effect_type = EFFECT_CONSTANT
                 if not self._h_effect: 
                     return False
-                self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+                self._send_constant(magnitude, direction, kwargs)
                 return True
             
             self._pending_create = create_and_setup
         else:
             # Effect exists, update it directly
-            self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+            self._send_constant(magnitude, direction, kwargs)
 
         return self
 
@@ -2052,7 +2058,7 @@ class HapticEffect(Destroyable):
         
         # If effect already exists and envelope is set, apply envelope immediately
         if self._h_effect and self._pending_envelope:
-            self._h_effect.setEnvelope(self._pending_envelope)
+            self._send_envelope(self._pending_envelope)
             self._envelope_applied = True
         
         return self
@@ -2251,6 +2257,63 @@ class HapticEffect(Destroyable):
             except Exception:
                 logging.exception("Failed to destroy effect during teardown")
         return freed
+
+    # Effect levels (telemffb.hw.effect_levels) apply at these sends, the
+    # only path from this class to a handle's parameter setters.  Each
+    # remembers the unscaled request so reapply_levels() can re-send it.
+
+    def _send_periodic(self, frequency, magnitude, direction, duration, kwargs):
+        self._last_periodic = (frequency, magnitude, direction, duration, kwargs)
+        magnitude, kwargs = effect_levels.levels.periodic_for_device(magnitude, kwargs, self._h_effect.type)
+        self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+
+    def _send_constant(self, magnitude, direction, kwargs):
+        self._last_constant = (magnitude, direction, kwargs)
+        magnitude = effect_levels.levels.magnitude_for_device(magnitude, self._h_effect.type)
+        self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+
+    def _send_condition(self, cond : FFBReport_SetCondition):
+        effect_levels.remember_condition(self._level_conditions, cond)
+        self._h_effect.setCondition(effect_levels.levels.condition_for_device(cond, self._h_effect.type))
+
+    def _send_envelope(self, envelope : FFBReport_SetEnvelope):
+        self._h_effect.setEnvelope(effect_levels.levels.envelope_for_device(envelope, self._h_effect.type))
+
+    @classmethod
+    def reapply_levels(cls) -> int:
+        """Re-send the last request of every allocated effect through the
+        current effect levels, so a level or mute change reaches effects
+        that are not updated every frame.  Playback state is untouched:
+        a stopped effect stays stopped.
+
+        Call it on the thread that owns effect sends (the telemetry
+        thread).  A no-op while the device is gone: recovery re-creates
+        the effects, and creation applies the levels current then.
+
+        Returns the number of effects re-sent.
+        """
+        if not cls.device_alive():
+            return 0
+        sent = 0
+        for effect in list(cls._instances):
+            handle = effect._h_effect
+            if not handle:
+                continue
+            try:
+                if handle.type == EFFECT_CONSTANT:
+                    if effect._last_constant:
+                        effect._send_constant(*effect._last_constant)
+                elif handle.type in PERIODIC_EFFECTS:
+                    if effect._last_periodic:
+                        effect._send_periodic(*effect._last_periodic)
+                for cond in list(effect._level_conditions.values()):
+                    effect._send_condition(cond)
+                if effect._pending_envelope is not None and effect._envelope_applied:
+                    effect._send_envelope(effect._pending_envelope)
+                sent += 1
+            except Exception:
+                logging.exception(f"Failed to reapply effect levels to {effect.name!r}")
+        return sent
 
 # unit test
 if __name__ == "__main__":
