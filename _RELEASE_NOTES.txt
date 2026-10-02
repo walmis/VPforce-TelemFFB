@@ -62,6 +62,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 
 ## MSFS
 - **NEW: 25 more aircraft defaults ship with an elevator trim calibration**, 13 of them as new built-in profiles
+- Fix: Camera add-ons such as ChasePlane user camera states TelemFFB did not understand which could leave TelemFFB paused during flight. TelemFFB now uses the sim's motion simulation state instead of the camera views to determine if the user is in the menu system.
 
 
 ## IL-2

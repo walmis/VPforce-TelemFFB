@@ -152,7 +152,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         blocked_names = ['T', 'N', 'G', 'AccBody', 'TAS', 'IAS', 'AirDensity', 'AoA', 'StallAoA', 'SideSlip',
                          'DynPressure', 'Pitch', 'Roll', 'Heading', 'PitchRate', 'RollRate', 'VelRotBody',
                          'PitchAccel', 'RollAccel', 'AccRotBody', 'DesignSpeed', 'VerticalSpeed', 'SimDisabled',
-                         'SimOnGround', 'Parked', 'Slew', 'SurfaceType', 'SimConnectCategory', 'EngineType',
+                         'SimOnGround', 'InHangar', 'Slew', 'SurfaceType', 'SimConnectCategory', 'EngineType',
                          'AmbWind', 'VelWorld']
 
         self.cb_name.clear()

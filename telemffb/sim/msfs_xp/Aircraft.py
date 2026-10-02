@@ -242,7 +242,7 @@ class Aircraft(
     def on_telemetry(self, telem_data: BaseTelemetryData):
         self.effects["pause_spring"].destroy()
 
-        if telem_data.Parked: # MSFS in Hangar
+        if telem_data.InHangar:
             return
 
         self._probe_axis_jitter(telem_data)

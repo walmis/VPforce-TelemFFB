@@ -19,7 +19,7 @@ def _telem(ffb_type):
     return (TelemetryDataBuilder()
             .ffb_type(ffb_type)
             .set("N", "TestAircraft")
-            .set("Parked", 0)
+            .set("InHangar", 0)
             .set("PropRPM", 2400.0)
             .set("IAS", 60.0)
             .set("AccBody", [0, 1, 0])

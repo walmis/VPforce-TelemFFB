@@ -1,15 +1,11 @@
 """The MSFS stop latch: which conditions suppress telemetry, and the log
 says which.
 
-While any stop condition is true (paused, parked, slewed, controlling the
-avatar, in a realtime cinematic, or in menus), the manager drops every
-packet and emits only the transition frame.  Before, a stopped gate
-logged nothing, so a stuck stop was indistinguishable from a dead
-connection.  The latch and the release now both log, naming the
-conditions that latched - which is what lets a genuinely-stuck gate be
-found.  FS2024 is the tricky case: during a menu cinematic it reports
-Pause=0 while IS IN RTC stays 1, so the gate correctly stays closed but
-the log alone looks like an unpause with no matching resume.
+While any stop condition is true the manager drops every packet and
+emits only the transition frame; the latch and the release both log,
+naming the conditions.  FS2024 stops on paused, slew, avatar, rtc or no
+MOTION SIMULATION; FS2020 (no such variable) on paused, slew or hangar
+(InHangar = PLANE IN PARKING STATE, its menu flag).
 """
 import ctypes
 
@@ -45,16 +41,17 @@ class RecordingManager(SimConnectManager):
 #: the variables the stop check consults, exactly as the manager declares
 #: them (SimConnectManager.sim_vars); the packet carries them in this order
 STOP_VARS = [
-    SimVar("Parked", "PLANE IN PARKING STATE", "Bool"),
+    SimVar("InHangar", "PLANE IN PARKING STATE", "Bool"),
     SimVar("Slew", "IS SLEW ACTIVE", "Bool"),
-    SimVar("CameraState", "CAMERA STATE", "Enum"),
     SimVar("_IS AVATAR", "IS AVATAR", "bool"),
     SimVar("_IS IN RTC", "IS IN RTC", "bool"),
+    SimVar("_MOTION SIMULATION", "MOTION SIMULATION", "bool"),
 ]
 
 
-def make_manager():
+def make_manager(version=None):
     m = RecordingManager()
+    m.connected_version = version
     m.sc = FakeSDK()
     m.subscribed_vars = list(STOP_VARS)
     return m
@@ -88,25 +85,25 @@ def make_packet(m, values):
 
 def flying_frame(**over):
     """A normal in-flight frame: nothing that would stop telemetry."""
-    values = {"Parked": 0, "Slew": 0, "CameraState": 2,
-              "_IS AVATAR": 0, "_IS IN RTC": 0}
+    values = {"InHangar": 0, "Slew": 0,
+              "_IS AVATAR": 0, "_IS IN RTC": 0, "_MOTION SIMULATION": 1}
     values.update(over)
     return values
 
 
 class TestStopLatch:
-    def test_parked_latch_is_logged_and_the_following_packets_are_dropped(
+    def test_hangar_latch_is_logged_and_the_following_packets_are_dropped(
             self, caplog):
         import logging as _logging
         m = make_manager()
         with caplog.at_level(_logging.INFO):
-            assert m._handle_recv(make_packet(m, flying_frame(Parked=1)))
-            assert m._handle_recv(make_packet(m, flying_frame(Parked=1)))
+            assert m._handle_recv(make_packet(m, flying_frame(InHangar=1)))
+            assert m._handle_recv(make_packet(m, flying_frame(InHangar=1)))
         stopped = [r.getMessage() for r in caplog.records
                    if "MSFS telemetry stopped" in r.getMessage()]
-        assert stopped == ["MSFS telemetry stopped (parked): packets are "
+        assert stopped == ["MSFS telemetry stopped (hangar): packets are "
                            "suppressed until all of these clear"], stopped
-        # one transition frame only: the second parked frame was dropped
+        # one transition frame only: the second hangar frame was dropped
         assert len(m.packets) == 1
         assert m.packets[0]["STOP"] == 1
         assert m.events == [("STOP",)]
@@ -116,8 +113,8 @@ class TestStopLatch:
         import logging as _logging
         m = make_manager()
         with caplog.at_level(_logging.INFO):
-            m._handle_recv(make_packet(m, flying_frame(Parked=1)))
-            m._handle_recv(make_packet(m, flying_frame(Parked=0)))
+            m._handle_recv(make_packet(m, flying_frame(InHangar=1)))
+            m._handle_recv(make_packet(m, flying_frame(InHangar=0)))
         resumed = [r.getMessage() for r in caplog.records
                    if "MSFS telemetry resumed" in r.getMessage()]
         assert resumed == ["MSFS telemetry resumed: stop condition cleared"]
@@ -140,14 +137,13 @@ class TestStopLatch:
         m._sim_paused = 1
         with caplog.at_level(_logging.INFO):
             m._handle_recv(make_packet(m, flying_frame(**{
-                "Parked": 1, "Slew": 1, "CameraState": 7,
+                "InHangar": 1, "Slew": 1,
                 "_IS AVATAR": 1, "_IS IN RTC": 1})))
         msg = [r.getMessage() for r in caplog.records
                if "MSFS telemetry stopped" in r.getMessage()][0]
         assert "paused" in msg
-        assert "parked" in msg
+        assert "hangar" in msg
         assert "slew" in msg
-        assert "in_menus (camera state 7)" in msg
         assert "avatar" in msg
         assert "rtc" in msg
 
@@ -161,3 +157,37 @@ class TestStopLatch:
         msg = [r.getMessage() for r in caplog.records
                if "MSFS telemetry stopped" in r.getMessage()][0]
         assert "avatar" in msg and "rtc" not in msg
+
+    def test_fs2020_ignores_the_motion_simulation(self):
+        # the variable does not exist on FS2020 and reads as 0
+        m = make_manager("MSFS2020")
+        m._handle_recv(make_packet(m, flying_frame(**{"_MOTION SIMULATION": 0})))
+        assert "STOP" not in m.packets[0]
+
+
+class TestFS2024MotionGate:
+    """FS2024 stops on paused, slew, avatar, rtc, or no MOTION SIMULATION."""
+
+    def _frame(self, **over):
+        m = make_manager("MSFS2024")
+        m._handle_recv(make_packet(m, flying_frame(**over)))
+        return m
+
+    def test_flows_while_the_motion_simulation_runs(self):
+        m = self._frame()
+        assert "STOP" not in m.packets[0]
+
+    def test_no_motion_stops(self):
+        m = self._frame(**{"_MOTION SIMULATION": 0})
+        assert m.packets[0]["STOP"] == 1
+        assert m._stop_reasons == ("no_motion",)
+
+    def test_hangar_does_not_stop_fs2024(self):
+        m = self._frame(InHangar=1)
+        assert "STOP" not in m.packets[0]
+
+    def test_walkaround_and_slew_stop_while_the_motion_simulation_runs(self):
+        for frame, reason in (({"_IS AVATAR": 1}, "avatar"), ({"Slew": 1}, "slew")):
+            m = self._frame(**frame)
+            assert m.packets[0]["STOP"] == 1
+            assert m._stop_reasons == (reason,)

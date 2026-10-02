@@ -423,7 +423,7 @@ class SimConnectManager(threading.Thread):
         #SimVar("SigmaSqrt", "SIGMA SQRT", "Per Radian"),
         SimVar("SimDisabled", "SIM DISABLED", "Bool"),
         SimVar("SimOnGround", "SIM ON GROUND", "Bool"),
-        SimVar("Parked", "PLANE IN PARKING STATE", "Bool"),
+        SimVar("InHangar", "PLANE IN PARKING STATE", "Bool"),
         SimVar("Slew", "IS SLEW ACTIVE", "Bool"),
         SimVar("SurfaceType", "SURFACE TYPE", "Enum", mutator=lambda x: surface_types.get(x, "unknown")),
         SimVar("SimconnectCategory", "CATEGORY", "", datatype=DATATYPE_STRING128),
@@ -452,6 +452,7 @@ class SimConnectManager(threading.Thread):
         SimVar("_IS IN RTC", "IS IN RTC", "bool"),
         SimVar("_IS AVATAR", "IS AVATAR", "bool"),
         SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool"),
+        SimVar("_MOTION SIMULATION", "MOTION SIMULATION", "bool"),
         SimVar("CenterSteerAnglePct", "CONTACT POINT STEER ANGLE PCT", "percent over 100"),
         SimVar("WaterRudderExt", "WATER LEFT RUDDER EXTENDED", "percent over 100"),
         SimVar("ForceTrimSW", "L:TelemFFBHeliFT", "bool"),
@@ -472,6 +473,7 @@ class SimConnectManager(threading.Thread):
         self._sim_started = 0
         self._sim_state = 0
         self._stop_state = 0
+        self._stop_reasons = ()
         self._final_frame_sent = 0
         self._events_to_send = []
         self._simdatums_to_send = []
@@ -1073,6 +1075,35 @@ class SimConnectManager(threading.Thread):
             else:
                 self._warn_unresolved(name)
 
+    def _stop_reasons_for(self, data) -> tuple:
+        """The reasons telemetry is stopped for this frame; empty while it flows.
+
+        Both FS2020 and FS2024 stop on pause, slew, the walkaround avatar and RTC.
+
+        MSFS 2024 also stops while MOTION SIMULATION which is an indication that
+        telemetry may be flowing in the background but the user is in a menu or
+        other non flying condition
+
+        MSFS 2020 stops on AIRCRAFT IN PARKING STATE (InHangar) which is an
+        indication that the user is in the menu system
+        """
+        reasons = []
+        if self._sim_paused:
+            reasons.append("paused")
+        if data.get("Slew", 0):
+            reasons.append("slew")
+        if data.get("_IS AVATAR", False):
+            reasons.append("avatar")
+        if data.get("_IS IN RTC", False):
+            reasons.append("rtc")
+        if self.connected_version == "MSFS2024" and "_MOTION SIMULATION" in data:
+            if not data.get("_MOTION SIMULATION"):
+                reasons.append("no_motion")
+        else:
+            if data.get("InHangar", 0):
+                reasons.append("hangar")
+        return tuple(reasons)
+
     def _handle_recv(self, recv) -> bool:
         """Act on one dispatched message; False once the sim said Quit."""
         #print(f"got {recv.__class__.__name__}")
@@ -1152,39 +1183,27 @@ class SimConnectManager(threading.Thread):
                 self._note_aircraft_title(data.get("N"))
                 data.update(self._b_values)
 
-                avatar = data.get("_IS AVATAR", False) # in 2024, see if user is controlling avatar
-                rtc = data.get("_IS IN RTC", False) # check if 2024 sim is running realtime cinematic (cut scene)
-
-                in_menus = data.get('CameraState', 0) not in (2,3,4,5)  # Check the camera state value - workaround for FS2024 telemetry at wrong times https://forums.flightsimulator.com/t/at-the-finish-of-beta-loading-if-start-is-not-click-open-upon-reaching-yosemite-during-2nd-run-of-opening-graphics-telemetry-is-sent-to-motion-platform-causiing-violent-shaking-and-movement/702082/2?u=number4815901
-
-                if self._sim_paused or data.get("Parked", 0) or data.get("Slew", 0) or avatar or rtc or in_menus:
+                reasons = self._stop_reasons_for(data)
+                if reasons:
                     data["STOP"] = 1
                     data['_num_simvars'] = len(data)
                     data['msfs_vers'] = self.connected_version
+                    # Packets are dropped while stopped, so the log names the
+                    # conditions holding the stop, and names them again when
+                    # they change.  The camera state is printed but not
+                    # compared: it changes constantly in the menus.
+                    if not self._stop_state or reasons != self._stop_reasons:
+                        shown = ", ".join(
+                            f"{r} (camera state {data.get('CameraState')})"
+                            if r == "no_motion" else r
+                            for r in reasons)
+                        if not self._stop_state:
+                            logging.info(f"MSFS telemetry stopped ({shown}): "
+                                         "packets are suppressed until all of these clear")
+                        else:
+                            logging.info(f"MSFS telemetry still stopped, now ({shown})")
+                        self._stop_reasons = reasons
                     if not self._stop_state:
-                        # Say WHICH condition latched: while the state is held,
-                        # every packet is dropped, so without this a stuck stop
-                        # leaves the log with no clue as to why telemetry
-                        # stopped.  FS2024 is the tricky case - during a menu
-                        # cinematic it reports Pause=0 while IS IN RTC stays 1,
-                        # so the gate correctly stays closed but the log alone
-                        # looks like an unpause with no matching "resumed".
-                        reasons = []
-                        if self._sim_paused:
-                            reasons.append("paused")
-                        if data.get("Parked", 0):
-                            reasons.append("parked")
-                        if data.get("Slew", 0):
-                            reasons.append("slew")
-                        if avatar:
-                            reasons.append("avatar")
-                        if rtc:
-                            reasons.append("rtc")
-                        if in_menus:
-                            reasons.append(f"in_menus (camera state {data.get('CameraState')})")
-                        logging.info(
-                            f"MSFS telemetry stopped ({', '.join(reasons)}): "
-                            "packets are suppressed until all of these clear")
                         self.emit_event("STOP")
                         self.emit_packet(data) # emit last packet
                         self._stop_state = True
@@ -1193,6 +1212,7 @@ class SimConnectManager(threading.Thread):
                     if self._stop_state:
                         logging.info("MSFS telemetry resumed: stop condition cleared")
                     self._stop_state = False
+                    self._stop_reasons = ()
                     self.emit_packet(data)
             else:
                 # dbprint("green", f"**DEBUG*** got dispatch for OLD request: {recv.dwRequestID} defID: {recv.dwDefineID} | currrent defID: {self.def_id}")

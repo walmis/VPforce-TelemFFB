@@ -476,9 +476,9 @@ class BaseTelemetryData:
     Other sims: not available.  
     """
 
-    Parked: Optional[Union[bool, int]]
-    """Whether the aircraft is in parking state.  
-    MSFS: PLANE IN PARKING STATE SimVar.  
+    InHangar: Optional[Union[bool, int]]
+    """Whether FS2020 is in its menus (hangar, world map) rather than a flight.  
+    MSFS: PLANE IN PARKING STATE SimVar;  
     Other sims: not available.  
     """
 
