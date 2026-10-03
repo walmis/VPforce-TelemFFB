@@ -6,7 +6,7 @@
 // don't fight the user while they're mid-drag on a control.
 
 // Stamped from manifest.json's package_version by build_layout.py.
-const PANEL_VERSION = "0.3.1";
+const PANEL_VERSION = "0.3.2";
 const API_BASE = "http://127.0.0.1:9873";
 const STATUS_POLL_MS = 2000;
 const SETTINGS_POLL_MS = 3000;
@@ -424,6 +424,9 @@ const bind = { name: null, remaining: 0 };
 
 function bindLabel(item) {
     if (bind.name === item.name) return "Push a button... " + bind.remaining;
+    // "label" names the bound device as the desktop form does; older
+    // servers send only the number
+    if (item.label) return item.label;
     return item.value ? "Button " + item.value : "Click to bind";
 }
 

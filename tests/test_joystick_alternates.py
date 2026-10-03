@@ -265,7 +265,7 @@ class TestThreeTabLayout:
         world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
         tabs = world.dialog.tabWidget
         titles = [tabs.tabText(i) for i in range(tabs.count())]
-        assert titles == ['Devices', 'System', 'Simulator Setup']
+        assert titles == ['Devices', 'Button Devices', 'System', 'Simulator Setup']
 
     def test_a_role_page_holds_both_of_its_panels(self, app, tmp_path, monkeypatch):
         world = World(tmp_path, monkeypatch, random.Random(0), settings=SETTLED)
