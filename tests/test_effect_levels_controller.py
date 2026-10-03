@@ -23,8 +23,8 @@ from telemffb.state.effect_levels_controller import (CONTROLS_SHOWN_KEY, LEVEL_K
                                                       PINNED_KEY, SCOPE_ALL, SCOPE_DEVICE,
                                                       EffectLevelsController)
 from telemffb.state.mute_button_binding import (BEHAVIOR_MOMENTARY, BEHAVIOR_TOGGLE,
-                                                BUTTON_BEHAVIOR_KEY, BUTTON_NUMBER_KEY,
-                                                BUTTON_ROLE_KEY)
+                                                BUTTON_BEHAVIOR_KEY, BUTTON_INVERTED_KEY,
+                                                BUTTON_NUMBER_KEY, BUTTON_ROLE_KEY)
 from telemffb.telem.TelemManager import TelemManager
 
 # IPCNetworkThread opens a UDP socket in its constructor; these tests never
@@ -213,6 +213,20 @@ class TestMute:
         assert effect_levels.levels.mute_mode == MUTE_OFF
         assert env.manager.requests == 0
 
+    def test_a_child_that_connects_during_a_global_mute_is_muted(self, env, monkeypatch):
+        monkeypatch.setattr(G, 'launched_instances', {}, raising=False)
+        ctl = EffectLevelsController()
+        ctl.set_muted_all(True)
+        assert not ctl.muted('pedals')
+        ctl.on_device_status('pedals', 'ACTIVE')
+        assert ctl.muted('pedals')
+        sent = len(env.ipc.mute)
+        ctl.on_device_status('pedals', 'ACTIVE')          # repeated status: nothing new
+        assert len(env.ipc.mute) == sent
+        ctl.set_muted_all(False)
+        ctl.on_device_status('collective', 'ACTIVE')
+        assert not ctl.muted('collective')
+
     def test_global_mute_covers_every_role(self, env):
         env.settings.values[(None, MUTE_MODE_KEY)] = MUTE_ALL
         ctl = EffectLevelsController()
@@ -375,29 +389,35 @@ class TestToggleMute:
         assert ctl.muted_all()
 
 
-def _bind(env, role='joystick', button=5, behavior=BEHAVIOR_TOGGLE):
+def _store_binding(env, role='joystick', button=5, behavior=BEHAVIOR_TOGGLE, inverted=False):
     env.settings.values[(None, BUTTON_ROLE_KEY)] = role
     env.settings.values[(None, BUTTON_NUMBER_KEY)] = button
     env.settings.values[(None, BUTTON_BEHAVIOR_KEY)] = behavior
+    env.settings.values[(None, BUTTON_INVERTED_KEY)] = inverted
+
+
+def _bind(env, **binding):
+    _store_binding(env, **binding)
     return EffectLevelsController()
 
 
 class TestMuteButtonBinding:
     def test_unbound_by_default_and_does_nothing(self, env):
         ctl = EffectLevelsController()
-        assert ctl.mute_button_binding() == ('joystick', 0, BEHAVIOR_TOGGLE)
+        assert ctl.mute_button_binding() == ('joystick', 0, BEHAVIOR_TOGGLE, False)
         for buttons in ([1], [1, 5], [], [5]):
             ctl.on_device_buttons('joystick', buttons)
         assert env.ipc.mute == [] and not ctl.muted('joystick')
 
     def test_the_binding_is_stored_globally_and_read_back(self, env):
         ctl = EffectLevelsController()
-        ctl.set_mute_button_binding('pedals', 7, BEHAVIOR_MOMENTARY)
+        ctl.set_mute_button_binding('pedals', 7, BEHAVIOR_MOMENTARY, True)
         assert {(k, v) for _, k, v in env.settings.writes} == {
             (BUTTON_ROLE_KEY, 'pedals'), (BUTTON_NUMBER_KEY, 7),
-            (BUTTON_BEHAVIOR_KEY, BEHAVIOR_MOMENTARY)}
+            (BUTTON_BEHAVIOR_KEY, BEHAVIOR_MOMENTARY), (BUTTON_INVERTED_KEY, True)}
         assert all(scope is None for scope, _, _ in env.settings.writes)
-        assert EffectLevelsController().mute_button_binding() == ('pedals', 7, BEHAVIOR_MOMENTARY)
+        assert EffectLevelsController().mute_button_binding() == (
+            'pedals', 7, BEHAVIOR_MOMENTARY, True)
 
     def test_toggle_acts_on_press_edges_only(self, env):
         ctl = _bind(env)
@@ -447,6 +467,58 @@ class TestMuteButtonBinding:
         assert ctl.muted('pedals')
         ctl.on_device_status('pedals', 'TIMEOUT')
         assert not ctl.muted('pedals')
+
+    def test_inverted_momentary_mutes_while_released(self, env):
+        ctl = _bind(env, behavior=BEHAVIOR_MOMENTARY, inverted=True)
+        ctl.on_device_buttons('joystick', [5])
+        assert not ctl.muted('joystick')
+        ctl.on_device_buttons('joystick', [5, 1])
+        assert not ctl.muted('joystick')
+        ctl.on_device_buttons('joystick', [1])
+        assert ctl.muted('joystick')
+
+    def test_momentary_calls_the_controller_only_on_a_change(self, env, monkeypatch):
+        ctl = _bind(env, behavior=BEHAVIOR_MOMENTARY, inverted=True)
+        calls = []
+        monkeypatch.setattr(ctl, 'set_mute_active',
+                            lambda role, on, scope=None: calls.append(on))
+        for buttons in ([1], [], [5], [5], [5, 1], [1], [1], []):
+            ctl.on_device_buttons('joystick', buttons)
+        assert calls == [False, True]
+
+    def test_an_inverted_binding_mutes_from_startup(self, env):
+        ctl = _bind(env, role='pedals', behavior=BEHAVIOR_MOMENTARY, inverted=True)
+        assert ctl.muted('pedals') and not ctl.muted('joystick')
+
+    def test_setting_an_inverted_binding_mutes_at_once_and_leaving_it_releases(self, env):
+        ctl = EffectLevelsController()
+        ctl.set_mute_button_binding('joystick', 5, BEHAVIOR_MOMENTARY, True)
+        assert ctl.muted('joystick')
+        ctl.set_mute_button_binding('joystick', 5, BEHAVIOR_MOMENTARY, False)
+        assert not ctl.muted('joystick')
+        ctl.set_mute_button_binding('joystick', 5, BEHAVIOR_MOMENTARY, True)
+        ctl.set_mute_button_binding('joystick', 5, BEHAVIOR_TOGGLE, True)
+        assert not ctl.muted('joystick')
+
+    def test_toggle_ignores_inversion(self, env):
+        ctl = _bind(env, inverted=True)
+        assert not ctl.muted('joystick')
+        ctl.on_device_buttons('joystick', [5])
+        ctl.on_device_buttons('joystick', [])
+        assert ctl.muted('joystick')
+
+    def test_a_lost_device_engages_an_inverted_mute(self, env):
+        ctl = _bind(env, role='pedals', behavior=BEHAVIOR_MOMENTARY, inverted=True)
+        ctl.on_device_buttons('pedals', [5])
+        assert not ctl.muted('pedals')
+        ctl.on_device_status('pedals', 'TIMEOUT')
+        assert ctl.muted('pedals')
+
+    def test_a_child_applies_no_initial_mute(self, env, monkeypatch):
+        _store_binding(env, behavior=BEHAVIOR_MOMENTARY, inverted=True)
+        child = _child(monkeypatch, env, role='joystick')
+        assert not child.muted('joystick')
+        assert effect_levels.levels.mute_mode == MUTE_OFF
 
     def test_a_toggled_mute_survives_a_lost_device(self, env):
         ctl = _bind(env)

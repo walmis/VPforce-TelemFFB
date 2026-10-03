@@ -27,8 +27,11 @@ a paused sim or no aircraft loaded.
 
 The binding is stored in the global system settings.  ``toggle`` acts on
 each press; ``momentary`` mutes on the press and releases on the release.
-A held momentary mute is released when the binding changes or the
-button's device is lost.
+An inverted ``momentary`` binding mutes while the button is released, so
+it mutes from the start (master only) until the button is first held.
+Inversion does not apply to ``toggle``.  A momentary mute the binding
+applied is released when the binding changes.  A lost device counts as
+all buttons released.
 
 Main thread only.
 """
@@ -48,6 +51,7 @@ BEHAVIORS = (BEHAVIOR_TOGGLE, BEHAVIOR_MOMENTARY)
 BUTTON_ROLE_KEY = "effectMuteButtonDevice"
 BUTTON_NUMBER_KEY = "effectMuteButtonNumber"
 BUTTON_BEHAVIOR_KEY = "effectMuteButtonBehavior"
+BUTTON_INVERTED_KEY = "effectMuteButtonInverted"
 
 
 def _button_number(value) -> int:
@@ -57,8 +61,19 @@ def _button_number(value) -> int:
         return 0
 
 
+def _inverted_flag(value) -> bool:
+    """A stored on/off value: a bool, a number, or a string.  Anything
+    unreadable reads as off."""
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    if isinstance(value, (bool, int, float)):
+        return bool(value)
+    return False
+
+
 class MuteButtonBinding:
-    """The bound (role, button, behavior) and the edge detection for it."""
+    """The bound (role, button, behavior, inverted) and the edge detection
+    for it.  The owner calls ``apply_initial_state`` once it can mute."""
 
     def __init__(self, controller):
         self._controller = controller
@@ -68,8 +83,10 @@ class MuteButtonBinding:
         self._button: int = _button_number(settings.get(BUTTON_NUMBER_KEY, 0))
         behavior = settings.get(BUTTON_BEHAVIOR_KEY, BEHAVIOR_TOGGLE)
         self._behavior: str = behavior if behavior in BEHAVIORS else BEHAVIOR_TOGGLE
+        self._inverted: bool = _inverted_flag(settings.get(BUTTON_INVERTED_KEY, False))
         self._held: bool = False
-        # the scope a momentary mute was applied with, while it is held
+        # the scope of the momentary mute this binding applied; None while
+        # it applies none
         self._active_scope: Optional[str] = None
 
     @property
@@ -85,8 +102,14 @@ class MuteButtonBinding:
     def behavior(self) -> str:
         return self._behavior
 
-    def set_binding(self, role: str, button: int, behavior: str) -> None:
-        """Store a new binding.  Releases a held momentary mute.
+    @property
+    def inverted(self) -> bool:
+        """The stored inversion; it only acts with ``momentary``."""
+        return self._inverted
+
+    def set_binding(self, role: str, button: int, behavior: str, inverted: bool = False) -> None:
+        """Store a new binding.  Releases the momentary mute the old one
+        applied, then applies the new one's initial state.
 
         :raises ValueError: an unknown role or behavior, or a button that
             is not a whole number >= 0; nothing changes then.
@@ -97,7 +120,9 @@ class MuteButtonBinding:
             raise ValueError(f"unknown mute button behavior {behavior!r}")
         if isinstance(button, bool) or not isinstance(button, int) or button < 0:
             raise ValueError(f"mute button must be a whole number >= 0, not {button!r}")
-        if (role, button, behavior) == (self.role, self._button, self._behavior):
+        inverted = bool(inverted)
+        if (role, button, behavior, inverted) == (self.role, self._button, self._behavior,
+                                                  self._inverted):
             return
         self._release()
         self._held = False
@@ -108,36 +133,57 @@ class MuteButtonBinding:
             settings.setValue(BUTTON_NUMBER_KEY, button)
         if behavior != self._behavior:
             settings.setValue(BUTTON_BEHAVIOR_KEY, behavior)
+        if inverted != self._inverted:
+            settings.setValue(BUTTON_INVERTED_KEY, inverted)
         self._role, self._button, self._behavior = role, button, behavior
+        self._inverted = inverted
         if button:
-            logging.info(f"Effect mute button: {role} button {button}, {behavior}")
+            suffix = ", inverted" if self._inverts() else ""
+            logging.info(f"Effect mute button: {role} button {button}, {behavior}{suffix}")
         else:
             logging.info("Effect mute button: not bound")
+        self.apply_initial_state()
+
+    def apply_initial_state(self) -> None:
+        """Master: mute now when the binding is inverted momentary, since
+        its button counts as released until a press arrives."""
+        if self._button and self._inverts() and G.master_instance:
+            self._apply(True)
 
     def buttons_changed(self, role: str, buttons: Iterable[int]) -> None:
         """``role``'s device now has ``buttons`` pressed."""
         if not self._button or role != self.role:
             return
         held = self._button in buttons
-        if held == self._held:
-            return
+        pressed = held and not self._held
         self._held = held
-        ctl = self._controller
         if self._behavior == BEHAVIOR_TOGGLE:
-            if held:
-                ctl.toggle_mute(role)
-        elif held:
-            self._active_scope = ctl.mute_scope()
-            ctl.set_mute_active(role, True, scope=self._active_scope)
+            if pressed:
+                self._controller.toggle_mute(role)
         else:
-            self._release()
+            self._apply(held != self._inverted)
 
     def device_lost(self, role: str) -> None:
         """``role``'s device stopped reporting: its button counts as released."""
         self.buttons_changed(role, ())
 
+    def _inverts(self) -> bool:
+        return self._inverted and self._behavior == BEHAVIOR_MOMENTARY
+
+    def _apply(self, active: bool) -> None:
+        """Bring the momentary mute this binding applies to ``active``;
+        the controller is called only on a change."""
+        if active == (self._active_scope is not None):
+            return
+        if active:
+            ctl = self._controller
+            self._active_scope = ctl.mute_scope()
+            ctl.set_mute_active(self.role, True, scope=self._active_scope)
+        else:
+            self._release()
+
     def _release(self) -> None:
-        """Release a momentary mute applied by a press still held."""
+        """Release the momentary mute this binding applied, if any."""
         scope, self._active_scope = self._active_scope, None
         if scope is not None:
             self._controller.set_mute_active(self.role, False, scope=scope)
