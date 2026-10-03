@@ -280,12 +280,10 @@ class HPGHelicopter(Helicopter):
             trim_reset = telem_data.hpgTrimRelease or 0
         else:
             trim_reset = False
-        input_data = HapticEffect.get_device_input()
         # Force-trim button is only meaningful once bound and after the
         # cyclic has initialised, and unreadable without a live device.
-        force_trim_pressed = (input_data.isButtonPressed(self.force_trim_button)
-                              if (self.force_trim_button and input_data is not None
-                                  and self.cyclic_spring_init) else False)
+        force_trim_pressed = (self.check_button_press(self.force_trim_button)
+                              if self.cyclic_spring_init else False)
         if force_trim_pressed:
             # Tell the HPG AFCS to reset its cyclic trim reference to the current
             # physical stick position, aligning the sim's trim state with the FFB center.

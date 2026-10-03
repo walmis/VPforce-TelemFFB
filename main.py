@@ -72,6 +72,8 @@ from telemffb import match_history
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
+from telemffb.hw.button_devices import ButtonDeviceManager
+from telemffb.hw.button_state import publish_buttons
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.ui.widgets.LogWindow import LogWindow
 from telemffb.ui.widgets.TooltipWrapFilter import TooltipWrapFilter
@@ -1330,6 +1332,25 @@ def _setup_ipc_and_connections():
     G.ipc_instance.start()
 
 
+def _start_button_devices():
+    """Start reading the generic HID controllers that supply buttons.
+
+    Master only, once IPC is up: each change is stored in
+    ``G.button_states`` and relayed to the children.  A failure is logged
+    and leaves ``G.button_devices`` None; it never blocks startup.
+    """
+    if not G.master_instance:
+        return
+    try:
+        manager = ButtonDeviceManager()
+        manager.buttons_changed.connect(lambda key, buttons: publish_buttons(key, buttons))
+        manager.start()
+        G.button_devices = manager
+    except Exception:
+        logging.exception("Button devices: could not start reading generic controllers")
+        G.button_devices = None
+
+
 def _sim_connected_events():
     G.sim_listeners.allStarted.connect(G.telem_manager.reset_sim_connected)
     G.telem_manager.first_frame_received.connect(G.sim_listeners.stop_inactive)
@@ -1450,14 +1471,22 @@ def _cleanup_on_exit(dev_serial):
     Handle cleanup operations when application exits.
 
     Flow:
-    1. Notify child instances to close
-    2. Stop IPC communication
-    3. Release any X-Plane axis override this instance holds
-    4. Stop all simulation listeners
-    5. Quit telemetry manager
-    6. Apply exit VPConfigurator profile if configured
-    7. Reset device gains to startup values if configured
+    1. Stop reading generic button controllers (master)
+    2. Notify child instances to close
+    3. Stop IPC communication
+    4. Release any X-Plane axis override this instance holds
+    5. Stop all simulation listeners
+    6. Quit telemetry manager
+    7. Apply exit VPConfigurator profile if configured
+    8. Reset device gains to startup values if configured
     """
+    # before IPC stops, so a held button's release still reaches the children
+    if G.button_devices is not None:
+        try:
+            G.button_devices.stop()
+        except Exception:
+            logging.exception("Button devices: stopping the readers failed")
+
     if G.ipc_instance:
         G.ipc_instance.notify_close_children()
         G.ipc_instance.stop()
@@ -1825,6 +1854,9 @@ def main():
     # ============================================================================
     # Setup IPC for master-child instance communication and connect all signals
     _setup_ipc_and_connections()
+
+    # Generic controllers as button sources (master only)
+    _start_button_devices()
 
 
 

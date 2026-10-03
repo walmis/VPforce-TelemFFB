@@ -62,6 +62,7 @@ from telemffb.state.app_state import Notice, NEW_CRAFT_PRIORITY, PROFILE_CHANGE_
 from telemffb.state.sim_status import SimStatusTracker
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.hw.button_state import publish_own_buttons
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
@@ -690,6 +691,9 @@ class MainWindow(QMainWindow):
             if btns != G.active_buttons:
                 # only send if pressed buttons has changed
                 G.active_buttons = btns
+                # also under this device's key, for qualified binding ids;
+                # the master relays it to the children as BTNDEV
+                publish_own_buttons(btns)
                 if G.master_instance:
                     G.ipc_instance.send_broadcast_message(f"MASTER_BUTTONS:{G.active_buttons}")
                 else:

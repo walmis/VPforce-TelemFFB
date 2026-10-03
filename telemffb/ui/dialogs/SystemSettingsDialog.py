@@ -41,6 +41,7 @@ from telemffb.app_events import events as app_events
 from telemffb.ui.generated.Ui_SystemDialog import Ui_SystemDialog
 from telemffb.ui.dialogs.directlink_notice import with_download_link
 from telemffb.ui.dialogs.restart_offer import ask_to_restart
+from telemffb.ui.panels.ButtonDevicesPanel import ButtonDevicesPanel
 from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
 from telemffb.tap.tap_install import SIMS_BY_KEY, matches_signature, sim_status
 from telemffb.ui.panels.InstanceSettingsPanel import (
@@ -491,6 +492,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.themeButtonGroup.setId(self.rb_SystemTheme, 2)
 
         self._build_instance_panels()
+        # its own tab after Devices; the panel applies its changes itself,
+        # Save and Cancel do not involve it
+        self.tab_ButtonDevices = QtWidgets.QWidget()
+        self.tab_ButtonDevices.setObjectName("tab_ButtonDevices")
+        button_devices_layout = QVBoxLayout(self.tab_ButtonDevices)
+        self.button_devices_panel = ButtonDevicesPanel(parent=self.tab_ButtonDevices)
+        button_devices_layout.addWidget(self.button_devices_panel)
+        self.tabWidget.insertTab(self.tabWidget.indexOf(self.tab_Devices) + 1,
+                                 self.tab_ButtonDevices, "Button Devices")
 
         self.load_settings()
 
