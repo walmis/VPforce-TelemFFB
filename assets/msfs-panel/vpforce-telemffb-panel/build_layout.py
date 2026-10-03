@@ -62,7 +62,8 @@ def main():
     layout = {"content": entries}
 
     out_path = os.path.join(PACKAGE_ROOT, "layout.json")
-    with open(out_path, "w", encoding="utf-8") as f:
+    # LF regardless of platform: the file ships as written
+    with open(out_path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(layout, f, indent=2)
         f.write("\n")
 

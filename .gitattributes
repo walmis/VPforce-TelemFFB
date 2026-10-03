@@ -1,0 +1,3 @@
+# MSFS panel package: shipped byte for byte and cataloged by size in its
+# layout.json, so no line-ending conversion on any clone or build runner.
+assets/msfs-panel/** -text
