@@ -1889,9 +1889,9 @@ class MainWindow(QMainWindow):
         result to the status container and tray."""
         self.sim_status.push_status(source, paused=paused, error=error, message=message)
 
-    def on_first_sim_frame(self, src):
+    def on_first_sim_frame(self, src, stopped=False):
         """Handle first_frame_received: see SimStatusTracker.on_first_frame."""
-        self.sim_status.on_first_frame(src)
+        self.sim_status.on_first_frame(src, stopped)
 
 
 
