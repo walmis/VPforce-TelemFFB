@@ -219,6 +219,7 @@ class SystemSettings(QSettings):
         'effectMuteButtonDevice': '',
         'effectMuteButtonNumber': 0,
         'effectMuteButtonBehavior': 'toggle',
+        'effectMuteButtonInverted': False,
         # effect level sliders shown above the settings list, comma
         # separated; the same set for every device in scope
         'effectLevelsPinned': 'master',

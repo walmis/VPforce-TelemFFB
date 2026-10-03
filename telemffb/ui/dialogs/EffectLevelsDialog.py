@@ -33,8 +33,8 @@ import threading
 from typing import Optional
 
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFrame,
-                             QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
+from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton,
                              QRadioButton, QSpinBox, QToolButton, QVBoxLayout, QWidget)
 
 from telemffb.ButtonPressThread import wait_for_button_press
@@ -49,6 +49,7 @@ from telemffb.utils import schedule_on_main_thread
 
 _BINDING_TIP = ("A button on a device that performs the function selected on the Mute "
                 "button. Toggle: each press mutes or releases. Momentary: muted while held.")
+_INVERTED_TIP = "Muted while the button is released; hold it to let the effects through."
 
 _SLIDER_WIDTH = 220
 _DIALOG_MIN_WIDTH = 420
@@ -181,6 +182,10 @@ class EffectLevelsDialog(QDialog):
             group.addButton(radio)
             row.addWidget(radio)
             self.behavior_buttons[behavior] = radio
+        self.binding_inverted_check = QCheckBox("Inverted")
+        self.binding_inverted_check.setToolTip(_INVERTED_TIP)
+        self.binding_inverted_check.toggled.connect(lambda _on: self._on_binding_edited())
+        row.addWidget(self.binding_inverted_check)
         row.addStretch()
         self.binding_device_combo.currentIndexChanged.connect(lambda _i: self._on_binding_edited())
         self.binding_button_spin.valueChanged.connect(lambda _v: self._on_binding_edited())
@@ -280,7 +285,7 @@ class EffectLevelsDialog(QDialog):
         """Show the stored binding; its device is listed even when it is
         not among ``roles``."""
         try:
-            role, button, behavior = self._controller.mute_button_binding()
+            role, button, behavior, inverted = self._controller.mute_button_binding()
             if roles is None:
                 roles = list(self._controller.roles())
         except Exception:
@@ -288,7 +293,7 @@ class EffectLevelsDialog(QDialog):
             return
         listed = list(roles) + ([role] if role not in roles else [])
         widgets = (self.binding_device_combo, self.binding_button_spin,
-                   *self.behavior_buttons.values())
+                   self.binding_inverted_check, *self.behavior_buttons.values())
         for widget in widgets:
             widget.blockSignals(True)
         try:
@@ -301,6 +306,9 @@ class EffectLevelsDialog(QDialog):
             self.clear_button.setEnabled(button != 0)
             for b, radio in self.behavior_buttons.items():
                 radio.setChecked(b == behavior)
+            momentary = behavior == BEHAVIOR_MOMENTARY
+            self.binding_inverted_check.setEnabled(momentary)
+            self.binding_inverted_check.setChecked(momentary and inverted)
         finally:
             for widget in widgets:
                 widget.blockSignals(False)
@@ -311,8 +319,14 @@ class EffectLevelsDialog(QDialog):
         behavior = next((b for b, radio in self.behavior_buttons.items() if radio.isChecked()),
                         BEHAVIOR_TOGGLE)
         try:
+            # the box is disabled, and shows unchecked, while Toggle is shown:
+            # the stored value is kept then
+            if self.binding_inverted_check.isEnabled():
+                inverted = self.binding_inverted_check.isChecked()
+            else:
+                inverted = self._controller.mute_button_binding()[3]
             self._controller.set_mute_button_binding(role, self.binding_button_spin.value(),
-                                                     behavior)
+                                                     behavior, inverted)
         except Exception:
             logging.exception("Effect levels: could not set the mute button")
         self._refresh_binding()

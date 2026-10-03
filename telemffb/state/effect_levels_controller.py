@@ -149,6 +149,7 @@ class EffectLevelsController(QObject):
         self._pinned: Optional[tuple[str, ...]] = None  # pinned level names, read lazily
         self._shown: Optional[bool] = None              # controls shown, read lazily
         self._muted: dict[str, str] = {}                # role -> applied mode, muted roles only
+        self._all_muted: bool = False                   # a global mute is in force
         self._button = MuteButtonBinding(self)
         # a slider drag asks for a replay per tick; replays are limited to
         # one per _DRAG_REPLAY_MS, with the last tick's value sent when the
@@ -161,6 +162,10 @@ class EffectLevelsController(QObject):
         effect_levels.levels.set_levels({name: value / 100 for name, value in own.items()})
         if any(value < 100 for value in own.values()):
             logging.info(f"Effect levels for {self._role}: {_levels_text(own)}")
+        try:
+            self._button.apply_initial_state()
+        except Exception:
+            logging.exception("Effect levels: initial mute of the mute button not applied")
 
     # --- roles ---------------------------------------------------------
 
@@ -383,22 +388,26 @@ class EffectLevelsController(QObject):
         if not on:
             roles += [role for role in self._muted if role not in roles]
         mode = self.mute_mode() if on else MUTE_OFF
+        # remembered so a child that connects later is muted too
+        self._all_muted = bool(on)
         self._set_mute(dict.fromkeys(roles, mode), "all devices")
 
     # --- mute button on a device ---------------------------------------
 
-    def mute_button_binding(self) -> tuple[str, int, str]:
-        """The hardware mute button: (role, button number, behavior).
-        Button 0 is not bound."""
+    def mute_button_binding(self) -> tuple[str, int, str, bool]:
+        """The hardware mute button: (role, button number, behavior,
+        inverted).  Button 0 is not bound; inverted acts only with
+        momentary."""
         b = self._button
-        return b.role, b.button, b.behavior
+        return b.role, b.button, b.behavior, b.inverted
 
-    def set_mute_button_binding(self, role: str, button: int, behavior: str) -> None:
+    def set_mute_button_binding(self, role: str, button: int, behavior: str,
+                                inverted: bool = False) -> None:
         """Bind (button > 0) or unbind (0) the hardware mute button.
 
         :raises ValueError: see ``MuteButtonBinding.set_binding``.
         """
-        self._button.set_binding(role, button, behavior)
+        self._button.set_binding(role, button, behavior, inverted)
 
     def on_device_buttons(self, role: str, buttons) -> None:
         """Master: ``role``'s device now has ``buttons`` pressed (button
@@ -412,13 +421,18 @@ class EffectLevelsController(QObject):
 
     def on_device_status(self, role: str, status: str) -> None:
         """Master: ``role``'s device status (``"ACTIVE"``, or anything
-        else for a device no longer reporting).  Never raises."""
-        if not G.master_instance or status == "ACTIVE":
+        else for a device no longer reporting).  A device that reports
+        while a global mute is in force is muted too.  Never raises."""
+        if not G.master_instance:
             return
         try:
-            self._button.device_lost(role)
+            if status == "ACTIVE":
+                if self._all_muted and role != self._role and not self.muted(role):
+                    self._set_mute({role: self.mute_mode()}, role)
+            else:
+                self._button.device_lost(role)
         except Exception:
-            logging.exception(f"Effect levels: mute button release on {role} failed")
+            logging.exception(f"Effect levels: device status for {role} not applied")
 
     def apply_master_mute(self, mode: str) -> None:
         """Child: this process's mute mode as the master last sent it.

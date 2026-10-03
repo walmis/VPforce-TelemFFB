@@ -50,7 +50,7 @@ class FakeController(QObject):
         self._mode = MUTE_KEEP_SPRING
         self._scope = SCOPE_DEVICE
         self._muted = {}
-        self._binding = (own, 0, BEHAVIOR_TOGGLE)
+        self._binding = (own, 0, BEHAVIOR_TOGGLE, False)
         self._pinned = ['master']
         self._shown = True
         self.calls = []
@@ -131,9 +131,9 @@ class FakeController(QObject):
     def mute_button_binding(self):
         return self._binding
 
-    def set_mute_button_binding(self, role, button, behavior):
-        self.calls.append(('set_mute_button_binding', role, button, behavior))
-        self._binding = (role, button, behavior)
+    def set_mute_button_binding(self, role, button, behavior, inverted=False):
+        self.calls.append(('set_mute_button_binding', role, button, behavior, inverted))
+        self._binding = (role, button, behavior, inverted)
 
     def on_device_buttons(self, role, buttons):
         self.calls.append(('on_device_buttons', role, list(buttons)))
@@ -173,7 +173,7 @@ class RefusingController(FakeController):
     def set_mute_scope(self, scope):
         raise ValueError("refused")
 
-    def set_mute_button_binding(self, role, button, behavior):
+    def set_mute_button_binding(self, role, button, behavior, inverted=False):
         raise ValueError("refused")
 
     def set_levels(self, role, values, persist=True):
@@ -502,36 +502,51 @@ class TestDialog:
         assert dialog.role == 'joystick'
 
     def test_the_mute_button_row_shows_the_binding(self, ctl):
-        ctl._binding = ('pedals', 7, BEHAVIOR_MOMENTARY)
+        ctl._binding = ('pedals', 7, BEHAVIOR_MOMENTARY, True)
         dialog = EffectLevelsDialog(ctl)
         assert dialog.binding_device_combo.currentData() == 'pedals'
         assert dialog.binding_button_spin.value() == 7
         assert dialog.behavior_buttons[BEHAVIOR_MOMENTARY].isChecked()
         assert not dialog.behavior_buttons[BEHAVIOR_TOGGLE].isChecked()
+        assert dialog.binding_inverted_check.isChecked()
         assert ctl.calls == []
 
     def test_the_clear_button_unbinds(self, ctl):
-        ctl._binding = ('pedals', 7, BEHAVIOR_MOMENTARY)
+        ctl._binding = ('pedals', 7, BEHAVIOR_MOMENTARY, False)
         dialog = EffectLevelsDialog(ctl)
         assert dialog.clear_button.isEnabled()
         dialog.clear_button.click()
         assert dialog.binding_button_spin.value() == 0
-        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 0, BEHAVIOR_MOMENTARY)
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 0, BEHAVIOR_MOMENTARY, False)
         assert not dialog.clear_button.isEnabled()
 
     def test_each_mute_button_control_stores_the_binding(self, ctl):
         dialog = EffectLevelsDialog(ctl)
         dialog.binding_button_spin.setValue(4)
-        assert ctl.calls[-1] == ('set_mute_button_binding', 'joystick', 4, BEHAVIOR_TOGGLE)
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'joystick', 4, BEHAVIOR_TOGGLE, False)
         dialog.binding_device_combo.setCurrentIndex(dialog.binding_device_combo.findData('pedals'))
-        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 4, BEHAVIOR_TOGGLE)
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 4, BEHAVIOR_TOGGLE, False)
         dialog.behavior_buttons[BEHAVIOR_MOMENTARY].click()
-        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 4, BEHAVIOR_MOMENTARY)
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 4, BEHAVIOR_MOMENTARY, False)
+        dialog.binding_inverted_check.click()
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 4, BEHAVIOR_MOMENTARY, True)
         dialog.binding_button_spin.setValue(0)
-        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 0, BEHAVIOR_MOMENTARY)
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'pedals', 0, BEHAVIOR_MOMENTARY, True)
+
+    def test_inverted_is_offered_only_with_momentary(self, ctl):
+        ctl._binding = ('joystick', 4, BEHAVIOR_MOMENTARY, True)
+        dialog = EffectLevelsDialog(ctl)
+        assert dialog.binding_inverted_check.isEnabled()
+        dialog.behavior_buttons[BEHAVIOR_TOGGLE].click()
+        assert not dialog.binding_inverted_check.isEnabled()
+        assert not dialog.binding_inverted_check.isChecked()
+        dialog.behavior_buttons[BEHAVIOR_MOMENTARY].click()
+        assert ctl._binding == ('joystick', 4, BEHAVIOR_MOMENTARY, True)
+        assert dialog.binding_inverted_check.isEnabled()
+        assert dialog.binding_inverted_check.isChecked()
 
     def test_a_stored_device_not_running_is_still_listed(self, ctl):
-        ctl._binding = ('collective', 3, BEHAVIOR_TOGGLE)
+        ctl._binding = ('collective', 3, BEHAVIOR_TOGGLE, False)
         dialog = EffectLevelsDialog(ctl)
         assert dialog.binding_device_combo.currentData() == 'collective'
 
@@ -554,7 +569,7 @@ class TestDialog:
         dialog = EffectLevelsDialog(ctl)
         dialog.detect_button.click()
         assert asked == [None]                   # the own device
-        assert ctl.calls[-1] == ('set_mute_button_binding', 'joystick', 12, BEHAVIOR_TOGGLE)
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'joystick', 12, BEHAVIOR_TOGGLE, False)
         assert dialog.detect_button.isEnabled()
         dialog.binding_device_combo.setCurrentIndex(dialog.binding_device_combo.findData('pedals'))
         dialog.detect_button.click()
