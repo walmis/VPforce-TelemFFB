@@ -71,6 +71,9 @@ from telemffb.ui.widgets.DeviceViewToggle import DeviceViewToggle
 from telemffb.ui.widgets.DockZoneOverlay import DockZoneOverlay
 from telemffb.ui.widgets.DeviceStrip import DeviceSlot, DeviceStrip, RailDeviceSlot
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
+from telemffb.ui.widgets.EffectLevelsHeader import build_effect_levels_header
+from telemffb.ui.widgets.effect_levels_ui import levels_tooltip_text, mute_badge_text, readout_note
+from telemffb.ui.dialogs.EffectLevelsDialog import EffectLevelsDialog
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.preview.controller import EffectPreviewController
 # from telemffb.ui.dialogs.UserModelDialog import UserModelDialog
@@ -305,6 +308,10 @@ class MainWindow(QMainWindow):
         # list, active device, and every device's icon/label/status -
         # however it was changed.
         self.device_panel.changed.connect(self._sync_device_strips)
+        if getattr(G, 'effect_levels', None) is not None:
+            G.effect_levels.mute_changed.connect(self._refresh_mute_badges)
+            G.effect_levels.mute_changed.connect(self._refresh_levels_notes)
+            G.effect_levels.levels_changed.connect(self._refresh_levels_notes)
         device_groupbox_layout.addWidget(self.device_panel)
         self.device_groupbox.setLayout(device_groupbox_layout)
         # Switches to the compact view last used; the strip's glyph
@@ -480,9 +487,9 @@ class MainWindow(QMainWindow):
 
         """ The settings page is the scroll area under a header bar of its
         own, for the "tab header" device view: the compact device row lands
-        in the same place here as it does on the Monitor page. The bar
-        holds nothing else, so it shows only in that view (see
-        _sync_devices_display). """
+        in the same place here as it does on the Monitor page (see
+        _sync_devices_display). On the master it also holds the effect
+        levels controls for the device in scope. """
 
         self.settings_header_bar = TabHeaderBar()
         self.settings_header_bar.match_page_background()
@@ -490,6 +497,13 @@ class MainWindow(QMainWindow):
         # two device rows sit at the same height and end at the same x.
         monitor_margins = self.monitor_panel.layout().contentsMargins()
         self.settings_header_bar.set_page_inset(monitor_margins.top(), monitor_margins.right())
+        self._effect_levels_dialog = None
+        self.effect_levels_header = build_effect_levels_header(getattr(G, 'effect_levels', None))
+        if self.effect_levels_header is not None:
+            self.effect_levels_header.open_dialog_requested.connect(self.open_effect_levels_dialog)
+            self.effect_levels_header.bind(G.app_state)
+            self.settings_header_bar.add_left(self.effect_levels_header)
+            self.settings_header_bar.align_slot_top()
         settings_page = QWidget()
         settings_page_layout = QVBoxLayout(settings_page)
         settings_page_layout.setContentsMargins(0, 0, 0, 0)
@@ -692,6 +706,9 @@ class MainWindow(QMainWindow):
                 G.active_buttons = btns
                 if G.master_instance:
                     G.ipc_instance.send_broadcast_message(f"MASTER_BUTTONS:{G.active_buttons}")
+                    controller = getattr(G, 'effect_levels', None)
+                    if controller is not None:
+                        controller.on_device_buttons(G.device_type, btns)
                 else:
                     G.ipc_instance.send_message(f"BUTTONS:{G.device_type}_{G.active_buttons}")
 
@@ -829,7 +846,7 @@ class MainWindow(QMainWindow):
 
     def _add_device_view_context_menu(self, widget):
         """Right-click on either device display: the same switch as its
-        button and the Window menu's 'Show Device Frame'."""
+        button and the View menu's Devices submenu."""
         widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         widget.customContextMenuRequested.connect(
             lambda pos, w=widget: self._show_device_view_context_menu(w, pos))
@@ -1080,6 +1097,8 @@ class MainWindow(QMainWindow):
                 mini.set_device_icon(name, widget.icon_path)
                 mini.set_device_label(name, widget.text_label.text())
                 mini.set_device_configured(name, widget.configured)
+                mini.set_device_muted(name, self.device_panel.device_muted_note(name))
+                mini.set_device_levels_note(name, self.device_panel.device_levels_note(name))
                 if widget.configured:
                     mini.set_device_status(name, widget.status_color)
         self._sync_devices_display()
@@ -1178,7 +1197,7 @@ class MainWindow(QMainWindow):
             G.system_settings.setValue('deviceViewIntegrated', leaving)
         # Kept for a build from before there were three views.
         G.system_settings.setValue('showDevicesFrame', view == DEVICE_VIEW_FRAME)
-        # The Window menu is one of several ways here; keep its mark in
+        # The View menu is one of several ways here; keep its mark in
         # step when one of the others was used.
         self.main_menu.set_device_view_checked(view)
         side_cost, window_width = self._side_panel_cost(), self.width()
@@ -1279,6 +1298,10 @@ class MainWindow(QMainWindow):
         # only says a transition happened): never opened (zombie),
         # opened-but-dead (reconnecting), or alive (active).
         self.device_panel.set_device_status(G.device_type, device_status_state())
+        controller = getattr(G, 'effect_levels', None)
+        if not connected and controller is not None:
+            # a lost device holds no buttons: releases a held mute button
+            controller.on_device_buttons(G.device_type, [])
 
     @pyqtSlot(str, str)
     def update_child_status(self, device, status):
@@ -1337,6 +1360,7 @@ class MainWindow(QMainWindow):
         self.tray.build()
         order, configured = self._device_display_order()
         self.device_panel.set_devices(order, configured=configured)
+        self._refresh_levels_notes()        # levels stored from an earlier session
         # children that reported in before these icons existed
         G.ipc_instance.republish_child_status()
         self.device_panel.set_device_status(G.device_type, device_status_state())
@@ -1344,7 +1368,7 @@ class MainWindow(QMainWindow):
         self.device_panel.set_active_device(G.device_type)
         self.refresh_device_labels()
 
-        """ Window menu: where the devices are shown. Every view is on
+        """ View menu: where the devices are shown. Every view is on
         offer however many devices are CONFIGURED - all four roles are
         always on the panel, the rest as inert ghost icons """
 
@@ -1868,6 +1892,31 @@ class MainWindow(QMainWindow):
             G.telem_manager.recheck_profile_offer()
         self._update_profile_change_prompt()
 
+    def open_effect_levels_dialog(self):
+        """The Effect Levels dialog, on the device in scope.  One dialog,
+        kept between openings."""
+        controller = getattr(G, 'effect_levels', None)
+        if controller is None or not G.master_instance:
+            return
+        if self._effect_levels_dialog is None:
+            self._effect_levels_dialog = EffectLevelsDialog(controller, parent=self)
+        self._effect_levels_dialog.show_for(G.current_device_config_scope or G.device_type)
+
+    def _refresh_mute_badges(self):
+        """Mark each muted role's device icon."""
+        for name in self.device_panel.get_device_names():
+            self.device_panel.set_device_muted(name, mute_badge_text(name))
+
+    def _refresh_levels_notes(self, *_):
+        """Put each role's effect levels line on its device icon.  Master only."""
+        if not getattr(G, 'master_instance', False):
+            return
+        try:
+            for name in self.device_panel.get_device_names():
+                self.device_panel.set_device_levels_note(name, levels_tooltip_text(name))
+        except Exception:
+            logging.exception("Effect levels: device icon tooltips not updated")
+
     def reset_all_effects(self):
         result = QMessageBox.warning(self, "Are you sure?", "*** Only use this if you have effects which are 'stuck' ***\n\n  Proceeding will result in the destruction"
                                                             " of any effects which are currently being generated by the simulator and may result in requiring a restart of"
@@ -2194,12 +2243,17 @@ class MainWindow(QMainWindow):
             if self.tab_widget.currentIndex() == 1:
                 qcolor_green = QColor(ACTIVE_GREEN)
                 qcolor_grey = QColor("grey")
+                # the tap readouts are measured after the effect levels
+                levels_note = readout_note(G.current_device_config_scope)
                 for my_slider, live_key in self.settings_layout.live_key_sliders:
                     pct = min(scoped.get(live_key, 0), 1.0)
                     new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct)
                     my_slider.blockSignals(True)
                     my_slider.setHandleColor(new_color.name(), f"{int(pct * 100)}%")
                     my_slider.blockSignals(False)
+                    tip = levels_note if live_key.startswith('_pct_tap_') else ''
+                    if my_slider.toolTip() != tip:
+                        my_slider.setToolTip(tip)
 
             # Error onset/hold/clear - see SimStatusTracker.on_frame.
             self.sim_status.on_frame(data)
