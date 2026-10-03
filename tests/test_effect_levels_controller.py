@@ -134,6 +134,15 @@ class TestLevels:
         assert env.manager.requests == 1
         assert env.ipc.levels == []
 
+    def test_a_drag_replays_once_per_interval_and_a_persist_at_once(self, env):
+        ctl = EffectLevelsController()
+        for value in (90, 80, 70):
+            ctl.set_levels('joystick', {'master': value}, persist=False)
+        assert env.manager.requests == 1              # the rest wait for the interval
+        assert effect_levels.levels.level('master') == 0.7
+        ctl.set_levels('joystick', {'master': 60})
+        assert env.manager.requests == 2
+
     def test_only_a_persisting_set_writes_settings(self, env):
         ctl = EffectLevelsController()
         ctl.set_levels('joystick', {'spring': 70}, persist=False)

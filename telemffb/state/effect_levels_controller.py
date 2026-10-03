@@ -25,7 +25,8 @@ unmuted, and a child takes its mute state and its levels from the
 master's messages (see ``IPCNetworkThread.publish_effect_mute``).
 
 The mute function is one app-wide selection, stored in the global system
-settings: what is muted (``mute_mode``: springs kept, or everything) and
+settings: what is muted (``mute_mode``: the forces, keeping every condition
+type, or everything) and
 where (``mute_scope``: the device a mute button is bound to, or every
 device).  ``toggle_mute`` and ``set_mute_active`` perform it; the mute
 buttons and the bound hardware button (``MuteButtonBinding``) call them.
@@ -43,9 +44,10 @@ Main thread only.
 """
 
 import logging
+import time
 from typing import Optional
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 import telemffb.globals as G
 import telemffb.hw.effect_levels as effect_levels
@@ -64,6 +66,9 @@ PINNED_KEY = "effectLevelsPinned"
 DEFAULT_PINNED = ("master",)
 #: Global settings key: whether the controls above the settings list show.
 CONTROLS_SHOWN_KEY = "effectLevelsShown"
+#: Shortest interval between replays requested by a slider drag.
+_DRAG_REPLAY_MS = 80
+
 #: Modes a mute can apply.
 BUTTON_MUTE_MODES = (MUTE_KEEP_SPRING, MUTE_ALL)
 #: Where a mute applies: the device in question, or every device.
@@ -71,7 +76,7 @@ SCOPE_DEVICE = "device"
 SCOPE_ALL = "all"
 MUTE_SCOPES = (SCOPE_DEVICE, SCOPE_ALL)
 
-_MODE_TEXT = {MUTE_KEEP_SPRING: "springs kept", MUTE_ALL: "all effects"}
+_MODE_TEXT = {MUTE_KEEP_SPRING: "haptics, control feel kept", MUTE_ALL: "all effects"}
 
 
 def _percent(value) -> int:
@@ -145,6 +150,13 @@ class EffectLevelsController(QObject):
         self._shown: Optional[bool] = None              # controls shown, read lazily
         self._muted: dict[str, str] = {}                # role -> applied mode, muted roles only
         self._button = MuteButtonBinding(self)
+        # a slider drag asks for a replay per tick; replays are limited to
+        # one per _DRAG_REPLAY_MS, with the last tick's value sent when the
+        # interval ends
+        self._replay_timer = QTimer(self)
+        self._replay_timer.setSingleShot(True)
+        self._replay_timer.timeout.connect(self._request_replay)
+        self._last_replay = 0.0
         own = self.levels(self._role)
         effect_levels.levels.set_levels({name: value / 100 for name, value in own.items()})
         if any(value < 100 for value in own.values()):
@@ -196,7 +208,7 @@ class EffectLevelsController(QObject):
         if persist:
             self._store_levels(role, new)
         if changed or persist:
-            self._apply_levels(role, new)
+            self._apply_levels(role, new, throttled=not persist)
         if changed:
             self.levels_changed.emit(role)
 
@@ -216,10 +228,10 @@ class EffectLevelsController(QObject):
         if clean:
             self.set_levels(self._role, clean, persist=False)
 
-    def _apply_levels(self, role: str, values: dict[str, int]) -> None:
+    def _apply_levels(self, role: str, values: dict[str, int], throttled: bool = False) -> None:
         if role == self._role:
             if effect_levels.levels.set_levels({name: value / 100 for name, value in values.items()}):
-                self._request_replay()
+                self._request_replay(throttled)
         elif G.master_instance:
             ipc = getattr(G, "ipc_instance", None)
             if ipc is not None:
@@ -443,7 +455,18 @@ class EffectLevelsController(QObject):
             logging.info(f"Effect mute released on {target}")
         self.mute_changed.emit()
 
-    def _request_replay(self) -> None:
+    def _request_replay(self, throttled: bool = False) -> None:
+        """Re-send the live effects through the levels.  ``throttled``
+        requests (slider drags) are limited to one per _DRAG_REPLAY_MS; the
+        last one in an interval is sent when it ends."""
         manager = getattr(G, "telem_manager", None)
-        if manager is not None:
-            manager.request_effect_levels_reapply()
+        if manager is None:
+            return
+        now = time.perf_counter()
+        if throttled and (self._replay_timer.isActive()
+                          or now - self._last_replay < _DRAG_REPLAY_MS / 1000):
+            self._replay_timer.start(_DRAG_REPLAY_MS)
+            return
+        self._replay_timer.stop()
+        self._last_replay = now
+        manager.request_effect_levels_reapply()

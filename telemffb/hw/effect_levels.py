@@ -20,14 +20,18 @@ from typing import Literal, Optional
 
 LEVEL_NAMES = ("master", "periodic", "constant", "spring", "damper", "inertia", "friction")
 
-#: Mute modes.  ``MUTE_KEEP_SPRING`` silences everything but the spring
-#: bucket (spring and detent), which keeps its normal factor.
+#: Mute modes.  ``MUTE_KEEP_SPRING`` silences the periodic and constant
+#: buckets; the condition buckets (spring with detent, damper, inertia,
+#: friction) keep their normal factor.
 MUTE_OFF = "off"
 MUTE_KEEP_SPRING = "keep_spring"
 MUTE_ALL = "all"
 MUTE_MODES = (MUTE_OFF, MUTE_KEEP_SPRING, MUTE_ALL)
 
 MuteMode = Literal["off", "keep_spring", "all"]
+
+#: The buckets a "keep springs" mute silences: the forces, not the feel.
+_FORCE_BUCKETS = ("periodic", "constant")
 
 #: Device-unit full scale of condition coefficients and saturations.
 _FULL_SCALE = 4096
@@ -184,7 +188,7 @@ class EffectLevels:
         factors = {}
         for effect_type, bucket in buckets.items():
             muted = (mute == MUTE_ALL
-                     or (mute == MUTE_KEEP_SPRING and bucket != "spring"))
+                     or (mute == MUTE_KEEP_SPRING and bucket in _FORCE_BUCKETS))
             factors[effect_type] = 0.0 if muted else master * self._levels[bucket]
         # the table is complete before the flag lets readers use it
         self._factors = factors

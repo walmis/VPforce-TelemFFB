@@ -44,7 +44,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - **NEW: TelemFFB can restart itself when a change requires it**
 - **NEW: Effect Levels and Mute**
   - Per device effect level control. Master and per effect type controls are offered.
-  - Instantly mute effects per device or globally with the click of a button.  Or bind a toggle/momentary device button to the mute function.
+  - Instantly mute effects per device or globally with the click of a button.  "Mute haptics", the default, silences vibrations and constant forces and keeps the control feel (springs, dampers, inertia and friction); "Mute all effects" silences everything.  Or bind a toggle/momentary device button to the mute function.
 
 ## MSFS / X-Plane
 - **NEW: In-sim settings panel**
