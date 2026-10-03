@@ -41,14 +41,13 @@ from telemffb.ui.widgets.effect_levels_ui import (MODE_MENU_TEXT, MUTE_BUTTON_QS
 
 
 def button_text(mode: str, scope: str, muted: bool) -> str:
-    """The button's label for a selected function: "Mute" for this
-    device, "Mute All" for every device, with "+ Spring" when springs are
-    muted too; "Muted ..." while the mute is on."""
-    text = "Muted" if muted else "Mute"
+    """The button's label for a selected function: what it mutes
+    ("Haptics" or "All Effects"), as a command while off and a state while
+    on, with ": All Devices" when the scope is every device."""
+    what = "All Effects" if mode == MUTE_ALL else "Haptics"
+    text = f"{what} Muted" if muted else f"Mute {what}"
     if scope == SCOPE_ALL:
-        text += " All"
-    if mode == MUTE_ALL:
-        text += " + Spring"
+        text += ": All Devices"
     return text
 
 

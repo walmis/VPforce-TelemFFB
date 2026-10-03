@@ -176,13 +176,14 @@ class TestFactor:
                             EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_DETENT):
             assert levels.factor(effect_type) == 0.0
 
-    def test_mute_keep_spring_keeps_the_spring_bucket(self):
+    def test_mute_keep_spring_keeps_every_condition_type(self):
         levels.set_levels({"master": 0.8, "spring": 0.5})
         levels.set_mute(MUTE_KEEP_SPRING)
         assert levels.factor(EFFECT_SPRING) == pytest.approx(0.4)
         assert levels.factor(EFFECT_DETENT) == pytest.approx(0.4)
-        for effect_type in (*PERIODIC_EFFECTS, EFFECT_CONSTANT, EFFECT_DAMPER,
-                            EFFECT_INERTIA, EFFECT_FRICTION):
+        for effect_type in (EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION):
+            assert levels.factor(effect_type) == pytest.approx(0.8)
+        for effect_type in (*PERIODIC_EFFECTS, EFFECT_CONSTANT):
             assert levels.factor(effect_type) == 0.0
 
     def test_a_suspended_mute_applies_the_levels_alone(self):

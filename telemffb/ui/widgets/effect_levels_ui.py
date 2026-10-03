@@ -36,7 +36,7 @@ from telemffb.utils.device import device_display_name
 
 #: The mute button's menu entries, one per mode it can apply.
 MODE_MENU_TEXT = {
-    MUTE_KEEP_SPRING: "Mute all except springs",
+    MUTE_KEEP_SPRING: "Mute haptics (keep control feel)",
     MUTE_ALL: "Mute all effects",
 }
 
@@ -54,7 +54,7 @@ BEHAVIOR_TEXT = {
 
 #: What each mode silences, for tooltips and notices.
 MODE_EFFECT_TEXT = {
-    MUTE_KEEP_SPRING: "all effects except springs",
+    MUTE_KEEP_SPRING: "the haptic effects, vibrations and constant forces (springs, dampers, inertia and friction stay)",
     MUTE_ALL: "all effects",
 }
 
@@ -62,7 +62,7 @@ MODE_EFFECT_TEXT = {
 SCOPE_TEXT = ("Scales only the effects TelemFFB creates. Effects created by a sim or by "
                   "the device's own software are not changed.")
 
-MUTE_SCOPE_TEXT = ("Only effects TelemFFB creates are muted. Effects a sim creates directly"
+MUTE_SCOPE_TEXT = ("Only effects TelemFFB creates are muted. Effects a sim creates directly "
                    "on the device are not.")
 
 #: Each level's label and tooltip, keyed by ``LEVEL_NAMES``.
@@ -117,7 +117,7 @@ QToolButton:checked::menu-button {{ border-left: 1px solid rgba(255, 255, 255, 1
 
 
 def mode_effect_text(mode: str) -> str:
-    """What ``mode`` silences, e.g. "all effects except springs"."""
+    """What ``mode`` silences, for tooltips and notices."""
     return MODE_EFFECT_TEXT.get(mode, MODE_EFFECT_TEXT[MUTE_ALL])
 
 
