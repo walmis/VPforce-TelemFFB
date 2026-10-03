@@ -999,9 +999,7 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         inst.cyclic_spring_init = 1
         telem = self._make_telem()
         self.set_telemetry(inst, telem)
-        input_data = self.mock_device.get_input()
-
-        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+        result = inst._update_cyclic_force_trim(telem, 0.0, 0.0, True)
 
         assert result is False
         assert inst.spring_x.positiveCoefficient == 0
@@ -1020,9 +1018,7 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         inst.last_device_y = 0.0
         telem = self._make_telem(SimOnGround=1)
         self.set_telemetry(inst, telem)
-        input_data = self.mock_device.get_input()
-
-        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+        result = inst._update_cyclic_force_trim(telem, 0.0, 0.0, True)
 
         assert result is True
 
@@ -1040,9 +1036,7 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
 
         # Press force trim button
         self.mock_device._input_data.press_button(1)
-        input_data = self.mock_device.get_input()
-
-        result = inst._update_cyclic_force_trim(telem, input_data, 0.3, 0.4, True)
+        result = inst._update_cyclic_force_trim(telem, 0.3, 0.4, True)
 
         assert result is False
         assert inst.cyclic_trim_release_active == 1
@@ -1059,9 +1053,7 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         self.set_telemetry(inst, telem)
 
         # Button NOT pressed
-        input_data = self.mock_device.get_input()
-
-        result = inst._update_cyclic_force_trim(telem, input_data, 0.4, 0.5, True)
+        result = inst._update_cyclic_force_trim(telem, 0.4, 0.5, True)
 
         assert result is False
         assert inst.cyclic_trim_release_active == 0
@@ -1078,9 +1070,7 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         telem = self._make_telem()
         self.set_telemetry(inst, telem)
 
-        input_data = self.mock_device.get_input()
-
-        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+        result = inst._update_cyclic_force_trim(telem, 0.0, 0.0, True)
 
         assert result is False
         assert inst.ft_was_inactive is False
@@ -1091,10 +1081,8 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         telem = self._make_telem()
         self.set_telemetry(inst, telem)
 
-        input_data = self.mock_device.get_input()
-
         # force_trim_active=False with FORCETRIM mode → inactive following
-        result = inst._update_cyclic_force_trim(telem, input_data, 0.3, -0.2, False)
+        result = inst._update_cyclic_force_trim(telem, 0.3, -0.2, False)
 
         assert result is False
         assert inst.ft_was_inactive is True
@@ -1107,9 +1095,7 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         telem = self._make_telem()
         self.set_telemetry(inst, telem)
 
-        input_data = self.mock_device.get_input()
-
-        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+        result = inst._update_cyclic_force_trim(telem, 0.0, 0.0, True)
 
         assert result is False
 

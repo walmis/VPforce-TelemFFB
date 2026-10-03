@@ -123,6 +123,8 @@ class SystemSettings(QSettings):
     enableBMS: bool
     pathBMS: str
     enableDirectInput: bool
+    buttonDevicesIgnored: str
+    buttonDeviceNames: str
     masterInstance: int
     autolaunchMaster: bool
     autolaunchJoystick: bool
@@ -197,6 +199,13 @@ class SystemSettings(QSettings):
         'enableTapIL2_K': False,
         'enableTapBMS': False,
         'enableDirectInput': False,
+        # comma-separated keys of the generic controllers the user turned
+        # off as button sources (telemffb.hw.button_devices)
+        'buttonDevicesIgnored': '',
+        # JSON object: generic controller key -> product name, kept for
+        # devices that are unplugged or read by another instance
+        # (telemffb.hw.button_refs.button_device_name)
+        'buttonDeviceNames': '{}',
         'masterInstance': 1,
         'autolaunchMaster': False,
         'autolaunchJoystick': False,

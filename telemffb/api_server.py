@@ -31,6 +31,7 @@ from bottle import Bottle, request, response
 import telemffb.globals as G
 from telemffb import xmlutils
 from telemffb.ButtonPressThread import wait_for_button_press
+from telemffb.hw.button_refs import button_binding_label, parse_button_ref
 from telemffb.hw.ffb_rhino import effect_names
 from telemffb.telem.telem_format import (BADGE_LETTERS, BADGE_SHAPES,
                                          SignedKeys, axes_text,
@@ -133,10 +134,20 @@ def _build_control(item: dict) -> Optional[dict]:
     }
 
     if datatype == "button":
-        # the number of the bound button, 0 when unbound; bound from the
-        # panel through /api/bind
+        # the number of the bound button, 0 when unbound, or the qualified
+        # id string when the binding names a device; bound from the panel
+        # through /api/bind.  "label" is the text the settings form shows
+        # for it, ready for a panel that cannot read the id itself
         base["control"] = "button"
-        base["value"] = int(_parse_raw_value(item.get("value") or "0"))
+        raw = (item.get("value") or "0").strip()
+        base["label"] = button_binding_label(raw)
+        if parse_button_ref(raw)[0] is not None:
+            base["value"] = raw
+        else:
+            try:
+                base["value"] = int(_parse_raw_value(raw))
+            except ValueError:
+                base["value"] = 0
         return base
 
     if datatype in _BOOL_TYPES:

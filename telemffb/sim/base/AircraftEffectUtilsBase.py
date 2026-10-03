@@ -2,13 +2,13 @@ import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.globals import master_instance
 from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.hw.button_refs import parse_button_ref
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.state.sim_status import ERROR_SEPARATOR
 
 import logging
 import random
 import time
-
 
 class AircraftEffectUtilsBase(object):
     """Base class for aircraft effects and utilities."""
@@ -53,15 +53,36 @@ class AircraftEffectUtilsBase(object):
         # print(f"Checking {button} against {master_buttons}")
         return button in G.master_buttons
 
-    def check_button_press(self, button=0, check_master=False):
+    def check_button_press(self, button=0, check_master=False, report=None):
+        """Whether a bound button is pressed.
+
+        Safe per frame: a qualified id costs one cached parse and one dict
+        lookup, and a string or other non-int value never raises.
+
+        :param button: a button setting value.  A bare int is button n on
+            this instance's device (or on the master's, with
+            ``check_master``); a qualified id string ``<key>:<n>`` is
+            button n on the device ``key`` names, read from
+            ``G.button_states`` whatever ``check_master`` says.  0,
+            negative, empty and invalid values are never pressed.
+        :param check_master: read a bare int from the master's buttons.
+            Without a live device a bare int is never pressed.
+        :param report: this frame's input report, for a caller that checks
+            several bindings in one frame; fetched when None.
+        """
         if not button:
-            #button not set
+            return False
+        if not isinstance(button, int):
+            key, button = parse_button_ref(button)
+            if key is not None:
+                return button in G.button_states.get(key, ())
+        if button < 1:
             return False
         if check_master:
             return self.check_master_button_press(button)
-        else:
-            input_data = self._get_device_report()
-            return input_data is not None and input_data.isButtonPressed(button)
+        if report is None:
+            report = self._get_device_report()
+        return report is not None and report.isButtonPressed(button)
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''

@@ -156,22 +156,20 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             self.telem_data._ovrd_spr_dt = dt
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
-            input_data = HapticEffect.get_device_input()
+            report = self._get_device_report()
             x, y = self._get_device_axes()
-            # No live device: hat buttons unreadable, none can be pressed.
-            current_buttons = input_data.getPressedButtons() if input_data is not None else ()
-            if self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
+            if self.check_button_press(self.override_spring_trim_reset, report=report):
                 self.override_spring_cp0_x = 0.0
                 self.override_spring_cp0_y = 0.0
 
-            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+            if self.check_button_press(self.override_spring_trim_down, report=report):
                 self.override_spring_cp0_y -= trim_step_size
-            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+            elif self.check_button_press(self.override_spring_trim_up, report=report):
                 self.override_spring_cp0_y += trim_step_size
 
-            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+            if self.check_button_press(self.override_spring_trim_left, report=report):
                 self.override_spring_cp0_x -= trim_step_size
-            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+            elif self.check_button_press(self.override_spring_trim_right, report=report):
                 self.override_spring_cp0_x += trim_step_size
 
             self.override_spring_cp0_x = utils.clamp(self.override_spring_cp0_x, -1.0, 1.0)

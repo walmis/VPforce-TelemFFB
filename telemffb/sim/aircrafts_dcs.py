@@ -484,8 +484,7 @@ class Aircraft(AircraftBase, DCSCommands):
                 self.cp_spr_override_active = False
                 return
 
-            input_data = self._get_device_report()
-            override_pressed = input_data is not None and input_data.isButtonPressed(self.cp_spr_override_button)
+            override_pressed = self.check_button_press(self.cp_spr_override_button)
 
             if not override_pressed:
                 self.effects['cp_ovd_spring'].stop()
@@ -522,12 +521,10 @@ class Aircraft(AircraftBase, DCSCommands):
             # telemetry key is absent (as will be for all other helicopters).
             ft_switch_state = self.telem_data.get('ForceTrimSW', True)
 
-            input_data = self._get_device_report()
+            report = self._get_device_report()
             x, y = self._get_device_axes()
-            current_buttons = input_data.getPressedButtons() if input_data is not None else []
-            # print(f"BUTTONS:>{current_buttons}<")
             # decide what to do depending on which button is pressed
-            if (self.override_spring_trim_release and self.override_spring_trim_release in current_buttons) or not ft_switch_state:
+            if self.check_button_press(self.override_spring_trim_release, report=report) or not ft_switch_state:
                 # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
                 # as it is moved while spring force is enabled.
                 # return from method so default spring gains do not get applied at the end of the method
@@ -545,7 +542,7 @@ class Aircraft(AircraftBase, DCSCommands):
                 spring.start(override=True)
                 return
             
-            elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
+            elif self.check_button_press(self.override_spring_trim_reset, report=report):
                 # if trim reset button pressed, set offsets back to 0
                 # print("TRIM RESET")
                 self.override_spring_cp0_x = 0.0
@@ -562,26 +559,26 @@ class Aircraft(AircraftBase, DCSCommands):
 
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
-            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+            if self.check_button_press(self.override_spring_trim_down, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM DOWN")
                 self.override_spring_cp0_y = utils.clamp(
                     self.override_spring_cp0_y - trim_step_size, -1.0, 1.0)
                 self.spring_y.set_offset(self.override_spring_cp0_y)
-            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+            elif self.check_button_press(self.override_spring_trim_up, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM UP")
                 self.override_spring_cp0_y = utils.clamp(
                     self.override_spring_cp0_y + trim_step_size, -1.0, 1.0)
                 self.spring_y.set_offset(self.override_spring_cp0_y)
 
-            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+            if self.check_button_press(self.override_spring_trim_left, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM LEFT")
                 self.override_spring_cp0_x = utils.clamp(
                     self.override_spring_cp0_x - trim_step_size, -1.0, 1.0)
                 self.spring_x.set_offset(self.override_spring_cp0_x)
-            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+            elif self.check_button_press(self.override_spring_trim_right, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM RIGHT")
                 self.override_spring_cp0_x = utils.clamp(
@@ -680,8 +677,7 @@ class Helicopter(Aircraft):
             self.flag_error('Please configure the trim-release button.  It must match that which is bound as trim release in the sim.')
             return
 
-        input_data = self._get_device_report()
-        force_trim_pressed = input_data is not None and input_data.isButtonPressed(self.dcs_tr_button)
+        force_trim_pressed = self.check_button_press(self.dcs_tr_button)
 
         if force_trim_pressed:
             x, y = self._get_device_axes()

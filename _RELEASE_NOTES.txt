@@ -30,6 +30,11 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - **NEW: Profile Fork button - create a new, more specific profile**
   - A new button sits beside the Matched Model row.  It forks the matched profile for the currently matched aircraft into a more specific match string
   - Until now the New Aircraft Wizard only appeared for unmatched aircraft.  An aircraft that mistakenly matched a broader profile had no way to be separated from it without hand-editing the config
+- **NEW: Bind buttons from any game controller**
+  - Anywhere you can/must bind a button within TelemFFB to perform some function, you can now bind any game controller attached to your PC
+  - Legacy bindings, including the "use master button" based bindings are still honored
+  - New bindings carry the VID:PID:BUTTON_ID of the device button which was pressed during the binding
+
 
 ## UI
 - **NEW: Redesigned Main UI**
