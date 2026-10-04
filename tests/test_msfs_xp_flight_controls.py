@@ -1571,6 +1571,55 @@ class TestJoystickControlsLock(BaseTelemetryEffectTestCase):
         spring = self.mock_effects['dynamic_spring']
         assert spring.start_count > 0, "Spring should resume after controls unlock"
 
+    def _locked_instance(self, **settings):
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar_invert = False
+        for name, value in settings.items():
+            setattr(instance, name, value)
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        return instance
+
+    def _frame(self, instance, locked):
+        telem = self._create_flight_telem()
+        telem["ControlsLock"] = 1 if locked else 0
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+    def test_controls_lock_force_sets_the_detent_strength(self):
+        instance = self._locked_instance(controls_lock_intensity=0.5)
+        self._frame(instance, locked=True)
+        for name in ("lock_1", "lock_2"):
+            config = self.mock_effects[name].detent_config
+            assert config["peak_x"] == 0.5 and config["peak_y"] == 0.5
+            assert isinstance(config["peak_x"], float), "an int would be read as device units"
+
+    def test_changing_the_force_while_locked_reengages_at_it(self):
+        instance = self._locked_instance()
+        self._frame(instance, locked=True)
+        assert self.mock_effects["lock_1"].detent_config["peak_x"] == 1.0
+        instance.controls_lock_intensity = 0.4
+        self._frame(instance, locked=True)
+        self._frame(instance, locked=True)
+        assert self.mock_effects["lock_1"].started
+        assert self.mock_effects["lock_1"].detent_config["peak_x"] == 0.4
+
+    def test_controls_lock_damper_runs_only_while_locked(self):
+        instance = self._locked_instance()
+        self._frame(instance, locked=True)
+        damper = self.mock_effects["lock_damper"]
+        assert damper.started
+        assert damper._x_coefficient == 0.25 and damper._y_coefficient == 0.25
+        self._frame(instance, locked=False)
+        assert not damper.started
+
+    def test_controls_lock_damper_at_zero_adds_nothing(self):
+        instance = self._locked_instance(controls_lock_damper=0.0)
+        self._frame(instance, locked=True)
+        assert not self.mock_effects["lock_damper"].started
+
 
 class TestJoystickControlsLockSecondFrame(BaseTelemetryEffectTestCase):
     """Test that a second frame with controls locked short-circuits via _lock_effects_started."""

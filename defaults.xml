@@ -4745,7 +4745,6 @@
 		<prereq>controls_lock_enable</prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Sim Variable for control locks</info>
-		<any>any</any>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4762,14 +4761,47 @@
 		<displayname>Invert Controls Lock Simvar</displayname>
 		<prereq>controls_lock_enable</prereq>
 		<in_sim_panel>false</in_sim_panel>
-		<info>Enable if variable ON means Control Lock is OFF</info>
-		<any>any</any>
+		<info>Enable if variable ON means Controls Lock is OFF</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Mechanical</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40060.4</order>
+		<name>controls_lock_intensity</name>
+		<displayname>Controls Lock Force</displayname>
+		<prereq>controls_lock_enable</prereq>
+		<info>Strength of the detents and centering spring that hold the controls while locked</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0.75</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>damper</effecttype>
+		<grouping>Mechanical</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40060.5</order>
+		<name>controls_lock_damper</name>
+		<displayname>Controls Lock Damper</displayname>
+		<prereq>controls_lock_enable</prereq>
+		<info>Damping while the controls are locked, to keep a strong lock from oscillating</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0.25</value>
+		<datatype>float</datatype>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>

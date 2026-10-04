@@ -45,6 +45,8 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
     controls_lock_enable = False
     controls_lock_simvar = ''
     controls_lock_simvar_invert = False
+    controls_lock_intensity = 1.0
+    controls_lock_damper = 0.25
 
     ## end of user parameters
 
@@ -63,6 +65,8 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         self.rudder_gain = 0.1
 
         self.rudder_force_dampener = utils.Dampener()
+        self._lock_force_applied = None    # strength the lock detents were started at
+        self._lock_damper_applied = None   # coefficient the lock damper was started at
 
     def _sync_controls_lock_simvar(self):
         """Subscribe the ControlsLock simvar once and re-subscribe only when the binding changes."""
@@ -112,12 +116,41 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             controls_locked = not controls_locked
         return controls_locked
 
+    def _lock_force(self) -> float:
+        """Lock detent and centering spring strength, normalized 0..1.
+
+        A float on purpose: the detent and condition setters read an int as
+        device units.
+        """
+        return clamp(float(self.controls_lock_intensity), 0.0, 1.0)
+
     def _lock_effects_started(self) -> bool:
         return self.effects['lock_1'].started or self.effects['lock_2'].started
 
     def _stop_lock_effects(self):
         self.effects['lock_1'].stop()
         self.effects['lock_2'].stop()
+        self.effects['lock_damper'].stop()
+        self._lock_force_applied = None
+        self._lock_damper_applied = None
+
+    def _start_lock_spring(self, *conditions):
+        """Drive the shared spring as the lock's centering spring, named so."""
+        self._spring_handle.name = "lock_spring"
+        for condition in conditions:
+            self._spring_handle.setCondition(condition)
+        self._spring_handle.start()
+
+    def _update_lock_damper(self):
+        """Hold the lock damper at the configured coefficient, sending only on change."""
+        coef = clamp(float(self.controls_lock_damper), 0.0, 1.0)
+        if coef == self._lock_damper_applied:
+            return
+        if coef > 0:
+            self.effects['lock_damper'].damper(coef, coef).start()
+        else:
+            self.effects['lock_damper'].stop()
+        self._lock_damper_applied = coef
 
     def _prepare_controls_lock(
         self,
@@ -137,11 +170,17 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             self._stop_lock_effects()
             return False
 
+        self._update_lock_damper()
+
         if set_locked_telemetry:
             telem_data._controls_locked = True
 
         if self._lock_effects_started():
-            return True
+            if self._lock_force_applied in (None, self._lock_force()):
+                return True
+            # the strength changed while locked: re-engage the detents at it
+            self.effects['lock_1'].stop()
+            self.effects['lock_2'].stop()
 
         return None
 
@@ -158,10 +197,10 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         if stop_control_weight:
             self.effects['control_weight'].stop()
 
-        spring_condition.set_coefficient(1.0)
+        force = self._lock_force()
+        spring_condition.set_coefficient(force)
         spring_condition.cpOffset = to_device_units(spring_offset)
-        self._spring_handle.setCondition(spring_condition)
-        self._spring_handle.start()
+        self._start_lock_spring(spring_condition)
         caps = getattr(HapticEffect.device, 'caps', None)
         if caps is not None and not caps.has_detents:
             # no detents to hold the axis: keep the centering spring engaged
@@ -170,6 +209,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             return
         self.effects['lock_1'].detent(**detent_1).start()
         self.effects['lock_2'].detent(**detent_2).start()
+        self._lock_force_applied = force
         self._spring_handle.stop()
 
     def _apply_joystick_controls_lock(self, telem_data: BaseTelemetryData, controls_locked):
@@ -182,19 +222,18 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             return True
         if lock_result is None:
             phys_x, phys_y = self._get_device_axes()
+            force = self._lock_force()
 
-            self.spring_y.set_coefficient(1.0)
-            self.spring_x.set_coefficient(1.0)
+            self.spring_y.set_coefficient(force)
+            self.spring_x.set_coefficient(force)
             self.spring_y.cpOffset = 0
             self.spring_x.cpOffset = 0
-            self._spring_handle.setCondition(self.spring_y)
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.start()
+            self._start_lock_spring(self.spring_y, self.spring_x)
 
             if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
                 # normalized -1..1 values; HapticEffect.detent converts to device units
-                detent_params = dict(peak_x=1.0, range_x=1.0, gate_pos_y=0, gate_neg_y=0,
-                                     peak_y=1.0, range_y=1.0, gate_pos_x=0, gate_neg_x=0)
+                detent_params = dict(peak_x=force, range_x=1.0, gate_pos_y=0, gate_neg_y=0,
+                                     peak_y=force, range_y=1.0, gate_pos_x=0, gate_neg_x=0)
                 self._engage_controls_lock_detents(
                     self.spring_x,
                     spring_offset=0,
@@ -217,15 +256,15 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             return True
         if lock_result is None:
             phys_x, _ = self._get_device_axes()
+            force = self._lock_force()
 
-            self.spring_x.set_coefficient(1.0)
+            self.spring_x.set_coefficient(force)
             self.spring_x.cpOffset = 0
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.start()
+            self._start_lock_spring(self.spring_x)
 
             if -0.15 < phys_x < 0.15:
                 # normalized -1..1 values; HapticEffect.detent converts to device units
-                detent_params = dict(peak_x=1.0, range_x=1.0, gate_pos_y=0, gate_neg_y=0)
+                detent_params = dict(peak_x=force, range_x=1.0, gate_pos_y=0, gate_neg_y=0)
                 self._engage_controls_lock_detents(
                     self.spring_x,
                     spring_offset=0,

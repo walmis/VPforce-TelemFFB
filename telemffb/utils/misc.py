@@ -208,8 +208,10 @@ class EffectTranslator:
         "wingfoldmovement.*": ["Wing Fold", "wingfold_motion_intensity"],
         "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
         "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
-        "lock_1": ["Controls Lock Lower Bound", ""],
-        "lock_2": ["Controls Lock Upper Bound", ""],
+        "lock_1": ["Controls Lock Lower Bound", "controls_lock_intensity"],
+        "lock_2": ["Controls Lock Upper Bound", "controls_lock_intensity"],
+        "lock_damper": ["Controls Lock Damper", "controls_lock_damper"],
+        "lock_spring": ["Controls Lock Spring","controls_lock_intensity"],
     }
     @classmethod
     def get_translation(cls, key):

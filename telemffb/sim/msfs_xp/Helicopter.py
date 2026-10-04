@@ -289,26 +289,26 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             return lock_result
 
         _, phys_y = self._get_device_axes()
+        force = self._lock_force()
 
         detent_1 = {
             'position_y': 4000,
-            'peak_y': 4096,
+            'peak_y': force,
             'range_y': 4096,
             'gate_pos_x': 0,
             'gate_neg_x': 0,
         }
         detent_2 = {
             'position_y': 2500,
-            'peak_y': 4096,
+            'peak_y': force,
             'range_y': 4096,
             'gate_pos_x': 0,
             'gate_neg_x': 0,
         }
 
-        self.spring_y.set_coefficient(4096)
+        self.spring_y.set_coefficient(force)
         self.spring_y.set_offset(1.0)
-        self._spring_handle.setCondition(self.spring_y)
-        self._spring_handle.start()
+        self._start_lock_spring(self.spring_y)
 
         # Collective reports lock ownership as soon as lock mode is active, then snaps into the upper detent near full-down.
         if 0.9 < phys_y < 1.0:
