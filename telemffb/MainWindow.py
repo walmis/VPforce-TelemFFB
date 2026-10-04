@@ -31,7 +31,7 @@ from datetime import datetime
 from typing import override
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import Qt, QUrl, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, QUrl, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
                          QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
@@ -155,6 +155,13 @@ class MainWindow(QMainWindow):
         # apply it. See telemffb/state/sim_status.py.
         self.sim_status = SimStatusTracker(G.app_state, G.exception_tracker)
         self.last_telemetry_refresh = utils.millis()
+        # A frame that arrives inside the refresh window is held here and
+        # shown when the window ends, so the last frame before a gap (the
+        # one MSFS sends as it pauses) is never the one left unshown.
+        self._held_telemetry = None
+        self._telemetry_refresh_timer = QTimer(self)
+        self._telemetry_refresh_timer.setSingleShot(True)
+        self._telemetry_refresh_timer.timeout.connect(self._show_held_telemetry)
         self.profile_mgr_dialog = None
 
 
@@ -2133,9 +2140,24 @@ class MainWindow(QMainWindow):
                     active_settings.append(settingname)
         return active_effects, active_settings
 
+    #: Minimum time between two refreshes of the window from telemetry.
+    TELEMETRY_REFRESH_MS = 50
+
+    def _show_held_telemetry(self):
+        """The refresh window ended with a frame waiting: show it."""
+        held, self._held_telemetry = self._held_telemetry, None
+        if held is not None:
+            self.on_update_telemetry(held)
+
     def on_update_telemetry(self, datadict: dict):
-        if utils.millis() - self.last_telemetry_refresh < 50:
+        elapsed = utils.millis() - self.last_telemetry_refresh
+        if elapsed < self.TELEMETRY_REFRESH_MS:
+            self._held_telemetry = datadict
+            if not self._telemetry_refresh_timer.isActive():
+                self._telemetry_refresh_timer.start(self.TELEMETRY_REFRESH_MS - elapsed)
             return
+        self._held_telemetry = None
+        self._telemetry_refresh_timer.stop()
         self.last_telemetry_refresh = utils.millis()
 
         if G.child_instance:

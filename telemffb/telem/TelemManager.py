@@ -626,18 +626,20 @@ class TelemManager(QObject, threading.Thread):
             if data.startswith("Ev="):
                 self._events.append(data.lstrip("Ev="))
                 self._cond.notify()
-            elif self._data is None:
+            else:
+                if self._data is not None:
+                    # The previous frame was not consumed yet: it is the
+                    # one to drop.  The newest frame is the one worth
+                    # processing, for latency and because it may be the
+                    # last one before the sim pauses (MSFS marks that frame
+                    # STOP), after which nothing follows to replace it.
+                    self._dropped_frames += 1
+                    if self._flushing_deferred:
+                        logging.warning("Deferred startup frame replaced a pending "
+                                        "frame on re-inject")
+                    logging.debug(f"Dropped frame (total {self._dropped_frames})")
                 self._data = data
                 self._cond.notify()  # notify waiting thread of new data
-            else:
-                self._dropped_frames += 1
-                if self._flushing_deferred:
-                    logging.warning("Deferred startup frame dropped on re-inject "
-                                    "(previous frame not yet consumed)")
-                # log dropped frames, this is not necessarily a bad thing
-                # USB interrupt transfers (1ms) might take longer than one video frame
-                # we drop frames to keep latency to a minimum
-                logging.debug(f"Dropped frame (total {self._dropped_frames})")
 
     def process_events(self, events=None):
         """Dispatch buffered Ev= events to the current aircraft.
