@@ -638,7 +638,7 @@ class TrimCalibrator:
         if telem_data is None:
             return False, "Waiting for telemetry"
         if telem_data.get("SimPaused"):
-            return False, "donUnpause the simulator to calibrate"
+            return False, "Unpause the simulator to calibrate"
         if telem_data.get("Slew"):
             return False, "Exit slew mode to calibrate"
         if telem_data.get("SimOnGround", 1):

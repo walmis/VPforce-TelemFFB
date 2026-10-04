@@ -3495,9 +3495,14 @@ class IasTrendWidget(QWidget):
         red = QColor(204, 51, 51)
         color = self._blend(green, amber, frac / 0.5) if frac < 0.5 \
             else self._blend(amber, red, (frac - 0.5) / 0.5)
+        self._draw_arrow(p, self._rate > 0, frac, color)
 
+    def _draw_arrow(self, p, up, frac, color):
+        """A vertical arrow from the center, ``frac`` of full length."""
+        w, h = self.width(), self.height()
+        cx, cy = w / 2.0, h / 2.0
         length = max(6.0, frac * (cy - 2.0))
-        d = 1.0 if self._rate > 0 else -1.0     # positive rate draws UP
+        d = 1.0 if up else -1.0
         tip_y = cy - d * length
         base_y = cy + d * length * 0.5
         p.setPen(QPen(color, 2.2))
@@ -3508,3 +3513,47 @@ class IasTrendWidget(QWidget):
         p.setBrush(QBrush(color))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawPolygon(head)
+
+
+class VsTargetWidget(IasTrendWidget):
+    """Vertical speed against the band calibration accepts as ready.
+
+    A flat green dash while the deviation from the target is inside the
+    band. Outside it, an arrow in the direction of the deviation, growing
+    and shifting amber -> red out to ``RED_AT`` band widths. Blank when no
+    band applies.
+    """
+
+    RED_AT = 3.0   # band widths at full arrow length
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._error = None
+        self._band = None
+
+    def set_deviation(self, error_fpm, band_fpm=None):
+        """``error_fpm`` is VS minus the target; None blanks the indicator."""
+        if error_fpm is None or not band_fpm:
+            error_fpm = band_fpm = None
+        if error_fpm == self._error and band_fpm == self._band:
+            return
+        self._error, self._band = error_fpm, band_fpm
+        self.setToolTip("" if error_fpm is None else
+                        f"Vertical speed {error_fpm:+.0f} fpm from target "
+                        f"(ready within ±{band_fpm:.0f} fpm)")
+        self.update()
+
+    def paintEvent(self, event):
+        if self._error is None:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        over = abs(self._error) / self._band
+        if over <= 1.0:
+            cy = self.height() / 2.0
+            p.setPen(QPen(QColor(51, 170, 51), 3))
+            p.drawLine(QPointF(2.0, cy), QPointF(self.width() - 2.0, cy))
+            return
+        frac = min((over - 1.0) / (self.RED_AT - 1.0), 1.0)
+        color = self._blend(QColor(230, 168, 23), QColor(204, 51, 51), frac)
+        self._draw_arrow(p, self._error > 0, 0.4 + 0.6 * frac, color)

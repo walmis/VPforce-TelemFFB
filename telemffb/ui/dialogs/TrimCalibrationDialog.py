@@ -42,8 +42,8 @@ import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.ui.widgets.custom_widgets import (
-    IasTrendWidget, InfoLabel, NoWheelComboBox, TrimCurveWidget, svg_icon,
-    vpf_purple,
+    IasTrendWidget, InfoLabel, NoWheelComboBox, TrimCurveWidget, VsTargetWidget,
+    svg_icon, vpf_purple,
 )
 from telemffb.sim.msfs_xp.MsfsXpTrimwheelMixIn import MsfsXpTrimwheelMixIn
 from telemffb.sim.msfs_xp.TrimCalibrator import CalState, TrimCalibrator
@@ -223,7 +223,9 @@ class TrimCalibrationDialog(QDialog):
             "stick is <b>inactive</b> while TelemFFB has the controls.</li>"
             "<li>Once speed and trim hold steady, the button becomes "
             "<b>Start Trim Sweep</b> — press it to calibrate the current "
-            "airspeed, or adjust power first to pick a different speed. "
+            "airspeed, or adjust power first to pick a different speed. With "
+            "<b>Start sweep automatically when steady</b> checked, the sweep "
+            "begins on its own at that point. "
             "<b>Abort</b> works at any point; aborting during the hold leaves "
             "the aircraft trimmed for the current power.</li>"
             "<li>The sweep measures the stick input needed to hold the nose level "
@@ -474,6 +476,15 @@ class TrimCalibrationDialog(QDialog):
         self.btn_wizard.setText("Begin Calibration")
         self.btn_wizard.setMinimumWidth(widest)
         wizard_row.addWidget(self.btn_wizard)
+        wizard_row.addSpacing(10)
+        self.chk_auto_sweep = QCheckBox("Start sweep automatically when steady")
+        self.chk_auto_sweep.setToolTip(
+            "Begin the trim sweep as soon as speed and trim hold steady,\n"
+            "instead of waiting for Start Trim Sweep to be pressed.")
+        self.chk_auto_sweep.setChecked(bool(G.system_settings.get(
+            "TrimCalAutoSweep", False)))
+        self.chk_auto_sweep.toggled.connect(self._on_auto_sweep_toggled)
+        wizard_row.addWidget(self.chk_auto_sweep)
         # Abort at the far edge — deliberate distance from the go button.
         wizard_row.addStretch(1)
         self.btn_stop = QPushButton("Abort")
@@ -536,23 +547,34 @@ class TrimCalibrationDialog(QDialog):
         # its new equilibrium speed for a minute-plus after a power change;
         # the arrow shows the assistant is waiting on physics, not wedged).
         self.ias_trend = IasTrendWidget()
+        # VS gets the same arrow against the band the current ready gate
+        # accepts.
+        self.vs_target = VsTargetWidget()
+        arrows = {self.lbl_ias: self.ias_trend, self.lbl_vs: self.vs_target}
+        widest = {self.lbl_ias: "888.8 kt", self.lbl_vs: "+8888 fpm"}
+        gap = 3
         for col, (name, w) in enumerate([
-            ("IAS", self.lbl_ias), ("Pitch", self.lbl_pitch), ("VS", self.lbl_vs),
+            ("IAS", self.lbl_ias), ("VS", self.lbl_vs), ("Pitch", self.lbl_pitch),
             ("Bank", self.lbl_bank), ("Trim", self.lbl_trim),
         ]):
             grid.addWidget(QLabel(f"<b>{name}</b>"), 2, col, alignment=Qt.AlignmentFlag.AlignHCenter)
             w.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-            if w is self.lbl_ias:
-                # Arrow pinned at the cell's right edge, OUTSIDE the label's
-                # centering, so neither the arrow redrawing nor the label
-                # text changing shifts anything else.
+            if w in arrows:
+                # The value is right-aligned in a fixed-width box with the
+                # arrow just after it, and a matching space before it keeps
+                # the value centered under its heading. Changing text or a
+                # redrawn arrow shifts nothing.
+                w.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                w.setMinimumWidth(w.fontMetrics().horizontalAdvance(widest[w]))
                 cell = QHBoxLayout()
                 cell.setContentsMargins(0, 0, 0, 0)
                 cell.setSpacing(0)
                 cell.addStretch(1)
-                cell.addWidget(self.lbl_ias)
+                cell.addSpacing(arrows[w].width() + gap)
+                cell.addWidget(w)
+                cell.addSpacing(gap)
+                cell.addWidget(arrows[w])
                 cell.addStretch(1)
-                cell.addWidget(self.ias_trend)
                 grid.addLayout(cell, 3, col)
             else:
                 grid.addWidget(w, 3, col)
@@ -984,6 +1006,7 @@ class TrimCalibrationDialog(QDialog):
 
             ias_ref = getattr(cal, "_ias0", None) if (cal is not None and cal.active) else None
             self._update_live_values(data, ias_ref)
+            self._update_vs_target(data, cal)
 
             if G.device_type != "joystick":
                 self._set_ready(False, "Run from the joystick (master) instance")
@@ -1026,6 +1049,8 @@ class TrimCalibrationDialog(QDialog):
             # abort; the hysteresis lives engine-side, next to the data).
             if assist_holding:
                 if getattr(cal, "assist_stable", False):
+                    if self.chk_auto_sweep.isChecked():
+                        cal.begin_sweep()
                     self._apply_wizard("Start Trim Sweep", True)
                     self._set_tracker(2, self.COL_OK)
                     ias_kt = (data.get("IAS") or 0) * 1.94384
@@ -1675,6 +1700,9 @@ class TrimCalibrationDialog(QDialog):
         G.system_settings.setValue(
             f"{G.device_type}/TrimCalInstructionsCollapsed", not checked)
 
+    def _on_auto_sweep_toggled(self, checked):
+        G.system_settings.setValue(f"{G.device_type}/TrimCalAutoSweep", checked)
+
     def _apply_instructions_state(self, expanded):
         self.scroll_instructions.setVisible(expanded)
         self.btn_instructions.setArrowType(
@@ -1698,10 +1726,15 @@ class TrimCalibrationDialog(QDialog):
         self._refit(allow_shrink=not expanded)
 
     def _update_live_values(self, data, ias_ref=None):
-        def fmt(v, conv=1.0, unit="", nd=0):
+        def fmt(v, conv=1.0, unit="", nd=0, signed=False):
             if v is None:
                 return "—"
-            return f"{v * conv:.{nd}f}{unit}"
+            # + 0.0 turns a rounded -0 into 0, so it never reads "-0"
+            v = round(v * conv, nd) + 0.0
+            if not signed:
+                return f"{v:.{nd}f}{unit}"
+            # U+2212 minus is as wide as the plus; a hyphen is narrower
+            return f"{v:+.{nd}f}".replace("-", "−") + unit
 
         # Live airspeed-drift warning during a run: the measured slope is only
         # trustworthy at roughly constant speed, so surface drift as it happens
@@ -1748,11 +1781,23 @@ class TrimCalibrationDialog(QDialog):
                 ias_style = f"QLabel {{ color:{color}; font-weight:bold; }}"
         self.lbl_ias.setText(ias_txt)
         self.lbl_ias.setStyleSheet(ias_style)
-        self.lbl_pitch.setText(fmt(data.get("Pitch"), 1.0, "°", nd=1))
-        self.lbl_vs.setText(fmt(data.get("VerticalSpeed"), MS_TO_FPM, " fpm"))
-        self.lbl_bank.setText(fmt(data.get("Roll"), 1.0, "°", nd=1))
-        et = data.get("ElevTrimPct")
-        self.lbl_trim.setText("—" if et is None else f"{et * 100:.0f}%")
+        self.lbl_pitch.setText(fmt(data.get("Pitch"), 1.0, "°", nd=1, signed=True))
+        self.lbl_vs.setText(fmt(data.get("VerticalSpeed"), MS_TO_FPM, " fpm", signed=True))
+        self.lbl_bank.setText(fmt(data.get("Roll"), 1.0, "°", nd=1, signed=True))
+        self.lbl_trim.setText(fmt(data.get("ElevTrimPct"), 100.0, "%", signed=True))
+
+    def _update_vs_target(self, data, cal):
+        """Point the VS arrow at the band the current ready gate accepts:
+        the start gate while idle, the level-hold gate during a run."""
+        vs = data.get("VerticalSpeed")
+        if cal is None or vs is None or G.device_type != "joystick":
+            self.vs_target.set_deviation(None)
+            return
+        if cal.active:
+            target, band = cal.vs_target, cal.STABLE_VS_TOL
+        else:
+            target, band = self._glider_vs_target_ms(), cal.START_MAX_VS
+        self.vs_target.set_deviation((vs - target) * MS_TO_FPM, band * MS_TO_FPM)
 
     # ---- button handlers ----------------------------------------------------
 
@@ -2253,6 +2298,7 @@ class TrimCalibrationDialog(QDialog):
     def _refresh_idle(self):
         self._ias_hist.clear()
         self.ias_trend.set_rate(None)
+        self.vs_target.set_deviation(None)
         self.lbl_ias.setText("—")
         self.lbl_pitch.setText("—")
         self.lbl_vs.setText("—")
