@@ -314,7 +314,7 @@ class TrimCalibrationDialog(QDialog):
                 "leveling off. Pick the sink rate you want to hold during the run\n"
                 "(a gentle, steady descent your glider can maintain hands-off is\n"
                 "ideal).\n\n"
-                "While the trim assistant is holding, this is also how you pick a\n"
+                "While TelemFFB holds at the test speed, this is also how you pick a\n"
                 "different test speed: with no throttle, a glider's airspeed\n"
                 "follows its sink rate — set a steeper descent to fly faster, a\n"
                 "shallower one to fly slower, then start the sweep once it\n"
@@ -831,7 +831,8 @@ class TrimCalibrationDialog(QDialog):
         self.btn_apply = QPushButton("Apply (test in sim)")
         self.btn_apply.setToolTip("Apply the value live for a fly-test without saving it to the profile")
         self.btn_save = QPushButton("Save")
-        self.btn_save.setToolTip("Write the value to this aircraft's Y Trim Gain Virtual setting")
+        self.btn_save.setToolTip("Add this result to the aircraft's stored calibrations "
+                                 "and turn on the calibrated trim curve")
         self.btn_close = QPushButton("Close")
         self.btn_apply.clicked.connect(self._on_apply)
         self.btn_save.clicked.connect(self._on_save)
@@ -2153,7 +2154,7 @@ class TrimCalibrationDialog(QDialog):
         """Save is a step in the multi-speed loop, not the end of it: fold
         the result into the family, persist, apply live, and return the
         dialog to the ready state showing the updated stored set — so the
-        next speed is one Trim Assistant click away, no reopen needed."""
+        next speed is one Begin Calibration click away, no reopen needed."""
         if self._last_result is None:
             return
         merged = self._merged_family()
@@ -2173,7 +2174,7 @@ class TrimCalibrationDialog(QDialog):
         n = len(merged)
         self.lbl_note.setText(
             f"Saved — {n} stored speed{'s' if n != 1 else ''} for this "
-            f"aircraft. Ready for the next run: press Trim Assistant, pick "
+            f"aircraft. Ready for the next run: press Begin Calibration, set "
             f"the next test speed, and calibrate again.")
 
     # ---- result / state display ---------------------------------------------
@@ -2242,8 +2243,8 @@ class TrimCalibrationDialog(QDialog):
             notes.append(
                 f"Airspeed drifted {ias_drift * 100:+.0f}% during the sweep, which can skew "
                 "the measurement. The result may still be fine — test it with Apply, and if "
-                "trim following seems off, re-run with steadier power (the Trim Assistant "
-                "helps find a stable speed first).")
+                "trim following seems off, re-run with steadier power and let the airspeed "
+                "settle before the sweep starts.")
         flagged = result.get("flagged") or []
         if flagged:
             worst = max(abs(f["vs_fpm"]) for f in flagged)
@@ -2253,8 +2254,8 @@ class TrimCalibrationDialog(QDialog):
                 f"{len(flagged)} station{plural} (trim {where}, shown in amber) sampled "
                 f"with a residual climb/descent of up to {worst:.0f} fpm — usually slow "
                 "airspeed drift. The curve may be slightly skewed near those points; if "
-                "trim following seems off there, re-run with steadier power (the Trim "
-                "Assistant helps find a stable speed first).")
+                "trim following seems off there, re-run with steadier power and let the "
+                "airspeed settle before the sweep starts.")
         split = result.get("split")
         if split and split["mismatch"] > 0.2:
             notes.append(
