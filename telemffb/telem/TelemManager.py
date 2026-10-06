@@ -537,6 +537,19 @@ class TelemManager(QObject, threading.Thread):
                 'winner': col['winner'], 'same_claim': col['same_claim'], 'keep': keep,
                 'shipped': shipped}
 
+    def keep_user_pattern(self, sim, aircraft_name) -> bool:
+        """Record Keep mine for the aircraft's collision when the user's
+        pattern is the one in effect.  The record is the one the offer
+        dialog writes, so it lapses when the built-in changes.  Returns
+        whether a record was made."""
+        col = xmlutils.collision(sim, aircraft_name)
+        if not col or not (col['winner'] == 'user' or col['user'] == col['curated']):
+            return False
+        shipped = match_history.fingerprint(
+            xmlutils.curated_rows_for_fingerprint(sim, col['curated']))
+        match_history.resolve(sim, col['user'], col['curated'], match_history.DECLINED, shipped)
+        return True
+
     def quit(self):
         self._run = False
         self.join()

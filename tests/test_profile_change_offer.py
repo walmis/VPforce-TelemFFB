@@ -256,6 +256,25 @@ def test_the_offer_is_recomputed_on_every_resolution(store, monkeypatch):
     assert _load(store, monkeypatch) is None
 
 
+def test_a_profile_made_in_the_wizard_is_kept_without_asking(store, monkeypatch):
+    # the user forked 737-600 PAX.* off the built-in on purpose: theirs wins, and
+    # the wizard's answer stands in for Keep mine, so the next load does not ask
+    _added("737-600 PAX.*", ("aileron_expo", "0.9"))
+    mgr = _manager(monkeypatch, "737-600 PAX.*")
+    assert mgr.keep_user_pattern(SIM, AC) is True
+    assert match_history.resolution(SIM, "737-600 PAX.*", "737-600.*") == "declined"
+    assert _load(store, monkeypatch) is None
+
+
+def test_a_wizard_pattern_the_builtin_beats_is_still_offered(store, monkeypatch):
+    # typed broader than the built-in: theirs reaches nothing, which is the prompt's job
+    _added("737-6.*", ("aileron_expo", "0.9"))
+    mgr = _manager(monkeypatch, "737-600.*")
+    assert mgr.keep_user_pattern(SIM, AC) is False
+    assert match_history.resolution(SIM, "737-6.*", "737-600.*") is None
+    assert _load(store, monkeypatch)["winner"] == "curated"
+
+
 def test_a_child_instance_offers_but_leaves_the_record_to_the_master(store, monkeypatch):
     match_history.record_match(SIM, AC, "737.*")
     _added("737-600 PAX.*", ("aileron_expo", "0.9"))

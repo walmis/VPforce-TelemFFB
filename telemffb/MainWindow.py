@@ -2407,10 +2407,12 @@ class MainWindow(QMainWindow):
         # the form we reload below already edits the new profile.
         if not G.settings_mgr.offline_mode and G.telem_manager is not None:
             G.telem_manager.refresh_aircraft_profile()
-        # A profile the user just made on purpose is not a surprise, and
-        # the wizard already offered the clone; the refresh above recorded
-        # the new match, so neither the next reload nor the next start
-        # offers again.
+            # A pattern made here is a deliberate choice: answer its
+            # collision now, or every later load asks about it.
+            sim = getattr(G.settings_mgr, 'current_sim', None)
+            name = getattr(G.settings_mgr, 'current_aircraft_name', None)
+            if sim and name:
+                G.telem_manager.keep_user_pattern(sim, name)
         G.settings_mgr.profile_change = None
         G.app_state.set_prompt('profile_change', None)
         self.settings_layout.reload_layout(None)

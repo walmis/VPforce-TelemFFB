@@ -26,6 +26,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Now the most specific match wins. When two match equally the built-in profile wins, so a new default profile that ships for an aircraft you already have gets noticed instead of being quietly shadowed
 - **NEW: Overlapping profile resolution**
   - The main window shows "Multiple matching profiles detected" and offers to resolve it.  This happens when a curated profile ships for an aircraft you had already made a profile for
+  - A profile you make in the New Aircraft Wizard is not asked about: forking an aircraft off a broader built-in counts as keeping yours
 - **NEW: Profile Fork button - create a new, more specific profile**
   - A new button sits beside the Matched Model row.  It forks the matched profile for the currently matched aircraft into a more specific match string
   - Until now the New Aircraft Wizard only appeared for unmatched aircraft.  An aircraft that mistakenly matched a broader profile had no way to be separated from it without hand-editing the config

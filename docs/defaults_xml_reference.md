@@ -209,6 +209,12 @@ burying it forever. Rewording the shipped notes is not a change in what the prof
 re-ask. A merge is never re-offered: the user is already on the built-in, so whatever it becomes
 reaches them the ordinary way.
 
+A profile made in the New Aircraft Wizard for the loaded aircraft is answered on the spot. Where
+its pattern collides with a shipped one and wins, the pair is recorded as *Keep mine*, so forking
+an aircraft off a broader built-in does not raise the prompt about the profile just made. It is
+the same record the dialog writes and lapses the same way. Where the built-in wins, nothing is
+recorded, since the new profile reaches nothing.
+
 A decline can be taken back. *Profiles > Reset Dismissed Profile Prompts* forgets every collision
 answered with *Keep mine* or *Don't ask again*, so each one is raised again, at once for the loaded
 aircraft and on the next load for the rest. The configuration itself is untouched. A merge is not

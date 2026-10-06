@@ -106,6 +106,19 @@ class TestWizardFinishedHook:
         assert win._new_craft_target is None
         assert G.app_state.current_prompts() == ()
 
+    def test_keeps_the_new_pattern_for_the_loaded_aircraft(self, monkeypatch):
+        from telemffb.state.app_state import AppState
+        hook, win, calls = self._window()
+        tm = SimpleNamespace(refresh_aircraft_profile=lambda: calls.append('refresh'),
+                             keep_user_pattern=lambda sim, name: calls.append(('keep', sim, name)))
+        monkeypatch.setattr(G, 'telem_manager', tm, raising=False)
+        monkeypatch.setattr(G, 'settings_mgr', SimpleNamespace(
+            offline_mode=False, profile_change=None, current_sim='MSFS',
+            current_aircraft_name='PMDG 737-600'), raising=False)
+        monkeypatch.setattr(G, 'app_state', AppState(), raising=False)
+        hook(win)
+        assert calls == ['refresh', ('keep', 'MSFS', 'PMDG 737-600'), 'reload']
+
     def test_offline_editor_does_not_touch_the_live_profile(self, monkeypatch):
         from telemffb.state.app_state import AppState
         hook, win, calls = self._window()
