@@ -851,6 +851,21 @@ class BaseTelemetryData:
     MSFS: AUTOPILOT MASTER SimVar — bool/int.  
     """
 
+    APFollowX: Optional[float]
+    """Roll position the stick follows under the autopilot, raw.  
+    MSFS: the variable named in custom_ap_follow_x_var while that setting is on.  
+    """
+
+    APFollowY: Optional[float]
+    """Pitch position the stick follows under the autopilot, raw.  
+    MSFS: the variable named in custom_ap_follow_y_var while that setting is on.  
+    """
+
+    APFollowRudder: Optional[float]
+    """Yaw position the pedals follow under the autopilot, raw.  
+    MSFS: the variable named in custom_ap_follow_rudder_var while that setting is on.  
+    """
+
     APEnabled: Optional[Union[bool, int]]
     """Whether autopilot is actively enabled.  
     DCS: Exported from TelemFFB.lua as MCP.AutopilotOn.  

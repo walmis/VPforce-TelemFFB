@@ -866,6 +866,77 @@ class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
         assert self._settled_y(instance, telem) == pytest.approx(0.25 * 4096, abs=40)
 
 
+class TestCustomAPFollowSources(BaseTelemetryEffectTestCase):
+    """A position the user names replaces the control-surface deflection as
+    the AP-follow target, through a transform to -1..1."""
+
+    def _instance(self, ffb_type="joystick"):
+        instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.trim_following = True
+        instance.ap_following = True
+        instance.telemffb_controls_axes = True
+        instance._simconnect = self.mock_simconnect
+        instance.joystick_ap_follow_gain_physical_x = 1.0
+        instance.joystick_ap_follow_gain_physical_y = 1.0
+        instance.joystick_trim_follow_gain_physical_y = 1.0
+        instance.joystick_trim_follow_use_curve_y = False
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        return instance
+
+    def _settled_offsets(self, instance, telem, frames=3):
+        for _ in range(frames):
+            self.set_telemetry(instance, telem)
+            instance.update_fbw_flight_controls(telem)
+        return instance._spring_handle.get_offsets()
+
+    def test_custom_roll_variable_replaces_the_aileron_source(self):
+        instance = self._instance()
+        instance.custom_ap_follow_x_var_enabled = True
+        instance.custom_ap_follow_x_var = "L:yokes_L_R_capt"
+        instance.custom_ap_follow_x_transform = "x - 1"
+        telem = (TelemetryDataBuilder().ffb_type("joystick").autopilot(True)
+                 .aileron_deflection(0.4, -0.4).elevator_trim(0.0)
+                 .with_field("APFollowX", 1.6).build())
+
+        x, _ = self._settled_offsets(instance, telem)
+        assert x == pytest.approx(0.6 * 4096, abs=40)
+
+    def test_custom_pitch_variable_is_followed_whatever_the_follow_axis_toggle_says(self):
+        instance = self._instance()
+        instance.custom_ap_follow_y_var_enabled = True
+        instance.custom_ap_follow_y_var = "L:yokes_Fore_Aft_capt"
+        instance.custom_ap_follow_y_transform = "x - 1"
+        telem = (TelemetryDataBuilder().ffb_type("joystick").autopilot(True)
+                 .elevator_trim(0.5).elevator_deflection(-0.3)
+                 .with_field("APFollowY", 1.3).build())
+
+        for follow_axis in (False, True):
+            instance.joystick_ap_y_follow_axis = follow_axis
+            _, y = self._settled_offsets(instance, telem)
+            assert y == pytest.approx(0.3 * 4096, abs=40)
+
+        # Variable off: back to the toggle's choice, trim or deflection.
+        instance.custom_ap_follow_y_var_enabled = False
+        instance.joystick_ap_y_follow_axis = False
+        _, y = self._settled_offsets(instance, telem)
+        assert y == pytest.approx(0.5 * 4096, abs=40)
+        instance.joystick_ap_y_follow_axis = True
+        _, y = self._settled_offsets(instance, telem)
+        assert y == pytest.approx(-0.3 * 4096, abs=40)
+
+    def test_custom_yaw_variable_replaces_the_rudder_source(self):
+        instance = self._instance("pedals")
+        instance.custom_ap_follow_rudder_var_enabled = True
+        instance.custom_ap_follow_rudder_var = "L:NGXRudderPedals"
+        instance.custom_ap_follow_rudder_transform = "x/50 - 1"
+        telem = (TelemetryDataBuilder().ffb_type("pedals").autopilot(True)
+                 .rudder_deflection(0.3).with_field("APFollowRudder", 25.0).build())
+
+        x, _ = self._settled_offsets(instance, telem)
+        assert x == pytest.approx(-0.5 * 4096, abs=40)
+
+
 class TestMsfsXpFBWFlightControlsTimeout(BaseTelemetryEffectTestCase):
     """The on_timeout guard over the private flight-control spring.
 

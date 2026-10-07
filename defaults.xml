@@ -2915,6 +2915,7 @@
 		<datatype>bool</datatype>
 		<name>joystick_ap_y_follow_axis</name>
 		<displayname>    AP Pitch - Follow axis instead of trim</displayname>
+		<exclusive_with>custom_ap_follow_y_var_enabled</exclusive_with>
 		<prereq>ap_following</prereq>
 		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
 		<info>Elevator AP will attempt to follow the axis position rather than the trim value</info>
@@ -2953,6 +2954,137 @@
 		<pedals>true</pedals>
 		<validvalues>AUTOPILOT MASTER</validvalues>
 		<value>AUTOPILOT MASTER</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.93</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_follow_x_var_enabled</name>
+		<displayname>    Custom Roll Follow Variable</displayname>
+		<prereq>ap_following</prereq>
+		<info>Follow the autopilot in roll through a variable of your choice instead of the aileron deflection, for an aircraft that publishes its control wheel position in its own variable</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.931</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_follow_x_var</name>
+		<displayname>    Custom Roll Follow Variable</displayname>
+		<prereq>custom_ap_follow_x_var_enabled</prereq>
+		<info>A SimVar, an L:Var or an input event (B:) holding the roll position the stick follows, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>YOKE X POSITION,AILERON POSITION</validvalues>
+		<value>YOKE X POSITION</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.932</order>
+		<datatype>text</datatype>
+		<name>custom_ap_follow_x_transform</name>
+		<displayname>    Roll Transform to -1..1</displayname>
+		<prereq>custom_ap_follow_x_var_enabled</prereq>
+		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowX</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value></value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.94</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_follow_y_var_enabled</name>
+		<displayname>    Custom Pitch Follow Variable</displayname>
+		<exclusive_with>joystick_ap_y_follow_axis</exclusive_with>
+		<prereq>ap_following</prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
+		<info>Follow the autopilot in pitch through a variable of your choice instead of the trim or the elevator deflection, for an aircraft that publishes its control column position in its own variable</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.941</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_follow_y_var</name>
+		<displayname>    Custom Pitch Follow Variable</displayname>
+		<prereq>custom_ap_follow_y_var_enabled</prereq>
+		<info>A SimVar, an L:Var or an input event (B:) holding the pitch position the stick follows, -1 (full forward) to 1 (full aft). A value on another scale needs the transform below.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>YOKE Y POSITION,ELEVATOR POSITION</validvalues>
+		<value>YOKE Y POSITION</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.942</order>
+		<datatype>text</datatype>
+		<name>custom_ap_follow_y_transform</name>
+		<displayname>    Pitch Transform to -1..1</displayname>
+		<prereq>custom_ap_follow_y_var_enabled</prereq>
+		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowY</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value></value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.95</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_follow_rudder_var_enabled</name>
+		<displayname>    Custom Yaw Follow Variable</displayname>
+		<prereq>ap_following</prereq>
+		<info>Follow the autopilot through a variable of your choice instead of the rudder deflection, for an aircraft that publishes its pedal position in its own variable</info>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.951</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_follow_rudder_var</name>
+		<displayname>    Custom Yaw Follow Variable</displayname>
+		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
+		<info>A SimVar, an L:Var or an input event (B:) holding the yaw position the pedals follow, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<validvalues>RUDDER PEDAL POSITION,RUDDER POSITION</validvalues>
+		<value>RUDDER PEDAL POSITION</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2450.952</order>
+		<datatype>text</datatype>
+		<name>custom_ap_follow_rudder_transform</name>
+		<displayname>    Yaw Transform to -1..1</displayname>
+		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
+		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowRudder</info>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<value></value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>

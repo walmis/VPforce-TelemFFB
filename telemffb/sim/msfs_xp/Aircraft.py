@@ -251,6 +251,7 @@ class Aircraft(
             sc_unit="number")
         self._sync_runtime_simvar(
             "APMaster", self.custom_ap_var if self.custom_ap_var_enabled else None, sc_unit="number")
+        self._sync_ap_follow_sources()
 
         if self._sim_is_xplane():
             self.toggle_xp_control()

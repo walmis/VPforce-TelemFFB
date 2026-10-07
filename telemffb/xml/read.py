@@ -123,7 +123,9 @@ class ConfigResolver:
         # Filter empty values (except special names, where empty is a valid setting)
         defaultdata = [d for d in defaultdata
                        if d['value'] != '' or d['name'] in (
-                           'vpconf', 'vne_override', 'hydraulic_source_var', 'hydraulic_source_transform')]
+                           'vpconf', 'vne_override', 'hydraulic_source_var', 'hydraulic_source_transform',
+                           'custom_ap_follow_x_transform', 'custom_ap_follow_y_transform',
+                           'custom_ap_follow_rudder_transform')]
 
         # Apply validvalues overrides
         self._apply_validvalue_overrides(defaultdata, sim, model_class, dev)

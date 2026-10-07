@@ -7,8 +7,10 @@ from telemffb.sim.msfs_xp.MsfsXpSimConnectMixIn import MsfsXpSimConnectMixIn
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 
 from telemffb.utils import clamp
+from telemffb.utils.TransformExpr import TransformExpr
 
 import logging
+from typing import Optional
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
@@ -60,13 +62,86 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
     fbw_elevator_gain = 0.8
     fbw_aileron_gain = 0.8
     fbw_rudder_gain = 0.8
+
+    # MSFS: follow the autopilot through a variable the user names instead of
+    # the control-surface deflection, each with a transform to -1..1
+    custom_ap_follow_x_var_enabled: bool = False
+    custom_ap_follow_x_var: str = ""
+    custom_ap_follow_x_transform: str = ""
+    custom_ap_follow_y_var_enabled: bool = False
+    custom_ap_follow_y_var: str = ""
+    custom_ap_follow_y_transform: str = ""
+    custom_ap_follow_rudder_var_enabled: bool = False
+    custom_ap_follow_rudder_var: str = ""
+    custom_ap_follow_rudder_transform: str = ""
     # end of user parameters
+
+    #: axis -> (enabled setting, variable setting, transform setting, telemetry name)
+    _AP_FOLLOW_SOURCES = {
+        "x": ("custom_ap_follow_x_var_enabled", "custom_ap_follow_x_var",
+              "custom_ap_follow_x_transform", "APFollowX"),
+        "y": ("custom_ap_follow_y_var_enabled", "custom_ap_follow_y_var",
+              "custom_ap_follow_y_transform", "APFollowY"),
+        "rudder": ("custom_ap_follow_rudder_var_enabled", "custom_ap_follow_rudder_var",
+                   "custom_ap_follow_rudder_transform", "APFollowRudder"),
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.elev_trim_dampener = utils.Dampener()
         self.aileron_pos_dampener = utils.Dampener()
         self.rudder_pos_dampener = utils.Dampener()
+        # axis -> (transform text, parsed TransformExpr or the error it raised)
+        self._ap_follow_transforms: dict = {}
+
+    def _custom_ap_follow_var(self, axis: str) -> Optional[str]:
+        """The variable the settings name for ``axis``; None when the option is off."""
+        enabled, var, _, _ = self._AP_FOLLOW_SOURCES[axis]
+        if getattr(self, enabled, False):
+            return getattr(self, var, "") or None
+        return None
+
+    def _sync_ap_follow_sources(self) -> None:
+        """Keep each custom follow variable subscribed while its setting is on."""
+        for axis, (_, _, _, name) in self._AP_FOLLOW_SOURCES.items():
+            self._sync_runtime_simvar(name, self._custom_ap_follow_var(axis), sc_unit="number")
+
+    def _custom_ap_follow_position(self, axis: str, telem_data: BaseTelemetryData) -> Optional[float]:
+        """The custom follow variable for ``axis`` through its transform, clamped to
+        -1..1; None when the option is off, the value has not arrived, or the
+        transform fails.
+
+        Telemetry:
+            Read: APFollowX / APFollowY / APFollowRudder - float; the variable named
+                  in the matching custom_ap_follow_*_var setting, raw
+        """
+        if self._custom_ap_follow_var(axis) is None:
+            return None
+        _, _, transform_attr, name = self._AP_FOLLOW_SOURCES[axis]
+        raw = telem_data.get(name, None)
+        if raw is None:
+            return None
+        text = getattr(self, transform_attr, "")
+        text = "" if text is None else str(text).strip()
+        cached = self._ap_follow_transforms.get(axis)
+        if cached is None or cached[0] != text:
+            try:
+                parsed = TransformExpr(text) if text else None
+            except ValueError as e:
+                parsed = e
+            cached = self._ap_follow_transforms[axis] = (text, parsed)
+        parsed = cached[1]
+        if isinstance(parsed, ValueError):
+            self.flag_error(f"AP following: the {axis} transform '{text}' is not valid ({parsed}). "
+                            f"Use x for the variable's value, for example x - 1")
+            return None
+        try:
+            value = float(raw)
+            if parsed is not None:
+                value = float(parsed.apply(value))
+        except (ArithmeticError, TypeError, ValueError):
+            return None
+        return clamp(value, -1, 1)
 
     def on_timeout(self):
         """Stop the flight-control spring, except when hold-forces says to
@@ -188,7 +263,11 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     phys_x, phys_y = self._get_device_axes()
                     if self._sim_is_msfs():
                         aileron_pos = telem_data.AileronDeflPctLR or (0, 0)
+                        custom_x = self._custom_ap_follow_position("x", telem_data)
+                        if custom_x is not None:
+                            aileron_pos = (custom_x, custom_x)
                         telem_data.phys_x_aileron = aileron_pos[0]
+                        custom_y = self._custom_ap_follow_position("y", telem_data)
                         if curve_active:
                             # Calibrated curve owns the center: AP-follow Y
                             # sources the same trim signal the curve maps, so
@@ -197,15 +276,16 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             # already defines the resting geometry. Only the
                             # deadzone reference needs the center normalized.
                             elevator_pos = center_y
-                        elif self.joystick_ap_y_follow_axis:
+                        elif self.joystick_ap_y_follow_axis or custom_y is not None:
                             # Follow the elevator DEFLECTION — the surface the
-                            # AP actually commands — rather than the trim.
+                            # AP actually commands — rather than the trim, or
+                            # the custom follow variable when one is set.
                             # This is the setting's original intent (a27a7f4),
                             # dead since dea669a (2025-04-30) unconditionally
                             # overwrote it with the trim value. Restored here
                             # for the no-curve case.
-                            elevator_pos = clamp((telem_data.ElevDeflPct or 0)
-                                                 * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                            source = custom_y if custom_y is not None else (telem_data.ElevDeflPct or 0)
+                            elevator_pos = clamp(source * self.joystick_ap_follow_gain_physical_y, -1, 1)
                             virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
                             phys_stick_y_offs = elevator_pos
                         else:
@@ -373,7 +453,9 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     phys_x, phys_y = self._get_device_axes()
                     rudder_pos = None
                     if self._sim_is_msfs():
-                        rudder_pos = telem_data.RudderDeflPct or 0
+                        rudder_pos = self._custom_ap_follow_position("rudder", telem_data)
+                        if rudder_pos is None:
+                            rudder_pos = telem_data.RudderDeflPct or 0
                     if self._sim_is_xplane():
                         rudder_pos = telem_data.APYawServo or 0
 
