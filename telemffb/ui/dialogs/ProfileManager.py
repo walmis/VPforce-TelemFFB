@@ -1090,7 +1090,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             sim = self.get_metadata(active_item, "sim_name")
             cls = self.get_metadata(active_item, "cls_name")
             model = active_item.text(self.COL_AIRCRAFT)
-            profile = active_item.text(self.COL_PROFILE)
+            profile = self.get_metadata(active_item, "profile_name") or active_item.text(self.COL_PROFILE)
             cls_item = active_item.parent()
 
             # Get sibling profiles for same aircraft
@@ -1164,7 +1164,9 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             return
 
         # Handle standard deletions
-        names = "\n".join(f"{i.text(self.COL_AIRCRAFT)} ({i.text(self.COL_PROFILE)})" for i in items)
+        names = "\n".join(
+            f"{i.text(self.COL_AIRCRAFT)} ({self.get_metadata(i, 'profile_name') or i.text(self.COL_PROFILE)})"
+            for i in items)
         resp = QMessageBox.question(
             self, "Confirm Deletion",
             f"Delete the following profiles?\n\n{names}",
@@ -1176,7 +1178,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         for item in items:
             sim = self.get_metadata(item, "sim_name")
             model = item.text(self.COL_AIRCRAFT)
-            profile = item.text(self.COL_PROFILE)
+            profile = self.get_metadata(item, "profile_name") or item.text(self.COL_PROFILE)
             xmlutils.erase_model_profile(sim, model, profile)
             item.parent().removeChild(item)
 
