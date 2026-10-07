@@ -1400,6 +1400,46 @@ class TestReadSingleModel:
         settings = {d["name"]: d for d in data}
         assert "gear_effect_gain" in settings
 
+    def test_prereq_filtering_can_be_skipped(self, xml_tmpdir):
+        """A setting under a parent that is off is dropped by default and
+        kept when the caller asks for the unfiltered resolution."""
+        from pathlib import Path
+        block = """  <defaults>
+    <datatype>bool</datatype>
+    <grouping>Basic</grouping>
+    <order>60</order>
+    <name>curve_toggle</name>
+    <displayname>Curve</displayname>
+    <prereq>basic_group</prereq>
+    <MSFS>true</MSFS>
+    <joystick>true</joystick>
+    <value>false</value>
+  </defaults>
+  <defaults>
+    <datatype>list</datatype>
+    <grouping>Basic</grouping>
+    <order>60.2</order>
+    <name>stick_rest</name>
+    <displayname>Stick Rest</displayname>
+    <prereq>curve_toggle</prereq>
+    <MSFS>true</MSFS>
+    <joystick>true</joystick>
+    <value>Stays Centered</value>
+  </defaults>
+</TelemFFB>"""
+        path = Path(xml_tmpdir["defaults"])
+        path.write_text(path.read_text(encoding="utf-8").replace("</TelemFFB>", block, 1),
+                        encoding="utf-8")
+        xmlutils.update_roots()
+
+        _, _, data = xmlutils.read_single_model("MSFS", "Cessna 172", instance_device="joystick")
+        assert "stick_rest" not in {d["name"] for d in data}
+
+        _, _, data = xmlutils.read_single_model("MSFS", "Cessna 172", instance_device="joystick",
+                                                apply_prereqs=False)
+        settings = {d["name"]: d for d in data}
+        assert settings["stick_rest"]["value"] == "Stays Centered"
+
     def test_returns_tuple_of_three(self, xml_tmpdir):
         result = xmlutils.read_single_model("MSFS", "Cessna 172")
         assert isinstance(result, tuple)

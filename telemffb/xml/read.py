@@ -56,10 +56,13 @@ class ConfigResolver:
         input_modeltype: str = '',
         instance_device: str = '',
         active_profile: Optional[str] = None,
+        apply_prereqs: bool = True,
     ) -> tuple[str, str, list[DefaultDataRow]]:
         """Full 6-layer cascade resolution for a single aircraft.
 
-        Returns (model_class, model_pattern, sorted_data).
+        Returns (model_class, model_pattern, sorted_data).  With
+        ``apply_prereqs`` False, rows whose prerequisite is off are kept:
+        the value a setting resolves to once its parent is switched on.
         """
         ptrn = self.get_pattern_by_sim_fullname(sim, aircraft_name)
         if active_profile is None:
@@ -131,9 +134,11 @@ class ConfigResolver:
         self._apply_validvalue_overrides(defaultdata, sim, model_class, dev)
 
         # Prerequisite filtering
-        prereq_list = self.read_prereqs()
-        xmmerge.check_prereq_value(prereq_list, defaultdata)
-        final = xmmerge.eliminate_no_prereq(defaultdata)
+        final = defaultdata
+        if apply_prereqs:
+            prereq_list = self.read_prereqs()
+            xmmerge.check_prereq_value(prereq_list, defaultdata)
+            final = xmmerge.eliminate_no_prereq(defaultdata)
 
         return model_class, pattern, sorted(final, key=lambda x: float(x['order']))
 

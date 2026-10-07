@@ -357,7 +357,8 @@ def read_default_class_data(the_sim: str, the_class: str, instance_device: str =
 
 
 def read_single_model(the_sim: str, aircraft_name: str, input_modeltype: str = '', instance_device: str = '',
-                      active_profile: Optional[str] = None) -> tuple[str, str, list[DefaultDataRow]]:
+                      active_profile: Optional[str] = None,
+                      apply_prereqs: bool = True) -> tuple[str, str, list[DefaultDataRow]]:
     """Resolve the complete setting set for a single aircraft.
 
     Performs the full 6-layer cascade (sim → class → user-sim → user-class → model → user-model),
@@ -369,12 +370,13 @@ def read_single_model(the_sim: str, aircraft_name: str, input_modeltype: str = '
         input_modeltype: Pre-known class (looked up from XML if empty)
         instance_device: Device override
         active_profile: Profile override (auto-resolved if ``None``)
+        apply_prereqs: False keeps rows whose prerequisite is off
 
     Returns:
         Tuple of (class name, matched pattern, sorted settings list)
     """
     return _resolver().resolve(the_sim, aircraft_name, input_modeltype,
-                               instance_device, active_profile)
+                               instance_device, active_profile, apply_prereqs)
 
 
 def read_user_sim_data(the_sim: str, instance_device: str = '') -> list[ModelDataRow]:

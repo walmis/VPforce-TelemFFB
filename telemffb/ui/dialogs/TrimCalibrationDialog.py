@@ -1205,7 +1205,10 @@ class TrimCalibrationDialog(QDialog):
             ac = G.telem_manager.currentAircraft if G.telem_manager else None
             raw = getattr(ac, "joystick_trim_follow_curve_y", None) if ac is not None else None
             use_curve = bool(getattr(ac, "joystick_trim_follow_use_curve_y", False))
-            stick_pos = getattr(ac, "joystick_trim_follow_stick_position", None)
+            stick_pos = getattr(ac, "joystick_trim_follow_stick_position", None) \
+                if use_curve else None
+        if stick_pos not in self.STICK_POSITION_MODES:
+            stick_pos = self._resolved_stick_position()
         # Record what this display attempt was based on, drawn or not, so the
         # live change check in _on_telemetry knows when a redraw is due.
         self._stored_curve_seen = raw
@@ -1389,7 +1392,9 @@ class TrimCalibrationDialog(QDialog):
         else:
             ac = G.telem_manager.currentAircraft if G.telem_manager else None
             stick = getattr(ac, "joystick_trim_follow_stick_position", None) \
-                if ac is not None else None
+                if ac is not None and getattr(ac, "joystick_trim_follow_use_curve_y", False) else None
+        if stick not in self.STICK_POSITION_MODES:
+            stick = self._resolved_stick_position()
         payload = {
             "type": self.EXPORT_TYPE,
             "version": 1,
@@ -1583,6 +1588,29 @@ class TrimCalibrationDialog(QDialog):
         if not self.lbl_suggest.isVisible():
             self._set_suggest_visible(True)
             self._refit()
+
+    def _resolved_stick_position(self):
+        """The trimmed stick position the aircraft resolves to once curve
+        mode is on.  The setting hangs under the curve toggle, so the live
+        aircraft only carries it after a calibration exists; before that
+        the class default lives in the XML alone."""
+        sm = G.settings_mgr
+        if sm is None or not getattr(sm, "current_aircraft_name", ""):
+            return None
+        if self._offline_editing() and not self._offline_target_valid():
+            return None
+        try:
+            _, _, rows = xmlutils.read_single_model(
+                sm.current_sim, sm.current_aircraft_name, sm.current_class,
+                G.device_type, active_profile=sm.active_profile, apply_prereqs=False)
+        except Exception as e:
+            logger.warning(f"Stick position read failed: {e}")
+            return None
+        for row in rows:
+            if row.get("name") == "joystick_trim_follow_stick_position":
+                value = row.get("value")
+                return value if value in self.STICK_POSITION_MODES else None
+        return None
 
     def _sync_stick_pos_combo(self, value):
         want = value if value in self.STICK_POSITION_MODES \
