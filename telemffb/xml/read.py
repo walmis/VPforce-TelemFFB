@@ -128,7 +128,7 @@ class ConfigResolver:
                        if d['value'] != '' or d['name'] in (
                            'vpconf', 'vne_override', 'hydraulic_source_var', 'hydraulic_source_transform',
                            'custom_ap_follow_x_transform', 'custom_ap_follow_y_transform',
-                           'custom_ap_follow_rudder_transform')]
+                           'custom_ap_follow_rudder_transform', 'ap_disconnect_release_value')]
 
         # Apply validvalues overrides
         self._apply_validvalue_overrides(defaultdata, sim, model_class, dev)

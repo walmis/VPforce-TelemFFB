@@ -1028,6 +1028,75 @@ class TestAPFollowHold(BaseTelemetryEffectTestCase):
         assert instance._ap_hold["x"] is None
 
 
+class TestAPDisconnectOnOverride(BaseTelemetryEffectTestCase):
+    """Holding the stick past the disconnect deflection for the dwell sends
+    the disconnect event once, with its release value a moment later."""
+
+    def _instance(self, monkeypatch, clock, timers):
+        import telemffb.sim.msfs_xp.MsfsXpFBWFlightControlsMixIn as module
+        monkeypatch.setattr(module.time, "perf_counter", lambda: clock[0])
+        self.clock = clock
+
+        class FakeTimer:
+            def __init__(self, interval, function, args=()):
+                timers.append((interval, function, args))
+
+            def start(self):
+                pass
+
+        monkeypatch.setattr(module.threading, "Timer", FakeTimer)
+        instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.trim_following = True
+        instance.ap_following = True
+        instance.telemffb_controls_axes = True
+        instance._simconnect = self.mock_simconnect
+        instance.joystick_ap_follow_gain_physical_x = 1.0
+        instance.joystick_ap_follow_gain_physical_y = 1.0
+        instance.joystick_ap_y_follow_axis = True
+        instance.joystick_trim_follow_use_curve_y = False
+        instance.ap_disconnect_on_override = True
+        instance.ap_disconnect_deflection = 0.3
+        return instance
+
+    def _frame(self, instance, stick_x):
+        # the patched clock is shared with the dampeners, which divide by dt
+        self.clock[0] += 0.001
+        self.mock_device._input_data.set_axis(x=stick_x, y=0.0)
+        telem = (TelemetryDataBuilder().ffb_type("joystick").autopilot(True)
+                 .aileron_deflection(0.2, -0.2).elevator_deflection(0.0).elevator_trim(0.0).build())
+        self.set_telemetry(instance, telem)
+        self.mock_simconnect.sent_events.clear()
+        instance.update_fbw_flight_controls(telem)
+        return [v for n, v in self.mock_simconnect.sent_events if n == "AUTOPILOT_DISENGAGE_SET"]
+
+    def test_sends_once_after_the_dwell_then_the_release(self, monkeypatch):
+        clock, timers = [10.0], []
+        instance = self._instance(monkeypatch, clock, timers)
+        assert self._frame(instance, 0.2) == []
+        # held 0.4 past the command: nothing until the dwell has passed
+        assert self._frame(instance, 0.6) == []
+        clock[0] += 0.1
+        assert self._frame(instance, 0.6) == []
+        clock[0] += 0.15
+        assert self._frame(instance, 0.6) == [1]
+        assert len(timers) == 1 and timers[0][0] == pytest.approx(0.1)
+        timers[0][1](*timers[0][2])
+        assert ("AUTOPILOT_DISENGAGE_SET", 0) in self.mock_simconnect.sent_events
+        # the same excursion never sends again
+        clock[0] += 1.0
+        assert self._frame(instance, 0.6) == []
+
+    def test_a_push_short_of_the_deflection_never_sends(self, monkeypatch):
+        clock, timers = [10.0], []
+        instance = self._instance(monkeypatch, clock, timers)
+        self._frame(instance, 0.2)
+        for _ in range(5):
+            clock[0] += 0.2
+            assert self._frame(instance, 0.45) == []
+        assert timers == []
+
+
 class TestMsfsXpFBWFlightControlsTimeout(BaseTelemetryEffectTestCase):
     """The on_timeout guard over the private flight-control spring.
 

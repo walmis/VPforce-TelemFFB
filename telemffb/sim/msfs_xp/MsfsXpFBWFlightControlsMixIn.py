@@ -10,6 +10,8 @@ from telemffb.utils import clamp
 from telemffb.utils.TransformExpr import TransformExpr
 
 import logging
+import threading
+import time
 from typing import Optional
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
@@ -74,7 +76,20 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
     custom_ap_follow_rudder_var_enabled: bool = False
     custom_ap_follow_rudder_var: str = ""
     custom_ap_follow_rudder_transform: str = ""
+
+    # MSFS: send a disconnect once the stick is held past a deflection from
+    # the autopilot's command, with an optional second value shortly after
+    ap_disconnect_on_override: bool = False
+    ap_disconnect_deflection: float = 0.3
+    ap_disconnect_event: str = "AUTOPILOT_DISENGAGE_SET"
+    ap_disconnect_value: str = "1"
+    ap_disconnect_release_value: str = "0"
     # end of user parameters
+
+    #: seconds the deflection must be held before the disconnect is sent
+    AP_DISCONNECT_DWELL_S = 0.2
+    #: seconds between the disconnect value and its release value
+    AP_DISCONNECT_RELEASE_S = 0.1
 
     #: axis -> (enabled setting, variable setting, transform setting, telemetry name)
     _AP_FOLLOW_SOURCES = {
@@ -97,6 +112,10 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         # autopilot's command (MSFS), and frames spent back inside the deadzone
         self._ap_hold = {"x": None, "y": None}
         self._ap_hold_inside = {"x": 0, "y": 0}
+        # when the stick first went past the disconnect deflection, and
+        # whether the disconnect has been sent for this excursion
+        self._ap_disconnect_since = None
+        self._ap_disconnect_fired = False
 
     #: frames back inside the deadzone after which a held center lets go even
     #: though the surface has not returned to it: the autopilot moved its
@@ -129,6 +148,45 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 return held, False
             self._ap_hold[axis] = None
         return target, False
+
+    @staticmethod
+    def _ap_disconnect_number(text):
+        """The event value a setting holds, as an int when whole; None when blank or not a number."""
+        value = utils.to_number(str(text).strip()) if text is not None else None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return int(value) if float(value).is_integer() else value
+
+    def _ap_disconnect_check(self, phys_x: float, phys_y: float, center_x: float, center_y: float) -> None:
+        """Send the disconnect once the stick has been held past the deflection
+        for the dwell.  Sent once per excursion; the next excursion can send
+        again only after the stick has been back inside the deadzone."""
+        if self._ap_hold["x"] is None and self._ap_hold["y"] is None:
+            self._ap_disconnect_fired = False
+        if not self.ap_disconnect_on_override or self._ap_disconnect_fired:
+            return
+        if max(abs(phys_x - center_x), abs(phys_y - center_y)) <= self.ap_disconnect_deflection:
+            self._ap_disconnect_since = None
+            return
+        now = time.perf_counter()
+        if self._ap_disconnect_since is None:
+            self._ap_disconnect_since = now
+            return
+        if now - self._ap_disconnect_since < self.AP_DISCONNECT_DWELL_S:
+            return
+        event = (self.ap_disconnect_event or "").strip()
+        value = self._ap_disconnect_number(self.ap_disconnect_value)
+        if not event or value is None:
+            self.flag_error("Autopilot disconnect: the event and its value must both be set")
+            return
+        self._simconnect.send_event_to_msfs(event, value)
+        release = self._ap_disconnect_number(self.ap_disconnect_release_value)
+        if release is not None:
+            threading.Timer(self.AP_DISCONNECT_RELEASE_S,
+                            self._simconnect.send_event_to_msfs, (event, release)).start()
+        self._ap_disconnect_fired = True
+        self._ap_disconnect_since = None
+        logging.info(f"Autopilot disconnect sent: {event} {value}")
 
     def _custom_ap_follow_var(self, axis: str) -> Optional[str]:
         """The variable the settings name for ``axis``; None when the option is off."""
@@ -294,6 +352,8 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 elif prev_ap and not ap_on:
                     logging.info("AP following released")
                     self._ap_hold = {"x": None, "y": None}
+                    self._ap_disconnect_fired = False
+                    self._ap_disconnect_since = None
                 self._ap_follow_seen = ap_on
 
                 if self.ap_following and ap_active:
@@ -386,6 +446,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                         virtual_stick_y_offs = phys_stick_y_offs
                         telem_data.phys_x_send_flag = ap_send_flag_x
                         telem_data.phys_y_send_flag = ap_send_flag_y
+                        self._ap_disconnect_check(phys_x, phys_y, phys_stick_x_offs, phys_stick_y_offs)
                 else:
                     phys_stick_x_offs = aileron_trim
 

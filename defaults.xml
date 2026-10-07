@@ -2927,7 +2927,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.92</order>
+		<order>2470</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_var_enabled</name>
 		<displayname>    Custom Autopilot Variable</displayname>
@@ -2943,7 +2943,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.921</order>
+		<order>2470.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_var</name>
 		<displayname>    Custom Autopilot Variable</displayname>
@@ -2959,7 +2959,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.93</order>
+		<order>2480</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_x_var_enabled</name>
 		<displayname>    Custom Roll Follow Variable</displayname>
@@ -2973,7 +2973,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.931</order>
+		<order>2480.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_x_var</name>
 		<displayname>    Custom Roll Follow Variable</displayname>
@@ -2988,7 +2988,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.932</order>
+		<order>2480.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_x_transform</name>
 		<displayname>    Roll Transform to -1..1</displayname>
@@ -3002,7 +3002,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.94</order>
+		<order>2490</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_y_var_enabled</name>
 		<displayname>    Custom Pitch Follow Variable</displayname>
@@ -3017,7 +3017,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.941</order>
+		<order>2490.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_y_var</name>
 		<displayname>    Custom Pitch Follow Variable</displayname>
@@ -3032,7 +3032,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.942</order>
+		<order>2490.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_y_transform</name>
 		<displayname>    Pitch Transform to -1..1</displayname>
@@ -3046,7 +3046,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.95</order>
+		<order>2492</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_rudder_var_enabled</name>
 		<displayname>    Custom Yaw Follow Variable</displayname>
@@ -3060,7 +3060,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.951</order>
+		<order>2492.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_rudder_var</name>
 		<displayname>    Custom Yaw Follow Variable</displayname>
@@ -3075,7 +3075,7 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2450.952</order>
+		<order>2492.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_rudder_transform</name>
 		<displayname>    Yaw Transform to -1..1</displayname>
@@ -3084,6 +3084,78 @@
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 		<value></value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2460</order>
+		<datatype>bool</datatype>
+		<name>ap_disconnect_on_override</name>
+		<displayname>    Disconnect Autopilot on Override</displayname>
+		<prereq>ap_following</prereq>
+		<info>Send a disconnect once the stick is held past the deflection below, for an autopilot that does not let go on its own</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2460.2</order>
+		<datatype>float</datatype>
+		<name>ap_disconnect_deflection</name>
+		<displayname>    Disconnect Deflection</displayname>
+		<prereq>ap_disconnect_on_override</prereq>
+		<info>Stick travel from the autopilot's command, as a share of full travel, that sends the disconnect. Keep it above the deadzone.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2460.3</order>
+		<datatype>anylist</datatype>
+		<name>ap_disconnect_event</name>
+		<displayname>    Disconnect Event</displayname>
+		<prereq>ap_disconnect_on_override</prereq>
+		<info>The key event, L:Var, B: input event or SimVar to send. AUTOPILOT_DISENGAGE_SET is the yoke disconnect switch; AUTOPILOT_OFF is the master switch.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>AUTOPILOT_DISENGAGE_SET,AUTOPILOT_OFF</validvalues>
+		<value>AUTOPILOT_DISENGAGE_SET</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2460.4</order>
+		<datatype>text</datatype>
+		<name>ap_disconnect_value</name>
+		<displayname>    Disconnect Value</displayname>
+		<prereq>ap_disconnect_on_override</prereq>
+		<info>The value sent with the event</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>1</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2460.5</order>
+		<datatype>text</datatype>
+		<name>ap_disconnect_release_value</name>
+		<displayname>    Release Value</displayname>
+		<prereq>ap_disconnect_on_override</prereq>
+		<info>A second value sent 100 ms later, the switch letting go. Blank sends none.</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>0</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -19107,6 +19179,34 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>ap_disconnect_on_override</name>
+		<model>737-600.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_event</name>
+		<model>737-600.*</model>
+		<value>ROTOR_BRAKE</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_value</name>
+		<model>737-600.*</model>
+		<value>100401</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_release_value</name>
+		<model>737-600.*</model>
+		<value>100404</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>joystick_trim_follow_use_curve_y</name>
 		<model>737-600.*</model>
 		<value>true</value>
@@ -19270,6 +19370,34 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>ap_disconnect_on_override</name>
+		<model>737-700.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_event</name>
+		<model>737-700.*</model>
+		<value>ROTOR_BRAKE</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_value</name>
+		<model>737-700.*</model>
+		<value>100401</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_release_value</name>
+		<model>737-700.*</model>
+		<value>100404</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>737-800.*</model>
 		<value>JetAircraft</value>
@@ -19419,6 +19547,34 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>ap_disconnect_on_override</name>
+		<model>737-800.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_event</name>
+		<model>737-800.*</model>
+		<value>ROTOR_BRAKE</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_value</name>
+		<model>737-800.*</model>
+		<value>100401</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_release_value</name>
+		<model>737-800.*</model>
+		<value>100404</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>737-900.*</model>
 		<value>JetAircraft</value>
@@ -19566,6 +19722,34 @@
 		<value>0.5</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>ap_disconnect_on_override</name>
+		<model>737-900.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_event</name>
+		<model>737-900.*</model>
+		<value>ROTOR_BRAKE</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_value</name>
+		<model>737-900.*</model>
+		<value>100401</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_disconnect_release_value</name>
+		<model>737-900.*</model>
+		<value>100404</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
