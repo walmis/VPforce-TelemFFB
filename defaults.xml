@@ -2203,12 +2203,27 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<order>2050</order>
+		<displayname>Axis Control</displayname>
+		<any>true</any>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>true</value>
+		<datatype>group</datatype>
+		<name>axis_control_group</name>
+	</defaults>
+	<defaults>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100</order>
 		<datatype>bool</datatype>
 		<name>telemffb_controls_axes</name>
-		<displayname>Axis Control</displayname>
-		<prereq>basic_group</prereq>
+		<displayname>Enable Globally</displayname>
+		<prereq>axis_control_group</prereq>
 		<info>TelemFFB sends axis position to sim&lt;br&gt;&lt;br&gt;Required for Trim/AP Following&lt;br&gt;&lt;br&gt;** Do not assign in game or SPAD.next **</info>
 		<any>true</any>
 		<MSFS>true</MSFS>
@@ -2220,12 +2235,12 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100</order>
 		<datatype>bool</datatype>
 		<name>telemffb_controls_axes</name>
-		<displayname>Axis Control</displayname>
-		<prereq>basic_group</prereq>
+		<displayname>Enable Globally</displayname>
+		<prereq>axis_control_group</prereq>
 		<info>TelemFFB sends axis position to sim&lt;br&gt;&lt;br&gt;Required for Trim/AP Following</info>
 		<any>true</any>
 		<XPLANE>true</XPLANE>
@@ -2237,12 +2252,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.2</order>
 		<datatype>bool</datatype>
 		<name>local_disable_axis_control</name>
 		<displayname>Disable for this device</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Disable axis control for this device</info>
 		<MSFS>true</MSFS>
@@ -2256,12 +2272,13 @@
 	<defaults>
 		<debug_only>true</debug_only>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.3</order>
 		<datatype>bool</datatype>
 		<name>use_firmware_axis_override</name>
 		<displayname>Use Firmware Axis Override</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Route TelemFFB axis manipulation through Rhino firmware instead of simulator axis injection</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2273,12 +2290,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.4</order>
 		<datatype>float</datatype>
 		<name>joystick_x_axis_scale</name>
 		<displayname>X Axis Scale</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Scaling of axis position sent to game</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2288,12 +2306,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.5</order>
 		<datatype>float</datatype>
 		<name>joystick_y_axis_scale</name>
 		<displayname>Y Axis Scale</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Scaling of axis position sent to game</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2304,12 +2323,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.6</order>
 		<datatype>float</datatype>
 		<name>rudder_x_axis_scale</name>
 		<displayname>Rudder (X) Axis Scale</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Scaling of axis position sent to game</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2319,12 +2339,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.72</order>
 		<datatype>float</datatype>
 		<name>hands_on_deadzone</name>
 		<displayname>Hands On Deadzone</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Distance required to trigger a hands-on condition</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2332,12 +2353,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.73</order>
 		<datatype>float</datatype>
 		<name>hands_off_deadzone</name>
 		<displayname>Hands Off Deadzone</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Distance at which hands-off resumes (set lower than hands-on)</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2345,24 +2367,26 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.74</order>
 		<datatype>bool</datatype>
 		<name>handson_force_mode</name>
 		<displayname>Force Mode ( &lt;b&gt;Experimental&lt;/b&gt;)</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>When enabled, uses force output from Rhino vs. deflection to determine hands-on detection&lt;br&gt;&lt;br&gt;Note: Regular hands on/off sliders are inactive when force mode enabled.&lt;br&gt;&lt;br&gt;Use Force Mode sub settings to control hands on/off detection.&lt;br&gt;&lt;br&gt;For best results, disable adaptive recentering in configurator</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.75</order><joystick>true</joystick>
 		<datatype>pct_float</datatype>
 		<name>hands_on_force_threshold</name>
 		<displayname>Hands On Force Threshold</displayname>
 		<prereq>handson_force_mode</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Force value to achieve hands-on detection</info>
 		<MSFS>true</MSFS>
 		<sliderfactor>0.1</sliderfactor>
@@ -2371,25 +2395,27 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.76</order>
 		<info>Time (ms) duration below hands-on threshold to consider "hands-off"</info>
 		<datatype>d_int</datatype>
 		<name>handsoff_force_duration</name>
 		<displayname>Hands Off Hysteresis Time (ms)</displayname>
 		<prereq>handson_force_mode</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<validvalues>0,1500</validvalues>
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.77</order>
 		<datatype>bool</datatype>
 		<name>handson_force_debug</name>
 		<displayname>Debug Logging</displayname>
 		<prereq>handson_force_mode</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Enable logging of hands on/off state (generates lots of logs.. only use if troubleshooting)</info>
 		<MSFS>true</MSFS>
@@ -2399,12 +2425,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.80</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_var_enabled</name>
 		<displayname>Custom Autopilot Variable</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Read the autopilot state from a variable of your choice instead of AUTOPILOT MASTER, for an aircraft whose autopilot does not set it</info>
 		<MSFS>true</MSFS>
@@ -2413,12 +2440,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.82</order>
 		<datatype>float</datatype>
 		<name>feet_on_deadzone</name>
 		<displayname>Feet On Deadzone</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Distance required to trigger a feet-on condition</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -2426,12 +2454,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.83</order>
 		<datatype>float</datatype>
 		<name>feet_off_deadzone</name>
 		<displayname>Feet Off Deadzone</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Distance at which feet-off resumes (set lower than hands-on)</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -2439,12 +2468,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.84</order>
 		<datatype>bool</datatype>
 		<name>trimwheel_use_axis</name>
 		<displayname>Use Axis instead of Direct</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Enable to use Axis control (vs direct trim surface manipulating)</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2452,12 +2482,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.85</order>
 		<datatype>bool</datatype>
 		<name>trimwheel_axis_invert</name>
 		<displayname>Elevator Trim Axis Invert</displayname>
 		<prereq>trimwheel_use_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Enable if trim wheel axis moves the wrong way</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2466,12 +2497,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2100.861</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_var</name>
 		<displayname>Custom Autopilot Variable</displayname>
 		<prereq>custom_ap_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A variable that needs converting belongs in the SimConnect Overrides Editor as APMaster instead. Turn this setting off for that entry to be used: while it is on, this variable is the one read.</info>
 		<MSFS>true</MSFS>
 		<trimwheel>true</trimwheel>
@@ -2480,12 +2512,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2200</order>
 		<datatype>bool</datatype>
 		<name>enable_custom_x_axis</name>
 		<displayname>Custom Simconnect X Variable</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
@@ -2495,12 +2528,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2200.2</order>
 		<datatype>anylist</datatype>
 		<name>custom_x_axis</name>
 		<displayname>Custom Simconnect X Var Name</displayname>
 		<prereq>enable_custom_x_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2509,12 +2543,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2200.2</order>
 		<datatype>anylist</datatype>
 		<name>custom_x_axis</name>
 		<displayname>Custom Simconnect X Var Name</displayname>
 		<prereq>enable_custom_x_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -2523,12 +2558,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2200.3</order>
 		<datatype>list</datatype>
 		<name>raw_x_axis_scale</name>
 		<displayname>+/- Range X Scaling</displayname>
 		<prereq>enable_custom_x_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>+/- Value Range to send to sim</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2538,12 +2574,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2300</order>
 		<datatype>bool</datatype>
 		<name>enable_custom_y_axis</name>
 		<displayname>Custom Simconnect Y Variable</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
@@ -2553,12 +2590,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2300</order>
 		<datatype>bool</datatype>
 		<name>enable_custom_y_axis</name>
 		<displayname>Custom Simconnect Y Variable</displayname>
 		<prereq>trimwheel_use_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
 		<trimwheel>true</trimwheel>
@@ -2566,12 +2604,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2300.2</order>
 		<datatype>anylist</datatype>
 		<name>custom_y_axis</name>
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<prereq>enable_custom_y_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2580,12 +2619,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2300.2</order>
 		<datatype>anylist</datatype>
 		<name>custom_y_axis</name>
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<prereq>enable_custom_y_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
 		<collective>true</collective>
@@ -2594,12 +2634,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2300.2</order>
 		<datatype>anylist</datatype>
 		<name>custom_y_axis</name>
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<prereq>enable_custom_y_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 		<MSFS>true</MSFS>
 		<trimwheel>true</trimwheel>
@@ -2608,12 +2649,13 @@
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2300.3</order>
 		<datatype>list</datatype>
 		<name>raw_y_axis_scale</name>
 		<displayname>+/- Range Y Scaling</displayname>
 		<prereq>enable_custom_y_axis</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>+/- Value Range to send to sim</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2625,12 +2667,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2400</order>
 		<datatype>bool</datatype>
 		<name>trim_following</name>
 		<displayname>Trim / AP Following</displayname>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Enable physical stick movement with in-game trims and auto-pilot.&lt;br&gt;&lt;br&gt;Note: Not all aircraft types support AP following</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2641,11 +2684,12 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2405</order>
 		<name>joystick_trim_follow_use_curve_y</name>
 		<displayname>Use Calibrated Trim Curve</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Use the auto-calibrated elevator trim response curve instead of the static Y Trim Gain Virtual value.&lt;br&gt;&lt;br&gt;Run the calibration (button below) to capture the curve. Recommended for aircraft where the nose drifts as trim is applied even with a tuned static gain.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2655,11 +2699,12 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2405.2</order>
 		<name>joystick_trim_follow_curve_y</name>
 		<displayname>Trim Curve Calibration</displayname>
 		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Auto-calibrated elevator trim response curve. Captured by the Elevator Trim Calibration tool; used when 'Use Calibrated Trim Curve' is enabled.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2669,11 +2714,12 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2405.4</order>
 		<name>joystick_trim_follow_curve_gain_y</name>
 		<displayname>Calibrated Trim Stick Travel</displayname>
 		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>How far the stick sits from center for a given amount of out-of-trim - which sets how much force you feel holding against it. 100% is the aircraft's measured response, exactly as the calibration recorded it.&lt;br&gt;&lt;br&gt;In 'Stays Centered' this affects out-of-trim force only; trimmed flight always rests the stick at center.&lt;br&gt;&lt;br&gt;In 'Follows Trim' it also scales how far the resting position rides with airspeed. Raise it to exaggerate that trim-position cue, or lower it if the stick sits so far aft in slow flight that you run out of usable travel.&lt;br&gt;&lt;br&gt;It does not change the calibration or the trim curve - trimming with the stick held never moves the nose, at any setting. Away from 100% a released stick delivers a small residual input, so a hands-off aircraft will not follow its trim quite exactly; in 'Follows Trim' this also shows up as slow drift when trimmed at the extremes of your calibrated speed range.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2685,11 +2731,12 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2405.6</order>
 		<name>joystick_trim_follow_stick_position</name>
 		<displayname>Trimmed Stick Position</displayname>
 		<prereq>joystick_trim_follow_use_curve_y</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Where the stick rests when the aircraft is trimmed, with calibrated curves at multiple speeds.&lt;br&gt;&lt;br&gt;'Follows Trim': the rest position rides the measured trim state - aft when trimmed for slow flight, forward when fast - like cable/trim-tab aircraft where the yoke is linked to the control surface.&lt;br&gt;&lt;br&gt;'Stays Centered': trimmed flight always rests the stick at center - like moving-stabilizer, FBW or spring-cartridge aircraft where trim re-rigs the feel datum.&lt;br&gt;&lt;br&gt;Force behavior is identical in both modes (trimmed = zero force, out-of-trim = force); only the resting geometry differs.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2701,12 +2748,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2410</order>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<displayname>X Trim Gain Physical</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Amount of trim telemetry movement that will be translated into physical movement of the stick</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2717,12 +2765,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2415</order>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<displayname>X Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Amount of physical movement of the stick that will be transmittted to sim</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2733,9 +2782,9 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2420</order>
-		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y,telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<displayname>Y Trim Gain Physical</displayname>
@@ -2750,13 +2799,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2425</order>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<displayname>Y Trim Gain Virtual</displayname>
 		<prereq>trim_following</prereq>
-		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y,telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Amount of physical movement of the stick that will be transmittted to sim&lt;br&gt;&lt;br&gt;Amount of physical movementof the stick that will be transmitted to sim. &lt;br&gt; &lt;br&gt;Adjust virtual y % so that trim ingame does not pitch aircraft when stick held. &lt;br&gt;&lt;br&gt; To configure, slowly apply nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negative.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2767,12 +2816,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2430</order>
 		<datatype>negfloat</datatype>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Rudder physical trim movement scalar</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2783,12 +2833,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2435</order>
 		<datatype>negfloat</datatype>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -2798,12 +2849,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450</order>
 		<datatype>bool</datatype>
 		<name>ap_following</name>
 		<displayname>Autopilot Following</displayname>
 		<prereq>trim_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Enable physical stick following of autopilot movements</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2813,12 +2865,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.2</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_x_follow_deadzone</name>
-		<displayname>    Roll Deadzone</displayname>
+		<displayname>Roll Deadzone</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2828,12 +2881,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.3</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_physical_x</name>
-		<displayname>    AP Roll Physical Gain</displayname>
+		<displayname>AP Roll Physical Gain</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Amount of aileron surface deflection translated into physical movement of the stick</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2843,12 +2897,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.4</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_virtual_x</name>
-		<displayname>    AP Roll Virtual Gain</displayname>
+		<displayname>AP Roll Virtual Gain</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2856,24 +2911,26 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.5</order>
 		<datatype>bool</datatype>
 		<name>invert_ap_x_axis</name>
-		<displayname>    Invert Aileron Autopilot Axis</displayname>
+		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
 		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.6</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_y_follow_deadzone</name>
-		<displayname>    Pitch Deadzone</displayname>
+		<displayname>Pitch Deadzone</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2882,12 +2939,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.7</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_physical_y</name>
-		<displayname>    AP Pitch Physical Gain</displayname>
+		<displayname>AP Pitch Physical Gain</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Amount of elevator trim deflection translated into physical movement of the stick</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2897,12 +2955,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.8</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_virtual_y</name>
-		<displayname>    AP Pitch Virtual Gain</displayname>
+		<displayname>AP Pitch Virtual Gain</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2910,14 +2969,14 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2450.9</order>
 		<datatype>bool</datatype>
 		<name>joystick_ap_y_follow_axis</name>
-		<displayname>    AP Pitch - Follow axis instead of trim</displayname>
+		<displayname>AP Pitch - Follow axis instead of trim</displayname>
 		<exclusive_with>custom_ap_follow_y_var_enabled</exclusive_with>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
+		<enable_prereq>!joystick_trim_follow_use_curve_y,telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Elevator AP will attempt to follow the axis position rather than the trim value</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2926,12 +2985,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2470</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_var_enabled</name>
-		<displayname>    Custom Autopilot Variable</displayname>
+		<displayname>Custom Autopilot Variable</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Read the autopilot state from a variable of your choice instead of AUTOPILOT MASTER, for an aircraft whose autopilot does not set it</info>
 		<MSFS>true</MSFS>
@@ -2942,12 +3002,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2470.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_var</name>
-		<displayname>    Custom Autopilot Variable</displayname>
+		<displayname>Custom Autopilot Variable</displayname>
 		<prereq>custom_ap_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A variable that needs converting belongs in the SimConnect Overrides Editor as APMaster instead. Turn this setting off for that entry to be used: while it is on, this variable is the one read.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2958,12 +3019,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2480</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_x_var_enabled</name>
-		<displayname>    Custom Roll Follow Variable</displayname>
+		<displayname>Custom Roll Follow Variable</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in roll through a variable of your choice instead of the aileron deflection, for an aircraft that publishes its control wheel position in its own variable</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2972,12 +3034,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2480.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_x_var</name>
-		<displayname>    Custom Roll Follow Variable</displayname>
+		<displayname>Custom Roll Follow Variable</displayname>
 		<prereq>custom_ap_follow_x_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) holding the roll position the stick follows, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -2987,12 +3050,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2480.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_x_transform</name>
-		<displayname>    Roll Transform to -1..1</displayname>
+		<displayname>Roll Transform to -1..1</displayname>
 		<prereq>custom_ap_follow_x_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowX</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3001,13 +3065,14 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2490</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_y_var_enabled</name>
-		<displayname>    Custom Pitch Follow Variable</displayname>
+		<displayname>Custom Pitch Follow Variable</displayname>
 		<exclusive_with>joystick_ap_y_follow_axis</exclusive_with>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in pitch through a variable of your choice instead of the trim or the elevator deflection, for an aircraft that publishes its control column position in its own variable</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3016,12 +3081,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2490.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_y_var</name>
-		<displayname>    Custom Pitch Follow Variable</displayname>
+		<displayname>Custom Pitch Follow Variable</displayname>
 		<prereq>custom_ap_follow_y_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) holding the pitch position the stick follows, -1 (full forward) to 1 (full aft). A value on another scale needs the transform below.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3031,12 +3097,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2490.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_y_transform</name>
-		<displayname>    Pitch Transform to -1..1</displayname>
+		<displayname>Pitch Transform to -1..1</displayname>
 		<prereq>custom_ap_follow_y_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowY</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3045,12 +3112,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2492</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_rudder_var_enabled</name>
-		<displayname>    Custom Yaw Follow Variable</displayname>
+		<displayname>Custom Yaw Follow Variable</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot through a variable of your choice instead of the rudder deflection, for an aircraft that publishes its pedal position in its own variable</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -3059,12 +3127,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2492.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_rudder_var</name>
-		<displayname>    Custom Yaw Follow Variable</displayname>
+		<displayname>Custom Yaw Follow Variable</displayname>
 		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) holding the yaw position the pedals follow, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -3074,12 +3143,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2492.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_rudder_transform</name>
-		<displayname>    Yaw Transform to -1..1</displayname>
+		<displayname>Yaw Transform to -1..1</displayname>
 		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowRudder</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -3088,12 +3158,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2460</order>
 		<datatype>bool</datatype>
 		<name>ap_disconnect_on_override</name>
-		<displayname>    Disconnect Autopilot on Override</displayname>
+		<displayname>Disconnect Autopilot on Override</displayname>
 		<prereq>ap_following</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Send a disconnect once the stick is held past the deflection below, for an autopilot that does not let go on its own</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3102,12 +3173,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2460.2</order>
 		<datatype>float</datatype>
 		<name>ap_disconnect_deflection</name>
-		<displayname>    Disconnect Deflection</displayname>
+		<displayname>Disconnect Deflection</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>Stick travel from the autopilot's command, as a share of full travel, that sends the disconnect. Keep it above the deadzone.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3117,12 +3189,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2460.3</order>
 		<datatype>anylist</datatype>
 		<name>ap_disconnect_event</name>
-		<displayname>    Disconnect Event</displayname>
+		<displayname>Disconnect Event</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>The key event, L:Var, B: input event or SimVar to send. AUTOPILOT_DISENGAGE_SET is the yoke disconnect switch; AUTOPILOT_OFF is the master switch.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3132,12 +3205,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2460.4</order>
 		<datatype>text</datatype>
 		<name>ap_disconnect_value</name>
-		<displayname>    Disconnect Value</displayname>
+		<displayname>Disconnect Value</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>The value sent with the event</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3146,12 +3220,13 @@
 	<defaults>
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
-		<parentgroup>basic</parentgroup>
+		<parentgroup>axis_control</parentgroup>
 		<order>2460.5</order>
 		<datatype>text</datatype>
 		<name>ap_disconnect_release_value</name>
-		<displayname>    Release Value</displayname>
+		<displayname>Release Value</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
+		<enable_prereq>telemffb_controls_axes,!local_disable_axis_control</enable_prereq>
 		<info>A second value sent 100 ms later, the switch letting go. Blank sends none.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
