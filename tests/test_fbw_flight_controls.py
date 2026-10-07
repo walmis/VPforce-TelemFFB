@@ -852,6 +852,7 @@ class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
 
         # Toggle ON: follows deflection (physical gain 1.0), NOT trim.
         instance.joystick_ap_y_follow_axis = True
+        instance._ap_hold = {"x": None, "y": None}  # the stick rests off target throughout
         assert self._settled_y(instance, telem) == pytest.approx(-0.3 * 4096, abs=40)
 
     def test_curve_overrides_ap_follow_axis(self):
@@ -885,6 +886,9 @@ class TestCustomAPFollowSources(BaseTelemetryEffectTestCase):
         return instance
 
     def _settled_offsets(self, instance, telem, frames=3):
+        # the stick rests off the target throughout; a hold from the previous
+        # phase would mask the source change under test
+        instance._ap_hold = {"x": None, "y": None}
         for _ in range(frames):
             self.set_telemetry(instance, telem)
             instance.update_fbw_flight_controls(telem)
@@ -935,6 +939,82 @@ class TestCustomAPFollowSources(BaseTelemetryEffectTestCase):
 
         x, _ = self._settled_offsets(instance, telem)
         assert x == pytest.approx(-0.5 * 4096, abs=40)
+
+
+class TestAPFollowHold(BaseTelemetryEffectTestCase):
+    """Under the autopilot the surface carries the input TelemFFB sends.
+    Once the stick leaves the deadzone the center freezes on the autopilot's
+    command, so a push holds its force, what goes to the sim is the stick's
+    displacement from that center, and following resumes after the stick
+    has been back inside the deadzone for a few frames."""
+
+    def _instance(self):
+        instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.trim_following = True
+        instance.ap_following = True
+        instance.telemffb_controls_axes = True
+        instance._simconnect = self.mock_simconnect
+        instance.joystick_ap_follow_gain_physical_x = 1.0
+        instance.joystick_ap_follow_gain_physical_y = 1.0
+        instance.joystick_ap_y_follow_axis = True
+        instance.joystick_trim_follow_use_curve_y = False
+        return instance
+
+    def _frame(self, instance, stick, aileron, elevator):
+        self.mock_device._input_data.set_axis(x=stick[0], y=stick[1])
+        telem = (TelemetryDataBuilder().ffb_type("joystick").autopilot(True)
+                 .aileron_deflection(aileron, -aileron).elevator_deflection(elevator)
+                 .elevator_trim(0.0).build())
+        self.set_telemetry(instance, telem)
+        self.mock_simconnect.sent_events.clear()
+        instance.update_fbw_flight_controls(telem)
+        return instance._spring_handle.get_offsets(), dict(self.mock_simconnect.sent_events)
+
+    def test_a_push_holds_the_center_on_the_autopilot_command(self):
+        instance = self._instance()
+        (x, y), sent = self._frame(instance, (0.4, -0.2), 0.4, -0.2)
+        assert x == pytest.approx(0.4 * 4096, abs=8) and y == pytest.approx(-0.2 * 4096, abs=8)
+        assert sent["AXIS_AILERONS_SET"] == 0 and sent["AXIS_ELEVATOR_SET"] == 0
+
+        # push 0.3 right and 0.3 forward: the displacement goes out
+        (x, y), sent = self._frame(instance, (0.7, -0.5), 0.4, -0.2)
+        assert sent["AXIS_AILERONS_SET"] == -int(0.3 * 16384)
+        assert sent["AXIS_ELEVATOR_SET"] == -int(-0.3 * 16384)
+
+        # the sim applied it to the surface, and the center stays put
+        (x, y), sent = self._frame(instance, (0.7, -0.5), 0.7, -0.5)
+        assert x == pytest.approx(0.4 * 4096, abs=8) and y == pytest.approx(-0.2 * 4096, abs=8)
+        assert sent["AXIS_AILERONS_SET"] == -int(0.3 * 16384)
+
+    def test_a_release_settles_without_a_swing(self):
+        instance = self._instance()
+        self._frame(instance, (0.4, 0.0), 0.4, 0.0)
+        self._frame(instance, (0.7, 0.0), 0.4, 0.0)
+        self._frame(instance, (0.7, 0.0), 0.7, 0.0)
+        # stick back on the command while the surface still carries the push:
+        # the center stays held as long as that lasts
+        for _ in range(6):
+            (x, _), sent = self._frame(instance, (0.4, 0.0), 0.7, 0.0)
+            assert x == pytest.approx(0.4 * 4096, abs=8) and sent["AXIS_AILERONS_SET"] == 0
+        assert instance._ap_hold["x"] == pytest.approx(0.4)
+        # the surface comes back to the command: the hold lets go, no step
+        (x, _), sent = self._frame(instance, (0.4, 0.0), 0.4, 0.0)
+        assert x == pytest.approx(0.4 * 4096, abs=8) and sent["AXIS_AILERONS_SET"] == 0
+        assert instance._ap_hold["x"] is None
+
+    def test_a_held_center_lets_go_when_the_autopilot_moved_on(self):
+        instance = self._instance()
+        self._frame(instance, (0.4, 0.0), 0.4, 0.0)
+        self._frame(instance, (0.7, 0.0), 0.4, 0.0)
+        # the autopilot re-trimmed to 0.1 under the push; the surface never
+        # returns to the held 0.4, so the fallback count releases the hold
+        for _ in range(MsfsXpFBWFlightControlsMixIn.AP_HOLD_RELEASE_FRAMES - 1):
+            (x, _), _ = self._frame(instance, (0.4, 0.0), 0.1, 0.0)
+            assert x == pytest.approx(0.4 * 4096, abs=8)
+        (x, _), _ = self._frame(instance, (0.4, 0.0), 0.1, 0.0)
+        assert x == pytest.approx(0.1 * 4096, abs=8)
+        assert instance._ap_hold["x"] is None
 
 
 class TestMsfsXpFBWFlightControlsTimeout(BaseTelemetryEffectTestCase):

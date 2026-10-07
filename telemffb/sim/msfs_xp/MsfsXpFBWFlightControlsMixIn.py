@@ -93,6 +93,42 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         self.rudder_pos_dampener = utils.Dampener()
         # axis -> (transform text, parsed TransformExpr or the error it raised)
         self._ap_follow_transforms: dict = {}
+        # axis -> the spring center frozen while the stick is pushed off the
+        # autopilot's command (MSFS), and frames spent back inside the deadzone
+        self._ap_hold = {"x": None, "y": None}
+        self._ap_hold_inside = {"x": 0, "y": 0}
+
+    #: frames back inside the deadzone after which a held center lets go even
+    #: though the surface has not returned to it: the autopilot moved its
+    #: command while the stick was pushed
+    AP_HOLD_RELEASE_FRAMES = 30
+
+    def _ap_follow_hold(self, axis: str, phys: float, target: float, deadzone: float):
+        """Pick the spring center for one axis while the autopilot is followed.
+
+        While the stick is inside the deadzone, the center is the live target
+        and nothing is sent.  When the stick is pushed outside it, the center
+        stays where the target was at that moment and the displacement is sent.
+        The center follows the live target again once the stick is back inside
+        the deadzone and the target has returned to within the deadzone of the
+        held center, or after AP_HOLD_RELEASE_FRAMES frames inside regardless.
+
+        Returns (center, send).
+        """
+        held = self._ap_hold[axis]
+        ref = target if held is None else held
+        if abs(phys - ref) > deadzone:
+            if held is None:
+                held = self._ap_hold[axis] = target
+            self._ap_hold_inside[axis] = 0
+            return held, True
+        if held is not None:
+            self._ap_hold_inside[axis] += 1
+            settled = abs(target - held) <= deadzone
+            if not settled and self._ap_hold_inside[axis] < self.AP_HOLD_RELEASE_FRAMES:
+                return held, False
+            self._ap_hold[axis] = None
+        return target, False
 
     def _custom_ap_follow_var(self, axis: str) -> Optional[str]:
         """The variable the settings name for ``axis``; None when the option is off."""
@@ -257,6 +293,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                                     else "raw trim (no curve)"))
                 elif prev_ap and not ap_on:
                     logging.info("AP following released")
+                    self._ap_hold = {"x": None, "y": None}
                 self._ap_follow_seen = ap_on
 
                 if self.ap_following and ap_active:
@@ -336,6 +373,17 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     phys_stick_x_offs = aileron_pos
                     if self.invert_ap_x_axis:
                         phys_stick_x_offs = -phys_stick_x_offs
+                    if self._sim_is_msfs():
+                        phys_stick_x_offs, ap_send_flag_x = self._ap_follow_hold(
+                            "x", phys_x, phys_stick_x_offs, self.joystick_ap_x_follow_deadzone)
+                        phys_stick_y_offs, ap_send_flag_y = self._ap_follow_hold(
+                            "y", phys_y, phys_stick_y_offs, self.joystick_ap_y_follow_deadzone)
+                        # past the deadzone the sim gets the stick's displacement
+                        # from the held center, never the center itself
+                        virtual_stick_x_offs = phys_stick_x_offs
+                        virtual_stick_y_offs = phys_stick_y_offs
+                        telem_data.phys_x_send_flag = ap_send_flag_x
+                        telem_data.phys_y_send_flag = ap_send_flag_y
                 else:
                     phys_stick_x_offs = aileron_trim
 
