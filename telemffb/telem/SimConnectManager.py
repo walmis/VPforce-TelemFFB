@@ -316,6 +316,18 @@ def is_input_event(var) -> bool:
     return isinstance(var, str) and var[:2].upper() == "B:"
 
 
+def is_simvar_name(var) -> bool:
+    """Whether a write target names a SimVar rather than a key event: an
+    "A:" prefix, or a space in the name, since event names never carry one."""
+    return isinstance(var, str) and (var[:2].upper() == "A:" or " " in var.strip())
+
+
+def simvar_write_units(var: str) -> str:
+    """The units a SimVar written through the axis path is set in: the
+    control-position variables take "position" (-1..1), anything else "number"."""
+    return "position" if var.strip().upper().endswith("POSITION") else "number"
+
+
 EV_PAUSED = 65499 # id for paused event
 EV_STARTED = 65498 # id for started event
 EV_STOPPED = 65497  # id for stopped event
@@ -733,7 +745,9 @@ class SimConnectManager(threading.Thread):
         Queue an event to be sent to MSFS.
         
         Args:
-            event (str): The event name or L:var name
+            event (str): A key event name, an L:var, a B: input event, or a
+                settable SimVar ("A:" prefix or a name with spaces), which is
+                written as a datum
             data (int): The event data/value (default: 0)
         """
         if event == "DO_NOT_SEND": return
@@ -777,6 +791,9 @@ class SimConnectManager(threading.Thread):
                 self._set_input_event(event, data)
             elif event.startswith('L:'):
                 self.set_simdatum_to_msfs(event, data, units="number")
+            elif is_simvar_name(event):
+                name = event[2:] if event[:2].upper() == "A:" else event
+                self.set_simdatum_to_msfs(name, data, units=simvar_write_units(name))
             else:
                 try:
                     self.sc.send_event(event, data)

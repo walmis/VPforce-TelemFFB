@@ -30,12 +30,15 @@ class FakeSDK:
 
     def __getattr__(self, name):
         def call(*args, **kwargs):
-            self.calls.append((name, args))
+            self.calls.append((name, args, kwargs))
             return 0
         return call
 
     def named(self, name):
-        return [args for n, args in self.calls if n == name]
+        return [args for n, args, _ in self.calls if n == name]
+
+    def kwargs_of(self, name):
+        return [kwargs for n, _, kwargs in self.calls if n == name]
 
     def clear(self):
         self.calls.clear()
@@ -340,6 +343,19 @@ def test_l_var_and_plain_event_writes_keep_their_old_paths():
     assert m.sc.named("send_event") == [("ROTOR_TRIM_RESET", 1)]
     assert [args[0] for args in m.sc.named("set_simdatum")] == ["L:FFB_HANDS_ON"]
     assert m.sc.named("SetInputEvent") == []
+
+
+def test_a_simvar_name_is_written_as_a_datum_in_its_units():
+    m = make_manager()
+    m.send_event_to_msfs("YOKE Y POSITION", -0.25)
+    m.send_event_to_msfs("A:ELEVATOR TRIM PCT", 0.5)
+    m.send_event_to_msfs("AXIS_ELEVATOR_SET", -4096)
+    m.tx_events_to_msfs()
+    m.tx_simdatums_to_msfs()
+    assert m.sc.named("send_event") == [("AXIS_ELEVATOR_SET", -4096)]
+    datums = m.sc.named("set_simdatum")
+    assert [args[:2] for args in datums] == [("YOKE Y POSITION", -0.25), ("ELEVATOR TRIM PCT", 0.5)]
+    assert [kw.get("units") for kw in m.sc.kwargs_of("set_simdatum")] == ["position", "number"]
 
 
 def test_frames_carry_the_latest_input_event_values():
