@@ -296,7 +296,8 @@ class SettingsLayout(QGridLayout):
                                     if p['name'] in self.expanded_items and p.get('is_visible', 'false') == 'true':
                                         iv = 'true'
                                         cond = 'item parent expanded'
-                                    elif p.get('hasbump', 'false').lower() == 'true' and bumped_up:
+                                    elif (p.get('hasbump', 'false').lower() == 'true' and bumped_up
+                                          and p.get('is_visible', 'false').lower() == 'true'):
                                         iv = 'true'
                                         cond = 'parent hasbump & bumped'
                                 elif p.get('is_visible', 'false').lower() == 'true':

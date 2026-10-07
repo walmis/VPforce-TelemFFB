@@ -187,3 +187,39 @@ class TestDefaultsXmlNestedGroups:
                     continue
                 assert other not in gname, f"{other} is a substring of {gname}"
                 assert gname not in other, f"{gname} is a substring of {other}"
+
+
+class TestBumpedChildOfExpandableParent:
+    """A bump-up row (order ending in 1) of a parent that also has a plain
+    child, so the parent carries an expander, follows the parent's own
+    visibility.  Shown while its parent is hidden, the bump lands on
+    whatever row was drawn last."""
+
+    @staticmethod
+    def _tree():
+        return [
+            {'name': 'basic_group', 'prereq': '', 'order': '50.0',
+             'value': 'true', 'datatype': 'group'},
+            {'name': 'ap_following', 'prereq': 'basic_group', 'order': '2450',
+             'value': 'true', 'datatype': 'bool'},
+            {'name': 'follow_var_enabled', 'prereq': 'ap_following', 'order': '2450.94',
+             'value': 'true', 'datatype': 'bool'},
+            {'name': 'follow_var', 'prereq': 'follow_var_enabled', 'order': '2450.941',
+             'value': 'L:yoke', 'datatype': 'anylist'},
+            {'name': 'follow_transform', 'prereq': 'follow_var_enabled', 'order': '2450.942',
+             'value': 'x - 1', 'datatype': 'text'},
+        ]
+
+    def _visible(self, expanded):
+        layout = _make_layout()
+        layout.expanded_items = list(expanded)
+        data = self._tree()
+        _run_pipeline(layout, data)
+        return {it['name'] for it in data if it['is_visible'] == 'true'}
+
+    def test_hidden_with_its_parent_while_the_section_is_collapsed(self):
+        assert self._visible([]) == {'basic_group', 'ap_following'}
+
+    def test_on_its_parent_row_while_the_parent_is_collapsed(self):
+        assert self._visible(['ap_following']) == {
+            'basic_group', 'ap_following', 'follow_var_enabled', 'follow_var'}
