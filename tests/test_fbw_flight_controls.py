@@ -855,6 +855,17 @@ class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
         instance._ap_hold = {"x": None, "y": None}  # the stick rests off target throughout
         assert self._settled_y(instance, telem) == pytest.approx(-0.3 * 4096, abs=40)
 
+    def test_custom_pitch_source_wins_over_the_curve(self):
+        instance = self._curve_instance(sim_msfs=True)  # curve enabled
+        instance.custom_ap_follow_y_var_enabled = True
+        instance.custom_ap_follow_y_var = "L:yokes_Fore_Aft_capt"
+        instance.custom_ap_follow_y_transform = "x - 1"
+        telem = (TelemetryDataBuilder().ffb_type("joystick")
+                 .elevator_trim(0.5).elevator_deflection(-0.3)
+                 .with_field("APFollowY", 1.3).autopilot(True).build())
+        # the column at 0.3, not the curve center at 0.25*4096
+        assert self._settled_y(instance, telem) == pytest.approx(0.3 * 4096, abs=40)
+
     def test_curve_overrides_ap_follow_axis(self):
         # With a curve active, the toggle is ignored — the curve owns the
         # center (no snap to raw deflection when the AP engages).

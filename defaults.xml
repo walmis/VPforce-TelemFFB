@@ -3008,7 +3008,6 @@
 		<displayname>    Custom Pitch Follow Variable</displayname>
 		<exclusive_with>joystick_ap_y_follow_axis</exclusive_with>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!joystick_trim_follow_use_curve_y</enable_prereq>
 		<info>Follow the autopilot in pitch through a variable of your choice instead of the trim or the elevator deflection, for an aircraft that publishes its control column position in its own variable</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>

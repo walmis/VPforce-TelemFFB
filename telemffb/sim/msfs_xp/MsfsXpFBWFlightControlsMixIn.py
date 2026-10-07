@@ -305,13 +305,15 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             aileron_pos = (custom_x, custom_x)
                         telem_data.phys_x_aileron = aileron_pos[0]
                         custom_y = self._custom_ap_follow_position("y", telem_data)
-                        if curve_active:
+                        if curve_active and custom_y is None:
                             # Calibrated curve owns the center: AP-follow Y
                             # sources the same trim signal the curve maps, so
                             # the curve values ARE the follow targets. The
                             # follow-axis toggle is ignored here — the curve
                             # already defines the resting geometry. Only the
                             # deadzone reference needs the center normalized.
+                            # A custom pitch source is the column itself and
+                            # is followed whether or not a curve is active.
                             elevator_pos = center_y
                         elif self.joystick_ap_y_follow_axis or custom_y is not None:
                             # Follow the elevator DEFLECTION — the surface the
