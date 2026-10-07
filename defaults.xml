@@ -8919,6 +8919,20 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>elevator_prop_flow_ratio</name>
+			<type>JetAircraft</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>elevator_prop_flow_ratio</name>
+			<type>GliderAircraft</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>elevator_spring_gain</name>
 			<type>GliderAircraft</type>
 			<value>0.25</value>
@@ -10670,6 +10684,20 @@
 			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>rudder_prop_flow_ratio</name>
+			<type>JetAircraft</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>rudder_prop_flow_ratio</name>
+			<type>GliderAircraft</type>
+			<value>0</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>rudder_spring_gain</name>
 			<type>GliderAircraft</type>
 			<value>0.25</value>
@@ -12069,6 +12097,20 @@
 			<device>joystick</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
+			<name>elevator_prop_flow_ratio</name>
+			<type>JetAircraft</type>
+			<value>0</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>elevator_prop_flow_ratio</name>
+			<type>GliderAircraft</type>
+			<value>0</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
 			<name>elevator_spring_gain</name>
 			<type>GliderAircraft</type>
 			<value>0.25</value>
@@ -12778,6 +12820,20 @@
 			<name>rudder_prop_flow_ratio</name>
 			<type>TurbopropAircraft</type>
 			<value>0.2</value>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>rudder_prop_flow_ratio</name>
+			<type>JetAircraft</type>
+			<value>0</value>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>rudder_prop_flow_ratio</name>
+			<type>GliderAircraft</type>
+			<value>0</value>
 			<sim>XPLANE</sim>
 			<device>pedals</device>
 		</classdefaults_XPLANE>
