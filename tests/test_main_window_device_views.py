@@ -21,11 +21,13 @@ import pytest
 pytest.importorskip("PyQt6")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import QEvent, QObject, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
 import telemffb.globals as G
 from telemffb.ExceptionTracker import ExceptionTracker
+from telemffb.hw.effect_levels import LEVEL_NAMES
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.MainWindow import (DEVICE_VIEW_FLOATING, DEVICE_VIEW_FRAME,
                                  DEVICE_VIEW_HEADER, DEVICE_VIEW_MENUBAR,
@@ -613,3 +615,264 @@ class TestTheBottomView:
         for x in (400, window.width() - 20):  # the right-hand end too, where the strip will sit
             zone = window._device_dock_zone_at(window.mapToGlobal(QPoint(x, foot)))
             assert zone[0] == DEVICE_VIEW_BOTTOM, x
+
+
+class TestEffectLevelsControls:
+    """The effect levels controls: on the master's Settings tab header and
+    its View and Utilities menus, none on a child; the device icons show a
+    mute and lowered levels."""
+
+    @pytest.fixture
+    def levels(self, monkeypatch):
+        from tests.test_effect_levels_ui import FakeController
+        controller = FakeController(roles=('joystick', 'pedals', 'collective'))
+        monkeypatch.setattr(G, 'effect_levels', controller, raising=False)
+        return controller
+
+    def test_the_master_has_them(self, build_window, levels):
+        window = build_window()
+        assert window.effect_levels_header is not None
+        assert window.settings_header_bar.isAncestorOf(window.effect_levels_header)
+        assert window.main_menu.mute_all_action is not None
+
+    def test_a_child_has_none(self, build_window, levels):
+        window = build_window(master=False)
+        assert window.effect_levels_header is None
+        assert window.main_menu.mute_all_action is None
+        window.open_effect_levels_dialog()
+        assert window._effect_levels_dialog is None
+
+    def test_the_header_and_dialog_follow_the_scope(self, build_window, levels, monkeypatch):
+        window = build_window()
+        monkeypatch.setattr(G, 'current_device_config_scope', 'pedals', raising=False)
+        G.app_state.set_scope('pedals')
+        _pump()
+        assert window.effect_levels_header.role == 'pedals'
+        window.open_effect_levels_dialog()
+        dialog = window._effect_levels_dialog
+        try:
+            assert dialog.role == 'pedals'
+        finally:
+            dialog.close()
+
+    def test_pinned_sliders_push_the_settings_list_down(self, build_window, levels):
+        window = build_window(deviceView=DEVICE_VIEW_HEADER)
+        window.resize(1000, 700)
+        _pump()
+        header = window.effect_levels_header
+        bar = window.settings_header_bar
+        page = window.settings_area.parentWidget()
+        monitor_bar = window.monitor_panel.header_bar.height()
+        one_row = window.settings_area.y()
+        tops = []
+        for count in (2, 4, 7):
+            for name in LEVEL_NAMES:
+                levels.set_level_pinned(name, name in LEVEL_NAMES[:count])
+            _pump()
+            assert header.height() == header.sizeHint().height()   # nothing clipped
+            last = header.sliders[header.shown_levels()[-1]]
+            last_bottom = last.mapTo(page, last.rect().bottomLeft()).y()
+            assert last_bottom <= bar.geometry().bottom()
+            assert window.settings_area.y() > last_bottom
+            tops.append(window.settings_area.y())
+            # the device strip keeps to the top of the bar, level with the
+            # first row once the rows stand taller than it
+            slot = bar.device_slot
+            assert slot.y() == bar.contentsRect().top()
+            if header.height() > slot.height():
+                assert header.y() == slot.y()
+        assert one_row <= tops[0] < tops[1] < tops[2]   # two rows can fit beside the strip
+        for name in LEVEL_NAMES[1:]:
+            levels.set_level_pinned(name, False)
+        _pump()
+        assert window.settings_area.y() == one_row
+        assert window.monitor_panel.header_bar.height() == monitor_bar
+
+    def test_the_view_menu_sits_between_utilities_and_window_with_its_items(self, build_window,
+                                                                             levels):
+        menu = build_window().main_menu
+        menus = [a.menu() for a in menu.menu.actions() if a.menu() is not None]
+        assert menus.index(menu.view_menu) == menus.index(menu.utilities_menu) + 1
+        assert menus.index(menu.window_menu) == menus.index(menu.view_menu) + 1
+        assert menu.view_menu.menuAction().isVisible()
+        items = [a for a in menu.view_menu.actions() if not a.isSeparator()]
+        assert items == [menu.show_levels_action, menu.configure_levels_action,
+                         menu.devices_menu.menuAction()]
+        assert menu.show_levels_action.isCheckable()
+
+    def test_utilities_keeps_mute_all_and_not_the_dialog_entry(self, build_window, levels):
+        menu = build_window().main_menu
+        actions = menu.utilities_menu.actions()
+        assert menu.mute_all_action in actions
+        assert menu.configure_levels_action not in actions
+        assert menu.show_levels_action not in actions
+
+    def test_a_child_shows_no_view_menu_items(self, build_window, levels):
+        menu = build_window(master=False).main_menu
+        assert menu.show_levels_action is None and menu.configure_levels_action is None
+        assert menu.view_menu.actions() == []
+        assert not menu.view_menu.menuAction().isVisible()
+
+    def test_the_devices_submenu_is_under_view_and_drives_the_view(self, build_window, levels):
+        window = build_window(deviceView=DEVICE_VIEW_ROW)
+        menu = window.main_menu
+        assert menu.devices_menu.menuAction() in menu.view_menu.actions()
+        assert all(a.menu() is not menu.devices_menu for a in menu.window_menu.actions())
+        menu.device_view_actions[DEVICE_VIEW_FLOATING].trigger()
+        _pump()
+        assert window._device_view() == DEVICE_VIEW_FLOATING
+        window._set_device_view(DEVICE_VIEW_ROW)
+        _pump()
+        assert menu.device_view_actions[DEVICE_VIEW_ROW].isChecked()
+
+    def test_show_effect_level_controls_hides_and_shows_the_box(self, build_window, levels):
+        levels.set_levels('joystick', {'master': 70})
+        window = build_window()
+        action = window.main_menu.show_levels_action
+        header = window.effect_levels_header
+        assert action.isChecked() and header.box.isVisible()
+        before = len(levels.calls)
+        action.trigger()
+        _pump()
+        assert levels.calls[before:] == [('set_controls_shown', False)]
+        assert not action.isChecked() and not header.box.isVisible()
+        assert levels.levels('joystick')['master'] == 70 and not levels.muted('joystick')
+        action.trigger()
+        _pump()
+        assert action.isChecked() and header.box.isVisible()
+
+    def test_the_check_follows_a_change_made_elsewhere(self, build_window, levels):
+        window = build_window()
+        levels.set_controls_shown(False)
+        _pump()
+        assert not window.main_menu.show_levels_action.isChecked()
+        assert not window.effect_levels_header.box.isVisible()
+
+    def test_hidden_controls_stay_hidden_at_startup(self, build_window, levels):
+        levels._shown = False
+        window = build_window()
+        assert not window.main_menu.show_levels_action.isChecked()
+        assert window.effect_levels_header.box.isHidden()
+
+    def test_configure_opens_the_dialog(self, build_window, levels):
+        window = build_window()
+        window.main_menu.configure_levels_action.trigger()
+        dialog = window._effect_levels_dialog
+        try:
+            assert dialog is not None and dialog.isVisible()
+        finally:
+            if dialog is not None:
+                dialog.close()
+
+    def test_the_note_opens_the_dialog(self, build_window, levels):
+        levels.set_levels('joystick', {'damper': 50})
+        window = build_window()
+        note = window.effect_levels_header.note
+        assert note.isVisible()
+        QTest.mouseClick(note, Qt.MouseButton.LeftButton)
+        dialog = window._effect_levels_dialog
+        try:
+            assert dialog is not None and dialog.isVisible()
+        finally:
+            if dialog is not None:
+                dialog.close()
+
+    @pytest.mark.parametrize('view', [DEVICE_VIEW_HEADER, DEVICE_VIEW_ROW])
+    @pytest.mark.parametrize('state', ['box', 'box with note', 'nothing', 'note alone'])
+    def test_the_settings_list_starts_directly_below_the_bar(self, build_window, levels, state, view):
+        if 'note' in state:
+            levels.set_levels('joystick', {'damper': 50})
+        if not state.startswith('box'):
+            levels._shown = False
+        window = build_window(deviceView=view)
+        window.resize(1000, 700)
+        _pump()
+        header = window.effect_levels_header
+        bar = window.settings_header_bar
+        page = window.settings_area.parentWidget()
+        assert header.box.isVisible() == state.startswith('box')
+        assert header.note.isVisible() == ('note' in state)
+        assert window.settings_area.y() == bar.geometry().bottom() + 1
+        for widget in (header.box, header.note):
+            if widget.isVisible():
+                bottom = widget.mapTo(page, widget.rect().bottomLeft()).y()
+                assert bottom <= bar.geometry().bottom()
+
+    def test_the_menu_mutes_every_device(self, build_window, levels):
+        window = build_window()
+        window.main_menu.mute_all_action.trigger()
+        assert levels.calls[-1] == ('set_muted_all', True)
+        assert window.main_menu.mute_all_action.isChecked()
+        window.main_menu.mute_all_action.trigger()
+        assert levels.calls[-1] == ('set_muted_all', False)
+        assert not window.main_menu.mute_all_action.isChecked()
+
+    def test_a_muted_device_is_marked_on_the_panel_and_the_strip(self, build_window, levels):
+        window = build_window(deviceView=DEVICE_VIEW_ROW)
+        levels.set_muted('pedals', True)
+        _pump()
+        assert window.device_panel.device_muted_note('pedals')
+        assert not window.device_panel.icons['pedals']._mute_badge.isHidden()
+        chip = window.device_strip.device_mini_panel.chips['pedals']
+        assert not chip._mute_badge.isHidden()
+        assert chip._levels_badge.isHidden()
+        assert window.device_strip.device_mini_panel.chips['joystick']._mute_badge.isHidden()
+        levels.set_muted('pedals', False)
+        _pump()
+        assert chip._mute_badge.isHidden()
+
+    def test_a_childs_lowered_levels_reach_its_icon_and_the_strip(self, build_window, levels):
+        window = build_window(deviceView=DEVICE_VIEW_ROW)
+        assert window.device_panel.device_levels_note('pedals') is None
+        levels.set_levels('pedals', {'damper': 40})
+        _pump()
+        note = window.device_panel.device_levels_note('pedals')
+        assert note
+        icon = window.device_panel.icons['pedals']
+        assert note in icon.toolTip()
+        assert not icon._levels_badge.isHidden()
+        assert icon._mute_badge.isHidden()
+        assert window.device_panel.device_levels_note('joystick') is None
+        assert window.device_panel.icons['joystick']._levels_badge.isHidden()
+        chip = window.device_strip.device_mini_panel.chips['pedals']
+        assert chip.levels_note == note
+        assert not chip._levels_badge.isHidden()
+        assert chip._mute_badge.isHidden()
+        assert window.device_strip.device_mini_panel.chips['joystick']._levels_badge.isHidden()
+        levels.set_levels('pedals', {'damper': 100})
+        _pump()
+        assert window.device_panel.device_levels_note('pedals') is None
+        assert chip.levels_note is None
+        assert icon._levels_badge.isHidden()
+        assert chip._levels_badge.isHidden()
+
+    def test_levels_stored_before_startup_show_on_the_icon(self, build_window, levels):
+        levels.set_levels('collective', {'spring': 70})
+        window = build_window()
+        assert window.device_panel.device_levels_note('collective')
+
+    def test_the_own_devices_buttons_reach_the_mute_binding(self, build_window, levels,
+                                                            monkeypatch):
+        window = build_window()
+        report = SimpleNamespace(getPressedButtons=lambda: [3])
+        monkeypatch.setattr(HapticEffect, 'device', SimpleNamespace(get_input=lambda: report),
+                            raising=False)
+        monkeypatch.setattr(G, 'active_buttons', [], raising=False)
+        monkeypatch.setattr(G, 'device_connection_status', True, raising=False)
+        window.get_active_buttons()
+        assert levels.calls[-1] == ('on_device_buttons', 'joystick', [3])
+        window.get_active_buttons()                  # unchanged: not reported again
+        assert len([c for c in levels.calls if c[0] == 'on_device_buttons']) == 1
+        monkeypatch.setattr(HapticEffect, 'device', None, raising=False)
+        window.update_device_status(False)
+        assert levels.calls[-1] == ('on_device_buttons', 'joystick', [])
+
+    def test_a_child_reports_its_buttons_only_over_ipc(self, build_window, levels, monkeypatch):
+        window = build_window(master=False)
+        report = SimpleNamespace(getPressedButtons=lambda: [3])
+        monkeypatch.setattr(HapticEffect, 'device', SimpleNamespace(get_input=lambda: report),
+                            raising=False)
+        monkeypatch.setattr(G, 'active_buttons', [], raising=False)
+        window.get_active_buttons()
+        assert not [c for c in levels.calls if c[0] == 'on_device_buttons']
+        G.ipc_instance.send_message.assert_called_with('BUTTONS:pedals_[3]')

@@ -78,6 +78,13 @@ class TabHeaderBar(QWidget):
         """
         self.setContentsMargins(0, top, right, 0)
 
+    def align_slot_top(self) -> None:
+        """Hold the device slot at the top of the bar rather than centered,
+        for a page whose own controls can grow taller than the strip: the
+        strip then stays level with their first row, at the same height as
+        on the other page's bar."""
+        self._row.setAlignment(self.device_slot, Qt.AlignmentFlag.AlignTop)
+
     def add_left(self, widget: QWidget) -> None:
         """Append to the page's own controls, packed from the left."""
         self._row.insertWidget(self._left_count, widget, alignment=Qt.AlignmentFlag.AlignVCenter)
