@@ -78,7 +78,7 @@ Full walkthrough of creating a new class (module placement, sc_overrides, regist
 ```python
 import telemffb.globals as G
 ```
-Key attributes (the full list, annotation-only, is in the file — they have no runtime value until `main.py` startup phases set them; tests use `monkeypatch.setattr(G, ..., raising=False)`): `G.device_type` (`"joystick"` / `"pedals"` / `"collective"` / `"trimwheel"`), `G.master_instance` / `G.child_instance`, `G.effects` (global `HapticEffect` dispenser), `G.telem_manager`, `G.sim_listeners`, `G.main_window`, `G.settings_mgr`, `G.system_settings`, `G.ipc_instance`, `G.log_window`, `G.exception_tracker`, `G.device_info` / `G.device_devpath` / `G.device_usbpid` / `G.device_firmware_version` / `G.device_connection_status`, `G.userconfig_path` / `G.defaults_path` / `G.userconfig_rootpath`, `G.args`, `G.launched_instances`, `G.instance_dev_dict`, `G.active_buttons` / `G.master_buttons` / `G.child_buttons`, `G.startup_configurator_gains` / `G.vpconf_configurator_gains` / `G.current_configurator_gains`, `G.gain_override_dialog`, `G.useDarkMode`, `G.dev_build` / `G.release_version` / `G.is_exe`, `G.force_reload_aircraft_trigger`, `G.il2_ffb_device_ordinal`, `G.vpconf_init_pending`, `G.current_vpconf_profile`, `G.app_state` (the app-state model widgets subscribe to; see `telemffb/state/app_state.py`).
+Key attributes (the full list, annotation-only, is in the file — they have no runtime value until `main.py` startup phases set them; tests use `monkeypatch.setattr(G, ..., raising=False)`): `G.device_type` (`"joystick"` / `"pedals"` / `"collective"` / `"trimwheel"`), `G.master_instance` / `G.child_instance`, `G.effects` (global `HapticEffect` dispenser), `G.telem_manager`, `G.sim_listeners`, `G.main_window`, `G.settings_mgr`, `G.system_settings`, `G.ipc_instance`, `G.log_window`, `G.exception_tracker`, `G.device_info` / `G.device_devpath` / `G.device_usbpid` / `G.device_firmware_version` / `G.device_connection_status`, `G.userconfig_path` / `G.defaults_path` / `G.userconfig_rootpath`, `G.args`, `G.launched_instances`, `G.instance_dev_dict`, `G.active_buttons` / `G.master_buttons` / `G.child_buttons`, `G.button_states` (pressed buttons per device key, every instance) / `G.button_devices` (generic controller reader, master only), `G.startup_configurator_gains` / `G.vpconf_configurator_gains` / `G.current_configurator_gains`, `G.gain_override_dialog`, `G.useDarkMode`, `G.dev_build` / `G.release_version` / `G.is_exe`, `G.force_reload_aircraft_trigger`, `G.il2_ffb_device_ordinal`, `G.vpconf_init_pending`, `G.current_vpconf_profile`, `G.app_state` (the app-state model widgets subscribe to; see `telemffb/state/app_state.py`).
 
 ### Configuration System (XML-based)
 Two parallel XML files:
@@ -103,7 +103,7 @@ Config hierarchy: SIM → CLASS → MODEL → PROFILE (profile is an optional ov
 
 ### Multi-Instance Architecture
 - **Master** auto-launches **child** instances (one per additional device); children handle their own device and send button/telemetry data to the master
-- IPC over UDP sockets on localhost (**not** ZMQ): master binds a random port, children connect via `--masterport`; keepalive 1 s interval, 3 missed → exit; message types: `Keepalive`, `Child Keepalive:<dev>:<status>`, `telem:<json>`, `effects:<json>`, `MASTER INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`
+- IPC over UDP sockets on localhost (**not** ZMQ): master binds a random port, children connect via `--masterport`; keepalive 1 s interval, 3 missed → exit; message types: `Keepalive`, `Child Keepalive:<dev>:<status>`, `telem:<json>`, `effects:<json>`, `MASTER INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`, `BTNDEV:<key>:<json>` (master relays one device's pressed buttons)
 - Win32 named mutex (`namedmutex.py`) prevents duplicate masters unless `G.allow_multi_instance`; master auto-assigns `devpath_*` settings by product string or VID:PID
 
 ---
@@ -222,6 +222,9 @@ When you create a new effect, register its name in the effects translator: `effe
 When you need the full input report (buttons, `CP_XY`, `CP_scaled_axisXY`), guard with `self._device_feeding()` first, then `HapticEffect.device.get_input()` — the guard makes the subsequent dereference safe. Do **not** use `assert HapticEffect.device is not None` in production paths (asserts are stripped under `python -O` and a failed assert kills the telemetry thread).
 
 Non-hot-path code (UI, startup, IPC handlers) may check `HapticEffect.device is None` directly.
+
+### Button Bindings
+A button setting is either a bare int (button n on the device in this instance's slot) or a qualified id string `<key>:<n>` naming one physical device by identity (`VVVV:PPPP` with an optional `#suffix`; see `telemffb/hw/button_refs.py`). Always test a binding with `self.check_button_press(value, check_master, report=None)`, which resolves both forms (qualified ids through `G.button_states`); never compare a setting value numerically or test it against `getPressedButtons()` yourself.
 
 ### Telemetry Data
 Raw telemetry arrives as semicolon-delimited key-value pairs, with tilde-separated arrays: `KEY1=val1~val2;KEY2=val3;...`. `TelemManager` parses this into `BaseTelemetryData` — a dict-backed container that also supports dot-access (`telem_data.AoA`). All known fields are type-annotated on the class for IDE autocomplete; values default to `None` when absent. Access safely with `telem_data.get("key", default)` or dot-access with a `None` check.

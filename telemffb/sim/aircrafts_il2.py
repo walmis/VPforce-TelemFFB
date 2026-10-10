@@ -445,9 +445,7 @@ class Aircraft(AircraftBase):
         self.telem_data._ovrd_spr_dt = dt
 
         if self.override_spring_ft_enabled:
-            input_data = self._get_device_report()
-            current_buttons = input_data.getPressedButtons() if input_data is not None else []
-
+            report = self._get_device_report()
             # calculate step size based on configured rate and delta time
             trim_step_size = self.override_spring_trim_rate * dt / conv.FFB_UNITS
 
@@ -455,26 +453,26 @@ class Aircraft(AircraftBase):
 
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
-            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+            if self.check_button_press(self.override_spring_trim_down, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM DOWN")
                 self.override_spring_cp0_y = utils.clamp(
                     self.override_spring_cp0_y - trim_step_size, -1.0, 1.0)
                 self.spring_y.set_offset(self.override_spring_cp0_y)
-            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+            elif self.check_button_press(self.override_spring_trim_up, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM UP")
                 self.override_spring_cp0_y = utils.clamp(
                     self.override_spring_cp0_y + trim_step_size, -1.0, 1.0)
                 self.spring_y.set_offset(self.override_spring_cp0_y)
 
-            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+            if self.check_button_press(self.override_spring_trim_left, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM LEFT")
                 self.override_spring_cp0_x = utils.clamp(
                     self.override_spring_cp0_x - trim_step_size, -1.0, 1.0)
                 self.spring_x.set_offset(self.override_spring_cp0_x)
-            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+            elif self.check_button_press(self.override_spring_trim_right, report=report):
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM RIGHT")
                 self.override_spring_cp0_x = utils.clamp(

@@ -37,6 +37,7 @@ from telemffb.ui.widgets.custom_widgets import (InfoLabel, NoWheelSlider, NoWhee
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.ui.dialogs.AdvancedGDialog import AdvancedGDialog
+from telemffb.hw.button_refs import button_binding_label, parse_button_ref
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.state.app_state import AppState
 from telemffb.utils import validate_vpconf_profile, device_pid_key, dbprint, HiDpiPixmap
@@ -1332,10 +1333,8 @@ class SettingsLayout(QGridLayout):
         expand_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         expand_button.clicked.connect(self.expander_clicked)
 
-        usb_button_text = f"Button {item['value']}"
-        if item['value'] == '0':
-            usb_button_text = 'Click to Configure'
-        self.usbdevice_button = QPushButton(usb_button_text)
+        self.usbdevice_button = QPushButton()
+        self._show_binding(self.usbdevice_button, item['value'])
         self.usbdevice_button.setMinimumWidth(150)
         self.usbdevice_button.setObjectName(f"pb_{item['name']}")
         self.usbdevice_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
@@ -2234,14 +2233,20 @@ class SettingsLayout(QGridLayout):
         self.thread.button_pressed.connect(self.update_button)
         self.thread.start()
 
+    @staticmethod
+    def _show_binding(button, value):
+        """Label a bind button with its binding; a qualified id's exact
+        value goes in the tooltip."""
+        button.setText(button_binding_label(value) or 'Click to Configure')
+        key, _ = parse_button_ref(value)
+        button.setToolTip(str(value) if key else '')
+
     def update_button(self, button_name, value):
         self.trigger_form_reload = False
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
-        the_button.setText(str(value))
+        self._show_binding(the_button, value)
         if str(value) != '0':
             self.write_or_revert(button_name, str(value))
-        else:
-            the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
