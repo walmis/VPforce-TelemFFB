@@ -265,7 +265,10 @@ class TelemManager(QObject, threading.Thread):
     aircraftUpdated = pyqtSignal()
     telemetryTimeout = pyqtSignal(bool)
 
-    first_frame_received = pyqtSignal(str)
+    #: (source, stopped): stopped is the frame's STOP flag (MSFS paused or
+    #: in its menus sends one such frame and nothing after).  Slots that
+    #: only want the source may take one argument.
+    first_frame_received = pyqtSignal(str, bool)
     sim_exited = pyqtSignal(str)   # emitted when a sim exit detected
     #: per-aircraft device swap, handled on the main thread (the device's
     #: read timer must live there); the payload is the devpath to acquire,
@@ -698,7 +701,8 @@ class TelemManager(QObject, threading.Thread):
         self._emit_telemetry(parsed_data)
         if not self._first_frame_from_sim:
             self._first_frame_from_sim = True
-            self.first_frame_received.emit(parsed_data.get('src', None))
+            self.first_frame_received.emit(parsed_data.get('src', None),
+                                           bool(parsed_data.get('STOP', 0)))
 
     def _parse_telemetry_data(self, data) -> BaseTelemetryData:
         """Parse raw telemetry data and calculate frame timing metrics."""
