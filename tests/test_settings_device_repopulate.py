@@ -334,3 +334,45 @@ class TestAxisInvert(TestAxisChooser):
         self._select_di(dlg.cb_select_p)
         row = dlg.device_cards.cards['pedals'].primary_row
         assert row.axis_invert_value() is True
+
+
+class TestForceFrameControls(TestAxisChooser):
+    """The force-frame controls (Mirror X, Mirror Y, rotation) show on any
+    row holding a DirectInput device, read the device's stored frame, and
+    stage it under the device's VID:PID key at save."""
+
+    KEY = 'dinput_force_frame_346E_0005'          # _FakeDIDevice's ids
+
+    def test_hidden_until_a_di_device_is_selected(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        assert row.force_frame_value() is None
+        self._select_di(dlg.cb_select_j)
+        assert row.force_frame_value() == (False, False, 0)
+
+    def test_the_stored_frame_is_restored(self, monkeypatch):
+        dlg = self._dialog(monkeypatch, extra={self.KEY: 'my,rot90'})
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        assert row.force_frame_value() == (False, True, 90)
+
+    def test_the_joystick_row_has_them_too(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        assert not row.frame_rotate.isHidden()
+
+    def test_a_change_is_staged_under_the_device_key(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_p)
+        row = dlg.device_cards.cards['pedals'].primary_row
+        row.frame_mirror_x.setChecked(True)
+        row.frame_rotate.setCurrentIndex(row.frame_rotate.findData(180))
+        dlg._stage_force_frames()
+        assert dlg._pending_devpaths[self.KEY] == 'mx,rot180'
+
+    def test_a_native_device_row_stages_nothing(self, monkeypatch):
+        dlg = self._dialog(monkeypatch)
+        dlg._stage_force_frames()
+        assert not any(k.startswith('dinput_force_frame_')
+                       for k in dlg._pending_devpaths)

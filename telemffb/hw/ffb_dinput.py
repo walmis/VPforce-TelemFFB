@@ -473,6 +473,120 @@ def invert_setting_key(role: str) -> str:
     return f'dinput_invert_{role}'
 
 
+def force_frame_setting_key(vendor_id: int, product_id: int) -> str:
+    """Where a DirectInput device's force-frame correction is stored.
+    Keyed by USB ids: the frame is a property of the base, whatever role
+    or slot it serves in."""
+    return f'dinput_force_frame_{vendor_id:04X}_{product_id:04X}'
+
+
+@dataclass(frozen=True)
+class ForceFrame:
+    """How a device reads the forces TelemFFB sends, relative to the
+    DirectInput convention (a direction is where the force comes from,
+    clockwise from north; a condition is per axis, in input units).
+
+    ``mirror_x`` / ``mirror_y`` reflect the force frame across an axis:
+    a direction angle is reflected, and a condition on that axis has its
+    center offset negated and its positive and negative halves swapped.
+    The input reading is untouched: this is for a base whose forces run
+    backwards while its position reads right (the role-level axis
+    inversion flips both).  ``rotate_deg`` turns the direction angle
+    after the mirrors; conditions carry no angle and ignore it.
+    """
+    mirror_x: bool = False
+    mirror_y: bool = False
+    rotate_deg: int = 0
+
+    ROTATIONS = (0, 90, 180, 270)
+
+    @property
+    def is_identity(self) -> bool:
+        return not (self.mirror_x or self.mirror_y or self.rotate_deg)
+
+    @classmethod
+    def from_setting(cls, value) -> "ForceFrame":
+        """Parse the stored form (``mx``, ``my``, ``rot<deg>`` tokens,
+        comma separated); anything unreadable reads as identity."""
+        mirror_x = mirror_y = False
+        rotate = 0
+        for token in str(value or '').lower().replace(';', ',').split(','):
+            token = token.strip()
+            if token == 'mx':
+                mirror_x = True
+            elif token == 'my':
+                mirror_y = True
+            elif token.startswith('rot'):
+                try:
+                    deg = int(token[3:]) % 360
+                except ValueError:
+                    continue
+                if deg in cls.ROTATIONS:
+                    rotate = deg
+        return cls(mirror_x, mirror_y, rotate)
+
+    def to_setting(self) -> str:
+        tokens = []
+        if self.mirror_x:
+            tokens.append('mx')
+        if self.mirror_y:
+            tokens.append('my')
+        if self.rotate_deg:
+            tokens.append(f'rot{self.rotate_deg}')
+        return ','.join(tokens)
+
+    def describe(self) -> str:
+        if self.is_identity:
+            return 'standard'
+        parts = []
+        if self.mirror_x:
+            parts.append('X mirrored')
+        if self.mirror_y:
+            parts.append('Y mirrored')
+        if self.rotate_deg:
+            parts.append(f'direction rotated {self.rotate_deg}\u00b0')
+        return ', '.join(parts)
+
+    def direction(self, deg: int) -> int:
+        """A direction angle as the device must receive it."""
+        if self.mirror_x:
+            deg = -deg
+        if self.mirror_y:
+            deg = 180 - deg
+        return (deg + self.rotate_deg) % 360
+
+    def apply(self, params: DibEffectParams, effect_type: int,
+              single_axis: Optional[str] = None) -> DibEffectParams:
+        """``params`` as the device should receive them.  ``single_axis``
+        names the one logical axis ('X'/'Y') a device is mapped to, where
+        the bridge takes direction from the magnitude's sign instead of
+        the angle.  Identity returns ``params`` itself."""
+        if self.is_identity:
+            return params
+        out = DibEffectParams.from_buffer_copy(bytes(params))
+        if effect_type in CONDITION_EFFECTS:
+            for mirrored, block in ((self.mirror_x, out.condition_x),
+                                    (self.mirror_y, out.condition_y)):
+                if mirrored:
+                    block.cp_offset = -block.cp_offset
+                    block.positive_coefficient, block.negative_coefficient = (
+                        block.negative_coefficient, block.positive_coefficient)
+                    block.positive_saturation, block.negative_saturation = (
+                        block.negative_saturation, block.positive_saturation)
+            return out
+        if single_axis is not None:
+            mirrored = self.mirror_x if single_axis == 'X' else self.mirror_y
+            if mirrored:
+                if effect_type == EFFECT_CONSTANT:
+                    out.constant_magnitude = -out.constant_magnitude
+                else:
+                    out.periodic_offset = -out.periodic_offset
+                    out.periodic_phase_deg = (out.periodic_phase_deg + 180) % 360
+            return out
+        out.direction_deg = self.direction(out.direction_deg)
+        return out
+
+
 def resolve_axis_map(role, choice, actuators):
     """(native axis for logical X, native for logical Y) as AXIS_NAMES
     entries or None-for-unmapped - or None entirely for a role that
@@ -998,6 +1112,21 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
             # device-wide (see recover_effects)
             self.device.recover_effects(reason=repr(self))
 
+    def _wire_params(self) -> DibEffectParams:
+        """The params as the device receives them: the logical params
+        through the device's force frame."""
+        frame = getattr(self.device, 'force_frame', None)
+        if frame is None or frame.is_identity:
+            return self.params
+        return frame.apply(self.params, self.type,
+                           self.device._single_mapped_axis())
+
+    def repush(self):
+        """Send the params again although they did not change; the
+        device's force frame did."""
+        self._pushed_hash = None
+        self._push()
+
     def _push(self):
         """Send params to the bridge if they changed since the last push."""
         if not self.effect_id:
@@ -1007,7 +1136,7 @@ class DInputEffectHandle(ffb_backend.BaseEffectHandle):
         if h == self._pushed_hash:
             return
         try:
-            rc = self.device.bridge.effect_update(self.effect_id, self.params)
+            rc = self.device.bridge.effect_update(self.effect_id, self._wire_params())
         except OSError:
             self.device._note_native_fault("effect_update")
             return
@@ -1277,9 +1406,11 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         # MISSING attribute on an uninitialized QObject raises RuntimeError
         self._axis_map_state = self._IDENTITY_MAP
         self._axis_map_reapply = False
+        self._force_frame = ForceFrame()
 
         self._handle = self.bridge.open(guid)
         self._apply_axis_map()
+        self._apply_force_frame()
         self._log_autocenter_state()
 
         super().__init__()
@@ -1363,12 +1494,57 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
 
     def request_axis_map_reapply(self):
         """A settings save may have changed this role's axis or invert
-        choice: re-resolve and re-apply on the next poll tick.  Called
-        from any thread (a settings save, the IPC listener) - the device
-        work happens on this instance's own timer, and an unchanged map
-        is a no-op there.
+        choice, or this device's force frame: re-resolve and re-apply on
+        the next poll tick.  Called from any thread (a settings save, the
+        IPC listener) - the device work happens on this instance's own
+        timer, and an unchanged map is a no-op there.
         """
         self._axis_map_reapply = True
+
+    @property
+    def force_frame(self) -> ForceFrame:
+        return self._force_frame
+
+    def _single_mapped_axis(self) -> Optional[str]:
+        """The one logical axis the device is mapped to, or None when both
+        are mapped (the bridge then takes direction from the angle)."""
+        x_code, y_code = self._axis_map_state[0], self._axis_map_state[1]
+        none = DIBridge.AXIS_NONE
+        if x_code != none and y_code == none:
+            return 'X'
+        if y_code != none and x_code == none:
+            return 'Y'
+        return None
+
+    def _desired_force_frame(self) -> ForceFrame:
+        settings = getattr(G, 'system_settings', None)
+        if settings is None or not self.info.vendor_id:
+            return ForceFrame()
+        try:
+            return ForceFrame.from_setting(settings.get(
+                force_frame_setting_key(self.info.vendor_id,
+                                        self.info.product_id), ''))
+        except Exception:
+            logging.exception("DirectInput force frame resolution failed; "
+                              "using the standard frame")
+            return ForceFrame()
+
+    def _apply_force_frame(self, live=False):
+        """Adopt the stored force frame.  With ``live`` (a settings
+        change) every downloaded effect is sent again through the new
+        frame; the device keeps its effects, so nothing drops out."""
+        frame = self._desired_force_frame()
+        if live and frame == self._force_frame:
+            return
+        self._force_frame = frame
+        logging.info(f"DirectInput force frame ({self.info.vidpid()}): "
+                     f"{frame.describe()}")
+        if not live:
+            return
+        for ref in list(self._effect_handles):
+            handle = ref()
+            if handle is not None and handle.effect_id:
+                handle.repush()
 
     def _log_autocenter_state(self):
         """Say whether the device's own centering spring was switched off.
@@ -1457,6 +1633,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
             self._axis_map_reapply = False
             try:
                 self._apply_axis_map(recover=True)
+                self._apply_force_frame(live=True)
             except Exception:
                 logging.exception("live axis-map re-apply failed")
         try:

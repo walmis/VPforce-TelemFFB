@@ -146,9 +146,21 @@ class DeviceRow(QWidget):
                  axis_choice=False, parent=None):
         super().__init__(parent)
         self.primary = primary
-        row = QHBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(4)
+        row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
+        outer.addLayout(row)
+        # the selected device's options (axis choice, force frame) sit on
+        # a second row under the selector, shown only while any applies
+        self.options = QWidget()
+        options = QHBoxLayout(self.options)
+        options.setContentsMargins(24, 0, 0, 0)
+        options.setSpacing(8)
+        self.options.setVisible(False)
+        outer.addWidget(self.options)
 
         if alternates:
             # a real radio: the marker MOVES between rows (the card's
@@ -217,7 +229,46 @@ class DeviceRow(QWidget):
                 "VPConfigurator.")
             for w in (self.axis_label, self.axis_combo, self.axis_invert):
                 w.setVisible(False)
-                row.addWidget(w)
+                options.addWidget(w)
+
+        # the device's force frame: how it reads the forces TelemFFB sends,
+        # relative to the DirectInput convention.  Every role, keyed by the
+        # device's USB ids; hidden until a [DI] device is selected.  A
+        # rule separates it from the role's axis controls on the same row.
+        self.frame_separator = QFrame()
+        self.frame_separator.setFrameShape(QFrame.Shape.VLine)
+        self.frame_separator.setFrameShadow(QFrame.Shadow.Sunken)
+        # the line is drawn down the middle of the widget, so its width
+        # is the breathing room either side
+        self.frame_separator.setFixedWidth(16)
+        self.frame_separator.setVisible(False)
+        options.addWidget(self.frame_separator)
+        self.frame_label = QLabel('Forces:')
+        self.frame_mirror_x = QCheckBox('Mirror X')
+        self.frame_mirror_x.setObjectName(
+            selector_name.replace('cb_select', 'cb_frame_mx'))
+        self.frame_mirror_y = QCheckBox('Mirror Y')
+        self.frame_mirror_y.setObjectName(
+            selector_name.replace('cb_select', 'cb_frame_my'))
+        for box, axis in ((self.frame_mirror_x, 'X'), (self.frame_mirror_y, 'Y')):
+            box.setToolTip(
+                f"Reverse the forces on the {axis} axis only"
+                "\nFor a base whose forces run backwards while its axis moves correctly.")
+        self.frame_rotate_label = QLabel('Rotation:')
+        self.frame_rotate = QComboBox()
+        self.frame_rotate.setObjectName(
+            selector_name.replace('cb_select', 'cb_frame_rot'))
+        for deg in (0, 90, 180, 270):
+            self.frame_rotate.addItem(f'{deg}\u00b0', deg)
+        self.frame_rotate.setToolTip(
+            "Rotate the direction of constant and periodic forces.\n"
+            "For a base that reads the direction angle from a different "
+            "reference than the DirectInput standard defines.")
+        self.frame_rotate_label.setToolTip(self.frame_rotate.toolTip())
+        for w in self._frame_widgets():
+            w.setVisible(False)
+            options.addWidget(w)
+        options.addStretch(1)
         row.addStretch(1)
 
         if alternates:
@@ -281,6 +332,15 @@ class DeviceRow(QWidget):
         self.axis_invert.blockSignals(True)
         self.axis_invert.setChecked(bool(inverted) if show else False)
         self.axis_invert.blockSignals(False)
+        self._refresh_options_row()
+
+    def _refresh_options_row(self):
+        """The options row collapses while nothing on it applies, and the
+        rule between its two groups shows only when both do."""
+        axis = self.axis_combo is not None and not self.axis_combo.isHidden()
+        frame = not self.frame_rotate.isHidden()
+        self.frame_separator.setVisible(axis and frame)
+        self.options.setVisible(axis or frame)
 
     def axis_choice_value(self):
         """The stored form of the chooser ('auto' or an axis name), or
@@ -296,6 +356,38 @@ class DeviceRow(QWidget):
         if self.axis_invert is None or self.axis_invert.isHidden():
             return None
         return self.axis_invert.isChecked()
+
+    def _frame_widgets(self):
+        return (self.frame_label, self.frame_mirror_x, self.frame_mirror_y,
+                self.frame_rotate_label, self.frame_rotate)
+
+    def show_force_frame(self, frame):
+        """Show the force-frame controls set to ``frame`` = (mirror_x,
+        mirror_y, rotate_deg); None hides them (not a DirectInput
+        device)."""
+        show = frame is not None
+        for w in self._frame_widgets():
+            w.setVisible(show)
+        mirror_x, mirror_y, rotate = frame if show else (False, False, 0)
+        for box, value in ((self.frame_mirror_x, mirror_x),
+                           (self.frame_mirror_y, mirror_y)):
+            box.blockSignals(True)
+            box.setChecked(bool(value))
+            box.blockSignals(False)
+        self.frame_rotate.blockSignals(True)
+        idx = self.frame_rotate.findData(int(rotate))
+        self.frame_rotate.setCurrentIndex(idx if idx >= 0 else 0)
+        self.frame_rotate.blockSignals(False)
+        self._refresh_options_row()
+
+    def force_frame_value(self):
+        """(mirror_x, mirror_y, rotate_deg), or None while the controls are
+        hidden (isHidden, not isVisibleTo; see axis_choice_value)."""
+        if self.frame_rotate.isHidden():
+            return None
+        return (self.frame_mirror_x.isChecked(),
+                self.frame_mirror_y.isChecked(),
+                int(self.frame_rotate.currentData() or 0))
 
     def device_icon(self) -> str:
         if self.icon_group is None:

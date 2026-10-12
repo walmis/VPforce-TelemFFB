@@ -921,6 +921,61 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self._refresh_axis_choice(role)
             except Exception:
                 logging.exception(f'axis chooser refresh failed ({role})')
+        try:
+            self._refresh_force_frames()
+        except Exception:
+            logging.exception('force frame controls refresh failed')
+
+    def _device_rows(self):
+        """Every device row on the page: each card's primary row and the
+        joystick card's alternates."""
+        for card in self.device_cards.cards.values():
+            yield card.primary_row
+            yield from getattr(card, 'alt_rows', [])
+
+    @staticmethod
+    def _force_frame_key_for(device):
+        """The force-frame setting key of a row's selected device, or None
+        when it is not a DirectInput device (or has no USB ids)."""
+        path = getattr(device, 'path', b'') or b''
+        if isinstance(path, (bytes, bytearray)):
+            path = path.decode(errors='replace')
+        if not str(path).startswith('dinput:'):
+            return None
+        vid = getattr(device, 'vendor_id', 0)
+        pid = getattr(device, 'product_id', None)
+        if not vid or pid is None:
+            return None
+        from telemffb.hw.ffb_dinput import force_frame_setting_key
+        return force_frame_setting_key(vid, pid)
+
+    def _refresh_force_frames(self):
+        """Show each DirectInput device row's stored force frame (or the
+        pending one from an earlier change this session); hide the
+        controls on every other row."""
+        from telemffb.hw.ffb_dinput import ForceFrame
+        for row in self._device_rows():
+            key = self._force_frame_key_for(row.selector.currentData())
+            if key is None:
+                row.show_force_frame(None)
+                continue
+            frame = ForceFrame.from_setting(self._stored_or_pending(key, ''))
+            row.show_force_frame((frame.mirror_x, frame.mirror_y,
+                                  frame.rotate_deg))
+
+    def _stage_force_frames(self):
+        """Queue each shown row's force frame under its device's key; a
+        hidden row (not a DirectInput device) leaves the stored value
+        alone for the device that set it."""
+        from telemffb.hw.ffb_dinput import ForceFrame
+        for row in self._device_rows():
+            value = row.force_frame_value()
+            if value is None:
+                continue
+            key = self._force_frame_key_for(row.selector.currentData())
+            if key is None:
+                continue
+            self._pending_devpaths[key] = ForceFrame(*value).to_setting()
 
     def _slot_changed(self, cb, role):
         """A slot now holds something else - or nothing.  Record it, and
@@ -932,6 +987,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self._tap_baseline = self.tap_settings_view()
         self._persist_combobox_selection(cb, role)
         self._refresh_axis_choice(role)
+        try:
+            self._refresh_force_frames()
+        except Exception:
+            logging.exception('force frame controls refresh failed')
         # the tap panels describe the devices as much as the folders,
         # so a new selection changes what they should be saying
         self.refresh_tap_panels()
@@ -2771,6 +2830,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                         inverted
         except Exception:
             logging.exception('Failed to record FFB axis choices')
+        try:
+            self._stage_force_frames()
+        except Exception:
+            logging.exception('Failed to record force frames')
 
         try:
             for k, v in self._pending_devpaths.items():
@@ -2778,11 +2841,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         except Exception:
             logging.exception('Failed to write pending devpath settings')
 
-        # a changed FFB axis map applies live: this instance re-resolves on
-        # its next poll tick, and every child is told to do the same (each
-        # re-reads its OWN settings, so an unchanged map is a no-op; the
-        # re-apply recreates the device's effects, since DirectInput fixes
-        # an effect's axes at creation)
+        # a changed FFB axis map or force frame applies live: this
+        # instance re-resolves on its next poll tick, and every child is
+        # told to do the same (each re-reads its OWN settings, so an
+        # unchanged map is a no-op; the re-apply recreates the device's
+        # effects, since DirectInput fixes an effect's axes at creation)
         try:
             self._request_axis_map_reapply_everywhere()
         except Exception:
