@@ -501,6 +501,7 @@ class SimConnectManager(threading.Thread):
         self.req_id = os.getpid()
         self.def_id = os.getpid()
         self.sv_dict = {}
+        self.sv_units = {}               # name -> (sc_unit, scale), for the monitor's Unit column
         self.connected_version = None
         self._connect_attempts = 0
         # Input events ("B:" variables).  The sim addresses them by a
@@ -639,6 +640,7 @@ class SimConnectManager(threading.Thread):
 
         self.new_var_tracker.clear()
         self.sv_dict.clear()
+        self.sv_units.clear()
 
         for sv in resulting_list:
             # build list of just the simvar / l:var for use in comparing to currently subscribed list (self.current_var_tracker)
@@ -646,9 +648,11 @@ class SimConnectManager(threading.Thread):
                 for sv in sv.vars:
                     self.new_var_tracker.append(sv.var)
                     self.sv_dict[sv.name] = sv.var
+                    self.sv_units[sv.name] = (sv.sc_unit, sv.scale)
             else:
                 self.new_var_tracker.append(sv.var)
                 self.sv_dict[sv.name] = sv.var
+                self.sv_units[sv.name] = (sv.sc_unit, sv.scale)
 
         return resulting_list
 
@@ -683,6 +687,7 @@ class SimConnectManager(threading.Thread):
         self.subscribed_vars.clear()
         self.current_var_tracker.clear()
         self.sv_dict.clear()
+        self.sv_units.clear()
         self._sent_datums.clear()
 
         flat = []
@@ -696,6 +701,7 @@ class SimConnectManager(threading.Thread):
         for sv in flat:
             self.current_var_tracker.append(sv.var)
             self.sv_dict[sv.name] = sv.var
+            self.sv_units[sv.name] = (sv.sc_unit, sv.scale)
             if is_input_event(sv.var):
                 input_event_vars.append(sv)
                 continue
@@ -1365,6 +1371,20 @@ class SimConnectManager(threading.Thread):
                 self._connect_attempts += 1
                 time.sleep(10)
                 pass
+
+    def get_var_unit(self, k):
+        """
+        Get the unit a variable key is subscribed in, and its scale transform.
+
+        Args:
+            k (str): The variable name key to look up
+
+        Returns:
+            tuple or None: ``(sc_unit, scale)`` from the current subscription
+            (``scale`` is None when the value is passed through untransformed),
+            or None if not found
+        """
+        return self.sv_units.get(k, None)
 
     def get_var_name(self,k):
         """

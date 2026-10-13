@@ -55,6 +55,13 @@ button starts (``telemffb.plot``, a window of its own in a process of its
 own, fed from the telemetry thread), kept and shared the same way as the
 favorites and painted by ``PlotMarkDelegate``.
 
+The last column is the value's unit (``telemffb.telem.telemetry_units``:
+for MSFS the unit each SimVar is subscribed in, otherwise a registry kept
+in step with ``BaseTelemetryData``). A unit with relatives - m/s with kt,
+mph, fpm - gets a chevron (``UnitCellDelegate``), and a click on it picks
+which of them the value is shown in. The choice is per telemetry key and,
+like the favorites, saved globally (``monitorUnitPrefs``).
+
 Ownership split follows ``OfflineEditorPanel``/``SettingsLayout``: this
 panel owns the two tables, the filter box and the detach toolbar button;
 what a detach *does* (reparenting the tab into its own window) stays
@@ -76,9 +83,9 @@ from typing import Dict, List, Optional, Set, Tuple
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor, QPixmap
-from PyQt6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QHeaderView, QMenu,
-                             QLabel, QLineEdit, QSplitter, QStackedWidget,
-                             QWidget)
+from PyQt6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QHeaderView,
+                             QLabel, QLineEdit, QMenu, QSplitter,
+                             QStackedWidget, QWidget)
 
 import telemffb.globals as G
 from telemffb.SettingsManager import SettingsManager
@@ -86,8 +93,11 @@ from telemffb.hw.ffb_rhino import PERIODIC_EFFECTS, effect_names
 from telemffb.telem.telem_format import (SignedKeys, axes_text,
                                          format_telemetry_value,
                                          grouped_effects, load_favorites,
-                                         load_plot_keys, clear_plot_keys, toggle_favorite,
-                                         toggle_plot_key)
+                                         load_plot_keys, clear_plot_keys,
+                                         load_unit_prefs, set_unit_pref,
+                                         toggle_favorite, toggle_plot_key)
+from telemffb.telem.telemetry_units import (PCT_OVER_100, conversions_for,
+                                            convert, unit_for)
 from telemffb.ui.panels.DevicePanel import DEVICE_ICONS, tint_pixmap
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
 from telemffb.ui.widgets.EffectTypeDelegate import EffectTypeDelegate
@@ -96,6 +106,7 @@ from telemffb.ui.widgets.FavoriteStarDelegate import (STAR_COLUMN_WIDTH,
 from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
 from telemffb.ui.widgets.PlotMarkDelegate import PLOT_COLUMN_WIDTH, PlotMarkDelegate
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
+from telemffb.ui.widgets.UnitCellDelegate import UnitCellDelegate
 from telemffb.ui.widgets.effect_levels_ui import readout_note
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
 
@@ -111,8 +122,16 @@ INTENSITY_COLUMN_WIDTH = 72
 #: The telemetry table's columns. The favorite star and the plot mark sit
 #: in gutters ahead of the key, the way a starred row reads in a mail
 #: client - and the model is told they hold no selectable value (see
-#: KeyValueTableModel).
-_STAR_COL, _PLOT_COL, _KEY_COL, _VALUE_COL = 0, 1, 2, 3
+#: KeyValueTableModel). The unit trails the value, and a click on it
+#: offers the other units it converts to.
+_STAR_COL, _PLOT_COL, _KEY_COL, _VALUE_COL, _UNIT_COL = 0, 1, 2, 3, 4
+
+#: Fits the longest unit token ("slug/ft³") plus the drop-down chevron.
+UNIT_COLUMN_WIDTH = 96
+
+#: How a unit token reads in the conversion menu, where it can be spelled
+#: out; the cell keeps the short token.
+_UNIT_MENU_LABELS = {PCT_OVER_100: "%/100 (percent over 100)", "%": "% (percent)"}
 
 _FAVORITES_ONLY_KEY = 'monitorFavoritesOnly'
 _PLOTTED_ONLY_KEY = 'monitorPlottedOnly'
@@ -202,6 +221,12 @@ class MonitorPanel(QWidget):
         # The plot mark column and the Plot button exist with the debug
         # setting enabled, like the debug menu.
         self._plotting_available = bool(G.system_settings.get('debug', False))
+        # Chosen display unit per ORIGINAL telemetry key, for the keys not
+        # shown in the unit they are reported in.
+        self._unit_prefs: Dict[str, str] = load_unit_prefs()
+        # The unit each convertible row was last reported in, by row key -
+        # what the conversion menu converts from.
+        self._native_units: Dict[str, str] = {}
         # The last frame rendered, so toggling a star or the Favorites box
         # redraws the list now rather than at whatever point the next frame
         # arrives (which, with the sim closed, is never).
@@ -317,13 +342,18 @@ class MonitorPanel(QWidget):
         """ Telemetry pane: a plain "waiting for data" label shown until the
         first telemetry frame, then the live table. """
         self._telem_model = KeyValueTableModel(
-            ['', '', 'Key', 'Value'], self, unselectable_columns=[_STAR_COL, _PLOT_COL])
+            ['', '', 'Key', 'Value', 'Unit'], self, unselectable_columns=[_STAR_COL, _PLOT_COL])
         self.telem_view = CopyableTableView(self)
         self.telem_view.setModel(self._telem_model)
         telem_header = self.telem_view.horizontalHeader()
-        telem_header.setStretchLastSection(True)
+        telem_header.setStretchLastSection(False)
         telem_header.setSectionResizeMode(_STAR_COL, QHeaderView.ResizeMode.Fixed)
+        telem_header.setSectionResizeMode(_VALUE_COL, QHeaderView.ResizeMode.Stretch)
+        telem_header.setSectionResizeMode(_UNIT_COL, QHeaderView.ResizeMode.Fixed)
         self.telem_view.setColumnWidth(_STAR_COL, STAR_COLUMN_WIDTH)
+        self.telem_view.setColumnWidth(_UNIT_COL, UNIT_COLUMN_WIDTH)
+        self._unit_delegate = UnitCellDelegate(self)
+        self.telem_view.setItemDelegateForColumn(_UNIT_COL, self._unit_delegate)
         self._star_delegate = FavoriteStarDelegate(self)
         self._star_delegate.set_favorites(self._favorites)
         self.telem_view.setItemDelegateForColumn(_STAR_COL, self._star_delegate)
@@ -536,7 +566,7 @@ class MonitorPanel(QWidget):
         filter and MSFS-simvar-name debug substitution
         ``get_telem_items`` used to."""
         self._last_data = data
-        self._telem_model.set_rows(self._build_telemetry_rows(data))
+        self._set_telemetry_rows(data)
         self._telem_stack.setCurrentWidget(self.telem_view)
         self._show_effects_pane()
 
@@ -546,15 +576,23 @@ class MonitorPanel(QWidget):
         widget: while the "waiting for data" page is up there is no frame to
         re-render anyway."""
         if self._last_data is not None:
-            self._telem_model.set_rows(self._build_telemetry_rows(self._last_data))
+            self._set_telemetry_rows(self._last_data)
 
-    def _build_telemetry_rows(self, data: Dict) -> List[Tuple[str, Tuple[str, str, str]]]:
+    def _set_telemetry_rows(self, data: Dict) -> None:
+        rows, tooltips = self._build_telemetry_rows(data)
+        self._telem_model.set_rows(rows, tooltips)
+
+    def _build_telemetry_rows(self, data: Dict):
+        """The table's rows for ``data``, and the hover text of the unit
+        cells that can be converted."""
         raw = (self.telem_filter.text() or "")
         tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
         favorites_only = self.favorites_check.isChecked()
         plotted_only = self._plotting_available and self.plotted_check.isChecked()
 
-        rows: List[Tuple[str, Tuple[str, str, str]]] = []
+        rows: List[Tuple[str, Tuple[str, str, str, str, str]]] = []
+        tooltips: Dict[str, Tuple[Optional[str], ...]] = {}
+        native_units: Dict[str, str] = {}
         for key, v in data.items():
             # Favorites are keyed on the raw telemetry key, so this is
             # settled before the debug rename and costs one set lookup.
@@ -577,30 +615,94 @@ class MonitorPanel(QWidget):
                 if not any(tok in k_cf for tok in tokens):
                     continue
 
-            value_str = format_telemetry_value(v, self._signed.is_signed(data, key, v))
+            # Sign is decided on the reported value: a conversion is a
+            # positive factor, so it never moves a value across zero.
+            signed = self._signed.is_signed(data, key, v)
+
+            # The unit, too, is looked up on the original key: the simvar
+            # display name is only a debug label.
+            row_key = str(key)
+            unit = unit_for(key, data)
+            shown_unit = unit or ''
+            choices = conversions_for(unit)
+            if choices:
+                native_units[row_key] = unit
+                wanted = self._unit_prefs.get(row_key)
+                if wanted in choices and wanted != unit:
+                    v = convert(v, unit, wanted)
+                    shown_unit = wanted
+                    unit_tip = f"Converted from {unit}\nClick to choose another unit"
+                else:
+                    unit_tip = f"Reported in {unit}\nClick to show in another unit"
+                tooltips[row_key] = (None, None, None, None, unit_tip)
+
+            value_str = format_telemetry_value(v, signed)
 
             # Keyed by the ORIGINAL telemetry key (always unique in `data`)
             # rather than the display key, so two keys that happen to
             # resolve to the same simvar name under the debug rename don't
             # collide into a single row. The star column holds no text of
             # its own - FavoriteStarDelegate paints it from the row key.
-            rows.append((str(key), ('', '', str(display_key), value_str)))
-        return rows
+            rows.append((row_key, ('', '', str(display_key), value_str, shown_unit)))
+        self._native_units = native_units
+        self._unit_delegate.set_convertible(native_units)
+        return rows, tooltips
 
     # ---- favorites ---------------------------------------------------------
 
     def _on_telem_clicked(self, index) -> None:
-        """A click in the star gutter toggles that row's favorite. Handled
-        from the view rather than inside the delegate so the favorites set
-        is only ever mutated by the object that owns it."""
+        """A click in the star gutter toggles that row's favorite, one in the
+        plot gutter its plot mark; one on a convertible unit opens the
+        conversion menu. Handled from the view rather than inside the
+        delegates so the favorites, plot marks and unit choices are only
+        ever mutated by the object that owns them."""
         if index.column() == _PLOT_COL:
             toggle_plot_key(self._telem_model.row_key(index.row()))
             self.reload_plot_keys()
+            return
+        if index.column() == _UNIT_COL:
+            self._show_unit_menu(index)
             return
         if index.column() != _STAR_COL:
             return
         toggle_favorite(self._telem_model.row_key(index.row()))
         self.reload_favorites()
+
+    # ---- unit conversion -----------------------------------------------------
+
+    def unit_choices(self, key: str) -> List[str]:
+        """The units the conversion menu offers for row ``key``; empty when
+        its unit converts to nothing."""
+        return conversions_for(self._native_units.get(key))
+
+    def _show_unit_menu(self, index) -> None:
+        """Pop the units this row's value converts to under its unit cell."""
+        key = self._telem_model.row_key(index.row())
+        choices = self.unit_choices(key)
+        if not choices:
+            return
+        native = self._native_units[key]
+        current = self._unit_prefs.get(key, native)
+        menu = QMenu(self.telem_view)
+        for unit in choices:
+            label = _UNIT_MENU_LABELS.get(unit, unit)
+            if unit == native:
+                label += "  (reported)"
+            action = menu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(unit == current)
+            action.setData(unit)
+        rect = self.telem_view.visualRect(index)
+        chosen = menu.exec(self.telem_view.viewport().mapToGlobal(rect.bottomLeft()))
+        if chosen is not None:
+            self.set_display_unit(key, chosen.data())
+
+    def set_display_unit(self, key: str, unit: str) -> None:
+        """Show row ``key`` in ``unit`` from now on - saved, and shared by
+        every device like the favorites. Its reported unit clears the choice."""
+        set_unit_pref(key, None if unit == self._native_units.get(key) else unit)
+        self._unit_prefs = load_unit_prefs()
+        self._refresh_rows()
 
     def reload_favorites(self) -> None:
         """Show the stars as saved now, after a change here or in the in-sim

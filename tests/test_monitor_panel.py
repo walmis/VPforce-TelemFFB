@@ -20,8 +20,8 @@ from PyQt6.QtWidgets import QApplication
 
 import telemffb.globals as G
 from telemffb.SettingsManager import SettingsManager
-from telemffb.ui.panels.MonitorPanel import (_KEY_COL, _STAR_COL, _VALUE_COL,
-                                            MonitorPanel)
+from telemffb.ui.panels.MonitorPanel import (_KEY_COL, _STAR_COL, _UNIT_COL,
+                                            _VALUE_COL, MonitorPanel)
 
 pytestmark = pytest.mark.unit
 
@@ -353,6 +353,109 @@ class TestFavorites:
             'monitorFavoritesOnly': 1, 'monitorFavoriteKeys': '',
         }), raising=False)
         assert not MonitorPanel(mainwindow=mainwindow).favorites_check.isChecked()
+
+
+class TestUnits:
+    """The Unit column: each key's unit, and the per-key choice of another
+    unit of the same kind, saved globally like the favorites."""
+
+    def _row(self, panel, key):
+        keys = panel.telemetry_keys()
+        model = panel._telem_model
+        row = keys.index(key)
+        return model.column_values(_VALUE_COL)[row], model.column_values(_UNIT_COL)[row]
+
+    def test_registry_units_are_shown(self, panel):
+        panel.update_telemetry({'IAS': 100.0, 'AoA': 2.0, 'N': 'F-16C', 'src': 'DCS'})
+        assert self._row(panel, 'IAS') == ('100.000', 'm/s')
+        assert self._row(panel, 'AoA')[1] == 'deg'
+        assert self._row(panel, 'N')[1] == ''
+
+    def test_msfs_units_come_from_the_subscription(self, panel, monkeypatch):
+        fake = SimpleNamespace(get_var_name=lambda k: None,
+                               get_var_unit=lambda k: ('knots', None) if k == 'IAS' else None)
+        monkeypatch.setattr(G, 'telem_manager', SimpleNamespace(simconnect=fake), raising=False)
+        panel.update_telemetry({'IAS': 100.0, 'src': 'MSFS'})
+        assert self._row(panel, 'IAS')[1] == 'kt'
+
+    def test_choosing_a_unit_converts_the_value(self, panel):
+        panel.update_telemetry({'IAS': 100.0, 'src': 'DCS'})
+        panel.set_display_unit('IAS', 'kt')
+        value, unit = self._row(panel, 'IAS')
+        assert unit == 'kt'
+        assert float(value) == pytest.approx(194.385, abs=1e-3)
+
+    def test_the_choice_is_saved_globally(self, panel):
+        panel.update_telemetry({'IAS': 100.0, 'src': 'DCS'})
+        panel.set_display_unit('IAS', 'kt')
+        assert G.system_settings.writes[-1] == ('monitorUnitPrefs', 'IAS=kt', None)
+
+    def test_choosing_the_reported_unit_clears_the_choice(self, panel):
+        panel.update_telemetry({'IAS': 100.0, 'src': 'DCS'})
+        panel.set_display_unit('IAS', 'kt')
+        panel.set_display_unit('IAS', 'm/s')
+        assert G.system_settings.values['monitorUnitPrefs'] == ''
+        assert self._row(panel, 'IAS') == ('100.000', 'm/s')
+
+    def test_choices_are_restored_on_construction(self, qapp, mainwindow):
+        G.system_settings.values['monitorUnitPrefs'] = 'AoA=rad'
+        panel = MonitorPanel(mainwindow=mainwindow)
+        panel.update_telemetry({'AoA': 180.0, 'src': 'DCS'})
+        value, unit = self._row(panel, 'AoA')
+        assert unit == 'rad'
+        assert float(value) == pytest.approx(3.142, abs=1e-3)
+
+    def test_a_choice_from_another_family_is_ignored(self, qapp, mainwindow):
+        G.system_settings.values['monitorUnitPrefs'] = 'IAS=deg'
+        panel = MonitorPanel(mainwindow=mainwindow)
+        panel.update_telemetry({'IAS': 100.0, 'src': 'DCS'})
+        assert self._row(panel, 'IAS') == ('100.000', 'm/s')
+
+    def test_conversion_keeps_the_sign_formatting(self, panel):
+        panel.update_telemetry({'VerticalSpeed': 1.0, 'src': 'DCS'})
+        panel.set_display_unit('VerticalSpeed', 'fpm')
+        assert self._row(panel, 'VerticalSpeed')[0] == '+196.850'
+
+    def test_lists_convert_per_element(self, panel):
+        panel.update_telemetry({'Flaps': [0.5, 1.0], 'src': 'DCS'})
+        panel.set_display_unit('Flaps', '%')
+        assert self._row(panel, 'Flaps') == ('[50.000, 100.000]', '%')
+
+    def test_menu_choices_only_for_convertible_units(self, panel):
+        panel.update_telemetry({'IAS': 1.0, 'RPM': 2.0, 'N': 'x', 'src': 'DCS'})
+        assert 'kt' in panel.unit_choices('IAS')
+        assert panel.unit_choices('RPM') == []
+        assert panel.unit_choices('N') == []
+        assert panel._unit_delegate.is_convertible(
+            panel._telem_model.index(panel.telemetry_keys().index('IAS'), _UNIT_COL))
+
+    def test_a_click_on_an_unconvertible_unit_opens_nothing(self, panel, monkeypatch):
+        opened = []
+        monkeypatch.setattr('telemffb.ui.panels.MonitorPanel.QMenu.exec',
+                            lambda *a, **k: opened.append(True))
+        panel.update_telemetry({'RPM': 2.0, 'src': 'DCS'})
+        panel._on_telem_clicked(panel._telem_model.index(0, _UNIT_COL))
+        assert not opened
+
+    def test_a_click_on_a_convertible_unit_opens_the_menu(self, panel, monkeypatch):
+        offered = []
+
+        def fake_exec(menu, *args, **kwargs):
+            offered.extend(a.data() for a in menu.actions())
+            return next(a for a in menu.actions() if a.data() == 'kt')
+        monkeypatch.setattr('telemffb.ui.panels.MonitorPanel.QMenu.exec', fake_exec)
+        panel.update_telemetry({'IAS': 100.0, 'src': 'DCS'})
+        panel._on_telem_clicked(panel._telem_model.index(0, _UNIT_COL))
+        assert offered[0] == 'm/s' and 'kt' in offered
+        assert self._row(panel, 'IAS')[1] == 'kt'
+
+    def test_the_converted_unit_cell_explains_itself(self, panel):
+        from PyQt6.QtCore import Qt
+        panel.update_telemetry({'IAS': 100.0, 'src': 'DCS'})
+        panel.set_display_unit('IAS', 'kt')
+        tip = panel._telem_model.data(panel._telem_model.index(0, _UNIT_COL),
+                                      Qt.ItemDataRole.ToolTipRole)
+        assert 'Converted from m/s' in tip
 
 
 class TestActiveEffects:
@@ -765,7 +868,7 @@ class TestCopySelection:
         selection = view.selectionModel()
         for column in range(model.columnCount()):
             selection.select(model.index(0, column), selection.SelectionFlag.Select)
-        assert {i.column() for i in selection.selectedIndexes()} == {_KEY_COL, _VALUE_COL}
+        assert {i.column() for i in selection.selectedIndexes()} == {_KEY_COL, _VALUE_COL, _UNIT_COL}
 
     def test_copy_with_no_selection_leaves_clipboard_untouched(self, panel):
         QApplication.clipboard().setText('unchanged')
