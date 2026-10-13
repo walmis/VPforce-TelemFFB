@@ -1625,3 +1625,96 @@ class TestForceFrame:
         sent = bridge.effects[h.effect_id]['params']
         assert sent.constant_magnitude == -2048
         assert sent.direction_deg == 90
+
+    def test_an_override_frame_applies_live_and_clears(self, monkeypatch):
+        """A calibration renders through a frame of its choosing without
+        touching the stored one; clearing it restores the stored frame."""
+        from telemffb.hw.ffb_dinput import ForceFrame
+        bridge, device, settings = self._open(monkeypatch, frame='my,rot90')
+        h = device.create_effect(EFFECT_CONSTANT)
+        h.setConstantForce(0.5, 180)
+        assert bridge.effects[h.effect_id]['params'].direction_deg == 90
+        device.set_force_frame_override(ForceFrame())
+        assert bridge.effects[h.effect_id]['params'].direction_deg == 180
+        assert settings[self.KEY] == 'my,rot90'
+        device.set_force_frame_override(None)
+        assert bridge.effects[h.effect_id]['params'].direction_deg == 90
+        assert getattr(bridge, 'reset_calls', 0) == 0
+
+
+class TestLiveCalibrationDevice:
+    """The calibrator's device interface over a DInputFFBDevice: springs
+    with per-axis centers, a constant force, the frame override, and a
+    release that frees everything it played."""
+
+    def _open(self, monkeypatch):
+        import telemffb.globals as G
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        monkeypatch.setattr(G, 'system_settings', {}, raising=False)
+        bridge = FakeDIBridge()
+        device = DInputFFBDevice("{FAKE-GUID}", bridge=bridge, poll_interval_ms=0)
+        monkeypatch.setattr(HapticEffect, 'device', device)
+        from telemffb.calibration.force_frame_device import LiveCalibrationDevice
+        return bridge, device, LiveCalibrationDevice(device)
+
+    @staticmethod
+    def _effects_of_type(bridge, effect_type):
+        return [e for e in bridge.effects.values() if e['type'] == effect_type]
+
+    def test_a_spring_block_carries_its_center_and_the_other_axis_is_slack(self, monkeypatch):
+        from telemffb.calibration.force_frame import AxisSpring
+        bridge, device, live = self._open(monkeypatch)
+        live.spring(AxisSpring(0.4, 0.6, 0.3), None)
+        springs = self._effects_of_type(bridge, EFFECT_SPRING)
+        assert len(springs) == 1
+        x, y = springs[0]['params'].condition_x, springs[0]['params'].condition_y
+        assert (x.cp_offset, x.positive_coefficient, x.positive_saturation) == \
+            (1638, 2458, 1229)
+        assert y.positive_coefficient == 0
+        live.spring(None, AxisSpring(-0.4, 1.0, 0.5))
+        assert len(self._effects_of_type(bridge, EFFECT_SPRING)) == 1   # reused
+        x, y = springs[0]['params'].condition_x, springs[0]['params'].condition_y
+        assert x.positive_coefficient == 0
+        assert (y.cp_offset, y.positive_coefficient, y.positive_saturation) == \
+            (-1638, 4096, 2048)
+
+    def test_a_constant_force_plays_and_zero_stops_it(self, monkeypatch):
+        bridge, device, live = self._open(monkeypatch)
+        live.constant(0.3, 90)
+        constants = self._effects_of_type(bridge, EFFECT_CONSTANT)
+        assert len(constants) == 1
+        params = constants[0]['params']
+        assert (params.direction_deg, params.constant_magnitude) == (90, 1229)
+        effect_id = next(k for k, v in bridge.effects.items() if v['type'] == EFFECT_CONSTANT)
+        assert effect_id in bridge.started
+        live.constant(0.0, 0)
+        assert effect_id not in bridge.started
+        live.constant(0.45, 270)
+        assert effect_id in bridge.started
+        assert bridge.effects[effect_id]['params'].direction_deg == 270
+
+    def test_the_frame_override_reaches_the_device(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import ForceFrame
+        bridge, device, live = self._open(monkeypatch)
+        live.set_frame(ForceFrame(False, True, 90))
+        assert device.force_frame == ForceFrame(False, True, 90)
+        live.set_frame(None)
+        assert device.force_frame.is_identity
+
+    def test_release_frees_every_effect_it_played(self, monkeypatch):
+        from telemffb.calibration.force_frame import AxisSpring
+        bridge, device, live = self._open(monkeypatch)
+        live.spring(AxisSpring(0.0, 0.5, 0.4), AxisSpring(0.0, 0.5, 0.4))
+        live.constant(0.3, 0)
+        assert len(bridge.effects) == 2
+        live.stop_all()
+        assert not bridge.started
+        live.release()
+        assert bridge.effects == {}
+
+    def test_read_axes_follows_the_bridge_state(self, monkeypatch):
+        bridge, device, live = self._open(monkeypatch)
+        assert live.read_axes() is None
+        bridge.state.x, bridge.state.y = 2048, -4096
+        device._poll_once()
+        assert live.read_axes() == (0.5, -1.0)

@@ -1407,6 +1407,8 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._axis_map_state = self._IDENTITY_MAP
         self._axis_map_reapply = False
         self._force_frame = ForceFrame()
+        # a frame in force instead of the stored one (calibration), or None
+        self._force_frame_override: Optional[ForceFrame] = None
 
         self._handle = self.bridge.open(guid)
         self._apply_axis_map()
@@ -1516,7 +1518,16 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
             return 'Y'
         return None
 
+    def set_force_frame_override(self, frame: Optional[ForceFrame]):
+        """Render through ``frame`` instead of the stored one until this
+        is called with None.  Every downloaded effect is sent again
+        through the frame now in force; the stored setting is untouched."""
+        self._force_frame_override = frame
+        self._apply_force_frame(live=True)
+
     def _desired_force_frame(self) -> ForceFrame:
+        if self._force_frame_override is not None:
+            return self._force_frame_override
         settings = getattr(G, 'system_settings', None)
         if settings is None or not self.info.vendor_id:
             return ForceFrame()

@@ -265,6 +265,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.device_cards = DeviceCardsPanel(self)
         self.deviceCardsHostLayout.addWidget(self.device_cards)
         self.device_cards.bind_to(self)
+        for card in self.device_cards.cards.values():
+            card.primary_row.calibrate_requested.connect(
+                lambda r=card.primary_row: self._calibrate_force_frame(r))
         joy_card = self.device_cards.joystick_card
         joy_card.add_requested.connect(self._on_add_joystick_alt)
         joy_card.activate_requested.connect(self._on_activate_joystick_row)
@@ -963,6 +966,145 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             row.show_force_frame((frame.mirror_x, frame.mirror_y,
                                   frame.rotate_deg))
 
+    @staticmethod
+    def _is_this_instances_device(device) -> bool:
+        """Whether ``device`` is the DirectInput device this instance is
+        connected to right now."""
+        path = getattr(device, 'path', b'') or b''
+        if isinstance(path, (bytes, bytearray)):
+            path = path.decode(errors='replace')
+        own = getattr(G, 'device_di_guid', None)
+        return bool(own) and str(path) == 'dinput:' + str(own)
+
+    def _row_role(self, row):
+        """The role whose primary device ``row`` holds, or None for an
+        alternate row."""
+        for role, card in self.device_cards.cards.items():
+            if row is card.primary_row:
+                return role
+        return None
+
+    @staticmethod
+    def _force_frame_calibration_blockers(device):
+        """Why ``device``'s force frame cannot be calibrated right now
+        (empty: it can).  The run plays effects on the device this
+        instance drives, through its X and Y axes, so the row's device
+        must be that one.  A connected simulator is not a blocker: the
+        run takes telemetry offline for its duration."""
+        from telemffb.hw.ffb_rhino import HapticEffect
+        if not SystemSettingsDialog._is_this_instances_device(device):
+            return ["this instance is not connected to that device"]
+        if getattr(G, 'device_type', None) != 'joystick':
+            return ["calibration needs the device's X and Y axes: run it "
+                    "from an instance using it as the joystick"]
+        if not HapticEffect.device_alive():
+            return ["no FFB device connected"]
+        return []
+
+    def _quiet_telemetry_for_detection(self):
+        """Keep a simulator's forces out of the detection.  With telemetry
+        streaming, ask, then pause it for the run (the same pause offline
+        editing uses, without the editor); a loaded aircraft's effects are
+        stopped and freed under the frame lock, and the aircraft recreates
+        them when frames resume.  Returns the callable that resumes
+        telemetry, or None when the user declined."""
+        from telemffb.hw.ffb_rhino import HapticEffect
+        manager = getattr(G, 'telem_manager', None)
+        aircraft = getattr(manager, 'currentAircraft', None)
+        streaming = aircraft is not None and not getattr(manager, 'pause_state', False)
+        restore = None
+        if streaming:
+            answer = QMessageBox.question(
+                self, "Detect Force Directions",
+                "A simulator is connected.  Telemetry will be paused while the detection runs.\n\n"
+                "Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if answer != QMessageBox.StandardButton.Yes:
+                return None
+            manager.set_paused(True)
+            restore = lambda: manager.set_paused(False)
+        if aircraft is not None:
+            lock = manager.frame_hold() if hasattr(manager, 'frame_hold') else None
+            held = bool(lock) and lock.acquire(timeout=1.0)
+            try:
+                try:
+                    aircraft.on_timeout()
+                except Exception:
+                    logging.exception("aircraft on_timeout failed before the detection")
+                HapticEffect.destroy_all()
+            finally:
+                if held:
+                    lock.release()
+        return restore or (lambda: None)
+
+    def _run_force_frame_calibration(self, device, device_name):
+        """Open the calibration dialog on ``device``; the derived frame,
+        or None when it did not complete."""
+        from telemffb.ui.dialogs.ForceFrameCalibrationDialog import (
+            ForceFrameCalibrationDialog,
+        )
+        dialog = ForceFrameCalibrationDialog(device, parent=self,
+                                             device_name=device_name)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            return dialog.result
+        return None
+
+    def _offer_connect_for_calibration(self, row) -> bool:
+        """The row holds a device this instance would connect to on Save:
+        offer to save now, in place, so the calibration can run without
+        reopening the dialog.  True when the instance is connected to the
+        row's device afterwards."""
+        device = row.selector.currentData()
+        if not (G.master_instance and self._row_role(row) == G.device_type):
+            return False
+        answer = QMessageBox.question(
+            self, "Detect Force Directions",
+            "The device selection must be saved prior to running the "
+            "detection.  Would you like to save now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes)
+        if answer != QMessageBox.StandardButton.Yes:
+            return False
+        if self.save_settings(close=False):
+            return False          # a restart is on its way
+        return self._is_this_instances_device(device)
+
+    def _calibrate_force_frame(self, row):
+        """Calibrate the force frame of the device in ``row`` and put the
+        result in the row's controls; Save persists it as any edit."""
+        from telemffb.hw.ffb_rhino import HapticEffect
+        device = row.selector.currentData()
+        if not self._is_this_instances_device(device):
+            if not self._offer_connect_for_calibration(row):
+                reasons = self._force_frame_calibration_blockers(device)
+                if reasons:
+                    QMessageBox.warning(
+                        self, "Detect Force Directions",
+                        "Cannot run the detection now: " + "; ".join(reasons) + ".")
+                    return
+        reasons = self._force_frame_calibration_blockers(device)
+        if reasons:
+            QMessageBox.warning(self, "Detect Force Directions",
+                                "Cannot run the detection now: " + "; ".join(reasons) + ".")
+            return
+        restore = self._quiet_telemetry_for_detection()
+        if restore is None:
+            return
+        from telemffb.calibration.force_frame_device import LiveCalibrationDevice
+        try:
+            frame = self._run_force_frame_calibration(
+                LiveCalibrationDevice(HapticEffect.device),
+                row.selector.currentText())
+        finally:
+            try:
+                restore()
+            except Exception:
+                logging.exception("could not resume telemetry after the detection")
+        if frame is None:
+            return
+        row.show_force_frame((frame.mirror_x, frame.mirror_y, frame.rotate_deg))
+
     def _stage_force_frames(self):
         """Queue each shown row's force frame under its device's key; a
         hidden row (not a DirectInput device) leaves the stored value
@@ -1078,6 +1220,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             lambda _i, r=row: self._on_alt_device_changed(r))
         row.icon_changed.connect(
             lambda kind, r=row: self._on_device_icon_changed(r, kind))
+        row.calibrate_requested.connect(
+            lambda r=row: self._calibrate_force_frame(r))
         return row
 
     def _on_add_joystick_alt(self):
@@ -2681,7 +2825,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             return False
         return True
 
-    def save_settings(self):
+    def save_settings(self, close=True):
+        """Write the form to the settings and apply what applies live.
+        With ``close`` the dialog is dismissed afterwards; without, it
+        stays up on the saved state.  Returns whether a restart was
+        requested."""
         # Create a dictionary with the values of all components
         tp = G.device_type
 
@@ -2929,9 +3077,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self._apply_log_levels()
 
-        self.accept()
+        if close:
+            self.accept()
         if restart:
             utils.request_restart()
+        return restart
 
     #: Which devices need the tap, and for what.  Stated wherever the tap
     #: comes up, because the distinction decides whether a missing rule is a

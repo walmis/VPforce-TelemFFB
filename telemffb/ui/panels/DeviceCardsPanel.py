@@ -141,6 +141,8 @@ class DeviceRow(QWidget):
     #: the user removed this (alternate) row
     removed = pyqtSignal()
     icon_changed = pyqtSignal(str)
+    #: the user asked to detect this row's device's force frame
+    calibrate_requested = pyqtSignal()
 
     def __init__(self, selector_name, alternates=False, primary=True,
                  axis_choice=False, parent=None):
@@ -265,6 +267,13 @@ class DeviceRow(QWidget):
             "For a base that reads the direction angle from a different "
             "reference than the DirectInput standard defines.")
         self.frame_rotate_label.setToolTip(self.frame_rotate.toolTip())
+        self.frame_calibrate = QPushButton('Detect…')
+        self.frame_calibrate.setObjectName(
+            selector_name.replace('cb_select', 'btn_frame_cal'))
+        self.frame_calibrate.clicked.connect(self.calibrate_requested.emit)
+        self.frame_calibrate.setToolTip(
+            "Measure how this device renders forces and fill in the "
+            "corrections.\nRuns on the device this instance is connected to.")
         for w in self._frame_widgets():
             w.setVisible(False)
             options.addWidget(w)
@@ -359,7 +368,7 @@ class DeviceRow(QWidget):
 
     def _frame_widgets(self):
         return (self.frame_label, self.frame_mirror_x, self.frame_mirror_y,
-                self.frame_rotate_label, self.frame_rotate)
+                self.frame_rotate_label, self.frame_rotate, self.frame_calibrate)
 
     def show_force_frame(self, frame):
         """Show the force-frame controls set to ``frame`` = (mirror_x,

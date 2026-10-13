@@ -7,7 +7,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - **NEW: 3rd party device support via DirectLink**
   - An optional integration that lets TelemFFB drive any device exposing force feedback through DirectInput
   - Enabled in System Settings > Integrations; DirectLink is a separate free download
-  - Per-device force direction (System Settings > Devices): mirror the forces on an axis, or turn the direction angle, for a base that reads force directions differently from the DirectInput convention.  The position reading is left alone
+  - Per-device force direction (System Settings > Devices): mirror the forces on an axis, or turn the direction angle, for a base that reads force directions differently from the DirectInput convention.  The position reading is left alone.  A Detect button measures the device and fills these in: it checks the position reading, plays a light spring on each axis and a light force in two directions, then verifies the result with you
 - **NEW: The DirectInput Tap (DCS / IL-2 / Falcon BMS)**
   - "The tap" intercepts the games own FFB effects and lets TelemFFB render them locally
     - **Game Managed (DirectInput Tap)** spring mode re-renders the game's spring: trim center follow and force-trim collapse reproduce exactly

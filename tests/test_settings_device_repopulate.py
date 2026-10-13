@@ -376,3 +376,204 @@ class TestForceFrameControls(TestAxisChooser):
         dlg._stage_force_frames()
         assert not any(k.startswith('dinput_force_frame_')
                        for k in dlg._pending_devpaths)
+
+    def test_calibration_runs_only_on_this_instances_joystick(self, monkeypatch):
+        """Judged when the button is clicked, not when the row was filled:
+        a Save that switches the instance to the device makes the button
+        work without reopening the dialog."""
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        own = '{0d1e55b2-f16f-11cf-88cb-001111000030}'       # _FakeDIDevice's guid
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        assert row.frame_calibrate.isEnabled()
+        device = row.selector.currentData()
+        blockers = SystemSettingsDialog._force_frame_calibration_blockers
+        monkeypatch.setattr('telemffb.hw.ffb_rhino.HapticEffect.device', None)
+        monkeypatch.setattr(G, 'device_di_guid', '{other}', raising=False)
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        assert blockers(device)
+        monkeypatch.setattr(G, 'device_di_guid', own, raising=False)
+        monkeypatch.setattr(G, 'device_type', 'pedals', raising=False)
+        assert blockers(device)
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        assert blockers(device) == ['no FFB device connected']
+
+    def test_a_calibration_result_fills_the_row(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import ForceFrame
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        monkeypatch.setattr(SystemSettingsDialog, '_is_this_instances_device',
+                            staticmethod(lambda device: True))
+        monkeypatch.setattr(SystemSettingsDialog, '_force_frame_calibration_blockers',
+                            staticmethod(lambda device: []))
+        monkeypatch.setattr(SystemSettingsDialog, '_run_force_frame_calibration',
+                            lambda self, device, name: ForceFrame(False, True, 90))
+        monkeypatch.setattr('telemffb.hw.ffb_rhino.HapticEffect.device', object())
+        dlg._calibrate_force_frame(row)
+        assert row.force_frame_value() == (False, True, 90)
+        dlg._stage_force_frames()
+        assert dlg._pending_devpaths[self.KEY] == 'my,rot90'
+
+    def test_an_unconnected_device_offers_an_in_place_save(self, monkeypatch):
+        """Selecting a DirectInput device and calibrating at once: the
+        dialog offers to save now, the save connects the instance to the
+        device, and the calibration runs without reopening anything."""
+        from telemffb.hw.ffb_dinput import ForceFrame
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        own = '{0d1e55b2-f16f-11cf-88cb-001111000030}'       # _FakeDIDevice's guid
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        monkeypatch.setattr(G, 'device_di_guid', None, raising=False)
+        saves = []
+
+        def save(self, close=True):
+            saves.append(close)
+            monkeypatch.setattr(G, 'device_di_guid', own, raising=False)
+            return False
+        monkeypatch.setattr(SystemSettingsDialog, 'save_settings', save)
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                            staticmethod(lambda *a, **k: QtWidgets.QMessageBox.StandardButton.Yes))
+        monkeypatch.setattr('telemffb.hw.ffb_rhino.HapticEffect.device_alive',
+                            staticmethod(lambda: True))
+        monkeypatch.setattr('telemffb.hw.ffb_rhino.HapticEffect.device', object())
+        monkeypatch.setattr(G, 'telem_manager', None, raising=False)
+        monkeypatch.setattr(SystemSettingsDialog, '_run_force_frame_calibration',
+                            lambda self, device, name: ForceFrame(True, False, 0))
+        dlg._calibrate_force_frame(row)
+        assert saves == [False]
+        assert row.force_frame_value() == (True, False, 0)
+
+    def test_declining_the_save_offer_calibrates_nothing(self, monkeypatch):
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        monkeypatch.setattr(G, 'device_di_guid', None, raising=False)
+        saves, opened = [], []
+        monkeypatch.setattr(SystemSettingsDialog, 'save_settings',
+                            lambda self, close=True: saves.append(close))
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                            staticmethod(lambda *a, **k: QtWidgets.QMessageBox.StandardButton.No))
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: QtWidgets.QMessageBox.StandardButton.Ok))
+        monkeypatch.setattr(SystemSettingsDialog, '_run_force_frame_calibration',
+                            lambda self, device, name: opened.append(1))
+        dlg._calibrate_force_frame(row)
+        assert saves == [] and opened == []
+
+    def test_a_pedals_row_gets_no_save_offer_from_a_joystick_instance(self, monkeypatch):
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_p)
+        row = dlg.device_cards.cards['pedals'].primary_row
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        monkeypatch.setattr(G, 'device_di_guid', None, raising=False)
+        asked, warned = [], []
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                            staticmethod(lambda *a, **k: asked.append(1)))
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: warned.append(1)))
+        dlg._calibrate_force_frame(row)
+        assert asked == [] and warned == [1]
+
+    def _detection_env(self, monkeypatch, dlg, aircraft, paused):
+        """A connected instance with ``aircraft`` loaded in the telemetry
+        manager, paused or streaming."""
+        import threading
+        from types import SimpleNamespace
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        monkeypatch.setattr(SystemSettingsDialog, '_is_this_instances_device',
+                            staticmethod(lambda device: True))
+        monkeypatch.setattr(G, 'device_type', 'joystick', raising=False)
+        monkeypatch.setattr('telemffb.hw.ffb_rhino.HapticEffect.device', object())
+        monkeypatch.setattr('telemffb.hw.ffb_rhino.HapticEffect.device_alive',
+                            staticmethod(lambda: True))
+        freed = []
+        monkeypatch.setattr('telemffb.hw.ffb_rhino.HapticEffect.destroy_all',
+                            classmethod(lambda cls: freed.append(1) or 0))
+        toggles = []
+        manager = SimpleNamespace(currentAircraft=aircraft, pause_state=paused,
+                                  frame_hold=lambda: threading.Lock(),
+                                  set_paused=lambda state: toggles.append(state))
+        monkeypatch.setattr(G, 'telem_manager', manager, raising=False)
+        return freed, toggles
+
+    def test_a_streaming_sim_is_paused_for_the_detection(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import ForceFrame
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        timeouts = []
+        aircraft = type('Aircraft', (), {'on_timeout': lambda self: timeouts.append(1)})()
+        freed, toggles = self._detection_env(monkeypatch, dlg, aircraft, paused=False)
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                            staticmethod(lambda *a, **k: QtWidgets.QMessageBox.StandardButton.Yes))
+        during = []
+
+        def run(self, device, name):
+            during.append((list(toggles), list(freed), list(timeouts)))
+            return ForceFrame(False, True, 90)
+        monkeypatch.setattr(SystemSettingsDialog, '_run_force_frame_calibration', run)
+        dlg._calibrate_force_frame(row)
+        assert during == [([True], [1], [1])]          # paused, freed, quieted before the run
+        assert toggles == [True, False]                 # and resumed after
+        assert row.force_frame_value() == (False, True, 90)
+
+    def test_declining_the_pause_runs_nothing(self, monkeypatch):
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        aircraft = type('Aircraft', (), {'on_timeout': lambda self: None})()
+        freed, toggles = self._detection_env(monkeypatch, dlg, aircraft, paused=False)
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                            staticmethod(lambda *a, **k: QtWidgets.QMessageBox.StandardButton.No))
+        opened = []
+        monkeypatch.setattr(SystemSettingsDialog, '_run_force_frame_calibration',
+                            lambda self, device, name: opened.append(1))
+        dlg._calibrate_force_frame(row)
+        assert opened == [] and toggles == [] and freed == []
+
+    def test_an_already_paused_aircraft_is_quieted_without_asking(self, monkeypatch):
+        from telemffb.hw.ffb_dinput import ForceFrame
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        aircraft = type('Aircraft', (), {'on_timeout': lambda self: None})()
+        freed, toggles = self._detection_env(monkeypatch, dlg, aircraft, paused=True)
+        asked = []
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                            staticmethod(lambda *a, **k: asked.append(1)))
+        monkeypatch.setattr(SystemSettingsDialog, '_run_force_frame_calibration',
+                            lambda self, device, name: ForceFrame())
+        dlg._calibrate_force_frame(row)
+        assert asked == [] and toggles == [] and freed == [1]
+
+    def test_a_blocked_calibration_changes_nothing(self, monkeypatch):
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg = self._dialog(monkeypatch)
+        self._select_di(dlg.cb_select_j)
+        row = dlg.device_cards.cards['joystick'].primary_row
+        monkeypatch.setattr(SystemSettingsDialog, '_is_this_instances_device',
+                            staticmethod(lambda device: True))
+        monkeypatch.setattr(SystemSettingsDialog, '_force_frame_calibration_blockers',
+                            staticmethod(lambda device: ['no FFB device connected']))
+        opened = []
+        monkeypatch.setattr(SystemSettingsDialog, '_run_force_frame_calibration',
+                            lambda self, device, name: opened.append(1))
+        monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                            staticmethod(lambda *a, **k: QtWidgets.QMessageBox.StandardButton.Ok))
+        dlg._calibrate_force_frame(row)
+        assert opened == []
+        assert row.force_frame_value() == (False, False, 0)
