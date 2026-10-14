@@ -29,6 +29,8 @@ from typing import Optional
 
 import telemffb.globals as G
 from telemffb.hw.effect_levels import LEVEL_NAMES, MUTE_ALL, MUTE_KEEP_SPRING
+from telemffb.hw.ffb_rhino import (EFFECT_CONSTANT, EFFECT_DAMPER, EFFECT_FRICTION,
+                                   EFFECT_INERTIA, EFFECT_SINE, EFFECT_SPRING)
 from telemffb.state.effect_levels_controller import SCOPE_ALL, SCOPE_DEVICE
 from telemffb.state.mute_button_binding import BEHAVIOR_MOMENTARY, BEHAVIOR_TOGGLE
 from telemffb.ui.theme.tokens import ERROR_RED
@@ -64,6 +66,17 @@ SCOPE_TEXT = ("Scales only the effects TelemFFB creates. Effects created by a si
 
 MUTE_SCOPE_TEXT = ("Only effects TelemFFB creates are muted. Effects a sim creates directly "
                    "on the device are not.")
+
+#: The Monitor page badge drawn beside each type level, so a slider and the
+#: effects it scales carry the same mark.  Master has none.
+LEVEL_GLYPH_TYPES = {
+    "periodic": EFFECT_SINE,
+    "constant": EFFECT_CONSTANT,
+    "spring": EFFECT_SPRING,
+    "damper": EFFECT_DAMPER,
+    "inertia": EFFECT_INERTIA,
+    "friction": EFFECT_FRICTION,
+}
 
 #: Each level's label and tooltip, keyed by ``LEVEL_NAMES``.
 LEVEL_TEXT = {

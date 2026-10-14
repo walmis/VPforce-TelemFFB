@@ -27,7 +27,7 @@ from telemffb.ui.dialogs.EffectLevelsDialog import EffectLevelsDialog
 from telemffb.ui.panels.DevicePanel import DeviceIconPanel, MiniDevicePanel
 from telemffb.ui.widgets.EffectLevelsHeader import EffectLevelsHeader
 from telemffb.ui.widgets.EffectMuteButton import EffectMuteButton
-from telemffb.ui.widgets.effect_levels_ui import readout_note
+from telemffb.ui.widgets.effect_levels_ui import LEVEL_GLYPH_TYPES, readout_note
 
 pytestmark = pytest.mark.unit
 
@@ -584,6 +584,12 @@ class TestDialog:
         dialog.detect_button.click()
         assert ctl.calls == []
         assert dialog.detect_button.isEnabled()
+
+    def test_each_type_level_carries_the_monitor_badge(self, ctl):
+        dialog = EffectLevelsDialog(ctl)
+        assert {n: g.effect_type for n, g in dialog.glyphs.items()} == {
+            'master': None, **LEVEL_GLYPH_TYPES}
+        assert dialog.glyphs['master'].size() == dialog.glyphs['spring'].size()
 
     def test_pin_toggles_show_the_pinned_set(self, ctl):
         ctl._pinned = ['master', 'spring']

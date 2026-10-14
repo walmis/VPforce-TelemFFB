@@ -42,9 +42,10 @@ from telemffb.hw.effect_levels import LEVEL_NAMES
 from telemffb.state.mute_button_binding import BEHAVIOR_MOMENTARY, BEHAVIOR_TOGGLE
 from telemffb.ui.widgets.EffectLevelSlider import EffectLevelSlider
 from telemffb.ui.widgets.EffectMuteButton import EffectMuteButton
+from telemffb.ui.widgets.EffectTypeGlyph import EffectTypeGlyph
 from telemffb.ui.widgets.PinToggleButton import PinToggleButton
-from telemffb.ui.widgets.effect_levels_ui import (BEHAVIOR_TEXT, LEVEL_TEXT, PIN_TIP,
-                                                  SCOPE_TEXT, UNPIN_TIP, role_name)
+from telemffb.ui.widgets.effect_levels_ui import (BEHAVIOR_TEXT, LEVEL_GLYPH_TYPES, LEVEL_TEXT,
+                                                  PIN_TIP, SCOPE_TEXT, UNPIN_TIP, role_name)
 from telemffb.utils import schedule_on_main_thread
 
 _BINDING_TIP = ("A button on a device that performs the function selected on the Mute "
@@ -90,8 +91,9 @@ class EffectLevelsDialog(QDialog):
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(6)
-        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(2, 1)
         self.sliders: dict[str, EffectLevelSlider] = {}
+        self.glyphs: dict[str, EffectTypeGlyph] = {}
         self.pin_buttons: dict[str, PinToggleButton] = {}
         row = 0
         for name in LEVEL_NAMES:
@@ -108,10 +110,14 @@ class EffectLevelsDialog(QDialog):
                 label.setFont(font)
             pin = PinToggleButton(PIN_TIP, UNPIN_TIP)
             pin.clicked.connect(lambda on, n=name: self._on_pin_clicked(n, on))
+            glyph = EffectTypeGlyph(LEVEL_GLYPH_TYPES.get(name))
+            glyph.setToolTip(tip)
             grid.addWidget(label, row, 0)
-            grid.addWidget(slider, row, 1)
-            grid.addWidget(pin, row, 2)
+            grid.addWidget(glyph, row, 1)
+            grid.addWidget(slider, row, 2)
+            grid.addWidget(pin, row, 3)
             self.sliders[name] = slider
+            self.glyphs[name] = glyph
             self.pin_buttons[name] = pin
             row += 1
             if name == "master":
@@ -120,7 +126,7 @@ class EffectLevelsDialog(QDialog):
                 line = QFrame()
                 line.setFixedHeight(1)
                 line.setStyleSheet("background: palette(mid); border: none;")
-                grid.addWidget(line, row, 0, 1, 3)
+                grid.addWidget(line, row, 0, 1, 4)
                 row += 1
         layout.addLayout(grid)
         layout.addWidget(self._build_binding_box())

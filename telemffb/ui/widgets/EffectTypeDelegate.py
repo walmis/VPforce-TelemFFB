@@ -86,6 +86,47 @@ def _svg_bytes(name):
         return None
 
 
+#: Rendered waveforms by (type, colour, height, device pixel ratio).
+_PIXMAPS = {}
+
+
+def badge_pixmap(effect_type, color, height):
+    """The waveform, tinted and sized, built once per (type, colour,
+    size). Rasterising an SVG per row per telemetry frame - twenty
+    times a second - would be real work for a picture that never
+    changes; the cache key covers a theme switch and a DPI change, the
+    only two things that invalidate one."""
+    ratio = (QGuiApplication.instance().devicePixelRatio()
+             if QGuiApplication.instance() is not None else 1.0)
+    key = (effect_type, color.name(), height, ratio)
+    if key in _PIXMAPS:
+        return _PIXMAPS[key]
+
+    from PyQt6.QtSvg import QSvgRenderer
+    data = _svg_bytes(BADGE_SHAPES[effect_type])
+    pixmap = None
+    if data:
+        renderer = QSvgRenderer(data.replace(b"currentColor",
+                                             color.name().encode()))
+        box = renderer.viewBoxF()
+        if box.width() > 0 and box.height() > 0:
+            # Fit, never stretch: the five files differ in width (359 to
+            # 439 against a common height), so scaling each to a square
+            # would draw the sine noticeably lighter than the square.
+            scale = min(BADGE_WIDTH / box.width(), height / box.height())
+            w, h = box.width() * scale, box.height() * scale
+            pixmap = QPixmap(round(BADGE_WIDTH * ratio), round(height * ratio))
+            pixmap.setDevicePixelRatio(ratio)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            renderer.render(painter, QRectF((BADGE_WIDTH - w) / 2,
+                                            (height - h) / 2, w, h))
+            painter.end()
+    _PIXMAPS[key] = pixmap
+    return pixmap
+
+
 class EffectTypeDelegate(QStyledItemDelegate):
     """Draws the name, indented by its effect-type badge.
 
@@ -97,7 +138,6 @@ class EffectTypeDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._types = {}
-        self._pixmaps = {}
 
     def set_types(self, types) -> None:
         """``{row label: PID effect type}``. A label absent from it, or a
@@ -106,40 +146,7 @@ class EffectTypeDelegate(QStyledItemDelegate):
         self._types = dict(types or {})
 
     def _pixmap(self, effect_type, color, height):
-        """The waveform, tinted and sized, built once per (type, colour,
-        size). Rasterising an SVG per row per telemetry frame - twenty
-        times a second - would be real work for a picture that never
-        changes; the cache key covers a theme switch and a DPI change, the
-        only two things that invalidate one."""
-        ratio = (QGuiApplication.instance().devicePixelRatio()
-                 if QGuiApplication.instance() is not None else 1.0)
-        key = (effect_type, color.name(), height, ratio)
-        if key in self._pixmaps:
-            return self._pixmaps[key]
-
-        from PyQt6.QtSvg import QSvgRenderer
-        data = _svg_bytes(BADGE_SHAPES[effect_type])
-        pixmap = None
-        if data:
-            renderer = QSvgRenderer(data.replace(b"currentColor",
-                                                 color.name().encode()))
-            box = renderer.viewBoxF()
-            if box.width() > 0 and box.height() > 0:
-                # Fit, never stretch: the five files differ in width (359 to
-                # 439 against a common height), so scaling each to a square
-                # would draw the sine noticeably lighter than the square.
-                scale = min(BADGE_WIDTH / box.width(), height / box.height())
-                w, h = box.width() * scale, box.height() * scale
-                pixmap = QPixmap(round(BADGE_WIDTH * ratio), round(height * ratio))
-                pixmap.setDevicePixelRatio(ratio)
-                pixmap.fill(Qt.GlobalColor.transparent)
-                painter = QPainter(pixmap)
-                painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-                renderer.render(painter, QRectF((BADGE_WIDTH - w) / 2,
-                                                (height - h) / 2, w, h))
-                painter.end()
-        self._pixmaps[key] = pixmap
-        return pixmap
+        return badge_pixmap(effect_type, color, height)
 
     def paint(self, painter: QPainter, option, index) -> None:
         label = index.data(Qt.ItemDataRole.DisplayRole) or ""
