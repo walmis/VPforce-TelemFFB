@@ -27,7 +27,7 @@ parser (``hid.dll``).
 hidapi opens Windows HID handles with shared access, so a sim reading the
 same controller keeps working while TelemFFB reads it.
 
-The listing thread reads the configured device slots and the ignored list
+The listing thread reads the configured device slots and the enabled list
 from the system settings (QSettings) off the main thread.  Reads only, as
 other modules already do; writes stay on the main thread.
 
@@ -61,10 +61,10 @@ from telemffb.utils.device import (DEVICE_ROLES, device_ids_key,
                                    parse_usb_ids)
 
 __all__ = [
-    "IGNORED_SETTING",
+    "ENABLED_SETTING",
     "ButtonDeviceInfo",
     "assign_keys",
-    "ignored_keys",
+    "enabled_keys",
     "enumerate_button_devices",
     "hat_buttons",
     "HidReportDecoder",
@@ -72,8 +72,9 @@ __all__ = [
     "ButtonDeviceManager",
 ]
 
-#: Global system setting: comma-separated device keys the user turned off.
-IGNORED_SETTING = 'buttonDevicesIgnored'
+#: Global system setting: comma-separated device keys the user turned on.
+#: A controller is read only while listed here; a new one starts off.
+ENABLED_SETTING = 'buttonDevicesEnabled'
 
 #: Generic Desktop usage page and the top-level usages read as controllers.
 _USAGE_PAGE_GENERIC_DESKTOP = 0x01
@@ -261,7 +262,7 @@ class ButtonDeviceInfo:
     :ivar path: the hidapi device path, as hidapi returns it.
     :ivar readable: False once opening or reading the device has failed,
         and from the start for an XInput controller.
-    :ivar ignored: True when the user turned the device off.
+    :ivar ignored: True until the user turns the device on.
     :ivar usage: the top-level Generic Desktop usage (4, 5 or 8).
     :ivar xinput: an XInput controller's HID interface.  It lists buttons
         and a hat but never delivers input reports to a HID reader, so it
@@ -287,7 +288,7 @@ def _key_suffix(serial: str) -> str:
     """A serial made safe for a key.
 
     Consumers append ``:<button>`` and split on the last colon, and the
-    ignored list is comma-separated, so neither character may appear.
+    enabled list is comma-separated, so neither character may appear.
     """
     return serial.replace(':', '_').replace(',', '_')
 
@@ -320,11 +321,11 @@ def assign_keys(infos: list[ButtonDeviceInfo]) -> list[ButtonDeviceInfo]:
     return infos
 
 
-def ignored_keys(settings) -> set[str]:
-    """The device keys listed in the ``buttonDevicesIgnored`` setting."""
+def enabled_keys(settings) -> set[str]:
+    """The device keys listed in the ``buttonDevicesEnabled`` setting."""
     if settings is None:
         return set()
-    raw = str(settings.get(IGNORED_SETTING, '') or '')
+    raw = str(settings.get(ENABLED_SETTING, '') or '')
     return {part.strip() for part in raw.split(',') if part.strip()}
 
 
@@ -361,8 +362,9 @@ def enumerate_button_devices(settings=None) -> list[ButtonDeviceInfo]:
     Joysticks, gamepads and multi-axis controllers (Generic Desktop usages 4,
     5 and 8), minus every device TelemFFB drives as an FFB device: VPforce
     hardware (VID 0xFFFF), any configured ``devpath_<role>`` and any stored
-    ``devids_<role>`` VID:PID.  Ignored devices are listed with ``ignored``
-    set, XInput controllers with ``xinput`` set and ``readable`` False.
+    ``devids_<role>`` VID:PID.  Devices the user has not enabled are listed
+    with ``ignored`` set, XInput controllers with ``xinput`` set and
+    ``readable`` False.
     Opens no handles.
 
     :param settings: a ``SystemSettings``-like object with ``get(key,
@@ -391,9 +393,9 @@ def enumerate_button_devices(settings=None) -> list[ButtonDeviceInfo]:
             serial=str(entry.get('serial_number') or ''), usage=int(usage),
             readable=not xinput, xinput=xinput))
     assign_keys(infos)
-    ignored = ignored_keys(settings)
+    enabled = enabled_keys(settings)
     for info in infos:
-        info.ignored = info.key in ignored
+        info.ignored = info.key not in enabled
     return infos
 
 
@@ -872,15 +874,16 @@ class ButtonDeviceManager(QObject):
             return dict(self._states)
 
     def set_ignored(self, key: str, ignored: bool) -> None:
-        """Turn a controller off or back on, persisting the choice."""
+        """Turn a controller on or off, persisting the choice.  Every
+        controller starts off; only the ones the user turned on are read."""
         settings = _resolve_settings(self._settings)
-        keys = ignored_keys(settings)
+        keys = enabled_keys(settings)
         if ignored:
-            keys.add(key)
-        else:
             keys.discard(key)
+        else:
+            keys.add(key)
         if settings is not None:
-            settings.setValue(IGNORED_SETTING, ','.join(sorted(keys)))
+            settings.setValue(ENABLED_SETTING, ','.join(sorted(keys)))
         for info in self._devices:
             if info.key != key:
                 continue
@@ -926,10 +929,10 @@ class ButtonDeviceManager(QObject):
         self._scan_failed = False
 
         settings = _resolve_settings(self._settings)
-        ignored = ignored_keys(settings)
+        enabled = enabled_keys(settings)
         previous = {info.path: info for info in self._devices}
         for info in listed:
-            info.ignored = info.key in ignored
+            info.ignored = info.key not in enabled
             old = previous.get(info.path)
             # a failed device is not retried until it is replugged
             if old is not None and old.key == info.key and not old.readable:

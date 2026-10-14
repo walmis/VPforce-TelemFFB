@@ -34,6 +34,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Anywhere you can/must bind a button within TelemFFB to perform some function, you can now bind any game controller attached to your PC
   - Legacy bindings, including the "use master button" based bindings are still honored
   - New bindings carry the VID:PID:BUTTON_ID of the device button which was pressed during the binding
+  - Individual game controllers can be enabled in System Settings > Button Devices
 
 
 ## UI

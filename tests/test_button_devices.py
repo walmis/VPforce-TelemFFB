@@ -191,7 +191,7 @@ def make_manager(settings, listed):
 
 def test_manager_releases_vanished_device(qapp):
     listed = [info(0x1234, 0x0001, b'p1', key='1234:0001')]
-    manager, readers, emitted = make_manager(FakeSettings(), listed)
+    manager, readers, emitted = make_manager(FakeSettings(buttonDevicesEnabled='1234:0001'), listed)
     scan(manager, qapp)
     readers['1234:0001'].on_change('1234:0001', frozenset({2, 7}))
     qapp.processEvents()
@@ -210,7 +210,7 @@ def test_reader_change_is_stored_without_the_event_loop(qapp, monkeypatch):
     monkeypatch.setattr(G, 'button_states', {}, raising=False)
     monkeypatch.setattr(G, 'ipc_instance', None, raising=False)
     listed = [info(0x1234, 0x0001, b'p1', key='1234:0001')]
-    manager, readers, emitted = make_manager(FakeSettings(), listed)
+    manager, readers, emitted = make_manager(FakeSettings(buttonDevicesEnabled='1234:0001'), listed)
     scan(manager, qapp)
 
     readers['1234:0001'].on_change('1234:0001', frozenset({3}))
@@ -220,8 +220,8 @@ def test_reader_change_is_stored_without_the_event_loop(qapp, monkeypatch):
     assert emitted == [('1234:0001', [3])]
 
 
-def test_manager_skips_ignored_devices(qapp):
-    settings = FakeSettings(buttonDevicesIgnored='1234:0002')
+def test_a_controller_is_read_only_once_the_user_enables_it(qapp):
+    settings = FakeSettings(buttonDevicesEnabled='1234:0001')
     listed = [info(0x1234, 0x0001, b'p1', key='1234:0001'),
               info(0x1234, 0x0002, b'p2', key='1234:0002')]
     manager, readers, emitted = make_manager(settings, listed)
@@ -236,7 +236,22 @@ def test_manager_skips_ignored_devices(qapp):
     manager.set_ignored('1234:0002', False)
 
     assert set(readers) == {'1234:0001', '1234:0002'}
-    assert settings.values['buttonDevicesIgnored'] == ''
+    assert settings.values['buttonDevicesEnabled'] == '1234:0001,1234:0002'
+
+    manager.set_ignored('1234:0001', True)
+
+    assert readers['1234:0001'].stopped
+    assert settings.values['buttonDevicesEnabled'] == '1234:0002'
+
+
+def test_a_new_controller_starts_off(qapp):
+    listed = [info(0x1234, 0x0001, b'p1', key='1234:0001')]
+    manager, readers, emitted = make_manager(FakeSettings(), listed)
+
+    scan(manager, qapp)
+
+    assert readers == {}
+    assert [(d.key, d.ignored) for d in manager.devices()] == [('1234:0001', True)]
 
 
 class CountingSettings(FakeSettings):

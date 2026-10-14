@@ -74,9 +74,8 @@ class ButtonDevicesPanel(QGroupBox):
         self._populating = False
 
         layout = QVBoxLayout(self)
-        intro = QLabel('Any game controller listed here can supply buttons to the '
-                       'button settings. Click a button setting, then push the button '
-                       'on the controller. Enabled applies at once, without Save.')
+        intro = QLabel('Any game controller listed here can be used for the various bindable button settings in TelemFFB such as force trim control.\n\n'
+                       'Enable a device\'s checkbox to allow binding detection for that controller.')
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
@@ -168,7 +167,7 @@ class ButtonDevicesPanel(QGroupBox):
     def _status(info: ButtonDeviceInfo) -> tuple[str, str]:
         """Status text and its tooltip."""
         if info.ignored:
-            return 'off', 'Turned off; its buttons are not read.'
+            return 'off', 'Not enabled; its buttons are not read.'
         if info.xinput:
             return 'not readable', 'Xbox-style (XInput) controllers send no button reports TelemFFB can read.'
         if not info.readable:
