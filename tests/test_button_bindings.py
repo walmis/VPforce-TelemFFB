@@ -5,6 +5,7 @@ qualified id ``<key>:<n>`` resolved through ``G.button_states``.  The
 master fills that map and relays it to the children over IPC:
 
     child  -> master     BUTTONS:<role>_<json list>     (legacy, unchanged)
+    child  -> master     BTNROLE:<json role, key, buttons>
     master -> children   BTNDEV:<key>:<json list>
 """
 import json
@@ -224,8 +225,32 @@ def test_master_keys_a_childs_buttons_and_relays_them(states, monkeypatch):
     ipc._child_addrs = {'pedals': ('127.0.0.1', 41001), 'collective': ('127.0.0.1', 41002)}
 
     ipc._handle_message('BUTTONS:pedals_[4]', ('127.0.0.1', 41001))
+    ipc._handle_message(button_state.btnrole_message('pedals', 'FFFF:2056', [4]),
+                        ('127.0.0.1', 41001))
 
     assert G.child_buttons == {'pedals': [4]}
     assert states == {'FFFF:2056': frozenset({4})}
     assert sorted(fake.sent) == [('BTNDEV:FFFF:2056:[4]', ('127.0.0.1', 41001)),
                                  ('BTNDEV:FFFF:2056:[4]', ('127.0.0.1', 41002))]
+
+
+def test_master_keys_a_childs_buttons_by_the_key_the_child_sent(states, monkeypatch):
+    """A child joystick on an alternate slot keys itself by the device in
+    hand, which the master cannot derive from its own settings."""
+    monkeypatch.setattr(G, 'device_type', 'pedals', raising=False)
+    monkeypatch.setattr(G, 'child_buttons', {}, raising=False)
+    monkeypatch.setattr(G, 'system_settings', FakeSettings(
+        devids_joystick='FFFF:2055', devpath_joystick='p1'), raising=False)
+    ipc, fake = _thread(monkeypatch)
+    ipc._child_addrs = {'joystick': ('127.0.0.1', 41001)}
+
+    ipc._handle_message(button_state.btnrole_message('joystick', '045E:001B', [2]),
+                        ('127.0.0.1', 41001))
+    assert states == {'045E:001B': frozenset({2})}
+
+    # the child swapped devices: the old key is released, the new one holds
+    ipc._handle_message(button_state.btnrole_message('joystick', 'FFFF:2055', [6]),
+                        ('127.0.0.1', 41001))
+    assert states == {'045E:001B': frozenset(), 'FFFF:2055': frozenset({6})}
+    assert [m for m, _ in fake.sent] == ['BTNDEV:045E:001B:[2]', 'BTNDEV:045E:001B:[]',
+                                         'BTNDEV:FFFF:2055:[6]']

@@ -56,6 +56,7 @@ from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal, pyqtSlot
 import telemffb.globals as G
 import telemffb.hw.hid as hid
 from telemffb.hw.button_refs import NAMES_SETTING, stored_device_names
+from telemffb.hw.button_state import publish_buttons
 from telemffb.utils.device import (DEVICE_ROLES, device_ids_key,
                                    parse_usb_ids)
 
@@ -790,14 +791,19 @@ class ButtonDeviceManager(QObject):
     that for seconds; the result is reconciled on the main thread.  A
     device that disappears or is ignored has its pressed buttons released
     through :attr:`buttons_changed` before its key leaves :attr:`states`.
-    Both signals are delivered on the thread that owns the manager (the
-    main thread).
+    A change is stored and relayed from the reader's own thread, so the
+    telemetry thread and the children see it without a turn of the main
+    event loop; :attr:`buttons_changed` is emitted from that thread too
+    (a Qt slot receives it queued) and serves the panel.
+    :attr:`devices_changed` is delivered on the main thread.
 
     :param settings: ``SystemSettings``-like store; ``G.system_settings``
         when None.
     :param enumerate_devices: ``callable(settings) -> list[ButtonDeviceInfo]``.
     :param reader_factory: ``callable(info, on_change)`` returning an object
         with ``start() -> bool`` and ``stop()``.
+    :param publish: ``callable(key, buttons)`` that stores and relays a
+        change; :func:`publish_buttons` when None.
     """
 
     #: (key, sorted list of pressed buttons)
@@ -805,17 +811,18 @@ class ButtonDeviceManager(QObject):
     #: the device list, an ignored flag or a readable flag changed
     devices_changed = pyqtSignal()
 
-    _reader_changed = pyqtSignal(object, str, object)
     _scanned = pyqtSignal(object)
 
     def __init__(self, settings=None,
                  enumerate_devices: Optional[Callable] = None,
                  reader_factory: Optional[Callable] = None,
+                 publish: Optional[Callable] = None,
                  parent: Optional[QObject] = None):
         super().__init__(parent)
         self._settings = settings
         self._enumerate = enumerate_devices or enumerate_button_devices
         self._reader_factory = reader_factory or ButtonDeviceReader
+        self._publish = publish or publish_buttons
         self._lock = threading.Lock()
         self._devices: list[ButtonDeviceInfo] = []
         self._readers: dict[bytes, object] = {}
@@ -828,7 +835,6 @@ class ButtonDeviceManager(QObject):
         self._timer = QTimer(self)
         self._timer.setInterval(_RESCAN_INTERVAL_MS)
         self._timer.timeout.connect(self.rescan)
-        self._reader_changed.connect(self._apply_change, Qt.ConnectionType.QueuedConnection)
         self._scanned.connect(self._reconcile, Qt.ConnectionType.QueuedConnection)
 
     def start(self) -> None:
@@ -978,20 +984,23 @@ class ButtonDeviceManager(QObject):
         path = info.path
 
         def on_change(key, pressed, path=path):
-            self._reader_changed.emit(path, key, pressed)
+            self._apply_change(path, key, pressed)
 
         reader = self._reader_factory(info, on_change)
         if not reader.start():
             info.readable = False
             return
-        self._readers[path] = reader
-        self._reader_keys[path] = info.key
         with self._lock:
+            self._readers[path] = reader
+            self._reader_keys[path] = info.key
             self._states[info.key] = frozenset()
 
     def _stop_reader(self, path) -> None:
-        reader = self._readers.pop(path, None)
-        key = self._reader_keys.pop(path, None)
+        # the key goes first: a read that completes while the reader is
+        # being stopped finds it gone and publishes nothing
+        with self._lock:
+            reader = self._readers.pop(path, None)
+            key = self._reader_keys.pop(path, None)
         if reader is not None:
             reader.stop()
         if key is None:
@@ -999,15 +1008,18 @@ class ButtonDeviceManager(QObject):
         with self._lock:
             pressed = self._states.pop(key, frozenset())
         if pressed:
+            self._publish(key, ())
             self.buttons_changed.emit(key, [])
 
-    @pyqtSlot(object, str, object)
     def _apply_change(self, path, key: str, pressed) -> None:
-        if self._reader_keys.get(path) != key:
-            return     # the reader was stopped after this change was queued
+        """Store a reader's change; runs on the reader's thread."""
         pressed = frozenset(pressed)
         with self._lock:
+            if self._reader_keys.get(path) != key:
+                return
             if self._states.get(key) == pressed:
                 return
             self._states[key] = pressed
-        self.buttons_changed.emit(key, sorted(pressed))
+        buttons = sorted(pressed)
+        self._publish(key, buttons)
+        self.buttons_changed.emit(key, buttons)

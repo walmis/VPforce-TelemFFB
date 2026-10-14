@@ -73,7 +73,6 @@ import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
 from telemffb.hw.button_devices import ButtonDeviceManager
-from telemffb.hw.button_state import publish_buttons
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.ui.widgets.LogWindow import LogWindow
 from telemffb.ui.widgets.TooltipWrapFilter import TooltipWrapFilter
@@ -1440,7 +1439,6 @@ def _start_button_devices():
         return
     try:
         manager = ButtonDeviceManager()
-        manager.buttons_changed.connect(lambda key, buttons: publish_buttons(key, buttons))
         manager.start()
         G.button_devices = manager
     except Exception:

@@ -29,9 +29,9 @@ from PyQt6.QtWidgets import QMessageBox
 import telemffb.globals as G
 from telemffb import utils
 from telemffb.ChildTelemView import ChildTelemView
-from telemffb.hw.button_state import (BTNDEV_ALL_PREFIX, BTNDEV_PREFIX,
-                                     apply_remote_buttons, apply_remote_snapshot,
-                                     btndev_all_message, publish_role_buttons)
+from telemffb.hw.button_state import (BTNDEV_ALL_PREFIX, BTNDEV_PREFIX, BTNROLE_PREFIX,
+                                     apply_child_role_buttons, apply_remote_buttons,
+                                     apply_remote_snapshot, btndev_all_message)
 from telemffb.utils import load_custom_userconfig
 
 # How long a child keeps sending its telemetry view after the master last
@@ -445,12 +445,10 @@ class IPCNetworkThread(QObject, threading.Thread):
             G.child_buttons[dev] = btns
             # print(G.child_buttons)
             self.child_buttons_signal.emit(dev, btns)
+        elif msg.startswith(BTNROLE_PREFIX):
             # the same buttons under the child's device key, for qualified
             # binding ids, relayed so the other children see them too
-            try:
-                publish_role_buttons(dev, btns, broadcast=True, ipc=self)
-            except Exception:
-                logging.exception(f"Relaying the {dev} buttons failed")
+            apply_child_role_buttons(msg.removeprefix(BTNROLE_PREFIX), ipc=self)
         elif msg.startswith(BTNDEV_ALL_PREFIX):
             apply_remote_snapshot(msg.removeprefix(BTNDEV_ALL_PREFIX))
         elif msg.startswith(BTNDEV_PREFIX):

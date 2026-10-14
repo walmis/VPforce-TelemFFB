@@ -21,7 +21,7 @@
 ``G.button_states`` maps a device key to the frozenset of its pressed
 buttons; qualified binding ids (:mod:`telemffb.hw.button_refs`) resolve
 against it.  The master fills it from the generic controllers, its own
-FFB device and each child's ``BUTTONS:`` report, and relays every change
+FFB device and each child's ``BTNROLE:`` report, and relays every change
 to the children as::
 
     BTNDEV:<key>:<json list of pressed buttons>
@@ -34,9 +34,12 @@ second the master also broadcasts the whole table as::
 so a dropped change message heals within a second and a child that starts
 while a button is held learns of it.
 
-The master computes a child's device key on the IPC thread, which reads the
-stored device ids from the system settings (QSettings) off the main thread.
-Reads only, as other modules already do.
+A child reports its own FFB device's buttons as::
+
+    BTNROLE:<json object: role, key, buttons>
+
+under the key it stores them by itself, since only the child knows which
+joystick slot's device is in hand.
 """
 
 import json
@@ -50,6 +53,9 @@ from telemffb.utils.device import active_joystick_slot_suffix
 __all__ = [
     "BTNDEV_PREFIX",
     "BTNDEV_ALL_PREFIX",
+    "BTNROLE_PREFIX",
+    "btnrole_message",
+    "apply_child_role_buttons",
     "btndev_message",
     "btndev_all_message",
     "apply_remote_snapshot",
@@ -64,6 +70,7 @@ __all__ = [
 
 BTNDEV_PREFIX = 'BTNDEV:'
 BTNDEV_ALL_PREFIX = 'BTNDEV_ALL:'
+BTNROLE_PREFIX = 'BTNROLE:'
 
 #: The key each FFB role's buttons were last stored under.  Written on the
 #: main thread (own device) and the IPC thread (children), one role each.
@@ -171,14 +178,37 @@ def apply_remote_buttons(payload: str) -> Optional[str]:
     return key
 
 
+def btnrole_message(role: str, key: str, buttons: Iterable[int]) -> str:
+    """The ``BTNROLE:`` IPC message: a child's role, the key it stores its
+    own buttons under, and the pressed list.  JSON, since a key can hold
+    the underscores and colons the older messages split on."""
+    return BTNROLE_PREFIX + json.dumps(
+        {'role': role, 'key': key, 'buttons': sorted(int(b) for b in buttons)})
+
+
+def apply_child_role_buttons(payload: str, ipc=None) -> Optional[str]:
+    """Store a child's buttons from a ``BTNROLE:`` payload under the key the
+    child sent, and relay them to the children.  Master only.
+
+    :returns: the key, or None when the payload is malformed.
+    """
+    try:
+        data = json.loads(payload)
+        role, key = str(data['role']), str(data['key'])
+        buttons = [int(b) for b in data['buttons']]
+    except (TypeError, ValueError, KeyError):
+        return None
+    if not role or not key:
+        return None
+    return _publish_under_key(role, key, buttons, broadcast=True, ipc=ipc)
+
+
 def publish_role_buttons(role: str, buttons: Iterable[int], broadcast: bool,
                          ipc=None, slot_suffix: str = '') -> str:
     """Store an FFB device's buttons under its device key.
 
     The key is computed from the stored settings on every call, so call
-    this on a button change only.  When the role's key differs from the
-    one its buttons were last stored under (the device was swapped or
-    reconfigured), the old key is released first so nothing stays held.
+    this on a button change only.
 
     :param role: the FFB device's role.
     :param broadcast: relay to the children as well (master only).
@@ -187,6 +217,15 @@ def publish_role_buttons(role: str, buttons: Iterable[int], broadcast: bool,
     :returns: the key used, or '' when the role has no stored ids.
     """
     key = ffb_device_key(role, slot_suffix=slot_suffix)
+    return _publish_under_key(role, key, buttons, broadcast, ipc)
+
+
+def _publish_under_key(role: str, key: str, buttons: Iterable[int], broadcast: bool,
+                       ipc=None) -> str:
+    """Store ``role``'s buttons under ``key``.  When the key differs from
+    the one the role's buttons were last stored under (the device was
+    swapped or reconfigured), the old key is released first so nothing
+    stays held."""
     previous = _role_keys.get(role, '')
     if previous and previous != key and G.button_states.get(previous):
         if broadcast:

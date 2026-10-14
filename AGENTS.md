@@ -103,7 +103,7 @@ Config hierarchy: SIM → CLASS → MODEL → PROFILE (profile is an optional ov
 
 ### Multi-Instance Architecture
 - **Master** auto-launches **child** instances (one per additional device); children handle their own device and send button/telemetry data to the master
-- IPC over UDP sockets on localhost (**not** ZMQ): master binds a random port, children connect via `--masterport`; keepalive 1 s interval, 3 missed → exit; message types: `Keepalive:<json>` (the master's keepalive repeats the effect mute and levels state, so a dropped `MUTE:` / `LEVELS:` heals within a second), `Child Keepalive:<dev>:<status>`, `MUTE:<json>`, `LEVELS:<role>:<json>`, `telem:<json>`, `effects:<json>`, `MASTER INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`, `BTNDEV:<key>:<json>` (master relays one device's pressed buttons)
+- IPC over UDP sockets on localhost (**not** ZMQ): master binds a random port, children connect via `--masterport`; keepalive 1 s interval, 3 missed → exit; message types: `Keepalive:<json>` (the master's keepalive repeats the effect mute and levels state, so a dropped `MUTE:` / `LEVELS:` heals within a second), `Child Keepalive:<dev>:<status>`, `MUTE:<json>`, `LEVELS:<role>:<json>`, `telem:<json>`, `effects:<json>`, `MASTER INSTANCE QUIT`, `RESTART SIMS`, `SHOW WINDOW`, `TOGGLE OFFLINE:`, `LOADCONFIG:`, `MASTER_BUTTONS:`, `BUTTONS:`, `BTNROLE:<json>` (a child's buttons under the key it stores them by), `BTNDEV:<key>:<json>` (master relays one device's pressed buttons)
 - Win32 named mutex (`namedmutex.py`) prevents duplicate masters unless `G.allow_multi_instance`; master auto-assigns `devpath_*` settings by product string or VID:PID
 
 ---

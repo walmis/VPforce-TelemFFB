@@ -18,6 +18,7 @@ sys.modules.setdefault('telemffb.hw.hid', MagicMock())
 
 from PyQt6.QtWidgets import QApplication
 
+import telemffb.globals as G
 import telemffb.hw.button_devices as button_devices
 from telemffb.hw.button_devices import (ButtonDeviceInfo, ButtonDeviceManager,
                                         ButtonDeviceReader, assign_keys,
@@ -203,6 +204,20 @@ def test_manager_releases_vanished_device(qapp):
     assert manager.states == {}
     assert readers['1234:0001'].stopped
     assert manager.devices() == []
+
+
+def test_reader_change_is_stored_without_the_event_loop(qapp, monkeypatch):
+    monkeypatch.setattr(G, 'button_states', {}, raising=False)
+    monkeypatch.setattr(G, 'ipc_instance', None, raising=False)
+    listed = [info(0x1234, 0x0001, b'p1', key='1234:0001')]
+    manager, readers, emitted = make_manager(FakeSettings(), listed)
+    scan(manager, qapp)
+
+    readers['1234:0001'].on_change('1234:0001', frozenset({3}))
+
+    assert G.button_states == {'1234:0001': frozenset({3})}
+    assert manager.states == {'1234:0001': {3}}
+    assert emitted == [('1234:0001', [3])]
 
 
 def test_manager_skips_ignored_devices(qapp):
