@@ -17,7 +17,7 @@
 #
 
 """MainMenu: builds MainWindow's menu bar (System / Profiles / Utilities /
-Window / Log / Help) and the developer-only Debug menu (Alt+D, or the
+View / Window / Log / Help) and the developer-only Debug menu (Alt+D, or the
 ``debug`` registry key).
 
 Like ``OfflineEditorPanel``/``SettingsLayout``, this takes the owning
@@ -27,8 +27,8 @@ here - only menu-construction/wiring lives in this module. ``G.master_instance``
 /``G.child_instance`` gating is carried over verbatim from where it used to
 live inline in ``MainWindow.__init__``.
 
-The menu bar, the Window/Log menus and the Debug menu's Configurator
-action all live on this object (``self.menu``, ``self.window_menu``,
+The menu bar, the View/Window/Log menus and the Debug menu's Configurator
+action all live on this object (``self.menu``, ``self.view_menu``, ``self.window_menu``,
 ``self.log_menu``, ``self.log_window_action``, ``self.configurator_settings_action``)
 rather than being mirrored onto MainWindow. MainWindow reaches them through
 ``self.main_menu`` and the small public methods below (``add_instance_log_menu``,
@@ -171,11 +171,25 @@ class MainMenu:
         """ Create the "Utilities" menu """
 
         utilities_menu = self.menu.addMenu('Utilities')
+        self.utilities_menu = utilities_menu
 
         # Add the "Reset" action to the "Utilities" menu
         reset_action = QAction('Reset All Effects', mw)
         reset_action.triggered.connect(mw.reset_all_effects)
         utilities_menu.addAction(reset_action)
+
+        # Effect levels: the master's entries act on every device
+        self.mute_all_action = None
+        controller = getattr(G, 'effect_levels', None)
+        if G.master_instance and controller is not None:
+            self.mute_all_action = QAction('Mute All Devices', mw)
+            self.mute_all_action.setCheckable(True)
+            self.mute_all_action.triggered.connect(self._set_mute_all)
+            utilities_menu.addAction(self.mute_all_action)
+            controller.mute_changed.connect(self.refresh_mute_all_action)
+            # the device list grows as children launch
+            utilities_menu.aboutToShow.connect(self.refresh_mute_all_action)
+            self.refresh_mute_all_action()
 
         update_action = QAction('Install Latest TelemFFB', mw)
         update_action.triggered.connect(mw.updates.update_from_menu)
@@ -232,6 +246,26 @@ class MainMenu:
         tap_monitor_action = QAction('DirectInput Tap Monitor...', mw)
         tap_monitor_action.triggered.connect(mw.open_tap_monitor)
         utilities_menu.addAction(tap_monitor_action)
+
+        """ Create the "View" menu: what the main window shows. The
+        Devices submenu joins it once the master knows its devices
+        (add_device_view_actions); a menu with nothing in it stays off the
+        bar. """
+
+        self.view_menu = self.menu.addMenu('View')
+        self.show_levels_action = None
+        self.configure_levels_action = None
+        if G.master_instance and controller is not None:
+            self.show_levels_action = QAction('Show Effect Level Controls', mw)
+            self.show_levels_action.setCheckable(True)
+            self.show_levels_action.triggered.connect(self._set_levels_shown)
+            self.view_menu.addAction(self.show_levels_action)
+            controller.controls_shown_changed.connect(self.refresh_show_levels_action)
+            self.refresh_show_levels_action()
+            self.configure_levels_action = QAction('Configure Effect Levels...', mw)
+            self.configure_levels_action.triggered.connect(mw.open_effect_levels_dialog)
+            self.view_menu.addAction(self.configure_levels_action)
+        self._fit_view_menu()
 
         self.window_menu = self.menu.addMenu('Window')
 
@@ -360,15 +394,17 @@ class MainMenu:
 
     def add_device_view_actions(self, views, current, on_chosen, group_starts=(),
                                 side_right=False, on_side_chosen=None):
-        """Window menu: a 'Devices' submenu choosing where the devices are
+        """View menu: a 'Devices' submenu choosing where the devices are
         shown. ``views`` is ``[(key, label), ...]`` and ``on_chosen(key)`` is
         called with the pick; a line is ruled above each key in
         ``group_starts``. With ``on_side_chosen``, a checkable item under
         the views says which side the side panels are on, and calls it with
         True for the right."""
-        if self.window_menu.actions():
-            self.window_menu.addSeparator()
-        submenu = self.window_menu.addMenu('Devices')
+        if self.view_menu.actions():
+            self.view_menu.addSeparator()
+        submenu = self.view_menu.addMenu('Devices')
+        self.devices_menu = submenu
+        self._fit_view_menu()
         self.device_view_actions = {}
         group = QActionGroup(self.mw)
         group.setExclusive(True)
@@ -397,6 +433,46 @@ class MainMenu:
         action = getattr(self, 'device_side_action', None)
         if action is not None and action.isChecked() != bool(right):
             action.setChecked(bool(right))
+
+    def _fit_view_menu(self):
+        """Keep the View menu off the bar while it has nothing in it."""
+        self.view_menu.menuAction().setVisible(bool(self.view_menu.actions()))
+
+    def refresh_show_levels_action(self, *_):
+        """Check "Show Effect Level Controls" while the controls show."""
+        controller = getattr(G, 'effect_levels', None)
+        action = getattr(self, 'show_levels_action', None)
+        if action is None or controller is None:
+            return
+        try:
+            action.setChecked(bool(controller.controls_shown()))
+        except Exception:
+            logging.exception("Effect levels: whether the controls show is unavailable")
+
+    def _set_levels_shown(self, checked):
+        try:
+            G.effect_levels.set_controls_shown(bool(checked))
+        except Exception:
+            logging.exception("Effect levels: could not show or hide the controls")
+        self.refresh_show_levels_action()
+
+    def refresh_mute_all_action(self):
+        """Check "Mute All Devices" while every device is muted."""
+        controller = getattr(G, 'effect_levels', None)
+        action = getattr(self, 'mute_all_action', None)
+        if action is None or controller is None:
+            return
+        try:
+            action.setChecked(controller.muted_all())
+        except Exception:
+            logging.exception("Effect levels: mute state unavailable")
+
+    def _set_mute_all(self, checked):
+        try:
+            G.effect_levels.set_muted_all(bool(checked))
+        except Exception:
+            logging.exception("Effect levels: could not change the mute on all devices")
+        self.refresh_mute_all_action()
 
     def set_device_view_checked(self, key):
         """Keep the submenu's mark in step when the view was changed from

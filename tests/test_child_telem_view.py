@@ -101,7 +101,7 @@ class TestMasterAsks:
         assert {m for m, _ in sent} == {"VIEW TELEM:"}
         del sent[:]
         ipc._send_keepalive()
-        assert {m for m, _ in sent} == {"Keepalive"}
+        assert sent and all(m.split(":", 1)[0] == "Keepalive" for m, _ in sent)
 
 
 class TestCounting:

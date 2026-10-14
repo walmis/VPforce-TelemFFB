@@ -40,7 +40,8 @@ def main_menu(qapp, monkeypatch):
     mw = FakeMainWindow()
     mm = MainMenu(mw)
     mm.menu = QMenuBar()
-    mm.window_menu = mm.menu.addMenu('Window')   # build() always makes one
+    mm.view_menu = mm.menu.addMenu('View')       # build() always makes these
+    mm.window_menu = mm.menu.addMenu('Window')
     return mm
 
 
@@ -63,7 +64,7 @@ class TestAddDebugMenuIsIdempotent:
 
 
 class TestDeviceViewActions:
-    """Window > Devices: where the devices are shown. One mark at a time,
+    """View > Devices: where the devices are shown. One mark at a time,
     and the pick is handed on by key."""
 
     VIEWS = [('frame', 'Side panel'), ('row', 'In the status box'), ('floating', 'Floating strip')]

@@ -69,6 +69,15 @@ class IPCNetworkThread(QObject, threading.Thread):
     preview_signal = pyqtSignal(str)
     preview_stop_signal = pyqtSignal()
     preview_done_signal = pyqtSignal(str, str)
+    # Effect levels, master -> children only (see publish_effect_mute).
+    # Child side: this instance's applied mute mode, and its levels in
+    # percent, emitted on every message that carries them; the receiver
+    # acts only on a difference.
+    effect_mute_signal = pyqtSignal(str)
+    effect_levels_signal = pyqtSignal(object)
+    # master <- child: the child's pressed buttons (role, button numbers),
+    # sent by the child whenever they change
+    child_buttons_signal = pyqtSignal(str, object)
 
     def __init__(self, host="127.0.0.1", dstport=0, keepalive_sec=1, missed_keepalive=3):
         QObject.__init__(self)
@@ -98,6 +107,12 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._view_lease_until = 0.0
         self._view_seq = 0
         self._view_oversize_logged = False
+        # Master: the effect-level state every keepalive repeats.  The lock
+        # orders a state change's own message after any keepalive built
+        # from the state before it.
+        self._levels_lock = threading.Lock()
+        self._effect_mute = {}      # role -> applied mute mode
+        self._effect_levels = {}    # role -> {level name: percent}
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Generous kernel receive buffer: the master ingests continuous
@@ -222,7 +237,9 @@ class IPCNetworkThread(QObject, threading.Thread):
 
     def _send_keepalive(self):
         if self._master:
-            self.send_broadcast_message("Keepalive")
+            with self._levels_lock:
+                state = {"mute": self._effect_mute, "levels": self._effect_levels}
+                self.send_broadcast_message(f"Keepalive:{json.dumps(state)}")
             self._announce_view(repeat=True)
         else:
             self.send_message(f"Child Keepalive:{G.device_type}:{G.device_connection_status}")
@@ -246,11 +263,29 @@ class IPCNetworkThread(QObject, threading.Thread):
         self.send_message(f"STATUS:{json.dumps(payload)}")
 
     def _handle_message(self, msg, fromaddr):
-        if msg == 'Keepalive':
+        if msg.startswith('Keepalive'):
             if not self._master:
                 ts = time.time()
                 logging.debug(f"GOT KEEPALIVE: {ts}")
                 self._last_keepalive_timestamp = ts
+                try:
+                    state = json.loads(msg.removeprefix('Keepalive:'))
+                    self._receive_effect_mute(state["mute"])
+                    self._receive_effect_levels(state["levels"].get(G.device_type))
+                except (ValueError, KeyError, TypeError, AttributeError):
+                    pass
+        elif msg.startswith('MUTE:'):
+            try:
+                self._receive_effect_mute(json.loads(msg.removeprefix('MUTE:')))
+            except (ValueError, TypeError, AttributeError):
+                pass
+        elif msg.startswith('LEVELS:'):
+            try:
+                _, dev, payload = msg.split(':', 2)
+                if dev == G.device_type:
+                    self._receive_effect_levels(json.loads(payload))
+            except (ValueError, TypeError):
+                pass
         elif msg.startswith('Child Keepalive:'):
             _, ch_dev, ch_status = msg.split(':')
             # ch_dev = msg.removeprefix('Child Keepalive:')
@@ -404,6 +439,7 @@ class IPCNetworkThread(QObject, threading.Thread):
             btns = json.loads(payload[1])
             G.child_buttons[dev] = btns
             # print(G.child_buttons)
+            self.child_buttons_signal.emit(dev, btns)
         elif msg.startswith('TOGGLE OFFLINE:'):
             state_str = msg.removeprefix('TOGGLE OFFLINE:')
             state = state_str == 'True'
@@ -436,6 +472,39 @@ class IPCNetworkThread(QObject, threading.Thread):
             self.preview_done_signal.emit(dev, name)
         else:
             logging.info(f"GOT GENERIC MESSAGE: {msg}")
+
+    # --- effect levels and mute, master -> children ---
+    #
+    #   MUTE:<json role -> mode>              every role's applied mute mode
+    #                                         ("off" or absent: not muted)
+    #   LEVELS:<role>:<json name -> percent>  one role's levels
+    #   Keepalive:{"mute": {...}, "levels": {role: {...}}}
+    #
+    # UDP may drop any of them; every keepalive repeats the whole state, so
+    # a child converges within one keepalive interval and a child started
+    # after a change picks it up from the first keepalive it hears.
+
+    def publish_effect_mute(self, state: dict) -> None:
+        """Master: every role's applied mute mode.  Sent now and repeated
+        on every keepalive."""
+        with self._levels_lock:
+            self._effect_mute = dict(state)
+            self.send_broadcast_message(f"MUTE:{json.dumps(self._effect_mute)}")
+
+    def publish_effect_levels(self, role: str, values: dict) -> None:
+        """Master: ``role``'s levels in percent.  Sent now and repeated on
+        every keepalive."""
+        with self._levels_lock:
+            self._effect_levels = {**self._effect_levels, role: dict(values)}
+            self.send_broadcast_message(f"LEVELS:{role}:{json.dumps(values)}")
+
+    def _receive_effect_mute(self, state: dict) -> None:
+        if not self._master:
+            self.effect_mute_signal.emit(str(state.get(G.device_type, "off")))
+
+    def _receive_effect_levels(self, values) -> None:
+        if not self._master and isinstance(values, dict):
+            self.effect_levels_signal.emit(values)
 
     def _report_child_status(self, payload: dict) -> None:
         """Forward any ``{dev}_vpconf_profile`` / ``{dev}_gain_ovd_active``

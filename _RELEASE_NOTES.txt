@@ -43,7 +43,9 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - You are no longer required to open a child instance to configure its local system settings
 - **NEW: Backup and restore system settings**, from a new File menu on the System Settings dialog
 - **NEW: TelemFFB can restart itself when a change requires it**
-
+- **NEW: Effect Levels and Mute**
+  - Per device effect level control. Master and per effect type controls are offered.
+  - Instantly mute effects per device or globally with the click of a button.
 ## MSFS / X-Plane
 - **NEW: In-sim settings panel**
   - View and change the current aircraft's TelemFFB settings from a window inside the sim

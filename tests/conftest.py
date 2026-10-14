@@ -33,6 +33,7 @@ with warnings.catch_warnings():
 from tests.framework.base import MockHapticEffect, MockSimConnect, MockFFBDevice
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 import telemffb.globals as G
+import telemffb.hw.effect_levels as effect_levels
 
 
 @pytest.fixture(autouse=True)
@@ -109,6 +110,7 @@ def setup_test_environment():
     # Cleanup after test
     G.effects = None
     G.master_buttons = []
+    effect_levels.levels.reset()
 
 
 @pytest.fixture

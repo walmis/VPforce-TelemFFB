@@ -14,8 +14,19 @@ import os
 from telemffb import utils
 import telemffb.globals as G
 from telemffb.ui.theme.props import set_state_prop
+from telemffb.ui.widgets.LevelsBadge import LevelsBadge
+from telemffb.ui.widgets.MuteBadge import MuteBadge
 
 ICON_SIZE = QSize(72, 72)
+
+#: The muted and levels marks' size on a full-size icon and on a compact-row chip.
+_BADGE_PX = 24
+_MINI_BADGE_PX = 14
+
+
+def _with_note_lines(tooltip: str, *notes) -> str:
+    """``tooltip`` with each note that is set on a line of its own under it."""
+    return "\n".join(line for line in (tooltip, *notes) if line)
 
 DEVICE_ICONS = {
     "joystick": ":/image/icon_joystick.png",
@@ -128,6 +139,13 @@ class DeviceIconWidget(QWidget):
         self.icon_opacity = QGraphicsOpacityEffect()
         self.icon_label.setGraphicsEffect(self.icon_opacity)
 
+        # TelemFFB effect levels mute (set_muted) and levels (set_levels_note)
+        self.muted_note = None
+        self.levels_note = None
+        self._base_tooltip = ''
+        self._mute_badge = MuteBadge(self.icon_label, _BADGE_PX)
+        self._levels_badge = LevelsBadge(self.icon_label, _BADGE_PX)
+
         self.icon_fade = QPropertyAnimation(self.icon_opacity, b"opacity")
         self.icon_fade.setStartValue(0.5)
         self.icon_fade.setEndValue(1.0)
@@ -237,6 +255,28 @@ class DeviceIconWidget(QWidget):
         self.icon_label.setPixmap(
             self._tint_pixmap(self._original_pixmap, self.status_color))
         return True
+
+    def setToolTip(self, text):
+        """The status tooltip; the muted and levels lines follow it."""
+        self._base_tooltip = text or ''
+        self._show_tooltip()
+
+    def set_muted(self, note):
+        """Mark the icon muted, ``note`` being its tooltip line, or clear
+        the mark with None."""
+        self.muted_note = note or None
+        self._mute_badge.set_shown(self.muted_note is not None)
+        self._show_tooltip()
+
+    def set_levels_note(self, text):
+        """The tooltip line summarizing the effect levels, or None for none.
+        The levels mark shows with it; the mute mark is left alone."""
+        self.levels_note = text or None
+        self._levels_badge.set_shown(self.levels_note is not None)
+        self._show_tooltip()
+
+    def _show_tooltip(self):
+        super().setToolTip(_with_note_lines(self._base_tooltip, self.muted_note, self.levels_note))
 
     def _fade_text(self, visible: bool):
         # Always show text if this widget is active
@@ -420,6 +460,8 @@ class DeviceIconPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._last_status = {}  # device -> the last status acted on (set_device_status)
+        self._muted = {}  # device -> its muted tooltip line (set_device_muted)
+        self._levels_notes = {}  # device -> its levels tooltip line (set_device_levels_note)
 
         self.icons = {}
         self.layout = QVBoxLayout(self)
@@ -456,6 +498,10 @@ class DeviceIconPanel(QWidget):
             widget = DeviceIconWidget(device.lower(), icon_path)
             if configured is not None and device.lower() not in configured:
                 widget.set_configured(False)
+            if self._muted.get(device.lower()):
+                widget.set_muted(self._muted[device.lower()])
+            if self._levels_notes.get(device.lower()):
+                widget.set_levels_note(self._levels_notes[device.lower()])
             widget.clicked.connect(self.handle_icon_click)
             self.layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignHCenter)
             self.icons[device.lower()] = widget
@@ -529,6 +575,46 @@ class DeviceIconPanel(QWidget):
                 widget.setToolTip(tooltip)
             self.changed.emit()
 
+    def set_device_muted(self, device_name: str, note):
+        """Mark a role's icon muted (``note``: its tooltip line) or clear
+        the mark (None).  Kept across ``set_devices``."""
+        name = device_name.lower()
+        note = note or None
+        if self._muted.get(name) == note:
+            return
+        if note is None:
+            self._muted.pop(name, None)
+        else:
+            self._muted[name] = note
+        widget = self.icons.get(name)
+        if widget is not None:
+            widget.set_muted(note)
+        self.changed.emit()
+
+    def device_muted_note(self, device_name: str):
+        """A role's muted tooltip line, or None while it is not muted."""
+        return self._muted.get(device_name.lower())
+
+    def set_device_levels_note(self, device_name: str, text):
+        """A role's effect levels tooltip line, or None for none.  Kept
+        across ``set_devices``."""
+        name = device_name.lower()
+        text = text or None
+        if self._levels_notes.get(name) == text:
+            return
+        if text is None:
+            self._levels_notes.pop(name, None)
+        else:
+            self._levels_notes[name] = text
+        widget = self.icons.get(name)
+        if widget is not None:
+            widget.set_levels_note(text)
+        self.changed.emit()
+
+    def device_levels_note(self, device_name: str):
+        """A role's effect levels tooltip line, or None while it has none."""
+        return self._levels_notes.get(device_name.lower())
+
     def set_device_label(self, device_name: str, text: str):
         """The text under a role's icon: the hardware holding the role.
         Returns True when this actually changed what was displayed."""
@@ -596,6 +682,11 @@ class MiniDeviceChip(QWidget):
         self.icon_label = QLabel(self)
         self.icon_label.setFixedSize(self._ICON_SIZE)
         self.icon_label.setScaledContents(True)
+        self.muted_note = None
+        self.levels_note = None
+        self._base_tooltip = ''
+        self._mute_badge = MuteBadge(self.icon_label, _MINI_BADGE_PX)
+        self._levels_badge = LevelsBadge(self.icon_label, _MINI_BADGE_PX)
 
         layout.addWidget(self.icon_label)
 
@@ -613,6 +704,34 @@ class MiniDeviceChip(QWidget):
             self._ICON_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation) if not pm.isNull() else None
         self._repaint()
+
+    def setToolTip(self, text):
+        """The chip's tooltip; the muted and levels lines follow it."""
+        self._base_tooltip = text or ''
+        self._show_tooltip()
+
+    def set_muted(self, note):
+        """Mark the chip muted, ``note`` being its tooltip line, or clear
+        the mark with None."""
+        note = note or None
+        if note == self.muted_note:
+            return
+        self.muted_note = note
+        self._mute_badge.set_shown(note is not None)
+        self._show_tooltip()
+
+    def set_levels_note(self, text):
+        """The tooltip line summarizing the effect levels, or None for none.
+        The levels mark shows with it; the mute mark is left alone."""
+        text = text or None
+        if text == self.levels_note:
+            return
+        self.levels_note = text
+        self._levels_badge.set_shown(text is not None)
+        self._show_tooltip()
+
+    def _show_tooltip(self):
+        super().setToolTip(_with_note_lines(self._base_tooltip, self.muted_note, self.levels_note))
 
     def set_label(self, text: str):
         """Not shown - kept only for the hover tooltip (set_clickable)."""
@@ -790,6 +909,16 @@ class MiniDevicePanel(QWidget):
         chip = self.chips.get(device_name.lower())
         if chip:
             chip.set_label(text)
+
+    def set_device_muted(self, device_name: str, note):
+        chip = self.chips.get(device_name.lower())
+        if chip:
+            chip.set_muted(note)
+
+    def set_device_levels_note(self, device_name: str, text):
+        chip = self.chips.get(device_name.lower())
+        if chip:
+            chip.set_levels_note(text)
 
     def set_device_icon(self, device_name: str, icon_path: str):
         chip = self.chips.get(device_name.lower())

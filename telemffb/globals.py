@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from .hw.ffb_rhino import DeviceInfo
     from telemffb.hw.ffb_rhino import FFBReport_Get_Gains_Feature_Data
     from telemffb.state.app_state import AppState
+    from telemffb.state.effect_levels_controller import EffectLevelsController
 
 DeviceTypeLiteral = Literal["joystick", "pedals", "collective", "trimwheel"]
 
@@ -180,6 +181,11 @@ app_state : 'AppState'
 """Single source of truth for state the UI used to hold itself (widgets
 subscribe to its signals instead of background code reaching into
 MainWindow). See telemffb/state/app_state.py."""
+
+effect_levels : 'EffectLevelsController'
+"""TelemFFB effect levels and mute per device role, the API the UI and
+IPC call (main thread only). Created at startup in every instance, before
+any effect exists. See telemffb/state/effect_levels_controller.py."""
 
 # Triggers and flags
 force_reload_aircraft_trigger: bool = False

@@ -40,7 +40,8 @@ import logging
 import time
 
 from telemffb.SettingsManager import SpringModeEnum
-from telemffb.hw.ffb_rhino import FFBReport_SetCondition
+from telemffb.hw import effect_levels
+from telemffb.hw.ffb_rhino import EFFECT_SPRING, FFBReport_SetCondition
 
 
 class FfbTapMixIn:
@@ -135,12 +136,15 @@ class FfbTapMixIn:
         if y_state is not None:
             y_state = y_state.scaled(self.tap_spring_gain_y)
         # live slider-handle readout: the rendered force as a fraction of
-        # device full scale - pinned at 1.0 = the gain is clipping
+        # device full scale, after the effect levels; pinned at 1.0 means the
+        # gain is clipping
+        levels = effect_levels.levels
+        level = 1.0 if levels.unity else levels.factor(EFFECT_SPRING)
         for axis_state, key in ((x_state, '_pct_tap_x'), (y_state, '_pct_tap_y')):
             if axis_state is None:
                 continue
             pct = max(abs(axis_state.positive_coefficient),
-                      abs(axis_state.negative_coefficient)) / 4096
+                      abs(axis_state.negative_coefficient)) / 4096 * level
             self.telem_data[key] = pct
             self._ipc_telem[key] = pct
 
@@ -445,8 +449,8 @@ class FfbTapMixIn:
     def _render_tap_effect(self, fx, name: str, duration_ms: int):
         """Push one mirrored effect's parameters and start it.  Returns the
         rendered peak force as a fraction of device full scale (post-gain,
-        post-clamp - 1.0 means the type's gain is clipping), for the live
-        slider-handle readouts.
+        post-clamp, after the effect levels; 1.0 means the type's gain is
+        clipping), for the live slider-handle readouts.
 
         ``duration_ms`` 0 keeps the device effect open-ended - the mirror's
         playing state is authoritative and reconciles the stop; a nonzero
@@ -507,4 +511,6 @@ class FfbTapMixIn:
                 attackTime=fx.envelope.attack_time_ms,
                 decayTime=fx.envelope.fade_time_ms)
         eff.start(override=True)
-        return pct
+        # the tap's effect types are the device's EFFECT_* numbers
+        levels = effect_levels.levels
+        return pct if levels.unity else pct * levels.factor(fx.effect_type)

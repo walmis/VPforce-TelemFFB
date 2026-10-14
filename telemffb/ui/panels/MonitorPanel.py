@@ -88,6 +88,7 @@ from telemffb.ui.widgets.FavoriteStarDelegate import (STAR_COLUMN_WIDTH,
                                                       FavoriteStarDelegate)
 from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
+from telemffb.ui.widgets.effect_levels_ui import readout_note
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
 
 _MONOSPACE_STYLE = """
@@ -568,6 +569,8 @@ class MonitorPanel(QWidget):
         # produce a wrongly ordered list rather than an error.
         ordered = grouped_effects(active_effects)
         rows, tooltips, types = [], {}, {}
+        # the values are measured after the shown device's effect levels
+        levels_note = readout_note(self._levels_role())
         for effect in ordered:
             label = effect.get('label', '')
             intensity = effect.get('intensity')
@@ -584,11 +587,21 @@ class MonitorPanel(QWidget):
             else:
                 shown = '-'
                 value_tip = _intensity_tooltip(None, None, None)
+            if levels_note:
+                value_tip = f"{value_tip}\n{levels_note}"
             rows.append((label, (label, shown)))
             tooltips[label] = (_name_tooltip(label, effect_type), value_tip)
             types[label] = effect_type
         self._type_delegate.set_types(types)
         self._effects_model.set_rows(rows, tooltips)
+
+    @staticmethod
+    def _levels_role():
+        """The device whose effects the table shows: the config scope on
+        the master, this instance's own device on a child."""
+        if getattr(G, 'master_instance', False):
+            return getattr(G, 'current_device_config_scope', None) or getattr(G, 'device_type', None)
+        return getattr(G, 'device_type', None)
 
     def clear_effects(self) -> None:
         self._effects_model.clear()
