@@ -257,8 +257,7 @@ def remember_condition(store: dict, cond) -> None:
     """Keep an unscaled copy of ``cond`` in ``store``, keyed by its axis
     (``parameterBlockOffset``).  A copy, because callers reuse and mutate
     their condition structs between frames."""
-    if store.get(cond.parameterBlockOffset) is not cond:
-        store[cond.parameterBlockOffset] = type(cond).from_buffer_copy(cond)
+    store[cond.parameterBlockOffset] = type(cond).from_buffer_copy(cond)
 
 
 #: The process-wide level table.

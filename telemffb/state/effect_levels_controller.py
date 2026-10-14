@@ -450,6 +450,9 @@ class EffectLevelsController(QObject):
         for role, mode in changes.items():
             if mode == MUTE_OFF:
                 self._muted.pop(role, None)
+                # a release ends the global mute: a device reporting later
+                # must not be muted again on the user's behalf
+                self._all_muted = False
             else:
                 self._muted[role] = mode
         if self._role in changes:
