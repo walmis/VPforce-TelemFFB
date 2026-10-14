@@ -1943,7 +1943,6 @@ def main():
 
     # The sim listeners start from the gate: version check resolved (or
     # skipped) and device ready, which phase 14's async init reports.
-    startup_gate.arm_fallback()
     G.main_window.updates.version_check_complete.connect(startup_gate.version_checked)
 
     # Check for version updates in background (non-release builds)
@@ -1977,6 +1976,8 @@ def main():
     # ============================================================================
     # PHASE 14: Background Initialization
     # ============================================================================
+    # Arm the fallback now:
+    startup_gate.arm_fallback()
     # Start background tasks that don't block UI appearance
     _setup_async_initialization(dev, dev_serial)
 
