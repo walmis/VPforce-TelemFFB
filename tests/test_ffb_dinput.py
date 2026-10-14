@@ -1539,6 +1539,20 @@ class TestForceFrame:
                                  poll_interval_ms=0)
         return bridge, device, settings
 
+    def test_a_known_device_starts_with_its_default_until_a_setting_is_stored(self, monkeypatch):
+        from telemffb.hw import ffb_dinput
+        from telemffb.hw.ffb_dinput import ForceFrame, resolve_force_frame
+        assert resolve_force_frame(None, 0x25BB, 0x00CA) == (ForceFrame(False, True, 90), True)
+        assert resolve_force_frame('', 0x25BB, 0x00CA) == (ForceFrame(), False)
+        assert resolve_force_frame('mx', 0x25BB, 0x00CA) == (ForceFrame(True, False, 0), False)
+        assert resolve_force_frame(None, 0x1234, 0x5678) == (ForceFrame(), False)
+        # through a device: the fake bridge's ids made known for the test
+        monkeypatch.setitem(ffb_dinput.KNOWN_FORCE_FRAMES, (0x1234, 0x5678), 'my,rot90')
+        _, device, _ = self._open(monkeypatch, frame=None)
+        assert device.force_frame == ForceFrame(False, True, 90)
+        _, device, _ = self._open(monkeypatch, frame='')
+        assert device.force_frame.is_identity
+
     def test_setting_round_trip(self):
         from telemffb.hw.ffb_dinput import ForceFrame
         frame = ForceFrame.from_setting('my,rot90')

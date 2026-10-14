@@ -956,13 +956,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """Show each DirectInput device row's stored force frame (or the
         pending one from an earlier change this session); hide the
         controls on every other row."""
-        from telemffb.hw.ffb_dinput import ForceFrame
+        from telemffb.hw.ffb_dinput import resolve_force_frame
         for row in self._device_rows():
-            key = self._force_frame_key_for(row.selector.currentData())
+            device = row.selector.currentData()
+            key = self._force_frame_key_for(device)
             if key is None:
                 row.show_force_frame(None)
                 continue
-            frame = ForceFrame.from_setting(self._stored_or_pending(key, ''))
+            # None when nothing is stored (a known device then shows its
+            # default); '' is an explicit standard
+            stored = (self._pending_devpaths[key] if key in self._pending_devpaths
+                      else G.system_settings.get(key, None))
+            frame, _ = resolve_force_frame(stored, getattr(device, 'vendor_id', 0),
+                                           getattr(device, 'product_id', 0))
             row.show_force_frame((frame.mirror_x, frame.mirror_y,
                                   frame.rotate_deg))
 

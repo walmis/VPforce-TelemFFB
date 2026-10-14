@@ -480,6 +480,16 @@ def force_frame_setting_key(vendor_id: int, product_id: int) -> str:
     return f'dinput_force_frame_{vendor_id:04X}_{product_id:04X}'
 
 
+#: Bases known to read forces in a frame other than DirectInput's, by USB
+#: ids, in the stored form.  Used when nothing is stored for the device;
+#: a stored value, an explicit standard included, wins.  An entry needs a
+#: Detect run's log behind it: a wrong default drives the axis the wrong
+#: way.
+KNOWN_FORCE_FRAMES = {
+    (0x25BB, 0x00CA): 'my,rot90',       # Brunner base, Detect run of 2026-10-14
+}
+
+
 @dataclass(frozen=True)
 class ForceFrame:
     """How a device reads the forces TelemFFB sends, relative to the
@@ -585,6 +595,19 @@ class ForceFrame:
             return out
         out.direction_deg = self.direction(out.direction_deg)
         return out
+
+
+def resolve_force_frame(stored, vendor_id: int, product_id: int) -> tuple:
+    """The frame a device renders through, and whether it is a known-device
+    default.  ``stored`` is the setting's value: None when nothing is
+    stored, '' for an explicit standard.  A stored value wins; with none,
+    the device's entry in :data:`KNOWN_FORCE_FRAMES`; else standard."""
+    if stored is not None:
+        return ForceFrame.from_setting(stored), False
+    known = KNOWN_FORCE_FRAMES.get((int(vendor_id or 0), int(product_id or 0)))
+    if known is None:
+        return ForceFrame(), False
+    return ForceFrame.from_setting(known), True
 
 
 def resolve_axis_map(role, choice, actuators):
@@ -1407,6 +1430,7 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         self._axis_map_state = self._IDENTITY_MAP
         self._axis_map_reapply = False
         self._force_frame = ForceFrame()
+        self._force_frame_is_default = False
         # a frame in force instead of the stored one (calibration), or None
         self._force_frame_override: Optional[ForceFrame] = None
 
@@ -1529,12 +1553,15 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         if self._force_frame_override is not None:
             return self._force_frame_override
         settings = getattr(G, 'system_settings', None)
+        self._force_frame_is_default = False
         if settings is None or not self.info.vendor_id:
             return ForceFrame()
         try:
-            return ForceFrame.from_setting(settings.get(
-                force_frame_setting_key(self.info.vendor_id,
-                                        self.info.product_id), ''))
+            stored = settings.get(force_frame_setting_key(self.info.vendor_id,
+                                                          self.info.product_id), None)
+            frame, self._force_frame_is_default = resolve_force_frame(
+                stored, self.info.vendor_id, self.info.product_id)
+            return frame
         except Exception:
             logging.exception("DirectInput force frame resolution failed; "
                               "using the standard frame")
@@ -1548,8 +1575,9 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
         if live and frame == self._force_frame:
             return
         self._force_frame = frame
+        source = " (known-device default; run Detect to verify)" if self._force_frame_is_default else ""
         logging.info(f"DirectInput force frame ({self.info.vidpid()}): "
-                     f"{frame.describe()}")
+                     f"{frame.describe()}{source}")
         if not live:
             return
         for ref in list(self._effect_handles):
