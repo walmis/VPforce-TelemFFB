@@ -47,6 +47,10 @@ from telemffb.ui.widgets.EffectMuteButton import EffectMuteButton
 from telemffb.ui.widgets.HiddenLevelsNote import HiddenLevelsNote
 from telemffb.ui.widgets.effect_levels_ui import LEVEL_TEXT, TOOL_BUTTON_QSS, role_name
 
+#: The shortest a header slider gets as the bar narrows.
+_SLIDER_MIN_WIDTH = 90
+#: The widest the mute button gets; longer labels are elided.
+_MUTE_MAX_WIDTH = 140
 #: Space between a row's label and its slider, and between the readouts
 #: and the buttons.
 _LABEL_SPACING = 6
@@ -104,13 +108,13 @@ class EffectLevelsHeader(QWidget):
         self.sliders: dict[str, EffectLevelSlider] = {}
         for name in LEVEL_NAMES:
             label = QLabel(LEVEL_TEXT[name][0], self.box)
-            slider = EffectLevelSlider(self.box)
+            slider = EffectLevelSlider(self.box, slider_min_width=_SLIDER_MIN_WIDTH)
             slider.edited.connect(lambda value, persist, n=name: self._on_edited(n, value, persist))
             self.labels[name] = label
             self.sliders[name] = slider
         self.master = self.sliders["master"]
 
-        self.mute_button = EffectMuteButton(controller, self._role)
+        self.mute_button = EffectMuteButton(controller, self._role, max_width=_MUTE_MAX_WIDTH)
 
         self.levels_button = QToolButton()
         self.levels_button.setText("Levels...")

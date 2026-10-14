@@ -30,6 +30,7 @@ controller refuses leaves it as it was.
 import logging
 from typing import Optional
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QActionGroup
 from PyQt6.QtWidgets import QMenu, QToolButton
 
@@ -54,7 +55,13 @@ def button_text(mode: str, scope: str, muted: bool) -> str:
 class EffectMuteButton(QToolButton):
     """Mute toggle for the role it is bound to (``set_role``)."""
 
-    def __init__(self, controller, role: Optional[str] = None, parent=None):
+    def __init__(self, controller, role: Optional[str] = None, parent=None,
+                 max_width: int = 0):
+        """
+        :param max_width: the widest the button may be; a label that does
+            not fit is elided and shown in full in the tooltip.  0 for as
+            wide as the widest label.
+        """
         super().__init__(parent)
         self._controller = controller
         self._role = role or controller.own_role
@@ -93,13 +100,23 @@ class EffectMuteButton(QToolButton):
         self.setMenu(menu)
 
         # As wide as the widest label, so the row does not shift when the
-        # selected function or the muted state changes.
+        # selected function or the muted state changes; no wider than
+        # max_width, with the labels that do not fit elided.
         self.ensurePolished()
-        width = 0
+        width = chrome = 0
         for mode in (MUTE_KEEP_SPRING, MUTE_ALL):
             for scope in (SCOPE_DEVICE, SCOPE_ALL):
-                self.setText(button_text(mode, scope, True))
-                width = max(width, self.sizeHint().width())
+                text = button_text(mode, scope, True)
+                self.setText(text)
+                hint = self.sizeHint().width()
+                if hint > width:
+                    width = hint
+                    chrome = hint - self.fontMetrics().horizontalAdvance(text)
+        #: room for the label's text, 0 while every label fits
+        self._text_room = 0
+        if max_width and width > max_width:
+            self._text_room = max(1, max_width - chrome)
+            width = max_width
         self.setFixedWidth(width)
 
         self.clicked.connect(self._on_clicked)
@@ -126,7 +143,11 @@ class EffectMuteButton(QToolButton):
             logging.exception(f"Effect levels: mute state of {self._role} unavailable")
             return
         self.setChecked(muted)
-        self.setText(button_text(mode, scope, muted))
+        label = button_text(mode, scope, muted)
+        shown = label
+        if self._text_room:
+            shown = self.fontMetrics().elidedText(label, Qt.TextElideMode.ElideRight, self._text_room)
+        self.setText(shown)
         for action_mode, action in self.mode_actions.items():
             action.setChecked(action_mode == mode)
         for action_scope, action in self.scope_actions.items():
@@ -137,8 +158,10 @@ class EffectMuteButton(QToolButton):
             first = f"TelemFFB effects muted on {where} ({effects}). Click to release."
         else:
             first = f"Click to mute {effects} on {where}."
-        self.setToolTip(f"{first}\n{MUTE_SCOPE_TEXT}\n"
-                        "The arrow chooses what is muted and where.")
+        tip = f"{first}\n{MUTE_SCOPE_TEXT}\nThe arrow chooses what is muted and where."
+        if shown != label:
+            tip = f"{label}\n{tip}"
+        self.setToolTip(tip)
 
     def _on_clicked(self, _checked: bool = False) -> None:
         try:

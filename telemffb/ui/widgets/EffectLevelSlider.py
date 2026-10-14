@@ -35,7 +35,7 @@ class EffectLevelSlider(QWidget):
     #: (value, persist) on a change the user made
     edited = pyqtSignal(int, bool)
 
-    def __init__(self, parent=None, slider_width: int = 0):
+    def __init__(self, parent=None, slider_width: int = 0, slider_min_width: int = 0):
         super().__init__(parent)
         self._quiet = False
 
@@ -46,6 +46,8 @@ class EffectLevelSlider(QWidget):
         self.slider.setValue(100)
         if slider_width:
             self.slider.setFixedWidth(slider_width)
+        elif slider_min_width:
+            self.slider.setMinimumWidth(slider_min_width)
 
         self.readout = QLabel()
         self.readout.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
