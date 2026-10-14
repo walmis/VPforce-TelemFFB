@@ -45,7 +45,7 @@ def test_orphaned_self_substring_prereq_does_not_recurse():
     """The exact DA40 trigger: an orphan whose name is a substring of its own prereq."""
     layout = _make_layout()
     datalist = [
-        {'name': 'telemffb_controls_axes', 'prereq': 'basic_group', 'order': '2100'},
+        {'name': 'local_disable_axis_control', 'prereq': 'basic_group', 'order': '2100'},
         {'name': 'custom_x_axis', 'prereq': 'enable_custom_x_axis', 'order': '2200.2'},
         {'name': 'raw_x_axis_scale', 'prereq': 'enable_custom_x_axis', 'order': '2200.3'},
     ]

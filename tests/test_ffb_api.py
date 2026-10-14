@@ -11,7 +11,7 @@ synthetic telemetry.  Coverage follows plan section 8:
 - trim spring, TR_ON unclutch and fly-through per control
 - hydraulic assist loss, including the loss/health inversion
 - containment: every other helicopter class is untouched by the API
-- axis ownership under both telemffb_controls_axes modes
+- axis ownership with the device's axis control enabled and disabled
 """
 import pytest
 from unittest.mock import MagicMock, patch
@@ -104,8 +104,7 @@ class FFBApiTestBase(BaseTelemetryEffectTestCase):
         )
         # Default to "user binds axes in MSFS" so the spring/trim assertions are not
         # entangled with the axis-send path.  The axis tests override this.
-        instance.telemffb_controls_axes = False
-        instance.local_disable_axis_control = False
+        instance.local_disable_axis_control = True
         return instance
 
     def arm(self, instance, telem, frames=FFB_API_DISCOVERY_STABLE_FRAMES, settled=True):
@@ -1009,7 +1008,6 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
 
     def test_no_axis_sent_when_user_binds_axes_in_msfs(self):
         instance = self.make_instance()
-        instance.telemffb_controls_axes = False
         telem = self.make_telem(ffbTrimCyclicRoll=0.5)
         self.arm(instance, telem)
         instance.msfs_update_heli_controls(telem)
@@ -1033,7 +1031,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
     def test_sent_axis_is_raw_with_no_trim_contribution(self):
         """Trim lives in the spring centre; applying it to the axis too would double it."""
         instance = self.make_instance()
-        instance.telemffb_controls_axes = True
+        instance.local_disable_axis_control = False
         instance.trim_following = True
         instance.use_firmware_axis_override = False
         instance.cyclic_spring_init = 1
@@ -1076,7 +1074,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
         step input.  The cyclic case is displaced in pitch only: both axes count."""
         update, prefix, trim, displaced = self.CONTROLS[device]
         instance = self.make_instance(device=device)
-        instance.telemffb_controls_axes = True
+        instance.local_disable_axis_control = False
         instance.use_firmware_axis_override = False
         telem = self.make_telem(device=device, **trim)
         self.arm(instance, telem)
@@ -1094,7 +1092,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
     def test_a_pause_starts_the_recapture_again_and_covers_the_relatch(self, device):
         update, prefix, trim, displaced = self.CONTROLS[device]
         instance = self.make_instance(device=device)
-        instance.telemffb_controls_axes = True
+        instance.local_disable_axis_control = False
         instance.use_firmware_axis_override = False
         telem = self.make_telem(device=device, **trim)
         self.arm(instance, telem)
@@ -1115,7 +1113,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
     def _untrimmed(self, device, on_ground, position):
         """A control the aircraft gives no trim system (only the cyclic bit is set)."""
         instance = self.make_instance(device=device)
-        instance.telemffb_controls_axes = True
+        instance.local_disable_axis_control = False
         instance.use_firmware_axis_override = False
         instance._ffb_api_walk.duration_s = 0.0          # center straight to the target
         telem = self.make_telem(device=device, features=BIT_CYCLIC, SimOnGround=int(on_ground))
@@ -1167,7 +1165,7 @@ class TestFFBApiAxisOwnership(FFBApiTestBase):
 
     def test_trim_still_reaches_the_spring_when_axes_are_sent(self):
         instance = self.make_instance()
-        instance.telemffb_controls_axes = True
+        instance.local_disable_axis_control = False
         instance.use_firmware_axis_override = False
         instance.cyclic_spring_init = 1
         telem = self.make_telem(ffbTrimCyclicRoll=0.3)
@@ -1289,9 +1287,6 @@ class TestFFBApiSettingsScope:
         # spring_mode = CENTER, which this class does not have.
         ("aircraft_is_spring_centered", "joystick"),
         ("aircraft_is_spring_centered", "pedals"),
-        # Helicopter's only row is a legacy classdefaults_any that restates the
-        # baseline `true`, so there is nothing to mirror: this class takes the baseline.
-        ("telemffb_controls_axes", "collective"),
     }
 
     def _msfs_rows(self, root, cls):

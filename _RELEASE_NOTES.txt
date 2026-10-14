@@ -54,6 +54,10 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Per device effect level control. Master and per effect type controls are offered.
   - Instantly mute effects per device or globally with the click of a button.
 ## MSFS / X-Plane
+- **CHANGED: Global Axis Control is permanently enabled**
+  - Axis control settings are moved into a collapsable 'Axis Control' settings group
+  - The global 'Axis Control' toggle is no longer available.  To disable axis control, user the per-role 'Disable for This Device' setting
+  - Trim and autopilot following remain gated behind the axis control.  Axis control must be enabled to access these features.
 - **NEW: In-sim settings panel**
   - View and change the current aircraft's TelemFFB settings from a window inside the sim
   - Both the settings and monitor tabs are available in the in-sim panels

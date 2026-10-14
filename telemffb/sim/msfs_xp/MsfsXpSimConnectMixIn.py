@@ -62,7 +62,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
 
     # user parameters
     local_disable_axis_control: bool = False
-    telemffb_controls_axes: bool = False
+    telemffb_controls_axes: bool = True
     use_firmware_axis_override: bool = False
     joystick_trim_follow_use_curve_y: bool = False
     # Where the trimmed stick RESTS in curve mode: "Follows Trim" (tab/cable
@@ -483,9 +483,8 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         these hold, and released the moment any of them stops holding:
 
         * the simulator-side axis backend is in use — false when the user
-          disables axis control globally (``telemffb_controls_axes``) or for
-          this device alone (``local_disable_axis_control``), and false when
-          the axis is driven in device firmware instead;
+          disables axis control for this device (``local_disable_axis_control``),
+          and false when the axis is driven in device firmware instead;
         * the FFB device is connected and feeding input — a dead instance
           would otherwise pin the sim's yoke to zeros and silence the user's
           real controller;

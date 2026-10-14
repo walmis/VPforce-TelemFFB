@@ -54,8 +54,8 @@ class HPGHelicopter(Helicopter):
       controls via axis-deviation thresholds or force sensing.  Contact state is
       written back to the sim via L-vars (``L:FFB_HANDS_ON_CYCLIC``,
       ``L:FFB_FEET_ON_PEDALS``) so the AFCS can react appropriately.
-    - **telemffb_controls_axes must be True** for all three devices.  TelemFFB is
-      solely responsible for sending axis positions to MSFS; physical device axes
+    - **Axis control must be enabled** for all three devices.  TelemFFB is solely
+      responsible for sending axis positions to MSFS; physical device axes
       must be unbound in MSFS settings.
 
     User-configurable parameters
@@ -264,8 +264,8 @@ class HPGHelicopter(Helicopter):
         current stick position.  The follow-up trim loop is also frozen while
         ``hpgTrimRelease`` is non-zero to avoid fighting the AFCS during its reset.
 
-        Note: ``telemffb_controls_axes`` must be True and the cyclic axes must be
-        unbound in MSFS settings for this integration to work correctly.
+        Note: axis control must be enabled for this device and the cyclic axes must
+        be unbound in MSFS settings for this integration to work correctly.
         """
         super().msfs_update_heli_controls(telem_data)
         ffb_type = telem_data.FFBType or "joystick"
@@ -290,9 +290,9 @@ class HPGHelicopter(Helicopter):
             self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 1)
 
         if ffb_type == "joystick":
-            if not self.telemffb_controls_axes and not self.local_disable_axis_control:
+            if self.local_disable_axis_control:
                 self.flag_error(
-                    "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
+                    "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nAxis control must be enabled for this device (uncheck 'Disable for this device' under Axis Control); unbind the cyclic axes in MSFS settings")
                 return
 
             # SEMA actuator values (range ±100).  A 100 ms rolling average is used
@@ -504,7 +504,7 @@ class HPGHelicopter(Helicopter):
         -----------
         The physical pedal position is sent to MSFS every frame via
         ``ROTOR_AXIS_TAIL_ROTOR_SET`` (or a custom axis variable if configured).
-        ``telemffb_controls_axes`` must be True and the pedal axes must be unbound
+        Axis control must be enabled for the pedals and the pedal axes must be unbound
         in MSFS settings.
         """
         if telem_data.FFBType != 'pedals':
@@ -690,8 +690,8 @@ class HPGHelicopter(Helicopter):
         """
         if telem_data.FFBType != 'collective':
             return
-        if not self.telemffb_controls_axes and not self.local_disable_axis_control:
-            self.flag_error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
+        if self.local_disable_axis_control:
+            self.flag_error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nAxis control must be enabled for this device (uncheck 'Disable for this device' under Axis Control); unbind the collective axes in MSFS settings")
             return
         self._spring_handle.name = "collective_ap_spring"
         force_trim_pressed = False

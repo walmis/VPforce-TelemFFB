@@ -633,8 +633,8 @@ class TrimCalibrator:
 
         Also used by the dialog for the live "ready to calibrate" indicator.
         """
-        if not (self.ac.telemffb_controls_axes and not self.ac.local_disable_axis_control):
-            return False, "Enable 'TelemFFB Controls Axes' (axis control) first"
+        if self.ac.local_disable_axis_control:
+            return False, "Axis control must be enabled for this device (uncheck 'Disable for this device')"
         if telem_data is None:
             return False, "Waiting for telemetry"
         if telem_data.get("SimPaused"):

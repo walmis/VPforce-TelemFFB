@@ -235,9 +235,9 @@ class SettingsLayout(QGridLayout):
         Recursively check if the top-level parent of `item` is in self.expanded_items.
 
         `_visited` guards against cyclic / self-referential prereq chains. One can
-        arise when a mid-chain parent is dropped during the settings merge: e.g. with
-        `telemffb_controls_axes=false`, eliminate_no_prereq removes `enable_custom_x_axis`
-        but leaves its child `custom_x_axis` orphaned. The substring parent lookup below
+        arise when a mid-chain parent is dropped during the settings merge: were
+        `enable_custom_x_axis` removed, eliminate_no_prereq would leave its child
+        `custom_x_axis` orphaned. The substring parent lookup below
         then matches the orphan's prereq (`enable_custom_x_axis`) against the only
         surviving name that is a substring of it -- `custom_x_axis` itself -- so the row
         becomes its own parent. Without this guard that recurses until Python's limit and

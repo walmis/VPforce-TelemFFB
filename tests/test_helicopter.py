@@ -422,6 +422,7 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         instance._test_device_type = "joystick"  # Not pedals
         
         telem = self._create_heli_telem()
+        telem.FFBType = "joystick"
         self.set_telemetry(instance, telem)
         
         instance.msfs_update_pedals(telem)
@@ -1101,9 +1102,9 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
 
     # --- _send_cyclic_axis_output tests ---
 
-    def test_send_axis_output_disabled_when_controls_axes_off(self):
+    def test_send_axis_output_disabled_for_the_device(self):
         inst = self._make_instance()
-        inst.telemffb_controls_axes = False
+        inst.local_disable_axis_control = True
         telem = self._make_telem()
         self.set_telemetry(inst, telem)
 

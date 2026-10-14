@@ -936,13 +936,13 @@ class TrimCalibrationDialog(QDialog):
 
     def _update_tf_warning(self):
         """Show/hide the trim-following-disabled banner for the current
-        aircraft. When Axis Control is off, trim following is prereq-blocked
+        aircraft. When Axis Control is disabled, trim following is prereq-blocked
         with it, so the message names the real first step (the Trim Following
         row is not even visible on the Settings tab until Axis Control is
         enabled)."""
         if self._offline_editing():
             # Judge the EDITED profile, not the stale live aircraft. Prereq
-            # filtering drops trim_following when axis control is off, so
+            # filtering drops trim_following when axis control is disabled, so
             # "missing" reads as disabled — the same semantics the live
             # aircraft would have. With NO aircraft selected there is
             # nothing to judge: no banner (an empty settings dict would
@@ -953,14 +953,13 @@ class TrimCalibrationDialog(QDialog):
             vals = self._offline_settings()
             show = (G.device_type == "joystick" and vals is not None
                     and vals.get("trim_following") is not True)
-            axis_off = vals is None or \
-                vals.get("telemffb_controls_axes") is not True
+            axis_off = vals is None or vals.get("local_disable_axis_control") is True
         else:
             ac = G.telem_manager.currentAircraft if G.telem_manager else None
             show = (G.device_type == "joystick"
                     and ac is not None and hasattr(ac, "get_trim_calibrator")
                     and not getattr(ac, "trim_following", False))
-            axis_off = show and not getattr(ac, "telemffb_controls_axes", False)
+            axis_off = show and bool(getattr(ac, "local_disable_axis_control", False))
         if show:
             if axis_off:
                 text = (
