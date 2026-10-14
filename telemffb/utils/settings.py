@@ -36,6 +36,7 @@ __all__ = [
     "SystemSettings",
     "convert_legacy_userconfig",
     "migrate_il2_korea_userconfig",
+    "migrate_axis_control_userconfig",
     "copy_legacy_config_to_new",
     "create_empty_userxml_file",
     "load_custom_userconfig",
@@ -690,4 +691,63 @@ def migrate_il2_korea_userconfig(userconfig_path, defaults_path) -> bool:
         consolidate_sort_and_write(tree, userconfig_path)
     logging.info(f"IL-2 Korea migration: {aircraft} aircraft rows and {shared} sim/class rows "
                  f"copied to IL2K")
+    return True
+
+
+AXIS_CONTROL_ROW_TAGS = ("models", "classSettings", "simSettings")
+DEVICE_ROLES = ("joystick", "pedals", "collective", "trimwheel")
+
+
+def migrate_axis_control_userconfig(userconfig_path) -> bool:
+    """Convert a user's ``telemffb_controls_axes`` rows, once.
+
+    Axis control is always enabled and the global toggle is no longer a setting.
+    A row that turned it off applied to every device, so it becomes a
+    ``local_disable_axis_control`` row for each device role, under the same
+    sim, scope, pattern and profile, unless the user already has one there.
+    Every row naming the
+    old toggle is then removed, so the pass runs only on a file that still
+    has one.  Returns True when the file was changed.
+    """
+    if not os.path.isfile(userconfig_path):
+        return False
+    tree = xmlutils.try_parse(userconfig_path)
+    if tree is None:
+        logging.error(f"Axis control migration: failed to parse {userconfig_path}")
+        return False
+    root = tree.getroot()
+    old = [e for e in root if e.tag in AXIS_CONTROL_ROW_TAGS
+           and e.findtext("name") == "telemffb_controls_axes"]
+    if not old:
+        return False
+
+    def scope(e):
+        return tuple(sorted((c.tag, (c.text or "").strip()) for c in e
+                            if c.tag not in ("name", "value", "device")))
+
+    existing = {(e.tag, scope(e), e.findtext("device")) for e in root
+                if e.tag in AXIS_CONTROL_ROW_TAGS and e.findtext("name") == "local_disable_axis_control"}
+    added = 0
+    for e in old:
+        if str(e.findtext("value") or "").strip().lower() != "false":
+            continue
+        for role in DEVICE_ROLES:
+            if (e.tag, scope(e), role) in existing:
+                continue
+            twin = copy.deepcopy(e)
+            twin.find("name").text = "local_disable_axis_control"
+            twin.find("value").text = "true"
+            device = twin.find("device")
+            if device is None:
+                device = ET.SubElement(twin, "device")
+            device.text = role
+            root.append(twin)
+            existing.add((e.tag, scope(e), role))
+            added += 1
+    for e in old:
+        root.remove(e)
+    with FileLock(userconfig_path):
+        consolidate_sort_and_write(tree, userconfig_path)
+    logging.info(f"Axis control migration: {len(old)} global toggle rows removed, "
+                 f"{added} per-device rows written")
     return True

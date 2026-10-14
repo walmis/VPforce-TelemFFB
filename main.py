@@ -1321,6 +1321,7 @@ def _convert_user_config():
         xmlutils.update_roots()
         utils.convert_legacy_userconfig(G.userconfig_path)
         utils.migrate_il2_korea_userconfig(G.userconfig_path, G.defaults_path)
+        utils.migrate_axis_control_userconfig(G.userconfig_path)
         xmlutils.update_roots()
 
 
