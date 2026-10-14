@@ -90,26 +90,34 @@ class SimStatusTracker:
         state = 'error' if error else 'paused' if paused else 'running'
         # Called only on state transitions (error onset / clear / timeout,
         # or a caller-guarded first frame), so this is not on the
-        # per-frame hot path.
+        # per-frame hot path.  AppState dedupes the tuple itself (and
+        # forgets it when the widget is reset directly); the check here only
+        # keeps the log line from repeating when the first frame reaches
+        # both on_frame and on_first_frame.
+        if self._app_state.current_sim_status() == (state, source, message or ''):
+            return
         logging.info(f"App status indicator -> {state} (src={source})")
         self._app_state.set_sim_status(state, source, message)
 
-    def on_first_frame(self, src: str) -> None:
+    def on_first_frame(self, src: str, stopped: bool = False) -> None:
         """first_frame_received: clear the initial 'Waiting' state by
-        flipping the status to Running.
+        flipping the status to Running, or to Paused for a stopped frame
+        (MSFS paused or in its menus sends one such frame and nothing
+        after it).
 
         Guarded against error_state: process_data emits telemetryReceived
         before first_frame_received, so when the very first frame is the
         one that raises a config error (common at startup), on_frame has
         already set the error indicator by the time this runs. Without
         this guard the unconditional flip to Running clobbers that error
-        and, since error_state stays set, it is never re-asserted. The
-        paused-in-menus case is unaffected (error_state is False there:
-        Running here, then the telemetry timeout flips it to Paused).
+        and, since error_state stays set, it is never re-asserted.
         """
         if self.error_state:
             return
-        self.push_status(src, paused=False)
+        self.push_status(src, paused=stopped)
+        # a stopped frame keeps the timeout state, so the first live
+        # frame flips the indicator to Running
+        self.telemetry_timed_out = stopped or self.telemetry_timed_out
 
     def on_timeout(self, src: Optional[str]) -> None:
         """telemetryTimeout: pause unless an error is already showing -
@@ -164,10 +172,13 @@ class SimStatusTracker:
             if self.telemetry_timed_out or self.error_state:  # only set status to run if previously timed out or error status was true
                 if self.error_state:
                     logging.info("App status error cleared by an error-free frame (hold window elapsed)")
-                self.push_status(data.get('src'), paused=False)
+                # a STOP frame shows Paused and keeps the timeout state,
+                # so the first live frame flips the indicator to Running
+                stopped = bool(data.get('STOP', 0))
+                self.push_status(data.get('src'), paused=stopped)
                 self.error_state = False
                 self._shown_msg = None
-                self.telemetry_timed_out = False
+                self.telemetry_timed_out = stopped
             return
 
         # One at a time on the indicator, oldest first, so a message does not

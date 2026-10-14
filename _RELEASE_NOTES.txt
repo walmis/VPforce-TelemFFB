@@ -74,6 +74,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: the runway rumble effect never played - its enable toggle was not being honored.  It now runs when enabled, so expect a rumble on the ground if you have it switched on
 
 ## General fixes
+- Fix: the sim listeners now start once the device is ready (open, delivering input, startup gains read, startup vpconf profile pushed).  Starting TelemFFB while MSFS sat in its menus could leave the status indicator on Running with no telemetry flowing, because the sim's one menu-time frame arrived before the device was ready.  That frame now shows Paused
 - Fix: keep-forces-on-pause is honored for the flight-control spring on MSFS / X-Plane aircraft - a timeout used to stop it one call after the keep-forces protection ran.  When center-spring-on-pause is also on, the flight-control spring is now replaced by the centering spring on a pause instead of left riding on top of it
 - Fix: effects are now properly freed when the sim exits and when TelemFFB exits preventing scenarios that may result in hung effects on the device
 - Fix: resetting the device's effects no longer strands the effects

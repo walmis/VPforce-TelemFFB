@@ -46,58 +46,58 @@ __all__ = [
 ]
 
 
+class _MainThreadCall(QObject):
+    """One callable queued by schedule_on_main_thread."""
+
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+    @pyqtSlot()
+    def execute(self):
+        try:
+            self.func()
+        finally:
+            with _pending_calls_lock:
+                _pending_calls.discard(self)
+
+
+# Qt holds only the C++ side of a queued call: the Python wrapper must stay
+# referenced from here until it has run, or garbage collection deletes it
+# and the call is silently dropped.
+_pending_calls: set = set()
+_pending_calls_lock = threading.Lock()
+
+
 def schedule_on_main_thread(func):
     """
     Schedule a callable to execute in the main Qt thread.
-    
+
     This is essential when calling GUI methods from worker threads (e.g., threading.Thread).
     Qt GUI objects must only be accessed from the thread they were created in (main thread).
-    
+
     Args:
         func: A callable (lambda or function) to execute in the main thread
-    
+
     Examples:
         # Lambda (simple and clean):
         schedule_on_main_thread(lambda: G.main_window.update_sim_indicators("dcs", True))
         schedule_on_main_thread(lambda: some_widget.setText("Hello"))
-        
+
         # Function reference:
         def update_ui():
             G.main_window.statusBar().showMessage("Updated")
         schedule_on_main_thread(update_ui)
     """
-    class CallableWrapper(QObject):
-        # Keep references to wrapper objects to prevent garbage collection
-        _scheduled_wrappers = []
-
-        def __init__(self, func):
-            super().__init__()
-            # Keep a reference to prevent garbage collection before execution
-            self._scheduled_wrappers.append(self)
-            # Clean up old wrappers if list gets too long (prevent memory leak)
-            if len(self._scheduled_wrappers) > 100:
-                self._scheduled_wrappers[:] = self._scheduled_wrappers[-50:]
-
-            self.func = func
-            # Move to main thread
-            if QCoreApplication.instance():
-                self.moveToThread(QCoreApplication.instance().thread())
-        
-        @pyqtSlot()
-        def execute(self):
-            try:
-                self.func()
-            finally:
-                # Remove from references list after execution
-                try:
-                    self._scheduled_wrappers.remove(self)
-                except (ValueError, AttributeError):
-                    pass
-    
-    wrapper = CallableWrapper(func)
+    call = _MainThreadCall(func)
+    app = QCoreApplication.instance()
+    if app:
+        call.moveToThread(app.thread())
+    with _pending_calls_lock:
+        _pending_calls.add(call)
 
     QMetaObject.invokeMethod(
-        wrapper,
+        call,
         "execute",
         Qt.ConnectionType.QueuedConnection
     )
