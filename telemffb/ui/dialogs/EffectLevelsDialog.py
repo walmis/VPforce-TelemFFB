@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialo
                              QRadioButton, QSpinBox, QToolButton, QVBoxLayout, QWidget)
 
 from telemffb.ButtonPressThread import wait_for_button_press
+from telemffb.hw.button_refs import button_binding_label
 from telemffb.hw.effect_levels import LEVEL_NAMES
 from telemffb.state.mute_button_binding import BEHAVIOR_MOMENTARY, BEHAVIOR_TOGGLE
 from telemffb.ui.widgets.EffectLevelSlider import EffectLevelSlider
@@ -166,16 +167,22 @@ class EffectLevelsDialog(QDialog):
         self.binding_button_spin.setKeyboardTracking(False)
         self.binding_button_spin.setToolTip(_BINDING_TIP)
         row.addWidget(self.binding_button_spin)
+        # a button on another device shows as its label in place of the spin box
+        self._qualified: Optional[str] = None
+        self.binding_label = QLabel()
+        self.binding_label.hide()
+        row.addWidget(self.binding_label)
         self.clear_button = QToolButton()
         self.clear_button.setText("✕")
         self.clear_button.setAutoRaise(True)
         self.clear_button.setToolTip("Clear the bound button.")
-        self.clear_button.clicked.connect(lambda _checked=False: self.binding_button_spin.setValue(0))
-        self.binding_button_spin.valueChanged.connect(lambda value: self.clear_button.setEnabled(value != 0))
+        self.clear_button.clicked.connect(lambda _checked=False: self._clear_binding())
+        self.binding_button_spin.valueChanged.connect(
+            lambda value: self.clear_button.setEnabled(value != 0 or self._qualified is not None))
         self.clear_button.setEnabled(False)
         row.addWidget(self.clear_button)
         self.detect_button = QPushButton("Bind")
-        self.detect_button.setToolTip("Click, then press the button on the device within five seconds.")
+        self.detect_button.setToolTip("Click, then press a button on any device within five seconds.")
         self.detect_button.clicked.connect(self._detect_button)
         row.addWidget(self.detect_button)
         row.addSpacing(6)
@@ -308,8 +315,14 @@ class EffectLevelsDialog(QDialog):
                 self.binding_device_combo.addItem(role_name(r), r)
             self.binding_device_combo.setCurrentIndex(
                 max(0, self.binding_device_combo.findData(role)))
-            self.binding_button_spin.setValue(button)
-            self.clear_button.setEnabled(button != 0)
+            self._qualified = button if isinstance(button, str) else None
+            self.binding_button_spin.setValue(0 if self._qualified else button)
+            self.binding_button_spin.setVisible(self._qualified is None)
+            self.binding_label.setVisible(self._qualified is not None)
+            if self._qualified:
+                self.binding_label.setText(button_binding_label(self._qualified) or self._qualified)
+                self.binding_label.setToolTip(self._qualified)
+            self.clear_button.setEnabled(bool(button))
             for b, radio in self.behavior_buttons.items():
                 radio.setChecked(b == behavior)
             momentary = behavior == BEHAVIOR_MOMENTARY
@@ -331,11 +344,18 @@ class EffectLevelsDialog(QDialog):
                 inverted = self.binding_inverted_check.isChecked()
             else:
                 inverted = self._controller.mute_button_binding()[3]
-            self._controller.set_mute_button_binding(role, self.binding_button_spin.value(),
-                                                     behavior, inverted)
+            button = self._qualified or self.binding_button_spin.value()
+            self._controller.set_mute_button_binding(role, button, behavior, inverted)
         except Exception:
             logging.exception("Effect levels: could not set the mute button")
         self._refresh_binding()
+
+    def _clear_binding(self) -> None:
+        self._qualified = None
+        if self.binding_button_spin.value():
+            self.binding_button_spin.setValue(0)      # stores through valueChanged
+        else:
+            self._on_binding_edited()
 
     def _detect_button(self) -> None:
         """Wait, off the main thread, for a press on the selected device
@@ -355,13 +375,20 @@ class EffectLevelsDialog(QDialog):
 
         threading.Thread(target=wait, name="MuteButtonDetect", daemon=True).start()
 
-    def _on_detected(self, value: int) -> None:
+    def _on_detected(self, value) -> None:
         # runs from a queued call; the dialog may be gone by then
         try:
             self.detect_button.setEnabled(True)
             self.detect_button.setText("Bind")
-            if value:
-                self.binding_button_spin.setValue(value)
+            if isinstance(value, str) and value:
+                self._qualified = value
+                self._on_binding_edited()
+            elif value:
+                self._qualified = None
+                if self.binding_button_spin.value() == value:
+                    self._on_binding_edited()
+                else:
+                    self.binding_button_spin.setValue(value)
         except Exception:
             logging.exception("Effect levels: detected button not applied")
 

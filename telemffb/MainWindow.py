@@ -62,6 +62,7 @@ from telemffb.state.app_state import Notice, NEW_CRAFT_PRIORITY, PROFILE_CHANGE_
 from telemffb.state.sim_status import SimStatusTracker
 from telemffb.ui.dialogs.ExceptionViewerDialog import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.hw.button_state import btnrole_message, publish_own_buttons
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.ProfileNotesDialog import ProfileNotesDialog
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
@@ -711,6 +712,9 @@ class MainWindow(QMainWindow):
             if btns != G.active_buttons:
                 # only send if pressed buttons has changed
                 G.active_buttons = btns
+                # also under this device's key, for qualified binding ids;
+                # the master relays it to the children as BTNDEV
+                key = publish_own_buttons(btns)
                 if G.master_instance:
                     G.ipc_instance.send_broadcast_message(f"MASTER_BUTTONS:{G.active_buttons}")
                     controller = getattr(G, 'effect_levels', None)
@@ -718,6 +722,8 @@ class MainWindow(QMainWindow):
                         controller.on_device_buttons(G.device_type, btns)
                 else:
                     G.ipc_instance.send_message(f"BUTTONS:{G.device_type}_{G.active_buttons}")
+                    if key:
+                        G.ipc_instance.send_message(btnrole_message(G.device_type, key, btns))
 
     def toggle_start_with_windows(self, set_enabled=None):
         try:

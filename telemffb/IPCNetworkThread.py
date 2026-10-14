@@ -29,6 +29,9 @@ from PyQt6.QtWidgets import QMessageBox
 import telemffb.globals as G
 from telemffb import utils
 from telemffb.ChildTelemView import ChildTelemView
+from telemffb.hw.button_state import (BTNDEV_ALL_PREFIX, BTNDEV_PREFIX, BTNROLE_PREFIX,
+                                     apply_child_role_buttons, apply_remote_buttons,
+                                     apply_remote_snapshot, btndev_all_message)
 from telemffb.utils import load_custom_userconfig
 
 # How long a child keeps sending its telemetry view after the master last
@@ -241,6 +244,8 @@ class IPCNetworkThread(QObject, threading.Thread):
                 state = {"mute": self._effect_mute, "levels": self._effect_levels}
                 self.send_broadcast_message(f"Keepalive:{json.dumps(state)}")
             self._announce_view(repeat=True)
+            # the whole button table, so a dropped BTNDEV heals in a second
+            self.send_broadcast_message(btndev_all_message())
         else:
             self.send_message(f"Child Keepalive:{G.device_type}:{G.device_connection_status}")
             self.send_ipc_status()
@@ -440,6 +445,14 @@ class IPCNetworkThread(QObject, threading.Thread):
             G.child_buttons[dev] = btns
             # print(G.child_buttons)
             self.child_buttons_signal.emit(dev, btns)
+        elif msg.startswith(BTNROLE_PREFIX):
+            # the same buttons under the child's device key, for qualified
+            # binding ids, relayed so the other children see them too
+            apply_child_role_buttons(msg.removeprefix(BTNROLE_PREFIX), ipc=self)
+        elif msg.startswith(BTNDEV_ALL_PREFIX):
+            apply_remote_snapshot(msg.removeprefix(BTNDEV_ALL_PREFIX))
+        elif msg.startswith(BTNDEV_PREFIX):
+            apply_remote_buttons(msg.removeprefix(BTNDEV_PREFIX))
         elif msg.startswith('TOGGLE OFFLINE:'):
             state_str = msg.removeprefix('TOGGLE OFFLINE:')
             state = state_str == 'True'

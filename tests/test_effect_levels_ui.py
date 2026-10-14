@@ -511,6 +511,28 @@ class TestDialog:
         assert dialog.binding_inverted_check.isChecked()
         assert ctl.calls == []
 
+    def test_a_qualified_binding_shows_its_label_in_place_of_the_spin_box(self, ctl):
+        ctl._binding = ('joystick', '1234:0001:7', BEHAVIOR_TOGGLE, False)
+        dialog = EffectLevelsDialog(ctl)
+        assert dialog.binding_button_spin.isHidden()
+        assert not dialog.binding_label.isHidden()
+        assert dialog.clear_button.isEnabled()
+        dialog.behavior_buttons[BEHAVIOR_MOMENTARY].click()
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'joystick', '1234:0001:7',
+                                 BEHAVIOR_MOMENTARY, False)
+        dialog.clear_button.click()
+        assert ctl.calls[-1][:3] == ('set_mute_button_binding', 'joystick', 0)
+
+    def test_detect_takes_a_qualified_id_from_another_device(self, ctl, monkeypatch):
+        monkeypatch.setattr(dialog_module, 'wait_for_button_press', lambda target, timeout: '1234:0001:12')
+        monkeypatch.setattr(dialog_module, 'schedule_on_main_thread', lambda f: f())
+        monkeypatch.setattr(dialog_module, 'threading', SimpleNamespace(
+            Thread=lambda target, **kwargs: SimpleNamespace(start=target)))
+        dialog = EffectLevelsDialog(ctl)
+        dialog.detect_button.click()
+        assert ctl.calls[-1] == ('set_mute_button_binding', 'joystick', '1234:0001:12',
+                                 BEHAVIOR_TOGGLE, False)
+
     def test_the_clear_button_unbinds(self, ctl):
         ctl._binding = ('pedals', 7, BEHAVIOR_MOMENTARY, False)
         dialog = EffectLevelsDialog(ctl)

@@ -333,14 +333,11 @@ class SimXPLANE(SimTelemListener):
             return
 
         def listing(pending):
-            return "\n".join(f"{o.root}: {xplane_install.PLUGIN_NAMES[o.plugin]} "
-                             f"({'install' if o.missing else 'update'})" for o in pending)
+            return "\n".join(o.describe() for o in pending)
 
         logging.info(f"X-Plane plugins to offer: {listing(offers)}")
-        answer = QMessageBox.question(
-            G.main_window, "X-Plane Plugins",
-            f"TelemFFB's X-Plane plugins are out of date in the following managed installs:\n\n{listing(offers)}\n\n"
-            "Update the plugins? Close any running X-Plane before proceeding.")
+        title, text = xplane_install.update_prompt(offers)
+        answer = QMessageBox.question(G.main_window, title, text)
         pending = list(offers)
         while pending and answer == QMessageBox.StandardButton.Yes:
             failed = []
@@ -353,11 +350,15 @@ class SimXPLANE(SimTelemListener):
             pending = failed
             if pending:
                 answer = QMessageBox.warning(
-                    G.main_window, "X-Plane Plugins",
-                    f"Failed to update the following instance(s):\n\n{listing(pending)}\n\n"
+                    G.main_window, "X-Plane Plugin Update",
+                    f"Couldn't update the plugins in the following installs:\n\n{listing(pending)}\n\n"
                     "Close X-Plane and try again?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No)
+            elif answer == QMessageBox.StandardButton.Yes:
+                QMessageBox.information(
+                    G.main_window, "X-Plane Plugin Update",
+                    "Plugins updated.  If X-Plane is running, restart it to load the updated plugins.")
 
     @override
     def stop(self):
@@ -438,9 +439,11 @@ class SimMSFS(SimTelemListener):
         logging.info(f"MSFS panel {bundled} is bundled; installed: {stale}")
         listing = "\n".join(f"{path}  ({installed})" for path, installed in stale)
         ans = QMessageBox.question(
-            G.main_window, "MSFS Panel Update",
-            f"The VPforce settings panel installed for MSFS differs from the one "
-            f"this version of TelemFFB ships ({bundled}):\n\n{listing}\n\nUpdate it now?")
+            G.main_window, f"MSFS Panel Update ({bundled})",
+            f"A new version ({bundled}) is available for the MSFS settings panel\n\n"
+            f"Installed: {installed}\n"
+            f"Available: {bundled}\n\n"
+            f"Update it now?")
         if ans != QMessageBox.StandardButton.Yes:
             return
         failed = []
@@ -455,7 +458,7 @@ class SimMSFS(SimTelemListener):
                                 "Couldn't update the panel:\n\n" + "\n".join(failed))
         else:
             QMessageBox.information(G.main_window, "MSFS Panel Update",
-                                    "Panel updated.  Restart MSFS if it is running to load it.")
+                                    "Panel updated.  If MSFS is running, restart it to load the updated panel.")
 
 class SimListenerManager(QtCore.QObject):
     simStarted = QtCore.pyqtSignal(object)

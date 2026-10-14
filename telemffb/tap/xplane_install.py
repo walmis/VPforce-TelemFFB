@@ -18,6 +18,7 @@ plugin is left alone. The one exception is the telemetry plugin when no
 install has it at all, which is offered everywhere, since without it there
 is no force feedback in X-Plane.
 """
+import ctypes
 import glob
 import json
 import logging
@@ -33,6 +34,8 @@ TELEMETRY = "TelemFFB-XPP"
 PANEL = "TelemFFB-Panel"
 PLUGINS = (TELEMETRY, PANEL)
 PLUGIN_NAMES = {TELEMETRY: "Telemetry plugin", PANEL: "Panel"}
+#: how a prompt sentence names each plugin
+PLUGIN_PROSE = {TELEMETRY: "X-Plane telemetry plugin", PANEL: "X-Plane settings panel"}
 
 #: The installs the user added by hand, as a JSON list of folders
 ADDED_SETTING = "xplaneInstalls"
@@ -163,11 +166,93 @@ def install_plugin(root: str, plugin: str) -> None:
     logging.info(f"Installed the X-Plane {PLUGIN_NAMES[plugin]} into {root}")
 
 
+def plugin_version(path: str) -> Optional[str]:
+    """The version a plugin carries in its Windows version resource
+    (``ProductVersion``, else the fixed file version), or None when the
+    file has none or cannot be read."""
+    if not path or os.name != "nt" or not os.path.isfile(path):
+        return None
+    try:
+        from ctypes import wintypes
+        lib = ctypes.WinDLL("version", use_last_error=True)
+        lib.GetFileVersionInfoSizeW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(wintypes.DWORD)]
+        lib.GetFileVersionInfoSizeW.restype = wintypes.DWORD
+        lib.GetFileVersionInfoW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                                            wintypes.LPVOID]
+        lib.GetFileVersionInfoW.restype = wintypes.BOOL
+        lib.VerQueryValueW.argtypes = [wintypes.LPCVOID, wintypes.LPCWSTR,
+                                       ctypes.POINTER(wintypes.LPVOID), ctypes.POINTER(wintypes.UINT)]
+        lib.VerQueryValueW.restype = wintypes.BOOL
+        size = lib.GetFileVersionInfoSizeW(path, None)
+        if not size:
+            return None
+        data = ctypes.create_string_buffer(size)
+        if not lib.GetFileVersionInfoW(path, 0, size, data):
+            return None
+        value, length = wintypes.LPVOID(), wintypes.UINT()
+        if lib.VerQueryValueW(data, "\\VarFileInfo\\Translation", ctypes.byref(value),
+                              ctypes.byref(length)) and length.value >= 4:
+            lang, codepage = (wintypes.WORD * 2).from_address(value.value)
+            sub = f"\\StringFileInfo\\{lang:04x}{codepage:04x}\\ProductVersion"
+            if lib.VerQueryValueW(data, sub, ctypes.byref(value), ctypes.byref(length)) and length.value:
+                text = ctypes.wstring_at(value.value, length.value).rstrip("\x00").strip()
+                if text:
+                    return text
+        if lib.VerQueryValueW(data, "\\", ctypes.byref(value), ctypes.byref(length)) and length.value >= 16:
+            # VS_FIXEDFILEINFO: dwFileVersionMS and dwFileVersionLS at offsets 8 and 12
+            ms = wintypes.DWORD.from_address(value.value + 8).value
+            ls = wintypes.DWORD.from_address(value.value + 12).value
+            return f"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}"
+    except Exception:
+        logging.debug(f"No version resource read from {path}", exc_info=True)
+    return None
+
+
 @dataclass(frozen=True)
 class Offer:
     root: str
     plugin: str
-    missing: bool       # an install rather than an update
+    missing: bool                       # an install rather than an update
+    installed: Optional[str] = None     # the installed copy's version, when it carries one
+    available: Optional[str] = None     # the bundled copy's version, when it carries one
+
+    def describe(self) -> str:
+        """One line for a prompt: the install, the plugin and, for an
+        update, the installed and available versions as far as they are
+        known.  A copy built before the plugin carried a version resource
+        reads as unknown."""
+        name = PLUGIN_NAMES[self.plugin]
+        if self.missing:
+            return f"{self.root}: {name} (install)"
+        if self.available:
+            return f"{self.root}: {name} {self.installed or 'unknown'} -> {self.available}"
+        return f"{self.root}: {name} (update)"
+
+
+def update_prompt(offers: List[Offer]) -> tuple:
+    """The title and text of the startup offer, one block per plugin: a
+    sentence naming the available version, an Installed line per install
+    (unknown for a copy with no version resource, not installed for an
+    install being offered the plugin), then the Available line."""
+    plugins = [p for p in PLUGINS if any(o.plugin == p for o in offers)]
+    blocks = []
+    for plugin in plugins:
+        mine = [o for o in offers if o.plugin == plugin]
+        available = next((o.available for o in mine if o.available), None)
+        version = f" ({available})" if available else ""
+        lines = [f"A new version{version} is available for the {PLUGIN_PROSE[plugin]}", ""]
+        for o in mine:
+            state = "Not installed" if o.missing else f"Installed: {o.installed or 'unknown'}"
+            lines.append(f"{state}  ({o.root})")
+        lines.append(f"Available: {available or 'bundled with this TelemFFB'}")
+        blocks.append("\n".join(lines))
+    if len(plugins) == 1:
+        label = "Panel" if plugins[0] == PANEL else "Telemetry Plugin"
+        available = next((o.available for o in offers if o.available), None)
+        title = f"X-Plane {label} Update" + (f" ({available})" if available else "")
+    else:
+        title = "X-Plane Plugin Update"
+    return title, "\n\n".join(blocks) + "\n\nUpdate it now?  If X-Plane is running, close it first."
 
 
 def startup_offers(installs: List[str], telemetry: bool, panel: bool) -> List[Offer]:
@@ -179,7 +264,9 @@ def startup_offers(installs: List[str], telemetry: bool, panel: bool) -> List[Of
     for root in installs:
         for plugin in plugins:
             if plugin_state(root, plugin) == OUTDATED and bundled_plugin(plugin):
-                offers.append(Offer(root, plugin, missing=False))
+                offers.append(Offer(root, plugin, missing=False,
+                                    installed=plugin_version(_plugin_file(root, plugin)),
+                                    available=plugin_version(bundled_plugin(plugin))))
     if telemetry and installs and bundled_plugin(TELEMETRY) and all(
             plugin_state(root, TELEMETRY) == ABSENT for root in installs):
         offers.extend(Offer(root, TELEMETRY, missing=True) for root in installs)

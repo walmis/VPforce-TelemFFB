@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from telemffb.hw.ffb_rhino import FFBReport_Get_Gains_Feature_Data
     from telemffb.state.app_state import AppState
     from telemffb.state.effect_levels_controller import EffectLevelsController
+    from telemffb.hw.button_devices import ButtonDeviceManager
 
 DeviceTypeLiteral = Literal["joystick", "pedals", "collective", "trimwheel"]
 
@@ -171,6 +172,16 @@ ipc_instance : 'IPCNetworkThread'
 active_buttons: list[int] = []
 master_buttons: list[int] = []
 child_buttons: Dict[str, int] = {}
+
+button_states: Dict[str, frozenset] = {}
+"""Pressed buttons per device key (``VVVV:PPPP`` with an optional ``#suffix``),
+for every device a qualified binding id can name: generic controllers and the
+FFB devices of every instance. Filled on the master and relayed to the children
+as BTNDEV messages; see telemffb/hw/button_state.py."""
+
+button_devices: Optional['ButtonDeviceManager'] = None
+"""Reads the generic HID controllers that supply buttons. Master only; None on
+children and when it could not be started."""
 
 # System components
 system_settings : 'SystemSettings'

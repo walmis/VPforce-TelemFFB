@@ -1,6 +1,5 @@
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
-from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
 from telemffb.utils import clamp
 from typing import override
@@ -121,7 +120,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if self._sim_is_msfs() and self.force_trim_send_reset:
             self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
-    def _update_cyclic_force_trim(self, telem_data: BaseTelemetryData, input_data, x, y, force_trim_active) -> bool:
+    def _update_cyclic_force_trim(self, telem_data: BaseTelemetryData, x, y, force_trim_active) -> bool:
         """Run the cyclic force-trim state machine.
 
         Returns True if the caller should return early (init in progress),
@@ -130,18 +129,16 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if self.spring_mode_is(SpringModeEnum.FORCETRIM) and not self._force_trim_configured():
             self.flag_error("Force trim enabled but buttons not configured")
 
+        report = self._get_device_report()
         if self._force_trim_configured() and force_trim_active:
-            # A missing/hot-unplugged device (input_data is None) reads
-            # as "no button pressed", so no trim action can fire.
-            if self.cyclic_spring_init and input_data is not None:
-                force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
+            # A missing or hot-unplugged device reads as no button
+            # pressed, so no trim action can fire.
+            if self.cyclic_spring_init:
+                force_trim_pressed = self.check_button_press(self.force_trim_button, report=report)
             else:
                 force_trim_pressed = False
 
-            if self.force_trim_reset_button > 0 and input_data is not None:
-                trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
-            else:
-                trim_reset_pressed = False
+            trim_reset_pressed = self.check_button_press(self.force_trim_reset_button, report=report)
 
             self.tr_state_change = False
 
@@ -151,8 +148,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             # remember previous "pressed" to detect edge
             force_trim_pressed_prev = getattr(self, "force_trim_pressed_prev", False)
             force_trim_pressed = (
-                input_data.isButtonPressed(self.force_trim_button)
-                if (input_data is not None and self.cyclic_spring_init) else False
+                self.check_button_press(self.force_trim_button, report=report)
+                if self.cyclic_spring_init else False
             )
             self.tr_state_change = force_trim_pressed != force_trim_pressed_prev
             self.force_trim_pressed_prev = force_trim_pressed
@@ -342,8 +339,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             if self._apply_joystick_controls_lock(telem_data, controls_locked):
                 return
 
-            input_data = HapticEffect.get_device_input()
-            if self._update_cyclic_force_trim(telem_data, input_data, x, y, force_trim_active):
+            if self._update_cyclic_force_trim(telem_data, x, y, force_trim_active):
                 return
 
             self._send_cyclic_axis_output(telem_data, force_trim_active)

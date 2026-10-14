@@ -45,15 +45,17 @@ Main thread only.
 
 import logging
 import time
-from typing import Optional
+import weakref
+from typing import Optional, Union
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 import telemffb.globals as G
+import telemffb.hw.button_state as button_state
 import telemffb.hw.effect_levels as effect_levels
 from telemffb.hw.effect_levels import LEVEL_NAMES, MUTE_ALL, MUTE_KEEP_SPRING, MUTE_MODES, MUTE_OFF
 from telemffb.state.mute_button_binding import MuteButtonBinding
-from telemffb.utils import DEVICE_ROLES
+from telemffb.utils import DEVICE_ROLES, schedule_on_main_thread
 
 #: Settings key of each level, instance-scoped (``{role}/{key}``).
 LEVEL_KEYS = {name: f"effectLevel{name.capitalize()}" for name in LEVEL_NAMES}
@@ -151,6 +153,19 @@ class EffectLevelsController(QObject):
         self._muted: dict[str, str] = {}                # role -> applied mode, muted roles only
         self._all_muted: bool = False                   # a global mute is in force
         self._button = MuteButtonBinding(self)
+        # a qualified mute button follows G.button_states; the store tells
+        # us on whatever thread stored, so the call is marshalled here
+        ref = weakref.ref(self)
+
+        def forward(key, buttons):
+            ctl = ref()
+            if ctl is None:
+                button_state.unsubscribe(forward)
+                return
+            schedule_on_main_thread(lambda: ctl.on_key_buttons(key, buttons))
+
+        self._key_listener = forward
+        button_state.subscribe(forward)
         # a slider drag asks for a replay per tick; replays are limited to
         # one per _DRAG_REPLAY_MS, with the last tick's value sent when the
         # interval ends
@@ -394,16 +409,18 @@ class EffectLevelsController(QObject):
 
     # --- mute button on a device ---------------------------------------
 
-    def mute_button_binding(self) -> tuple[str, int, str, bool]:
-        """The hardware mute button: (role, button number, behavior,
-        inverted).  Button 0 is not bound; inverted acts only with
-        momentary."""
+    def mute_button_binding(self) -> tuple[str, Union[int, str], str, bool]:
+        """The hardware mute button: (role, button, behavior, inverted).
+        The button is a number on the role's device or a qualified id
+        ``<key>:<n>`` on any device; 0 is not bound.  Inverted acts only
+        with momentary."""
         b = self._button
         return b.role, b.button, b.behavior, b.inverted
 
-    def set_mute_button_binding(self, role: str, button: int, behavior: str,
+    def set_mute_button_binding(self, role: str, button: Union[int, str], behavior: str,
                                 inverted: bool = False) -> None:
-        """Bind (button > 0) or unbind (0) the hardware mute button.
+        """Bind (a number > 0 or a qualified id) or unbind (0) the hardware
+        mute button.
 
         :raises ValueError: see ``MuteButtonBinding.set_binding``.
         """
@@ -418,6 +435,16 @@ class EffectLevelsController(QObject):
             self._button.buttons_changed(role, list(buttons or ()))
         except Exception:
             logging.exception(f"Effect levels: mute button on {role} not handled")
+
+    def on_key_buttons(self, key: str, buttons) -> None:
+        """Master: the device ``key`` names now has ``buttons`` pressed,
+        for a qualified binding.  Never raises."""
+        if not G.master_instance:
+            return
+        try:
+            self._button.key_buttons_changed(key, list(buttons or ()))
+        except Exception:
+            logging.exception(f"Effect levels: mute button on {key} not handled")
 
     def on_device_status(self, role: str, status: str) -> None:
         """Master: ``role``'s device status (``"ACTIVE"``, or anything
