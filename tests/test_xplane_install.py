@@ -78,6 +78,35 @@ class TestPluginState:
         assert xi.plugin_state(root, xi.PANEL) == xi.CURRENT
 
 
+class TestPluginVersion:
+    def test_the_bundled_panel_carries_its_version(self):
+        path = os.path.join(os.path.dirname(__file__), "..", "xplane-plugin", xi.PANEL, "64", "win.xpl")
+        if not os.path.isfile(path):
+            pytest.skip("no bundled panel plugin in this checkout")
+        version = xi.plugin_version(path)
+        assert version is not None
+        assert [int(part) for part in version.split(".")] >= [0, 1, 2]
+
+    def test_a_file_without_a_resource_has_no_version(self, tmp_path):
+        path = tmp_path / "win.xpl"
+        path.write_bytes(b"not a PE file")
+        assert xi.plugin_version(str(path)) is None
+        assert xi.plugin_version(str(tmp_path / "missing.xpl")) is None
+
+    def test_an_update_offer_carries_both_versions(self, tmp_path, bundled, monkeypatch):
+        stale = make_install(tmp_path / "a", **{xi.PANEL: b"old"})
+        versions = {b"old": "0.1.1", bundled[xi.PANEL]: "0.1.2"}
+
+        def version_of(path):
+            with open(path, "rb") as f:
+                return versions.get(f.read())
+
+        monkeypatch.setattr(xi, "plugin_version", version_of)
+        offer, = xi.startup_offers([stale], telemetry=False, panel=True)
+        assert (offer.installed, offer.available) == ("0.1.1", "0.1.2")
+        assert offer.describe().endswith("Panel 0.1.1 -> 0.1.2")
+
+
 class TestStartupOffers:
     def test_only_what_is_installed_and_out_of_date(self, tmp_path, bundled):
         stale = make_install(tmp_path / "a", **{xi.TELEMETRY: b"old", xi.PANEL: b"old"})

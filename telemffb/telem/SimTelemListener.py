@@ -333,15 +333,11 @@ class SimXPLANE(SimTelemListener):
             return
 
         def listing(pending):
-            return "\n".join(f"{o.root}: {xplane_install.PLUGIN_NAMES[o.plugin]} "
-                             f"({'install' if o.missing else 'update'})" for o in pending)
+            return "\n".join(o.describe() for o in pending)
 
         logging.info(f"X-Plane plugins to offer: {listing(offers)}")
-        answer = QMessageBox.question(
-            G.main_window, "X-Plane Plugin Update",
-            f"New versions are available for the X-Plane plugins in the following installs:\n\n"
-            f"{listing(offers)}\n\n"
-            "Update them now?  If X-Plane is running, close it first.")
+        title, text = xplane_install.update_prompt(offers)
+        answer = QMessageBox.question(G.main_window, title, text)
         pending = list(offers)
         while pending and answer == QMessageBox.StandardButton.Yes:
             failed = []
