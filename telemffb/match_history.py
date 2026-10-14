@@ -41,7 +41,7 @@ MERGED, DECLINED = "merged", "declined"
 
 def _write_lock() -> FileLock:
     """The lock every read-modify-write below holds: the same per-path
-    lock the config store takes on userconfig_v2.xml, keyed on this file.
+    lock the config store takes on userconfig_v3.xml, keyed on this file.
     Without it a match recorded from the telemetry thread and an answer
     recorded from the main thread at the same instant each load the file
     and each save their own copy, and on Windows the shared temporary name

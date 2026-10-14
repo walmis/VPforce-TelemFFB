@@ -41,15 +41,11 @@ def rows_of(path, tag, sim):
     return [{c.tag: c.text for c in e} for e in root.findall(tag) if e.findtext("sim") == sim]
 
 
-def backup_of(user):
-    return str(user).replace("userconfig_v2.xml", "userconfig_v2_pre-il2k_backup.xml")
-
-
 @pytest.fixture
 def paths(tmp_path):
     defaults = tmp_path / "defaults.xml"
     defaults.write_text(DEFAULTS, encoding="utf-8")
-    return tmp_path / "userconfig_v2.xml", str(defaults)
+    return tmp_path / "userconfig_v3.xml", str(defaults)
 
 
 def test_korea_rows_are_copied_and_the_il2_rows_stay(paths):
@@ -71,7 +67,6 @@ def test_korea_rows_are_copied_and_the_il2_rows_stay(paths):
     # the release build's rows are all still there
     assert {r["model"] for r in rows_of(user, "models", "IL2")} == {"F-86A-5.*", "MiG-15bis.*", "P-51D-15"}
     assert len(rows_of(user, "classSettings", "IL2")) == 1
-    assert os.path.isfile(backup_of(user))
 
 
 def test_a_file_without_korea_rows_is_left_alone(paths):
@@ -82,7 +77,6 @@ def test_a_file_without_korea_rows_is_left_alone(paths):
     before = user.read_bytes()
     assert not migrate_il2_korea_userconfig(str(user), defaults)
     assert user.read_bytes() == before
-    assert not os.path.isfile(backup_of(user))
 
 
 def test_later_il2_edits_do_not_reach_korea(paths):

@@ -83,7 +83,7 @@ Key attributes (the full list, annotation-only, is in the file — they have no 
 ### Configuration System (XML-based)
 Two parallel XML files:
 - `defaults.xml` — shipped defaults (full schema and 6-layer resolution hierarchy: `docs/defaults_xml_reference.md`)
-- `userconfig_v2.xml` — user overrides (in `%LOCALAPPDATA%\VPForce-TelemFFB\`)
+- `userconfig_v3.xml` — user overrides (in `%LOCALAPPDATA%\VPForce-TelemFFB\`)
 
 `telemffb/xmlutils.py` is a **legacy facade** over the `telemffb/xml/` package — `XmlStore` (I/O, parsing, tree management, file locking), `ConfigResolver` (reads), `ConfigWriter` (writes); all read/write operations go through that triple. The module-level names (`auto_user_root` & co) are **one-way sync targets** (store → globals): reading them still works, but assigning to them changes no behavior — in tests, inject fixture trees via `XmlStore`.
 

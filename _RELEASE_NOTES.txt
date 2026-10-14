@@ -36,7 +36,8 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Legacy bindings, including the "use master button" based bindings are still honored
   - New bindings carry the VID:PID:BUTTON_ID of the device button which was pressed during the binding
   - Individual game controllers can be enabled in System Settings > Button Devices
-
+- **CHANGED: The configuration file is now userconfig_v3.xml**
+  - Any existing "v2" config is migrated on the first startup
 
 ## UI
 - **NEW: Redesigned Main UI**
@@ -83,7 +84,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - **NEW: IL-2 Korea is now its own sim**
   - Korea sends its telemetry on its own port, so TelemFFB can tell it apart from Great Battles. With config validation on, the Korea startup.cfg is updated on the next start
   - IL-2 Sturmovik and IL-2 Korea have separate enable switches (System Settings > IL2)
-  - Korea aircraft profiles and settings now live under the new sim. Your existing Korea settings are copied to the new sim automatically the first time this version starts (a backup is written beside the config as userconfig_v2_pre-il2k_backup.xml)
+  - Korea aircraft profiles and settings now live under the new sim. Your existing Korea settings are copied to the new sim automatically the first time this version starts
 - Fix: the runway rumble effect never played - its enable toggle was not being honored.  It now runs when enabled, so expect a rumble on the ground if you have it switched on
 
 ## General fixes

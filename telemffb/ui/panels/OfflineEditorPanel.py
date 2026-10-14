@@ -17,7 +17,7 @@
 #
 
 """OfflineEditorPanel: the "Offline Editor Setup" group box - sim/class/
-aircraft-name/profile selectors used to edit defaults.xml / userconfig_v2.xml
+aircraft-name/profile selectors used to edit defaults.xml / userconfig_v3.xml
 and preview effects without a live sim connected.
 
 Replaces MainWindow's ~15 ``offline_*`` widgets (``offline_config_area``,

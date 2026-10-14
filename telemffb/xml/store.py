@@ -1,6 +1,6 @@
 """XmlStore — XML file I/O, parsing, and tree management.
 
-Handles loading defaults.xml and userconfig_v2.xml with OS-level file
+Handles loading defaults.xml and userconfig_v3.xml with OS-level file
 locking via :class:`namedmutex.FileLock`, and writing back consolidated
 userconfig.
 """

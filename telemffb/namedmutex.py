@@ -159,13 +159,13 @@ class FileLock:
     Example::
 
         # Exclusive lock (write)
-        with FileLock('/path/to/userconfig_v2.xml'):
+        with FileLock('/path/to/userconfig_v3.xml'):
             tree = ET.parse(path)
             # ... modify ...
             tree.write(path)
 
         # Shared lock (read)
-        with FileLock('/path/to/userconfig_v2.xml', shared=True):
+        with FileLock('/path/to/userconfig_v3.xml', shared=True):
             tree = ET.parse(path)  # safe from mid-write corruption
 
     The lock is released automatically on exit or exception.

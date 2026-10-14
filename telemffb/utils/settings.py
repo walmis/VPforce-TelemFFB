@@ -37,6 +37,8 @@ __all__ = [
     "convert_legacy_userconfig",
     "migrate_il2_korea_userconfig",
     "migrate_axis_control_userconfig",
+    "USERCONFIG_FILENAME",
+    "PREVIOUS_USERCONFIG_FILENAMES",
     "copy_legacy_config_to_new",
     "create_empty_userxml_file",
     "load_custom_userconfig",
@@ -532,20 +534,31 @@ def convert_legacy_userconfig(path):
     logging.info("Conversion complete: userconfig upgraded to v2.")
     return True
 
-def copy_legacy_config_to_new(path):
-    # path is the destination for the new v2 config file
-    if os.path.exists(path):
-        # new config already exists, don't copy
-        return
+#: The config file this version reads and writes.
+USERCONFIG_FILENAME = "userconfig_v3.xml"
+#: Earlier generations, newest first.  The first one found is copied to
+#: the live name on a start that has none; the original is never touched
+#: again, so it stays the way back to the version that wrote it.
+PREVIOUS_USERCONFIG_FILENAMES = ("userconfig_v2.xml", "userconfig.xml")
 
-    # get root of path
-    user_rootpath = os.path.dirname(path)
-    legacy_config_path = os.path.join(user_rootpath, "userconfig.xml")
-    if not os.path.exists(legacy_config_path):
-        # there is no legacy config to copy over
+
+def copy_legacy_config_to_new(path):
+    """Seed the live config from the newest previous generation beside it.
+
+    Nothing happens when the live file already exists: a config carried
+    forward once is the one in use from then on, whatever happens to the
+    older file afterwards.  The conversions that run after this call bring
+    the copy up to date.
+    """
+    if os.path.exists(path):
         return
-    shutil.copy(legacy_config_path, path)
-    logging.info(f"Copied legacy userconfig.xml to {path}")
+    user_rootpath = os.path.dirname(path)
+    for name in PREVIOUS_USERCONFIG_FILENAMES:
+        previous = os.path.join(user_rootpath, name)
+        if os.path.exists(previous):
+            shutil.copy(previous, path)
+            logging.info(f"Copied {name} to {path}")
+            return
 
 
 def create_empty_userxml_file(path):
@@ -652,8 +665,7 @@ def migrate_il2_korea_userconfig(userconfig_path, defaults_path) -> bool:
     It runs only while the file has no IL2K rows at all - the first start
     of a build that knows the new sim.  After that each sim's rows are
     its own, so nothing edited under IL2 later reaches IL2K.  No marker is
-    kept, and a file with nothing to copy is not rewritten.  A backup is
-    written beside the file the first time it is changed.
+    kept, and a file with nothing to copy is not rewritten.
 
     Returns True when rows were copied.
     """
@@ -684,9 +696,6 @@ def migrate_il2_korea_userconfig(userconfig_path, defaults_path) -> bool:
         return False
     shared = copy_rows("simSettings", lambda e: True) + copy_rows("classSettings", lambda e: True)
 
-    backup = os.path.join(os.path.dirname(userconfig_path), "userconfig_v2_pre-il2k_backup.xml")
-    if not os.path.exists(backup):
-        shutil.copy2(userconfig_path, backup)
     with FileLock(userconfig_path):
         consolidate_sort_and_write(tree, userconfig_path)
     logging.info(f"IL-2 Korea migration: {aircraft} aircraft rows and {shared} sim/class rows "
