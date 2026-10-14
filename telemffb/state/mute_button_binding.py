@@ -22,8 +22,13 @@ function (``EffectLevelsController.toggle_mute`` / ``set_mute_active``).
 Owned by the master's ``EffectLevelsController``, which feeds it every
 device's pressed-button list as it changes: the master's own device from
 ``MainWindow.get_active_buttons``, a child's from its ``BUTTONS:`` IPC
-message.  Neither depends on telemetry, so the button works with no sim,
-a paused sim or no aircraft loaded.
+message, and any device in ``G.button_states`` by key.  Neither depends
+on telemetry, so the button works with no sim, a paused sim or no
+aircraft loaded.
+
+The button is a bare number on the bound role's device, or a qualified
+id ``<key>:<n>`` naming a button on any device (a generic controller or
+another FFB device); the mute still acts on the bound role.
 
 The binding is stored in the global system settings.  ``toggle`` acts on
 each press; ``momentary`` mutes on the press and releases on the release.
@@ -40,6 +45,8 @@ import logging
 from typing import Iterable, Optional
 
 import telemffb.globals as G
+from telemffb.hw.button_refs import format_button_ref, parse_button_ref
+from telemffb.hw.button_state import role_key
 from telemffb.utils import DEVICE_ROLES
 
 BEHAVIOR_TOGGLE = "toggle"
@@ -54,11 +61,17 @@ BUTTON_BEHAVIOR_KEY = "effectMuteButtonBehavior"
 BUTTON_INVERTED_KEY = "effectMuteButtonInverted"
 
 
-def _button_number(value) -> int:
-    try:
-        return max(0, int(value))
-    except (TypeError, ValueError):
+def _button_value(value):
+    """A stored button: a whole number >= 0, or a qualified id
+    ``<key>:<n>`` in its normalized form; anything else reads as 0."""
+    if isinstance(value, bool):
         return 0
+    if isinstance(value, int):
+        return max(0, value)
+    key, number = parse_button_ref(value)
+    if key is not None and number > 0:
+        return format_button_ref(key, number)
+    return max(0, number)
 
 
 def _inverted_flag(value) -> bool:
@@ -80,7 +93,7 @@ class MuteButtonBinding:
         settings = G.system_settings
         role = settings.get(BUTTON_ROLE_KEY, "") or ""
         self._role: str = role if role in DEVICE_ROLES else ""
-        self._button: int = _button_number(settings.get(BUTTON_NUMBER_KEY, 0))
+        self._button = _button_value(settings.get(BUTTON_NUMBER_KEY, 0))
         behavior = settings.get(BUTTON_BEHAVIOR_KEY, BEHAVIOR_TOGGLE)
         self._behavior: str = behavior if behavior in BEHAVIORS else BEHAVIOR_TOGGLE
         self._inverted: bool = _inverted_flag(settings.get(BUTTON_INVERTED_KEY, False))
@@ -95,7 +108,8 @@ class MuteButtonBinding:
         return self._role or self._controller.own_role
 
     @property
-    def button(self) -> int:
+    def button(self):
+        """The bound button: an int, a qualified id string, or 0 for none."""
         return self._button
 
     @property
@@ -107,18 +121,26 @@ class MuteButtonBinding:
         """The stored inversion; it only acts with ``momentary``."""
         return self._inverted
 
-    def set_binding(self, role: str, button: int, behavior: str, inverted: bool = False) -> None:
+    def set_binding(self, role: str, button, behavior: str, inverted: bool = False) -> None:
         """Store a new binding.  Releases the momentary mute the old one
         applied, then applies the new one's initial state.
 
+        :param button: a whole number >= 0 (0 unbinds), or a qualified id
+            ``<key>:<n>``.
         :raises ValueError: an unknown role or behavior, or a button that
-            is not a whole number >= 0; nothing changes then.
+            is neither; nothing changes then.
         """
         if role not in DEVICE_ROLES:
             raise ValueError(f"unknown device role {role!r}")
         if behavior not in BEHAVIORS:
             raise ValueError(f"unknown mute button behavior {behavior!r}")
-        if isinstance(button, bool) or not isinstance(button, int) or button < 0:
+        if isinstance(button, str):
+            key, number = parse_button_ref(button)
+            if key is None or number < 1:
+                raise ValueError(f"mute button must be a whole number >= 0 or a "
+                                 f"device-qualified id, not {button!r}")
+            button = format_button_ref(key, number)
+        elif isinstance(button, bool) or not isinstance(button, int) or button < 0:
             raise ValueError(f"mute button must be a whole number >= 0, not {button!r}")
         inverted = bool(inverted)
         if (role, button, behavior, inverted) == (self.role, self._button, self._behavior,
@@ -151,21 +173,38 @@ class MuteButtonBinding:
             self._apply(True)
 
     def buttons_changed(self, role: str, buttons: Iterable[int]) -> None:
-        """``role``'s device now has ``buttons`` pressed."""
-        if not self._button or role != self.role:
+        """``role``'s device now has ``buttons`` pressed (a bare binding)."""
+        if not self._button or isinstance(self._button, str) or role != self.role:
             return
-        held = self._button in buttons
+        self._edge(self._button in buttons)
+
+    def key_buttons_changed(self, key: str, buttons: Iterable[int]) -> None:
+        """The device ``key`` names now has ``buttons`` pressed (a
+        qualified binding)."""
+        if not isinstance(self._button, str):
+            return
+        bound_key, number = parse_button_ref(self._button)
+        if key != bound_key:
+            return
+        self._edge(number in buttons)
+
+    def device_lost(self, role: str) -> None:
+        """``role``'s device stopped reporting: its button counts as released."""
+        if isinstance(self._button, str):
+            key, _ = parse_button_ref(self._button)
+            if key and key == role_key(role):
+                self.key_buttons_changed(key, ())
+            return
+        self.buttons_changed(role, ())
+
+    def _edge(self, held: bool) -> None:
         pressed = held and not self._held
         self._held = held
         if self._behavior == BEHAVIOR_TOGGLE:
             if pressed:
-                self._controller.toggle_mute(role)
+                self._controller.toggle_mute(self.role)
         else:
             self._apply(held != self._inverted)
-
-    def device_lost(self, role: str) -> None:
-        """``role``'s device stopped reporting: its button counts as released."""
-        self.buttons_changed(role, ())
 
     def _inverts(self) -> bool:
         return self._inverted and self._behavior == BEHAVIOR_MOMENTARY

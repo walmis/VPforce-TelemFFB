@@ -402,6 +402,25 @@ def _bind(env, **binding):
 
 
 class TestMuteButtonBinding:
+    def test_a_qualified_binding_follows_the_named_device(self, env):
+        ctl = _bind(env, button='1234:0001#2:3')
+        assert ctl.mute_button_binding() == ('joystick', '1234:0001#2:3', BEHAVIOR_TOGGLE, False)
+        ctl.on_device_buttons('joystick', [3])          # the role's own button 3: not the bound one
+        assert not ctl.muted('joystick')
+        ctl.on_key_buttons('1234:0001#2', [3])
+        assert ctl.muted('joystick')
+        ctl.on_key_buttons('1234:0001#2', [])
+        ctl.on_key_buttons('1234:0001#2', [3])
+        assert not ctl.muted('joystick')
+
+    def test_a_qualified_id_is_stored_and_a_bad_string_refused(self, env):
+        ctl = EffectLevelsController()
+        ctl.set_mute_button_binding('joystick', '1234:0001:7', BEHAVIOR_MOMENTARY)
+        assert env.settings.values[(None, BUTTON_NUMBER_KEY)] == '1234:0001:7'
+        with pytest.raises(ValueError):
+            ctl.set_mute_button_binding('joystick', 'seven', BEHAVIOR_TOGGLE)
+        assert ctl.mute_button_binding()[1] == '1234:0001:7'
+
     def test_unbound_by_default_and_does_nothing(self, env):
         ctl = EffectLevelsController()
         assert ctl.mute_button_binding() == ('joystick', 0, BEHAVIOR_TOGGLE, False)

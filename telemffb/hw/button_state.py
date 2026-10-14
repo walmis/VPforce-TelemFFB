@@ -61,6 +61,8 @@ __all__ = [
     "apply_remote_snapshot",
     "parse_btndev_payload",
     "store_buttons",
+    "subscribe",
+    "unsubscribe",
     "publish_buttons",
     "apply_remote_buttons",
     "publish_role_buttons",
@@ -105,10 +107,36 @@ def parse_btndev_payload(payload: str) -> Optional[tuple[str, list[int]]]:
         return None
 
 
+#: ``listener(key, buttons)`` callables told after every store, on the
+#: storing thread (a reader thread, the IPC thread or the main thread).
+_listeners: list = []
+
+
+def subscribe(listener) -> None:
+    """Call ``listener(key, buttons)`` after every change stored."""
+    if listener not in _listeners:
+        _listeners.append(listener)
+
+
+def unsubscribe(listener) -> None:
+    try:
+        _listeners.remove(listener)
+    except ValueError:
+        pass
+
+
 def store_buttons(key: str, buttons: Iterable[int]) -> None:
-    """Record ``key``'s pressed buttons in ``G.button_states``."""
-    if key:
-        G.button_states[key] = frozenset(buttons)
+    """Record ``key``'s pressed buttons in ``G.button_states`` and tell
+    the listeners."""
+    if not key:
+        return
+    pressed = frozenset(buttons)
+    G.button_states[key] = pressed
+    for listener in list(_listeners):
+        try:
+            listener(key, sorted(pressed))
+        except Exception:
+            logging.exception(f'A button listener failed for {key}')
 
 
 def publish_buttons(key: str, buttons: Iterable[int], ipc=None) -> None:
