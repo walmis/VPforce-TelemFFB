@@ -85,9 +85,14 @@ class TabHeaderBar(QWidget):
         on the other page's bar."""
         self._row.setAlignment(self.device_slot, Qt.AlignmentFlag.AlignTop)
 
-    def add_left(self, widget: QWidget) -> None:
-        """Append to the page's own controls, packed from the left."""
-        self._row.insertWidget(self._left_count, widget, alignment=Qt.AlignmentFlag.AlignVCenter)
+    def add_left(self, widget: QWidget, stretch: int = 0) -> None:
+        """Append to the page's own controls, packed from the left. A
+        nonzero ``stretch`` lets the widget take the spare width up to the
+        device slot (an aligned item never grows past its size hint)."""
+        if stretch:
+            self._row.insertWidget(self._left_count, widget, stretch)
+        else:
+            self._row.insertWidget(self._left_count, widget, alignment=Qt.AlignmentFlag.AlignVCenter)
         self._left_count += 1
 
     def add_right(self, widget: QWidget) -> None:

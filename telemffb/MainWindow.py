@@ -510,7 +510,7 @@ class MainWindow(QMainWindow):
         if self.effect_levels_header is not None:
             self.effect_levels_header.open_dialog_requested.connect(self.open_effect_levels_dialog)
             self.effect_levels_header.bind(G.app_state)
-            self.settings_header_bar.add_left(self.effect_levels_header)
+            self.settings_header_bar.add_left(self.effect_levels_header, stretch=1)
             self.settings_header_bar.align_slot_top()
         settings_page = QWidget()
         settings_page_layout = QVBoxLayout(settings_page)

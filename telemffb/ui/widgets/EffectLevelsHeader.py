@@ -47,8 +47,6 @@ from telemffb.ui.widgets.EffectMuteButton import EffectMuteButton
 from telemffb.ui.widgets.HiddenLevelsNote import HiddenLevelsNote
 from telemffb.ui.widgets.effect_levels_ui import LEVEL_TEXT, TOOL_BUTTON_QSS, role_name
 
-#: Each header slider, short enough to leave the bar its device strip.
-_SLIDER_WIDTH = 110
 #: Space between a row's label and its slider, and between the readouts
 #: and the buttons.
 _LABEL_SPACING = 6
@@ -85,7 +83,7 @@ class EffectLevelsHeader(QWidget):
         self._outer.setSpacing(0)
 
         self.box = QGroupBox("Effect Levels", self)
-        self.box.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._box_layout = QVBoxLayout(self.box)
         self._box_layout.setContentsMargins(*_BOX_MARGINS)
         self._box_layout.setSpacing(_BOX_SPACING)
@@ -96,6 +94,7 @@ class EffectLevelsHeader(QWidget):
         self._grid.setContentsMargins(0, 0, 0, 0)
         self._grid.setHorizontalSpacing(_LABEL_SPACING)
         self._grid.setVerticalSpacing(0)
+        self._grid.setColumnStretch(1, 1)  # the sliders take the box's spare width
         row.addLayout(self._grid)
         row.setAlignment(self._grid, Qt.AlignmentFlag.AlignTop)
         self._box_layout.addLayout(row)
@@ -105,7 +104,7 @@ class EffectLevelsHeader(QWidget):
         self.sliders: dict[str, EffectLevelSlider] = {}
         for name in LEVEL_NAMES:
             label = QLabel(LEVEL_TEXT[name][0], self.box)
-            slider = EffectLevelSlider(self.box, slider_width=_SLIDER_WIDTH)
+            slider = EffectLevelSlider(self.box)
             slider.edited.connect(lambda value, persist, n=name: self._on_edited(n, value, persist))
             self.labels[name] = label
             self.sliders[name] = slider
@@ -133,8 +132,10 @@ class EffectLevelsHeader(QWidget):
         self._box_layout.addWidget(self.note, alignment=Qt.AlignmentFlag.AlignLeft)
         self._note_in_box = True
 
-        self._outer.addWidget(self.box, alignment=Qt.AlignmentFlag.AlignTop)
-        self._outer.addStretch(1)
+        # The box takes the width up to the device slot; the stretch only
+        # holds the note at the left while the box is hidden.
+        self._outer.addWidget(self.box, 1)
+        self._outer.addStretch(0)
 
         try:
             self._shown = bool(controller.controls_shown())
