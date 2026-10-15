@@ -286,24 +286,26 @@ Lifecycle rules (from the proposal, mapped to TelemFFB):
 
 Where the lifecycle lives: a small helper on the aircraft class (it has
 `self._simconnect`, device type, and telemetry). Enable/disable decisions key off
-`telemffb_controls_axes` + device presence + `ffbApiVersion`. The `on_timeout`
+axis control for the device (`local_disable_axis_control`) + device presence +
+`ffbApiVersion`. The `on_timeout`
 override writes the disable.
 
-**Important interaction with `telemffb_controls_axes`:** the proposal says the rig
+**Important interaction with axis control:** the proposal says the rig
 drives position through *normal axis inputs* ("the physical stick moves the aircraft
 as usual") and the API covers only trim/feel/hydraulics. This is a real divergence
 from the HPG/generic heli path, where TelemFFB itself sends
 `AXIS_CYCLIC_*_SET` / `AXIS_COLLECTIVE_SET` / `ROTOR_AXIS_TAIL_ROTOR_SET`. Under the
 new API the axis can just be bound normally in MSFS.
 
-**Decision (§10.2): honour the user's existing `telemffb_controls_axes` setting.** The
+**Decision (§10.2): honour the user's axis control choice (**Disable for this
+device**, `local_disable_axis_control`).** The
 API does not change axis ownership and does not impose a new default — both models are
 supported and both must be validated. Consequences:
 
-  - **`telemffb_controls_axes = False`** (user binds axes in MSFS): the spec's clean
+  - **Axis control disabled for the device** (user binds axes in MSFS): the spec's clean
     model. TelemFFB does spring/trim/hydraulics/fly-through only and never sends an
     axis.
-  - **`telemffb_controls_axes = True`**: TelemFFB keeps sending
+  - **Axis control enabled** (the default): TelemFFB keeps sending
     `AXIS_CYCLIC_*_SET` / `AXIS_COLLECTIVE_SET` / `ROTOR_AXIS_TAIL_ROTOR_SET`. The
     axis value must stay **raw** — trim lands in the spring center and nowhere else.
     Double-applying is silent and presents as "trim feels twice as strong", so this
@@ -544,10 +546,10 @@ the existing inverted convention table in HPG before wiring.
   misreport intent.
 - **`center_spring_on_pause` stays.** It hangs off `system_group`, not `spring_mode`,
   and governs the pause/slew spring in `Aircraft.on_timeout` rather than control feel.
-- **`telemffb_controls_axes` takes the baseline (`true`).** TelemFFB's standing rule is
-  that the user disables the in-sim axes and TelemFFB sends them, and this class is no
-  exception even though the API does not strictly need it: it carries no class default
-  for the setting. Both axis models of §10.2 stay supported and tested.
+- **Axis control takes the baseline (enabled).** TelemFFB's standing rule is that the
+  user disables the in-sim axes and TelemFFB sends them, and this class is no exception
+  even though the API does not strictly need it: it carries no class row for the device
+  toggle. Both axis models of §10.2 stay supported and tested.
 - Reuse existing user parameters where they map (`trim_release_spring_gain`,
   `cyclic_spring_gain`, `collective_ap_spring_gain`, `hpg_pedal_spring_gain`,
   fly-through / hands-on deadzones and force thresholds). Rename the exposed
@@ -591,7 +593,7 @@ the existing inverted convention table in HPG before wiring.
 | `HYD_ASSIST_LOSS` absent | Defaults to `0` = full boost. Correct for non-hydraulic aircraft. |
 | `FFB_*_TRIM` jumps (aircraft publishes coarse/stepped values) | **Consume raw (§10.4).** No rig-side filtering. A stepped `_TRIM` is an aircraft-side spec violation (§3.4: it tracks the actuator, updated every frame) and should be reported as such, not papered over. Revisit only if a shipped aircraft proves otherwise. |
 | Device not connected on a child instance | Don't write `ENABLED` for that control; other controls unaffected. |
-| User binds axes in MSFS vs. `telemffb_controls_axes` | Support both (§10.2), no new default. Trim is applied via spring center only, never double-applied to a sent axis. |
+| User binds axes in MSFS vs. axis control enabled | Support both (§10.2), no new default. Trim is applied via spring center only, never double-applied to a sent axis. |
 | Vendor class (HPG, SAS, XAW109) on an API-implementing aircraft | Mutually exclusive: an aircraft is configured as one class or the other. A vendor aircraft that adopts the spec gets a vendor subclass of `FFBApiHelicopter` (§4.3). |
 | User wants the API off for an aircraft | Set the aircraft's class back to `Helicopter`. The reload retires the outgoing handler, which writes `ENABLED = 0` on the way out. There is deliberately no separate "enable" setting duplicating the `type` decision. |
 | Mixed enablement (e.g. FFB cyclic, normal collective) on a vendor class | Falls out of per-dispatch-site gating: API cyclic path + untouched vendor collective path, no special case. |
