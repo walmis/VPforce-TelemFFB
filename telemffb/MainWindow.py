@@ -228,9 +228,9 @@ class MainWindow(QMainWindow):
 
         version = utils.get_version()
         if version:
-            self.setWindowTitle(f"TelemFFB v2 ({G.device_type}) ({version})")
+            self.setWindowTitle(f"TelemFFB v3 ({G.device_type}) ({version})")
         else:
-            self.setWindowTitle(f"TelemFFB v2")
+            self.setWindowTitle("TelemFFB v3")
 
         # Construct the absolute path of the icon file
         icon = QIcon(":/image/vpforceicon.png")
