@@ -36,6 +36,11 @@ __all__ = [
     "SystemSettings",
     "convert_legacy_userconfig",
     "migrate_il2_korea_userconfig",
+    "migrate_axis_control_userconfig",
+    "USERCONFIG_FILENAME",
+    "PREVIOUS_USERCONFIG_FILENAMES",
+    "USERCONFIG_ROOT_TAG",
+    "USERCONFIG_ROOT_TAGS",
     "copy_legacy_config_to_new",
     "create_empty_userxml_file",
     "load_custom_userconfig",
@@ -423,7 +428,7 @@ def convert_legacy_userconfig(path):
     root = tree.getroot()
 
     # Convert legacy root tag
-    new_root = ET.Element("TelemFFB_v2")
+    new_root = ET.Element(USERCONFIG_ROOT_TAG)
     for child in list(root):
         new_root.append(child)
     tree._setroot(new_root)
@@ -531,26 +536,57 @@ def convert_legacy_userconfig(path):
     logging.info("Conversion complete: userconfig upgraded to v2.")
     return True
 
-def copy_legacy_config_to_new(path):
-    # path is the destination for the new v2 config file
-    if os.path.exists(path):
-        # new config already exists, don't copy
-        return
+#: The config file this version reads and writes.
+USERCONFIG_FILENAME = "userconfig_v3.xml"
+#: Earlier generations, newest first.  The first one found is copied to
+#: the live name on a start that has none; the original is never touched
+#: again, so it stays the way back to the version that wrote it.
+PREVIOUS_USERCONFIG_FILENAMES = ("userconfig_v2.xml", "userconfig.xml")
+#: The root tag of a config or profile file this TelemFFB writes, so the
+#: file says which generation wrote it, and the tags the profile import
+#: accepts: a file from the v2 train still imports.
+USERCONFIG_ROOT_TAG = "TelemFFB_v3"
+USERCONFIG_ROOT_TAGS = ("TelemFFB_v3", "TelemFFB_v2")
 
-    # get root of path
-    user_rootpath = os.path.dirname(path)
-    legacy_config_path = os.path.join(user_rootpath, "userconfig.xml")
-    if not os.path.exists(legacy_config_path):
-        # there is no legacy config to copy over
+
+def copy_legacy_config_to_new(path):
+    """Seed the live config from the newest previous generation beside it.
+
+    Nothing happens when the live file already exists: a config carried
+    forward once is the one in use from then on, whatever happens to the
+    older file afterwards.  The copy gets this generation's root tag; the
+    conversions that run after this call bring its contents up to date.
+    """
+    if os.path.exists(path):
         return
-    shutil.copy(legacy_config_path, path)
-    logging.info(f"Copied legacy userconfig.xml to {path}")
+    user_rootpath = os.path.dirname(path)
+    for name in PREVIOUS_USERCONFIG_FILENAMES:
+        previous = os.path.join(user_rootpath, name)
+        if os.path.exists(previous):
+            shutil.copy(previous, path)
+            logging.info(f"Copied {name} to {path}")
+            _stamp_root_tag(path)
+            return
+
+
+def _stamp_root_tag(path):
+    """Give a carried-forward file this generation's root tag."""
+    tree = xmlutils.try_parse(path)
+    if tree is None:
+        logging.error(f"Could not parse {path} to set its root tag")
+        return
+    root = tree.getroot()
+    if root.tag == USERCONFIG_ROOT_TAG:
+        return
+    root.tag = USERCONFIG_ROOT_TAG
+    with FileLock(path):
+        consolidate_sort_and_write(tree, path)
 
 
 def create_empty_userxml_file(path):
     if not os.path.isfile(path):
         # Create an empty XML file with the specified root element
-        root = ET.Element("TelemFFB_v2")
+        root = ET.Element(USERCONFIG_ROOT_TAG)
         tree = ET.ElementTree(root)
         # Create a backup directory if it doesn't exist
         if not os.path.exists(os.path.dirname(path)):
@@ -651,8 +687,7 @@ def migrate_il2_korea_userconfig(userconfig_path, defaults_path) -> bool:
     It runs only while the file has no IL2K rows at all - the first start
     of a build that knows the new sim.  After that each sim's rows are
     its own, so nothing edited under IL2 later reaches IL2K.  No marker is
-    kept, and a file with nothing to copy is not rewritten.  A backup is
-    written beside the file the first time it is changed.
+    kept, and a file with nothing to copy is not rewritten.
 
     Returns True when rows were copied.
     """
@@ -683,11 +718,70 @@ def migrate_il2_korea_userconfig(userconfig_path, defaults_path) -> bool:
         return False
     shared = copy_rows("simSettings", lambda e: True) + copy_rows("classSettings", lambda e: True)
 
-    backup = os.path.join(os.path.dirname(userconfig_path), "userconfig_v2_pre-il2k_backup.xml")
-    if not os.path.exists(backup):
-        shutil.copy2(userconfig_path, backup)
     with FileLock(userconfig_path):
         consolidate_sort_and_write(tree, userconfig_path)
     logging.info(f"IL-2 Korea migration: {aircraft} aircraft rows and {shared} sim/class rows "
                  f"copied to IL2K")
+    return True
+
+
+AXIS_CONTROL_ROW_TAGS = ("models", "classSettings", "simSettings")
+DEVICE_ROLES = ("joystick", "pedals", "collective", "trimwheel")
+
+
+def migrate_axis_control_userconfig(userconfig_path) -> bool:
+    """Convert a user's ``telemffb_controls_axes`` rows, once.
+
+    Axis control is always enabled and the global toggle is no longer a setting.
+    A row applied to every device, so it becomes a ``local_disable_axis_control``
+    row for each device role, under the same sim, scope, pattern and profile,
+    unless the user already has one there: ``true`` where the row turned axis
+    control off, ``false`` where it turned it back on below a wider-scope row
+    that had turned it off.  Every row naming the old toggle is then removed,
+    so the pass runs only on a file that still has one.  Returns True when the
+    file was changed.
+    """
+    if not os.path.isfile(userconfig_path):
+        return False
+    tree = xmlutils.try_parse(userconfig_path)
+    if tree is None:
+        logging.error(f"Axis control migration: failed to parse {userconfig_path}")
+        return False
+    root = tree.getroot()
+    old = [e for e in root if e.tag in AXIS_CONTROL_ROW_TAGS
+           and e.findtext("name") == "telemffb_controls_axes"]
+    if not old:
+        return False
+
+    def scope(e):
+        return tuple(sorted((c.tag, (c.text or "").strip()) for c in e
+                            if c.tag not in ("name", "value", "device")))
+
+    existing = {(e.tag, scope(e), e.findtext("device")) for e in root
+                if e.tag in AXIS_CONTROL_ROW_TAGS and e.findtext("name") == "local_disable_axis_control"}
+    added = 0
+    for e in old:
+        value = str(e.findtext("value") or "").strip().lower()
+        if value not in ("true", "false"):
+            continue
+        disable = "true" if value == "false" else "false"
+        for role in DEVICE_ROLES:
+            if (e.tag, scope(e), role) in existing:
+                continue
+            twin = copy.deepcopy(e)
+            twin.find("name").text = "local_disable_axis_control"
+            twin.find("value").text = disable
+            device = twin.find("device")
+            if device is None:
+                device = ET.SubElement(twin, "device")
+            device.text = role
+            root.append(twin)
+            existing.add((e.tag, scope(e), role))
+            added += 1
+    for e in old:
+        root.remove(e)
+    with FileLock(userconfig_path):
+        consolidate_sort_and_write(tree, userconfig_path)
+    logging.info(f"Axis control migration: {len(old)} global toggle rows removed, "
+                 f"{added} per-device rows written")
     return True

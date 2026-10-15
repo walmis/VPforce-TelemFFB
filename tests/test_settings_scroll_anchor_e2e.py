@@ -150,7 +150,7 @@ def test_axis_control_then_ground_expand_stays_put(rendered, monkeypatch):
     # Expand Axis Control (this alone was always fine)...
     vbar.setValue(0)
     _pump(r.app)
-    b_axis, a_axis = expand('telemffb_controls_axes', 'telemffb_controls_axes')
+    b_axis, a_axis = expand('axis_control_group', 'axis_control_group')
     assert b_axis is not None and a_axis is not None
     assert abs(a_axis - b_axis) <= 2
 

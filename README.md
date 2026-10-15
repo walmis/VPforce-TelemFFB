@@ -80,7 +80,7 @@ Not every feature applies to every simulator.
 There are two types of settings, each with different storage locations and formats.
 
 **Aircraft settings:**
-Aircraft settings are stored in the user configuration file  `userconfig_v2.xml` which is stored in your user folder at `%LOCALAPPDATA%\VPForce-TelemFFB`.
+Aircraft settings are stored in the user configuration file  `userconfig_v3.xml` which is stored in your user folder at `%LOCALAPPDATA%\VPForce-TelemFFB`.
 
 **System Settings:**
 System settings are stored in the Windows registry under `HKEY_CURRENT_USER\Software\VPforce\TelemFFB`.

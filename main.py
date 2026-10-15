@@ -426,8 +426,9 @@ def _backup_userconfig_for_beta():
         if not os.path.isfile(G.userconfig_path):
             return  # fresh install, nothing to preserve
         tag = re.sub(r'[<>:"/\\|?*]', '_', G.beta_build_str).strip()
+        stem = os.path.splitext(utils.USERCONFIG_FILENAME)[0]
         backup_path = os.path.join(
-            G.userconfig_rootpath, f'userconfig_v2_pre-{tag}_backup.xml')
+            G.userconfig_rootpath, f'{stem}_pre-{tag}_backup.xml')
         if os.path.exists(backup_path):
             return  # already snapshotted before this beta's first run
         shutil.copy2(G.userconfig_path, backup_path)
@@ -437,28 +438,29 @@ def _backup_userconfig_for_beta():
         logging.error(f"Beta build: could not back up user config: {e}")
 
 def _setup_dev_userconfig_paths():
-    """Setup development userconfig paths."""
+    """Development userconfig paths: the config lives beside the code, seeded
+    from the real one.  Every generation the real folder holds is copied
+    across when the dev folder lacks it, so a dev start goes through the
+    same carry-forward as a production one."""
     real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    real_userconfig = os.path.join(real_userconfig_path, 'userconfig_v2.xml')
-    real_legacy_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
 
     if getattr(sys, 'frozen', False):
         G.userconfig_rootpath = os.path.dirname(sys.executable)
     else:
         G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
 
-    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
-    if not os.path.isfile(G.userconfig_path) and os.path.exists(real_userconfig):
-        shutil.copy(real_userconfig, G.userconfig_path)
-
-    if not os.path.isfile(os.path.join(G.userconfig_rootpath, 'userconfig_.xml')) and os.path.exists(real_legacy_userconfig):
-        shutil.copy(real_legacy_userconfig, os.path.join(G.userconfig_rootpath, 'userconfig.xml'))
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, utils.USERCONFIG_FILENAME)
+    for name in (utils.USERCONFIG_FILENAME, *utils.PREVIOUS_USERCONFIG_FILENAMES):
+        dev_copy = os.path.join(G.userconfig_rootpath, name)
+        real = os.path.join(real_userconfig_path, name)
+        if not os.path.isfile(dev_copy) and os.path.exists(real):
+            shutil.copy(real, dev_copy)
 
 
 def _setup_standard_config_paths():
     """Setup standard configuration paths."""
     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, utils.USERCONFIG_FILENAME)
 
 def _device_is_configured() -> bool:
     """True if any STORED system setting assigns this instance's device
@@ -1321,6 +1323,7 @@ def _convert_user_config():
         xmlutils.update_roots()
         utils.convert_legacy_userconfig(G.userconfig_path)
         utils.migrate_il2_korea_userconfig(G.userconfig_path, G.defaults_path)
+        utils.migrate_axis_control_userconfig(G.userconfig_path)
         xmlutils.update_roots()
 
 
@@ -1839,7 +1842,8 @@ def main():
     # Setup configuration file paths (dev vs production, userconfig locations)
     _setup_config_paths()
 
-    # if legacy 'userconfig.xml' exists, copy it to 'userconfig_v2' for conversion
+    # a first start on this generation carries the previous config forward;
+    # the conversions below then run on the copy
     utils.copy_legacy_config_to_new(G.userconfig_path)
 
     # check if userconfig exists.  If not, create empty one

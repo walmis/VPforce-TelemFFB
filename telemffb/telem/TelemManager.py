@@ -61,7 +61,6 @@ TRIM_CAL_SETTING_CHAIN = {
     "joystick_trim_follow_curve_y",
     "joystick_trim_follow_use_curve_y",
     "trim_following",
-    "telemffb_controls_axes",
 }
 
 

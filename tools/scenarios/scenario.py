@@ -11,7 +11,7 @@ copy, so the fixtures cannot go stale as defaults.xml changes.
     py tools/scenarios/scenario.py verify      what the app should show for the active one
     py tools/scenarios/scenario.py restore     put the real files back
 
-A dev build reads defaults.xml, userconfig_v2.xml and match_history.json
+A dev build reads defaults.xml, userconfig_v3.xml and match_history.json
 from the repo root, so "swap in" means writing those three files.  The
 originals are copied aside on the first `use` and put back by `restore`;
 anything the app writes while a scenario is active is discarded with it.
@@ -26,7 +26,7 @@ import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 BACKUP = os.path.join(HERE, "_scenario_backup")
-FILES = ("defaults.xml", "userconfig_v2.xml", "match_history.json")
+FILES = ("defaults.xml", "userconfig_v3.xml", "match_history.json")
 ACTIVE = os.path.join(HERE, "_active_scenario.txt")
 
 #: Menu width, wide enough for the longest description on two lines and
@@ -268,8 +268,8 @@ def dev_mode_problem():
         return ("TelemFFB is not in dev mode: " + " and ".join(off) + " must be True in "
                 "telemffb/globals.py.\nWithout it the app reads your real config in "
                 "%LOCALAPPDATA% and the bench would be swapping files nothing looks at.")
-    if not os.path.exists(os.path.join(REPO, "userconfig_v2.xml")):
-        return ("there is no userconfig_v2.xml in the repo root yet.\nStart TelemFFB once with "
+    if not os.path.exists(os.path.join(REPO, "userconfig_v3.xml")):
+        return ("there is no userconfig_v3.xml in the repo root yet.\nStart TelemFFB once with "
                 "dev mode on: it copies your real config here, and that copy is what the bench "
                 "swaps.")
     return None
@@ -363,7 +363,7 @@ def do_use(name):
         print(f"backed up your real files to {BACKUP}")
     tree, spec = build(name)
     tree.write(os.path.join(REPO, "defaults.xml"), encoding="utf-8", xml_declaration=True)
-    with open(os.path.join(REPO, "userconfig_v2.xml"), "w", encoding="utf-8") as f:
+    with open(os.path.join(REPO, "userconfig_v3.xml"), "w", encoding="utf-8") as f:
         f.write(spec["user"])
     hp = os.path.join(REPO, "match_history.json")
     if spec.get("declined"):
@@ -392,7 +392,7 @@ def seeded_history(pairs):
     sys.path.insert(0, REPO)
     import telemffb.globals as G
     from telemffb import match_history, xmlutils
-    G.userconfig_path = os.path.join(REPO, "userconfig_v2.xml")
+    G.userconfig_path = os.path.join(REPO, "userconfig_v3.xml")
     G.defaults_path = os.path.join(REPO, "defaults.xml")
     xmlutils.update_vars(DEV, G.userconfig_path, G.defaults_path)
     xmlutils.update_roots()
@@ -429,7 +429,7 @@ def do_restore():
     shutil.rmtree(BACKUP)
     if os.path.exists(ACTIVE):
         os.remove(ACTIVE)
-    print("your real defaults.xml, userconfig_v2.xml and match_history.json are back")
+    print("your real defaults.xml, userconfig_v3.xml and match_history.json are back")
 
 
 def do_verify():
@@ -444,7 +444,7 @@ def do_verify():
     QApplication.instance() or QApplication([])
     import telemffb.globals as G
     from telemffb import xmlutils
-    G.userconfig_path = os.path.join(REPO, "userconfig_v2.xml")
+    G.userconfig_path = os.path.join(REPO, "userconfig_v3.xml")
     G.defaults_path = os.path.join(REPO, "defaults.xml")
     G.device_type, G.master_instance = DEV, True
     xmlutils.update_vars(DEV, G.userconfig_path, G.defaults_path)

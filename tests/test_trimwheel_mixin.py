@@ -95,13 +95,8 @@ class TestTrimwheelWriteMethods(BaseTelemetryEffectTestCase):
 
 
 class TestTrimwheelAxisControlGate(BaseTelemetryEffectTestCase):
-    """The wheel must stop driving the sim when axis control is switched off.
-
-    Either switch does it: the global "TelemFFB controls axes", or the
-    per-device disable.  The gate used to read
-    ``not telemffb_controls_axes and not local_disable_axis_control``, so a
-    wheel disabled for its own device alone kept writing trim to the sim.
-    """
+    """The wheel must stop driving the sim when axis control is disabled for its
+    device."""
 
     def _trimwheel(self, controls_axes, local_disable):
         instance = self.create_test_instance(
@@ -134,16 +129,6 @@ class TestTrimwheelAxisControlGate(BaseTelemetryEffectTestCase):
 
     def test_local_disable_stops_trim_writes(self):
         instance = self._trimwheel(controls_axes=True, local_disable=True)
-
-        assert self._run(instance) == []
-
-    def test_global_disable_stops_trim_writes(self):
-        instance = self._trimwheel(controls_axes=False, local_disable=False)
-
-        assert self._run(instance) == []
-
-    def test_both_disabled_stops_trim_writes(self):
-        instance = self._trimwheel(controls_axes=False, local_disable=True)
 
         assert self._run(instance) == []
 

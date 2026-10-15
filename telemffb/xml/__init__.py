@@ -1,7 +1,7 @@
 """Modular XML configuration system for TelemFFB.
 
 Provides encapsulated classes for reading, writing, and merging aircraft
-configuration data stored in ``defaults.xml`` and ``userconfig_v2.xml``.
+configuration data stored in ``defaults.xml`` and ``userconfig_v3.xml``.
 
 For backward compatibility with existing code, prefer importing from
 :mod:`telemffb.xmlutils` which wraps these classes with the original

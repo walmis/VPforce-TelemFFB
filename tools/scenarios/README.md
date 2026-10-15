@@ -1,6 +1,6 @@
 # Profile-matching scenario bench
 
-Swaps a synthetic `defaults.xml` + `userconfig_v2.xml` pair into the repo root so a
+Swaps a synthetic `defaults.xml` + `userconfig_v3.xml` pair into the repo root so a
 dev build can be flown through each situation profile matching has to get right,
 without owning every aircraft involved.
 
@@ -17,7 +17,7 @@ to switch scenario; picking one while it is still running is refused, since the 
 would write over the swap.
 
 The bench refuses to run at all unless `dev_build` and `dev_userconfig` are both True in
-`telemffb/globals.py` and a `userconfig_v2.xml` exists in the repo root. Without dev mode
+`telemffb/globals.py` and a `userconfig_v3.xml` exists in the repo root. Without dev mode
 the app reads and writes your real config in `%LOCALAPPDATA%`, and a swap here would
 touch files nothing looks at.
 
@@ -30,7 +30,7 @@ py tools/scenarios/scenario.py verify
 py tools/scenarios/scenario.py restore
 ```
 
-`use` copies your real `defaults.xml`, `userconfig_v2.xml` and `match_history.json`
+`use` copies your real `defaults.xml`, `userconfig_v3.xml` and `match_history.json`
 into `_scenario_backup/` the first time it runs, then writes the scenario over them.
 `restore` puts them back and removes the backup. Anything the app writes while a
 scenario is active (a recorded match, an accepted offer) is discarded with it.

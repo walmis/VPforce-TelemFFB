@@ -33,7 +33,7 @@ from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QProgressDialog
 
 import telemffb.globals as G
-from .settings import read_all_system_settings
+from .settings import PREVIOUS_USERCONFIG_FILENAMES, USERCONFIG_FILENAME, read_all_system_settings
 
 
 __all__ = [
@@ -246,15 +246,11 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
             ]
             support_zip.writestr("user_report.txt", "\n".join(lines))
 
-        # Add userconfig_v2.xml
-        userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
-        legacy_userconfig_path = os.path.join(userconfig_rootpath, "userconfig.xml")
-
-        if os.path.exists(userconfig_path):
-            support_zip.write(userconfig_path, "userconfig_v2.xml")
-
-        if os.path.exists(legacy_userconfig_path):
-            support_zip.write(userconfig_path, "userconfig.xml")
+        # the live config and whatever earlier generations are still beside it
+        for name in (USERCONFIG_FILENAME, *PREVIOUS_USERCONFIG_FILENAMES):
+            config_path = os.path.join(userconfig_rootpath, name)
+            if os.path.exists(config_path):
+                support_zip.write(config_path, name)
 
         history_path = os.path.join(userconfig_rootpath, "match_history.json")
         if os.path.exists(history_path):

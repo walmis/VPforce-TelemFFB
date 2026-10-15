@@ -80,7 +80,7 @@ print_method_calls: bool = False
 #: Active device type (e.g. ``'joystick'``, ``'pedals'``, ``'collective'``, ``'trimwheel'``)
 device: str = ''
 
-#: Path to user configuration XML file (``userconfig_v2.xml``)
+#: Path to user configuration XML file (``userconfig_v3.xml``)
 userconfig_path: str = ''
 
 #: Path to default settings XML file (``defaults.xml``)

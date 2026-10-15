@@ -534,7 +534,7 @@ class BaseTelemetryEffectTestCase:
                 self._telem_data = BaseTelemetryData()
                 self._last_telem_data = BaseTelemetryData()
                 self.friction_effect_overridden = False
-                self.telemffb_controls_axes = False
+                self.telemffb_controls_axes = True
                 self.local_disable_axis_control = False
                 self.dampener = MockDampener()
                 self.elev_trim_dampener = MockDampener()

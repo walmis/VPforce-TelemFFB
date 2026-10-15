@@ -97,7 +97,7 @@ class TestXpAxisOverrideDeviceGate(BaseTelemetryEffectTestCase):
     def test_controls_disabled_while_active_still_releases(self):
         instance = self._instance()
         instance.toggle_xp_control()
-        instance.telemffb_controls_axes = False
+        instance.local_disable_axis_control = True
         instance.toggle_xp_control()
         assert instance._socket.sent == [
             "OVERRIDE:joystick=true", "OVERRIDE:joystick=false",

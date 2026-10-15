@@ -66,9 +66,9 @@ class SASHelicopter(Helicopter):
         trim_reset = telem_data.hpgTrimRelease or 0
 
         if ffb_type == "joystick":
-            if not self.telemffb_controls_axes and not self.local_disable_axis_control:
+            if self.local_disable_axis_control:
                 self.flag_error(
-                    "Aircraft is configured as class SASHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
+                    "Aircraft is configured as class SASHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nAxis control must be enabled for this device (uncheck 'Disable for this device' under Axis Control); unbind the cyclic axes in MSFS settings")
                 return
             sema_x = telem_data.SEMAx or 0
             sema_y = telem_data.SEMAy or 0

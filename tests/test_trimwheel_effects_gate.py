@@ -44,7 +44,9 @@ class TestTrimwheelEffectsGate(BaseTelemetryEffectTestCase):
         ac.engine_rumble_highrpm_intensity = 0.15
         return ac
 
-    def _started_effects(self, exclude=("pause_spring",)):
+    # the pause spring and the wheel's own holding spring are the wheel's
+    # position, not a haptic effect
+    def _started_effects(self, exclude=("pause_spring", "spring")):
         return [name for name, eff in self.mock_effects.dict.items()
                 if eff.started and name not in exclude]
 

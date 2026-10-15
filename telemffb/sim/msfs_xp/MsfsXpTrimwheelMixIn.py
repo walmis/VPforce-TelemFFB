@@ -80,11 +80,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         """
         if not self.is_trimwheel():
             return
-        # Either switch turns the wheel's axis output off: the global
-        # "TelemFFB controls axes", or the per-device disable.  The old
-        # `not A and not B` form let a locally-disabled wheel keep driving
-        # the sim's trim axis.
-        if not self.telemffb_controls_axes or self.local_disable_axis_control:
+        if self.local_disable_axis_control:
             return
 
         if not self._device_feeding():  # device unplugged; nothing to send

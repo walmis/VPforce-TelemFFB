@@ -109,12 +109,12 @@ class TestNotInPanel:
             "<TelemFFB><defaults><name>enable_custom_x_axis</name>"
             "<in_sim_panel>false</in_sim_panel></defaults></TelemFFB>"))
         server.rows[:] = [
-            dict(row("telemffb_controls_axes", "Sim Default"), order="2000"),
-            dict(row("enable_custom_x_axis", "Sim Default"), prereq="telemffb_controls_axes", order="2200"),
+            dict(row("axis_control_group", "Sim Default"), order="2000"),
+            dict(row("enable_custom_x_axis", "Sim Default"), prereq="axis_control_group", order="2200"),
             dict(row("custom_x_axis", "Sim Default"), prereq="enable_custom_x_axis", order="2200.2"),
-            dict(row("x_axis_scale", "Sim Default"), prereq="telemffb_controls_axes", order="2400")]
+            dict(row("x_axis_scale", "Sim Default"), prereq="axis_control_group", order="2400")]
         _, data = call("GET", "/api/settings")
-        assert [s["name"] for s in data["settings"]] == ["telemffb_controls_axes", "x_axis_scale"]
+        assert [s["name"] for s in data["settings"]] == ["axis_control_group", "x_axis_scale"]
 
 
 class Settings(dict):
