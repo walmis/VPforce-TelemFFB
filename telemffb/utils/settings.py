@@ -733,12 +733,13 @@ def migrate_axis_control_userconfig(userconfig_path) -> bool:
     """Convert a user's ``telemffb_controls_axes`` rows, once.
 
     Axis control is always enabled and the global toggle is no longer a setting.
-    A row that turned it off applied to every device, so it becomes a
-    ``local_disable_axis_control`` row for each device role, under the same
-    sim, scope, pattern and profile, unless the user already has one there.
-    Every row naming the
-    old toggle is then removed, so the pass runs only on a file that still
-    has one.  Returns True when the file was changed.
+    A row applied to every device, so it becomes a ``local_disable_axis_control``
+    row for each device role, under the same sim, scope, pattern and profile,
+    unless the user already has one there: ``true`` where the row turned axis
+    control off, ``false`` where it turned it back on below a wider-scope row
+    that had turned it off.  Every row naming the old toggle is then removed,
+    so the pass runs only on a file that still has one.  Returns True when the
+    file was changed.
     """
     if not os.path.isfile(userconfig_path):
         return False
@@ -760,14 +761,16 @@ def migrate_axis_control_userconfig(userconfig_path) -> bool:
                 if e.tag in AXIS_CONTROL_ROW_TAGS and e.findtext("name") == "local_disable_axis_control"}
     added = 0
     for e in old:
-        if str(e.findtext("value") or "").strip().lower() != "false":
+        value = str(e.findtext("value") or "").strip().lower()
+        if value not in ("true", "false"):
             continue
+        disable = "true" if value == "false" else "false"
         for role in DEVICE_ROLES:
             if (e.tag, scope(e), role) in existing:
                 continue
             twin = copy.deepcopy(e)
             twin.find("name").text = "local_disable_axis_control"
-            twin.find("value").text = "true"
+            twin.find("value").text = disable
             device = twin.find("device")
             if device is None:
                 device = ET.SubElement(twin, "device")

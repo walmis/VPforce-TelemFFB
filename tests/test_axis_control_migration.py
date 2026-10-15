@@ -1,6 +1,7 @@
 """Axis control is always enabled and the global toggle is gone from the settings.
-A user's rows that turned it off become 'Disable for this device' rows for
-every device, once; every row naming the old toggle is removed."""
+A user's rows for it become 'Disable for this device' rows for every device,
+once: on where the row turned axis control off, off where it turned it back
+on; every row naming the old toggle is removed."""
 import os
 import xml.etree.ElementTree as ET
 
@@ -53,8 +54,12 @@ def test_off_rows_become_device_rows_for_each_configured_device(user):
                     if r.get("type") == "GliderAircraft")
     assert glider == [("classSettings", "collective", "true", "XPLANE"), ("classSettings", "joystick", "true", "XPLANE"),
                       ("classSettings", "pedals", "true", "XPLANE"), ("classSettings", "trimwheel", "true", "XPLANE")]
-    # the Cessna's 'on' row needed nothing
-    assert not any(r.get("model") == "Cessna 172.*" for r in rows_named(user, "local_disable_axis_control"))
+    # the Cessna's 'on' row re-enabled axis control below a wider-scope off row;
+    # it keeps doing so per device
+    cessna = sorted((r["device"], r["value"]) for r in rows_named(user, "local_disable_axis_control")
+                    if r.get("model") == "Cessna 172.*")
+    assert cessna == [("collective", "false"), ("joystick", "false"),
+                      ("pedals", "false"), ("trimwheel", "false")]
 
 
 def test_a_converted_file_is_left_alone(user):

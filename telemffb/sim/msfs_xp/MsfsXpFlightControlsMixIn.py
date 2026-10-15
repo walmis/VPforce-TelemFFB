@@ -1181,7 +1181,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
             return
 
-        if self.telemffb_controls_axes and self.ap_following and ap_active and self.use_fbw_for_ap_follow:
+        if self._axis_control_enabled() and self.ap_following and ap_active and self.use_fbw_for_ap_follow:
             logging.debug("FBW Setting enabled, running fbw_flight_controls")
             self.update_fbw_flight_controls(telem_data, ap=True)
             self.effects["dynamic_spring"].stop()
