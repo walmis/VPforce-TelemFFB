@@ -39,6 +39,8 @@ __all__ = [
     "migrate_axis_control_userconfig",
     "USERCONFIG_FILENAME",
     "PREVIOUS_USERCONFIG_FILENAMES",
+    "USERCONFIG_ROOT_TAG",
+    "USERCONFIG_ROOT_TAGS",
     "copy_legacy_config_to_new",
     "create_empty_userxml_file",
     "load_custom_userconfig",
@@ -426,7 +428,7 @@ def convert_legacy_userconfig(path):
     root = tree.getroot()
 
     # Convert legacy root tag
-    new_root = ET.Element("TelemFFB_v2")
+    new_root = ET.Element(USERCONFIG_ROOT_TAG)
     for child in list(root):
         new_root.append(child)
     tree._setroot(new_root)
@@ -540,6 +542,11 @@ USERCONFIG_FILENAME = "userconfig_v3.xml"
 #: the live name on a start that has none; the original is never touched
 #: again, so it stays the way back to the version that wrote it.
 PREVIOUS_USERCONFIG_FILENAMES = ("userconfig_v2.xml", "userconfig.xml")
+#: The root tag of a config or profile file this TelemFFB writes, so the
+#: file says which generation wrote it, and the tags the profile import
+#: accepts: a file from the v2 train still imports.
+USERCONFIG_ROOT_TAG = "TelemFFB_v3"
+USERCONFIG_ROOT_TAGS = ("TelemFFB_v3", "TelemFFB_v2")
 
 
 def copy_legacy_config_to_new(path):
@@ -547,8 +554,8 @@ def copy_legacy_config_to_new(path):
 
     Nothing happens when the live file already exists: a config carried
     forward once is the one in use from then on, whatever happens to the
-    older file afterwards.  The conversions that run after this call bring
-    the copy up to date.
+    older file afterwards.  The copy gets this generation's root tag; the
+    conversions that run after this call bring its contents up to date.
     """
     if os.path.exists(path):
         return
@@ -558,13 +565,28 @@ def copy_legacy_config_to_new(path):
         if os.path.exists(previous):
             shutil.copy(previous, path)
             logging.info(f"Copied {name} to {path}")
+            _stamp_root_tag(path)
             return
+
+
+def _stamp_root_tag(path):
+    """Give a carried-forward file this generation's root tag."""
+    tree = xmlutils.try_parse(path)
+    if tree is None:
+        logging.error(f"Could not parse {path} to set its root tag")
+        return
+    root = tree.getroot()
+    if root.tag == USERCONFIG_ROOT_TAG:
+        return
+    root.tag = USERCONFIG_ROOT_TAG
+    with FileLock(path):
+        consolidate_sort_and_write(tree, path)
 
 
 def create_empty_userxml_file(path):
     if not os.path.isfile(path):
         # Create an empty XML file with the specified root element
-        root = ET.Element("TelemFFB_v2")
+        root = ET.Element(USERCONFIG_ROOT_TAG)
         tree = ET.ElementTree(root)
         # Create a backup directory if it doesn't exist
         if not os.path.exists(os.path.dirname(path)):

@@ -38,6 +38,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Individual game controllers can be enabled in System Settings > Button Devices
 - **CHANGED: The configuration file is now userconfig_v3.xml**
   - Any existing "v2" config is migrated on the first startup
+  - A config or profile export written by this version carries the TelemFFB_v3 root tag; exports from TelemFFB v2 still import
 
 ## UI
 - **NEW: Redesigned Main UI**
