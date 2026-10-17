@@ -484,12 +484,7 @@ class MainWindow(QMainWindow):
 
         """ Create settings layout instance """
 
-        self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
-
-
-        """ Add settings layout to the tab widget """
-
-        settings_widget.setLayout(self.settings_layout)
+        self.settings_layout = SettingsLayout(parent=settings_widget, mainwindow=self)
         self.settings_layout.bind(G.app_state)
         self.settings_area.setWidget(settings_widget)
 
@@ -534,7 +529,6 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
-        self.layout = QVBoxLayout(central_widget)
 
 
         """ Add status bar to hold version information """
