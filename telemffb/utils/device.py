@@ -32,6 +32,7 @@ __all__ = [
     "DEVICE_ROLES",
     "recover_device_identity",
     "directinput_selection_devices",
+    "dinput_slot_configured",
     "device_pid_key",
     "active_joystick_slot_suffix",
     "multiple_joystick_devices",
@@ -288,6 +289,19 @@ def directinput_selection_devices(settings, enabled=None):
             f"enumerated: {e}. DirectLink is required - see the "
             "TelemFFB DirectInput documentation.")
         return []
+
+
+def dinput_slot_configured(settings) -> bool:
+    """Whether a configured device slot names a DirectInput device: a
+    ``devpath_<role>`` key, or an alternate joystick slot, holding a
+    ``dinput:{GUID}`` path."""
+    for role in DEVICE_ROLES:
+        suffixes = ('', '_2', '_3') if role == 'joystick' else ('',)
+        for suffix in suffixes:
+            path = str(settings.get(f'devpath_{role}{suffix}', '') or '')
+            if path.startswith('dinput:'):
+                return True
+    return False
 
 
 def device_pid_key(role):

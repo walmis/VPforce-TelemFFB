@@ -8,6 +8,8 @@ with nothing selected yet, which the change handler reads as "device cleared"
 and queuing its devpath to be cleared on save.
 """
 import os
+import threading
+import time
 
 import pytest
 
@@ -47,7 +49,8 @@ def _make_dialog(monkeypatch, settings):
     # bridge DLL and walks the machine's actual devices, which blocks
     # while a running TelemFFB holds one exclusively
     monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
-                        staticmethod(lambda enabled=None: []))
+                        staticmethod(lambda enabled=None, settings=None: []))
+    monkeypatch.setattr(SystemSettingsDialog, 'DINPUT_LISTING_THREADED', False)
     monkeypatch.setattr(SystemSettingsDialog, '_query_ffb_axes',
                         staticmethod(lambda guid: []))
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
@@ -121,7 +124,8 @@ def dialog(monkeypatch):
     monkeypatch.setattr('telemffb.ui.dialogs.SystemSettingsDialog.FFBRhino.enumerate',
                         staticmethod(lambda *a, **k: []), raising=False)
     monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
-                        staticmethod(lambda enabled=None: []))
+                        staticmethod(lambda enabled=None, settings=None: []))
+    monkeypatch.setattr(SystemSettingsDialog, 'DINPUT_LISTING_THREADED', False)
     monkeypatch.setattr(SystemSettingsDialog, '_query_ffb_axes',
                         staticmethod(lambda guid: []))
     monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
@@ -224,6 +228,49 @@ class TestDirectInputRolesListed:
                       dlg.cb_select_t):
             assert any('[DI]' in str(x) for x in self._listed(combo)), \
                 combo.objectName()
+
+
+class TestListingOffTheMainThread:
+    """The DirectInput listing opens every FFB device on the PC through
+    its driver and can block: the selectors come back at once with the
+    native devices and gain the [DI] entries when the listing arrives."""
+
+    @staticmethod
+    def _di_listed(combo):
+        model = combo.model()
+        return any('[DI]' in str(model.data(model.index(row, 0)))
+                   for row in range(model.rowCount()))
+
+    def test_the_selectors_fill_in_when_the_listing_arrives(self, monkeypatch):
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        app, dlg = _make_dialog(monkeypatch, _Settings({
+            'devpath_joystick': '', 'devpath_pedals': '',
+            'devpath_collective': '', 'devpath_trimwheel': '',
+            'enableDirectInput': True,
+        }))
+        self._app = app
+        started, release = threading.Event(), threading.Event()
+
+        def listing(enabled=None, settings=None):
+            started.set()
+            release.wait(5)
+            return [_FakeDIDevice()]
+        monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
+                            staticmethod(listing))
+        monkeypatch.setattr(SystemSettingsDialog, 'DINPUT_LISTING_THREADED', True)
+
+        dlg.populateUSBSelectors(dinput_enabled=True)
+
+        assert started.wait(5)
+        assert not self._di_listed(dlg.cb_select_j)
+        release.set()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not self._di_listed(dlg.cb_select_j):
+            app.processEvents()
+            time.sleep(0.01)
+        for combo in (dlg.cb_select_j, dlg.cb_select_p, dlg.cb_select_c,
+                      dlg.cb_select_t):
+            assert self._di_listed(combo), combo.objectName()
 
 
 class TestAxisChooser:

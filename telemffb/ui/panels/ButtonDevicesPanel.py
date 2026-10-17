@@ -30,6 +30,7 @@ and polls ``G.button_states`` (filled from the master's relay) while the
 group is visible.
 """
 
+import functools
 import logging
 from typing import Callable, Iterable, Optional
 
@@ -69,7 +70,10 @@ class ButtonDevicesPanel(QGroupBox):
         if manager is None:
             manager = getattr(G, 'button_devices', None)
         self._manager = manager
-        self._enumerate = enumerate_devices or enumerate_button_devices
+        # a child reads no strings: the names come from the map the master
+        # keeps, and a string request is device I/O that can block
+        self._enumerate = enumerate_devices or functools.partial(
+            enumerate_button_devices, strings=False)
         self._rows: dict[str, int] = {}
         self._populating = False
 

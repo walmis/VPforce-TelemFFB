@@ -141,6 +141,28 @@ def test_reader_reports_only_changes():
     assert dev_info.readable
 
 
+def test_a_failed_open_marks_the_device_unreadable_off_the_calling_thread():
+    """The open is device I/O that can block, so it runs on the reader's
+    thread, and its failure is reported on the device info."""
+    opened_on = []
+
+    def device_factory(path):
+        opened_on.append(threading.current_thread())
+        raise OSError('busy')
+    dev_info = info(0x1234, 0x0001, b'p', key='1234:0001')
+    reader = ButtonDeviceReader(dev_info, lambda key, pressed: None,
+                                decoder_factory=ByteDecoder, device_factory=device_factory)
+
+    assert reader.start()
+    deadline = time.monotonic() + 2.0
+    while reader.running and time.monotonic() < deadline:
+        time.sleep(0.005)
+
+    assert not reader.running
+    assert opened_on and opened_on[0] is not threading.main_thread()
+    assert not dev_info.readable
+
+
 def test_reader_failure_releases_and_marks_unreadable():
     device = ScriptedDevice([b'\x05'], fail_after=True)
 
@@ -284,11 +306,97 @@ def test_manager_merges_device_names_without_dropping_any(qapp):
     assert json.loads(settings.values['buttonDeviceNames']) == expected
 
 
+def _fake_listing(monkeypatch, present):
+    """The native listing on fakes: ``present`` is a one-item list holding
+    the current interface set; returns the paths the two passes asked."""
+    quick_calls, string_calls = [], []
+
+    def quick(path):
+        quick_calls.append(path)
+        return {'path': path.encode(), 'vendor_id': 0x1111, 'product_id': 0x0001,
+                'usage_page': 1, 'usage': 4, 'product_string': '', 'serial_number': ''}
+
+    def strings(path):
+        string_calls.append(path)
+        return 'Box', 'S1'
+
+    monkeypatch.setattr(button_devices, 'present_hid_paths', lambda: present[0])
+    monkeypatch.setattr(button_devices, '_quick_entry', quick)
+    monkeypatch.setattr(button_devices, '_read_strings', strings)
+    monkeypatch.setattr(button_devices, '_hid_listing', button_devices._HidListing())
+    return quick_calls, string_calls
+
+
+def test_strings_come_in_a_second_pass_and_neither_pass_repeats(monkeypatch):
+    """Ids and usages come from the driver; the strings are requests to
+    the device and come in a second pass.  Until they arrive a controller
+    is named by its ids, and nothing is asked again while the interface
+    set is unchanged."""
+    present = [frozenset({'\\\\?\\hid#box'})]
+    quick_calls, string_calls = _fake_listing(monkeypatch, present)
+    settings = FakeSettings()
+
+    first = enumerate_button_devices(settings, strings=False)
+    assert [(d.key, d.name) for d in first] == [('1111:0001', '1111:0001')]
+    assert string_calls == []
+    assert button_devices._hid_listing.strings_pending()
+
+    full = enumerate_button_devices(settings)
+    assert [(d.key, d.name, d.serial) for d in full] == [('1111:0001', 'Box', 'S1')]
+    assert not button_devices._hid_listing.strings_pending()
+
+    enumerate_button_devices(settings)
+    assert (quick_calls, string_calls) == (['\\\\?\\hid#box'], ['\\\\?\\hid#box'])
+
+    present[0] = frozenset({'\\\\?\\hid#box', '\\\\?\\hid#new'})
+    enumerate_button_devices(settings)
+    assert quick_calls == ['\\\\?\\hid#box', '\\\\?\\hid#new']
+    assert string_calls == ['\\\\?\\hid#box', '\\\\?\\hid#new']
+
+
+def test_the_manager_publishes_the_controllers_before_their_strings(qapp, monkeypatch):
+    """The readers start and the panel fills from the first pass; the
+    names follow when the strings arrive."""
+    present = [frozenset({'\\\\?\\hid#box'})]
+    _fake_listing(monkeypatch, present)
+    release = threading.Event()
+    original = button_devices._read_strings
+
+    def slow_strings(path):
+        release.wait(5)
+        return original(path)
+    monkeypatch.setattr(button_devices, '_read_strings', slow_strings)
+    readers = {}
+
+    def factory(dev_info, on_change):
+        readers[dev_info.key] = FakeReader(dev_info, on_change)
+        return readers[dev_info.key]
+    settings = FakeSettings(buttonDevicesEnabled='1111:0001')
+    manager = ButtonDeviceManager(settings=settings, reader_factory=factory)
+    names = []
+    manager.devices_changed.connect(lambda: names.append([d.name for d in manager.devices()]))
+
+    manager.rescan()
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and not names:
+        qapp.processEvents()
+        time.sleep(0.01)
+    assert names == [['1111:0001']]
+    assert '1111:0001' in readers
+    release.set()
+    manager.wait_for_scan()
+    qapp.processEvents()
+    assert names == [['1111:0001'], ['Box']]
+    manager.stop()
+
+
 def test_enumerate_excludes_ffb_devices_and_other_usages(monkeypatch):
     def entry(vid, pid, path, usage_page=1, usage=4, product='Box'):
         return {'path': path, 'vendor_id': vid, 'product_id': pid, 'serial_number': '',
                 'product_string': product, 'usage_page': usage_page, 'usage': usage}
 
+    # no interface list: hidapi's listing as is
+    monkeypatch.setattr(button_devices, 'present_hid_paths', lambda: None)
     monkeypatch.setattr(button_devices.hid, 'enumerate', lambda *a, **k: [
         entry(0x1111, 0x0001, b'\\\\?\\hid#keep', product=''),
         entry(0x1111, 0x0002, b'\\\\?\\hid#gamepad', usage=5),

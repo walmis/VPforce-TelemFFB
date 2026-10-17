@@ -328,6 +328,23 @@ class TestStartupHealsOldSettings:
         assert settings[device_ids_key('joystick')] == "045E:001B"
         assert settings[device_ident_key('joystick')] == "[DI] SideWinder"
 
+    def test_the_directinput_listing_is_skipped_with_no_directinput_slot(
+            self, monkeypatch):
+        """The listing opens every FFB device on the PC through its
+        driver, for identities only a dinput: slot could use."""
+        import main
+        settings = TestIdentIsRemembered.FakeSettings(
+            {'devpath_pedals': self.PATH, 'enableDirectInput': True})
+        monkeypatch.setattr(G, 'system_settings', settings, raising=False)
+        monkeypatch.setattr(G, 'master_instance', True, raising=False)
+
+        def refuse(settings, enabled=None):
+            raise AssertionError("listed DirectInput devices")
+        monkeypatch.setattr(main.utils, 'directinput_selection_devices', refuse)
+        pedals = self.Device(0x2052, "VPforce Pedals", self.PATH.encode())
+        main._record_device_identity([pedals])
+        assert settings[device_ids_key('pedals')] == "FFFF:2052"
+
     def test_a_child_instance_writes_nothing(self, monkeypatch):
         """Settings writes at startup are the master's, as everywhere else;
         four instances racing to write the same keys helps nobody."""

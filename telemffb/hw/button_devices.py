@@ -43,6 +43,7 @@ Layers, bottom up:
 """
 
 import ctypes
+import functools
 import json
 import logging
 import re
@@ -66,6 +67,7 @@ __all__ = [
     "assign_keys",
     "enabled_keys",
     "enumerate_button_devices",
+    "present_hid_paths",
     "hat_buttons",
     "HidReportDecoder",
     "ButtonDeviceReader",
@@ -97,6 +99,10 @@ _MIN_READ_SIZE = 64
 _READ_TIMEOUT_MS = 50
 _JOIN_TIMEOUT_S = 1.0
 _RESCAN_INTERVAL_MS = 3000
+#: ``GUID_DEVINTERFACE_HID`` and the configuration manager's present-only flag.
+_HID_INTERFACE_GUID = (0x4D1E55B2, 0xF16F, 0x11CF,
+                       (0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30))
+_CM_GET_DEVICE_INTERFACE_LIST_PRESENT = 1
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +126,16 @@ _FILE_SHARE_READ = 0x00000001
 _FILE_SHARE_WRITE = 0x00000002
 _OPEN_EXISTING = 3
 _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+
+class _HIDD_ATTRIBUTES(ctypes.Structure):
+    """``HIDD_ATTRIBUTES``."""
+    _fields_ = [
+        ('Size', ctypes.c_ulong),
+        ('VendorID', ctypes.c_ushort),
+        ('ProductID', ctypes.c_ushort),
+        ('VersionNumber', ctypes.c_ushort),
+    ]
 
 
 class _HIDP_CAPS(ctypes.Structure):
@@ -356,7 +372,135 @@ def _path_text(path) -> str:
     return str(path or '')
 
 
-def enumerate_button_devices(settings=None) -> list[ButtonDeviceInfo]:
+class _GUID(ctypes.Structure):
+    _fields_ = [('Data1', ctypes.c_ulong), ('Data2', ctypes.c_ushort),
+                ('Data3', ctypes.c_ushort), ('Data4', ctypes.c_ubyte * 8)]
+
+
+def present_hid_paths() -> Optional[frozenset]:
+    """The device paths of every HID interface present right now,
+    lowercased, from the configuration manager: no device is opened or
+    asked anything.  None when the list cannot be read."""
+    try:
+        cm = ctypes.windll.cfgmgr32
+        guid = _GUID(*_HID_INTERFACE_GUID[:3],
+                     (ctypes.c_ubyte * 8)(*_HID_INTERFACE_GUID[3]))
+        size = ctypes.c_ulong(0)
+        if cm.CM_Get_Device_Interface_List_SizeW(
+                ctypes.byref(size), ctypes.byref(guid), None,
+                _CM_GET_DEVICE_INTERFACE_LIST_PRESENT) != 0:
+            return None
+        buf = ctypes.create_unicode_buffer(size.value)
+        if cm.CM_Get_Device_Interface_ListW(
+                ctypes.byref(guid), None, buf, size.value,
+                _CM_GET_DEVICE_INTERFACE_LIST_PRESENT) != 0:
+            return None
+        return frozenset(p.lower() for p in buf[:size.value].split('\0') if p)
+    except Exception:
+        logging.debug('HID interface list unavailable', exc_info=True)
+        return None
+
+
+def _quick_entry(path: str) -> Optional[dict]:
+    """One HID interface's ids and top-level usage, in hidapi's entry
+    shape with empty strings.  The attributes and the report descriptor
+    come from the HID class driver, not from the device.  None when the
+    interface cannot be opened or parsed."""
+    dll, kernel32 = HidReportDecoder._libraries()
+    handle = kernel32.CreateFileW(path, 0, _FILE_SHARE_READ | _FILE_SHARE_WRITE,
+                                  None, _OPEN_EXISTING, 0, None)
+    if not handle or handle == _INVALID_HANDLE_VALUE:
+        return None
+    try:
+        attrs = _HIDD_ATTRIBUTES()
+        attrs.Size = ctypes.sizeof(attrs)
+        if not dll.HidD_GetAttributes(handle, ctypes.byref(attrs)):
+            return None
+        preparsed = ctypes.c_void_p()
+        if not dll.HidD_GetPreparsedData(handle, ctypes.byref(preparsed)):
+            return None
+        try:
+            caps = _HIDP_CAPS()
+            if _status(dll.HidP_GetCaps(preparsed, ctypes.byref(caps))) != _HIDP_STATUS_SUCCESS:
+                return None
+        finally:
+            dll.HidD_FreePreparsedData(preparsed)
+    finally:
+        kernel32.CloseHandle(handle)
+    return {
+        'path': path.encode(), 'vendor_id': int(attrs.VendorID),
+        'product_id': int(attrs.ProductID), 'usage_page': int(caps.UsagePage),
+        'usage': int(caps.Usage), 'product_string': '', 'serial_number': '',
+        'manufacturer_string': '',
+    }
+
+
+def _read_strings(path: str) -> tuple[str, str]:
+    """A HID interface's product and serial strings.  Each is a request
+    to the device; '' for one the device does not answer."""
+    dll, kernel32 = HidReportDecoder._libraries()
+    handle = kernel32.CreateFileW(path, 0, _FILE_SHARE_READ | _FILE_SHARE_WRITE,
+                                  None, _OPEN_EXISTING, 0, None)
+    if not handle or handle == _INVALID_HANDLE_VALUE:
+        return '', ''
+    try:
+        out = []
+        for call in (dll.HidD_GetProductString, dll.HidD_GetSerialNumberString):
+            buf = ctypes.create_unicode_buffer(256)
+            out.append(buf.value if call(handle, buf, ctypes.sizeof(buf)) else '')
+        return out[0], out[1]
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+class _HidListing:
+    """The HID interfaces, listed in two passes and kept while the set of
+    present interfaces is unchanged.
+
+    Ids and usages come from the HID class driver.  The product and serial
+    strings are requests to the device, which can block, so they are read
+    in a second pass, for game controllers only, and not again for an
+    interface that stays present.  The configuration manager's interface
+    list says whether anything was plugged or unplugged since.  Without
+    it, hidapi's listing is used as is.
+    """
+
+    def __init__(self):
+        self.present: Optional[frozenset] = None
+        self.entries: dict[str, dict] = {}
+        self.pending: set[str] = set()
+
+    def entries_now(self, strings: bool = True) -> list:
+        present = present_hid_paths()
+        if present is None:
+            return list(hid.enumerate())
+        if present != self.present:
+            kept = {path: entry for path, entry in self.entries.items() if path in present}
+            for path in sorted(present - kept.keys()):
+                entry = _quick_entry(path)
+                if entry is None:
+                    continue
+                kept[path] = entry
+                if (entry.get('usage_page') == _USAGE_PAGE_GENERIC_DESKTOP
+                        and entry.get('usage') in _CONTROLLER_USAGES):
+                    self.pending.add(path)
+            self.entries, self.present = kept, present
+            self.pending &= set(kept)
+        if strings and self.pending:
+            for path in sorted(self.pending):
+                product, serial = _read_strings(path)
+                self.entries[path].update(product_string=product, serial_number=serial)
+            self.pending.clear()
+        return [dict(entry) for entry in self.entries.values()]
+
+    def strings_pending(self) -> bool:
+        return bool(self.pending)
+
+
+_hid_listing = _HidListing()
+
+
+def enumerate_button_devices(settings=None, *, strings: bool = True) -> list[ButtonDeviceInfo]:
     """List the HID game controllers that can supply buttons.
 
     Joysticks, gamepads and multi-axis controllers (Generic Desktop usages 4,
@@ -369,11 +513,13 @@ def enumerate_button_devices(settings=None) -> list[ButtonDeviceInfo]:
 
     :param settings: a ``SystemSettings``-like object with ``get(key,
         default)``; ``G.system_settings`` when None.
+    :param strings: read the product and serial strings of controllers
+        not yet asked; without them a controller is named by its ids.
     """
     settings = _resolve_settings(settings)
     ffb_paths, ffb_ids = _ffb_identities(settings)
     infos = []
-    for entry in hid.enumerate():
+    for entry in _hid_listing.entries_now(strings):
         if entry.get('usage_page') != _USAGE_PAGE_GENERIC_DESKTOP:
             continue
         usage = entry.get('usage')
@@ -472,6 +618,11 @@ class HidReportDecoder:
                 kernel32.CloseHandle.restype = ctypes.c_int
 
                 dll = ctypes.WinDLL('hid', use_last_error=True)
+                dll.HidD_GetAttributes.argtypes = [ctypes.c_void_p, ctypes.POINTER(_HIDD_ATTRIBUTES)]
+                dll.HidD_GetAttributes.restype = ctypes.c_ubyte
+                for name in ('HidD_GetProductString', 'HidD_GetSerialNumberString'):
+                    getattr(dll, name).argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_ulong]
+                    getattr(dll, name).restype = ctypes.c_ubyte
                 dll.HidD_GetPreparsedData.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
                 dll.HidD_GetPreparsedData.restype = ctypes.c_ubyte
                 dll.HidD_FreePreparsedData.argtypes = [ctypes.c_void_p]
@@ -711,23 +862,23 @@ class ButtonDeviceReader:
         self._decoder = None
 
     def start(self) -> bool:
-        """Open the device and start reading.
+        """Start the reader thread, which opens the device and reads it.
 
-        :returns: False when the device could not be opened.
+        The open is device I/O and can block, so it is not done on the
+        calling thread.  A failed open marks the device not readable
+        (``info.readable``) and ends the thread.
+
+        :returns: False when the thread could not be started.
         """
-        try:
-            self._device = self._device_factory(self.info.path)
-            self._decoder = self._decoder_factory(self.info.path)
-        except Exception as e:
-            self._fail('open', e)
-            self._close_handles()
-            return False
-        size = max(_MIN_READ_SIZE, int(self._decoder.input_report_length or 0))
         self._stop_event.clear()
         self._thread = threading.Thread(
-            target=self._run, args=(size,), daemon=True,
+            target=self._run, daemon=True,
             name=f'ButtonDeviceReader {self.info.key}')
-        self._thread.start()
+        try:
+            self._thread.start()
+        except Exception as e:
+            self._fail('start', e)
+            return False
         return True
 
     def stop(self) -> None:
@@ -741,7 +892,18 @@ class ButtonDeviceReader:
     def running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
-    def _run(self, size: int) -> None:
+    def _run(self) -> None:
+        try:
+            self._device = self._device_factory(self.info.path)
+            self._decoder = self._decoder_factory(self.info.path)
+        except Exception as e:
+            self._fail('open', e)
+            self._close_handles()
+            return
+        if self._stop_event.is_set():
+            self._close_handles()
+            return
+        size = max(_MIN_READ_SIZE, int(self._decoder.input_report_length or 0))
         pressed: frozenset[int] = frozenset()
         try:
             while not self._stop_event.is_set():
@@ -823,6 +985,10 @@ class ButtonDeviceManager(QObject):
         super().__init__(parent)
         self._settings = settings
         self._enumerate = enumerate_devices or enumerate_button_devices
+        # with the real listing, the controllers are published before their
+        # strings are read, so the readers start and the panel fills at once
+        self._quick_enumerate = (None if enumerate_devices is not None
+                                 else functools.partial(enumerate_button_devices, strings=False))
         self._reader_factory = reader_factory or ButtonDeviceReader
         self._publish = publish or publish_buttons
         self._lock = threading.Lock()
@@ -907,6 +1073,10 @@ class ButtonDeviceManager(QObject):
 
         def scan():
             try:
+                if self._quick_enumerate is not None:
+                    quick = list(self._quick_enumerate(settings))
+                    if _hid_listing.strings_pending():
+                        self._scanned.emit(quick)
                 result = list(self._enumerate(settings))
             except Exception as e:
                 result = e

@@ -23,6 +23,7 @@ import html
 import logging
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -50,7 +51,7 @@ from telemffb.ui.panels.InstanceSettingsPanel import (
 from telemffb.utils import (
     device_display_name, device_ident_key, device_ids_key, device_pid_key,
     directinput_selection_devices, format_usb_ids, recover_device_identity,
-    validate_vpconf_profile, HiDpiPixmap,
+    schedule_on_main_thread, validate_vpconf_profile, HiDpiPixmap,
 )
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from telemffb.ui.widgets.custom_widgets import FFBDeviceListModel, LabeledToggle, svg_icon
@@ -224,6 +225,10 @@ def _describe_setting_scope(elem):
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
+    #: List DirectInput devices on a worker thread (see _dinput_devices).
+    #: Tests turn it off for a synchronous listing.
+    DINPUT_LISTING_THREADED = True
+
     def __init__(self, parent=None,):
         super(SystemSettingsDialog, self).__init__(parent)
         # pending device path changes (only written on Save).  Created
@@ -252,6 +257,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # while an import is populating the form, panels created on the fly
         # read the imported values instead of the store
         self._import_source = None
+        # The DirectInput listing opens every force feedback device on the
+        # PC through its driver and can block, so the dialog lists on a
+        # worker thread and fills the selectors when the result arrives;
+        # see _dinput_devices.
+        self._dinput_listing = None
+        self._dinput_scan = None
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"System Settings ({G.device_type.capitalize()})")
@@ -589,19 +600,82 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_enable_dinput.stateChanged.connect(self.toggle_dinput_support)
 
     @staticmethod
-    def _enumerate_dinput_devices(enabled=None):
+    def _enumerate_dinput_devices(enabled=None, settings=None):
         """Generic DirectInput FFB devices, prepared for the selector model.
 
         One definition, shared with startup: the listing is what a stored
         ``dinput:{GUID}`` slot is matched back to, so the two had better
         agree.  ``enabled`` overrides the stored setting so the dialog can
-        re-list live as the box is ticked.
+        re-list live as the box is ticked.  ``settings`` is a snapshot of
+        the values the listing reads, for a call off the main thread.
         """
-        return directinput_selection_devices(G.system_settings, enabled)
+        return directinput_selection_devices(
+            settings if settings is not None else G.system_settings, enabled)
 
-    def populateUSBSelectors(self, dinput_enabled=None):
+    def _dinput_devices(self, enabled, fresh, arrived=None):
+        """The [DI] entries for the selectors.
+
+        ``arrived`` is a listing the worker thread just delivered; it is
+        kept and used.  Otherwise the last listing is reused, unless
+        ``fresh`` (the toggle re-lists live).  A threaded listing returns
+        what is known so far, and the result repopulates the selectors
+        through _dinput_listed when it arrives.
+        """
+        if arrived is not None:
+            self._dinput_listing = list(arrived)
+            return list(arrived)
+        if not enabled:
+            return []
+        if self._dinput_listing is not None and not fresh:
+            return list(self._dinput_listing)
+        if not self.DINPUT_LISTING_THREADED:
+            self._dinput_listing = list(self._enumerate_dinput_devices(enabled))
+            return list(self._dinput_listing)
+        self._start_dinput_listing(enabled)
+        return list(self._dinput_listing or [])
+
+    def _start_dinput_listing(self, enabled):
+        """List the DirectInput devices on a worker thread.  While a
+        listing is in progress, no second one is started; its result
+        repopulates the selectors."""
+        if self._dinput_scan is not None and self._dinput_scan.is_alive():
+            return
+        # the settings are read here, on the main thread; the worker gets
+        # a copy of the values the listing needs
+        snapshot = {
+            'enableDirectInput': True,
+            'vpforce_as_dinput': G.system_settings.get('vpforce_as_dinput', ''),
+        }
+
+        def listing():
+            try:
+                result = list(self._enumerate_dinput_devices(enabled, snapshot))
+            except Exception as e:
+                logging.error(f"DirectInput device listing failed: {e}")
+                result = []
+            schedule_on_main_thread(lambda: self._dinput_listed(result))
+
+        self._dinput_scan = threading.Thread(
+            target=listing, daemon=True, name='SystemSettings DirectInput listing')
+        self._dinput_scan.start()
+
+    def _dinput_listed(self, result):
+        """Fill the selectors with the worker's listing (main thread)."""
+        try:
+            self.populateUSBSelectors(
+                dinput_enabled=self.cb_enable_dinput.isChecked(), dinput_devices=result)
+            self.toggle_device_launch_widgets()
+        except RuntimeError:
+            # the dialog was deleted while the listing ran
+            pass
+
+    def populateUSBSelectors(self, dinput_enabled=None, dinput_devices=None):
         # Populate the USB device selectors with currently connected devices
         devices = FFBRhino.enumerate()
+        dinput_on = (dinput_enabled if dinput_enabled is not None
+                     else bool(G.system_settings.get('enableDirectInput', False)))
+        dinput_devices = self._dinput_devices(
+            dinput_on, fresh=dinput_enabled is not None, arrived=dinput_devices)
 
         combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
         # kept so the tap code can ask what is connected without knowing
@@ -614,8 +688,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # The joystick keeps its native X/Y; other roles get an axis
         # mapping when the hardware's FFB axis is not the one the role
         # addresses.
-        extended_model = FFBDeviceListModel(
-            list(devices) + self._enumerate_dinput_devices(dinput_enabled))
+        extended_model = FFBDeviceListModel(list(devices) + dinput_devices)
         for cb in combo_boxes:
             cb_model = extended_model
             # Swapping the model emits currentIndexChanged with nothing

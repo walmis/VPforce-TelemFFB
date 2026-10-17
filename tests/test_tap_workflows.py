@@ -245,9 +245,10 @@ class World:
         # real one, which would find whatever is plugged into this machine
         monkeypatch.setattr(
             SystemSettingsDialog, '_enumerate_dinput_devices',
-            staticmethod(lambda enabled=None: [MOZA] if (
+            staticmethod(lambda enabled=None, settings=None: [MOZA] if (
                 enabled if enabled is not None
                 else self.settings.get('enableDirectInput')) else []))
+        monkeypatch.setattr(SystemSettingsDialog, 'DINPUT_LISTING_THREADED', False)
         monkeypatch.setattr('telemffb.hw.ffb_dinput.bridge_availability',
                             lambda *a, **k: (True, ''))
         # the status line beside the toggle must never load the real DLL

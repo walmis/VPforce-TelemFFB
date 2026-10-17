@@ -1279,10 +1279,14 @@ def _record_device_identity(devs: List[DeviceInfo]):
     if not G.master_instance:
         return
     try:
-        # DirectInput devices too, while support is on: a stick driven through
-        # the bridge sits in a slot like any other, and the selectors would
-        # otherwise be the only place its identity could be recovered.
-        listed = list(devs) + utils.directinput_selection_devices(G.system_settings)
+        # ``devs`` holds the VPforce devices only.  The ids and name of a
+        # slot that holds a DirectInput device come from the DirectInput
+        # listing instead.  That listing opens every force feedback
+        # device on the PC through its driver and can block, so it runs
+        # only when a slot holds a DirectInput device.
+        listed = list(devs)
+        if utils.dinput_slot_configured(G.system_settings):
+            listed += utils.directinput_selection_devices(G.system_settings)
         updates = utils.recover_device_identity(G.system_settings, listed)
         for key, value in updates.items():
             logging.info(f"Recording {key} = {value!r} for a configured device")
