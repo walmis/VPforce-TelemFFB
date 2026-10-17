@@ -212,7 +212,7 @@ class ConfigWriter:
                 elif child.tag == 'sc_unit':
                     child.text = sc_unit
                 elif child.tag == 'scale':
-                    child.text = str(scale)
+                    child.text = '' if scale is None else str(scale)
                 elif child.tag == 'source':
                     child.text = 'user'
             if sim:
@@ -224,7 +224,7 @@ class ConfigWriter:
             return
 
         children = [('name', name), ('model', model), ('var', var),
-                    ('sc_unit', sc_unit), ('scale', str(scale)), ('source', 'user')]
+                    ('sc_unit', sc_unit), ('scale', '' if scale is None else str(scale)), ('source', 'user')]
         if sim:
             children.append(('sim', sim))
         root.append(ET_element('sc_overrides', children))

@@ -154,11 +154,7 @@ class SimVar:
         """
         self.name = name
         self.var = var
-        # The overrides editor stores an empty transform as the text
-        # 'None'; either spelling means no scaling, not an expression.
-        if isinstance(scale, str) and scale.strip().lower() in ('', 'none'):
-            scale = None
-        self.scale = scale
+        self.scale = None if TransformExpr.is_blank(scale) else scale
         self.mutator = mutator
         self.sc_unit = sc_unit
         self.unit = unit
@@ -171,13 +167,14 @@ class SimVar:
 
     def _build_scale_transform(self):
         """
-        Convert the public 'scale' value into a Transform instance.
+        Convert the public 'scale' value into a Transform instance, or None
+        for a null scale.
         """
         if isinstance(self.scale, TransformExpr):
             return self.scale
 
         if isinstance(self.scale, (int, float, str)):
-            return TransformExpr(self.scale)
+            return TransformExpr.from_setting(self.scale)
 
         raise TypeError(
             f"Invalid scale type for SimVar '{self.name}': {type(self.scale)}"
@@ -199,6 +196,9 @@ class SimVar:
         if self.scale is not None:
             if self._scale_transform is None:
                 self._scale_transform = self._build_scale_transform()
+                if self._scale_transform is None:
+                    self.scale = None
+                    return input
             input = self._scale_transform.apply(input)
 
         return input

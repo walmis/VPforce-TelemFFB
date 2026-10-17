@@ -82,6 +82,27 @@ class TransformExpr:
 
         raise TypeError("Transform must be int, float, or expression string")
 
+    @staticmethod
+    def is_blank(value) -> bool:
+        """True when a stored scale setting asks for no transform:
+        ``None``, blank text, or the text ``None`` (written by older
+        versions for a blank transform)."""
+        if value is None:
+            return True
+        return isinstance(value, str) and value.strip().lower() in ("", "none")
+
+    @classmethod
+    def from_setting(cls, value):
+        """The transform a stored scale setting asks for, or ``None`` when
+        it is blank (``is_blank``).
+
+        :raises ValueError: an expression that is not valid.
+        :raises TypeError: a value that is not a number or text.
+        """
+        if cls.is_blank(value):
+            return None
+        return cls(value)
+
     def _validate(self, node):
         if isinstance(node, ast.BinOp):
             if type(node.op) not in _BIN_OPS:

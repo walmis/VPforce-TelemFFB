@@ -59,12 +59,14 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: The Exponential Curve G-force mode is selectable again, with its settings.  It was already the default for any aircraft whose G-force mode was never changed, while the settings showed it as Disabled
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
+- Fix: an override saved without a transform could not be re-added from the SimConnect/Dataref Overrides Editor until the transform field was cleared of the text 'None'
 - Fix: the log now names what stopped MSFS telemetry when the sim pauses (paused, parked, slewed, avatar, cinematic, in menus) and says when it resumes - before, a stuck stop was indistinguishable from a dead connection
 
 ## X-Plane
 - **NEW: Manage multiple X-Plane installs**
   - System Settings > X-Plane lists every X-Plane install found on the PC.  Add/remove additional install locations
 - Fix: the axis override is released when the FFB device disconnects, and a per-device axis disable is honored
+- Dataref override transforms accept the same math expressions as MSFS (x - 1, x/50 - 1, ...), applied in TelemFFB; a plain number is still applied by the plugin
 
 ## MSFS
 - **NEW: PMDG 737-600/700/800/900 profiles**

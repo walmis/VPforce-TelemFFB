@@ -1265,6 +1265,13 @@ class TestEraseFunctions:
             './/simSettings[sim="MSFS"][name="sim_test"]')
         assert found is None
 
+    def test_sc_override_without_a_transform_is_stored_blank(self, xml_tmpdir):
+        xmlutils.write_sc_override_to_xml("BlankOvr.*", "TestVar", "TestName", "float", None)
+        xmlutils.update_roots()
+        found = xmlutils.auto_user_root.find(
+            './/sc_overrides[model="BlankOvr.*"][name="TestName"]')
+        assert found.findtext('scale') == ''
+
     def test_erase_sc_override(self, xml_tmpdir):
         xmlutils.write_sc_override_to_xml("RemoveOvr.*", "TestVar", "TestName")
         xmlutils.update_roots()

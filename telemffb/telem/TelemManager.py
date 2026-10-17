@@ -40,6 +40,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.telem.SimConnectManager import SimConnectManager, RUNTIME_SOURCE_OVERRIDE
+from telemffb.utils.TransformExpr import TransformExpr
 from telemffb.utils import log_device_gains, upload_vpconf_profile
 
 if TYPE_CHECKING:
@@ -312,6 +313,8 @@ class TelemManager(QObject, threading.Thread):
         self.max_frame_time = 0
         self.timeout_sec = 0.2
         self._ipc_telem_data = {}
+        #: X-Plane override name -> expression transform applied on receipt
+        self._xplane_transforms: dict[str, TransformExpr] = {}
         self._simconnect : Optional[SimConnectManager] = None
         self._gain_overrides_active = False
         self._reapply_overrides_pending = False
@@ -712,6 +715,7 @@ class TelemManager(QObject, threading.Thread):
 
         self._handle_aircraft_changes(aircraft_info, parsed_data)
         self._handle_config_changes(aircraft_info)
+        self._apply_xplane_transforms(parsed_data)
         self._process_current_aircraft_telemetry(parsed_data)
         self._handle_ipc_and_plotting(parsed_data)
         self._emit_telemetry(parsed_data)
@@ -1036,31 +1040,60 @@ class TelemManager(QObject, threading.Thread):
             self._simconnect._resubscribe()
 
     def _setup_xpplugin_overrides(self, aircraft_name, data_source):
-        """Setup Dataref variable overrides for XPLANE aircraft."""
+        """Setup Dataref variable overrides for XPLANE aircraft.  A numeric
+        scale is applied by the plugin; an expression is applied here when
+        the value arrives (``_apply_xplane_transforms``)."""
+        self._xplane_transforms = {}
         if data_source == "XPLANE" and aircraft_name != '':
             if not getattr(self, "_socket", None):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
             d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
                                             cls=self._current_class_name())
             for sv in d1:
-                scale = self._xplane_conversion(sv['scale'], sv['name'])
-                sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={scale}"
+                scale, transform = self._xplane_scale(sv['scale'], sv['name'])
+                # the plugin rounds after its own conversion; a value
+                # transformed here arrives with more decimals to work from
+                precision = 3
+                if transform is not None:
+                    self._xplane_transforms[sv['name']] = transform
+                    precision = 6
+                sendstr = (f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},"
+                           f"precision={precision},conversion={scale}")
                 self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
 
     @staticmethod
-    def _xplane_conversion(scale, name) -> float:
-        """The conversion factor the X-Plane plugin can take: a plain
-        number.  The plugin parses the field with no fallback, so an
-        empty transform (stored as '' or the text 'None') and an
-        expression it cannot evaluate both go out as 1.0."""
-        if scale is None or (isinstance(scale, str) and scale.strip().lower() in ('', 'none')):
-            return 1.0
+    def _xplane_scale(scale, name):
+        """The plugin's conversion factor and the transform applied on
+        receipt, for one override's stored scale: a plain number goes to the
+        plugin; an expression goes out as 1.0 and is applied here; no
+        transform is 1.0.  The plugin parses the field with no fallback."""
         try:
-            return float(scale)
+            transform = TransformExpr.from_setting(scale)
         except (TypeError, ValueError):
-            logging.warning(f"X-Plane override {name!r}: transform {scale!r} is not a number; "
-                            "the plugin applies numeric factors only, sending 1.0")
-            return 1.0
+            logging.warning(f"X-Plane override {name!r}: transform {scale!r} is not a number "
+                            "or a valid expression; sending 1.0")
+            return 1.0, None
+        if transform is None:
+            return 1.0, None
+        try:
+            return float(scale), None
+        except (TypeError, ValueError):
+            return 1.0, transform
+
+    def _apply_xplane_transforms(self, telem_data: BaseTelemetryData):
+        """Apply the X-Plane overrides' expression transforms to the tagged
+        values of a frame."""
+        if not self._xplane_transforms or telem_data.get("src") != "XPLANE":
+            return
+        for name, transform in list(self._xplane_transforms.items()):
+            value = telem_data.get(name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            try:
+                telem_data[name] = transform.apply(value)
+            except Exception:
+                logging.exception(f"X-Plane override {name!r}: transform failed and is no longer applied")
+                del self._xplane_transforms[name]
 
     # def _update_settings_ui(self):
     #     """Update settings UI if visible."""

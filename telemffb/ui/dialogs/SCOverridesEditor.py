@@ -94,18 +94,12 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             ValueError      -> invalid expression
         """
         text = text.strip()
-        if not text:
+        if TransformExpr.from_setting(text) is None:   # raises if invalid
             return None
-
-        # First try numeric scale
         try:
             return float(text)
         except ValueError:
-            pass
-
-        # Otherwise, treat as expression and validate
-        TransformExpr(text)  # will raise if invalid
-        return text
+            return text
 
     def fill_fields(self):
         self.tableWidget.clear()
@@ -202,10 +196,8 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             name_item = QTableWidgetItem(override['name'])
             var_item = QTableWidgetItem(override['var'])
             sc_unit_item = QTableWidgetItem(override['sc_unit'])
-            if override['scale'] is not None:
-                scale_item = QTableWidgetItem(str(override['scale']))
-            else:
-                scale_item = QTableWidgetItem('')
+            scale = override['scale']
+            scale_item = QTableWidgetItem('' if TransformExpr.is_blank(scale) else str(scale))
             # The Source column names the tier in the words the Telem Ovd pill
             # uses.  The raw source rides along as item data: it is what the
             # selection handler reads to decide whether the row may be deleted.
@@ -308,7 +300,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
                 var,
                 name,
                 sc_unit,
-                scale_text.strip() if scale is not None else None,
+                scale_text.strip() if scale is not None else '',
                 sim=G.settings_mgr.current_sim,
             )
 
