@@ -25,6 +25,25 @@ class FakeSettings(dict):
 
 
 class TestDevicePanelLabel:
+    def test_a_display_name_is_shown_in_place_of_the_ident(self):
+        s = FakeSettings(devident_joystick='MOZA AB6 FFB Base',
+                         devname_joystick='AB6',
+                         devpath_joystick='dinput:{ABCD-1234}')
+        assert device_panel_label('joystick', s) == 'AB6'
+
+    def test_a_display_name_follows_the_slot(self):
+        s = FakeSettings(devident_joystick='Monster', devident_joystick_2='Yoke',
+                         devname_joystick_2='Left seat',
+                         devpath_joystick=r'\\?\HID#VID_FFFF&PID_2054',
+                         devpath_joystick_2=r'\\?\HID#VID_FFFF&PID_2055')
+        assert device_panel_label('joystick', s) == 'Monster'
+        assert device_panel_label('joystick', s, slot_suffix='_2') == 'Left seat'
+
+    def test_a_long_display_name_is_cut_to_the_icon(self):
+        s = FakeSettings(devname_pedals='Crosswind rudder pedals',
+                         devident_pedals='Pedals')
+        assert device_panel_label('pedals', s) == 'Crosswind rud…'
+
     def test_vpforce_ident_passes_through(self):
         s = FakeSettings(devident_joystick='Monster',
                          devpath_joystick=r'\\?\HID#VID_FFFF&PID_2054')

@@ -26,6 +26,7 @@ __all__ = [
     "format_usb_ids",
     "parse_usb_ids",
     "device_ident_key",
+    "device_name_key",
     "device_panel_icon",
     "device_panel_label",
     "usb_ids_from_devpath",
@@ -137,16 +138,30 @@ def device_panel_icon(role, settings, slot_suffix=''):
     return ''
 
 
+def device_name_key(role):
+    """The settings key holding a device slot's display name: the text
+    shown under the role's status icon.  Empty means the device's own
+    name is shown."""
+    return f'devname_{role}'
+
+
 def device_panel_label(role, settings, max_chars=14, slot_suffix=''):
     """A short device name for the role's status icon, or '' when unknown.
 
-    VPforce idents are the owner's own Configurator names and already
-    short; a generic DirectInput ident is the full product string
-    ("Microsoft SideWinder Force Feedback 2"), so it is cut to its first
-    word or two.  Either way the result fits under the icon.
-    ``slot_suffix`` reads an alternate slot's identity - what the panel
-    needs while a per-aircraft swap has that slot's device in hand.
+    A display name set on the device card is shown as entered.  Otherwise
+    the stored ident: VPforce idents are the owner's own Configurator
+    names and already short; a generic DirectInput ident is the full
+    product string ("Microsoft SideWinder Force Feedback 2"), so it is
+    cut to its first word or two.  Either way the result fits under the
+    icon.  ``slot_suffix`` reads an alternate slot's identity - what the
+    panel needs while a per-aircraft swap has that slot's device in hand.
     """
+    name = str(settings.get(
+        device_name_key(role) + slot_suffix, '') or '').strip()
+    if name:
+        if len(name) > max_chars:
+            name = name[:max_chars - 1] + '…'
+        return name
     ident = str(settings.get(
         device_ident_key(role) + slot_suffix, '') or '').strip()
     if not ident:

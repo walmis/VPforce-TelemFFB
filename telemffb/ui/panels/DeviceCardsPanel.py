@@ -46,7 +46,7 @@ from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
 from telemffb.ui.widgets.custom_widgets import LabeledToggle, Toggle
 from PyQt6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QPushButton, QRadioButton, QSizePolicy, QToolButton,
+    QLabel, QLineEdit, QPushButton, QRadioButton, QSizePolicy, QToolButton,
     QVBoxLayout, QWidget,
 )
 
@@ -61,6 +61,9 @@ DEVICE_ICON_CHOICES = {
 
 #: One selector width everywhere, so the columns line up across cards.
 SELECTOR_WIDTH = 360
+#: The display name field: as many characters as fit under a status icon.
+DISPLAY_NAME_MAX_CHARS = 14
+DISPLAY_NAME_WIDTH = 130
 
 #: Where DirectLink for TelemFFB is offered.  DirectLink deliberately does
 #: not ship with TelemFFB; the no-devices hint under the cards points here,
@@ -202,6 +205,18 @@ class DeviceRow(QWidget):
         self.ids_label.setAlignment(Qt.AlignmentFlag.AlignLeft |
                                     Qt.AlignmentFlag.AlignVCenter)
         row.addWidget(self.ids_label)
+
+        # the text under the role's status icon; blank shows the
+        # device's own name
+        self.name_edit = QLineEdit()
+        self.name_edit.setObjectName(selector_name.replace('cb_select', 'le_name'))
+        self.name_edit.setPlaceholderText('Display name')
+        self.name_edit.setMaxLength(DISPLAY_NAME_MAX_CHARS)
+        self.name_edit.setFixedWidth(DISPLAY_NAME_WIDTH)
+        self.name_edit.setToolTip(
+            "The name shown under this device's icon.\n"
+            "Blank shows the device's own name.")
+        row.addWidget(self.name_edit)
 
         # roles whose effects address one logical axis (pedals X,
         # collective Y, trim wheel Y) can point it at whichever axis a
@@ -409,6 +424,13 @@ class DeviceRow(QWidget):
     def set_device_icon(self, kind: str):
         if self.icon_group is not None and kind in self._icon_buttons:
             self._icon_buttons[kind].setChecked(True)
+
+    def display_name(self) -> str:
+        """The display name as typed, stripped; '' for none."""
+        return self.name_edit.text().strip()
+
+    def set_display_name(self, text) -> None:
+        self.name_edit.setText(str(text or ''))
 
     def _refresh_ids(self, _index=None):
         """The USB ids of the selected device, display-only (the selector

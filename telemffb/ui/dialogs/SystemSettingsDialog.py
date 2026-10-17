@@ -49,7 +49,7 @@ from telemffb.ui.panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 from telemffb.utils import (
-    device_display_name, device_ident_key, device_ids_key, device_pid_key,
+    device_display_name, device_ident_key, device_ids_key, device_name_key, device_pid_key,
     directinput_selection_devices, format_usb_ids, recover_device_identity,
     schedule_on_main_thread, validate_vpconf_profile, HiDpiPixmap,
 )
@@ -887,6 +887,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # the FFB-axis choosers track whatever the restore above landed on
         self._refresh_all_axis_choices()
+        self._restore_display_names()
 
         # Additionally, ensure that when selection is cleared (index 0 / None) the setting is persisted.
         # The on_device_changed handler will call persist after committing the change, but if a selection
@@ -1183,6 +1184,33 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if frame is None:
             return
         row.show_force_frame((frame.mirror_x, frame.mirror_y, frame.rotate_deg))
+
+    def _slot_rows(self):
+        """Every device row with the role its slot stores under: each
+        card's primary row, then the joystick card's rows in the order
+        the save maps them onto joystick, joystick_2, joystick_3."""
+        for role in self.INSTANCE_ROLES:
+            card = self.device_cards.cards[role]
+            if role != 'joystick':
+                yield role, card.primary_row
+                continue
+            rows = card.rows_by_priority()
+            for i, slot_role in enumerate(['joystick', self._alt_role(2), self._alt_role(3)]):
+                yield slot_role, rows[i] if i < len(rows) else None
+
+    def _restore_display_names(self):
+        """Fill each row's display name from its slot (stored, or pending
+        from earlier in this session)."""
+        for role, row in self._slot_rows():
+            if row is not None:
+                row.set_display_name(self._stored_or_pending(device_name_key(role)))
+
+    def _stage_display_names(self):
+        """Queue each slot's display name for the save; an empty slot
+        clears its name."""
+        for role, row in self._slot_rows():
+            self._pending_devpaths[device_name_key(role)] = \
+                row.display_name() if row is not None else ''
 
     def _stage_force_frames(self):
         """Queue each shown row's force frame under its device's key; a
@@ -1550,7 +1578,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # keeping the old selection behind the imported ones
         for key, value in flat.items():
             if key.startswith(("devpath_", "devicon_", "devids_",
-                               "devident_", "pid")):
+                               "devident_", "devname_", "pid")):
                 self._pending_devpaths[key] = value
         for role in list(self.INSTANCE_ROLES) + ['joystick_2', 'joystick_3']:
             self._pending_devpaths[f"devpath_{role}"] = \
@@ -3061,6 +3089,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self._stage_force_frames()
         except Exception:
             logging.exception('Failed to record force frames')
+        try:
+            self._stage_display_names()
+        except Exception:
+            logging.exception('Failed to record display names')
 
         try:
             for k, v in self._pending_devpaths.items():

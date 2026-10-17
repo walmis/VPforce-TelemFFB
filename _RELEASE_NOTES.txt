@@ -47,6 +47,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
     - See each playing effect, its current intensity and what type of effect it is including the specific waveform for periodic effects
 - **NEW: Device configuration UI re-work**
   - Device cards with pull-down selection of detected devices
+  - Edit the display name for the device shown on the device icons
   - More logical integration of the old "auto launch" configuration options
 - **NEW: All settings (master and child instances) are now configurable through the master instance system settings**
   - You are no longer required to open a child instance to configure its local system settings
