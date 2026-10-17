@@ -1590,6 +1590,7 @@ def _cleanup_on_exit(dev_serial):
     6. Quit telemetry manager
     7. Apply exit VPConfigurator profile if configured
     8. Reset device gains to startup values if configured
+    9. Delete the top-level windows while the QApplication is alive
     """
     # before IPC stops, so a held button's release still reaches the children
     if G.button_devices is not None:
@@ -1667,8 +1668,37 @@ def _cleanup_on_exit(dev_serial):
         except Exception:
             logging.error("Unable to release the device on exit")
 
+    _release_windows()
+
     if G.restart_requested:
         _relaunch_when_released()
+
+
+def _release_windows():
+    """Delete the top-level windows while the QApplication is alive.  A
+    window left to interpreter teardown can be destroyed after the
+    application, which faults inside sip (exit code 0xC0000005)."""
+    # stdout and stderr feed the log window through a queued signal; a
+    # message queued against a deleted widget would raise inside a slot
+    for stream in ("stdout", "stderr"):
+        redirect = getattr(sys, stream)
+        if isinstance(redirect, utils.OutLog):
+            setattr(sys, stream, redirect.out)
+    app = QApplication.instance()
+    if app is not None:
+        app.processEvents()
+    for name in ("main_window", "log_window"):
+        window = getattr(G, name, None)
+        setattr(G, name, None)
+        if window is None:
+            continue
+        try:
+            window.close()
+            window.deleteLater()
+        except RuntimeError:
+            pass    # already deleted
+    if app is not None:
+        app.processEvents()
 
 
 #: How long a restart waits for the children to exit before starting anyway.
