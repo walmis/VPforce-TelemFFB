@@ -65,6 +65,9 @@ class PromptStack(QWidget):
     #: Which notice was clicked, by id.
     activated = pyqtSignal(str)
 
+    #: Which notice was dismissed from its close segment, by id.
+    dismissed = pyqtSignal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._layout = QVBoxLayout(self)
@@ -103,7 +106,10 @@ class PromptStack(QWidget):
                 card = NoticeCard(self)
                 card.activated.connect(
                     lambda nid=notice.notice_id: self.activated.emit(nid))
+                card.dismissed.connect(
+                    lambda nid=notice.notice_id: self.dismissed.emit(nid))
                 self._cards[notice.notice_id] = card
-            card.set_notice(notice.html, _STYLES[notice.style], notice.pulse)
+            card.set_notice(notice.html, _STYLES[notice.style], notice.pulse,
+                            notice.dismiss_label)
             self._layout.addWidget(card, alignment=Qt.AlignmentFlag.AlignHCenter)
         self.setVisible(bool(notices))

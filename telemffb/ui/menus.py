@@ -56,7 +56,6 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb import match_history
 from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.restart_offer import ask_to_restart
@@ -156,16 +155,17 @@ class MainMenu:
             self.profiles_menu.addAction(self.offline_config_action)
 
             self.profiles_menu.setToolTipsVisible(True)
-            self.forget_offers_action = QAction('Reset Dismissed Profile Prompts', mw)
+            self.forget_offers_action = QAction('Reset Dismissed Prompts', mw)
             self.forget_offers_action.setToolTip(
                 "TelemFFB will ask again about each aircraft you answered with 'Keep mine' "
-                "or 'Don't ask again', the next time the aircraft loads.")
+                "or 'Don't ask again', and show each dismissed trim calibration prompt "
+                "again, the next time the aircraft loads.")
             self.forget_offers_action.triggered.connect(mw.forget_profile_offers)
             self.profiles_menu.addAction(self.forget_offers_action)
             # Nothing dismissed means nothing to bring back; checked as the menu
             # opens rather than tracked, since prompts are answered elsewhere.
             self.profiles_menu.aboutToShow.connect(
-                lambda: self.forget_offers_action.setEnabled(match_history.has_declines()))
+                lambda: self.forget_offers_action.setEnabled(mw.has_dismissed_prompts()))
 
 
         """ Create the "Utilities" menu """

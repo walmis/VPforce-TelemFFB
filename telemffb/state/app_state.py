@@ -88,13 +88,15 @@ class Notice:
     first - matching the fixed top-to-bottom order the three hand-rolled
     pills used to be laid out in. ``style`` names the look
     (``telemffb.ui.widgets.NoticeCard`` has the three styles); ``pulse``
-    is whether it breathes or sits static.
+    is whether it breathes or sits static. ``dismiss_label`` adds a close
+    segment whose menu entry, so named, emits ``PromptStack.dismissed``.
     """
     notice_id: str
     priority: int
     html: str
     style: str
     pulse: bool
+    dismiss_label: Optional[str] = None
 
 
 #: Priority values for the three prompts this step carries, in the same

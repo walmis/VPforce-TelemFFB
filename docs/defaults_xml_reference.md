@@ -215,7 +215,7 @@ an aircraft off a broader built-in does not raise the prompt about the profile j
 the same record the dialog writes and lapses the same way. Where the built-in wins, nothing is
 recorded, since the new profile reaches nothing.
 
-A decline can be taken back. *Profiles > Reset Dismissed Profile Prompts* forgets every collision
+A decline can be taken back. *Profiles > Reset Dismissed Prompts* forgets every collision
 answered with *Keep mine* or *Don't ask again*, so each one is raised again, at once for the loaded
 aircraft and on the next load for the rest. The configuration itself is untouched. A merge is not
 taken back: it changed the configuration, the profiles it carried across stay where they went, and

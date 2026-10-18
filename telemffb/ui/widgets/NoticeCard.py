@@ -27,8 +27,8 @@ NoticeCard per currently-active ``telemffb.state.app_state.Notice``.
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QVariantAnimation, pyqtSignal
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtCore import QPoint, Qt, QVariantAnimation, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QMenu, QToolButton
 
 from telemffb.ui.widgets.NoticeStyle import NoticeStyle
 
@@ -47,8 +47,19 @@ class NoticeCard(QLabel):
     #: PromptStack forwards it tagged with the notice's id.
     activated = pyqtSignal()
 
+    #: The dismiss entry in the close segment's menu was chosen.
+    dismissed = pyqtSignal()
+
     #: Matches the pulse timing every one of the old hand-rolled pills used.
     _PULSE_DURATION_MS = 2600
+
+    _BORDER_PX = 3
+    _PAD_RIGHT_PX = 18
+    #: The close segment: its width, and the gap from it to the pill's
+    #: outer edge, which keeps the divider on the straight part of the
+    #: pill, clear of the rounded end.
+    _CLOSE_W = 30
+    _CLOSE_GAP = 8
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -62,14 +73,35 @@ class NoticeCard(QLabel):
         self._anim.setLoopCount(-1)
         self._anim.valueChanged.connect(self._paint_pulse)
         self.linkActivated.connect(lambda _href: self.activated.emit())
+        self._dismiss_label: Optional[str] = None
+        self._close = QToolButton(self)
+        self._close.setText("\u2715")
+        self._close.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._close.clicked.connect(self._show_dismiss_menu)
+        self._close.hide()
         self.hide()
 
-    def set_notice(self, html: str, style: NoticeStyle, pulse: bool) -> None:
+    def set_notice(self, html: str, style: NoticeStyle, pulse: bool,
+                   dismiss_label: Optional[str] = None) -> None:
         """Show ``html`` styled as ``style``, breathing while ``pulse`` is
         true (started only while visible, like the originals - it costs
-        nothing while hidden)."""
+        nothing while hidden). ``dismiss_label`` adds a close segment past
+        a divider whose menu offers that one entry."""
         self.setText(html)
         self._style = style
+        self._dismiss_label = dismiss_label
+        self._close.setVisible(bool(dismiss_label))
+        self._close.setToolTip(dismiss_label or "")
+        self._close.setStyleSheet(f"""QToolButton {{
+                            border: none;
+                            border-left: 2px solid {style.border};
+                            background: transparent;
+                            color: {style.text};
+                            font-weight: bold;
+                        }}
+                        QToolButton:hover {{
+                            background-color: {style.hover};
+                        }}""")
         if pulse:
             if self._anim.state() != QVariantAnimation.State.Running:
                 self._paint_pulse(0.0)
@@ -78,6 +110,20 @@ class NoticeCard(QLabel):
             self._anim.stop()
             self._paint_pulse(1.0)
         self.show()
+
+    def _show_dismiss_menu(self) -> None:
+        if not self._dismiss_label:
+            return
+        menu = QMenu(self)
+        menu.addAction(self._dismiss_label).triggered.connect(self.dismissed.emit)
+        menu.exec(self._close.mapToGlobal(QPoint(0, self._close.height())))
+        menu.deleteLater()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        b = self._BORDER_PX
+        self._close.setGeometry(self.width() - b - self._CLOSE_GAP - self._CLOSE_W, b,
+                                self._CLOSE_W, max(0, self.height() - 2 * b))
 
     def clear(self) -> None:
         """Hide and stop pulsing - cheap since the animation only runs
@@ -94,12 +140,15 @@ class NoticeCard(QLabel):
         r = int(r0 + (r1 - r0) * v)
         g = int(g0 + (g1 - g0) * v)
         b = int(b0 + (b1 - b0) * v)
+        pad_right = self._PAD_RIGHT_PX
+        if self._dismiss_label:
+            pad_right += self._CLOSE_W + self._CLOSE_GAP
         self.setStyleSheet(f"""QLabel {{
                             background-color: rgb({r}, {g}, {b});
                             border: 3px solid {style.border};
                             border-radius: 17px;
                             color: {style.text};
-                            padding: 8px 18px;
+                            padding: 8px {pad_right}px 8px 18px;
                         }}
                         QLabel:hover {{
                             background-color: {style.hover};

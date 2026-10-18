@@ -396,6 +396,7 @@ class MainWindow(QMainWindow):
 
         self.prompt_stack = PromptStack()
         self.prompt_stack.activated.connect(self._on_prompt_activated)
+        self.prompt_stack.dismissed.connect(self._on_prompt_dismissed)
         self.prompt_stack.bind(G.app_state)
 
         """ Add the prompt stack to the main layout """
@@ -1870,21 +1871,28 @@ class MainWindow(QMainWindow):
         # Open the URL
         QDesktopServices.openUrl(QUrl(url))
 
+    def has_dismissed_prompts(self) -> bool:
+        return match_history.has_declines() or bool(self._trim_cal_dismissals())
+
     def forget_profile_offers(self):
-        """Give back every matching-profile offer the user answered for good,
-        so each one is raised again.  Their configuration is untouched: the
-        only thing forgotten is what they answered."""
+        """Give back every matching-profile offer the user answered for good
+        and every dismissed trim-calibration prompt, so each one is raised
+        again.  Their configuration is untouched: the only thing forgotten
+        is what they answered."""
         ans = QMessageBox.question(
-            self, "Reset dismissed profile prompts?",
+            self, "Reset dismissed prompts?",
             "TelemFFB will ask again about each aircraft you answered with 'Keep mine' "
-            "or 'Don't ask again'. The prompt returns as that aircraft loads, starting "
-            "with the one you have loaded now.\n\n"
+            "or 'Don't ask again', and show the trim calibration prompt again for each "
+            "aircraft you dismissed it on. Each prompt returns as its aircraft loads, "
+            "starting with the one you have loaded now.\n\n"
             "Nothing in your configuration changes, and merges you already made stay as "
             "they are.",
             QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes,
             QMessageBox.StandardButton.Yes)
         if ans != QMessageBox.StandardButton.Yes:
             return
+        self._save_trim_cal_dismissals(set())
+        self._update_trim_cal_prompt()
         try:
             match_history.forget_declines()
         except Exception:
@@ -1892,7 +1900,7 @@ class MainWindow(QMainWindow):
             # takes the process down, so it is logged here instead.
             logging.exception("Could not forget the declined profile offers")
             return
-        logging.info("Declined profile offers forgotten at the user's request")
+        logging.info("Dismissed prompts forgotten at the user's request")
         # The loaded aircraft may be one of them, so bring its prompt back now
         # rather than on whichever frame next resolves it.
         if not G.settings_mgr.offline_mode and G.telem_manager is not None:
@@ -2492,13 +2500,61 @@ class MainWindow(QMainWindow):
         show = (G.master_instance and G.device_type == "joystick"
                 and ac is not None
                 and getattr(ac, "_trim_cal_available", False)
-                and getattr(ac, "_trim_curve_y_fam", None) is None)
+                and getattr(ac, "_trim_curve_y_fam", None) is None
+                and self._trim_cal_prompt_key() not in self._trim_cal_dismissals())
         G.app_state.set_prompt('trim_cal', Notice(
             notice_id='trim_cal', priority=TRIM_CAL_PRIORITY, style='trim_cal', pulse=True,
+            dismiss_label="Dismiss for this aircraft",
             html="<a href='#trimcal' style='color:black; text-decoration:none;'>"
                  "<span style='font-weight:500;'>No Trim Calibration Found for this "
                  "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
                  " to Set Up Realistic Trim</span></a>") if show else None)
+
+    #: System setting holding the aircraft whose trim-calibration prompt was
+    #: dismissed: per machine, outside the config, so a dismissal neither
+    #: travels with a shared config nor reloads every instance's aircraft.
+    _TRIM_CAL_DISMISSED_KEY = "dismissedTrimCalPrompts"
+
+    @staticmethod
+    def _trim_cal_prompt_key():
+        """The loaded aircraft as a dismissal records it: sim and matched
+        pattern, so a dismissal covers every livery the pattern names."""
+        sim = G.settings_mgr.current_sim
+        pattern = G.settings_mgr.current_pattern
+        return f"{sim}|{pattern}" if sim and pattern else None
+
+    def _trim_cal_dismissals(self) -> set:
+        """The dismissed prompt keys, read from the system settings once;
+        the prompt is re-evaluated on every telemetry update."""
+        cached = getattr(self, '_trim_cal_dismissed', None)
+        if cached is None:
+            cached = set()
+            raw = G.system_settings.get(self._TRIM_CAL_DISMISSED_KEY, "")
+            try:
+                cached = set(json.loads(raw)) if raw else set()
+            except (TypeError, ValueError):
+                logging.warning(f"Dismissed trim calibration prompts unreadable: {raw!r}")
+            self._trim_cal_dismissed = cached
+        return cached
+
+    def _save_trim_cal_dismissals(self, keys: set):
+        self._trim_cal_dismissed = set(keys)
+        if keys:
+            G.system_settings.setValue(self._TRIM_CAL_DISMISSED_KEY, json.dumps(sorted(keys)))
+        else:
+            G.system_settings.remove(self._TRIM_CAL_DISMISSED_KEY)
+
+    def _on_prompt_dismissed(self, notice_id: str):
+        """PromptStack.dismissed relay: only the trim-calibration prompt
+        is dismissable, and only for the aircraft it names."""
+        if notice_id != 'trim_cal':
+            return
+        key = self._trim_cal_prompt_key()
+        if key is None:
+            return
+        self._save_trim_cal_dismissals(self._trim_cal_dismissals() | {key})
+        logging.info(f"Trim calibration prompt dismissed for {key}")
+        self._update_trim_cal_prompt()
 
     def _on_prompt_activated(self, notice_id: str):
         """PromptStack.activated relay: what a click on each of the three
