@@ -913,7 +913,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         realtime_coeff_y = elevator_coeff
         ec = utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 1.0), (base_elev_coeff, max_coeff_y))
 
-        pct_max_e = ec / max_coeff_y
+        pct_max_e = ec / max_coeff_y if max_coeff_y else 0.0
         telem_data._pct_max_e = pct_max_e
         self._ipc_telem["_pct_max_e"] = pct_max_e
         logging.debug(f"Elev Coef: {ec}")
@@ -923,7 +923,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         realtime_coeff_x = aileron_coeff
         ac = utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 1.0), (base_ailer_coeff, max_coeff_x))
 
-        pct_max_a = ac / max_coeff_x
+        pct_max_a = ac / max_coeff_x if max_coeff_x else 0.0
         telem_data._pct_max_a = pct_max_a
         self._ipc_telem["_pct_max_a"] = pct_max_a
         telem_data._ac = ac
@@ -1038,7 +1038,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
             realtime_coeff_x = rudder_coeff
             rudder_coeff = utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 1.0), (base_rudder_coeff, max_coeff_x))
 
-            pct_max_r = rudder_coeff / max_coeff_x
+            pct_max_r = rudder_coeff / max_coeff_x if max_coeff_x else 0.0
             telem_data._pct_max_r = pct_max_r
             self._ipc_telem["_pct_max_r"] = pct_max_r
             telem_data._rc = rudder_coeff
