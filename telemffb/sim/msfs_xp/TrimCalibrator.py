@@ -376,6 +376,32 @@ class TrimCalibrator:
     TRIM_RB_DEADBAND = 0.005     # residual below this = arrived
     TRIM_OVERDRIVE_MAX = 0.20    # bound on the closed-loop correction
 
+    # X-Plane command trim (trim_xp_commands): the trim moves at the
+    # aircraft's own rate only while a command is held, and the read-back
+    # trails the sim by the telemetry and flight-loop delay. Release decisions
+    # made from the moving read-back overshoot by rate x delay and hunt, so
+    # trim moves in timed presses instead: the press length comes from the
+    # error and the measured rate, and the next press waits for the read-back
+    # to settle. The delay holds up press and release alike, so the distance
+    # moved is the rate times the time between sending them. Each settled
+    # press re-measures the rate (per command) and the polarity.
+    XP_TRIM_UP_CMD = "sim/flight_controls/pitch_trim_up"
+    XP_TRIM_DOWN_CMD = "sim/flight_controls/pitch_trim_down"
+    XP_PULSE_DEADBAND = 0.006    # settled error at or below this needs no press
+    XP_PULSE_AIM = 0.75          # a press is sized for this share of the error
+    XP_PULSE_PROBE_S = 0.1       # first press, before any rate is known
+    # A press shorter than this can land its release in the same plugin
+    # flight loop as its press; the plugin runs a loop's queue press first,
+    # which turns it into a zero-length press.
+    XP_PULSE_MIN_S = 0.03
+    XP_PULSE_MAX_S = 2.0
+    XP_RATE_MIN_MOVE = 0.003     # settled move below this measures nothing
+    XP_SETTLE_MIN_S = 0.1        # after a release, at least this before measuring
+    XP_SETTLE_QUIET_S = 0.15     # ... and the read-back unchanged for this long
+    XP_SETTLE_MAX_S = 1.5        # measure anyway after this (trim the aircraft moves itself)
+    XP_NO_RESPONSE_S = 2.0       # this much held time with no movement -> unresponsive
+    XP_CMD_RESTORE_TIMEOUT_S = 20.0  # RESTORE waits this long for the trim to get home
+
     # Elevator-authority guard: sustained command beyond this during the sweep
     # means the trim band exceeds what the elevator can hold level against.
     U_ELEV_SAT = 0.7
@@ -453,6 +479,11 @@ class TrimCalibrator:
         self.trim_axis_invert = False
         self.trim_axis_var = "AXIS_ELEV_TRIM_SET"
         self.trim_axis_range = 16384
+        # Run option: X-Plane trim moved by holding the pitch trim up/down
+        # commands (closed loop on the read-back) instead of writing the
+        # trim dataref, for aircraft whose own trim system overwrites the
+        # dataref (Hot Start CL650).
+        self.trim_xp_commands = False
         # Run option: per-frame diagnostic CSV trace (debug-mode checkbox).
         self.trace_enabled = False
         # Run mode (start(assist=True)): stop after neutralization and hold
@@ -541,7 +572,24 @@ class TrimCalibrator:
         self._sign_flips = 0
         self._hold_tx_t = 0.0            # last trimwheel-hold broadcast time
         self._trim_method_logged = False # effective write method logged once per run
-        # trace (diagnostic flight recorder) state
+        self._xp_cmd_setpoint = None     # command-trim target, read-back space
+        self._xp_cmd_held = 0            # +1 trim-up held, -1 trim-down held, 0 none
+        self._xp_phase = "idle"          # idle | press | settle
+        self._xp_press = None            # (cmd, t_begin, rb_start, err_start)
+        self._xp_press_end_t = 0.0       # planned release time of the current press
+        self._xp_release_t = 0.0         # when the current press was released
+        self._xp_press_len = 0.0         # actual press length (begin to end sent)
+        self._xp_rb_last = None          # settle tracking: last read-back value...
+        self._xp_rb_change_t = 0.0       # ...and when it last changed
+        self._xp_rate = {1: None, -1: None}  # |read-back change| per held second
+        self._xp_polarity = None         # +1: trim-up raises the read-back; -1 inverted
+        self._xp_delay = 0.0             # press to first read-back movement
+        self._xp_dead_hold_s = 0.0       # held time since the last measurable move
+        self._xp_probe_s = self.XP_PULSE_PROBE_S  # press length while no rate is known
+        self._xp_press_moved_t = None    # first read-back movement of the current press
+        self._xp_polarity_doubts = 0     # consecutive presses against the polarity
+        self._xp_tick_t = None           # previous servo frame, for the frame time
+        self._xp_tick_dt = 0.0        # trace (diagnostic flight recorder) state
         self._trace_rows = []
         self._trace_t0 = None
         self._trace_broken = False
@@ -758,6 +806,11 @@ class TrimCalibrator:
                 self._set_trimwheel_hold(False)
             except Exception:
                 pass  # the hold self-expires within the TTL anyway
+            try:
+                if self._xp_cmd_mode():
+                    self._xp_cmd_drive(0)   # a held trim command runs to the stop
+            except Exception:
+                logger.exception("trim command release failed")
             self._dump_trace()
 
     # ---- Per-frame driver (called from the telemetry thread) ----------------
@@ -825,6 +878,8 @@ class TrimCalibrator:
         # SOLVE/DONE/ABORT are terminal and handled inline when reached.
 
         if self._active:
+            if self._xp_cmd_mode():
+                self._xp_trim_servo(telem_data, now)
             self._trace_frame(telem_data, now)
 
     def _set_state(self, new, why=""):
@@ -1306,7 +1361,7 @@ class TrimCalibrator:
 
         now = time.perf_counter()
         at_target = (not ramping and
-                     abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self.TRIM_STATION_TOL)
+                     abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self._arrival_tol(self.TRIM_STATION_TOL))
         settled = at_target and abs(self._vs_err(telem_data.VerticalSpeed)) <= self.STABLE_VS_TOL \
             and abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
 
@@ -1592,7 +1647,7 @@ class TrimCalibrator:
         ias_rate = (ias - hist[0][1]) / span if span >= 1.0 else 0.0
 
         at_target = (not ramping and
-                     abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self.TRIM_STATION_TOL)
+                     abs((telem_data.ElevTrimPct or 0) - self._neut_target) <= self._arrival_tol(self.TRIM_STATION_TOL))
         level = abs(self._vs_err(telem_data.VerticalSpeed)) <= self.STABLE_VS_TOL \
             and abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
 
@@ -2101,8 +2156,9 @@ class TrimCalibrator:
             self._trim_cmd += delta
             self._sign_cmd_accum += delta
             self._trim_slew_t = time.perf_counter()
-        elif self._trim_dir_verified:
-            # Command at target: close the loop on the read-back. Aircraft
+        elif self._trim_dir_verified and not self._xp_cmd_mode():
+            # Command at target: close the loop on the read-back (command
+            # trim's servo already does, so it gets no overdrive). Aircraft
             # whose reported travel limits differ from their actual travel
             # land the read-back proportionally short of the command; bleed
             # the steady residual off with a bounded, slew-limited overdrive
@@ -2114,8 +2170,11 @@ class TrimCalibrator:
                     -self.TRIM_OVERDRIVE_MAX, self.TRIM_OVERDRIVE_MAX)
         self._set_trim(self._trim_cmd + self._trim_overdrive)
 
-        # Direction verification against the read-back.
-        if not self._trim_dir_verified and abs(self._sign_cmd_accum) >= self.TRIM_SIGN_CHECK_DIST:
+        # Direction verification against the read-back. Command trim verifies
+        # polarity from each settled press instead: its read-back trails the
+        # setpoint by a press and a settle, which this check would misread.
+        if not self._trim_dir_verified and not self._xp_cmd_mode() and \
+                abs(self._sign_cmd_accum) >= self.TRIM_SIGN_CHECK_DIST:
             rb = telem_data.ElevTrimPct or 0
             rb_delta = rb - self._sign_rb_start
             if abs(rb_delta) >= self.TRIM_RESPOND_MIN:
@@ -2215,7 +2274,7 @@ class TrimCalibrator:
             self._sat_recovering = False
 
         at_station = (not ramping and
-                      abs((telem_data.ElevTrimPct or 0) - target) <= self._station_tol)
+                      abs((telem_data.ElevTrimPct or 0) - target) <= self._arrival_tol(self._station_tol))
         settled = at_station and \
             abs(self._vs_err(telem_data.VerticalSpeed)) <= self.STABLE_VS_TOL and \
             abs(telem_data.Roll) <= self.STABLE_ROLL_TOL
@@ -2344,7 +2403,7 @@ class TrimCalibrator:
             self._accept_station(mean_trim, mean_u, mean_ias, residual_vs=mean_vs_err)
             return
         rb_err = abs((telem_data.ElevTrimPct or 0) - target)
-        if rb_err > self._station_tol:
+        if rb_err > self._arrival_tol(self._station_tol):
             why = (f"trim read-back never reached the station target "
                    f"(off by {100 * rb_err:.1f}%)")
         elif abs(telem_data.Roll or 0) > self.STABLE_ROLL_TOL:
@@ -2477,8 +2536,15 @@ class TrimCalibrator:
         if not ramping:
             if self._restore_release_t is None:
                 self._restore_release_t = time.perf_counter()
-            if arrived or time.perf_counter() - self._restore_release_t \
-                    >= self.HOLD_WALK_GRACE_S:
+            waited = time.perf_counter() - self._restore_release_t
+            # Command trim moves at the aircraft's own rate, which can trail
+            # the slewed setpoint: release only once the trim is home and the
+            # last press has settled (idle: the previous frame chose no press).
+            if self._xp_cmd_mode() and waited < self.XP_CMD_RESTORE_TIMEOUT_S and (
+                    self._xp_phase != "idle" or
+                    abs((telem_data.ElevTrimPct or 0) - self._trim0) > self._arrival_tol(self.TRIM_STATION_TOL)):
+                return
+            if arrived or waited >= self.HOLD_WALK_GRACE_S:
                 self.status_message = getattr(self, "_done_status", "Done")
                 self._finish(CalState.DONE)
 
@@ -2795,7 +2861,18 @@ class TrimCalibrator:
         negated int — or, for a ±1 range, an un-negated float — and negated
         once more when ``trim_axis_invert`` is set. ``DO_NOT_SEND`` writes
         nothing (the read-back check then aborts the run as unresponsive).
+
+        X-Plane command trim (``trim_xp_commands``) only records ``pct`` as
+        the setpoint :meth:`_xp_trim_servo` drives the read-back to; there
+        ``_trim_sign`` selects which command raises the read-back instead of
+        negating a written value.
         """
+        if self._xp_cmd_mode():
+            self._xp_cmd_setpoint = clamp(pct, -1.0, 1.0)
+            self._log_trim_method(
+                f"{self.XP_TRIM_UP_CMD} / {self.XP_TRIM_DOWN_CMD} "
+                "(command trim, timed presses)")
+            return
         pct = clamp(pct * self._trim_sign, -1.0, 1.0)
         if self.ac._sim_is_msfs():
             limits = None
@@ -2870,6 +2947,195 @@ class TrimCalibrator:
             self._trace_trim_write = round(pct, 5)
             self.ac.write_xp_dataref("sim/cockpit2/controls/elevator_trim", round(pct, 5), type="float")
 
+    def _xp_cmd_mode(self):
+        return self.trim_xp_commands and self.ac._sim_is_xplane()
+
+    def _xp_trim_servo(self, telem_data, now):
+        """Move the read-back to the setpoint in timed presses (see
+        XP_TRIM_UP_CMD). Runs every frame of a run, so the trim holds its
+        setpoint through every phase like a written value would."""
+        if self._xp_tick_t is not None:
+            self._xp_tick_dt = now - self._xp_tick_t
+        self._xp_tick_t = now
+        rb = telem_data.ElevTrimPct
+        if rb is None:
+            if self._xp_phase == "press":
+                self._xp_release(now)
+            self._trace_trim_write = self._xp_cmd_held
+            return
+        if self._xp_rb_last is None or abs(rb - self._xp_rb_last) >= 0.0005:
+            self._xp_rb_last = rb
+            self._xp_rb_change_t = now
+        if self._xp_phase == "press":
+            self._xp_tick_press(rb, now)
+        elif self._xp_phase == "settle":
+            self._xp_tick_settle(rb, now)
+        if self._xp_phase == "idle" and self._active:
+            self._xp_maybe_press(rb, now)
+        self._trace_trim_write = self._xp_cmd_held
+
+    def _xp_maybe_press(self, rb, now):
+        if self._xp_cmd_setpoint is None:
+            return
+        err = self._xp_cmd_setpoint - rb
+        if abs(err) <= self.XP_PULSE_DEADBAND:
+            return
+        cmd = (1 if err > 0 else -1) * (self._xp_polarity or 1)
+        rate = self._xp_rate[cmd]
+        if rate is None:
+            length = self._xp_probe_s
+        else:
+            length = self.XP_PULSE_AIM * abs(err) / rate
+            if length < self.XP_PULSE_MIN_S:
+                # The release goes out on a frame, so the shortest press runs
+                # up to a frame longer. Press only while that move still
+                # shrinks the error: past it, the trim would step back and
+                # forth across the setpoint.
+                shortest = rate * (self.XP_PULSE_MIN_S + self._xp_tick_dt)
+                if shortest >= 1.8 * abs(err):
+                    return
+                length = self.XP_PULSE_MIN_S
+        self._xp_cmd_drive(cmd)
+        self._xp_press = (cmd, now, rb, err)
+        self._xp_press_moved_t = None
+        self._xp_press_end_t = now + min(length, self.XP_PULSE_MAX_S)
+        self._xp_phase = "press"
+
+    def _xp_tick_press(self, rb, now):
+        cmd, t_begin, rb_start, err_start = self._xp_press
+        moved = rb - rb_start
+        if self._xp_press_moved_t is None and abs(moved) >= 0.0005:
+            self._xp_press_moved_t = now
+            delay = now - t_begin
+            self._xp_delay = delay if not self._xp_delay else 0.5 * (self._xp_delay + delay)
+        # The read-back trails the sim, so one already at the setpoint means
+        # the trim is past it: the rate is far above the estimate.
+        if now >= self._xp_press_end_t or moved * err_start >= err_start * err_start:
+            self._xp_release(now)
+
+    def _xp_release(self, now):
+        self._xp_cmd_drive(0)
+        self._xp_release_t = now
+        self._xp_press_len = now - self._xp_press[1] if self._xp_press else 0.0
+        self._xp_phase = "settle"
+
+    def _xp_tick_settle(self, rb, now):
+        since = now - self._xp_release_t
+        if since < max(self.XP_SETTLE_MIN_S, self._xp_delay) or \
+                (now - self._xp_rb_change_t < self.XP_SETTLE_QUIET_S
+                 and since < self.XP_SETTLE_MAX_S):
+            return
+        self._xp_phase = "idle"
+        if self._xp_press is None:
+            return
+        cmd, _, rb_start, _ = self._xp_press
+        self._xp_press = None
+        moved = rb - rb_start
+        if abs(moved) < self.XP_RATE_MIN_MOVE:
+            self._xp_dead_hold_s += self._xp_press_len
+            if self._xp_dead_hold_s >= self.XP_NO_RESPONSE_S:
+                self._abort("Trim is not responding to commands")
+                return
+            if self._xp_rate[cmd] is None:
+                self._xp_probe_s = min(2 * self._xp_probe_s, self.XP_PULSE_MAX_S)
+            else:
+                self._xp_rate[cmd] *= 0.5   # slower than thought: press longer
+            return
+        self._xp_dead_hold_s = 0.0
+        polarity = (1 if moved > 0 else -1) * cmd   # +1: trim-up raises the read-back
+        if self._xp_polarity is None:
+            self._xp_polarity = polarity
+            if polarity < 0:
+                logger.info("Trim commands move the trim read-back inverted "
+                            "(trim up lowers it)")
+        elif polarity != self._xp_polarity:
+            # A settled press moved the trim against its learned direction:
+            # believe it only twice in a row (the aircraft can move its own trim).
+            self._xp_polarity_doubts += 1
+            if self._xp_polarity_doubts < 2:
+                return
+            self._sign_flips += 1
+            if self._sign_flips > 2:
+                self._abort("Trim read-back direction is erratic")
+                return
+            self._xp_polarity = polarity
+            self._xp_rate = {1: None, -1: None}
+            logger.warning(f"Trim commands reversed direction; polarity now {polarity:+d}")
+        self._xp_polarity_doubts = 0
+        self._trim_dir_verified = True
+        if self._xp_press_len > 0:
+            measured = abs(moved) / self._xp_press_len
+            old = self._xp_rate[cmd]
+            if old is None:
+                self._xp_rate[cmd] = measured
+                if self._xp_rate[-cmd] is None:
+                    self._xp_rate[-cmd] = measured
+                logger.info(f"Trim command rate measured: {measured:.3f}/s, "
+                            f"delay {self._xp_delay:.2f}s")
+            else:
+                weight = clamp(abs(moved) / 0.02, 0.25, 1.0)
+                self._xp_rate[cmd] = old + weight * (measured - old)
+
+    def _arrival_tol(self, base):
+        """Read-back arrival tolerance ``base``, widened for command trim to
+        the finest step its shortest press allows (see _xp_maybe_press).
+        Stations record the trim actually reached, so a coarser arrival does
+        not bias the measurement."""
+        if not self._xp_cmd_mode():
+            return base
+        rates = [r for r in self._xp_rate.values() if r]
+        if not rates:
+            return base
+        shortest = max(rates) * (self.XP_PULSE_MIN_S + self._xp_tick_dt)
+        return max(base, 1.1 * shortest / 1.8)
+
+    def release_trim_command(self):
+        """Telemetry stopped: release a trim press now instead of on the next
+        frame. The press is measured as released here."""
+        if self._active and self._xp_phase == "press":
+            self._xp_release(time.perf_counter())
+
+    def on_aircraft_unloaded(self):
+        """The aircraft handler is being retired with a run in progress. A
+        held trim command would run the trim to its stop with no more frames
+        coming, so command trim ends the run here; the written trim modes keep
+        their last value as before."""
+        if self._active and self._xp_cmd_mode():
+            self.force_abort("Aircraft unloaded")
+
+    def _xp_finish_commands(self):
+        """End-of-run command trim teardown: release, summarize, and say so
+        when the trim is not back where the run found it."""
+        try:
+            self._xp_cmd_drive(0)
+        except Exception:
+            logger.exception("Releasing the held trim command failed")
+        self._xp_phase = "idle"
+        self._xp_press = None
+        rates = self._xp_rate
+        if rates[1] is not None or rates[-1] is not None:
+            up, down = (("-" if r is None else f"{r:.3f}/s") for r in (rates[1], rates[-1]))
+            logger.info(f"Trim commands: up {up}, down {down}, "
+                        f"delay {self._xp_delay:.2f}s, polarity {self._xp_polarity or 1:+d}")
+        rb = self._xp_rb_last
+        if self._trim_touched and self.state != CalState.ASSIST_HOLD and rb is not None \
+                and abs(rb - self._trim0) > self.TRIM_STATION_TOL:
+            note = f"trim left at {100 * rb:+.0f}% (was {100 * self._trim0:+.0f}%)"
+            logger.info(f"Command trim: {note}")
+            self.status_message = f"{self.status_message} - {note}"
+
+    def _xp_cmd_drive(self, cmd):
+        """Make ``cmd`` (+1 up, -1 down, 0 none) the held trim command."""
+        if cmd == self._xp_cmd_held:
+            return
+        names = {1: self.XP_TRIM_UP_CMD, -1: self.XP_TRIM_DOWN_CMD}
+        if self._xp_cmd_held:
+            self.ac.send_xp_command(
+                f"COMMAND:cmd={names[self._xp_cmd_held]},phase=end")
+        if cmd:
+            self.ac.send_xp_command(f"COMMAND:cmd={names[cmd]},phase=begin")
+        self._xp_cmd_held = cmd
+
     # ---- Teardown ------------------------------------------------------------
 
     def _abort(self, reason):
@@ -2887,7 +3153,12 @@ class TrimCalibrator:
             # Ending from the assistant's hold keeps the CURRENT trim: it is
             # the level trim for the power the user chose, and snapping back
             # to the pre-assist trim would hand back an out-of-trim aircraft.
-            if self._trim_touched and self.state != CalState.ASSIST_HOLD:
+            # Command trim only moves while the engine runs: RESTORE has
+            # already brought it home after success; an abort leaves it where
+            # it is.
+            if self._xp_cmd_mode():
+                self._xp_finish_commands()
+            elif self._trim_touched and self.state != CalState.ASSIST_HOLD:
                 self._set_trim(self._trim0)
         except Exception as e:
             logger.debug(f"trim restore skipped: {e}")

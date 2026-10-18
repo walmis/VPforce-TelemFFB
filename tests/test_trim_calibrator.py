@@ -3569,3 +3569,263 @@ class TestTrimCalibrationSaveDevice:
         SettingsLayout.save_trim_position_mode(layout, "Trimmed")
         (_, k), = writes
         assert k.get("the_device") == "joystick"
+
+
+# --------------------------------------------------------------------------- #
+#  X-Plane command trim
+# --------------------------------------------------------------------------- #
+
+class FakeXPCommandTrimAircraft(FakePlantAircraft):
+    """X-Plane aircraft whose trim moves only while a pitch trim command is
+    held, at its own rate; trim dataref writes are overwritten by its own
+    trim system (the Hot Start CL650 case). Commands take effect
+    ``latency_frames`` after they are sent, and a press and release that come
+    due in the same frame run press first, as the plugin's queue does."""
+
+    def __init__(self, cmd_trim_rate=0.15, cmd_response_sign=1.0, latency_frames=2, **kw):
+        super().__init__(**kw)
+        self.cmd_trim_rate = cmd_trim_rate
+        self.cmd_response_sign = cmd_response_sign
+        self.latency_frames = latency_frames
+        self.dataref_writes = 0
+        self.command_log = []      # (time, command, phase) as sent
+        self._pending = []         # [frames left, command, phase]
+        self.held = set()
+
+    def _sim_is_msfs(self):
+        return False
+
+    def _sim_is_xplane(self):
+        return True
+
+    def send_xp_command(self, cmd):
+        kind, _, payload = cmd.partition(":")
+        fields = dict(kv.split("=", 1) for kv in payload.split(","))
+        if kind == "AXIS":
+            self.cmd_ail = float(fields["jx"])
+            self.cmd_elev = float(fields["jy"])
+        elif kind == "COMMAND":
+            self.command_log.append((time.perf_counter(), fields["cmd"], fields["phase"]))
+            self._pending.append([self.latency_frames, fields["cmd"], fields["phase"]])
+
+    def write_xp_dataref(self, dataref, value, type="float"):
+        self.dataref_writes += 1
+
+    def step(self, dt):
+        for p in self._pending:
+            p[0] -= 1
+        due = sorted((p for p in self._pending if p[0] <= 0), key=lambda p: p[2] != "begin")
+        self._pending = [p for p in self._pending if p[0] > 0]
+        for _, cmd, phase in due:
+            if phase == "begin":
+                self.held.add(cmd)
+            else:
+                self.held.discard(cmd)
+        rate = 0.0
+        if TrimCalibrator.XP_TRIM_UP_CMD in self.held:
+            rate += self.cmd_trim_rate
+        if TrimCalibrator.XP_TRIM_DOWN_CMD in self.held:
+            rate -= self.cmd_trim_rate
+        if rate:
+            new = clamp(self.trim + rate * self.cmd_response_sign * dt, -1.0, 1.0)
+            self.max_trim_step = max(self.max_trim_step, abs(new - self.trim))
+            self.trim = new
+        super().step(dt)
+
+    def flush(self, dt=1 / 30.0):
+        for _ in range(self.latency_frames + 1):
+            self.step(dt)
+
+
+class FakeXPDatarefTrimAircraft(FakePlantAircraft):
+    """X-Plane aircraft that honors the trim dataref write (the default write
+    method): ``sim/cockpit2/controls/elevator_trim`` sets the trim directly."""
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.command_log = []
+
+    def _sim_is_msfs(self):
+        return False
+
+    def _sim_is_xplane(self):
+        return True
+
+    def send_xp_command(self, cmd):
+        kind, _, payload = cmd.partition(":")
+        fields = dict(kv.split("=", 1) for kv in payload.split(","))
+        if kind == "AXIS":
+            self.cmd_ail = float(fields["jx"])
+            self.cmd_elev = float(fields["jy"])
+        elif kind == "COMMAND":
+            self.command_log.append(cmd)
+
+    def write_xp_dataref(self, dataref, value, type="float"):
+        if dataref == "sim/cockpit2/controls/elevator_trim":
+            self._apply_new_trim(float(value))
+
+
+@pytest.mark.xplane
+class TestXPlaneDatarefTrim:
+    def test_full_run_through_the_trim_dataref(self, clock):
+        ac = FakeXPDatarefTrimAircraft(coupling=0.5, physical_y=1.0)
+        cal = TrimCalibrator(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+        assert ac.trim == pytest.approx(cal.result["trim0"], abs=0.01)
+        assert ac.command_log == []
+
+
+def _longest_hold(command_log, end_t):
+    """Longest continuous hold of any trim command in a FakeXPCommandTrimAircraft log."""
+    held, longest = {}, 0.0
+    for t, cmd, phase in command_log:
+        if phase == "begin":
+            held[cmd] = t
+        elif cmd in held:
+            longest = max(longest, t - held.pop(cmd))
+    for t in held.values():
+        longest = max(longest, end_t - t)
+    return longest
+
+
+@pytest.mark.xplane
+class TestXPlaneCommandTrim:
+    @staticmethod
+    def _cal(ac):
+        cal = TrimCalibrator(ac)
+        cal.trim_xp_commands = True
+        return cal
+
+    @staticmethod
+    def _run_until(cal, ac, clock, done, dt=1 / 30.0, max_frames=40000):
+        for _ in range(max_frames):
+            clock.advance(dt)
+            cal.update(ac.telem())
+            ac.step(dt)
+            if done():
+                return True
+        return False
+
+    # Trim rate (full range = 2.0 per second), command delay in frames, frame
+    # time: slow and fast trims, short and long delays. Release decisions made
+    # from the delayed read-back hunt from about rate x delay = 0.011, and
+    # ran the trim to its stop at 0.3/s with 167 ms.
+    @pytest.mark.parametrize("rate, latency, dt", [
+        (0.05, 2, 1 / 30.0),
+        (0.15, 2, 1 / 30.0),
+        (0.3, 5, 1 / 30.0),
+        (0.5, 8, 1 / 50.0),
+        (1.0, 3, 1 / 50.0),
+    ])
+    def test_full_run_through_commands(self, clock, rate, latency, dt):
+        ac = FakeXPCommandTrimAircraft(coupling=0.5, physical_y=1.0,
+                                       cmd_trim_rate=rate, latency_frames=latency)
+        cal = self._cal(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock, dt=dt)
+        ac.flush(dt)
+
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+        assert ac.dataref_writes == 0
+        assert not ac.held
+        assert ac.trim == pytest.approx(cal.result["trim0"], abs=cal.TRIM_STATION_TOL)
+        assert _longest_hold(ac.command_log, clock.t) <= cal.XP_PULSE_MAX_S + 2 * dt
+        assert cal._xp_polarity == 1
+
+    def test_inverted_command_response_is_learned(self, clock):
+        ac = FakeXPCommandTrimAircraft(coupling=0.5, physical_y=1.0,
+                                       cmd_trim_rate=0.3, cmd_response_sign=-1.0)
+        cal = self._cal(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        ac.flush()
+
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal._xp_polarity == -1
+        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
+        assert not ac.held
+        assert ac.trim == pytest.approx(cal.result["trim0"], abs=cal.TRIM_STATION_TOL)
+
+    def test_stop_aborts_at_once_and_leaves_the_trim(self, clock):
+        ac = FakeXPCommandTrimAircraft(coupling=0.5, physical_y=1.0)
+        cal = self._cal(ac)
+        cal.start()
+        assert self._run_until(cal, ac, clock, lambda: cal.state == CalState.SWEEP
+                               and abs(ac.trim - cal._trim0) > 0.1)
+
+        cal.stop()
+        clock.advance(1 / 30.0)
+        cal.update(ac.telem())
+        ac.flush()
+        trim_at_stop = ac.trim
+
+        assert cal.state == CalState.ABORT
+        assert not ac.held
+        assert abs(trim_at_stop - cal._trim0) > 0.1
+        for _ in range(30):
+            ac.step(1 / 30.0)
+        assert ac.trim == trim_at_stop
+
+    def test_trim_deaf_to_commands_aborts(self, clock):
+        ac = FakeXPCommandTrimAircraft(cmd_trim_rate=0.0)
+        cal = self._cal(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+        ac.flush()
+
+        assert state == CalState.ABORT
+        assert not ac.held
+        assert ac.trim == 0.0
+
+    def test_aircraft_unloaded_mid_press_releases_the_command(self, clock):
+        ac = FakeXPCommandTrimAircraft()
+        cal = self._cal(ac)
+        cal.start()
+        assert self._run_until(cal, ac, clock, lambda: cal._xp_cmd_held != 0)
+
+        cal.on_aircraft_unloaded()
+        ac.flush()
+
+        assert cal.state == CalState.ABORT
+        assert not ac.held
+
+    def test_aircraft_unloaded_leaves_the_dataref_run_alone(self, clock):
+        ac = FakeXPDatarefTrimAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        assert self._run_until(cal, ac, clock, lambda: cal.state == CalState.TRIM_NEUTRAL)
+
+        cal.on_aircraft_unloaded()
+
+        assert cal.active
+
+    def test_telemetry_timeout_releases_a_press(self, clock):
+        ac = FakeXPCommandTrimAircraft()
+        cal = self._cal(ac)
+        cal.start()
+        assert self._run_until(cal, ac, clock, lambda: cal._xp_cmd_held != 0)
+
+        cal.release_trim_command()
+        ac.flush()
+
+        assert cal.active
+        assert not ac.held
+        assert ac.command_log[-1][2] == "end"
+
+    def test_no_command_is_pressed_again_inside_one_plugin_loop(self, clock):
+        ac = FakeXPCommandTrimAircraft(cmd_trim_rate=0.5)
+        cal = self._cal(ac)
+        cal.start()
+        run_to_completion(cal, ac, clock)
+
+        released = {}
+        for t, cmd, phase in ac.command_log:
+            if phase == "end":
+                released[cmd] = t
+            elif cmd in released:
+                assert t - released[cmd] >= cal.XP_SETTLE_MIN_S

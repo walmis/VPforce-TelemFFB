@@ -301,6 +301,14 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         self.effects['rudder_const_force'].stop()
         if self._use_firmware_axis_backend():
             self._clear_firmware_axis_override()
+        if self._trim_calibrator is not None:
+            self._trim_calibrator.release_trim_command()
+
+    @override
+    def on_shutdown(self):
+        if self._trim_calibrator is not None:
+            self._trim_calibrator.on_aircraft_unloaded()
+        super().on_shutdown()
 
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):

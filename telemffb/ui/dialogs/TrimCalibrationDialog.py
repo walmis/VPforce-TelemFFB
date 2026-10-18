@@ -297,6 +297,21 @@ class TrimCalibrationDialog(QDialog):
         self.cmb_response.setCurrentIndex(self.RESPONSE_DEFAULT_INDEX)
         self.cmb_response.currentIndexChanged.connect(self._on_response_changed)
         response_row.addWidget(self.cmb_response)
+        # X-Plane only, applies to the next run, not saved.
+        self.chk_xp_trim_cmds = QCheckBox("Trim commands")
+        self.chk_xp_trim_cmds.setChecked(True)
+        self.chk_xp_trim_cmds.setToolTip(
+            "Move the trim by holding X-Plane's pitch trim up and down\n"
+            "commands. Disable to write the trim value directly instead, for a\n"
+            "trim slower than about 100 s stop to stop or one the commands do\n"
+            "not move. Applies to the next run.")
+        # Wrapped with its spacing so a hidden checkbox takes no room.
+        self._xp_trim_cmds_w = QFrame()
+        xp_lay = QHBoxLayout(self._xp_trim_cmds_w)
+        xp_lay.setContentsMargins(12, 0, 0, 0)
+        xp_lay.addWidget(self.chk_xp_trim_cmds)
+        self._xp_trim_cmds_w.setVisible(False)
+        response_row.addWidget(self._xp_trim_cmds_w)
         response_row.addStretch(1)
         root.addLayout(response_row)
 
@@ -1920,6 +1935,11 @@ class TrimCalibrationDialog(QDialog):
         sm = G.settings_mgr
         return sm is not None and getattr(sm, "current_sim", None) == "MSFS"
 
+    @staticmethod
+    def _current_sim_is_xplane():
+        sm = G.settings_mgr
+        return sm is not None and getattr(sm, "current_sim", None) == "XPLANE"
+
     def _read_trim_write_settings(self):
         """The current aircraft's trimwheel-scope trim write settings.
 
@@ -1979,6 +1999,7 @@ class TrimCalibrationDialog(QDialog):
     def _sync_trim_write_widgets(self, s=None):
         """Show the aircraft's saved trim write settings in the debug row."""
         if self.chk_tw_use_axis is None:
+            self._update_trim_write_visibility()
             return
         if s is None:
             s = self._read_trim_write_settings()
@@ -2006,15 +2027,17 @@ class TrimCalibrationDialog(QDialog):
 
     def _update_trim_write_visibility(self):
         """MSFS only; invert / custom variable follow Use Axis, the variable
-        details follow Custom Y Variable (the defaults.xml prereq chain)."""
-        if self.chk_tw_use_axis is None:
-            return
-        msfs = self._current_sim_is_msfs()
-        use_axis = msfs and self.chk_tw_use_axis.isChecked()
-        custom = use_axis and self.chk_tw_custom.isChecked()
+        details follow Custom Y Variable (the defaults.xml prereq chain). The
+        X-Plane trim commands checkbox is outside the debug row."""
+        rows = [(self._xp_trim_cmds_w, self._current_sim_is_xplane())]
+        if self.chk_tw_use_axis is not None:
+            msfs = self._current_sim_is_msfs()
+            use_axis = msfs and self.chk_tw_use_axis.isChecked()
+            custom = use_axis and self.chk_tw_custom.isChecked()
+            rows += [(self._tw_box, msfs), (self.chk_tw_invert, use_axis),
+                     (self.chk_tw_custom, use_axis), (self._tw_custom_w, custom)]
         changed = False
-        for w, vis in ((self._tw_box, msfs), (self.chk_tw_invert, use_axis),
-                       (self.chk_tw_custom, use_axis), (self._tw_custom_w, custom)):
+        for w, vis in rows:
             if w.isVisibleTo(self) != vis:
                 w.setVisible(vis)
                 changed = True
@@ -2024,10 +2047,11 @@ class TrimCalibrationDialog(QDialog):
     def _set_trim_write_enabled(self, enabled):
         """Editable only while idle and online — the offline editor view is
         read-only here, like the other airframe controls."""
-        if self.chk_tw_use_axis is None:
-            return
         enabled = enabled and not self._offline_editing()
-        for w in (self._tw_box, self._tw_custom_w):
+        widgets = [self.chk_xp_trim_cmds]
+        if self.chk_tw_use_axis is not None:
+            widgets += [self._tw_box, self._tw_custom_w]
+        for w in widgets:
             if w.isEnabled() != enabled:
                 w.setEnabled(enabled)
 
@@ -2071,6 +2095,8 @@ class TrimCalibrationDialog(QDialog):
         tw = self._read_trim_write_settings()
         self._apply_trim_write(cal, tw)
         self._sync_trim_write_widgets(tw)
+        cal.trim_xp_commands = (self._current_sim_is_xplane()
+                                and self.chk_xp_trim_cmds.isChecked())
         cal.trace_enabled = self._debug and self.chk_trace.isChecked()
         cal.start(assist=assist)
 
