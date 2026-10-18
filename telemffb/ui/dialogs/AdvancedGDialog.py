@@ -339,10 +339,8 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             gs = gs[1]
         current_gains = G.telem_manager.currentAircraft.gforce_effect_adv_curve
         if current_gains == "none":
-            self.curve_pos.msg_label.setText('Please save a configuration before enabling live view')
-            self.curve_neg.msg_label.setText('Please save a configuration before enabling live view')
-            self.curve_pos.msg_label.show()
-            self.curve_neg.msg_label.show()
+            for curve in (self.curve_pos, self.curve_neg):
+                curve.show_message('Please save a configuration before enabling live view', clears_on_live_data=True)
             return
 
 

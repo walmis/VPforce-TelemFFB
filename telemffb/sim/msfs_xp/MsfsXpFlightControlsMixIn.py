@@ -656,18 +656,13 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
                 aileron_coeff = 0
                 rudder_coeff = 0
             else:
+                # An airspeed curve reads each surface's scaled dynamic pressure as
+                # its speed; a curve with an input source ignores it.
                 scale = adv_spr_stgs.get("scale")
-                spd_y = scale * elevator_coeff
-                spd_x = scale * aileron_coeff
-                y_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_y)
-                x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
-                elevator_coeff = y_gains.get("y")
-                aileron_coeff = x_gains.get("x")
-
+                elevator_coeff = self.adv_spr_curve_gain("y", telem_data, scale * elevator_coeff)
+                aileron_coeff = self.adv_spr_curve_gain("x", telem_data, scale * aileron_coeff)
                 # Rudder coefficient with advanced spring
-                spd_x_rud = scale * rudder_coeff
-                x_gains_rud = utils.get_gain_from_speed(self.adv_spr_gains, spd_x_rud)
-                rudder_coeff = x_gains_rud.get("x")
+                rudder_coeff = self.adv_spr_curve_gain("x", telem_data, scale * rudder_coeff)
         else:
             elevator_coeff = utils.expocurve(elevator_coeff, self.elevator_expo)
             aileron_coeff = utils.expocurve(aileron_coeff, self.aileron_expo)
@@ -1023,6 +1018,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         Telemetry:
             Read (ADVANCED spring mode only): IAS - float (m/s, ≥ 0); indicated airspeed;
                                                       used to look up gains from adv_spr_gains table
+                                                      unless the X curve names an input source
             Written: _pct_max_r (float, 0.0–1.0; rudder coeff as fraction of max)
                      _rc        (float, 0–1; final rudder spring coefficient, normalized -1..1)
         """
@@ -1031,7 +1027,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
                 self.flag_error("Please open and configure the advanced spring gain settings")
                 rudder_coeff = 0
             else:
-                gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.IAS or 0)
+                gains = self.adv_spr_curve_gains(telem_data, telem_data.IAS or 0)
                 self.spring_x.set_coefficient(gains.get("x", 0))
                 rudder_coeff = gains.get("x", 0)
         else:

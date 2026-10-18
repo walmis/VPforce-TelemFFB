@@ -315,6 +315,8 @@ class TelemManager(QObject, threading.Thread):
         self._ipc_telem_data = {}
         #: X-Plane override name -> expression transform applied on receipt
         self._xplane_transforms: dict[str, TransformExpr] = {}
+        #: X-Plane override names last subscribed with the plugin
+        self._xplane_override_tags: set[str] = set()
         self._simconnect : Optional[SimConnectManager] = None
         self._gain_overrides_active = False
         self._reapply_overrides_pending = False
@@ -1042,24 +1044,57 @@ class TelemManager(QObject, threading.Thread):
     def _setup_xpplugin_overrides(self, aircraft_name, data_source):
         """Setup Dataref variable overrides for XPLANE aircraft.  A numeric
         scale is applied by the plugin; an expression is applied here when
-        the value arrives (``_apply_xplane_transforms``)."""
+        the value arrives (``_apply_xplane_transforms``).
+
+        An override whose name is a built-in telemetry item replaces that
+        item (plugin 18102026 and later).  A row dropped since the last call
+        (a config edit, a class change) is unsubscribed here; at an aircraft
+        change the plugin has already dropped every subscription itself."""
         self._xplane_transforms = {}
-        if data_source == "XPLANE" and aircraft_name != '':
-            if not getattr(self, "_socket", None):
-                self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-            d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
-                                            cls=self._current_class_name())
-            for sv in d1:
-                scale, transform = self._xplane_scale(sv['scale'], sv['name'])
-                # the plugin rounds after its own conversion; a value
-                # transformed here arrives with more decimals to work from
-                precision = 3
-                if transform is not None:
-                    self._xplane_transforms[sv['name']] = transform
-                    precision = 6
-                sendstr = (f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},"
-                           f"precision={precision},conversion={scale}")
-                self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+        if data_source != "XPLANE" or aircraft_name == '':
+            self._xplane_override_tags = set()
+            return
+        d1 = xmlutils.read_sc_overrides(aircraft_name, sim=data_source,
+                                        cls=self._current_class_name())
+        tags = {sv['name'] for sv in d1}
+        for tag in self._xplane_override_tags - tags:
+            self.unsubscribe_xplane_dataref(tag)
+        self._xplane_override_tags = tags
+        for sv in d1:
+            scale, transform = self._xplane_scale(sv['scale'], sv['name'])
+            # the plugin rounds after its own conversion; a value
+            # transformed here arrives with more decimals to work from
+            precision = 3
+            if transform is not None:
+                self._xplane_transforms[sv['name']] = transform
+                precision = 6
+            self._send_to_xpplugin(f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},"
+                                   f"precision={precision},conversion={scale}")
+
+    def subscribe_xplane_dataref(self, tag: str, dataref: str, dtype: str = "float", precision: int = 6) -> None:
+        """Have the X-Plane plugin report ``dataref`` under ``tag`` in every frame.
+
+        A subscription under a tag the plugin already reports replaces it.
+
+        :param tag: the telemetry name the value arrives under
+        :param dataref: the dataref path
+        :param dtype: the dataref's type as the plugin names it
+        :param precision: decimals the plugin rounds the value to
+        """
+        self._send_to_xpplugin(f"SUBSCRIBE:dataref={dataref},type={dtype},tag={tag},"
+                               f"precision={precision},conversion=1.0")
+
+    def unsubscribe_xplane_dataref(self, tag: str) -> None:
+        """Have the X-Plane plugin stop reporting ``tag``."""
+        self._send_to_xpplugin(f"UNSUBSCRIBE:tag={tag}")
+
+    def _send_to_xpplugin(self, line: str) -> None:
+        if not getattr(self, "_socket", None):
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        try:
+            self._socket.sendto(bytes(line, "utf-8"), ("127.0.0.1", 34391))
+        except OSError:
+            logging.warning(f"X-Plane plugin: sending {line!r} failed", exc_info=True)
 
     @staticmethod
     def _xplane_scale(scale, name):

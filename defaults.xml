@@ -2404,6 +2404,22 @@
 		<value>false</value>
 	</defaults>
 	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
+		<order>2100.80</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_var_enabled</name>
+		<displayname>Custom Autopilot Variable</displayname>
+		<prereq>axis_control_group</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<in_sim_panel>false</in_sim_panel>
+		<info>Read the autopilot state from a dataref of your choice instead of sim/cockpit2/autopilot/servos_on, for an aircraft whose autopilot does not set it</info>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+	</defaults>
+	<defaults>
 		<grouping>Axis Control</grouping>
 		<parentgroup>axis_control</parentgroup>
 		<order>2100.82</order>
@@ -2474,6 +2490,22 @@
 		<trimwheel>true</trimwheel>
 		<validvalues>AUTOPILOT MASTER</validvalues>
 		<value>AUTOPILOT MASTER</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
+		<order>2100.861</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_var</name>
+		<displayname>Custom Autopilot Variable</displayname>
+		<prereq>custom_ap_var_enabled</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>A dataref that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A dataref that needs converting belongs in the overrides editor as APServos instead. Disable this setting for that entry to be used: while it is enabled, this dataref is the one read.</info>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<validvalues>sim/cockpit2/autopilot/servos_on</validvalues>
+		<value>sim/cockpit2/autopilot/servos_on</value>
 	</defaults>
 	<defaults>
 		<grouping>Axis Control</grouping>
@@ -2839,6 +2871,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,25</validvalues>
 		<value>0</value>
@@ -2855,6 +2888,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Amount of aileron surface deflection translated into physical movement of the stick</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,200</validvalues>
 		<value>1.0</value>
@@ -2898,6 +2932,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,25</validvalues>
 	</defaults>
@@ -2913,6 +2948,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Amount of elevator trim deflection translated into physical movement of the stick</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,200</validvalues>
 		<value>1.0</value>
@@ -2968,6 +3004,23 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>axis_control</parentgroup>
+		<order>2470</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_var_enabled</name>
+		<displayname>Custom Autopilot Variable</displayname>
+		<prereq>ap_following</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<in_sim_panel>false</in_sim_panel>
+		<info>Read the autopilot state from a dataref of your choice instead of sim/cockpit2/autopilot/servos_on, for an aircraft whose autopilot does not set it</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
 		<order>2470.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_var</name>
@@ -2985,6 +3038,23 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>axis_control</parentgroup>
+		<order>2470.1</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_var</name>
+		<displayname>Custom Autopilot Variable</displayname>
+		<prereq>custom_ap_var_enabled</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>A dataref that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A dataref that needs converting belongs in the overrides editor as APServos instead. Disable this setting for that entry to be used: while it is enabled, this dataref is the one read.</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<validvalues>sim/cockpit2/autopilot/servos_on</validvalues>
+		<value>sim/cockpit2/autopilot/servos_on</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
 		<order>2480</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_x_var_enabled</name>
@@ -2993,6 +3063,21 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in roll through a variable of your choice instead of the aileron deflection, for an aircraft that publishes its control wheel position in its own variable</info>
 		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
+		<order>2480</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_follow_x_var_enabled</name>
+		<displayname>Custom Roll Follow Variable</displayname>
+		<prereq>ap_following</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>Follow the autopilot in roll through a dataref of your choice instead of the autopilot roll servo, for an aircraft that publishes its control position in its own dataref</info>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -3016,6 +3101,22 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>axis_control</parentgroup>
+		<order>2480.1</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_follow_x_var</name>
+		<displayname>Custom Roll Follow Variable</displayname>
+		<prereq>custom_ap_follow_x_var_enabled</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>A dataref holding the roll position the stick follows, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues></validvalues>
+		<value></value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
 		<order>2480.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_x_transform</name>
@@ -3024,6 +3125,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowX</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<value></value>
 	</defaults>
@@ -3047,6 +3149,22 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>axis_control</parentgroup>
+		<order>2490</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_follow_y_var_enabled</name>
+		<displayname>Custom Pitch Follow Variable</displayname>
+		<exclusive_with>joystick_ap_y_follow_axis</exclusive_with>
+		<prereq>ap_following</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>Follow the autopilot in pitch through a dataref of your choice instead of the autopilot pitch servo, for an aircraft that publishes its control position in its own dataref</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
 		<order>2490.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_y_var</name>
@@ -3063,6 +3181,22 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>axis_control</parentgroup>
+		<order>2490.1</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_follow_y_var</name>
+		<displayname>Custom Pitch Follow Variable</displayname>
+		<prereq>custom_ap_follow_y_var_enabled</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>A dataref holding the pitch position the stick follows, -1 (full forward) to 1 (full aft). A value on another scale needs the transform below.</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues></validvalues>
+		<value></value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
 		<order>2490.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_y_transform</name>
@@ -3071,6 +3205,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowY</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<value></value>
 	</defaults>
@@ -3086,6 +3221,21 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot through a variable of your choice instead of the rudder deflection, for an aircraft that publishes its pedal position in its own variable</info>
 		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
+		<order>2492</order>
+		<datatype>bool</datatype>
+		<name>custom_ap_follow_rudder_var_enabled</name>
+		<displayname>Custom Yaw Follow Variable</displayname>
+		<prereq>ap_following</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>Follow the autopilot in yaw through a dataref of your choice instead of the autopilot yaw servo, for an aircraft that publishes its control position in its own dataref</info>
+		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
 		<value>false</value>
 	</defaults>
@@ -3109,6 +3259,22 @@
 		<effecttype>spring</effecttype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>axis_control</parentgroup>
+		<order>2492.1</order>
+		<datatype>anylist</datatype>
+		<name>custom_ap_follow_rudder_var</name>
+		<displayname>Custom Yaw Follow Variable</displayname>
+		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>A dataref holding the yaw position the pedals follows, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues></validvalues>
+		<value></value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
 		<order>2492.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_rudder_transform</name>
@@ -3117,6 +3283,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowRudder</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
 		<value></value>
 	</defaults>
@@ -3132,6 +3299,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Send a disconnect once the stick is held past the deflection below, for an autopilot that does not let go on its own</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -3147,6 +3315,7 @@
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Stick travel from the autopilot's command, as a share of full travel, that sends the disconnect. Keep it above the deadzone.</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0.3</value>
@@ -3166,6 +3335,22 @@
 		<joystick>true</joystick>
 		<validvalues>AUTOPILOT_DISENGAGE_SET,AUTOPILOT_OFF</validvalues>
 		<value>AUTOPILOT_DISENGAGE_SET</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>axis_control</parentgroup>
+		<order>2460.3</order>
+		<datatype>anylist</datatype>
+		<name>ap_disconnect_event</name>
+		<displayname>Disconnect Command</displayname>
+		<prereq>ap_disconnect_on_override</prereq>
+		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<info>The X-Plane command to send. sim/autopilot/servos_off_any disconnects the autopilot servos and leaves the flight director; sim/autopilot/servos_fdir_off also turns the flight director off.</info>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>sim/autopilot/servos_off_any,sim/autopilot/servos_fdir_off</validvalues>
+		<value>sim/autopilot/servos_off_any</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -12118,6 +12303,90 @@
 			<name>ap_following</name>
 			<type>TurbopropAircraft</type>
 			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>ap_following</name>
+			<type>GliderAircraft</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>ap_following</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>ap_following</name>
+			<type>PropellerAircraft</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>ap_following</name>
+			<type>TurbopropAircraft</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_x_follow_deadzone</name>
+			<type>GliderAircraft</type>
+			<value>0.05</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_x_follow_deadzone</name>
+			<type>JetAircraft</type>
+			<value>0.05</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_x_follow_deadzone</name>
+			<type>PropellerAircraft</type>
+			<value>0.05</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_x_follow_deadzone</name>
+			<type>TurbopropAircraft</type>
+			<value>0.05</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_y_follow_deadzone</name>
+			<type>GliderAircraft</type>
+			<value>0.05</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_y_follow_deadzone</name>
+			<type>JetAircraft</type>
+			<value>0.05</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_y_follow_deadzone</name>
+			<type>PropellerAircraft</type>
+			<value>0.05</value>
+			<sim>XPLANE</sim>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>joystick_ap_y_follow_deadzone</name>
+			<type>TurbopropAircraft</type>
+			<value>0.05</value>
 			<sim>XPLANE</sim>
 			<device>joystick</device>
 		</classdefaults_XPLANE>

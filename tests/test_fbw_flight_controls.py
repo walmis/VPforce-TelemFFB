@@ -15,6 +15,7 @@ from tests.framework.utils import (
     assert_simconnect_event_value,
 )
 from telemffb.sim.msfs_xp.MsfsXpFBWFlightControlsMixIn import MsfsXpFBWFlightControlsMixIn
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
@@ -781,6 +782,14 @@ class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
             y = self._y_offset(instance, telem)
         return y
 
+    def _riding_y(self, instance, telem, frames=3):
+        # The stick rides the spring center, as on the device; a stick left
+        # where it was reads as a push and the AP-follow hold freezes the center.
+        for _ in range(frames):
+            y = self._y_offset(instance, telem)
+            self.mock_device._input_data.set_axis(x=0.0, y=y / 4096)
+        return y
+
     def test_msfs_ap_engage_does_not_snap_off_the_curve(self):
         instance = self._curve_instance(sim_msfs=True)
         trimmed = TelemetryDataBuilder().ffb_type("joystick") \
@@ -800,21 +809,21 @@ class TestAPFollowCurveConsistency(BaseTelemetryEffectTestCase):
         instance = self._curve_instance(sim_msfs=False)
         trimmed = TelemetryDataBuilder().ffb_type("joystick") \
             .elevator_trim(0.5).autopilot(False).build()
-        y_hand = self._settled_y(instance, trimmed)
+        y_hand = self._riding_y(instance, trimmed)
         assert y_hand == pytest.approx(0.25 * 4096, abs=40)
 
         # AP in trim (servo ~ 0): rest point identical to hand-flying.
         ap_trimmed = TelemetryDataBuilder().ffb_type("joystick") \
             .elevator_trim(0.5).autopilot(True) \
             .ap_servos(roll=0.0, pitch=0.0).build()
-        assert self._settled_y(instance, ap_trimmed) == y_hand
+        assert self._riding_y(instance, ap_trimmed) == y_hand
 
         # AP commanding pitch: stick deviates from the trimmed rest point by
         # exactly the servo command.
         ap_pitching = TelemetryDataBuilder().ffb_type("joystick") \
             .elevator_trim(0.5).autopilot(True) \
             .ap_servos(roll=0.0, pitch=0.2).build()
-        y_dev = self._settled_y(instance, ap_pitching)
+        y_dev = self._riding_y(instance, ap_pitching)
         assert y_dev - y_hand == pytest.approx(0.2 * 4096, abs=40)
 
     def test_msfs_legacy_ap_follow_unchanged_without_curve(self):
@@ -988,15 +997,25 @@ class TestAPFollowHold(BaseTelemetryEffectTestCase):
         assert x == pytest.approx(0.4 * 4096, abs=8) and y == pytest.approx(-0.2 * 4096, abs=8)
         assert sent["AXIS_AILERONS_SET"] == 0 and sent["AXIS_ELEVATOR_SET"] == 0
 
-        # push 0.3 right and 0.3 forward: the displacement goes out
+        # push 0.3 right and 0.3 forward: the travel past the 0.05 deadzone
+        # edge goes out
         (x, y), sent = self._frame(instance, (0.7, -0.5), 0.4, -0.2)
-        assert sent["AXIS_AILERONS_SET"] == -int(0.3 * 16384)
-        assert sent["AXIS_ELEVATOR_SET"] == -int(-0.3 * 16384)
+        assert sent["AXIS_AILERONS_SET"] == -int(0.25 * 16384)
+        assert sent["AXIS_ELEVATOR_SET"] == -int(-0.25 * 16384)
 
         # the sim applied it to the surface, and the center stays put
         (x, y), sent = self._frame(instance, (0.7, -0.5), 0.7, -0.5)
         assert x == pytest.approx(0.4 * 4096, abs=8) and y == pytest.approx(-0.2 * 4096, abs=8)
-        assert sent["AXIS_AILERONS_SET"] == -int(0.3 * 16384)
+        assert sent["AXIS_AILERONS_SET"] == -int(0.25 * 16384)
+
+    def test_the_input_starts_from_zero_at_the_deadzone_edge(self):
+        instance = self._instance()
+        self._frame(instance, (0.4, 0.0), 0.4, 0.0)
+        # 0.06 past the command is 0.01 past the edge: no 0.05 step
+        _, sent = self._frame(instance, (0.46, 0.0), 0.4, 0.0)
+        assert sent["AXIS_AILERONS_SET"] == -int(0.01 * 16384)
+        _, sent = self._frame(instance, (0.34, 0.0), 0.4, 0.0)
+        assert sent["AXIS_AILERONS_SET"] == -int(-0.01 * 16384)
 
     def test_a_release_settles_without_a_swing(self):
         instance = self._instance()
@@ -1095,6 +1114,146 @@ class TestAPDisconnectOnOverride(BaseTelemetryEffectTestCase):
             clock[0] += 0.2
             assert self._frame(instance, 0.45) == []
         assert timers == []
+
+
+class TestXPlaneAPFollow(BaseTelemetryEffectTestCase):
+    """X-Plane AP following: the deadzone hold with a centered axis inside it,
+    the physical gains, the custom follow datarefs, and the disconnect
+    command, as on MSFS."""
+
+    def _instance(self):
+        instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
+        instance._test_sim_is_xplane = True
+        instance.trim_following = True
+        instance.ap_following = True
+        instance.telemffb_controls_axes = True
+        instance.joystick_ap_follow_gain_physical_x = 1.0
+        instance.joystick_ap_follow_gain_physical_y = 1.0
+        instance.joystick_ap_x_follow_deadzone = 0.05
+        instance.joystick_ap_y_follow_deadzone = 0.05
+        instance.joystick_trim_follow_use_curve_y = False
+        instance.joystick_x_axis_scale = 1.0
+        instance.joystick_y_axis_scale = 1.0
+        return instance
+
+    def _frame(self, instance, stick, roll=0.0, pitch=0.0, **fields):
+        """One frame; returns the spring center (normalized) and the axis sent."""
+        self.mock_device._input_data.set_axis(x=stick[0], y=stick[1])
+        builder = (TelemetryDataBuilder().ffb_type("joystick").autopilot(True)
+                   .ap_servos(roll=roll, pitch=pitch).elevator_trim(0.0))
+        for key, value in fields.items():
+            builder = builder.with_field(key, value)
+        telem = builder.build()
+        self.set_telemetry(instance, telem)
+        instance._xp_commands = []
+        instance.update_fbw_flight_controls(telem)
+        axis = next(c for c in instance._xp_commands if c.startswith("AXIS:"))
+        sent = {k: float(v) for k, v in (kv.split("=") for kv in axis[len("AXIS:"):].split(","))}
+        x, y = instance._spring_handle.get_offsets()
+        return (x / 4096, y / 4096), sent
+
+    def test_inside_the_deadzone_the_sim_gets_a_centered_axis(self):
+        instance = self._instance()
+        (_, y), sent = self._frame(instance, (0.0, 0.2), pitch=0.2)
+        assert y == pytest.approx(0.2, abs=0.002)
+        assert sent["jx"] == 0.0 and sent["jy"] == 0.0
+
+        # push 0.3 past the command: the travel past the deadzone edge goes
+        # out, the center holds
+        (_, y), sent = self._frame(instance, (0.0, 0.5), pitch=0.2)
+        assert sent["jy"] == pytest.approx(0.25, abs=0.002)
+        (_, y), sent = self._frame(instance, (0.0, 0.5), pitch=0.35)
+        assert y == pytest.approx(0.2, abs=0.002)
+        assert sent["jy"] == pytest.approx(0.25, abs=0.002)
+
+    def test_the_physical_gain_scales_the_servo(self):
+        instance = self._instance()
+        instance.joystick_ap_follow_gain_physical_y = 0.5
+        (_, y), _ = self._frame(instance, (0.0, 0.2), pitch=0.4)
+        assert y == pytest.approx(0.2, abs=0.002)
+
+    def test_custom_follow_datarefs_replace_the_servos(self):
+        instance = self._instance()
+        instance.custom_ap_follow_x_var_enabled = True
+        instance.custom_ap_follow_x_var = "sim/test/roll"
+        instance.custom_ap_follow_y_var_enabled = True
+        instance.custom_ap_follow_y_var = "sim/test/pitch"
+        instance.custom_ap_follow_y_transform = "x * 2"
+        (x, y), _ = self._frame(instance, (0.3, 0.5), roll=-0.4, pitch=-0.4,
+                                APFollowX=0.3, APFollowY=0.25)
+        assert x == pytest.approx(0.3, abs=0.002)
+        assert y == pytest.approx(0.5, abs=0.002)
+
+    def test_custom_yaw_dataref_replaces_the_yaw_servo(self):
+        instance = self._instance()
+        instance.custom_ap_follow_rudder_var_enabled = True
+        instance.custom_ap_follow_rudder_var = "sim/test/yaw"
+        telem = (TelemetryDataBuilder().ffb_type("pedals").autopilot(True)
+                 .ap_servos(roll=0.0, pitch=0.0, yaw=-0.6).with_field("APFollowRudder", 0.4).build())
+        self.mock_device._input_data.set_axis(x=0.4, y=0.0)
+        for _ in range(3):
+            self.set_telemetry(instance, telem)
+            instance.update_fbw_flight_controls(telem)
+        x, _ = instance._spring_handle.get_offsets()
+        assert x / 4096 == pytest.approx(0.4, abs=0.02)
+
+    def test_disconnect_sends_the_xplane_command_once(self, monkeypatch):
+        import telemffb.sim.msfs_xp.MsfsXpFBWFlightControlsMixIn as module
+        clock = [10.0]
+        monkeypatch.setattr(module.time, "perf_counter", lambda: clock[0])
+        instance = self._instance()
+        instance.ap_disconnect_on_override = True
+        instance.ap_disconnect_deflection = 0.3
+        instance.ap_disconnect_event = "sim/autopilot/servos_off_any"
+
+        def disconnects(stick, advance=0.02):
+            # the roll servo's dampener needs time to pass between frames
+            clock[0] += advance
+            self._frame(instance, stick, pitch=0.2)
+            return [c for c in instance._xp_commands if c.startswith("COMMAND:")]
+
+        assert disconnects((0.0, 0.2)) == []
+        assert disconnects((0.0, 0.6)) == []
+        assert disconnects((0.0, 0.6), advance=0.25) == ["COMMAND:cmd=sim/autopilot/servos_off_any,phase=once"]
+        assert disconnects((0.0, 0.6), advance=1.0) == []
+
+
+class TestXPlaneCustomAutopilotDataref:
+    """The custom autopilot variable on X-Plane: subscribed under the device's
+    own tag (the plugin's table is shared by every instance) and copied into
+    APServos for the frame."""
+
+    class _Aircraft:
+        def __init__(self, enabled, var):
+            self.custom_ap_var_enabled = enabled
+            self.custom_ap_var = var
+            self.synced = []
+
+        def _sim_is_xplane(self):
+            return True
+
+        def _sync_xplane_dataref(self, name, dataref):
+            self.synced.append((name, dataref))
+
+    def _run(self, monkeypatch, enabled, var, frame):
+        import telemffb.globals as G
+        from telemffb.sim.msfs_xp.Aircraft import Aircraft
+        monkeypatch.setattr(G, "device_type", "pedals", raising=False)
+        ac = self._Aircraft(enabled, var)
+        telem = BaseTelemetryData(frame)
+        Aircraft._sync_xplane_ap_state(ac, telem)
+        return ac, telem
+
+    def test_the_dataref_replaces_apservos(self, monkeypatch):
+        ac, telem = self._run(monkeypatch, True, "cl650/ap/engaged",
+                              {"APServos": 1, "APServos_pedals": 0})
+        assert ac.synced == [("APServos_pedals", "cl650/ap/engaged")]
+        assert telem["APServos"] == 0
+
+    def test_disabled_releases_it_and_leaves_apservos(self, monkeypatch):
+        ac, telem = self._run(monkeypatch, False, "cl650/ap/engaged", {"APServos": 1})
+        assert ac.synced == [("APServos_pedals", None)]
+        assert telem["APServos"] == 1
 
 
 class TestMsfsXpFBWFlightControlsTimeout(BaseTelemetryEffectTestCase):

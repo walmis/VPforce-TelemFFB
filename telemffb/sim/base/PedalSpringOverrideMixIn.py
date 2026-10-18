@@ -166,7 +166,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             # with an adjuster, AdvancedSpringMixIn applies the curve and trim
             if not self._adv_spr_via_adjuster():
                 if self.adv_spr_gains:
-                    gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.IAS or 0)
+                    gains = self.adv_spr_curve_gains(telem_data, telem_data.IAS or 0)
                     self.spring_x.set_coefficient(gains.get('x', 0))
                 else:
                     self.spring_x.set_coefficient(0)

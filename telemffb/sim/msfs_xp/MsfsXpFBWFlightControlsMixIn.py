@@ -10,9 +10,10 @@ from telemffb.utils import clamp
 from telemffb.utils.TransformExpr import TransformExpr
 
 import logging
+import math
 import threading
 import time
-from typing import Optional
+from typing import Optional, override
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
@@ -150,6 +151,15 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         return target, False
 
     @staticmethod
+    def _ap_override_reference(center: float, phys: float, deadzone: float, send: bool) -> float:
+        """The point an overriding stick's input is measured from: the held
+        center moved out to the deadzone edge on the side of the push, so the
+        input starts at zero at the edge and grows from there."""
+        if not send:
+            return center
+        return center + math.copysign(deadzone, phys - center)
+
+    @staticmethod
     def _ap_disconnect_number(text):
         """The event value a setting holds, as an int when whole; None when blank or not a number."""
         value = utils.to_number(str(text).strip()) if text is not None else None
@@ -175,6 +185,16 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         if now - self._ap_disconnect_since < self.AP_DISCONNECT_DWELL_S:
             return
         event = (self.ap_disconnect_event or "").strip()
+        if self._sim_is_xplane():
+            # an X-Plane command carries no value
+            if not event:
+                self.flag_error("Autopilot disconnect: the command must be set")
+                return
+            self.send_xp_command(f"COMMAND:cmd={event},phase=once")
+            self._ap_disconnect_fired = True
+            self._ap_disconnect_since = None
+            logging.info(f"Autopilot disconnect sent: {event}")
+            return
         value = self._ap_disconnect_number(self.ap_disconnect_value)
         if not event or value is None:
             self.flag_error("Autopilot disconnect: the event and its value must both be set")
@@ -196,9 +216,49 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         return None
 
     def _sync_ap_follow_sources(self) -> None:
-        """Keep each custom follow variable subscribed while its setting is on."""
+        """Keep each custom follow variable subscribed while its setting is enabled.
+
+        On X-Plane only a dataref path is subscribed.  Each follow item is
+        read by one device role only, so the plugin's shared subscription
+        table needs no per-role tag for them.
+        """
         for axis, (_, _, _, name) in self._AP_FOLLOW_SOURCES.items():
-            self._sync_runtime_simvar(name, self._custom_ap_follow_var(axis), sc_unit="number")
+            var = self._custom_ap_follow_var(axis)
+            self._sync_runtime_simvar(name, var, sc_unit="number")
+            self._sync_xplane_dataref(name, var if var and "/" in var else None)
+
+    @override
+    def _sync_spring_curve_input(self, axis: str, var: Optional[str]) -> None:
+        """Keep the input variable of advanced spring curve ``axis`` subscribed.
+
+        MSFS subscribes a SimVar, ``L:`` var or ``B:`` input event; X-Plane a
+        dataref.  A name that is an overrides-editor row, or on X-Plane any name
+        that is not a dataref path, is a telemetry item and is never subscribed
+        as a variable.  An override row's item is missing from the first frames
+        after an aircraft change, because its subscription follows the
+        aircraft's creation; subscribing its name as a variable would be wrong.
+        """
+        tag = self._adv_spr_input_tag(axis)
+        if var and not self._adv_spr_subscribable(var):
+            var = None
+        if self._sim_is_msfs():
+            self._sync_runtime_simvar(tag, var, sc_unit="number")
+        elif self._sim_is_xplane():
+            self._sync_xplane_dataref(tag, var)
+
+    def _adv_spr_subscribable(self, name: str) -> bool:
+        """True when ``name`` can be subscribed as a sim variable on this sim:
+        on MSFS any name that is not an overrides-editor row, on X-Plane a
+        dataref path."""
+        if self._sim_is_msfs():
+            return not (self._simconnect and self._simconnect.has_override(name))
+        if self._sim_is_xplane():
+            return "/" in name
+        return False
+
+    @override
+    def _adv_spr_source_is_variable(self, source: str, telem_data: BaseTelemetryData) -> bool:
+        return source not in telem_data and self._adv_spr_subscribable(source)
 
     def _custom_ap_follow_position(self, axis: str, telem_data: BaseTelemetryData) -> Optional[float]:
         """The custom follow variable for ``axis`` through its transform, clamped to
@@ -414,12 +474,23 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                         telem_data.phys_y_send_flag = ap_send_flag_y
 
                     if self._sim_is_xplane():
-                        aileron_pos = telem_data.APRollServo or 0
-                        aileron_pos = self.aileron_pos_dampener.update(
-                            aileron_pos, derivative_hz=5, derivative_k=0.15
-                        )
-                        elevator_pos = telem_data.APPitchServo or 0
-                        if curve_active:
+                        custom_x = self._custom_ap_follow_position("x", telem_data)
+                        if custom_x is None:
+                            aileron_pos = self.aileron_pos_dampener.update(
+                                telem_data.APRollServo or 0, derivative_hz=5, derivative_k=0.15
+                            )
+                        else:
+                            aileron_pos = custom_x
+                        aileron_pos = clamp(aileron_pos * self.joystick_ap_follow_gain_physical_x, -1, 1)
+                        custom_y = self._custom_ap_follow_position("y", telem_data)
+                        elevator_pos = clamp(
+                            (custom_y if custom_y is not None else (telem_data.APPitchServo or 0))
+                            * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                        if custom_y is not None:
+                            # The column itself, followed whether or not a
+                            # curve is active, as on MSFS.
+                            phys_stick_y_offs = elevator_pos
+                        elif curve_active:
                             # Trimmed rest point plus the AP's commanded
                             # deviation: the pitch servo reads ~0 once the AP
                             # has the aircraft in trim, so the stick rests
@@ -435,15 +506,17 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     phys_stick_x_offs = aileron_pos
                     if self.invert_ap_x_axis:
                         phys_stick_x_offs = -phys_stick_x_offs
-                    if self._sim_is_msfs():
+                    if self._sim_is_msfs() or self._sim_is_xplane():
                         phys_stick_x_offs, ap_send_flag_x = self._ap_follow_hold(
                             "x", phys_x, phys_stick_x_offs, self.joystick_ap_x_follow_deadzone)
                         phys_stick_y_offs, ap_send_flag_y = self._ap_follow_hold(
                             "y", phys_y, phys_stick_y_offs, self.joystick_ap_y_follow_deadzone)
-                        # past the deadzone the sim gets the stick's displacement
-                        # from the held center, never the center itself
-                        virtual_stick_x_offs = phys_stick_x_offs
-                        virtual_stick_y_offs = phys_stick_y_offs
+                        # past the deadzone the sim gets the stick's travel
+                        # beyond the deadzone edge, never the center itself
+                        virtual_stick_x_offs = self._ap_override_reference(
+                            phys_stick_x_offs, phys_x, self.joystick_ap_x_follow_deadzone, ap_send_flag_x)
+                        virtual_stick_y_offs = self._ap_override_reference(
+                            phys_stick_y_offs, phys_y, self.joystick_ap_y_follow_deadzone, ap_send_flag_y)
                         telem_data.phys_x_send_flag = ap_send_flag_x
                         telem_data.phys_y_send_flag = ap_send_flag_y
                         self._ap_disconnect_check(phys_x, phys_y, phys_stick_x_offs, phys_stick_y_offs)
@@ -467,8 +540,10 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
                 if self._sim_is_xplane():
-                    pos_x_pos = x_pos * x_scale
-                    pos_y_pos = y_pos * y_scale
+                    # Under the autopilot, inside the deadzone the sim gets a
+                    # centered axis every frame (see the MSFS send below).
+                    pos_x_pos = x_pos * x_scale if ap_send_flag_x else 0.0
+                    pos_y_pos = y_pos * y_scale if ap_send_flag_y else 0.0
                     self.send_xp_command(f"AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}")
 
                 if self._sim_is_msfs():
@@ -568,7 +643,9 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                         if rudder_pos is None:
                             rudder_pos = telem_data.RudderDeflPct or 0
                     if self._sim_is_xplane():
-                        rudder_pos = telem_data.APYawServo or 0
+                        rudder_pos = self._custom_ap_follow_position("rudder", telem_data)
+                        if rudder_pos is None:
+                            rudder_pos = telem_data.APYawServo or 0
 
                     rudder_pos = self.rudder_pos_dampener.update(
                         rudder_pos, derivative_hz=5, derivative_k=0.15

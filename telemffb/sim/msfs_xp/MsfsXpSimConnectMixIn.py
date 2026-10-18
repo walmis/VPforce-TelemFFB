@@ -4,7 +4,7 @@ import json
 import logging
 import socket
 import time
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, override
 
 import telemffb.globals as G
 from telemffb.hw.ffb_rhino import HapticEffect
@@ -97,6 +97,8 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._fw_override_supported_last = None
         # telemetry name -> the variable _sync_runtime_simvar subscribed it to
         self._runtime_simvars_subscribed: dict[str, Optional[str]] = {}
+        # telemetry name -> the dataref _sync_xplane_dataref subscribed it to
+        self._runtime_datarefs_subscribed: dict[str, Optional[str]] = {}
         # Monotonic stamp of the last OVERRIDE command sent; -inf means
         # nothing sent yet, so the plugin's echoed state is trusted at once.
         self.__xplane_override_sent_at = float("-inf")
@@ -294,18 +296,64 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         if not self._sim_is_msfs() or not self._simconnect:
             return
         wanted = var or None
-        if wanted == self._runtime_simvars_subscribed.get(name):
+        subscribed = self._runtime_simvars_subscribed.get(name)
+        if wanted == subscribed:
             return
         from telemffb.telem.SimConnectManager import RUNTIME_SOURCE_SETTING
         if wanted:
             self._simconnect.add_simvar(name=name, var=wanted, sc_unit=sc_unit, source=RUNTIME_SOURCE_SETTING)
+            logging.info(f"MSFS: subscribed {name} <- {wanted}")
             if self._simconnect.has_override(name):
                 logging.info(f"{name}: reading {wanted} from the settings; the overrides editor "
                              f"entry for it is not used")
         else:
             self._simconnect.remove_simvar(name, source=RUNTIME_SOURCE_SETTING)
+            logging.info(f"MSFS: released {name} (was {subscribed})")
         self._simconnect._resubscribe()
         self._runtime_simvars_subscribed[name] = wanted
+
+    def _sync_xplane_dataref(self, name: str, dataref: Optional[str]):
+        """Keep the telemetry item ``name`` subscribed to the X-Plane dataref a setting names.
+
+        ``dataref`` empty or None releases it; a changed dataref releases the old
+        one before subscribing the new.  Compared against what this handler has
+        subscribed rather than against the previous frame's setting, for the
+        reason :meth:`_sync_runtime_simvar` gives.  The plugin keeps a
+        subscription after this handler is retired, so :meth:`on_shutdown`
+        releases them.
+        """
+        if not self._sim_is_xplane():
+            return
+        manager = getattr(G, "telem_manager", None)
+        if manager is None:
+            return
+        wanted = dataref or None
+        subscribed = self._runtime_datarefs_subscribed.get(name)
+        if wanted == subscribed:
+            return
+        if subscribed:
+            manager.unsubscribe_xplane_dataref(name)
+            logging.info(f"X-Plane: released {name} (was {subscribed})")
+        if wanted:
+            manager.subscribe_xplane_dataref(name, wanted)
+            logging.info(f"X-Plane: subscribed {name} <- {wanted}")
+        self._runtime_datarefs_subscribed[name] = wanted
+
+    @override
+    def on_shutdown(self):
+        """Release the X-Plane datarefs :meth:`_sync_xplane_dataref` subscribed."""
+        subscribed = getattr(self, "_runtime_datarefs_subscribed", {})
+        manager = getattr(G, "telem_manager", None)
+        if manager is not None:
+            for name, dataref in subscribed.items():
+                if dataref:
+                    try:
+                        manager.unsubscribe_xplane_dataref(name)
+                        logging.info(f"X-Plane: released {name} (was {dataref}) on shutdown")
+                    except Exception:
+                        logging.debug(f"X-Plane: releasing {name} on shutdown failed", exc_info=True)
+        subscribed.clear()
+        super().on_shutdown()
 
     def send_xp_command(self, cmd):
         if self._socket is None:

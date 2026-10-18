@@ -21,6 +21,7 @@ from telemffb.sim.msfs_xp.MsfsXpNosewheelShimmyMixIn import MsfsXpNosewheelShimm
 from telemffb.sim.msfs_xp.MsfsXpTrimwheelMixIn import MsfsXpTrimwheelMixIn
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
 
+import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect, EFFECT_SQUARE
@@ -211,6 +212,28 @@ class Aircraft(
         except (TypeError, ValueError):
             return None
 
+    def _sync_xplane_ap_state(self, telem_data: BaseTelemetryData):
+        """X-Plane counterpart of the custom autopilot variable (MSFS
+        subscribes it as APMaster).  The dataref is subscribed under this
+        device's own tag, because the plugin's subscription table is shared by
+        every instance and each device sets its own variable, and its value
+        replaces APServos in this frame before anything reads it.
+
+        Telemetry:
+            Read: APServos_<device> - the dataref the setting names
+            Written: APServos       - while the setting is enabled
+        """
+        if not self._sim_is_xplane():
+            return
+        var = (self.custom_ap_var or "").strip() if self.custom_ap_var_enabled else ""
+        if var and "/" not in var:
+            self.flag_error(f"Custom Autopilot Variable '{var}' is not a dataref path")
+            var = ""
+        tag = f"APServos_{G.device_type or 'joystick'}"
+        self._sync_xplane_dataref(tag, var or None)
+        if var:
+            telem_data["APServos"] = telem_data.get(tag) or 0
+
     def _probe_axis_jitter(self, telem_data: BaseTelemetryData):
         """Feed the simulator's control-input positions to the probe.
 
@@ -251,6 +274,7 @@ class Aircraft(
             sc_unit="number")
         self._sync_runtime_simvar(
             "APMaster", self.custom_ap_var if self.custom_ap_var_enabled else None, sc_unit="number")
+        self._sync_xplane_ap_state(telem_data)
         self._sync_ap_follow_sources()
 
         if self._sim_is_xplane():

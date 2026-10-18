@@ -1106,6 +1106,17 @@ class NoWheelComboBox(QComboBox):
         # Ignore the wheel event entirely
         event.ignore()
 
+
+class PopupSignalComboBox(QComboBox):
+    """Combo box that emits :attr:`popupAboutToShow` before its list opens,
+    so the owner can refill the items from current data."""
+
+    popupAboutToShow = pyqtSignal()
+
+    def showPopup(self):
+        self.popupAboutToShow.emit()
+        super().showPopup()
+
 class NoWheelSlider(QSlider):
     delayedValueChanged = pyqtSignal(int)
     def __init__(self, *args, **kwargs):
@@ -2302,6 +2313,8 @@ class CurveWidget(QWidget):
                 """)
         self.msg_label.move(60, 40)
         self.msg_label.hide()
+        # Whether the shown message is hidden by the next live crosshair update
+        self._msg_clears_on_live_data = False
 
         self.coordinate_label = QLabel(self)
         bg = "#ffffff" if not G.useDarkMode else "#444444"
@@ -2367,6 +2380,9 @@ class CurveWidget(QWidget):
         """
         x_values = np.asarray(x_values, dtype=float)
         y_values = np.asarray(y_values, dtype=float)
+        # Akima needs ascending x; a reversed axis holds its points in descending x
+        order = np.argsort(x_values)
+        x_values, y_values = x_values[order], y_values[order]
         akima = Akima1DInterpolator(x_values, y_values)
 
         span = float(x_values.max() - x_values.min())
@@ -2391,8 +2407,7 @@ class CurveWidget(QWidget):
             return
 
         if len(self.points) < 4:
-            self.msg_label.setText("Error: Need at least 4 points for smooth mode.")
-            self.msg_label.show()
+            self.show_message("Error: Need at least 4 points for smooth mode.")
             QTimer.singleShot(3000, self.msg_label.hide)
             QTimer.singleShot(300, lambda: toggle.setChecked(False)) # Force the toggle to unchecked
 
@@ -2405,15 +2420,13 @@ class CurveWidget(QWidget):
         try:
             y_min, y_max = self._curve_bounds(x_values, y_values)
             if y_min < -self._BOUNDS_EPSILON or y_max > 100 + self._BOUNDS_EPSILON:
-                self.msg_label.setText("Error: Smooth curve would exceed bounds.")
-                self.msg_label.show()
+                self.show_message("Error: Smooth curve would exceed bounds.")
                 QTimer.singleShot(3000, self.msg_label.hide)
                 QTimer.singleShot(300, lambda: toggle.setChecked(False))  # Force the toggle to unchecked
 
                 return
         except Exception as e:
-            self.msg_label.setText(f"Error: Cannot enable smooth curve ({e}).")
-            self.msg_label.show()
+            self.show_message(f"Error: Cannot enable smooth curve ({e}).")
             QTimer.singleShot(300, lambda: toggle.setChecked(False))  # Force the toggle to unchecked
 
             # self.smooth_toggle.setChecked(False)  # Force the toggle to unchecked
@@ -2453,7 +2466,8 @@ class CurveWidget(QWidget):
             y_value (float):.
         """
 
-        x_value = max(self.x_min, min(self.x_max, x_value))
+        x_lower, x_upper = sorted((self.x_min, self.x_max))
+        x_value = max(x_lower, min(x_upper, x_value))
 
         rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
         x = rect.left() + ((x_value - self.x_min) / (self.x_max - self.x_min)) * rect.width()
@@ -2464,6 +2478,43 @@ class CurveWidget(QWidget):
         self.crosshair_y = y_value
         self.crosshair_x = x_value
         self.update()  # Trigger repaint
+
+    def _x_position(self, x):
+        """Where *x* sits across the axis: 0 at the left end (x_min), 1 at the right end (x_max).
+
+        x_max is below x_min on a reversed axis.
+        """
+        span = self.x_max - self.x_min
+        return (x - self.x_min) / span if span else 0.0
+
+    def _x_step(self):
+        """The minimum x gap between neighboring points, signed toward the right end."""
+        return 0.01 if self.x_max >= self.x_min else -0.01
+
+    def _clamp_x(self, x, left, right):
+        """*x* held between *left* and *right* in screen order; *left* wins when they cross."""
+        if self.x_max >= self.x_min:
+            return max(left, min(right, x))
+        return min(left, max(right, x))
+
+    def x_value_text(self, value, decimals=1):
+        """Text of an x value, with its unit, for the crosshair and drag readouts."""
+        return f"{value:.{decimals}f} {self.current_unit}"
+
+    def show_message(self, text, clears_on_live_data=False):
+        """Show *text* over the graph.
+
+        With *clears_on_live_data*, the next live crosshair update hides it;
+        otherwise it stays until hidden or replaced.
+        """
+        self.msg_label.setText(text)
+        self.msg_label.show()
+        self._msg_clears_on_live_data = clears_on_live_data
+
+    def _clear_live_data_message(self):
+        if self._msg_clears_on_live_data:
+            self.msg_label.hide()
+            self._msg_clears_on_live_data = False
 
     def clear_crosshairs(self):
         """
@@ -2502,7 +2553,7 @@ class CurveWidget(QWidget):
         # Draw the live speed and gain label at the center top of the graph
         if hasattr(self, 'crosshair_x') and self.crosshair_x is not None and hasattr(self, 'crosshair_y'):
             rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
-            label_text = f"{self.x_label_text} {self.crosshair_x:.1f} {self.current_unit}, {self.y_label_text} {self.crosshair_y:.1f}%"
+            label_text = f"{self.x_label_text} {self.x_value_text(self.crosshair_x)}, {self.y_label_text} {self.crosshair_y:.1f}%"
             label_x = rect.left() + (rect.width() // 2) - (len(label_text) * 3)  # Center horizontally
             label_y = rect.top() - 5  # Fixed position slightly above the graph area
 
@@ -2529,7 +2580,7 @@ class CurveWidget(QWidget):
             x = int(rect.left() + i * rect.width() / 10)  # Cast to int
             painter.drawLine(x, rect.top(), x, rect.bottom())
 
-    def draw_axis_labels(self, painter, x_unit=None, integer=True, sign=None):
+    def draw_axis_labels(self, painter, x_unit=None, integer=True, sign=None, decimals=1):
         rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
         font = QFont()
         font.setBold(True)
@@ -2545,7 +2596,7 @@ class CurveWidget(QWidget):
         for i in range(0, 11):
             x = int(rect.left() + i * rect.width() / 10)
             x_val = self.x_min + (self.x_max - self.x_min) * i / 10
-            x_val = round(x_val, 1)
+            x_val = round(x_val, decimals)
             if integer:
                 # print(f"int{x_val}")
                 x_val=round(x_val)
@@ -2611,9 +2662,10 @@ class CurveWidget(QWidget):
 
         painter.setPen(QPen(self.curve_color, 2))
 
-        # Extract x and y values from points
-        x_values = [p.x() for p in self.points]
-        y_values = [p.y() for p in self.points]
+        # Extract x and y values from points, in ascending x for Akima
+        ordered = sorted(self.points, key=lambda p: p.x())
+        x_values = [p.x() for p in ordered]
+        y_values = [p.y() for p in ordered]
 
         # Create smooth x and y values using Akima interpolation
         x_smooth = np.linspace(min(x_values), max(x_values), 500)
@@ -2715,26 +2767,30 @@ class CurveWidget(QWidget):
             new_pos = self.map_from_widget_space(pos)
             valid_move = True
 
-            x_lower = min(self.x_min, self.x_max)
-            x_upper = max(self.x_min, self.x_max)
+            # Points are ordered left to right; x_min is the left end, which on a
+            # reversed axis is the larger value.
+            x_left = self.x_min
+            x_right = self.x_max
+            step = self._x_step()
+            new_frac = self._x_position(new_pos.x())
 
             if index == 0:
-                # First point: allowed anywhere along X=x_lower (Y free) or Y=0 (X free).
+                # First point: allowed anywhere along X=x_left (Y free) or Y=0 (X free).
                 # If the cursor is off both legs, snap to whichever leg is nearer instead
                 # of freezing the point in place.
-                on_x_leg = new_pos.x() <= x_lower
+                on_x_leg = new_frac <= 0
                 on_y_leg = new_pos.y() <= 0
                 if not (on_x_leg or on_y_leg):
-                    x_frac = (new_pos.x() - x_lower) / (x_upper - x_lower) if x_upper != x_lower else 0
+                    x_frac = new_frac
                     y_frac = new_pos.y() / 100.0
                     on_x_leg = x_frac <= y_frac
 
                 if on_x_leg:
-                    new_pos.setX(x_lower)  # Lock X to min
+                    new_pos.setX(x_left)  # Lock X to the left end
                     new_pos.setY(max(0, min(100, new_pos.y())))  # Allow vertical movement (Y-axis)
                 else:
                     new_pos.setY(0)  # Lock Y to 0
-                    new_pos.setX(max(x_lower, min(self.points[1].x() - 0.01, new_pos.x())))  # Allow horizontal movement (X-axis)
+                    new_pos.setX(self._clamp_x(new_pos.x(), x_left, self.points[1].x() - step))  # Allow horizontal movement (X-axis)
 
                 if self.smooth_curve_enabled:
                     valid_move = self.check_smooth_curve_bounds(new_pos, index)
@@ -2742,29 +2798,26 @@ class CurveWidget(QWidget):
             elif index == len(self.points) - 1:
                 # Last point: allowed anywhere along X=x_upper (Y free) or Y=100 (X free).
                 # Snap to whichever leg is nearer rather than freezing when off both.
-                on_x_leg = new_pos.x() >= x_upper
+                on_x_leg = new_frac >= 1
                 on_y_leg = new_pos.y() >= 100
                 if not (on_x_leg or on_y_leg):
-                    x_frac = (x_upper - new_pos.x()) / (x_upper - x_lower) if x_upper != x_lower else 0
+                    x_frac = 1 - new_frac
                     y_frac = (100 - new_pos.y()) / 100.0
                     on_x_leg = x_frac <= y_frac
 
                 if on_x_leg:
-                    new_pos.setX(x_upper)  # Lock X to max
+                    new_pos.setX(x_right)  # Lock X to the right end
                     new_pos.setY(max(0, min(100, new_pos.y())))  # Allow vertical movement (Y-axis)
                 else:
                     new_pos.setY(100)  # Lock Y to 100
-                    new_pos.setX(
-                        max(self.points[-2].x() + 0.01,
-                            min(x_upper, new_pos.x()))  # Allow horizontal movement (X-axis)
-                    )
+                    new_pos.setX(self._clamp_x(new_pos.x(), self.points[-2].x() + step, x_right))  # Allow horizontal movement (X-axis)
 
                 if self.smooth_curve_enabled:
                     valid_move = self.check_smooth_curve_bounds(new_pos, index)
 
             else:
                 # Intermediate points: ensure proper bounds and prevent overlap
-                new_x = max(self.points[index - 1].x() + 0.01, min(self.points[index + 1].x() - 0.01, new_pos.x()))
+                new_x = self._clamp_x(new_pos.x(), self.points[index - 1].x() + step, self.points[index + 1].x() - step)
                 new_y = max(0, min(100, new_pos.y()))
                 proposed_pos = QPointF(new_x, new_y)
 
@@ -2789,13 +2842,12 @@ class CurveWidget(QWidget):
 
                 if index != 0 and index != len(self.points) - 1:
                     if not self.msg_label.isVisible():
-                        self.msg_label.setText("Error: Further movement would exceed curve bounds.")
-                        self.msg_label.show()
+                        self.show_message("Error: Further movement would exceed curve bounds.")
                         QTimer.singleShot(3000, self.msg_label.hide)
 
             # Update the coordinate label with the current position of the dragging point
             rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)  # Graph area
-            self.coordinate_label.setText(f"{self.dragging_point.x():.2f} {self.current_unit}, %{self.dragging_point.y():.2f}")
+            self.coordinate_label.setText(f"{self.x_value_text(self.dragging_point.x(), 2)}, %{self.dragging_point.y():.2f}")
             self.coordinate_label.move(
                 rect.right() - self.coordinate_label.width() - 1,
                 rect.bottom() - self.coordinate_label.height() - 1
@@ -2824,8 +2876,7 @@ class CurveWidget(QWidget):
         if action == delete_action:
             # Prevent deletion if smooth mode is enabled and only 4 points remain
             if self.smooth_curve_enabled and len(self.points) <= 4:
-                self.msg_label.setText("Error: Cannot delete more points with smooth mode enabled.")
-                self.msg_label.show()
+                self.show_message("Error: Cannot delete more points with smooth mode enabled.")
                 QTimer.singleShot(3000, self.msg_label.hide)
             else:
                 self.points.remove(self.right_clicked_point)
@@ -2839,7 +2890,7 @@ class CurveWidget(QWidget):
 
         # Temporarily add the new point and check bounds
         projected_points = self.points + [new_point]
-        projected_points.sort(key=lambda p: p.x())  # Ensure points are ordered by x (speed)
+        projected_points.sort(key=lambda p: self._x_position(p.x()))  # Ensure points are ordered left to right
 
         if self.smooth_curve_enabled:
             # Check bounds using Akima interpolation
@@ -2849,26 +2900,23 @@ class CurveWidget(QWidget):
             try:
                 y_min, y_max = self._curve_bounds(x_values, y_values)
             except Exception:
-                self.msg_label.setText("Error: Invalid smooth curve with this point.")
-                self.msg_label.show()
+                self.show_message("Error: Invalid smooth curve with this point.")
                 return
 
             if y_min < -self._BOUNDS_EPSILON or y_max > 100 + self._BOUNDS_EPSILON:
                 # Reject point if bounds exceeded
-                self.msg_label.setText("Error: Adding this point would exceed curve bounds.")
-                self.msg_label.show()
+                self.show_message("Error: Adding this point would exceed curve bounds.")
                 QTimer.singleShot(3000, self.msg_label.hide)
                 return
         else:
             # In linear mode, ensure Y is within 0 to 100
             if new_point.y() < 0 or new_point.y() > 100:
-                self.msg_label.setText("Error: Adding this point would exceed bounds.")
-                self.msg_label.show()
+                self.show_message("Error: Adding this point would exceed bounds.")
                 QTimer.singleShot(3000, self.msg_label.hide)
                 return
 
         self.points.append(new_point)
-        self.points.sort(key=lambda p: p.x())  # Ensure points are ordered by x (speed)
+        self.points.sort(key=lambda p: self._x_position(p.x()))  # Ensure points are ordered left to right
         self.modified.emit()
         self.update()
 
@@ -2906,6 +2954,15 @@ class SpringCurveWidget(CurveWidget):
         "kph": conv.ms2kmh,
         "m/s": 1.0,
     }
+    # Unit of a curve driven by a telemetry item or sim variable: x values are
+    # in the source's own units, with no conversion.
+    RAW_UNIT = "raw"
+    # A raw source can span a small range (a ratio, radians), so its x values
+    # keep more decimals than airspeed's 2.
+    RAW_DIGITS = 4
+    SPEED_LABEL_TEXT = "Speed:"
+    SPEED_LABEL_LEGEND = "Speed (IAS)"
+    INPUT_LABEL_TEXT = "Input:"
     def __init__(self, parent=None, unit='kt', base_unit='m/s'):
         super().__init__(parent)
         self.points = [QPointF(0, 0), QPointF(500, 100)]
@@ -2914,10 +2971,69 @@ class SpringCurveWidget(CurveWidget):
         self.current_unit = unit
         self.base_unit = base_unit
         self.setWindowTitle("Spring Force Curve Editor")
-        self.x_label_text = "Speed:"
-        self.x_label_legend = "Speed (IAS)"
+        self.x_label_text = self.SPEED_LABEL_TEXT
+        self.x_label_legend = self.SPEED_LABEL_LEGEND
         self.y_label_text = "Gain:"
         self.y_label_legend = "% Spring Gain"
+
+    def is_raw(self) -> bool:
+        """True when the x axis is a telemetry item or sim variable in its own units."""
+        return self.current_unit == self.RAW_UNIT
+
+    def set_input_legend(self, source=None):
+        """Label the x axis with *source*, or with airspeed when *source* is None."""
+        if source is None:
+            self.x_label_text = self.SPEED_LABEL_TEXT
+            self.x_label_legend = self.SPEED_LABEL_LEGEND
+        else:
+            self.x_label_text = self.INPUT_LABEL_TEXT
+            self.x_label_legend = source
+        self.update()
+
+    def set_input_range(self, x_min, x_max, rescale=True):
+        """Set the x range: *x_min* at the left end, *x_max* at the right end,
+        which reverses the axis when *x_max* is below *x_min*.
+
+        With *rescale*, the points keep their relative place in the range;
+        without it, they keep their x values and are reordered left to right.
+        """
+        old_min, old_max = self.x_min, self.x_max
+        if rescale and old_max != old_min:
+            factor = (x_max - x_min) / (old_max - old_min)
+            for point in self.points:
+                point.setX(x_min + (point.x() - old_min) * factor)
+        self.x_min = x_min
+        self.x_max = x_max
+        self.points.sort(key=lambda p: self._x_position(p.x()))
+        self.update()
+
+    def from_dict(self, data):
+        super().from_dict(data)
+        self.points.sort(key=lambda p: self._x_position(p.x()))
+
+    def x_value_text(self, value, decimals=1):
+        if not self.is_raw():
+            return super().x_value_text(value, decimals)
+        if abs(self.x_max - self.x_min) < 10:
+            decimals = 3
+        return f"{value:.{decimals}f}"
+
+    def draw_axis_labels(self, painter, x_unit=None, integer=True, sign=None, decimals=1):
+        if self.is_raw():
+            span = abs(self.x_max - self.x_min)
+            integer = span >= 20
+            if span < 1:
+                decimals = 2
+        super().draw_axis_labels(painter, x_unit, integer, sign, decimals)
+
+    def to_dict(self):
+        data = super().to_dict()
+        if self.is_raw():
+            digits = self.RAW_DIGITS
+            data["x_min"] = round(self.x_min, digits)
+            data["x_max"] = round(self.x_max, digits)
+            data["points"] = [{"x": round(p.x(), digits), "y": round(p.y(), 2)} for p in self.points]
+        return data
 
     def draw_crosshairs(self, speed_mps, gain):
         if not self.isEnabled():
@@ -2928,11 +3044,10 @@ class SpringCurveWidget(CurveWidget):
             speed_mps (float): The airspeed in m/s.
             gain (float): The percentage gain.
         """
-        if self.msg_label.isVisible() and self.msg_label.text() == 'Please save a configuration before enabling live view':
-            self.msg_label.hide()
+        self._clear_live_data_message()
 
-        # Convert speed to current units
-        current_conversion = self.UNIT_CONVERSIONS[self.current_unit]
+        # Convert speed to current units; a raw input arrives in its own units
+        current_conversion = self.UNIT_CONVERSIONS.get(self.current_unit, 1.0)
         speed_converted = speed_mps * current_conversion
 
         super().draw_crosshairs(speed_converted, gain)
@@ -3021,8 +3136,7 @@ class GForceCurveWidget(CurveWidget):
             speed_mps (float): The airspeed in m/s.
             gain (float): The percentage gain.
         """
-        if self.msg_label.isVisible() and self.msg_label.text() == 'Please save a configuration before enabling live view':
-            self.msg_label.hide()
+        self._clear_live_data_message()
 
         # # Convert speed to current units
         # current_conversion = self.UNIT_CONVERSIONS[self.current_unit]

@@ -3711,9 +3711,7 @@ class TestXPlaneCommandTrim:
         return False
 
     # Trim rate (full range = 2.0 per second), command delay in frames, frame
-    # time: slow and fast trims, short and long delays. Release decisions made
-    # from the delayed read-back hunt from about rate x delay = 0.011, and
-    # ran the trim to its stop at 0.3/s with 167 ms.
+    # time: slow and fast trims, short and long delays.
     @pytest.mark.parametrize("rate, latency, dt", [
         (0.05, 2, 1 / 30.0),
         (0.15, 2, 1 / 30.0),

@@ -589,7 +589,8 @@ class TrimCalibrator:
         self._xp_press_moved_t = None    # first read-back movement of the current press
         self._xp_polarity_doubts = 0     # consecutive presses against the polarity
         self._xp_tick_t = None           # previous servo frame, for the frame time
-        self._xp_tick_dt = 0.0        # trace (diagnostic flight recorder) state
+        self._xp_tick_dt = 0.0           # duration of that frame
+        # trace (diagnostic flight recorder) state
         self._trace_rows = []
         self._trace_t0 = None
         self._trace_broken = False
@@ -2863,9 +2864,9 @@ class TrimCalibrator:
         nothing (the read-back check then aborts the run as unresponsive).
 
         X-Plane command trim (``trim_xp_commands``) only records ``pct`` as
-        the setpoint :meth:`_xp_trim_servo` drives the read-back to; there
-        ``_trim_sign`` selects which command raises the read-back instead of
-        negating a written value.
+        the setpoint :meth:`_xp_trim_servo` drives the read-back to; the
+        learned ``_xp_polarity`` picks the command, and ``_trim_sign`` is not
+        applied.
         """
         if self._xp_cmd_mode():
             self._xp_cmd_setpoint = clamp(pct, -1.0, 1.0)
@@ -3099,7 +3100,7 @@ class TrimCalibrator:
         """The aircraft handler is being retired with a run in progress. A
         held trim command would run the trim to its stop with no more frames
         coming, so command trim ends the run here; the written trim modes keep
-        their last value as before."""
+        their last written value."""
         if self._active and self._xp_cmd_mode():
             self.force_abort("Aircraft unloaded")
 
@@ -3153,9 +3154,9 @@ class TrimCalibrator:
             # Ending from the assistant's hold keeps the CURRENT trim: it is
             # the level trim for the power the user chose, and snapping back
             # to the pre-assist trim would hand back an out-of-trim aircraft.
-            # Command trim only moves while the engine runs: RESTORE has
-            # already brought it home after success; an abort leaves it where
-            # it is.
+            # Command trim moves only while the calibrator runs: RESTORE has
+            # already brought it home after a success; an abort leaves it
+            # where it is.
             if self._xp_cmd_mode():
                 self._xp_finish_commands()
             elif self._trim_touched and self.state != CalState.ASSIST_HOLD:

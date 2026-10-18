@@ -47,6 +47,7 @@ __all__ = [
     "sine_point_in_time",
     "interpolate_curve_y_point",
     "get_gain_from_gs",
+    "get_curve_gain",
     "get_gain_from_speed",
     "pressure_from_altitude",
     "average",
@@ -580,6 +581,11 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     # Extract x and y values from points
     x_values = np.array([p["x"] for p in points]) * conversion_factor  # Convert curve points from user units to m/s
     y_values = np.array([p["y"] for p in points])
+    # A curve on a reversed axis stores its points right to left, in descending x;
+    # the end clamps and the interpolators need ascending x.
+    if np.any(np.diff(x_values) < 0):
+        order = np.argsort(x_values, kind="stable")
+        x_values, y_values = x_values[order], y_values[order]
 
     # Handle out-of-bounds x_values
     if input_x <= x_values[0]:
@@ -621,6 +627,47 @@ def get_gain_from_gs(curve_settings, input_gs):
     return interpolated_pos, interpolated_neg
 
 
+# Advanced spring airspeed units, as factors to m/s.  "raw" is a curve's input
+# source's own units.
+_SPEED_CURVE_UNITS = {
+    "kt": conv.kt2ms,
+    "mph": conv.mph2ms,
+    "kph": conv.kmh2ms,
+    "m/s": 1.0,
+    "raw": 1.0,
+}
+
+
+def _speed_curve_settings(curve_settings: str | dict) -> dict:
+    settings = curve_settings if isinstance(curve_settings, dict) else json.loads(curve_settings)
+    if settings is None:
+        raise ValueError("Invalid settings for speed curve.")
+    return settings
+
+
+def get_curve_gain(curve_settings: str | dict, axis: str, input_x: float) -> float:
+    """
+    The gain one advanced spring curve gives at ``input_x``.
+
+    Args:
+        curve_settings (str | dict): The advanced spring settings, or their JSON encoding.
+        axis (str): ``"x"`` or ``"y"``, the curve to read.
+        input_x (float): For a curve with an ``input`` block, the source's value in its own
+            units, which are the curve's x units; for any other curve, airspeed in m/s.
+
+    Returns:
+        float: The interpolated gain as a factor (0...1), scaled by the curve's gain setting.
+    """
+    settings = _speed_curve_settings(curve_settings)
+    curve = settings.get(f"curve_{axis}", {})
+    gain = settings.get(f"gain_{axis}") / 100
+    if isinstance(curve.get("input"), dict):
+        conversion_factor = 1.0
+    else:
+        conversion_factor = _SPEED_CURVE_UNITS[settings.get("units", "m/s")]
+    return round(float(interpolate_curve_y_point(curve, input_x, conversion_factor) / 100) * gain, 3)
+
+
 def get_gain_from_speed(curve_settings : str | dict, input_airspeed_ms):
     """
     Interpolates the % force input airspeed and the advanced spring curve settings passed.
@@ -628,41 +675,15 @@ def get_gain_from_speed(curve_settings : str | dict, input_airspeed_ms):
     Args:
         json_string (str): JSON-encoded string containing x and y curve dictionaries, units, and scale.
         input_airspeed_ms (float): The airspeed in m/s for which to calculate the interpolated values.
+            A curve with an ``input`` block reads it as the source's value instead (see
+            :func:`get_curve_gain`).
 
     Returns:
         dict: A dictionary containing the interpolated X and Y gain values as a factor (0...1).
     """
-    # Unit conversion factors (to m/s)
-    UNIT_CONVERSIONS = {
-        "kt": conv.kt2ms,
-        "mph": conv.mph2ms,
-        "kph": conv.kmh2ms,
-        "m/s": 1.0,
-    }
-
-    if isinstance(curve_settings, dict):
-        settings = curve_settings
-    else:
-        # Parse JSON string
-        settings = json.loads(curve_settings)
-    assert settings is not None, "Invalid settings for speed curve."
-
-    # Extract curves and units
-    curve_x = settings.get("curve_x", {})
-    curve_y = settings.get("curve_y", {})
-    gain_x = settings.get('gain_x')/100
-    gain_y = settings.get('gain_y')/100
-    units = settings.get("units", "m/s")  # Default to m/s if units not specified
-
-    # Conversion factor to m/s
-    conversion_factor = UNIT_CONVERSIONS[units]
-
-    # Interpolate X and Y values
-    # print(f"x:{gain_x}, y:{gain_y}")
-    interpolated_x = round(float(interpolate_curve_y_point(curve_x, input_airspeed_ms, conversion_factor) / 100) * gain_x, 3)
-    interpolated_y = round(float(interpolate_curve_y_point(curve_y, input_airspeed_ms, conversion_factor) / 100) * gain_y, 3)
-
-    return {"x": interpolated_x, "y": interpolated_y}
+    settings = _speed_curve_settings(curve_settings)
+    return {"x": get_curve_gain(settings, "x", input_airspeed_ms),
+            "y": get_curve_gain(settings, "y", input_airspeed_ms)}
 
 
 def pressure_from_altitude(altitude_m):

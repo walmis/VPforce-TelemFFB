@@ -50,6 +50,9 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Axis control settings are moved into a collapsible 'Axis Control' settings group
   - The global 'Axis Control' toggle is no longer available.  To disable axis control, use the per-device 'Disable for This Device' setting
   - Trim and autopilot following remain gated behind the axis control.  Axis control must be enabled to access these features.
+- **NEW: Advanced Dynamic spring curves can follow a telemetry item or sim variable instead of airspeed**
+  - Each curve has a Curve Input selector on the Advanced Spring dialog: name a telemetry item, a SimVar/L:Var/B: event (MSFS) or a dataref (X-Plane), set the range in its own units, and draw the curve over that range; the other curve can stay on airspeed
+  - For aircraft whose control feel keys off something other than airspeed, such as stabilizer trim position
 - **NEW: In-sim settings panels for MSFS and X-Plane**
   - View and change the current aircraft's TelemFFB settings from a window inside the sim
   - Both the settings and monitor tabs are available in the in-sim panels
