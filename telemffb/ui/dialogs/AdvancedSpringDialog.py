@@ -793,7 +793,9 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             self.gain_y = settings.get('gain_y', 100)
             self.sl_y_mastergain.setValue(settings['gain_y'])
 
-            self.x_scale = settings.get('scale', 500)
+            # a scale below 1 collapses the airspeed axis
+            scale = settings.get('scale', 500)
+            self.x_scale = scale if isinstance(scale, (int, float)) and scale >= 1 else 500
             # "units" is the airspeed curves' unit; a curve with an input block is in its source's units
             units = settings.get('units', "kt")
             if units in self.UNIT_CONVERSIONS:
@@ -856,8 +858,8 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             try:
                 # Convert the input to a float
                 new_airspeed = float(text)
-                if new_airspeed <= 0:
-                    raise ValueError("Airspeed must be a positive value.")
+                if not (math.isfinite(new_airspeed) and new_airspeed >= 1):
+                    raise ValueError("Airspeed must be at least 1.")
 
 
                 self.set_airspeed_scale(new_airspeed)

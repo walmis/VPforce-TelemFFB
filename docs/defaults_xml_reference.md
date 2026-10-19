@@ -269,7 +269,7 @@ them without cloning a shipped profile.
 
 | Element | Description |
 |---------|-------------|
-| `name` | The setting identifier this override applies to. On X-Plane, a name that is one of the plugin's built-in telemetry items replaces that item (plugin 18102026 and later; older plugins ignore such a row), except `src`, `N`, `STOP`, `SimPaused`, `jOvrd`, `pOvrd` and `cOvrd`. |
+| `name` | The setting identifier this override applies to. On X-Plane, a name that is one of the plugin's built-in telemetry items replaces that item, except `src`, `N`, `STOP`, `SimPaused`, `jOvrd`, `pOvrd` and `cOvrd`. |
 | `model` | Python regex pattern matching the aircraft name. Exactly one of `model` or `class` is required. |
 | `class` | Aircraft class name (e.g., `HPGHelicopter`). The row applies to every aircraft resolved to that class, including one auto-detected onto a generic class. A class row must carry `sim`, because the class modules are shared between MSFS and X-Plane. |
 | `sim` | Simulator this row applies to. Required on class rows; optional on model rows, where an absent `sim` applies to every simulator. |

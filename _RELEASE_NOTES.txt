@@ -44,6 +44,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Edit the display name for the device shown on the device icons
 - **NEW: All settings (master and child instances) are now configurable through the master instance system settings**
 - **NEW: Backup and restore system settings**, from a new File menu on the System Settings dialog
+- The "No Trim Calibration Found" prompt can be dismissed per aircraft from the menu on its right end; Profiles > Reset Dismissed Prompts brings it back
 
 ## MSFS / X-Plane
 - **CHANGED: Global Axis Control is permanently enabled**
@@ -53,6 +54,8 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - **NEW: Advanced Dynamic spring curves can follow a telemetry item or sim variable instead of airspeed**
   - Each curve has a Curve Input selector on the Advanced Spring dialog: name a telemetry item, a SimVar/L:Var/B: event (MSFS) or a dataref (X-Plane), set the range in its own units, and draw the curve over that range; the other curve can stay on airspeed
   - For aircraft whose control feel keys off something other than airspeed, such as stabilizer trim position
+- **CHANGED: Overriding the autopilot no longer steps the controls at the deadzone edge**
+  - Past the autopilot-follow deadzone, the input sent starts from zero at the deadzone edge instead of jumping in by the deadzone width.  While the autopilot is engaged, the largest input is reduced by the deadzone width
 - **NEW: In-sim settings panels for MSFS and X-Plane**
   - View and change the current aircraft's TelemFFB settings from a window inside the sim
   - Both the settings and monitor tabs are available in the in-sim panels
@@ -64,10 +67,19 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
 - Fix: an override saved without a transform could not be re-added from the SimConnect/Dataref Overrides Editor until the transform field was cleared of the text 'None'
 - Fix: the log now names what stopped MSFS telemetry when the sim pauses (paused, parked, slewed, avatar, cinematic, in menus) and says when it resumes - before, a stuck stop was indistinguishable from a dead connection
+- Fix: a maximum elevator, aileron or rudder spring gain of 0 no longer stops the flight controls from updating
 
 ## X-Plane
 - **NEW: Manage multiple X-Plane installs**
   - System Settings > X-Plane lists every X-Plane install found on the PC.  Add/remove additional install locations
+- **NEW: Elevator trim calibration through X-Plane's trim commands**
+  - The calibration moves the trim with X-Plane's pitch trim up and down commands, for aircraft whose own trim system overwrites the trim dataref, such as the Hot Start Challenger 650
+  - The default on X-Plane.  Uncheck Trim commands in the calibration dialog to write the trim dataref instead
+  - Cancelling a run leaves the trim where it is
+- **NEW: The Autopilot Following settings MSFS has are available on X-Plane**
+  - Inside the deadzone, the axis sent to X-Plane is centered
+  - KNOWN ISSUE: the Hot Start Challenger 650 reports its autopilot servos engaged under TOGA, so the autopilot-follow deadzone applies while hand flying a takeoff or go-around.  A Custom Autopilot Variable naming the aircraft's own autopilot-engaged dataref resolves it
+- **NEW: A dataref override named after a built-in telemetry item replaces that item**; requires the bundled X-Plane plugin
 - Fix: the axis override is released when the FFB device disconnects, and a per-device axis disable is honored
 - Dataref override transforms accept the same math expressions as MSFS (x - 1, x/50 - 1, ...), applied in TelemFFB; a plain number is still applied by the plugin
 

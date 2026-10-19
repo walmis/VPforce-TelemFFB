@@ -135,6 +135,10 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
         Returns (center, send).
         """
+        if deadzone <= 0:
+            # no deadzone to push out of: the center follows and every frame sends
+            self._ap_hold[axis] = None
+            return target, True
         held = self._ap_hold[axis]
         ref = target if held is None else held
         if abs(phys - ref) > deadzone:
@@ -258,7 +262,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
     @override
     def _adv_spr_source_is_variable(self, source: str, telem_data: BaseTelemetryData) -> bool:
-        return source not in telem_data and self._adv_spr_subscribable(source)
+        return not self._adv_spr_is_frame_item(source, telem_data) and self._adv_spr_subscribable(source)
 
     def _custom_ap_follow_position(self, axis: str, telem_data: BaseTelemetryData) -> Optional[float]:
         """The custom follow variable for ``axis`` through its transform, clamped to

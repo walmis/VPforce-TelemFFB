@@ -297,17 +297,24 @@ class MsfsXpFlightControlsMixIn(MsfsXpSteeringFrictionMixIn, MsfsXpFBWFlightCont
         - Stops the active rudder constant force effect.
         """
 
+        # First, so nothing below that raises can leave a trim command held
+        if self._trim_calibrator is not None:
+            try:
+                self._trim_calibrator.release_trim_command()
+            except Exception:
+                logging.exception("Releasing the trim command on timeout failed")
         super().on_timeout()
         self.effects['rudder_const_force'].stop()
         if self._use_firmware_axis_backend():
             self._clear_firmware_axis_override()
-        if self._trim_calibrator is not None:
-            self._trim_calibrator.release_trim_command()
 
     @override
     def on_shutdown(self):
         if self._trim_calibrator is not None:
-            self._trim_calibrator.on_aircraft_unloaded()
+            try:
+                self._trim_calibrator.on_aircraft_unloaded()
+            except Exception:
+                logging.exception("Ending the trim calibration on shutdown failed")
         super().on_shutdown()
 
     @override

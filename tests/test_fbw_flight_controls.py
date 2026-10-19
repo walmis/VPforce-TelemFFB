@@ -1023,6 +1023,16 @@ class TestAPFollowHold(BaseTelemetryEffectTestCase):
         _, sent = self._frame(instance, (0.34, 0.0), 0.4, 0.0)
         assert sent["AXIS_AILERONS_SET"] == -int(-0.01 * 16384)
 
+    def test_a_zero_deadzone_keeps_the_center_on_the_autopilot_command(self):
+        instance = self._instance()
+        instance.joystick_ap_x_follow_deadzone = 0.0
+        self._frame(instance, (0.4, 0.0), 0.4, 0.0)
+        (x, _), sent = self._frame(instance, (0.7, 0.0), 0.5, 0.0)
+        assert x == pytest.approx(0.5 * 4096, abs=8)
+        assert sent["AXIS_AILERONS_SET"] == -int(0.2 * 16384)
+        (x, _), _ = self._frame(instance, (0.7, 0.0), 0.6, 0.0)
+        assert x == pytest.approx(0.6 * 4096, abs=8)
+
     def test_a_release_settles_without_a_swing(self):
         instance = self._instance()
         self._frame(instance, (0.4, 0.0), 0.4, 0.0)

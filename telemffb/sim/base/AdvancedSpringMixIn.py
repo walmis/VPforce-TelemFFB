@@ -87,7 +87,12 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     @staticmethod
     def _sort_adv_spr_points(settings) -> None:
         """Order each curve's points by ascending x, as the per-frame lookup
-        needs them; a curve on a reversed axis is stored right to left."""
+        needs them; a curve on a reversed axis is stored right to left.
+
+        Of points sharing an x only the first is kept: the interpolators
+        refuse x values that do not strictly increase, which would raise on
+        every frame.  Stored x values are rounded, so two points dragged close
+        together can share one."""
         if not isinstance(settings, dict):
             return
         for axis in ADV_SPR_AXES:
@@ -96,6 +101,8 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             if isinstance(points, list):
                 try:
                     points.sort(key=lambda p: p["x"])
+                    points[:] = [p for i, p in enumerate(points)
+                                 if i == 0 or p["x"] != points[i - 1]["x"]]
                 except (KeyError, TypeError):
                     logging.warning(f"Advanced spring: the {axis.upper()} curve has malformed points")
 
@@ -135,14 +142,29 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         return self._adv_spr_input_key_for(axis, self.telem_data)
 
     def _adv_spr_input_key_for(self, axis: str, telem_data: Optional[BaseTelemetryData]) -> Optional[str]:
-        """A source that names an item of the frame is read under that name; any
-        other source is a sim variable, read under this role's tag for the curve."""
+        """A source that names an item of the frame, or one a frame of this
+        aircraft has carried, is read under that name; any other source is a sim
+        variable, read under this role's tag for the curve."""
         source = self.adv_spr_input_source(axis)
         if source is None:
             return None
-        if source and telem_data is not None and source in telem_data:
+        if source and telem_data is not None and (source in telem_data or source in self._adv_spr_items_seen):
             return source
         return self._adv_spr_input_tag(axis)
+
+    def _adv_spr_is_frame_item(self, source: str, telem_data: BaseTelemetryData) -> bool:
+        """True when ``source`` names a telemetry item: one this frame carries,
+        one the previous frame carried (it also holds the items the effect chain
+        writes after the subscription sync), or one any frame of this aircraft
+        has carried, which covers items present only in some frames.  Such a
+        name is never subscribed as a variable."""
+        seen = self._adv_spr_items_seen
+        if source in seen:
+            return True
+        if source in telem_data or source in self._last_telem_data:
+            seen.add(source)
+            return True
+        return False
 
     def _adv_spr_input_tag(self, axis: str) -> str:
         """This role's :func:`spring_curve_input_tag` for curve ``axis``, built
@@ -264,7 +286,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         source = self.adv_spr_input_source(axis)
         if not source or not self.spring_mode_is(SpringModeEnum.ADVANCED):
             return None
-        if source in telem_data:
+        if self._adv_spr_is_frame_item(source, telem_data):
             return None
         return source
 
@@ -333,6 +355,8 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         self._adv_spr_held: dict = {"x": None, "y": None}
         # per curve, the variable last passed to _sync_spring_curve_input
         self._adv_spr_synced_vars: dict = {"x": None, "y": None}
+        # Input sources a frame of this aircraft has carried; see _adv_spr_is_frame_item
+        self._adv_spr_items_seen: set = set()
 
         # per-instance state used by advanced spring override
         self.adv_spr_settings_dict: dict = {}

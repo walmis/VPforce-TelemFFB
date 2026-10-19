@@ -134,6 +134,13 @@ class TestAdvancedSpringInputSource(BaseTelemetryEffectTestCase):
         assert gain(6.0) == 0.0
         assert gain(0.5) == 1.0
 
+    def test_points_sharing_an_x_interpolate_on_the_first(self):
+        curve = _curve("StabTrim")
+        curve["points"] = [{"x": 0.0, "y": 0}, {"x": 5.0, "y": 50}, {"x": 5.0, "y": 80}, {"x": 10.0, "y": 100}]
+        instance = self._instance(_curve(), curve)
+
+        assert instance.adv_spr_curve_gain("y", BaseTelemetryData({"StabTrim": 7.5}), 0.0) == 0.75
+
 
 def _records(caplog, source, level=None):
     return [r for r in caplog.records
@@ -231,6 +238,18 @@ class TestSpringCurveInputSubscription(BaseTelemetryEffectTestCase):
         instance.on_telemetry(telem)
 
         assert TAG_Y not in instance.mock_simconnect.sv_dict
+
+    def test_msfs_never_subscribes_an_item_some_frames_lack(self):
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.ADVANCED
+        instance.adv_spr_gains = json.dumps(_settings(_curve(), _curve("StabTrim")))
+
+        for telem in (self._flight_frame(StabTrim=4.0), self._flight_frame(), self._flight_frame()):
+            self.set_telemetry(instance, telem)
+            instance.on_telemetry(telem)
+            assert TAG_Y not in instance.mock_simconnect.sv_dict
+            assert telem._elev_coeff == pytest.approx(0.4)
 
     def test_xplane_subscribes_a_dataref_and_releases_it(self, monkeypatch):
         tm = _telem_manager(monkeypatch)

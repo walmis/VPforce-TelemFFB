@@ -57,6 +57,7 @@ import enum
 import logging
 import math
 import os
+import threading
 import time
 
 import telemffb.globals as G
@@ -463,6 +464,10 @@ class TrimCalibrator:
         self.ac = aircraft
         self.state = CalState.IDLE
         self._active = False
+        # Teardown can run on the main thread while the telemetry thread is
+        # inside update(); the lock keeps a press from beginning after the
+        # release.
+        self._xp_cmd_lock = threading.Lock()
         self.status_message = "Idle"
         self.progress = 0.0
         # Run option: starting pitch-gain scale (1.0 = normal). Lets the user
@@ -3126,16 +3131,20 @@ class TrimCalibrator:
             self.status_message = f"{self.status_message} - {note}"
 
     def _xp_cmd_drive(self, cmd):
-        """Make ``cmd`` (+1 up, -1 down, 0 none) the held trim command."""
-        if cmd == self._xp_cmd_held:
-            return
-        names = {1: self.XP_TRIM_UP_CMD, -1: self.XP_TRIM_DOWN_CMD}
-        if self._xp_cmd_held:
-            self.ac.send_xp_command(
-                f"COMMAND:cmd={names[self._xp_cmd_held]},phase=end")
-        if cmd:
-            self.ac.send_xp_command(f"COMMAND:cmd={names[cmd]},phase=begin")
-        self._xp_cmd_held = cmd
+        """Make ``cmd`` (+1 up, -1 down, 0 none) the held trim command. A run
+        that has ended holds nothing."""
+        with self._xp_cmd_lock:
+            if not self._active:
+                cmd = 0
+            if cmd == self._xp_cmd_held:
+                return
+            names = {1: self.XP_TRIM_UP_CMD, -1: self.XP_TRIM_DOWN_CMD}
+            if self._xp_cmd_held:
+                self.ac.send_xp_command(
+                    f"COMMAND:cmd={names[self._xp_cmd_held]},phase=end")
+            if cmd:
+                self.ac.send_xp_command(f"COMMAND:cmd={names[cmd]},phase=begin")
+            self._xp_cmd_held = cmd
 
     # ---- Teardown ------------------------------------------------------------
 
@@ -3148,6 +3157,8 @@ class TrimCalibrator:
     def _finish(self, end_state):
         """Restore trim, release axis control, and hand back to normal flight
         controls (which take over the axis/spring on the next frame)."""
+        # Cleared first: a trim command begun after this point is refused.
+        self._active = False
         try:
             # Only touch trim if we actually moved it (neutralization or the
             # sweep); otherwise trim0 is still its default and untouched by us.
@@ -3165,7 +3176,6 @@ class TrimCalibrator:
             logger.debug(f"trim restore skipped: {e}")
         self._set_trimwheel_hold(False)
         self._set_state(end_state)
-        self._active = False
         self._dump_trace()
 
     def _set_trimwheel_hold(self, active):
