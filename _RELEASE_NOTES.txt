@@ -1,12 +1,28 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  DRAFT - October 2026
+##  3.0.261019 - October 19, 2026
 ############################################
 ## Platform
 - **NEW: 3rd party device support via DirectLink**
   - An optional integration that lets TelemFFB drive any device exposing force feedback through DirectInput
   - Enabled in System Settings > Integrations; DirectLink is a separate free download
+- **NEW: Effect previews - feel and tune an effects in isolation**
+  - Accessible via Offline Editor - use the new Offline/Preview mode button to quickly enter offline mode for an actively loaded aircraft.
+- **NEW: Effect Levels and Mute**
+  - Per device effect level control. Master and per effect type controls are available.
+  - Instantly mute effects per device or globally with the click of a button.
+- **NEW: Bind buttons from any game controller**
+  - Anywhere you can/must bind a button within TelemFFB to perform some function, you can now bind any game controller attached to your PC
+  - Individual game controllers can be enabled in System Settings > Button Devices
+- **NEW: Improved aircraft profile matching**
+  - Previously the first profile that matched in file order won
+  - Now the most specific match wins. When two match equally the built-in profile wins, so a new default profile that ships for an aircraft you already have gets noticed instead of being quietly shadowed
+- **NEW: Overlapping profile resolution**
+  - The main window shows "Multiple matching profiles detected" and offers to resolve the conflict.  This happens when a curated profile ships for an aircraft you had already made a profile for
+- **NEW: Profile Fork - create a new, more specific profile**
+  - A new button sits next to the Matched Model row.  It forks the matched profile for the currently matched aircraft into a more specific match string
+  - Previously, the New Aircraft Wizard only appeared for unmatched aircraft.  An aircraft that mistakenly matched a broader profile had no way to be separated from it without hand-editing the config
 - **NEW: The DirectInput Tap (DCS / IL-2 / Falcon BMS)**
   - "The tap" intercepts the games own FFB effects and lets TelemFFB render them locally
     - **Game Managed (DirectInput Tap)** spring mode re-renders the game's spring: trim center follow and force-trim collapse reproduce exactly
@@ -15,22 +31,6 @@ This is not an exhaustive change log (see github for that).  This file only outl
     - Required for DirectLink devices, optional for VPforce devices
 - **NEW: "DCS FFB Fix" installer (DCS)**
   - A sub-mode of the DirectInput Tap installation for DCS which installs the DirectInput Tap wrapper without the tap in the same way the "dcs-force-feedback-fix" wrapper is used today
-- **NEW: Effect previews - feel and tune an effects in isolation**
-  - Accessible via Offline Editor - use the new Offline/Preview mode button to quickly enter offline mode for an actively loaded aircraft.
-- **NEW: Effect Levels and Mute**
-  - Per device effect level control. Master and per effect type controls are available.
-  - Instantly mute effects per device or globally with the click of a button.
-- **NEW: Improved aircraft profile matching**
-  - Previously the first profile that matched in file order won
-  - Now the most specific match wins. When two match equally the built-in profile wins, so a new default profile that ships for an aircraft you already have gets noticed instead of being quietly shadowed
-- **NEW: Overlapping profile resolution**
-  - The main window shows "Multiple matching profiles detected" and offers to resolve the conflict.  This happens when a curated profile ships for an aircraft you had already made a profile for
-- **NEW: Profile Fork button - create a new, more specific profile**
-  - A new button sits next to the Matched Model row.  It forks the matched profile for the currently matched aircraft into a more specific match string
-  - Previously, the New Aircraft Wizard only appeared for unmatched aircraft.  An aircraft that mistakenly matched a broader profile had no way to be separated from it without hand-editing the config
-- **NEW: Bind buttons from any game controller**
-  - Anywhere you can/must bind a button within TelemFFB to perform some function, you can now bind any game controller attached to your PC
-  - Individual game controllers can be enabled in System Settings > Button Devices
 - **CHANGED: The configuration file is now userconfig_v3.xml**
   - Any existing "v2" config is migrated on the first startup
 
@@ -51,17 +51,14 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Axis control settings are moved into a collapsible 'Axis Control' settings group
   - The global 'Axis Control' toggle is no longer available.  To disable axis control, use the per-device 'Disable for This Device' setting
   - Trim and autopilot following remain gated behind the axis control.  Axis control must be enabled to access these features.
-- **NEW: Advanced Dynamic spring curves can follow a telemetry item or sim variable instead of airspeed**
-  - Each curve has a Curve Input selector on the Advanced Spring dialog: name a telemetry item, a SimVar/L:Var/B: event (MSFS) or a dataref (X-Plane), set the range in its own units, and draw the curve over that range; the other curve can stay on airspeed
-  - For aircraft whose control feel keys off something other than airspeed, such as stabilizer trim position
-- **CHANGED: Overriding the autopilot no longer steps the controls at the deadzone edge**
-  - Past the autopilot-follow deadzone, the input sent starts from zero at the deadzone edge instead of jumping in by the deadzone width.  While the autopilot is engaged, the largest input is reduced by the deadzone width
 - **NEW: In-sim settings panels for MSFS and X-Plane**
   - View and change the current aircraft's TelemFFB settings from a window inside the sim
   - Both the settings and monitor tabs are available in the in-sim panels
   - Install via the individual sim configurations in System Settings
 - **NEW: Multiple joystick devices, with per-aircraft switching (MSFS / X-Plane)**
   - Configure more than one joystick - a stick and a yoke, for example.  Switch between them by changing the primary device in the settings
+- **NEW: Advanced Dynamic spring curves can follow a telemetry item or sim variable instead of airspeed**
+  - For aircraft whose control feel keys off something other than airspeed, such as stabilizer trim position
 - Fix: The Exponential Curve G-force mode is selectable again, with its settings.  It was already the default for any aircraft whose G-force mode was never changed, while the settings showed it as Disabled
 - Fix: the Advanced G-Force 'offset' mode never actually ran on MSFS or X-Plane (it worked on DCS and IL-2) - the dispatch was swallowed on the way to the effect. It runs now
 - Fix: the offset-mode G effect's spring adjuster is back on its original, field-proven parameters - the spring no longer collapses when the offset kicks in
@@ -75,13 +72,9 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - **NEW: Elevator trim calibration through X-Plane's trim commands**
   - The calibration moves the trim with X-Plane's pitch trim up and down commands, for aircraft whose own trim system overwrites the trim dataref, such as the Hot Start Challenger 650
   - The default on X-Plane.  Uncheck Trim commands in the calibration dialog to write the trim dataref instead
-  - Cancelling a run leaves the trim where it is
-- **NEW: The Autopilot Following settings MSFS has are available on X-Plane**
-  - Inside the deadzone, the axis sent to X-Plane is centered
-  - KNOWN ISSUE: the Hot Start Challenger 650 reports its autopilot servos engaged under TOGA, so the autopilot-follow deadzone applies while hand flying a takeoff or go-around.  A Custom Autopilot Variable naming the aircraft's own autopilot-engaged dataref resolves it
-- **NEW: A dataref override named after a built-in telemetry item replaces that item**; requires the bundled X-Plane plugin
+- **NEW: The Autopilot Following settings are now feature parity with MSFS**
 - Fix: the axis override is released when the FFB device disconnects, and a per-device axis disable is honored
-- Dataref override transforms accept the same math expressions as MSFS (x - 1, x/50 - 1, ...), applied in TelemFFB; a plain number is still applied by the plugin
+- Dataref override transforms accept the same math expressions as MSFS (x - 1, x/50 - 1, ...), applied in TelemFFB
 
 ## MSFS
 - **NEW: PMDG 737-600/700/800/900 profiles**
@@ -89,7 +82,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
   - Elevator trim following uses a calibrated trim curve (Only the 600 variant ships with a pre-defined calibration)
 - **NEW: Custom autopilot follow variables** - follow the autopilot in roll, pitch or yaw through a variable of your choice, with a transform to the -1..1 range, for aircraft that publish their yoke or pedal position in their own variables
 - **NEW: Disconnect Autopilot on Override** - send a disconnect event once the stick is held past a configurable deflection, for an autopilot that does not let go on its own
-- **NEW: 25 more aircraft defaults ship with an elevator trim calibration**, 13 of them as new built-in profiles
+- **NEW: 25 additional aircraft defaults ship with an elevator trim calibration**, 13 of them as new built-in profiles
 - Fix: Camera add-ons such as ChasePlane user camera states TelemFFB did not understand which could leave TelemFFB paused during flight. TelemFFB now uses the sim's motion simulation state instead of the camera views to determine if the user is in the menu system.
 
 ## IL-2
