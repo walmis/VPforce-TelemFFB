@@ -230,7 +230,8 @@ class Aircraft(
             self.flag_error(f"Custom Autopilot Variable '{var}' is not a dataref path")
             var = ""
         tag = f"APServos_{G.device_type or 'joystick'}"
-        self._sync_xplane_dataref(tag, var or None)
+        # the stock autopilot flags (servos_on and the like) are int datarefs
+        self._sync_xplane_dataref(tag, var or None, dtype="int")
         if var:
             telem_data["APServos"] = telem_data.get(tag) or 0
 

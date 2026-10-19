@@ -4,7 +4,11 @@ Comprehensive unit tests for MsfsXpFBWFlightControlsMixIn.
 This module tests the fly-by-wire flight control effects including trim following,
 autopilot following, and axis control for both joystick and pedals.
 """
+import types
+
 import pytest
+
+import telemffb.globals as G
 from tests.framework.base import BaseTelemetryEffectTestCase
 from tests.framework.utils import (
     TelemetryDataBuilder,
@@ -16,6 +20,8 @@ from tests.framework.utils import (
 )
 from telemffb.sim.msfs_xp.MsfsXpFBWFlightControlsMixIn import MsfsXpFBWFlightControlsMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.sim.msfs_xp.MsfsXpSimConnectMixIn import MsfsXpSimConnectMixIn
+from telemffb.telem.TelemManager import TelemManager
 
 
 class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
@@ -1219,40 +1225,61 @@ class TestXPlaneAPFollow(BaseTelemetryEffectTestCase):
 
 
 class TestXPlaneCustomAutopilotDataref:
-    """The custom autopilot variable on X-Plane: subscribed under the device's
-    own tag (the plugin's table is shared by every instance) and copied into
-    APServos for the frame."""
+    """The custom autopilot variable on X-Plane: subscribed as an int dataref
+    under the device's own tag (the plugin's table is shared by every
+    instance) and copied into APServos for the frame."""
+
+    class _Socket:
+        def __init__(self):
+            self.sent = []
+
+        def sendto(self, data, addr):
+            self.sent.append(data.decode("utf-8"))
 
     class _Aircraft:
-        def __init__(self, enabled, var):
-            self.custom_ap_var_enabled = enabled
-            self.custom_ap_var = var
-            self.synced = []
+        _sync_xplane_dataref = MsfsXpSimConnectMixIn._sync_xplane_dataref
+
+        def __init__(self):
+            self.custom_ap_var_enabled = False
+            self.custom_ap_var = ""
+            self._runtime_datarefs_subscribed = {}
 
         def _sim_is_xplane(self):
             return True
 
-        def _sync_xplane_dataref(self, name, dataref):
-            self.synced.append((name, dataref))
-
-    def _run(self, monkeypatch, enabled, var, frame):
-        import telemffb.globals as G
-        from telemffb.sim.msfs_xp.Aircraft import Aircraft
+    @pytest.fixture
+    def plugin(self, monkeypatch):
+        monkeypatch.setattr(G, "system_settings", types.SimpleNamespace(get=lambda k, d=None: d), raising=False)
+        monkeypatch.setattr(G, "settings_mgr", types.SimpleNamespace(timed_out=False), raising=False)
+        monkeypatch.setattr(G, "ipc_instance", None, raising=False)
         monkeypatch.setattr(G, "device_type", "pedals", raising=False)
-        ac = self._Aircraft(enabled, var)
+        tm = TelemManager()
+        tm._socket = self._Socket()
+        monkeypatch.setattr(G, "telem_manager", tm, raising=False)
+        return tm._socket
+
+    @staticmethod
+    def _frame(ac, enabled, var, frame):
+        from telemffb.sim.msfs_xp.Aircraft import Aircraft
+        ac.custom_ap_var_enabled = enabled
+        ac.custom_ap_var = var
         telem = BaseTelemetryData(frame)
         Aircraft._sync_xplane_ap_state(ac, telem)
-        return ac, telem
+        return telem
 
-    def test_the_dataref_replaces_apservos(self, monkeypatch):
-        ac, telem = self._run(monkeypatch, True, "cl650/ap/engaged",
-                              {"APServos": 1, "APServos_pedals": 0})
-        assert ac.synced == [("APServos_pedals", "cl650/ap/engaged")]
+    def test_the_dataref_is_subscribed_as_int_and_replaces_apservos(self, plugin):
+        ac = self._Aircraft()
+        telem = self._frame(ac, True, "cl650/ap/engaged", {"APServos": 1, "APServos_pedals": 0})
+        assert plugin.sent == [
+            "SUBSCRIBE:dataref=cl650/ap/engaged,type=int,tag=APServos_pedals,precision=6,conversion=1.0",
+        ]
         assert telem["APServos"] == 0
 
-    def test_disabled_releases_it_and_leaves_apservos(self, monkeypatch):
-        ac, telem = self._run(monkeypatch, False, "cl650/ap/engaged", {"APServos": 1})
-        assert ac.synced == [("APServos_pedals", None)]
+    def test_disabled_releases_it_and_leaves_apservos(self, plugin):
+        ac = self._Aircraft()
+        self._frame(ac, True, "cl650/ap/engaged", {"APServos": 1, "APServos_pedals": 0})
+        telem = self._frame(ac, False, "cl650/ap/engaged", {"APServos": 1})
+        assert plugin.sent[1:] == ["UNSUBSCRIBE:tag=APServos_pedals"]
         assert telem["APServos"] == 1
 
 

@@ -312,7 +312,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._simconnect._resubscribe()
         self._runtime_simvars_subscribed[name] = wanted
 
-    def _sync_xplane_dataref(self, name: str, dataref: Optional[str]):
+    def _sync_xplane_dataref(self, name: str, dataref: Optional[str], dtype: str = "float"):
         """Keep the telemetry item ``name`` subscribed to the X-Plane dataref a setting names.
 
         ``dataref`` empty or None releases it; a changed dataref releases the old
@@ -320,7 +320,8 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         subscribed rather than against the previous frame's setting, for the
         reason :meth:`_sync_runtime_simvar` gives.  The plugin keeps a
         subscription after this handler is retired, so :meth:`on_shutdown`
-        releases them.
+        releases them.  The plugin reads a dataref with the accessor ``dtype``
+        names, so an int dataref must be subscribed as ``int``.
         """
         if not self._sim_is_xplane():
             return
@@ -335,7 +336,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
             manager.unsubscribe_xplane_dataref(name)
             logging.info(f"X-Plane: released {name} (was {subscribed})")
         if wanted:
-            manager.subscribe_xplane_dataref(name, wanted)
+            manager.subscribe_xplane_dataref(name, wanted, dtype=dtype)
             logging.info(f"X-Plane: subscribed {name} <- {wanted}")
         self._runtime_datarefs_subscribed[name] = wanted
 
