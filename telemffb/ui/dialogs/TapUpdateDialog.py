@@ -37,7 +37,7 @@ from typing import List, Tuple
 from PyQt6 import QtWidgets
 
 import telemffb.globals as G
-from telemffb.tap.tap_install import (SimStatus, bundled_version, install,
+from telemffb.tap.tap_install import (SimStatus, bundled_version, describe_failures, install,
                                   outdated_targets)
 from telemffb.tap.tap_reconcile import all_status, tap_is_enabled
 
@@ -125,11 +125,10 @@ def offer_wrapper_updates(parent=None, settings=None) -> bool:
                 logging.info(f"DirectInput tap: {status.sim.name} wrapper "
                              f"{outcome.action} in {outcome.directory}")
             else:
-                failures.append(f"{status.sim.name} - {outcome.directory}: "
-                                f"{outcome.detail}")
+                failures.append(outcome)
     if failures:
         QtWidgets.QMessageBox.warning(
             parent, "DirectInput Tap Updates",
             "Some wrappers could not be updated:\n\n"
-            + "\n".join(f"    {line}" for line in failures))
+            + describe_failures(failures, name=str))
     return updated_any

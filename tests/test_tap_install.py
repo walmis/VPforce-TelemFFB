@@ -586,10 +586,10 @@ class TestSharedLogFolder:
                     reason="OSError carries no winerror outside Windows")
 class TestWriteRefusals:
     """Two different problems arrive as the same PermissionError: the
-    game holding the file open (sharing violation) and the folder's ACL
-    refusing writes (a game under Program Files).  Telling a user with
-    an elevation problem to close a game that is not running sends them
-    in circles - the winerror says which it was."""
+    game holding the file (a sharing violation, or a loaded DLL that will
+    not delete) and the folder's ACL refusing writes (a game under Program
+    Files).  Whether a new file can be created in the folder tells them
+    apart."""
 
     def _sim(self, tmp_path, monkeypatch):
         game = tmp_path / "DCS World" / "bin"
@@ -606,40 +606,95 @@ class TestWriteRefusals:
                                   state=wrapper_state(str(game)),
                                   has_config=False)])
 
-    def _refuse(self, monkeypatch, winerror):
+    def _refuse_copy(self, monkeypatch, winerror=None):
         import shutil
         def denied(*args, **kwargs):
             raise PermissionError(13, "refused", None, winerror)
         monkeypatch.setattr(shutil, 'copyfile', denied)
 
-    def test_access_denied_names_the_folder_not_the_game(
+    def _refuse_remove(self, monkeypatch, winerror):
+        real = os.remove
+        def denied(path):
+            if os.path.basename(path) == WRAPPER_NAME:
+                raise PermissionError(13, "refused", None, winerror)
+            real(path)
+        monkeypatch.setattr(os, 'remove', denied)
+
+    def _folder(self, monkeypatch, writable):
+        monkeypatch.setattr(tap_install, '_folder_writable',
+                            lambda directory: writable)
+
+    def _program_files(self, monkeypatch, root):
+        monkeypatch.setenv("ProgramFiles", str(root))
+        monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+        monkeypatch.delenv("ProgramW6432", raising=False)
+
+    def test_an_unwritable_folder_under_program_files_asks_for_administrator(
             self, tmp_path, monkeypatch):
         status = self._sim(tmp_path, monkeypatch)
-        self._refuse(monkeypatch, winerror=5)
+        self._refuse_copy(monkeypatch)
+        self._folder(monkeypatch, writable=False)
+        self._program_files(monkeypatch, tmp_path)
         outcome, = install(status)
         assert not outcome.ok
-        assert "administrator" in outcome.detail
-        assert "Program Files" in outcome.detail
-        assert "close the game" not in outcome.detail
+        assert outcome.detail == tap_install._ACCESS_DENIED_PROGRAM_FILES
 
-    def test_a_sharing_violation_still_says_close_the_game(
+    def test_an_unwritable_folder_elsewhere_names_the_folder_not_the_game(
             self, tmp_path, monkeypatch):
         status = self._sim(tmp_path, monkeypatch)
-        self._refuse(monkeypatch, winerror=32)
+        self._refuse_copy(monkeypatch)
+        self._folder(monkeypatch, writable=False)
+        self._program_files(monkeypatch, tmp_path / "Program Files")
         outcome, = install(status)
-        assert not outcome.ok
-        assert "close the game" in outcome.detail
+        assert outcome.detail == tap_install._ACCESS_DENIED
 
-    def test_removal_distinguishes_the_same_two_cases(
+    def test_a_refusal_in_a_writable_folder_is_a_held_file(
+            self, tmp_path, monkeypatch):
+        status = self._sim(tmp_path, monkeypatch)
+        self._refuse_copy(monkeypatch)
+        self._folder(monkeypatch, writable=True)
+        outcome, = install(status)
+        assert outcome.detail == tap_install._IN_USE
+
+    def test_a_sharing_violation_is_a_held_file(self, tmp_path, monkeypatch):
+        status = self._sim(tmp_path, monkeypatch)
+        self._refuse_copy(monkeypatch, winerror=32)
+        self._folder(monkeypatch, writable=False)
+        outcome, = install(status)
+        assert outcome.detail == tap_install._IN_USE
+
+    def test_removing_a_loaded_wrapper_is_a_held_file(self, tmp_path, monkeypatch):
+        from telemffb.tap.tap_install import remove
+        status = self._sim(tmp_path, monkeypatch)
+        self._refuse_remove(monkeypatch, winerror=5)
+        outcome, = remove(status)
+        assert not outcome.ok
+        assert outcome.detail == tap_install._IN_USE
+
+    def test_removal_from_an_unwritable_folder_names_the_folder(
             self, tmp_path, monkeypatch):
         from telemffb.tap.tap_install import remove
         status = self._sim(tmp_path, monkeypatch)
-        def denied(path):
-            raise PermissionError(13, "refused", None, 5)
-        monkeypatch.setattr(os, 'remove', denied)
+        self._refuse_remove(monkeypatch, winerror=5)
+        self._folder(monkeypatch, writable=False)
+        self._program_files(monkeypatch, tmp_path / "Program Files")
         outcome, = remove(status)
+        assert outcome.detail == tap_install._ACCESS_DENIED
+
+    def test_a_refused_config_write_names_program_files(self, tmp_path, monkeypatch):
+        from telemffb.tap.tap_install import write_one_config
+        def denied(*args, **kwargs):
+            raise PermissionError(13, "refused")
+        monkeypatch.setattr(tap_install, 'open_config', denied)
+        self._folder(monkeypatch, writable=False)
+        self._program_files(monkeypatch, tmp_path)
+        outcome = write_one_config(str(tmp_path / "bin"), "text")
         assert not outcome.ok
-        assert "administrator" in outcome.detail
+        assert outcome.detail == tap_install._ACCESS_DENIED_PROGRAM_FILES
+
+    def test_the_probe_leaves_nothing_behind(self, tmp_path):
+        assert tap_install._folder_writable(str(tmp_path))
+        assert list(tmp_path.iterdir()) == []
 
 
 LEGACY_BYTES = (b"MZ\x00\x00 CreateDevice: [%ls]  FFB=%s  scale=%d%% "

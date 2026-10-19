@@ -44,7 +44,7 @@ from telemffb.ui.dialogs.directlink_notice import with_download_link
 from telemffb.ui.dialogs.restart_offer import ask_to_restart
 from telemffb.ui.panels.ButtonDevicesPanel import ButtonDevicesPanel
 from telemffb.ui.panels.TapStatusPanel import TapStatusPanel
-from telemffb.tap.tap_install import SIMS_BY_KEY, matches_signature, sim_status
+from telemffb.tap.tap_install import SIMS_BY_KEY, describe_failures, matches_signature, sim_status
 from telemffb.ui.panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
@@ -3521,7 +3521,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             QMessageBox.warning(
                 self, "DirectInput Tap Configuration",
                 "Some of it could not be removed:\n\n" +
-                "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
+                describe_failures(failures, name=str))
 
     def _raise_tap_gaps(self):
         """Tell the user a DirectInput device has no way to be driven at all,
@@ -3618,7 +3618,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             QMessageBox.warning(
                 self, "DirectInput Tap Configuration",
                 "Some configurations could not be updated:\n\n" +
-                "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
+                describe_failures(failures, name=str))
 
     def _offer_aircraft_device_reconcile(self, before, before_idents=None):
         """Keep per-aircraft device references in step with the devices.
@@ -3722,7 +3722,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             QMessageBox.warning(
                 self, "DirectInput Tap Configuration",
                 "Some configurations could not be updated:\n\n" +
-                "\n".join(f"    {o.directory}: {o.detail}" for o in failures))
+                describe_failures(failures, name=str))
 
     def load_settings(self, default=False, source=None):
         """

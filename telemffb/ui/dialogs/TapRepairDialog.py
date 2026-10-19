@@ -42,7 +42,7 @@ from PyQt6 import QtWidgets
 
 import telemffb.globals as G
 from telemffb.tap.tap_install import (SimStatus, TargetOutcome, TargetStatus,
-                                  WrapperState, configured_devices,
+                                  WrapperState, configured_devices, describe_failures,
                                   fix_only_config, generate_config, install,
                                   read_config, write_one_config)
 from telemffb.tap.tap_reconcile import all_status, sim_is_enabled, tap_is_enabled
@@ -221,8 +221,8 @@ def offer_wrapper_repairs(parent=None, settings=None) -> bool:
         if outcome.ok:
             repaired = True
             logging.info(f"DirectInput tap: {outcome.action} in {outcome.directory}")
-        else:
-            lines.append(f"{outcome.directory}: {outcome.detail}")
+    if any(not outcome.ok for outcome in outcomes):
+        lines.append(describe_failures(outcomes, name=str))
     for name in skipped:
         lines.append(f"{name} was not set up.  Choose its devices from the "
                      f"{name} tab in System Settings.")

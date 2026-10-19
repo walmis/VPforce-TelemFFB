@@ -51,7 +51,7 @@ from telemffb.tap.tap_config import (already_blocked, already_ordered,
 from telemffb.tap.tap_install import (MODE_FIX_ONLY, MODE_TAP, SimStatus,
                                   VJOY_RULE, WRAPPER_CONFIG,
                                   WRAPPER_NAME, WrapperState, block_line,
-                                  config_label,
+                                  config_label, describe_failures,
                                   config_link,
                                   config_paths, fix_only_config,
                                   generate_config, read_configs,
@@ -734,16 +734,12 @@ class TapStatusPanel(QtWidgets.QWidget):
         if not failures and then is not None:
             then()
         if failures:
-            lines = [f"{os.path.basename(o.directory)}: {o.detail}"
-                     for o in failures]
+            text = f"{self.status.sim.name}\n\n" + describe_failures(outcomes)
             done = [o for o in outcomes if o.ok]
             if done:
-                lines.append("")
-                lines.append("Completed for: " + ", ".join(
-                    os.path.basename(o.directory) for o in done))
-            QtWidgets.QMessageBox.warning(
-                self, f"DirectInput Tap {title}",
-                f"{self.status.sim.name}\n\n" + "\n".join(lines))
+                text += "\n\nCompleted for: " + ", ".join(
+                    os.path.basename(o.directory) for o in done)
+            QtWidgets.QMessageBox.warning(self, f"DirectInput Tap {title}", text)
         self.changed.emit()
 
     def _snapshot(self):

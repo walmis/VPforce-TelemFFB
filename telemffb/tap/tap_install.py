@@ -42,6 +42,7 @@ import ntpath
 import os
 import re
 import shutil
+import uuid
 from pathlib import Path, PureWindowsPath
 import sys
 from dataclasses import dataclass, field
@@ -898,6 +899,19 @@ def read_configs(status: SimStatus) -> List[Tuple[str, str]]:
     return out
 
 
+def describe_failures(outcomes: Sequence[TargetOutcome],
+                      name: Callable[[str], str] = os.path.basename) -> str:
+    """The failed ``outcomes`` as message text: the folders that failed for
+    the same reason are named together above that reason, given once.
+    ``name`` turns a directory into the label shown for it."""
+    groups = {}
+    for outcome in outcomes:
+        if not outcome.ok:
+            groups.setdefault(outcome.detail, []).append(name(outcome.directory))
+    return "\n\n".join(f"{', '.join(folders)}:\n{detail}"
+                       for detail, folders in groups.items())
+
+
 def write_one_config(directory: str, text: str) -> TargetOutcome:
     """Replace the config beside one executable."""
     path = os.path.join(directory, WRAPPER_CONFIG)
@@ -905,6 +919,8 @@ def write_one_config(directory: str, text: str) -> TargetOutcome:
         with open_config(path, "w") as handle:
             handle.write(text)
         return TargetOutcome(directory, True, "configured")
+    except PermissionError as e:
+        return TargetOutcome(directory, False, "failed", _write_refusal(e, directory))
     except OSError as e:
         return TargetOutcome(directory, False, "failed", str(e))
 
@@ -1007,25 +1023,80 @@ def _backfill_log_dir(destination: str) -> None:
         logging.exception(f"DirectInput tap: could not update {destination}")
 
 
-def _write_refusal(e: PermissionError) -> str:
-    """Why the game's folder refused a write, from the error itself.
+def _write_refusal(e: PermissionError, directory: str) -> str:
+    """Why the game's folder refused a write.
 
     Two different problems arrive as the same exception: a sharing
     violation (the game is running and holds the file) and access denied
     (the folder's ACL - a game installed under Program Files, typically).
     Telling a user with an elevation problem to close a game that is not
-    running sends them in circles.  The winerror is the ground truth; a
-    path test ("is it under Program Files?") would be both over- and
-    under-inclusive - Steam trees under Program Files (x86) are
-    user-writable, and a locked-down folder can live anywhere.
+    running sends them in circles.
+
+    The error itself cannot tell them apart.  ``open()``, which
+    ``shutil.copyfile`` uses, reports both as errno 13 with no winerror,
+    and deleting a DLL a running game has loaded fails with
+    ERROR_ACCESS_DENIED, the same winerror as a folder's ACL.  Whether a
+    new file can be created in ``directory`` does: only the ACL refuses
+    that.  The path only picks the wording once access is known to be
+    denied; on its own it would mislead, since Steam trees under Program
+    Files (x86) are user-writable.
     """
-    winerror = getattr(e, 'winerror', None)
-    if winerror == 5:      # ERROR_ACCESS_DENIED: the ACL, not a lock
-        return ("Windows denied write access to this folder - typical for "
-                "a game installed under Program Files.  Run TelemFFB as "
-                "administrator once to do this, or grant the folder write "
-                "access.")
-    return "the file is in use - close the game and try again"
+    if getattr(e, 'winerror', None) == 32 or _folder_writable(directory):
+        return _IN_USE    # 32: ERROR_SHARING_VIOLATION, a lock
+    if _under_program_files(directory):
+        return _ACCESS_DENIED_PROGRAM_FILES
+    return _ACCESS_DENIED
+
+
+_IN_USE = "The file appears to be in use or is otherwise locked, close the game and try again"
+
+
+_ACCESS_DENIED_PROGRAM_FILES = (
+    "The game is installed under Program Files, which only an administrator "
+    "can modify.  TelemFFB must be run as administrator to install, remove or "
+    "reconfigure the DirectInput tap.")
+
+
+_ACCESS_DENIED = ("Windows denied write access to this folder.  Run TelemFFB "
+                  "as administrator, or give your account write access to "
+                  "the folder.")
+
+
+def _under_program_files(directory: str) -> bool:
+    """Whether ``directory`` is inside a Program Files folder, either
+    architecture's."""
+    target = os.path.normcase(os.path.abspath(directory))
+    for variable in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
+        root = os.environ.get(variable)
+        if not root:
+            continue
+        root = os.path.normcase(os.path.abspath(root))
+        if target == root or target.startswith(root.rstrip("\\/") + os.sep):
+            return True
+    return False
+
+
+def _folder_writable(directory: str) -> bool:
+    """Whether a new file can be created in ``directory``; the probe file is
+    removed again.
+
+    One exclusive create, not ``tempfile.mkstemp``: on Windows that treats
+    access denied as a name collision and retries up to TMP_MAX (2**31)
+    times, so an unwritable folder never returns.
+    """
+    probe = os.path.join(directory, f".telemffb-probe-{os.getpid()}-{uuid.uuid4().hex}")
+    try:
+        handle = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+    except PermissionError:
+        return False
+    except OSError:
+        return True    # not an access problem; leave the lock reading
+    os.close(handle)
+    try:
+        os.remove(probe)
+    except OSError:
+        logging.warning(f"DirectInput tap: could not remove the write probe {probe}")
+    return True
 
 
 def install(status: SimStatus,
@@ -1072,7 +1143,7 @@ def install(status: SimStatus,
             shutil.copyfile(source, destination)
         except PermissionError as e:
             outcomes.append(TargetOutcome(
-                target.directory, False, "failed", _write_refusal(e)))
+                target.directory, False, "failed", _write_refusal(e, target.directory)))
             continue
         except OSError as e:
             outcomes.append(TargetOutcome(
@@ -1161,7 +1232,7 @@ def remove(status: SimStatus) -> List[TargetOutcome]:
             os.remove(path)
         except PermissionError as e:
             outcomes.append(TargetOutcome(
-                target.directory, False, "failed", _write_refusal(e)))
+                target.directory, False, "failed", _write_refusal(e, target.directory)))
             continue
         except OSError as e:
             outcomes.append(TargetOutcome(target.directory, False, "failed",
