@@ -43,7 +43,8 @@ import time
 from typing import override
 
 from telemffb import utils
-from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN)
+from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN,
+                                   HapticEffect)
 from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.SettingsManager import SpringModeEnum
@@ -176,6 +177,8 @@ class Aircraft(AircraftBase, DCSCommands):
         self.last_device_x, self.last_device_y = self._get_device_axes()
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = None
+        # True while the autopilot deadzone is applied through the axis commands
+        self._ap_axes_written = False
 
     @override
     def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr=False):
@@ -432,6 +435,10 @@ class Aircraft(AircraftBase, DCSCommands):
         """
         Updates the dead-zone when the AP is active.  Useful for aircraft that are sensitive to joystick input when AP is active.
 
+        A device with its own deadzone (VPforce firmware) gets it set; on any
+        other device the stick position is sent to DCS through the axis
+        commands with the deadzone applied (:meth:`_dcs_write_ap_axes`).
+
         Args:
             telem_data:  Expects 'APEnabled' key in the dictionary
 
@@ -444,12 +451,60 @@ class Aircraft(AircraftBase, DCSCommands):
 
         if not self.ap_active_deadzone_enabled:
             self.ac_set_deadzone_override(0)
+            self._dcs_write_ap_axes(False)
             return
 
-        if ap_active:
-            self.ac_set_deadzone_override(self.ap_active_deadzone)
-        else:
+        if not telem_data.APDetection:
+            self.flag_error("Autopilot Deadzone is enabled, but the autopilot state of this aircraft is not detectable or is not currently detected by the export plugin")
             self.ac_set_deadzone_override(0)
+            self._dcs_write_ap_axes(False)
+            return
+
+        device = HapticEffect.device
+        if device is not None and device.caps.has_deadzone:
+            self.ac_set_deadzone_override(self.ap_active_deadzone if ap_active else 0)
+        else:
+            self._dcs_write_ap_axes(bool(ap_active))
+
+    def _dcs_write_ap_axes(self, active: bool):
+        """Send the stick position to DCS through the pitch and roll axis
+        commands with the autopilot deadzone applied, while ``active``.
+
+        Each axis reads 0 inside the deadzone and rescales past it, so the input
+        starts from zero at the edge and full deflection still reaches full.
+        The export keeps running the last command it received for about
+        100 ms, so the frame that ends the writing sends the stick position
+        as it is.  The trim workaround sends the same commands, so the two do
+        not run together.
+        """
+        if self.trim_workaround:
+            self._ap_axes_written = False
+            return
+        if not active:
+            if not self._ap_axes_written:
+                return
+            self._ap_axes_written = False
+            deadzone = 0.0
+        else:
+            self._ap_axes_written = True
+            deadzone = self.ap_active_deadzone
+        if not self._device_feeding():
+            return
+        x, y = (self._ap_deadzone_axis(v, deadzone) for v in self._get_device_axes())
+        self.dcs_send_commands([f"LoSetCommand(2001, {y:.4f})", f"LoSetCommand(2002, {x:.4f})"])
+
+    @staticmethod
+    def _ap_deadzone_axis(value: float, deadzone: float) -> float:
+        """``value`` with a rescaling deadzone: 0 within ``deadzone`` of center,
+        then the travel past it scaled to reach 1 at full deflection."""
+        if deadzone <= 0:
+            return value
+        if deadzone >= 1:
+            return 0.0
+        travel = abs(value) - deadzone
+        if travel <= 0:
+            return 0.0
+        return math.copysign(min(travel / (1.0 - deadzone), 1.0), value)
 
 
     def dcs_override_copilot_spring(self, telem_data: BaseTelemetryData):

@@ -868,8 +868,14 @@ class BaseTelemetryData:
 
     APEnabled: Optional[Union[bool, int]]
     """Whether autopilot is actively enabled.  
-    DCS: Exported from TelemFFB.lua as MCP.AutopilotOn.  
-    Used by aircrafts_dcs for AP-specific spring override.  
+    DCS: from the export's per-aircraft module, meaningful only where APDetection is sent.
+    Used by aircrafts_dcs for AP-specific spring override.
+    """
+
+    APDetection: Optional[int]
+    """1 when the export detects this aircraft's autopilot state; absent otherwise.
+    DCS: sent by the export's per-aircraft modules that set APEnabled.
+    Used by aircrafts_dcs to flag the autopilot deadzone on an aircraft without it.
     """
 
     APServos: Optional[Union[bool, int]]
