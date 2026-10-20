@@ -291,7 +291,12 @@ class UpdateWorker(QThread):
                 )
             except Exception:
                 return  # cannot check; proceed rather than block updates
-            if EXECUTABLE_NAME.lower() not in result.stdout.lower():
+            listing = result.stdout
+            if not isinstance(listing, str):
+                self.log.emit(f"Process check returned {type(listing).__name__} "
+                              "instead of text; proceeding without it.")
+                return
+            if EXECUTABLE_NAME.lower() not in listing.lower():
                 self.log.emit("All TelemFFB instances have exited.")
                 return
             time.sleep(0.5)
