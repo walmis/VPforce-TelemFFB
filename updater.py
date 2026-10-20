@@ -284,9 +284,12 @@ class UpdateWorker(QThread):
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
+                # tasklist writes the OEM code page; a localized line that the
+                # ANSI code page cannot decode would otherwise kill the reader
+                # thread and leave stdout as None
                 result = subprocess.run(
                     ["tasklist", "/FI", f"IMAGENAME eq {EXECUTABLE_NAME}"],
-                    capture_output=True, text=True,
+                    capture_output=True, text=True, encoding="oem", errors="replace",
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
             except Exception:
