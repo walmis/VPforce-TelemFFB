@@ -2,6 +2,7 @@
 rollback on lock failure (a failed update must leave a launchable install),
 and the wait-for-app-exit gate."""
 import os
+import stat
 import subprocess
 import sys
 import types
@@ -9,7 +10,7 @@ import types
 import pytest
 
 import updater
-from updater import UpdateWorker, _move_with_retry, _rollback_moves
+from updater import UpdateWorker, _move_with_retry, _remove_tree_with_retry, _rollback_moves
 
 pytestmark = [pytest.mark.unit]
 
@@ -163,6 +164,48 @@ class TestBackupRollback:
         assert (app / "assets" / "PyQt6" / "Qt6Core.dll").exists()
         assert locked.exists()
         assert (app / "defaults.xml").exists()
+
+
+class TestStaleBackupRemoval:
+    """The backup folder left by a previous update is cleared before the new
+    backup; read-only entries are deleted anyway, and a folder that stays
+    put stops the update before any file has moved."""
+
+    def _worker(self, app_path):
+        w = UpdateWorker.__new__(UpdateWorker)
+        w.app_path = str(app_path)
+        w._folder_snapshot = os.listdir(app_path)
+        w.status = types.SimpleNamespace(emit=lambda *a: None)
+        w.log = types.SimpleNamespace(emit=lambda *a: None)
+        w.progress = types.SimpleNamespace(emit=lambda *a: None)
+        return w
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="the read-only attribute blocks deletion on Windows")
+    def test_read_only_entries_are_removed(self, tmp_path):
+        tree = tmp_path / "old_backup"
+        (tree / "assets" / "numpy" / "fft").mkdir(parents=True)
+        f = tree / "assets" / "numpy" / "fft" / "x.pyd"
+        f.write_text("1")
+        os.chmod(f, stat.S_IREAD)
+        os.chmod(tree / "assets" / "numpy" / "fft", stat.S_IREAD)
+        _remove_tree_with_retry(str(tree))
+        assert not tree.exists()
+
+    def test_unremovable_backup_aborts_before_any_move(self, tmp_path, monkeypatch):
+        app = _make_install(tmp_path)
+        stale = app / updater.BACKUP_FOLDER
+        stale.mkdir()
+        (stale / "leftover.txt").write_text("old")
+        before = sorted(p.relative_to(app) for p in app.rglob("*"))
+
+        def refuse(path, attempts=3, delay=0.5):
+            raise PermissionError(5, "Access is denied", str(stale / "leftover.txt"))
+        monkeypatch.setattr(updater, "_remove_tree_with_retry", refuse)
+
+        with pytest.raises(RuntimeError) as info:
+            self._worker(app)._backup()
+        assert str(stale / "leftover.txt") in str(info.value)
+        assert sorted(p.relative_to(app) for p in app.rglob("*")) == before
 
 
 class TestWaitForAppExit:

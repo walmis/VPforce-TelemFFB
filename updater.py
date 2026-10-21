@@ -21,6 +21,7 @@ import logging
 import os
 import shutil
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -183,6 +184,33 @@ def _move_tree_per_file(src, dst, log=None, moved=None):
     shutil.rmtree(src, ignore_errors=True)
 
 
+def _remove_tree_with_retry(path, attempts=3, delay=0.5):
+    """Delete a directory tree, clearing the read-only attribute on any entry
+    Windows refuses to remove and retrying transient refusals.
+
+    A backup folder left by a previous update can carry read-only
+    attributes and be held briefly by other software; a plain rmtree stops
+    at the first refusal.  Raises the last OSError when the tree is still
+    there after the retries.
+    """
+    def clear_readonly_and_retry(func, failed_path, exc):
+        if not isinstance(exc, PermissionError):
+            raise exc
+        os.chmod(failed_path, stat.S_IWRITE)
+        func(failed_path)
+
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            shutil.rmtree(path, onexc=clear_readonly_and_retry)
+            return
+        except OSError as e:
+            last_error = e
+            if attempt < attempts - 1:
+                time.sleep(delay)
+    raise last_error
+
+
 def _rollback_moves(moved, log=None):
     """Undo a partial backup: move (backup_path, original_path) pairs home,
     newest first.  Best-effort - logs anything it cannot restore."""
@@ -314,7 +342,18 @@ class UpdateWorker(QThread):
         self.status.emit("Backing up current version...")
         backup_path = os.path.join(self.app_path, BACKUP_FOLDER)
         if os.path.exists(backup_path):
-            shutil.rmtree(backup_path)
+            try:
+                _remove_tree_with_retry(backup_path)
+            except OSError as e:
+                # nothing has been moved yet, so the install is untouched
+                blocked = getattr(e, "filename", None) or backup_path
+                raise RuntimeError(
+                    f"The backup folder left by a previous update could not be removed:\n\n"
+                    f"{blocked}\n\n"
+                    f"Delete the {BACKUP_FOLDER} folder in the TelemFFB folder and run "
+                    "the update again.\n\n"
+                    "No changes have been made to your installation."
+                ) from e
         os.makedirs(backup_path)
         self.log.emit(f"Backing up to {backup_path}")
 
