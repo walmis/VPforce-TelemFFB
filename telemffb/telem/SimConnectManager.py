@@ -539,7 +539,7 @@ class SimConnectManager(threading.Thread):
 
         Args:
             name (str): Variable name. Use "name:index" format to override specific
-                       array elements (e.g., "PropRPM:2" for second engine RPM)
+                       array elements, zero-based (e.g., "PropRPM:1" for the second engine)
             var (str): SimConnect variable reference
             sc_unit (str): SimConnect unit specification
             unit (str, optional): Preferred output unit

@@ -79,8 +79,8 @@ class BMSManager(TelemParserBase):
         self.engine_ftit2: List[float] = [0.0]
         self.nozzle_pos: List[float] = [0.0]
         self.nozzle_pos2: List[float] = [0.0]
-        self.fuel_flow: float = 0.0
-        self.fuel_flow2: float = 0.0
+        self.fuel_flow: List[float] = [0.0]
+        self.fuel_flow2: List[float] = [0.0]  # FlightData2 block; summed with fuel_flow as lists
 
         # Weapon systems - match aircraft_base expectations
         self.gun_data: List = []

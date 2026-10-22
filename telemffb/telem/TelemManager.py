@@ -738,7 +738,7 @@ class TelemManager(QObject, threading.Thread):
         for param in data:
             try:
                 if len(param):
-                    section, conf = param.split("=")
+                    section, conf = param.split("=", 1)  # the first = ends the key
                     values = conf.split("~")
                     telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
             except Exception:
