@@ -1502,6 +1502,13 @@ class BaseTelemetryData:
     then deleted from telem_data after processing in aircrafts_dcs.py.  
     """
 
+    controlsurfaces_rudder_right: Optional[float]
+    """Rudder deflection, right (single-tail aircraft report the rudder here).  
+    DCS: MechInfo controlsurfaces.rudder.right, flattened — −1..1.  
+    Absent on a frame whose MechInfo failed to parse.  
+    Used for pedal trim following in aircrafts_dcs.py.  
+    """
+
     # -- Performance / frame timing (injected by TelemManager) --
     # These are computed by TelemManager._update_frame_timing(), not by sims.
 
@@ -1545,6 +1552,13 @@ class BaseTelemetryData:
     IL2: stall_buffet_amplitude × 10 — normalized 0-1 range.  
     """
 
+    FFBRecords: Optional[str]
+    """The FFB force records this instance's device received, as a JSON list.  
+    IL2: IL2Manager, from the FFB packet; filtered to G.il2_ffb_device_ordinal  
+    when one is set. Absent until the first FFB packet.  
+    Used by the IL-2 tap spring and constant force in aircrafts_il2.py.  
+    """
+
     # Single backing storage for all fields
     _data: Dict[str, Any]
 
@@ -1556,10 +1570,16 @@ class BaseTelemetryData:
         if initial:
             self._data.update(initial)
 
-    # Internal helper: known attribute names (from annotations)
+    # The declared field names, computed once per class: dot access runs in
+    # the telemetry hot path, so the set is never rebuilt per call.
+    _KNOWN_FIELDS: frozenset = frozenset()
+
     @classmethod
-    def _known_fields(cls) -> set:
-        return {k for k, v in cls.__annotations__.items() if not k.startswith('_')}
+    def _known_fields(cls) -> frozenset:
+        if not cls.__dict__.get('_KNOWN_FIELDS'):
+            cls._KNOWN_FIELDS = frozenset(
+                k for k in cls.__annotations__ if not k.startswith('_'))
+        return cls._KNOWN_FIELDS
 
     # --- Mapping-like interface ---
     def __getitem__(self, key: str) -> Any:
@@ -1640,11 +1660,7 @@ class BaseTelemetryData:
         if name == '_data':
             object.__setattr__(self, name, value)
             return
-        # All known fields go into _data
-        if name in self._known_fields():
-            self._data[name] = value
-            return
-        # Unknown attributes also go into _data for full dict compatibility
+        # Declared or not, every attribute lives in _data
         self._data[name] = value
 
     def __delattr__(self, name: str) -> None:
