@@ -274,14 +274,15 @@ class IL2TelemParser(TelemParserBase):
         # self.telem_data['Manifold'] = list(self.state.intake_manifold_pressure_pa)
         self.telem_data['GearPos'] = list(self.state.landing_gear_position)
 
+        # Reorder gear to match DCS for function re-use.
+        pressure = self.state.landing_gear_pressure
         try:
-            ## Reorder gear to match DCS for function re-use
-            update_gear_indices = [0, 2, 1]
-            self.state.landing_gear_pressure = [self.state.landing_gear_pressure[i] for i in update_gear_indices]
-        except: pass
+            pressure_list = [pressure[i] for i in (0, 2, 1)]
+        except IndexError:
+            pressure_list = list(pressure)
 
         self.telem_data['T'] = self.state.tick
-        self.telem_data['WeightOnWheels'] = list(self.state.landing_gear_pressure)
+        self.telem_data['WeightOnWheels'] = pressure_list
         self.telem_data['ACCs'] = self.state.acceleration_Gs
         self.telem_data['BuffetFrequency'] = self.state.stall_buffet_frequency
         self.telem_data['BuffetAmplitude'] = self.state.stall_buffet_amplitude * 10  # multiply by factor of 10 to make usable in 0-1.0 range

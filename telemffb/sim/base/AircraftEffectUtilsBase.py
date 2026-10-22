@@ -465,7 +465,7 @@ class AircraftEffectUtilsBase(object):
 
     def _should_skip_airborne_effect(self, telem_data: BaseTelemetryData) -> bool:
         """Common check for effects that should be disabled when on ground."""
-        if self._sim_is("IL2"):
+        if self._sim_is_il2():
             # Some IL-2 aircraft report non-zero gear pressure (WeightOnWheels) while airborne
             # after retraction (sim bug). Use gear extraction state as the authoritative gate:
             # if all gear are fully retracted, treat as airborne regardless of pressure.
