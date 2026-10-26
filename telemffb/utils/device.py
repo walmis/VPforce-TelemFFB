@@ -15,6 +15,7 @@
 
 import logging
 import re
+import sys
 
 import telemffb.globals as G
 
@@ -45,6 +46,7 @@ __all__ = [
     "read_device_gains",
     "format_device_gains",
     "log_device_gains",
+    "hidhide_running",
 ]
 
 def get_device_logo(dev_type :str):
@@ -470,3 +472,22 @@ def log_device_gains(context: str, gains=None) -> None:
     text = format_gains(gains) if gains is not None else format_device_gains()
     if text:
         logging.info(f"Device gains ({context}): {text}")
+
+
+def hidhide_running() -> bool:
+    """Whether the HidHide service is running on this PC.
+
+    HidHide is a HID filter driver that hides the devices on its list from
+    every process not on its list of allowed applications; a device it
+    hides is absent from hidapi and DirectInput alike, so TelemFFB cannot
+    tell it from an unplugged one.  Running means only that hiding is
+    possible.  False off Windows, when HidHide is not installed, and when
+    the service manager cannot be asked.
+    """
+    if sys.platform != 'win32':
+        return False
+    try:
+        import psutil
+        return psutil.win_service_get('HidHide').status() == 'running'
+    except Exception:
+        return False

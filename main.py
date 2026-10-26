@@ -51,6 +51,7 @@ if sys.argv[0].lower().endswith("updater.exe"):
     sys.exit()
 
 import argparse
+import html
 import logging
 import os
 import re
@@ -589,16 +590,18 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
     except (TypeError, ValueError):
         pid = 0
     if not _device_present(G.device_di_guid, pid):
-        wanted = (f"DirectInput device {G.device_di_guid}" if G.device_di_guid
-                  else f"VPforce device with PID {G.device_usbpid}")
         logging.info(f"The configured '{G.device_type}' device is not "
-                     f"connected ({wanted})")
+                     f"connected: {_device_description()}")
         G.device_connection_status = False
         if show_error:
-            _warn_cannot_connect(
-                f"The configured {G.device_type} device is not connected.\n\n"
-                "The application will open the device automatically when it appears.\n"
-                "Please open the System Settings and verify the device configuration is correct")
+            text = (f"The configured {G.device_type} device is not connected:<br>"
+                    f"{html.escape(_device_description())}<br><br>"
+                    "TelemFFB will open the device automatically when it is connected.<br>"
+                    "Please open the System Settings and verify the device configuration is correct")
+            if utils.hidhide_running():
+                text += ("<br><br><b>Possible Issue:</b><br>HidHide has been detected as running on this PC. If this device is on its hidden list, it "
+                         "will not be visible to TelemFFB unless TelemFFB is on HidHide's white-list of allowed applications.")
+            _warn_cannot_connect(text)
         return dev, dev_serial, dev_firmware_version
 
     try:
@@ -679,8 +682,9 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
         # manual restart is needed
         if show_error:
             _warn_cannot_connect(
-                f"Unable to open device: {G.device_type}\nError: {e}\n\n"
-                "The application will open the device automatically when it appears.\n"
+                f"Unable to open the {G.device_type} device:<br>"
+                f"{html.escape(_device_description())}<br>Error: {html.escape(str(e))}<br><br>"
+                "TelemFFB will open the device automatically when it is connected.<br>"
                 "Please open the System Settings and verify the device configuration is correct")
 
     return dev, dev_serial, dev_firmware_version
@@ -800,13 +804,30 @@ def _configured_device_present(devpath=None, pid=None) -> bool:
     return _device_present(di_guid, pid)
 
 
+def _device_description() -> str:
+    """The device this instance is opening, for messages: the stored name
+    and USB ids of the role's slot, else the identity the open uses."""
+    try:
+        entry = utils.absent_device_entry(G.system_settings.get, G.device_type)
+        if entry is not None and entry.ident:
+            return f"{entry.ident} ({entry.vidpid()})"
+    except Exception:
+        logging.debug("stored device identity unavailable", exc_info=True)
+    if G.device_di_guid:
+        return f"DirectInput device {G.device_di_guid}"
+    return f"VPforce device with PID {G.device_usbpid}"
+
+
 def _warn_cannot_connect(text):
-    """The connection-error dialog, parented to whatever the user is
-    looking at (the System Settings dialog during a live switch, the main
-    window otherwise) so it appears over the app, not centered on the
-    monitor; at startup neither exists yet and None is all there is."""
+    """The connection-error dialog, titled with this instance's role and
+    parented to whatever the user is looking at (the System Settings
+    dialog during a live switch, the main window otherwise) so it appears
+    over the app, not centered on the monitor; at startup neither exists
+    yet and None is all there is.  ``text`` is rich text: the box renders
+    it as such on sight of its tags, so line breaks are <br> and anything
+    dynamic in it is html-escaped by the caller."""
     parent = QApplication.activeWindow() or getattr(G, 'main_window', None)
-    QMessageBox.warning(parent, "Cannot connect to FFB device", text)
+    QMessageBox.warning(parent, f"Cannot connect to FFB device ({G.device_type.capitalize()})", text)
 
 
 class _StartupGate:
@@ -1223,6 +1244,9 @@ def _enumerate_and_log_devices() -> List[DeviceInfo]:
             G.instance_dev_dict[devinfo.product_id] = devinfo
 
     logging.info("-------")
+    if utils.hidhide_running():
+        logging.info("HidHide is running: a device on its hidden list is not "
+                     "listed unless TelemFFB is on its allowed applications")
     return devs
 
 
