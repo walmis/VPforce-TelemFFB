@@ -220,6 +220,7 @@ class TestDeviceRetryTicker:
     @pytest.fixture
     def ticker(self, rig, monkeypatch):
         t = rig.main._DeviceRetryTicker()
+        t.CHECK_THREADED = False
         rig.switch_calls = []
         monkeypatch.setattr(
             rig.main, 'switch_to_device',
@@ -229,7 +230,7 @@ class TestDeviceRetryTicker:
         monkeypatch.setattr(G, 'device_connection_status', False, raising=False)
         rig.present = False
         monkeypatch.setattr(rig.main, '_configured_device_present',
-                            lambda: rig.present)
+                            lambda *a: rig.present)
         t.start()
         assert t._timer.isActive()
         return t
@@ -262,6 +263,31 @@ class TestDeviceRetryTicker:
         rig.settings['devpath_joystick'] = ''
         ticker._tick()
         assert rig.switch_calls == []
+        assert not ticker._timer.isActive()
+
+    def test_threaded_check_enumerates_off_the_main_thread(self, rig, ticker,
+                                                           monkeypatch):
+        """The check runs on a worker with the selection read beforehand;
+        the switch runs when the main thread receives the result."""
+        import threading
+        ticker.CHECK_THREADED = True
+        seen = {}
+
+        def present(devpath, pid):
+            seen['thread'] = threading.current_thread().name
+            seen['selection'] = (devpath, pid)
+            return True
+        monkeypatch.setattr(rig.main, '_configured_device_present', present)
+        delivered = []
+        monkeypatch.setattr(rig.main.utils, 'schedule_on_main_thread',
+                            lambda fn: delivered.append(fn))
+        ticker._tick()
+        ticker._check.join(timeout=5)
+        assert seen['thread'] != threading.main_thread().name
+        assert seen['selection'] == (rig.settings['devpath_joystick'], 0x2055)
+        assert rig.switch_calls == []          # nothing until delivery
+        delivered[0]()
+        assert rig.switch_calls == [False]
         assert not ticker._timer.isActive()
 
 

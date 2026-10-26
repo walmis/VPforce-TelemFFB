@@ -436,6 +436,7 @@ class TestZombieStateWatcher:
 
     def _ticker(self):
         ticker = main_module._DeviceRetryTicker()
+        ticker.CHECK_THREADED = False
         timer = MagicMock()
         timer.isActive.return_value = True
         ticker._timer = timer
@@ -445,7 +446,7 @@ class TestZombieStateWatcher:
         self._env(monkeypatch)
         switches = []
         monkeypatch.setattr(main_module, "_configured_device_present",
-                            lambda: False)
+                            lambda *a: False)
         monkeypatch.setattr(main_module, "switch_to_device",
                             lambda show_error=True: switches.append(1) or True)
         ticker, timer = self._ticker()
@@ -457,7 +458,7 @@ class TestZombieStateWatcher:
         self._env(monkeypatch)
         switches = []
         monkeypatch.setattr(main_module, "_configured_device_present",
-                            lambda: True)
+                            lambda *a: True)
         monkeypatch.setattr(main_module, "switch_to_device",
                             lambda show_error=True: (switches.append(1), True)[1])
         ticker, timer = self._ticker()

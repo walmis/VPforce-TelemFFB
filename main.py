@@ -57,6 +57,7 @@ import re
 import shutil
 import time
 import subprocess
+import threading
 import traceback
 from datetime import datetime
 from typing import List, Optional
@@ -742,20 +743,33 @@ def _recovery_vpconf_profile():
     return G.current_vpconf_profile
 
 
-def _configured_device_present() -> bool:
-    """Whether the device this instance's saved selection names is
-    currently enumerable - without opening it."""
+def _configured_device_selection():
+    """The saved selection for this instance's role: ``(devpath, pid)``,
+    read from the settings (main thread)."""
+    devpath = str(G.system_settings.get(
+        f'devpath_{G.device_type}', '') or '')
     try:
-        devpath = str(G.system_settings.get(
-            f'devpath_{G.device_type}', '') or '')
+        pid = int(str(G.system_settings.get(
+            utils.device_pid_key(G.device_type), '') or '2055'), 16)
+    except (TypeError, ValueError):
+        pid = 0x2055
+    return devpath, pid
+
+
+def _configured_device_present(devpath=None, pid=None) -> bool:
+    """Whether the device this instance's saved selection names is
+    currently enumerable - without opening it.  ``devpath`` and ``pid``
+    are the selection when the caller has read it already (a worker
+    thread must not read the settings); otherwise it is read here."""
+    try:
+        if devpath is None:
+            devpath, pid = _configured_device_selection()
         if not devpath:
             return False
         if devpath.startswith('dinput:'):
             guid = devpath[len('dinput:'):]
             from telemffb.hw.ffb_dinput import DInputFFBDevice
             return any(d.guid == guid for d in DInputFFBDevice.enumerate())
-        pid = int(str(G.system_settings.get(
-            utils.device_pid_key(G.device_type), '') or '2055'), 16)
         return any(d.product_id == pid for d in FFBRhino.enumerate())
     except Exception:
         return False
@@ -861,11 +875,20 @@ class _DeviceRetryTicker:
     never pop the connection-error dialog.  Started by every failed open
     (startup and live switch alike); stops itself the moment a device is
     connected, however that came about.
+
+    The presence check enumerates devices, and a DirectInput enumeration
+    opens every force feedback device on the PC through its driver, which
+    a slow device can hold for seconds; so the check runs on a worker
+    thread, one at a time, and the switch runs on the main thread when the
+    result arrives.
     """
     INTERVAL_MS = 2000
+    #: Tests check inline.
+    CHECK_THREADED = True
 
     def __init__(self):
         self._timer = None
+        self._check = None
 
     def start(self):
         if self._timer is None:
@@ -886,11 +909,31 @@ class _DeviceRetryTicker:
         if G.device_connection_status:
             self.stop()            # connected by other means
             return
-        devpath = G.system_settings.get(f'devpath_{G.device_type}', '') or ''
+        devpath, pid = _configured_device_selection()
         if not devpath:
             self.stop()            # nothing selected: nothing to wait for
             return
-        if not _configured_device_present():
+        if not self.CHECK_THREADED:
+            self._checked(_configured_device_present(devpath, pid))
+            return
+        if self._check is not None and self._check.is_alive():
+            return                 # the previous check has not come back yet
+
+        def check():
+            found = _configured_device_present(devpath, pid)
+            utils.schedule_on_main_thread(lambda: self._checked(found))
+
+        self._check = threading.Thread(
+            target=check, daemon=True, name='device-retry presence check')
+        self._check.start()
+
+    def _checked(self, found):
+        """The presence check's result (main thread): connect when the
+        configured device has appeared."""
+        if not found:
+            return
+        if G.device_connection_status:
+            self.stop()            # connected while the check ran
             return
         logging.info("Device watcher: configured device appeared - connecting")
         if switch_to_device(show_error=False):
