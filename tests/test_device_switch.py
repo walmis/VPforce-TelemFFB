@@ -116,6 +116,11 @@ def rig(app, monkeypatch):
     monkeypatch.setattr(main, 'device_retry_ticker', SimpleNamespace(
         start=lambda: setattr(r.ticker, 'started', r.ticker.started + 1),
         stop=lambda: setattr(r.ticker, 'stopped', r.ticker.stopped + 1)))
+    # the open checks presence first; the rig's devices are present unless
+    # a test says otherwise.  The real check stays reachable for its tests.
+    r.present = True
+    r.real_present = main._device_present
+    monkeypatch.setattr(main, '_device_present', lambda guid, pid: r.present)
     return r
 
 
@@ -296,29 +301,68 @@ class TestConfiguredDevicePresent:
         from telemffb.hw.ffb_rhino import FFBRhino
         monkeypatch.setattr(FFBRhino, 'enumerate', staticmethod(
             lambda pid=0: [SimpleNamespace(product_id=0x2055)]))
-        assert rig.main._configured_device_present() is True
+        assert rig.real_present(None, 0x2055) is True
         monkeypatch.setattr(FFBRhino, 'enumerate', staticmethod(
             lambda pid=0: [SimpleNamespace(product_id=0x2052)]))
-        assert rig.main._configured_device_present() is False
+        assert rig.real_present(None, 0x2055) is False
 
     def test_dinput_matches_by_guid(self, rig, monkeypatch):
-        rig.settings['devpath_joystick'] = 'dinput:{ABCD-1234}'
         from telemffb.hw import ffb_dinput
         monkeypatch.setattr(ffb_dinput.DInputFFBDevice, 'enumerate',
                             staticmethod(lambda bridge=None: [
                                 SimpleNamespace(guid='{ABCD-1234}')]))
-        assert rig.main._configured_device_present() is True
+        assert rig.real_present('{ABCD-1234}', 0) is True
+        assert rig.real_present('{other}', 0) is False
 
     def test_enumeration_failure_reads_as_absent(self, rig, monkeypatch):
         from telemffb.hw.ffb_rhino import FFBRhino
         def boom(pid=0):
             raise OSError("hid backend gone")
         monkeypatch.setattr(FFBRhino, 'enumerate', staticmethod(boom))
-        assert rig.main._configured_device_present() is False
+        assert rig.real_present(None, 0x2055) is False
 
     def test_no_selection_reads_as_absent(self, rig):
         rig.settings['devpath_joystick'] = ''
         assert rig.main._configured_device_present() is False
+
+    def test_the_saved_selection_names_the_device(self, rig, monkeypatch):
+        asked = []
+        monkeypatch.setattr(rig.main, '_device_present',
+                            lambda guid, pid: asked.append((guid, pid)) or True)
+        assert rig.main._configured_device_present() is True
+        rig.settings['devpath_joystick'] = 'dinput:{ABCD-1234}'
+        assert rig.main._configured_device_present() is True
+        assert asked == [(None, 0x2055), ('{ABCD-1234}', 0x2055)]
+
+
+class TestAbsentDeviceAtOpen:
+    """A configured device that is not connected is an expected state:
+    no open is attempted, nothing is logged as an error, and the retry
+    ticker is armed."""
+
+    def test_absent_device_skips_the_open_and_arms_the_ticker(self, rig, caplog):
+        import logging
+        rig.present = False
+        with caplog.at_level(logging.INFO):
+            assert rig.main.switch_to_device() is False
+        opens = [o for o in rig.order if not isinstance(o, str)]
+        assert opens == []
+        assert rig.ticker.started == 1
+        assert G.device_connection_status is False
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert not [r for r in caplog.records if r.exc_info]
+
+    def test_present_device_that_fails_to_open_is_an_error(self, rig, monkeypatch, caplog):
+        import logging
+        from telemffb.hw.ffb_rhino import HapticEffect
+
+        def refuse(cls, pid):
+            raise OSError("device busy")
+        monkeypatch.setattr(HapticEffect, 'open', classmethod(refuse))
+        with caplog.at_level(logging.INFO):
+            assert rig.main.switch_to_device() is False
+        assert [r for r in caplog.records if r.levelno >= logging.ERROR and r.exc_info]
+        assert rig.ticker.started == 1
 
 
 class TestIdentityRefreshWithoutDebugMenu:

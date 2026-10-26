@@ -580,6 +580,27 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
     dev = None
     dev_serial = None
     dev_firmware_version = 'ERROR'
+
+    # An absent device is an expected state, not a fault: one line, the
+    # dialog, and the retry ticker the caller starts.  Only a device that
+    # is present but will not open is an error.
+    try:
+        pid = int(G.device_usbpid, 16)
+    except (TypeError, ValueError):
+        pid = 0
+    if not _device_present(G.device_di_guid, pid):
+        wanted = (f"DirectInput device {G.device_di_guid}" if G.device_di_guid
+                  else f"VPforce device with PID {G.device_usbpid}")
+        logging.info(f"The configured '{G.device_type}' device is not "
+                     f"connected ({wanted})")
+        G.device_connection_status = False
+        if show_error:
+            _warn_cannot_connect(
+                f"The configured {G.device_type} device is not connected.\n\n"
+                "The application will open the device automatically when it appears.\n"
+                "Please open the System Settings and verify the device configuration is correct")
+        return dev, dev_serial, dev_firmware_version
+
     try:
         if G.device_di_guid:
             dev = HapticEffect.open_dinput(G.device_di_guid)
@@ -652,22 +673,15 @@ def _open_device_and_derive(min_firmware_version='v1.0.18', show_error=True):
 
     except Exception as e:
         G.device_connection_status = False
-        logging.exception("Exception")
+        logging.exception(f"Opening the '{G.device_type}' device failed")
         # the one warning for the zombie state: the device panel stays red
         # and the retry ticker auto-opens the device when it appears, so no
         # manual restart is needed
         if show_error:
-            # parent to whatever the user is looking at (the System
-            # Settings dialog during a live switch, the main window
-            # otherwise) so the error appears over the app, not centered
-            # on the monitor; at startup neither exists yet and None is
-            # all there is
-            parent = (QApplication.activeWindow()
-                      or getattr(G, 'main_window', None))
-            QMessageBox.warning(parent, "Cannot connect to FFB device",
-                          f"Unable to open device: {G.device_type}\nError: {e}\n\n"
-                          "The application will open the device automatically when it appears.\n"
-                          "Please open the System Settings and verify the device configuration is correct")
+            _warn_cannot_connect(
+                f"Unable to open device: {G.device_type}\nError: {e}\n\n"
+                "The application will open the device automatically when it appears.\n"
+                "Please open the System Settings and verify the device configuration is correct")
 
     return dev, dev_serial, dev_firmware_version
 
@@ -756,23 +770,43 @@ def _configured_device_selection():
     return devpath, pid
 
 
-def _configured_device_present(devpath=None, pid=None) -> bool:
-    """Whether the device this instance's saved selection names is
-    currently enumerable - without opening it.  ``devpath`` and ``pid``
-    are the selection when the caller has read it already (a worker
-    thread must not read the settings); otherwise it is read here."""
+def _device_present(di_guid, pid) -> bool:
+    """Whether a device with this identity is currently enumerable,
+    without opening it: the DirectInput device ``di_guid`` when one is
+    given, else a VPforce device with product ID ``pid``.  A failed
+    enumeration reads as absent."""
     try:
-        if devpath is None:
-            devpath, pid = _configured_device_selection()
-        if not devpath:
-            return False
-        if devpath.startswith('dinput:'):
-            guid = devpath[len('dinput:'):]
+        if di_guid:
             from telemffb.hw.ffb_dinput import DInputFFBDevice
-            return any(d.guid == guid for d in DInputFFBDevice.enumerate())
+            return any(d.guid == di_guid for d in DInputFFBDevice.enumerate())
         return any(d.product_id == pid for d in FFBRhino.enumerate())
     except Exception:
         return False
+
+
+def _configured_device_present(devpath=None, pid=None) -> bool:
+    """Whether the device this instance's saved selection names is
+    currently enumerable.  ``devpath`` and ``pid`` are the selection when
+    the caller has read it already (a worker thread must not read the
+    settings); otherwise it is read here."""
+    try:
+        if devpath is None:
+            devpath, pid = _configured_device_selection()
+    except Exception:
+        return False
+    if not devpath:
+        return False
+    di_guid = devpath[len('dinput:'):] if devpath.startswith('dinput:') else None
+    return _device_present(di_guid, pid)
+
+
+def _warn_cannot_connect(text):
+    """The connection-error dialog, parented to whatever the user is
+    looking at (the System Settings dialog during a live switch, the main
+    window otherwise) so it appears over the app, not centered on the
+    monitor; at startup neither exists yet and None is all there is."""
+    parent = QApplication.activeWindow() or getattr(G, 'main_window', None)
+    QMessageBox.warning(parent, "Cannot connect to FFB device", text)
 
 
 class _StartupGate:
