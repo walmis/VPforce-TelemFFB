@@ -252,3 +252,50 @@ class TestHPGPedalSemaFollow(BaseTelemetryEffectTestCase):
         ac.msfs_update_pedals(self._telem(hpgSEMAyaw=10, hpgFeetOnPedals=1))
         assert ac.feet_on_active is True
         assert ac.cpO_x == 0, "SEMA follow must pause while feet are on the pedals"
+
+    @pytest.mark.parametrize("pressed, name", [
+        (False, "pedal_ap_spring"),
+        (True, "pedal_ft_release_button"),
+    ])
+    def test_force_trim_release_names_the_spring(self, pressed, name):
+        from telemffb.SettingsManager import SpringModeEnum
+        ac = self._inst()
+        ac.spring_mode = SpringModeEnum.FORCETRIM
+        ac.pedal_ft_release_button = 1
+        if pressed:
+            self.mock_device._input_data.press_button(1)
+        ac.msfs_update_pedals(self._telem(hpgSEMAyaw=0))
+        assert ac._spring_handle.name == name
+
+
+@pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestHPGCollectiveForceTrim(BaseTelemetryEffectTestCase):
+
+    @pytest.mark.parametrize("afcs_mode", [0, 1])
+    @pytest.mark.parametrize("pressed, gain, name", [
+        (False, 0.8, "collective_ap_spring"),
+        (True, 0.15, "collective_ap_ft_release_button"),
+    ])
+    def test_force_trim_release_names_the_spring(self, afcs_mode, pressed, gain, name):
+        from telemffb.SettingsManager import SpringModeEnum
+        ac = self.create_aircraft_instance(
+            HPGHelicopter, name="HPG H145",
+            _test_sim_is_msfs=True, _test_device_type="collective")
+        ac.spring_mode = SpringModeEnum.FORCETRIM
+        ac.force_trim_button = 1
+        ac.collective_ap_spring_gain = 0.8
+        ac.trim_release_spring_gain = 0.15
+        ac.collective_init = 1
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        if pressed:
+            self.mock_device._input_data.press_button(1)
+        telem = (TelemetryDataBuilder()
+                 .ffb_type("collective")
+                 .on_ground(False)
+                 .with_field("hpgCollectiveAfcsMode", afcs_mode)
+                 .build())
+        ac.msfs_update_collective(telem)
+        assert ac._spring_handle.name == name
+        assert ac.spring_y.positiveCoefficient == round(gain * 4096)

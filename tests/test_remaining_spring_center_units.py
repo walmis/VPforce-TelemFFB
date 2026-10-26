@@ -159,6 +159,7 @@ class TestPedalForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         assert instance.ac_update_pedal_force_trim(instance.telem_data)
         assert instance.cpO_x == pytest.approx(0.25)
         assert instance.spring_x.cpOffset == 1024
+        assert self.mock_effects["pedal_spring"].name == "pedal_ft_release_button"
 
     def test_cockpit_switch_off_uses_same_capture_path(self):
         instance = self._instance()
@@ -167,6 +168,7 @@ class TestPedalForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         assert instance.ac_update_pedal_force_trim(instance.telem_data, ft_active=False)
         assert instance.cpO_x == pytest.approx(-0.3)
         assert instance.spring_x.cpOffset == round(-0.3 * 4096)
+        assert self.mock_effects["pedal_spring"].name == "pedal_ft_release_switch"
 
     def test_reset_uploads_each_intermediate_center(self):
         instance = self._instance()
@@ -220,6 +222,7 @@ class TestCollectiveForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         assert instance.spring_y.cpOffset == 1024
         assert spring.get_offsets()[1] == 1024
         assert spring.start_count == 0
+        assert spring.name == "collective_ft_release_switch"
 
     def test_release_tracks_axis_and_starts_effect(self):
         instance = self._instance()
@@ -230,6 +233,7 @@ class TestCollectiveForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         instance.ac_collective_force_trim_override(instance.telem_data, spring)
 
         expected = round(-0.3 * 4096)
+        assert spring.name == "collective_ft_release_button"
         assert instance.collective_ft_ovd_cp0_y == pytest.approx(-0.3)
         assert instance.spring_y.cpOffset == expected
         assert spring.get_offsets()[1] == expected
@@ -311,6 +315,7 @@ class TestDcsSpringCenterUnits(BaseTelemetryEffectTestCase):
         instance.dcs_override_spring()
         assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == (0.25, -0.5)
         assert (instance.spring_x.cpOffset, instance.spring_y.cpOffset) == (1024, -2048)
+        assert self.mock_effects["dcs_spr_override"].name == "dcs_spr_override_release_button"
 
         self.mock_device.get_input().release_button(4)
         instance.override_spring_trim_right = 5
@@ -321,6 +326,7 @@ class TestDcsSpringCenterUnits(BaseTelemetryEffectTestCase):
         assert (instance.override_spring_cp0_x, instance.override_spring_cp0_y) == pytest.approx(
             (1074 / 4096, -2098 / 4096))
         assert (instance.spring_x.cpOffset, instance.spring_y.cpOffset) == (1074, -2098)
+        assert self.mock_effects["dcs_spr_override"].name == "dcs_spr_override"
         assert instance.telem_data._ovrd_spr_step == pytest.approx(50 / 4096)
         assert instance.telem_data._ovrd_spr_trim_pos == pytest.approx(
             [1074 / 4096, -2098 / 4096])

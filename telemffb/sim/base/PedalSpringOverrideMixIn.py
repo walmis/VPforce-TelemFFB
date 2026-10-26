@@ -105,6 +105,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         trim_reset_pressed = self.check_button_press(self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
 
         if force_trim_pressed or not ft_active:
+            self.effects["pedal_spring"].name = "pedal_ft_release_switch" if not ft_active else "pedal_ft_release_button"
             if self.pedal_ft_damper_enabled:
                 self.spring_x.set_coefficient(self.pedal_ft_damper_force)
             else:
@@ -143,6 +144,9 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             if self.effects['pedal_spring'].started:
                 self.effects["pedal_spring"].stop()
             return
+
+        # a force trim release below renames it for the monitor
+        self.effects["pedal_spring"].name = "pedal_spring"
 
         if self.spring_mode_is(SpringModeEnum.NOSPRING):
             self.spring_x.set_coefficient(0)

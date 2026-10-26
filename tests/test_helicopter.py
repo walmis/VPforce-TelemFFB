@@ -327,7 +327,37 @@ class TestHelicopterCollective(BaseTelemetryEffectTestCase):
         
         # Verify spring handle was configured (name check)
         assert instance._spring_handle.name == "collective_ft"
-    
+
+    @pytest.mark.parametrize("switch_option, switch, pressed, gain, name", [
+        (False, 0, False, 0.5, "collective_ft"),
+        (True, 0, False, 0.15, "collective_ft_release_switch"),
+        (False, 1, True, 0.15, "collective_ft_release_button"),
+    ])
+    def test_collective_force_trim_release_and_its_cause(self, switch_option, switch, pressed, gain, name):
+        """ForceTrimSW is subscribed for every aircraft; a switch reading off releases the
+        collective only when the collective's switch option is on.  The spring's name
+        says which release is in force."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True,
+                                                 _test_device_type="collective")
+        instance.collective_init = 1
+        instance.spring_mode = SpringModeEnum.FORCETRIM
+        instance.collective_ft_ovd_release = 5
+        instance.collective_ft_ovd_spring_gain = 0.5
+        instance.collective_ft_ovd_tr_damper = 0.15
+        instance.custom_ft_sw_var_enabled = switch_option
+
+        telem = self._create_heli_telem()
+        telem["ForceTrimSW"] = switch
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(y=0.0)
+        if pressed:
+            self.mock_device._input_data.press_button(5)
+
+        instance.msfs_update_collective(telem)
+
+        assert instance.spring_y.positiveCoefficient == round(gain * 4096)
+        assert instance._spring_handle.name == name
+
     def test_collective_custom_axis_support(self):
         """Test collective with custom axis configuration."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="collective")
@@ -520,8 +550,12 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         event_names = [event[0] for event in self.mock_simconnect.sent_events]
         assert 'ROTOR_AXIS_TAIL_ROTOR_SET' in event_names
     
-    def test_pedals_force_trim_mode(self):
-        """Test pedals in force trim mode."""
+    @pytest.mark.parametrize("switch, pressed, name", [
+        (True, True, "pedal_ft_release_button"),
+        (False, False, "pedal_ft_release_switch"),
+    ])
+    def test_pedals_force_trim_release_and_its_cause(self, switch, pressed, name):
+        """Either release follows the pedals; the spring's name says which is in force."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli")
         instance._test_sim_is_msfs = True
         instance._test_device_type = "pedals"
@@ -529,19 +563,20 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         instance.pedals_init = 1
         instance.spring_mode = SpringModeEnum.FORCETRIM
         instance.pedal_ft_release_button = 1
-        
+        instance.custom_ft_sw_var_enabled = True
+
         telem = self._create_heli_telem()
         telem["FFBType"] = "pedals"
-        telem["ForceTrimSW"] = True
+        telem["ForceTrimSW"] = switch
         self.set_telemetry(instance, telem)
-        
+
         self.mock_device._input_data.set_axis(x=0.25)
-        self.mock_device._input_data.press_button(1)
-        
+        if pressed:
+            self.mock_device._input_data.press_button(1)
+
         instance.msfs_update_pedals(telem)
-        
-        # Verify spring was configured (check name)
-        assert instance._spring_handle.name == "pedal_spring"
+
+        assert instance._spring_handle.name == name
         assert instance.cpO_x == pytest.approx(0.25)
         assert instance.spring_x.cpOffset == round(0.25 * 4096)
     
@@ -696,7 +731,25 @@ class TestHelicopterCyclicControls(BaseTelemetryEffectTestCase):
         
         # Should detect button press and handle trim release
         assert instance.cyclic_trim_release_active == 1
-    
+        assert instance._spring_handle.name == "cyclic_ft_release_button"
+
+    def test_cyclic_force_trim_switch_off_names_the_release(self):
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True,
+                                                 _test_device_type="joystick")
+        instance.spring_mode = SpringModeEnum.FORCETRIM
+        instance.force_trim_button = 1
+        instance.cyclic_spring_init = 1
+        instance.custom_ft_sw_var_enabled = True
+
+        telem = self._create_heli_telem()
+        telem["ForceTrimSW"] = 0
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.2, y=0.3)
+
+        instance.msfs_update_heli_controls(telem)
+
+        assert instance._spring_handle.name == "cyclic_ft_release_switch"
+
     def test_cyclic_force_trim_button_release(self):
         """Test force trim button release engages trim."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="joystick")

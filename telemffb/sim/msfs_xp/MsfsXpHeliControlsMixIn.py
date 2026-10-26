@@ -174,6 +174,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
                     logging.info(f"Force Trim Disengaged total={self.cpO_x}:{self.cpO_y}")
 
+                self._spring_handle.name = "cyclic_ft_release_button"
                 gain = int(self.trim_release_spring_gain * 4096)
                 self.spring_x.set_coefficient(gain)
                 self.spring_y.set_coefficient(gain)
@@ -220,6 +221,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         elif self._force_trim_configured() and not force_trim_active:
             self.ft_was_inactive = True
 
+            self._spring_handle.name = "cyclic_ft_release_switch"
             gain = int(self.trim_release_spring_gain * 4096)
             self.spring_x.set_coefficient(gain)
             self.spring_y.set_coefficient(gain)

@@ -164,6 +164,7 @@ class XAW109Helicopter(Helicopter):
         pedal_ft_released = telem_data.get("AW109_ped_force_trim_release_pressed", 0)
 
         if pedal_ft_released:
+            self._spring_handle.name = "pedal_ft_release_button"
             if self.pedal_ft_damper_enabled:
                 force = int(self.pedal_ft_damper_force * 4096)
             else:
@@ -294,6 +295,7 @@ class XAW109Helicopter(Helicopter):
             self.spring_y.set_offset(self.cpO_y)
 
             # self.damper.damper(coef_y=0).start()
+            self._spring_handle.name = "collective_ap_ft_release_button"
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(
                 4096 * self.trim_release_spring_gain)
 

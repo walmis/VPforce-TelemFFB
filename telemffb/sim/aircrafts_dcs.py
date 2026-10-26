@@ -565,6 +565,8 @@ class Aircraft(AircraftBase, DCSCommands):
 
 
         spring = self.effects['dcs_spr_override'].spring()
+        # a force trim release below renames it for the monitor
+        spring.name = 'dcs_spr_override'
 
         dt = perftracker.get_time_delta('override_spring_perf')
         self.telem_data._ovrd_spr_dt = dt
@@ -583,6 +585,8 @@ class Aircraft(AircraftBase, DCSCommands):
                 # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
                 # as it is moved while spring force is enabled.
                 # return from method so default spring gains do not get applied at the end of the method
+                spring.name = ('dcs_spr_override_release_switch' if not ft_switch_state
+                               else 'dcs_spr_override_release_button')
                 gain = int (self.override_spring_tr_damper * 4096)
                 self.spring_x.set_coefficient(gain)
                 self.spring_y.set_coefficient(gain)

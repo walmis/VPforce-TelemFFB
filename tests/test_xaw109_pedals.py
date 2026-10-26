@@ -113,6 +113,7 @@ class TestXAW109PedalAfcs(BaseTelemetryEffectTestCase):
         ac.msfs_update_pedals(t)
         assert ac.cpO_x == pytest.approx(0.4)
         assert ac.spring_x.cpOffset == round(0.4 * 4096)
+        assert ac._spring_handle.name == "pedal_ft_release_button"
 
 
 @pytest.mark.unit
@@ -250,3 +251,18 @@ class TestXAW109Collective(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.0, y=-0.5)
         ac.msfs_update_collective(self._telem(SimOnGround=1))
         assert ac.collective_init == 0
+
+    @pytest.mark.parametrize("released, coefficient, name", [
+        (0, round(0.8 * 4096), "collective_ap_spring"),
+        (1, round(0.15 * 4096), "collective_ap_ft_release_button"),
+    ])
+    def test_force_trim_release_names_the_spring(self, released, coefficient, name):
+        ac = self._inst()
+        ac.collective_ap_spring_gain = 0.8
+        ac.trim_release_spring_gain = 0.15
+        self.mock_device._input_data.set_axis(x=0.0, y=0.5)
+        ac.msfs_update_collective(self._telem(SimOnGround=0))
+        ac.msfs_update_collective(
+            self._telem(SimOnGround=0, AW109_col_force_trim_release_pressed=released))
+        assert ac._spring_handle.name == name
+        assert ac.spring_y.positiveCoefficient == coefficient

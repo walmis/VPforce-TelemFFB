@@ -246,6 +246,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
 
         if force_trim_pressed or not ft_active:
+            self._spring_handle.name = "pedal_ft_release_switch" if not ft_active else "pedal_ft_release_button"
             if self.pedal_ft_damper_enabled:
                 self.spring_x.set_coefficient(self.pedal_ft_damper_force)
             else:
@@ -363,7 +364,11 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
     def _update_collective_spring_mode(self, telem_data: BaseTelemetryData, phys_y: float):
         if self.spring_mode_is(SpringModeEnum.FORCETRIM):
             self._spring_handle.name = "collective_ft"
-            self.ac_collective_force_trim_override(telem_data, self._spring_handle)
+            # the switch counts only when the collective's own switch option is on,
+            # as for the cyclic and pedals: ForceTrimSW is subscribed for every aircraft
+            force_trim_active = telem_data.get('ForceTrimSW', True) if self.custom_ft_sw_var_enabled else True
+            self.ac_collective_force_trim_override(telem_data, self._spring_handle,
+                                                   ft_active=force_trim_active)
             return
 
         self._spring_handle.name = "collective_ap_spring"

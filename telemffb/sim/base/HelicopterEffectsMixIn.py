@@ -248,15 +248,19 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         else:
             self.effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
 
-    def ac_collective_force_trim_override(self, telem_data: BaseTelemetryData, spring):
+    def ac_collective_force_trim_override(self, telem_data: BaseTelemetryData, spring, ft_active=None):
         """Generic effect enabling spring force and hardware trim for collective axis.
+
+        :param ft_active: the cockpit force trim switch state as the caller
+            decides it; None reads ``ForceTrimSW`` from the telemetry.
 
         Telemetry:
             Read:    WeightOnWheels - List[float] ([nose/left, left/right, right/tail],
                                       compression 0.0–1.0); summed; informational only —
                                       does not currently gate the effect
-                     ForceTrimSW    - bool; cockpit force-trim switch state; when False
-                                      the spring follows the stick position without locking
+                     ForceTrimSW    - bool; cockpit force-trim switch state, read when
+                                      ft_active is None; when False the spring follows
+                                      the stick position without locking
             Written: _coll_ft_dt      (float, s; frame delta time)
                      _coll_ft_step    (float; normalized trim step per frame)
                      _coll_ft_trim_pos (float, -1.0 to 1.0; normalized trim offset)
@@ -283,12 +287,13 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
 
         _, y = self._get_device_axes()
 
-        force_trim_active = telem_data.get("ForceTrimSW", True)
+        force_trim_active = telem_data.get("ForceTrimSW", True) if ft_active is None else ft_active
         if force_trim_active is None:
             force_trim_active = True
 
         if not force_trim_active:
             # Force trim is enabled, but the 'ForceTrimSW' flag is false, just move
+            spring.name = "collective_ft_release_switch"
             self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
             self.collective_ft_ovd_cp0_y = float(utils.clamp(y, -1.0, 1.0))
             self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
@@ -300,6 +305,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
             # as it is moved while spring force is enabled.
             # return from method so default spring gains do not get applied at the end of the method
+            spring.name = "collective_ft_release_button"
             self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
 
             self.collective_ft_ovd_cp0_y = float(utils.clamp(y, -1.0, 1.0))

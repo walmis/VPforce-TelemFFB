@@ -598,6 +598,7 @@ class HPGHelicopter(Helicopter):
             self.spring_x.set_offset(self.cpO_x)
             if pedal_trim_pressed:
                 # Disable spring while button is held so pilot can freely reposition pedals
+                self._spring_handle.name = "pedal_ft_release_button"
                 if self.pedal_ft_damper_enabled:
                     self.spring_x.set_coefficient(self.pedal_ft_damper_force)
                 else:
@@ -760,6 +761,7 @@ class HPGHelicopter(Helicopter):
                 self.cpO_y = utils.clamp(phys_y, -1, 1)
                 self.spring_y.set_offset(self.cpO_y)
 
+                self._spring_handle.name = "collective_ap_ft_release_button"
                 self.spring_y.set_coefficient(self.trim_release_spring_gain, True)
 
                 self._spring_handle.setCondition(self.spring_y)
@@ -816,6 +818,7 @@ class HPGHelicopter(Helicopter):
                 self.spring_y.set_offset(self.cpO_y)
 
                 # self.damper.damper(coef_y=0).start()
+                self._spring_handle.name = "collective_ap_ft_release_button"
                 self.spring_y.set_coefficient(self.trim_release_spring_gain, True)
 
                 self._spring_handle.setCondition(self.spring_y)
