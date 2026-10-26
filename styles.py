@@ -208,6 +208,10 @@ MiniDeviceChip[clickable="true"] {
     border-radius: 4px;
 }
 
+QComboBox[absent="true"] {
+    color: $muted_text_color;
+}
+
 MiniDeviceChip[clickable="true"]:hover {
     background-color: rgba(128, 128, 128, 60);
 }
@@ -240,6 +244,7 @@ def render_stylesheet(tokens: ThemeTokens) -> str:
     """Render the shared QSS template with one mode's color tokens."""
     return _STYLESHEET_TEMPLATE.substitute(
         button_text_color=tokens.button_text_color,
+        muted_text_color=tokens.muted_text_color,
         hover_pressed_color_rule=tokens.hover_pressed_color_rule,
         erase_button_font_family=tokens.erase_button_font_family,
         erase_button_size_rules=tokens.erase_button_size_rules,

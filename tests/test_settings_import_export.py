@@ -168,7 +168,9 @@ class TestImport:
             'masterInstance': 1,
             'autolaunchMaster': True, 'autolaunchPedals': True,
         })
-        assert world.dialog.selected_device('pedals') is None
+        pedals = world.dialog.selected_device('pedals')
+        assert pedals is not None and pedals.connected is False
+        assert pedals.path.decode() == foreign
         assert world.save()
         assert world.settings.get('devpath_pedals') == foreign
 

@@ -26,6 +26,8 @@ __all__ = [
     "format_usb_ids",
     "parse_usb_ids",
     "device_ident_key",
+    "AbsentDeviceInfo",
+    "absent_device_entry",
     "device_name_key",
     "device_panel_icon",
     "device_panel_label",
@@ -136,6 +138,44 @@ def device_panel_icon(role, settings, slot_suffix=''):
     if kind == 'yoke':
         return ':/image/icon_yoke.png'
     return ''
+
+
+class AbsentDeviceInfo:
+    """A configured device that is not connected, as a selector entry.
+
+    Built from the slot's stored identity (path, name, USB ids) so the
+    selector can list and keep the device while it is unplugged.  Carries
+    the attributes the selector model and the staging code read from a
+    live ``DeviceInfo``; ``connected`` tells the two apart.
+    """
+
+    connected = False
+
+    def __init__(self, path, ident='', vendor_id=0, product_id=0):
+        self.path = path.encode() if isinstance(path, str) else bytes(path)
+        self.product_string = str(ident or '')
+        self.manufacturer_string = ''
+        self.serial_number = ''
+        self.vendor_id = int(vendor_id or 0)
+        self.product_id = int(product_id or 0)
+
+    @property
+    def ident(self) -> str:
+        return self.product_string
+
+    def vidpid(self) -> str:
+        return format_usb_ids(self.vendor_id, self.product_id)
+
+
+def absent_device_entry(get, role):
+    """The ``AbsentDeviceInfo`` for ``role``'s stored device, or None when
+    the slot is empty.  ``get(key)`` returns a settings value; the role may
+    be a joystick alternate (``joystick_2``)."""
+    path = str(get(f'devpath_{role}') or '').strip()
+    if not path:
+        return None
+    ids = parse_usb_ids(get(device_ids_key(role))) or (0, 0)
+    return AbsentDeviceInfo(path, get(device_ident_key(role)) or '', *ids)
 
 
 def device_name_key(role):

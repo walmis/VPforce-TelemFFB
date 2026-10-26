@@ -49,6 +49,7 @@ from telemffb.ui.panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 from telemffb.utils import (
+    absent_device_entry,
     device_display_name, device_ident_key, device_ids_key, device_name_key, device_pid_key,
     directinput_selection_devices, format_usb_ids, recover_device_identity,
     schedule_on_main_thread, validate_vpconf_profile, HiDpiPixmap,
@@ -225,8 +226,8 @@ def _describe_setting_scope(elem):
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
-    #: List DirectInput devices on a worker thread (see _dinput_devices).
-    #: Tests turn it off for a synchronous listing.
+    #: List DirectInput devices on a worker thread (see
+    #: _list_dinput_devices).  Tests turn it off for a synchronous listing.
     DINPUT_LISTING_THREADED = True
 
     def __init__(self, parent=None,):
@@ -235,6 +236,21 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # before ANY wiring: state-derivation slots that read it fire as
         # early as load_settings' master-radio click.
         self._pending_devpaths = {}
+        # The selectors are built from two listings, kept here as the
+        # lists they were last built from (None before the first listing):
+        # the VPforce devices, and the DirectInput devices.  The DirectInput
+        # listing opens every force feedback device on the PC through its
+        # driver and can block, so it is made on a worker thread and fills
+        # the selectors when it arrives; the watch lists the VPforce devices
+        # on a worker thread while the dialog is open.
+        self._vpforce_listing = None
+        self._dinput_listing = None
+        self._vpforce_scan = None
+        self._dinput_scan = None
+        self._watch_ticks = 0
+        self._device_watch = QtCore.QTimer(self)
+        self._device_watch.setInterval(self.DEVICE_WATCH_MS)
+        self._device_watch.timeout.connect(self._watch_devices)
         # The install path each sim path field is known to hold a good
         # value for.  A typed path is only re-checked when it differs from
         # this, so a field the user merely tabbed through asks nothing, and
@@ -257,12 +273,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # while an import is populating the form, panels created on the fly
         # read the imported values instead of the store
         self._import_source = None
-        # The DirectInput listing opens every force feedback device on the
-        # PC through its driver and can block, so the dialog lists on a
-        # worker thread and fills the selectors when the result arrives;
-        # see _dinput_devices.
-        self._dinput_listing = None
-        self._dinput_scan = None
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"System Settings ({G.device_type.capitalize()})")
@@ -612,32 +622,25 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return directinput_selection_devices(
             settings if settings is not None else G.system_settings, enabled)
 
-    def _dinput_devices(self, enabled, fresh, arrived=None):
-        """The [DI] entries for the selectors.
+    def _known_dinput_devices(self, enabled):
+        """The DirectInput entries the selectors can show right now: the
+        last listing, or nothing while DirectInput is disabled or before a
+        listing has arrived."""
+        return list(self._dinput_listing or []) if enabled else []
 
-        ``arrived`` is a listing the worker thread just delivered; it is
-        kept and used.  Otherwise the last listing is reused, unless
-        ``fresh`` (the toggle re-lists live).  A threaded listing returns
-        what is known so far, and the result repopulates the selectors
-        through _dinput_listed when it arrives.
-        """
-        if arrived is not None:
-            self._dinput_listing = list(arrived)
-            return list(arrived)
-        if not enabled:
-            return []
-        if self._dinput_listing is not None and not fresh:
-            return list(self._dinput_listing)
-        if not self.DINPUT_LISTING_THREADED:
-            self._dinput_listing = list(self._enumerate_dinput_devices(enabled))
-            return list(self._dinput_listing)
-        self._start_dinput_listing(enabled)
-        return list(self._dinput_listing or [])
+    def _list_dinput_devices(self):
+        """Make a DirectInput listing: on the worker thread, whose result
+        rebuilds the selectors through _dinput_listed; or inline (tests),
+        which only updates the kept listing."""
+        if self.DINPUT_LISTING_THREADED:
+            self._start_dinput_listing(True)
+        else:
+            self._dinput_listing = list(self._enumerate_dinput_devices(True))
 
     def _start_dinput_listing(self, enabled):
         """List the DirectInput devices on a worker thread.  While a
         listing is in progress, no second one is started; its result
-        repopulates the selectors."""
+        rebuilds the selectors."""
         if self._dinput_scan is not None and self._dinput_scan.is_alive():
             return
         # the settings are read here, on the main thread; the worker gets
@@ -660,22 +663,126 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._dinput_scan.start()
 
     def _dinput_listed(self, result):
-        """Fill the selectors with the worker's listing (main thread)."""
+        """A DirectInput listing arrived (main thread): rebuild the
+        selectors when it differs from the one they were built from."""
         try:
-            self.populateUSBSelectors(
-                dinput_enabled=self.cb_enable_dinput.isChecked(), dinput_devices=result)
+            unchanged = (self._dinput_listing is not None and
+                         self._paths_of(result) == self._paths_of(self._dinput_listing))
+            self._dinput_listing = list(result)
+            if unchanged:
+                return
+            dinput_on = self.cb_enable_dinput.isChecked()
+            self._rebuild_selectors(self._vpforce_listing or [],
+                                    self._known_dinput_devices(dinput_on), dinput_on)
             self.toggle_device_launch_widgets()
         except RuntimeError:
             # the dialog was deleted while the listing ran
             pass
 
-    def populateUSBSelectors(self, dinput_enabled=None, dinput_devices=None):
-        # Populate the USB device selectors with currently connected devices
-        devices = FFBRhino.enumerate()
-        dinput_on = (dinput_enabled if dinput_enabled is not None
-                     else bool(G.system_settings.get('enableDirectInput', False)))
-        dinput_devices = self._dinput_devices(
-            dinput_on, fresh=dinput_enabled is not None, arrived=dinput_devices)
+    def _refresh_dinput_listing(self):
+        """The watch's DirectInput re-listing; the result goes through
+        _dinput_listed, which rebuilds only on a change."""
+        if not self.cb_enable_dinput.isChecked():
+            return
+        if self.DINPUT_LISTING_THREADED:
+            self._start_dinput_listing(True)
+            return
+        try:
+            self._dinput_listed(list(self._enumerate_dinput_devices(True)))
+        except Exception:
+            logging.exception("Device watch: listing the DirectInput devices failed")
+
+    #: How often an open dialog re-lists the VPforce devices, so a device
+    #: that is plugged in or unplugged shows as such without reopening it.
+    DEVICE_WATCH_MS = 2000
+    #: The DirectInput listing opens every force feedback device through
+    #: its driver, so it is refreshed once per this many ticks.
+    DINPUT_WATCH_TICKS = 2
+    #: The watch lists the VPforce devices on a worker thread: a HID open
+    #: that a hub stalls must never hold the main thread.  Tests list inline.
+    DEVICE_WATCH_THREADED = True
+
+    @staticmethod
+    def _paths_of(devices):
+        return frozenset(_device_path(device) for device in devices)
+
+    def _watch_devices(self):
+        """One watch tick: list the VPforce devices (on a worker thread) and
+        hand the result to _vpforce_listed; every few ticks, re-list the
+        DirectInput devices the same way."""
+        if not self.isVisible():
+            self._device_watch.stop()
+            return
+        self._watch_ticks += 1
+        if self._watch_ticks % self.DINPUT_WATCH_TICKS == 0:
+            self._refresh_dinput_listing()
+        if not self.DEVICE_WATCH_THREADED:
+            self._vpforce_listed(self._list_vpforce_devices())
+            return
+        if self._vpforce_scan is not None and self._vpforce_scan.is_alive():
+            return      # the previous listing has not come back yet
+
+        def listing():
+            result = self._list_vpforce_devices()
+            schedule_on_main_thread(lambda: self._vpforce_listed(result))
+
+        self._vpforce_scan = threading.Thread(
+            target=listing, daemon=True, name='SystemSettings VPforce listing')
+        self._vpforce_scan.start()
+
+    @staticmethod
+    def _list_vpforce_devices():
+        """The VPforce listing, or None when it fails."""
+        try:
+            return list(FFBRhino.enumerate())
+        except Exception:
+            logging.exception("Device watch: listing the VPforce devices failed")
+            return None
+
+    def _vpforce_listed(self, devices):
+        """A VPforce listing arrived (main thread): rebuild the selectors
+        when it differs from the one they were built from."""
+        if devices is None:
+            return
+        try:
+            if not self.isVisible():
+                return
+            if self._paths_of(devices) != self._paths_of(self._vpforce_listing or []):
+                dinput_on = self.cb_enable_dinput.isChecked()
+                self._rebuild_selectors(devices, self._known_dinput_devices(dinput_on), dinput_on)
+        except RuntimeError:
+            # the dialog was deleted while the listing ran
+            pass
+
+    def hideEvent(self, event):
+        self._device_watch.stop()
+        super().hideEvent(event)
+
+    def populateUSBSelectors(self):
+        """List the devices and build the selectors: the VPforce devices
+        now, the DirectInput devices from the last listing (the first one
+        is started here and fills the selectors when it arrives)."""
+        dinput_on = bool(G.system_settings.get('enableDirectInput', False))
+        if dinput_on and self._dinput_listing is None:
+            self._list_dinput_devices()
+        self._rebuild_selectors(self._list_vpforce_devices() or [],
+                                self._known_dinput_devices(dinput_on), dinput_on)
+
+    def _relist_dinput_devices(self, enabled):
+        """The DirectInput box was ticked or cleared: list the DirectInput
+        devices afresh when enabled, and rebuild the selectors."""
+        if enabled:
+            self._list_dinput_devices()
+        self._rebuild_selectors(self._vpforce_listing or [],
+                                self._known_dinput_devices(enabled), enabled)
+
+    def _rebuild_selectors(self, devices, dinput_devices, dinput_on):
+        """Build the device selectors from a VPforce listing and a
+        DirectInput listing, and restore the saved or pending selections.
+        Main thread only; the listings are kept for the next rebuild."""
+        devices = list(devices)
+        dinput_devices = list(dinput_devices)
+        self._vpforce_listing = devices
 
         combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
         # kept so the tap code can ask what is connected without knowing
@@ -688,7 +795,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # The joystick keeps its native X/Y; other roles get an axis
         # mapping when the hardware's FFB axis is not the one the role
         # addresses.
-        extended_model = FFBDeviceListModel(list(devices) + dinput_devices)
+        # a configured device that is not connected stays listed, from its
+        # stored identity, so the slot survives a save and reads as absent
+        # rather than cleared; a live listing of the same path replaces it
+        extended_model = FFBDeviceListModel(
+            devices + dinput_devices
+            + self._absent_devices(devices + dinput_devices, dinput_on))
         for cb in combo_boxes:
             cb_model = extended_model
             # Swapping the model emits currentIndexChanged with nothing
@@ -870,9 +982,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # lives on the System page.  Shown only while the cards would
         # otherwise be a dead end - no VPforce hardware listed, nothing
         # configured, DirectInput off.
-        dinput_on = (dinput_enabled if dinput_enabled is not None
-                     else bool(G.system_settings.get('enableDirectInput',
-                                                     False)))
         nothing_stored = not any(self._stored_or_pending(f'devpath_{r}')
                                  for r in self.INSTANCE_ROLES)
         self.device_cards.dinput_hint.setVisible(
@@ -1273,6 +1382,29 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             return self._pending_devpaths[key]
         return G.system_settings.get(key, default) or default
 
+    def _absent_devices(self, listed, dinput_on):
+        """Selector entries for the configured devices that are not in
+        ``listed``, one per stored path, across the four roles and the
+        joystick alternates.  A DirectInput device while DirectInput is
+        disabled is unlisted by that switch, not absent, and gets none."""
+        present = set()
+        for device in listed:
+            path = getattr(device, 'path', b'')
+            present.add(path.decode(errors='replace') if isinstance(path, (bytes, bytearray)) else str(path))
+        absent = []
+        for role in list(self.INSTANCE_ROLES) + [self._alt_role(2), self._alt_role(3)]:
+            entry = absent_device_entry(self._stored_or_pending, role)
+            if entry is None:
+                continue
+            path = entry.path.decode(errors='replace')
+            if path in present:
+                continue
+            if not dinput_on and entry.path.startswith(b"dinput:"):
+                continue
+            present.add(path)
+            absent.append(entry)
+        return absent
+
     def _select_devpath(self, cb, saved_path):
         """Point a selector at the item whose device path matches, quietly."""
         if not saved_path:
@@ -1316,6 +1448,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 or 'stick')
         self.device_cards.joystick_card.primary_row.set_device_icon(
             self._stored_or_pending(self._devicon_key(1), 'stick') or 'stick')
+        # rows are laid out in storage order from the pending writes, so
+        # row one holds the active device and the marker belongs there
         card.set_active_slot(1)
 
     def _create_joystick_alt_row(self):
@@ -1586,8 +1720,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self._import_source = source
         try:
-            # selectors restart from nothing so an unmatched (unplugged)
-            # import shows no device rather than the previous selection
+            # selectors restart from nothing so an unplugged device in the
+            # file shows as not connected rather than as the previous
+            # selection
             selectors = list(self._device_combos) + [
                 row.selector
                 for row in self.device_cards.joystick_card.alt_rows]
@@ -2153,7 +2288,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return self._with_known_identity(merged)
 
     def _connected_devices(self):
-        """Everything enumerated in the selectors right now."""
+        """Everything enumerated in the selectors right now; a stored
+        device listed as not connected is not hardware to learn from."""
         devices = []
         for combo in self._device_combos:
             model = combo.model()
@@ -2162,7 +2298,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             for row in range(model.rowCount()):
                 device = model.data(model.index(row, 0),
                                     Qt.ItemDataRole.UserRole)
-                if device is not None:
+                if device is not None and getattr(device, 'connected', True):
                     devices.append(device)
         return devices
 
@@ -2263,6 +2399,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def showEvent(self, event):
         super().showEvent(event)
         self.refresh_tap_panels()
+        self._device_watch.start()
         QtCore.QTimer.singleShot(0, self._grow_to_fit)
 
     def _grow_to_fit(self):
@@ -2413,7 +2550,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if reason:
                 QMessageBox.warning(self, "DirectLink Update Required", with_download_link(reason))
 
-        self.populateUSBSelectors(dinput_enabled=self.cb_enable_dinput.isChecked())
+        self._relist_dinput_devices(self.cb_enable_dinput.isChecked())
         # the toggle is the moment a user who just installed the
         # bridge finds out whether it took
         self.refresh_dinput_status()
@@ -4054,7 +4191,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         """
         device = self.selected_device(role)
         devpath = str(self._stored_or_pending(f'devpath_{role}') or '')
-        if device is not None and _device_path(device) == devpath:
+        if device is not None and getattr(device, 'connected', True) \
+                and _device_path(device) == devpath:
             return format(device.product_id, 'x')
         # The selector and the staged devpath disagree, or nothing is
         # selected.  The devpath is what startup reads, so the pid follows

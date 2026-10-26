@@ -41,7 +41,7 @@ import numpy as np
 import telemffb.globals as G
 from telemffb.SettingsManager import SettingsManager
 from telemffb.ui.layout_utils import invalidate_ancestor_layouts
-from telemffb.ui.theme.tokens import PURPLE, ACTIVE_GREEN
+from telemffb.ui.theme.tokens import PURPLE, ACTIVE_GREEN, current_tokens
 from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
 import styles
 
@@ -85,6 +85,8 @@ class FFBDeviceListModel(QAbstractListModel):
         except IndexError:
             return None
 
+        connected = getattr(dev, 'connected', True)
+
         if role == Qt.ItemDataRole.DisplayRole:
             # Friendly name: Config ident, vendor:product, serial
             try:
@@ -92,9 +94,15 @@ class FFBDeviceListModel(QAbstractListModel):
                 pid = getattr(dev, 'product_id', 0)
                 ident = getattr(dev, 'ident', getattr(dev, 'product_string', 'Unknown'))
                 serial = getattr(dev, 'serial_number', '')
+                if not connected:
+                    ids = f" ({vid:04X}:{pid:04X})" if vid and pid else ""
+                    return f"{ident or 'Unnamed device'}{ids} - not connected"
                 return f"{ident} ({vid:04X}:{pid:04X}) {serial}"
             except Exception:
                 return str(getattr(dev, 'product_string', dev))
+
+        if role == Qt.ItemDataRole.ForegroundRole and not connected:
+            return QBrush(QColor(current_tokens().muted_text_color))
 
         if role == Qt.ItemDataRole.UserRole:
             return dev

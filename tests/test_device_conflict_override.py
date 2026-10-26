@@ -204,7 +204,8 @@ class TestPidFollowsTheStore:
         monkeypatch.setattr(tw, 'ENUMERATED', [COLL, TRIM, STICK])   # no Rudder
         w = World(tmp_path, monkeypatch, random.Random(0),
                   settings=stored_state())
-        assert w.dialog.selected_device('pedals') is None
+        pedals = w.dialog.selected_device('pedals')
+        assert pedals is not None and pedals.connected is False
         assert w.dialog.instance_pid('pedals') == pid_of(RUDDER)
 
     def test_an_unopposed_pick_is_reported_before_it_is_saved(self, world):

@@ -44,6 +44,7 @@ both work without theme-specific rules here.
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
 from telemffb.ui.widgets.custom_widgets import LabeledToggle, Toggle
+from telemffb.ui.theme.props import set_state_prop
 from PyQt6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QRadioButton, QSizePolicy, QToolButton,
@@ -443,6 +444,9 @@ class DeviceRow(QWidget):
             self.ids_label.setText(f'{vid:04X}:{pid:04X}')
         else:
             self.ids_label.setText('')
+        # a configured device that is not connected reads dimmed
+        set_state_prop(self.selector, 'absent',
+                       device is not None and not getattr(device, 'connected', True))
         if self.marker is not None:
             # the checked marker stays live however its row reads - being
             # active with nothing selected is a state, not a request

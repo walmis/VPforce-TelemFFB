@@ -170,7 +170,7 @@ def test_repopulate_does_not_queue_cleared_devpaths(dialog):
     """The same emission also reaches persist_combobox_selection, which would
     queue every role's devpath to be blanked when the dialog is saved."""
     dialog._pending_devpaths.clear()
-    dialog.populateUSBSelectors(dinput_enabled=True)
+    dialog._relist_dinput_devices(True)
     assert not [k for k, v in dialog._pending_devpaths.items() if v == ''], \
         f"repopulate queued devpath clears: {dialog._pending_devpaths}"
 
@@ -179,8 +179,8 @@ def test_repopulate_connects_handlers_once(dialog):
     """Reconnecting on every repopulate would multiply the handler, so a
     single user change would run it repeatedly."""
     before = dialog.cb_select_j.receivers(dialog.cb_select_j.currentIndexChanged)
-    dialog.populateUSBSelectors(dinput_enabled=True)
-    dialog.populateUSBSelectors(dinput_enabled=False)
+    dialog._relist_dinput_devices(True)
+    dialog._relist_dinput_devices(False)
     assert dialog.cb_select_j.receivers(dialog.cb_select_j.currentIndexChanged) == before
 
 
@@ -214,7 +214,7 @@ class TestDirectInputRolesListed:
         self._app = app
         monkeypatch.setattr(SystemSettingsDialog, '_enumerate_dinput_devices',
                             staticmethod(lambda enabled=None: [_FakeDIDevice()]))
-        dlg.populateUSBSelectors(dinput_enabled=True)
+        dlg._relist_dinput_devices(True)
         return dlg
 
     def _listed(self, combo):
@@ -259,7 +259,7 @@ class TestListingOffTheMainThread:
                             staticmethod(listing))
         monkeypatch.setattr(SystemSettingsDialog, 'DINPUT_LISTING_THREADED', True)
 
-        dlg.populateUSBSelectors(dinput_enabled=True)
+        dlg._relist_dinput_devices(True)
 
         assert started.wait(5)
         assert not self._di_listed(dlg.cb_select_j)
@@ -291,7 +291,7 @@ class TestAxisChooser:
                             staticmethod(lambda enabled=None: [_FakeDIDevice()]))
         monkeypatch.setattr(SystemSettingsDialog, '_query_ffb_axes',
                             staticmethod(lambda guid: list(axes)))
-        dlg.populateUSBSelectors(dinput_enabled=True)
+        dlg._relist_dinput_devices(True)
         return dlg
 
     def _select_di(self, combo):
