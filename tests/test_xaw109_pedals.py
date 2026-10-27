@@ -13,6 +13,7 @@ import telemffb.globals as G
 from tests.framework.base import BaseTelemetryEffectTestCase
 from tests.framework.utils import TelemetryDataBuilder
 from telemffb.sim.msfs_xp.XAW109Helicopter import XAW109Helicopter
+from telemffb.utils import EffectTranslator
 
 
 @pytest.fixture(autouse=True)
@@ -114,6 +115,13 @@ class TestXAW109PedalAfcs(BaseTelemetryEffectTestCase):
         assert ac.cpO_x == pytest.approx(0.4)
         assert ac.spring_x.cpOffset == round(0.4 * 4096)
         assert ac._spring_handle.name == "pedal_ft_release_button"
+
+    def test_spring_links_to_its_gain_setting(self):
+        ac = self._inst()
+        self._init_pedals(ac)
+        ac.msfs_update_pedals(self._telem(SimOnGround=0))
+        _, setting = EffectTranslator.get_translation(ac._spring_handle.name)
+        assert setting == "pedal_spring_gain"
 
 
 @pytest.mark.unit

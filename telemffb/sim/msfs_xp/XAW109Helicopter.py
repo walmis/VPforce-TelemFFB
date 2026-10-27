@@ -149,7 +149,7 @@ class XAW109Helicopter(Helicopter):
         telem_data.pedal_position = phys_x
         telem_data.IAS_kt = (telem_data.IAS or 0) * ms2kt
 
-        self._spring_handle.name = "pedal_ap_spring"
+        self._spring_handle.name = "pedal_spring"
 
         if not self.pedals_init:
 
