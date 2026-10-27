@@ -12409,8 +12409,7 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>collective_ap_spring_gain</name>
-			<type>Helicopter</type>
-			<value>1.0</value>
+			<type>!Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>collective</device>
 		</classdefaults_XPLANE>
@@ -12459,6 +12458,12 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>collective_ft_ovd_trim_up</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>collective</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>collective_ft_use_master_buttons</name>
 			<type>!XAW109Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>collective</device>
@@ -12765,8 +12770,7 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>force_trim_button</name>
-			<type>Helicopter</type>
-			<value>0</value>
+			<type>!Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>collective</device>
 		</classdefaults_XPLANE>
@@ -12779,8 +12783,7 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>force_trim_button</name>
-			<type>XAW109Helicopter</type>
-			<value>0</value>
+			<type>!XAW109Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>collective</device>
 		</classdefaults_XPLANE>
@@ -13206,7 +13209,19 @@
 			<device>pedals</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
+			<name>pedal_ft_release_button</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
 			<name>pedal_ft_reset_button</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>pedal_ft_use_master_buttons</name>
 			<type>!XAW109Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>pedals</device>
@@ -13639,6 +13654,12 @@
 			<value>true</value>
 			<sim>XPLANE</sim>
 			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>trim_release_spring_gain</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>collective</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>trimwheel_elev_dn_button</name>
