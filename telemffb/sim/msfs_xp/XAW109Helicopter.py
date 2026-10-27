@@ -233,11 +233,10 @@ class XAW109Helicopter(Helicopter):
             telem_data._pedal_afcs_demand = s
             telem_data._pedal_afcs_active = active
 
-            force = round(4096 * self.pedal_spring_gain)
             self.spring_x.set_offset(self.cpO_x)
             self.spring_y.set_offset(0.0)
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = int(self.pedal_spring_gain * force)
+            self.spring_x.set_coefficient(float(self.pedal_spring_gain))
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
             self._spring_handle.start()

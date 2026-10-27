@@ -116,6 +116,14 @@ class TestXAW109PedalAfcs(BaseTelemetryEffectTestCase):
         assert ac.spring_x.cpOffset == round(0.4 * 4096)
         assert ac._spring_handle.name == "pedal_ft_release_button"
 
+    def test_spring_gain_applies_once(self):
+        ac = self._inst()
+        ac.pedal_spring_gain = 0.6
+        self._init_pedals(ac)
+        ac.msfs_update_pedals(self._telem(SimOnGround=0))
+        assert ac.spring_x.positiveCoefficient == round(0.6 * 4096)
+        assert ac.spring_x.negativeCoefficient == round(0.6 * 4096)
+
     def test_spring_links_to_its_gain_setting(self):
         ac = self._inst()
         self._init_pedals(ac)
