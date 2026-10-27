@@ -180,6 +180,25 @@ class TestXAW109CyclicAfcs(BaseTelemetryEffectTestCase):
                         AW109_elevator_trim_rate=0))
         assert ac.cpO_x == 0 and ac.cpO_y == 0
 
+    @pytest.mark.parametrize("released, gain, name", [
+        (0, 0.8, "cyclic_spring"),
+        (1, 0.15, "cyclic_ft_release_button"),
+    ])
+    def test_force_trim_release_follows_the_aircraft_without_a_button(self, released, gain, name):
+        from telemffb.SettingsManager import SpringModeEnum
+        ac = self._inst()
+        ac.spring_mode = SpringModeEnum.FORCETRIM
+        ac.force_trim_button = 0
+        ac.cyclic_spring_gain = 0.8
+        ac.trim_release_spring_gain = 0.15
+        ac.msfs_update_heli_controls(self._telem(AW109_cyc_force_trim_release_pressed=0))
+        self.mock_device._input_data.set_axis(x=0.3, y=-0.2)
+        ac.msfs_update_heli_controls(
+            self._telem(AW109_cyc_force_trim_release_pressed=released))
+        assert ac._spring_handle.name == name
+        assert ac.spring_x.positiveCoefficient == round(gain * 4096)
+        assert (ac.cpO_x == pytest.approx(0.3)) == bool(released)
+
 
 @pytest.mark.unit
 @pytest.mark.xplane

@@ -42,6 +42,10 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         """
         return self.spring_mode_is(SpringModeEnum.FORCETRIM) and self.force_trim_button != 0
 
+    def _force_trim_release_pressed(self, telem_data: BaseTelemetryData, report) -> bool:
+        """Whether the cyclic force trim release is held this frame."""
+        return self.check_button_press(self.force_trim_button, report=report)
+
     def _initialize_cyclic_if_needed(self, telem_data: BaseTelemetryData) -> bool:
         """Initialize cyclic spring to ground-center or last-saved position.
 
@@ -133,22 +137,12 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if self._force_trim_configured() and force_trim_active:
             # A missing or hot-unplugged device reads as no button
             # pressed, so no trim action can fire.
-            if self.cyclic_spring_init:
-                force_trim_pressed = self.check_button_press(self.force_trim_button, report=report)
-            else:
-                force_trim_pressed = False
-
             trim_reset_pressed = self.check_button_press(self.force_trim_reset_button, report=report)
-
-            self.tr_state_change = False
-
-            if self.anything_has_changed("ft_tracker", force_trim_pressed):
-                self.tr_state_change = True
 
             # remember previous "pressed" to detect edge
             force_trim_pressed_prev = getattr(self, "force_trim_pressed_prev", False)
             force_trim_pressed = (
-                self.check_button_press(self.force_trim_button, report=report)
+                self._force_trim_release_pressed(telem_data, report)
                 if self.cyclic_spring_init else False
             )
             self.tr_state_change = force_trim_pressed != force_trim_pressed_prev

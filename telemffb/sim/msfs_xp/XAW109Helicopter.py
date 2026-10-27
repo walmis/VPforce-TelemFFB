@@ -102,6 +102,15 @@ class XAW109Helicopter(Helicopter):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
 
+    @override
+    def _force_trim_configured(self) -> bool:
+        # the aircraft's own trim release drives the cyclic, so no button is bound
+        return self.spring_mode_is(SpringModeEnum.FORCETRIM)
+
+    @override
+    def _force_trim_release_pressed(self, telem_data: BaseTelemetryData, report) -> bool:
+        return bool(telem_data.AW109_cyc_force_trim_release_pressed)
+
         # ---- Pedal AFCS following: modeled parallel trim ----------------------
     # The aircraft's own yaw servo (AW109_rudder_trim_rate) only commands
     # pedal motion when |trim_zero + coarse + fine| exceeds the certified

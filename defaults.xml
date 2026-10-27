@@ -12776,8 +12776,7 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>force_trim_button</name>
-			<type>XAW109Helicopter</type>
-			<value>0</value>
+			<type>!XAW109Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>joystick</device>
 		</classdefaults_XPLANE>
