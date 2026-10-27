@@ -1924,6 +1924,57 @@
 		<effecttype>spring</effecttype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
+		<order>1916</order>
+		<datatype>button</datatype>
+		<name>pedal_ft_trim_left</name>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1917</order>
+		<datatype>button</datatype>
+		<name>pedal_ft_trim_right</name>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1918</order>
+		<datatype>d_int</datatype>
+		<name>pedal_ft_trim_rate</name>
+		<displayname>Trim Slew Rate</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Affects rate at which trim will move when button held</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,1000</validvalues>
+		<value>200</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
 		<order>1920</order>
 		<datatype>float</datatype>
 		<name>pedal_spring_gain</name>
@@ -10793,6 +10844,24 @@
 			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>pedal_ft_trim_left</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>pedal_ft_trim_rate</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>pedal_ft_trim_right</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>pedal_ft_use_master_buttons</name>
 			<type>HPGHelicopter</type>
 			<value>false</value>
@@ -13215,6 +13284,24 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>pedal_ft_reset_button</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>pedal_ft_trim_left</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>pedal_ft_trim_rate</name>
+			<type>!XAW109Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>pedal_ft_trim_right</name>
 			<type>!XAW109Helicopter</type>
 			<sim>XPLANE</sim>
 			<device>pedals</device>

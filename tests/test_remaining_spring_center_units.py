@@ -18,6 +18,7 @@ import telemffb.sim.aircrafts_il2 as il2_module
 import telemffb.sim.base.AdvancedSpringMixIn as advanced_spring_module
 import telemffb.sim.base.GForceEffectMixIn as gforce_module
 import telemffb.sim.base.HelicopterEffectsMixIn as helicopter_effects_module
+import telemffb.sim.base.PedalSpringOverrideMixIn as pedal_spring_module
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.aircrafts_dcs import Aircraft as DcsAircraft
@@ -186,6 +187,25 @@ class TestPedalForceTrimCenterUnits(BaseTelemetryEffectTestCase):
         assert instance.spring_x.cpOffset == 768
         assert not instance.pedal_trim_reset_complete
         assert calls == [("center_x", 0.25, 1000, 0.0, {"floatpoint": True})]
+
+    @pytest.mark.parametrize("button, start, expected", [
+        (9, 0.0, -20 / 4096),
+        (10, 0.0, 20 / 4096),
+        (10, 4080 / 4096, 1.0),
+    ])
+    def test_trim_buttons_slew_the_center(self, monkeypatch, button, start, expected):
+        instance = self._instance()
+        instance.pedal_ft_trim_left = 9
+        instance.pedal_ft_trim_right = 10
+        instance.pedal_ft_trim_rate = 200
+        instance.pedal_trim_reset_complete = True
+        instance.cpO_x = start
+        monkeypatch.setattr(pedal_spring_module.perftracker, "get_time_delta", lambda _key: 0.1)
+        self.mock_device.get_input().press_button(button)
+
+        assert not instance.ac_update_pedal_force_trim(instance.telem_data)
+        assert instance.cpO_x == pytest.approx(expected)
+        assert instance.spring_x.cpOffset == round(expected * 4096)
 
 
 class TestCollectiveForceTrimCenterUnits(BaseTelemetryEffectTestCase):

@@ -21,6 +21,7 @@ from telemffb.sim.msfs_xp.MsfsXpHeliControlsMixIn import MsfsXpHeliControlsMixIn
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 import telemffb.globals as G
+import telemffb.sim.base.PedalSpringOverrideMixIn as pedal_spring_module
 
 
 @pytest.mark.unit
@@ -579,6 +580,31 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         assert instance._spring_handle.name == name
         assert instance.cpO_x == pytest.approx(0.25)
         assert instance.spring_x.cpOffset == round(0.25 * 4096)
+
+    def test_pedals_force_trim_right_slews_the_center_at_spring_gain(self, monkeypatch):
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli")
+        instance._test_sim_is_msfs = True
+        instance._test_device_type = "pedals"
+        instance.telemffb_controls_axes = True
+        instance.pedals_init = 1
+        instance.pedal_trim_reset_complete = True
+        instance.spring_mode = SpringModeEnum.FORCETRIM
+        instance.pedal_spring_gain = 0.6
+        instance.pedal_ft_trim_right = 2
+        instance.pedal_ft_trim_rate = 200
+        monkeypatch.setattr(pedal_spring_module.perftracker, "get_time_delta", lambda _key: 0.1)
+
+        telem = self._create_heli_telem()
+        telem["FFBType"] = "pedals"
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.press_button(2)
+
+        instance.msfs_update_pedals(telem)
+
+        assert instance._spring_handle.name == "pedal_spring"
+        assert instance.cpO_x == pytest.approx(20 / 4096)
+        assert instance.spring_x.cpOffset == 20
+        assert instance.spring_x.positiveCoefficient == round(0.6 * 4096)
     
     def test_pedals_custom_force_trim_switch(self):
         """Test pedals with custom force trim switch variable."""

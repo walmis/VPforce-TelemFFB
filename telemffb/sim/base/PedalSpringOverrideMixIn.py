@@ -8,6 +8,9 @@ from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
+from telemffb.utils.conversions import FFB_UNITS
+
+perftracker = utils.PerformanceTracker()
 
 class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
     '''Pedal spring override and trimming mixin.'''
@@ -21,6 +24,9 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
     pedal_ft_use_master_buttons: bool = False
     pedal_ft_release_button: int = 0
     pedal_ft_reset_button: int = 0
+    pedal_ft_trim_left: int = 0
+    pedal_ft_trim_right: int = 0
+    pedal_ft_trim_rate: int = 200
     pedal_ft_damper_enabled: bool = False
     pedal_ft_damper_force: float = 0.0
     # end of user parameters
@@ -36,6 +42,10 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         This method should be overridden in subclasses to implement specific pedal trim logic.
         """
         pass
+
+    def _pedal_ft_spring(self) -> HapticEffect:
+        """The spring effect the pedal force trim drives."""
+        return self.effects["pedal_spring"]
 
     def ac_update_pedal_force_trim(self, telem_data: BaseTelemetryData, ft_active=True):
         """
@@ -89,7 +99,10 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
           - Set self.pedal_trim_reset_complete to True when cpO_x reaches 0; otherwise
             set it to False.
           - Return True.
-        - Otherwise return False.
+        - Otherwise, while the trim left or right button is held, step
+          self.cpO_x by self.pedal_ft_trim_rate (FFB units per second), clamp
+          it to -1..1, apply it through self.spring_x.set_offset(), and return
+          False so the caller still applies the spring gain.
         Notes
         -----
         - Internal center math remains normalized; set_offset() converts once at
@@ -99,13 +112,15 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         """
         if not self.is_pedals(): return
 
+        # measured every frame, so a trim press after a release steps by one frame
+        dt = utils.clamp(perftracker.get_time_delta("pedal_ft_trim"), 0.0, 0.2)
         phys_x, phys_y = self._get_device_axes()
 
         force_trim_pressed = self.check_button_press(self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
         trim_reset_pressed = self.check_button_press(self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
 
         if force_trim_pressed or not ft_active:
-            self.effects["pedal_spring"].name = "pedal_ft_release_switch" if not ft_active else "pedal_ft_release_button"
+            self._pedal_ft_spring().name = "pedal_ft_release_switch" if not ft_active else "pedal_ft_release_button"
             if self.pedal_ft_damper_enabled:
                 self.spring_x.set_coefficient(self.pedal_ft_damper_force)
             else:
@@ -127,6 +142,14 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             else:
                 self.pedal_trim_reset_complete = False
             return True
+
+        trim_step = self.pedal_ft_trim_rate * dt / FFB_UNITS
+        if self.check_button_press(self.pedal_ft_trim_left, self.pedal_ft_use_master_buttons):
+            self.cpO_x = float(utils.clamp(self.cpO_x - trim_step, -1.0, 1.0))
+            self.spring_x.set_offset(self.cpO_x)
+        elif self.check_button_press(self.pedal_ft_trim_right, self.pedal_ft_use_master_buttons):
+            self.cpO_x = float(utils.clamp(self.cpO_x + trim_step, -1.0, 1.0))
+            self.spring_x.set_offset(self.cpO_x)
         return False
 
     def ac_override_pedal_spring(self, telem_data: BaseTelemetryData):

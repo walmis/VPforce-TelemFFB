@@ -234,37 +234,8 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         self._spring_handle.setCondition(self.spring_x)
 
     @override
-    def ac_update_pedal_force_trim(self, telem_data: BaseTelemetryData, ft_active=True):
-        """Update MSFS/X-Plane pedal force trim using normalized spring centers."""
-        if not self.is_pedals():
-            return None
-
-        phys_x, _ = self._get_device_axes()
-        force_trim_pressed = self.check_button_press(
-            self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
-        trim_reset_pressed = self.check_button_press(
-            self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
-
-        if force_trim_pressed or not ft_active:
-            self._spring_handle.name = "pedal_ft_release_switch" if not ft_active else "pedal_ft_release_button"
-            if self.pedal_ft_damper_enabled:
-                self.spring_x.set_coefficient(self.pedal_ft_damper_force)
-            else:
-                self.spring_x.set_coefficient(0)
-
-            self.cpO_x = utils.clamp(phys_x, -1, 1)
-            self.spring_x.set_offset(self.cpO_x)
-            return True
-
-        if trim_reset_pressed or not self.pedal_trim_reset_complete:
-            self.spring_x.set_coefficient(4096)
-            self.cpO_x = self.step_value_over_time(
-                "center_x", self.cpO_x, 1000, 0.0, floatpoint=True)
-            self.spring_x.set_offset(self.cpO_x)
-            self.pedal_trim_reset_complete = self.cpO_x == 0.0
-            return True
-
-        return False
+    def _pedal_ft_spring(self) -> HapticEffect:
+        return self._spring_handle
 
     def _send_pedal_outputs(self, telem_data: BaseTelemetryData, phys_x: float, x_scale: float, x_var: str, x_range: float):
         if self._use_firmware_axis_backend():
