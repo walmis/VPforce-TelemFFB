@@ -585,6 +585,8 @@ class MainWindow(QMainWindow):
 
         debug_shortcut = QShortcut(QKeySequence('Alt+D'), self)
         debug_shortcut.activated.connect(self.main_menu.add_debug_menu)
+        # the Monitor page's plot column and button come with the debug mode
+        debug_shortcut.activated.connect(lambda: self.monitor_panel.set_plotting_available(True))
 
         reload_shortcut = QShortcut(QKeySequence('Ctrl+Shift+R'), self)
         reload_shortcut.activated.connect(self.force_reload_aircraft)

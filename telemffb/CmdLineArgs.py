@@ -65,6 +65,18 @@ class CmdLineArgs:
     lightmode: Optional[bool]
     """Flag to force light mode theme"""
 
+    plot_window: bool
+    """Run as the telemetry plot process of another instance (telemffb.plot)"""
+
+    plot_port: Optional[int]
+    """Plot process: the localhost UDP port the feed arrives on"""
+
+    plot_device: Optional[str]
+    """Plot process: the launching instance's device, for the window title"""
+
+    plot_theme: Optional[str]
+    """Plot process: 'dark' or 'light'"""
+
     def __init__(
         self,
         teleplot: Optional[str] = None,
@@ -80,7 +92,11 @@ class CmdLineArgs:
         masterport: Optional[str] = None,
         minimize: Optional[bool] = False,
         darkmode: Optional[bool] = False,
-        lightmode: Optional[bool] = False
+        lightmode: Optional[bool] = False,
+        plot_window: bool = False,
+        plot_port: Optional[int] = None,
+        plot_device: Optional[str] = None,
+        plot_theme: Optional[str] = None
     ) -> None:
         self.teleplot = teleplot
         self.plot = plot
@@ -96,6 +112,10 @@ class CmdLineArgs:
         self.minimize = minimize
         self.darkmode = darkmode
         self.lightmode = lightmode
+        self.plot_window = plot_window
+        self.plot_port = plot_port
+        self.plot_device = plot_device
+        self.plot_theme = plot_theme
 
     @classmethod
     def parse(cls):
@@ -124,6 +144,11 @@ class CmdLineArgs:
 
         parser.add_argument('--darkmode', action='store_true', help='Force dark mode theme')
         parser.add_argument("--lightmode", action='store_true', help='Force light mode theme')
+        parser.add_argument('--plot-window', action='store_true',
+                            help='Run as the telemetry plot process of another instance')
+        parser.add_argument('--plot-port', type=int, default=None, help='Plot process: feed port')
+        parser.add_argument('--plot-device', type=str, default=None, help='Plot process: device name')
+        parser.add_argument('--plot-theme', type=str, default=None, help='Plot process: dark or light')
 
         args = parser.parse_args()
 

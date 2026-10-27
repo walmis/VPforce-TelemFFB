@@ -44,7 +44,12 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PyQt6.QtQuick', 'PyQt6.QtQuickWidgets', 'PyQt6.QtQuick3D', 'PyQt6.QtQml', 'PyQt6.QtOpenGL'],
+    # QtOpenGL and QtOpenGLWidgets stay in: pyqtgraph imports both at import
+    # time (Qt/OpenGLHelpers.py).  scipy is out: pyqtgraph only reaches for it
+    # inside guarded imports, and the build interpreter having it installed
+    # would otherwise double the bundle.
+    excludes=['PyQt6.QtQuick', 'PyQt6.QtQuickWidgets', 'PyQt6.QtQuick3D', 'PyQt6.QtQml',
+              'PyQt6.QtTest', 'scipy'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

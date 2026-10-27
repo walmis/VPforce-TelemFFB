@@ -10,6 +10,7 @@ libusb1
 pygetwindow
 numpy==2.3.0
 akima
+pyqtgraph==0.14.0
 bottle
 stackprinter
 

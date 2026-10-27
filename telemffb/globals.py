@@ -208,6 +208,11 @@ frame-by-frame). The master broadcasts a refreshing hold over IPC; this is
 the local time.perf_counter() deadline, so a dead master un-mutes the wheel
 on its own within the TTL."""
 
+# Telemetry plot process (Monitor page, debug mode); None until the first
+# Plot click.  TelemManager's telemetry thread reads it every frame.
+plot_process : Optional['PlotProcess'] = None
+"""This instance's plot process launcher and feed; see telemffb.plot"""
+
 # Exception tracking
 exception_tracker : 'ExceptionTracker'  
 """Tracks logged exceptions for user notification and reporting"""

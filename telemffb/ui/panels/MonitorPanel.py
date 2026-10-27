@@ -49,6 +49,12 @@ is a property of the sim, not of the device watching it. The stars
 themselves are painted by ``FavoriteStarDelegate``, which is handed this
 panel's own set to read.
 
+A second gutter beside the star is the plot mark, shown with the debug
+setting enabled: click it to plot that key in the plot process the Plot
+button starts (``telemffb.plot``, a window of its own in a process of its
+own, fed from the telemetry thread), kept and shared the same way as the
+favorites and painted by ``PlotMarkDelegate``.
+
 Ownership split follows ``OfflineEditorPanel``/``SettingsLayout``: this
 panel owns the two tables, the filter box and the detach toolbar button;
 what a detach *does* (reparenting the tab into its own window) stays
@@ -70,7 +76,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor, QPixmap
-from PyQt6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QHeaderView,
+from PyQt6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QHeaderView, QMenu,
                              QLabel, QLineEdit, QSplitter, QStackedWidget,
                              QWidget)
 
@@ -80,13 +86,15 @@ from telemffb.hw.ffb_rhino import PERIODIC_EFFECTS, effect_names
 from telemffb.telem.telem_format import (SignedKeys, axes_text,
                                          format_telemetry_value,
                                          grouped_effects, load_favorites,
-                                         toggle_favorite)
+                                         load_plot_keys, clear_plot_keys, toggle_favorite,
+                                         toggle_plot_key)
 from telemffb.ui.panels.DevicePanel import DEVICE_ICONS, tint_pixmap
 from telemffb.ui.panels.MonitorTableModel import KeyValueTableModel
 from telemffb.ui.widgets.EffectTypeDelegate import EffectTypeDelegate
 from telemffb.ui.widgets.FavoriteStarDelegate import (STAR_COLUMN_WIDTH,
                                                       FavoriteStarDelegate)
 from telemffb.ui.widgets.IntensityBarDelegate import IntensityBarDelegate
+from telemffb.ui.widgets.PlotMarkDelegate import PLOT_COLUMN_WIDTH, PlotMarkDelegate
 from telemffb.ui.widgets.TabHeaderBar import TabHeaderBar
 from telemffb.ui.widgets.effect_levels_ui import readout_note
 from telemffb.ui.widgets.custom_widgets import CopyableTableView
@@ -100,12 +108,14 @@ _MONOSPACE_STYLE = """
 #: enough to leave the effect names the rest of a half-split pane.
 INTENSITY_COLUMN_WIDTH = 72
 
-#: The telemetry table's columns. The favorite star sits in a gutter ahead
-#: of the key, the way a starred row reads in a mail client - and the model
-#: is told it holds no selectable value (see KeyValueTableModel).
-_STAR_COL, _KEY_COL, _VALUE_COL = 0, 1, 2
+#: The telemetry table's columns. The favorite star and the plot mark sit
+#: in gutters ahead of the key, the way a starred row reads in a mail
+#: client - and the model is told they hold no selectable value (see
+#: KeyValueTableModel).
+_STAR_COL, _PLOT_COL, _KEY_COL, _VALUE_COL = 0, 1, 2, 3
 
 _FAVORITES_ONLY_KEY = 'monitorFavoritesOnly'
+_PLOTTED_ONLY_KEY = 'monitorPlottedOnly'
 
 #: The scoped device's icon in the page header: the height of the text it
 #: sits in, against the 72px the device panel draws it at.
@@ -187,6 +197,11 @@ class MonitorPanel(QWidget):
         # Alt+D debug rename is on, so a favorite made with it on has to
         # survive it going off again.
         self._favorites: Set[str] = load_favorites()
+        # Keys marked for the plot window, kept the same way.
+        self._plot_keys: Set[str] = load_plot_keys()
+        # The plot mark column and the Plot button exist with the debug
+        # setting enabled, like the debug menu.
+        self._plotting_available = bool(G.system_settings.get('debug', False))
         # The last frame rendered, so toggling a star or the Favorites box
         # redraws the list now rather than at whatever point the next frame
         # arrives (which, with the sim closed, is never).
@@ -214,25 +229,32 @@ class MonitorPanel(QWidget):
         self.detach_action.setToolTip('Detach the Monitor Tab from the main window\ninto a separate window.')
         self.detach_action.triggered.connect(self._on_detach_clicked)
 
-        btn = self.detach_toolbar.widgetForAction(self.detach_action)
-        if isinstance(btn, QtWidgets.QToolButton):
-            btn.setAutoRaise(False)
-            btn.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-            btn.setStyleSheet("""
-                QToolButton {
-                    border: 1px solid palette(mid);
-                    border-radius: 4px;
-                    padding: 3px 9px;
-                    background: palette(button);
-                    color: palette(button-text);
-                }
-                QToolButton:hover { background: palette(midlight); }
-                QToolButton:pressed {
-                    background: palette(dark);
-                    color: palette(highlight);
-                }
-                QToolButton:disabled { color: palette(mid); border-color: palette(mid); }
-            """)
+        self.plot_action = self.detach_toolbar.addAction("Plot")
+        self.plot_action.setToolTip('Open the plot window for the telemetry items marked\n'
+                                    'in the chart column of the table.')
+        self.plot_action.triggered.connect(self._on_plot_clicked)
+        self.plot_action.setVisible(self._plotting_available)
+
+        for action in (self.detach_action, self.plot_action):
+            btn = self.detach_toolbar.widgetForAction(action)
+            if isinstance(btn, QtWidgets.QToolButton):
+                btn.setAutoRaise(False)
+                btn.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+                btn.setStyleSheet("""
+                    QToolButton {
+                        border: 1px solid palette(mid);
+                        border-radius: 4px;
+                        padding: 3px 9px;
+                        background: palette(button);
+                        color: palette(button-text);
+                    }
+                    QToolButton:hover { background: palette(midlight); }
+                    QToolButton:pressed {
+                        background: palette(dark);
+                        color: palette(highlight);
+                    }
+                    QToolButton:disabled { color: palette(mid); border-color: palette(mid); }
+                """)
 
         """ Page header - this page's own controls, and a compact device
         row for the "tab header" device view and for when the page is
@@ -259,6 +281,15 @@ class MonitorPanel(QWidget):
             bool(self._favorites) and bool(G.system_settings.get(_FAVORITES_ONLY_KEY, 0)))
         self.favorites_check.toggled.connect(self._on_favorites_only_toggled)
 
+        self.plotted_check = QCheckBox("Plotted")
+        self.plotted_check.setToolTip(
+            "Show only the telemetry items marked for the plot window.\n"
+            "Plot marks are shared by all devices and kept between sessions.")
+        self.plotted_check.setChecked(
+            bool(self._plot_keys) and bool(G.system_settings.get(_PLOTTED_ONLY_KEY, 0)))
+        self.plotted_check.toggled.connect(self._on_plotted_only_toggled)
+        self.plotted_check.setVisible(self._plotting_available)
+
         # Whose data the page is showing - both tables, so it is said once up
         # here rather than in a header of each. At the far end of the bar
         # from the page's controls: it is something to read, not to use.
@@ -279,13 +310,14 @@ class MonitorPanel(QWidget):
         self.header_bar.add_left(self.telem_lbl)
         self.header_bar.add_left(self.telem_filter)
         self.header_bar.add_left(self.favorites_check)
+        self.header_bar.add_left(self.plotted_check)
         self.header_bar.add_right(self._scope_indicator)
 
 
         """ Telemetry pane: a plain "waiting for data" label shown until the
         first telemetry frame, then the live table. """
         self._telem_model = KeyValueTableModel(
-            ['', 'Key', 'Value'], self, unselectable_columns=[_STAR_COL])
+            ['', '', 'Key', 'Value'], self, unselectable_columns=[_STAR_COL, _PLOT_COL])
         self.telem_view = CopyableTableView(self)
         self.telem_view.setModel(self._telem_model)
         telem_header = self.telem_view.horizontalHeader()
@@ -295,10 +327,18 @@ class MonitorPanel(QWidget):
         self._star_delegate = FavoriteStarDelegate(self)
         self._star_delegate.set_favorites(self._favorites)
         self.telem_view.setItemDelegateForColumn(_STAR_COL, self._star_delegate)
+        telem_header.setSectionResizeMode(_PLOT_COL, QHeaderView.ResizeMode.Fixed)
+        self.telem_view.setColumnWidth(_PLOT_COL, PLOT_COLUMN_WIDTH)
+        self._plot_delegate = PlotMarkDelegate(self)
+        self._plot_delegate.set_marked(self._plot_keys)
+        self.telem_view.setItemDelegateForColumn(_PLOT_COL, self._plot_delegate)
+        self.telem_view.setColumnHidden(_PLOT_COL, not self._plotting_available)
         # So an unstarred row's star lights up under the cursor - the column
         # carries no text to make it look clickable on its own.
         self.telem_view.setMouseTracking(True)
         self.telem_view.clicked.connect(self._on_telem_clicked)
+        self.telem_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.telem_view.customContextMenuRequested.connect(self._on_telem_context_menu)
         self.telem_view.setStyleSheet(f"QTableView {{ {_MONOSPACE_STYLE} }}")
 
         self._telem_waiting_label = QLabel()
@@ -396,6 +436,29 @@ class MonitorPanel(QWidget):
         if self.mainwindow is not None:
             self.mainwindow.detach_tab(0)
 
+    # ---- plot window --------------------------------------------------------
+
+    def set_plotting_available(self, available: bool) -> None:
+        """Show or hide the plot mark column and the Plot button."""
+        self._plotting_available = bool(available)
+        self.plot_action.setVisible(self._plotting_available)
+        self.plotted_check.setVisible(self._plotting_available)
+        self.telem_view.setColumnHidden(_PLOT_COL, not self._plotting_available)
+        self._refresh_rows()
+
+    def plot_keys(self) -> Set[str]:
+        """The live set of keys marked for plotting."""
+        return self._plot_keys
+
+    def _on_plot_clicked(self) -> None:
+        """Start this instance's plot process on the first click; show its
+        window on every click."""
+        if G.plot_process is None:
+            from telemffb.plot.process import PlotProcess
+            G.plot_process = PlotProcess(G.device_type or '', bool(G.useDarkMode))
+        G.plot_process.set_keys(self._plot_keys)
+        G.plot_process.show()
+
     # ---- detach toolbar visibility (MainWindow.detach_tab/reattach_tab) --
 
     def set_detach_toolbar_visible(self, visible: bool) -> None:
@@ -489,12 +552,15 @@ class MonitorPanel(QWidget):
         raw = (self.telem_filter.text() or "")
         tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
         favorites_only = self.favorites_check.isChecked()
+        plotted_only = self._plotting_available and self.plotted_check.isChecked()
 
         rows: List[Tuple[str, Tuple[str, str, str]]] = []
         for key, v in data.items():
             # Favorites are keyed on the raw telemetry key, so this is
             # settled before the debug rename and costs one set lookup.
             if favorites_only and key not in self._favorites:
+                continue
+            if plotted_only and key not in self._plot_keys:
                 continue
 
             display_key = key
@@ -518,7 +584,7 @@ class MonitorPanel(QWidget):
             # resolve to the same simvar name under the debug rename don't
             # collide into a single row. The star column holds no text of
             # its own - FavoriteStarDelegate paints it from the row key.
-            rows.append((str(key), ('', str(display_key), value_str)))
+            rows.append((str(key), ('', '', str(display_key), value_str)))
         return rows
 
     # ---- favorites ---------------------------------------------------------
@@ -527,6 +593,10 @@ class MonitorPanel(QWidget):
         """A click in the star gutter toggles that row's favorite. Handled
         from the view rather than inside the delegate so the favorites set
         is only ever mutated by the object that owns it."""
+        if index.column() == _PLOT_COL:
+            toggle_plot_key(self._telem_model.row_key(index.row()))
+            self.reload_plot_keys()
+            return
         if index.column() != _STAR_COL:
             return
         toggle_favorite(self._telem_model.row_key(index.row()))
@@ -545,9 +615,42 @@ class MonitorPanel(QWidget):
         self.telem_view.viewport().update()
         self._refresh_rows()
 
+    def reload_plot_keys(self) -> None:
+        """Show the plot marks as saved now; the plot window drops the
+        series of keys no longer marked."""
+        self._plot_keys.clear()
+        self._plot_keys.update(load_plot_keys())
+        self.telem_view.viewport().update()
+        if self.plotted_check.isChecked():
+            self._refresh_rows()
+        if G.plot_process is not None:
+            G.plot_process.set_keys(self._plot_keys)
+
     def _on_favorites_only_toggled(self, checked: bool) -> None:
         G.system_settings.setValue(_FAVORITES_ONLY_KEY, int(checked))
         self._refresh_rows()
+
+    def _on_plotted_only_toggled(self, checked: bool) -> None:
+        G.system_settings.setValue(_PLOTTED_ONLY_KEY, int(checked))
+        self._refresh_rows()
+
+    def _on_telem_context_menu(self, pos) -> None:
+        menu = self.plot_mark_menu(self.telem_view.indexAt(pos))
+        if menu is not None:
+            menu.exec(self.telem_view.viewport().mapToGlobal(pos))
+
+    def plot_mark_menu(self, index) -> Optional[QMenu]:
+        """The plot-mark gutter's context menu: clear every mark.  ``None``
+        anywhere else."""
+        if not index.isValid() or index.column() != _PLOT_COL or not self._plotting_available:
+            return None
+        menu = QMenu(self.telem_view)
+        menu.addAction("Clear all plot marks").triggered.connect(self._clear_plot_keys)
+        return menu
+
+    def _clear_plot_keys(self) -> None:
+        clear_plot_keys()
+        self.reload_plot_keys()
 
     def update_effects(self, active_effects) -> None:
         """``active_effects`` is the list of ``{'label', 'intensity'}`` dicts

@@ -52,6 +52,35 @@ def toggle_favorite(key: str) -> bool:
     return starred
 
 
+#: The telemetry keys marked for the plot window, kept like the favorites:
+#: one global comma-separated registry value.
+PLOT_KEYS_KEY = 'monitorPlotKeys'
+
+
+def load_plot_keys() -> set:
+    """The telemetry keys marked for plotting."""
+    raw = G.system_settings.get(PLOT_KEYS_KEY, '')
+    return {key.strip() for key in str(raw or '').split(',') if key.strip()}
+
+
+def toggle_plot_key(key: str) -> bool:
+    """Mark or unmark ``key`` for plotting, and say whether it is now
+    marked.  Re-read first, as toggle_favorite does."""
+    marked = load_plot_keys()
+    now_marked = key not in marked
+    if now_marked:
+        marked.add(key)
+    else:
+        marked.discard(key)
+    G.system_settings.setValue(PLOT_KEYS_KEY, ','.join(sorted(marked)))
+    return now_marked
+
+
+def clear_plot_keys() -> None:
+    """Unmark every key."""
+    G.system_settings.setValue(PLOT_KEYS_KEY, '')
+
+
 def ordered_telemetry(frame: dict) -> OrderedDict:
     """A frame as a monitor lists it: the identifying keys first, the rest
     alphabetical."""

@@ -1220,6 +1220,10 @@ class TelemManager(QObject, threading.Thread):
                 G.ipc_instance.send_ipc_telem(ipc_telem)
                 self.currentAircraft._ipc_telem.clear()
 
+        # The plot process, when the Monitor page has started one
+        if G.plot_process is not None:
+            G.plot_process.send_frame(telem_data)
+
         # Handle plotting
         if G.args.plot:
             for item in G.args.plot:

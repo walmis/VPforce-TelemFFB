@@ -763,9 +763,8 @@ class TestCopySelection:
         view = panel.telem_view
         model = view.model()
         selection = view.selectionModel()
-        selection.select(model.index(0, 0), selection.SelectionFlag.Select)
-        selection.select(model.index(0, 1), selection.SelectionFlag.Select)
-        selection.select(model.index(0, 2), selection.SelectionFlag.Select)
+        for column in range(model.columnCount()):
+            selection.select(model.index(0, column), selection.SelectionFlag.Select)
         assert {i.column() for i in selection.selectedIndexes()} == {_KEY_COL, _VALUE_COL}
 
     def test_copy_with_no_selection_leaves_clipboard_untouched(self, panel):
@@ -862,3 +861,79 @@ class TestSplit:
         QApplication.processEvents()
         assert panel._splitter.sizes() == dragged
         panel.close()
+
+
+class TestPlotMarks:
+    """The plot-mark gutter beside the star: click it to mark a key for the
+    plot window. Kept like the favorites, in one global registry value, and
+    shown only with the debug setting enabled."""
+
+    def _click_mark(self, panel, key):
+        from telemffb.ui.panels.MonitorPanel import _PLOT_COL
+        row = panel.telemetry_keys().index(key)
+        panel._on_telem_clicked(panel._telem_model.index(row, _PLOT_COL))
+
+    def test_the_plotted_checkbox_filters_the_list_to_the_marked_keys(self, panel):
+        panel.set_plotting_available(True)
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0, 'RPM': 3.0})
+        self._click_mark(panel, 'IAS')
+        panel.plotted_check.setChecked(True)
+        assert panel.telemetry_keys() == ['IAS']
+        assert G.system_settings.values['monitorPlottedOnly'] == 1
+        self._click_mark(panel, 'IAS')
+        assert panel.telemetry_keys() == []
+        panel.plotted_check.setChecked(False)
+        assert panel.telemetry_keys() == ['AoA', 'IAS', 'RPM']
+
+    def test_the_plotted_filter_is_inert_without_plotting(self, panel):
+        panel.set_plotting_available(True)
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
+        self._click_mark(panel, 'IAS')
+        panel.plotted_check.setChecked(True)
+        panel.set_plotting_available(False)
+        assert panel.plotted_check.isHidden()
+        assert panel.telemetry_keys() == ['AoA', 'IAS']
+
+    def test_the_gutter_menu_clears_every_mark(self, panel):
+        from telemffb.ui.panels.MonitorPanel import _KEY_COL, _PLOT_COL
+        panel.set_plotting_available(True)
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
+        self._click_mark(panel, 'IAS')
+        self._click_mark(panel, 'AoA')
+        assert panel.plot_mark_menu(panel._telem_model.index(0, _KEY_COL)) is None
+        menu = panel.plot_mark_menu(panel._telem_model.index(0, _PLOT_COL))
+        menu.actions()[0].trigger()
+        assert panel.plot_keys() == set()
+        assert G.system_settings.values['monitorPlotKeys'] == ''
+
+    def test_clicking_the_mark_column_marks_the_row_and_saves_globally(self, panel):
+        panel.update_telemetry({'AoA': 1.0, 'IAS': 2.0})
+        self._click_mark(panel, 'IAS')
+        self._click_mark(panel, 'AoA')
+        assert panel.plot_keys() == {'AoA', 'IAS'}
+        assert G.system_settings.values['monitorPlotKeys'] == 'AoA,IAS'
+        assert all(instance is None for key, _, instance in G.system_settings.writes
+                   if key == 'monitorPlotKeys')
+
+    def test_clicking_it_again_unmarks(self, panel):
+        panel.update_telemetry({'AoA': 1.0})
+        self._click_mark(panel, 'AoA')
+        self._click_mark(panel, 'AoA')
+        assert panel.plot_keys() == set()
+
+    def test_marks_do_not_touch_the_favorites(self, panel):
+        panel.update_telemetry({'AoA': 1.0})
+        self._click_mark(panel, 'AoA')
+        assert panel._favorites == set()
+
+    def test_the_column_and_button_follow_the_debug_setting(self, qapp, mainwindow, monkeypatch):
+        from telemffb.ui.panels.MonitorPanel import _PLOT_COL
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings({'debug': True}), raising=False)
+        shown = MonitorPanel(mainwindow=mainwindow)
+        assert shown.plot_action.isVisible() or not shown.isVisible()
+        assert not shown.telem_view.isColumnHidden(_PLOT_COL)
+        monkeypatch.setattr(G, 'system_settings', _FakeSettings({}), raising=False)
+        hidden = MonitorPanel(mainwindow=mainwindow)
+        assert hidden.telem_view.isColumnHidden(_PLOT_COL)
+        hidden.set_plotting_available(True)
+        assert not hidden.telem_view.isColumnHidden(_PLOT_COL)

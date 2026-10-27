@@ -1700,6 +1700,9 @@ def _cleanup_on_exit(dev_serial):
         except Exception:
             logging.exception("Button devices: stopping the readers failed")
 
+    if G.plot_process is not None:
+        G.plot_process.stop()
+
     if G.ipc_instance:
         G.ipc_instance.notify_close_children()
         G.ipc_instance.stop()
@@ -1914,6 +1917,12 @@ def main():
     # Parse command line arguments to determine device type, ports, and operation mode
     G.args = CmdLineArgs.parse()
     G.is_exe = getattr(sys, 'frozen', False)
+
+    # The telemetry plot process: another instance's plot window, fed over a
+    # socket, and nothing else of the startup below (no mutex, no device).
+    if G.args.plot_window:
+        from telemffb.plot.app import run as run_plot_process
+        sys.exit(run_plot_process(app, G.args))
 
     # Refuse to run from unsafe locations (Desktop, drive roots, Downloads,
     # ...).  The auto-updater manages the ENTIRE folder containing the

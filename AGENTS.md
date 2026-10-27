@@ -161,6 +161,7 @@ One class per file. Large classes belong in their own module under `telemffb/sim
 | `telemffb/telem/` | Telemetry routing + per-sim listeners |
 | `telemffb/tap/` | DirectInput telemetry tap (config parsing, sim discovery/install, reconcile) |
 | `telemffb/preview/` | Effect preview (spec catalog + runner, settings-window controller) |
+| `telemffb/plot/` | Telemetry plot process (datagram protocol, feed from the telemetry thread, launcher, the plot process's entry) |
 | `telemffb/hw/` | USB HID / FFB hardware |
 | `telemffb/utils/` | Utilities (star-import façade over category modules) |
 | `telemffb/xml/` | XML I/O internals behind the `xmlutils` façade |
@@ -272,6 +273,7 @@ This rule may only be broken to avoid circular imports — and even then, the ci
 | `telemffb/ui/` | All Qt code: `generated/` (pyuic output — never hand-edit; regenerate with the `SM/` scripts), `dialogs/` (19 dialogs), `panels/` (4), `widgets/` (`SettingsLayout`, `LogWindow`, `LogTailWindow`, `FrameTimeWidget`, `custom_widgets`) |
 | `telemffb/tap/` | DirectInput telemetry tap: `tap_config` (read/amend `dinput8.ini`), `tap_install` (sim discovery/install), `tap_reconcile` (keep the ini in step with the configured devices) |
 | `telemffb/preview/` | Effect preview: `engine` (spec catalog + runner) and `controller` (settings-window integration) |
+| `telemffb/plot/` | Telemetry plot process: `protocol` (JSON datagrams), `feed` (per-frame send from the telemetry thread), `process` (launch this program with `--plot-window`, keepalive, show/stop), `app` (the plot process's entry: feed listener thread, `TelemetryPlotWindow`). Plotting never runs on the TelemFFB main thread. |
 | `telemffb/ExceptionTracker.py` | Error capture, logging handler, reporting API (Qt viewer dialog: `ui/dialogs/ExceptionViewerDialog.py`) |
 | `telemffb/namedmutex.py` | Win32 named mutex (ctypes) |
 | `telemffb/CmdLineArgs.py` | CLI argument parser |
@@ -309,7 +311,7 @@ effect.stop()  # Frees device resource
 
 ## Dependencies & External Integrations
 
-**Runtime** (`requirements.txt`): `pyqt6==6.9.1`, `pysimconnect` (custom fork at github.com/walmis/pysimconnect — rolling `master.zip`), `libusb1`, `numpy==2.3.0`, `akima`, `psutil`, `stransi`, `pygetwindow`, `configobj`.
+**Runtime** (`requirements.txt`): `pyqt6==6.9.1`, `pysimconnect` (custom fork at github.com/walmis/pysimconnect — rolling `master.zip`), `libusb1`, `numpy==2.3.0`, `akima`, `pyqtgraph==0.14.0` (the Monitor plot window; it imports QtOpenGL and QtOpenGLWidgets unconditionally, so the spec no longer excludes them, and the spec excludes `scipy`, which pyqtgraph only imports under guards), `psutil`, `stransi`, `pygetwindow`, `configobj`.
 **Development/Testing** (`requirements-dev.txt`, which pulls in the runtime `requirements.txt` via `-r`): `pytest`, `pytest-cov`, `pytest-xdist` (for the `-n auto` parallel runs) — strict markers and warnings-as-errors configured in `pytest.ini`.
 **Bundled binaries**: `dll/hidapi.dll`, `simconnect/simconnect.dll`, `xplane-plugin/` (auto-installed).
 
