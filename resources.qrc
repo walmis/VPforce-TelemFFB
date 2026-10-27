@@ -65,6 +65,7 @@
         <file>image/g-force-curve.png</file>
         <file>image/dcs_seat_id.png</file>
         <file>image/BlackOpsOne-Regular.ttf</file>
+        <file>image/TopSecret.ttf</file>
         <!-- Add other image files as needed -->
     </qresource>
 </RCC>

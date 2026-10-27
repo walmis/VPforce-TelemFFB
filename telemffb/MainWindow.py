@@ -172,6 +172,8 @@ class MainWindow(QMainWindow):
         """ Add font used for settngs area group labels """
 
         QFontDatabase.addApplicationFont(':/image/BlackOpsOne-Regular.ttf')
+        # device panel name labels
+        QFontDatabase.addApplicationFont(':/image/TopSecret.ttf')
 
         # Get the absolute path of the script's directory
         # script_dir = os.path.dirname(os.path.abspath(__file__))
