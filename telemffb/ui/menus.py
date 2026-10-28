@@ -27,12 +27,11 @@ here - only menu-construction/wiring lives in this module. ``G.master_instance``
 /``G.child_instance`` gating is carried over verbatim from where it used to
 live inline in ``MainWindow.__init__``.
 
-The menu bar, the View/Window/Log menus and the Debug menu's Configurator
-action all live on this object (``self.menu``, ``self.view_menu``, ``self.window_menu``,
-``self.log_menu``, ``self.log_window_action``, ``self.configurator_settings_action``)
-rather than being mirrored onto MainWindow. MainWindow reaches them through
-``self.main_menu`` and the small public methods below (``add_instance_log_menu``,
-``add_device_view_actions``, ``set_configurator_action_enabled``).
+The menu bar and the View/Window/Log menus all live on this object
+(``self.menu``, ``self.view_menu``, ``self.window_menu``, ``self.log_menu``,
+``self.log_window_action``) rather than being mirrored onto MainWindow.
+MainWindow reaches them through ``self.main_menu`` and the small public
+methods below (``add_instance_log_menu``, ``add_device_view_actions``).
 
 The bar is held at ``MENU_BAR_HEIGHT``, a little taller than it would be
 left to itself: with the margin beneath it, that is the band the app logo
@@ -57,7 +56,6 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.preview.engine import PREVIEW_SPECS
-from telemffb.ui.dialogs.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.ui.dialogs.restart_offer import ask_to_restart
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
@@ -222,6 +220,7 @@ class MainMenu:
 
         def do_open_sc_override_dialog():
             dialog = SCOverridesEditor(mw)
+            dialog.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose)
             # Overrides save immediately in the editor; refresh the status
             # pill once the dialog closes so it reflects any changes.
             dialog.finished.connect(lambda *_: mw.refresh_telem_override_pill(force=True))
@@ -481,16 +480,6 @@ class MainMenu:
         if action is not None and not action.isChecked():
             action.setChecked(True)
 
-    def set_configurator_action_enabled(self, enabled, tooltip=''):
-        # the action is part of the Debug menu, which only exists with the
-        # debug registry key (or Alt+D) - on a normal install there is
-        # nothing to gate
-        action = getattr(self, 'configurator_settings_action', None)
-        if action is None:
-            return
-        action.setEnabled(enabled)
-        action.setToolTip(tooltip)
-
     def add_debug_menu(self):
         mw = self.mw
         # debug mode
@@ -557,20 +546,10 @@ class MainMenu:
         stop_preview_action.triggered.connect(mw.preview.stop)
         preview_menu.addAction(stop_preview_action)
 
-        configurator_settings_action = QAction('Configurator Gain Override', mw)
-        def do_open_configurator_dialog():
-            dialog = ConfiguratorDialog(mw)
-            dialog.raise_()
-            dialog.activateWindow()
-            dialog.show()
-        configurator_settings_action.triggered.connect(do_open_configurator_dialog)
-        self.configurator_settings_action = configurator_settings_action
-        mw.refresh_configurator_gating()
-        debug_menu.addAction(configurator_settings_action)
-
         sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', mw)
         def do_open_sc_override_dialog():
             dialog = SCOverridesEditor(mw)
+            dialog.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose)
             # Overrides save immediately in the editor; refresh the status
             # pill once the dialog closes so it reflects any changes.
             dialog.finished.connect(lambda *_: mw.refresh_telem_override_pill(force=True))

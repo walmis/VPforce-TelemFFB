@@ -119,6 +119,7 @@ class UpdateChecker(QObject):
     def on_version_check_cancelled(self):
         """Called when the user clicks Skip on the version check progress dialog."""
         if self._version_check_dialog is not None:
+            self._version_check_dialog.deleteLater()
             self._version_check_dialog = None
         # Disconnect thread callbacks so a late result doesn't double-resolve.
         for worker in utils.FetchLatestVersion.workers:
@@ -184,6 +185,7 @@ class UpdateChecker(QObject):
         # Hide (not close) the dialog so closeEvent/canceled are not emitted.
         if self._version_check_dialog is not None:
             self._version_check_dialog.hide()
+            self._version_check_dialog.deleteLater()
             self._version_check_dialog = None
 
     def on_version_check_error(self, error_message):
@@ -193,6 +195,7 @@ class UpdateChecker(QObject):
             except Exception:
                 pass
             self._version_check_dialog.hide()
+            self._version_check_dialog.deleteLater()
             self._version_check_dialog = None
         logging.error("Error checking for version update: %s", error_message)
         self._emit_version_check_complete()

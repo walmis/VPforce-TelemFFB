@@ -26,10 +26,7 @@ def qapp():
 
 class FakeMainWindow(QWidget):
     """Stands in for MainWindow: a real QObject to parent the debug menu's
-    actions to, plus the one callback add_debug_menu calls synchronously."""
-
-    def refresh_configurator_gating(self):
-        pass
+    actions to."""
 
     preview = SimpleNamespace(start=lambda spec: None, stop=lambda: None)
 
@@ -55,12 +52,6 @@ class TestAddDebugMenuIsIdempotent:
         main_menu.add_debug_menu()
         debug_actions = [a for a in main_menu.menu.actions() if a.text() == "Debug"]
         assert len(debug_actions) == 1
-
-    def test_configurator_settings_action_lands_on_the_main_menu(self, main_menu):
-        """refresh_configurator_gating (on MainWindow) reaches this
-        attribute through main_menu.set_configurator_action_enabled."""
-        main_menu.add_debug_menu()
-        assert hasattr(main_menu, 'configurator_settings_action')
 
 
 class TestDeviceViewActions:

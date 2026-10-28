@@ -1598,6 +1598,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # in TelemFFB saying a tap was live.
         self._discard_tap_writes()
         self.hide()
+        self.deleteLater()
         event.ignore()
 
     def reject(self):
@@ -1606,7 +1607,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.close()
 
     def accept(self):
+        # each open builds a new dialog, so a closed one is never shown again
         self.hide()
+        self.deleteLater()
 
     def _discard_tap_writes(self):
         failed = []

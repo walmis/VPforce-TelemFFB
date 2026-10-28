@@ -529,6 +529,7 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
     def on_finished(success: bool, payload: dict):
         try:
             progress.close()
+            progress.deleteLater()
         except Exception:
             pass
 

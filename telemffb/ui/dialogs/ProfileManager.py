@@ -47,6 +47,12 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
     COL_TYPE = 2
     COL_PROFILE = 3
     COL_ACTIVE = 4
+
+    # every tree population's (thread, worker) until a later population
+    # finds it finished: a dialog closed mid-population is deleted, and
+    # must not take a running thread with it
+    _populations = []
+
     def __init__(self, parent=None):
         super(ProfileManagerDialog, self).__init__(parent)
         self.sorted_column = -1
@@ -131,16 +137,18 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.treeWidget.addTopLevelItem(placeholder)
 
 
+        ProfileManagerDialog._populations = [
+            (thread, worker) for thread, worker in ProfileManagerDialog._populations
+            if not thread.isFinished()]
         self.thread = QThread()
         self.worker = TreePopulationWorker()
         self.worker.moveToThread(self.thread)
+        ProfileManagerDialog._populations.append((self.thread, self.worker))
 
         # Wire signals
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.on_tree_population_done)
         self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
 
         # Save scroll position
         self._last_scroll_pos = self.treeWidget.verticalScrollBar().value()
@@ -152,6 +160,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         # Start thread
         self.thread.start()
 
+    @pyqtSlot(list)
     def on_tree_population_done(self, result_data):
         """
         Processes data from the background tree population worker.

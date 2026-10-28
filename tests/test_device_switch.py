@@ -363,37 +363,3 @@ class TestAbsentDeviceAtOpen:
             assert rig.main.switch_to_device() is False
         assert [r for r in caplog.records if r.levelno >= logging.ERROR and r.exc_info]
         assert rig.ticker.started == 1
-
-
-class TestIdentityRefreshWithoutDebugMenu:
-    """The Configurator gain action lives on the Debug menu, which only
-    exists with the debug registry key.  The live switch's identity
-    refresh must survive a normal install where the menu - and so the
-    action - was never built.  (Field case: a first-launch restore on a
-    clean registry crashed the switch mid-apply.)"""
-
-    def test_gating_refresh_survives_a_missing_action(self):
-        from telemffb.MainWindow import MainWindow
-        from telemffb.ui.menus import MainMenu
-        bare = SimpleNamespace(main_menu=MainMenu(None))  # no configurator_settings_action
-        MainWindow.refresh_configurator_gating(bare)   # must not raise
-
-    def test_gating_still_applies_when_the_menu_exists(self, monkeypatch):
-        from telemffb.MainWindow import MainWindow
-        from telemffb.ui.menus import MainMenu
-        from telemffb.hw.ffb_rhino import HapticEffect
-
-        class Action:
-            enabled = None
-            def setEnabled(self, v): self.enabled = v
-            def setToolTip(self, t): self.tooltip = t
-
-        monkeypatch.setattr(
-            HapticEffect, 'device',
-            SimpleNamespace(caps=SimpleNamespace(has_gains=False)),
-            raising=False)
-        main_menu = MainMenu(None)
-        main_menu.configurator_settings_action = Action()
-        window = SimpleNamespace(main_menu=main_menu)
-        MainWindow.refresh_configurator_gating(window)
-        assert window.main_menu.configurator_settings_action.enabled is False

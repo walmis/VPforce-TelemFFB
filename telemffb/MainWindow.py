@@ -30,7 +30,7 @@ from collections import OrderedDict
 from datetime import datetime
 from typing import override
 
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets, sip
 from PyQt6.QtCore import Qt, QTimer, QUrl, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
                          QKeySequence, QPixmap, QAction, QShortcut, QFontDatabase)
@@ -605,6 +605,7 @@ class MainWindow(QMainWindow):
         """  Create configurator gain dialog for use during TelemFFB session and store object in globals """
 
         G.gain_override_dialog = ConfiguratorDialog(self)
+        G.gain_override_dialog.accepted.connect(self.settings_layout.update_configurator_overrides)
 
         # Put the device strip where the saved view says, now that every
         # slot exists: the syncs that ran while the window was being built
@@ -774,19 +775,10 @@ class MainWindow(QMainWindow):
                 f_vers = 'error fetching'
             self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
 
-    def refresh_configurator_gating(self):
-        caps = getattr(HapticEffect.device, 'caps', None)
-        no_gains = caps is not None and not caps.has_gains
-        self.main_menu.set_configurator_action_enabled(
-            not no_gains,
-            'Not supported on this device (no Configurator gains)'
-            if no_gains else '')
-
     def refresh_device_identity(self):
         """Bring every device-identity-derived piece of the UI in line with
         the currently open device - called after a live device switch."""
         self.refresh_firmware_label()
-        self.refresh_configurator_gating()
         self.update_device_status(G.device_connection_status)
         self.refresh_device_labels()
 
@@ -1422,7 +1414,12 @@ class MainWindow(QMainWindow):
 
     def show_profile_manager(self):
         xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
+        old = self.profile_mgr_dialog
+        if old is not None and not sip.isdeleted(old):
+            # hidden while its aircraft is edited offline, not closed
+            old.deleteLater()
         self.profile_mgr_dialog = ProfileManagerDialog(self)
+        self.profile_mgr_dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.profile_mgr_dialog.raise_()
         self.profile_mgr_dialog.activateWindow()
         self.profile_mgr_dialog.show()
@@ -1617,11 +1614,13 @@ class MainWindow(QMainWindow):
         on the same mapping would only double the wakeups."""
         from telemffb.ui.dialogs.TapMonitorDialog import TapMonitorDialog
         dlg = getattr(self, '_tap_monitor', None)
-        if dlg is not None and dlg.isVisible():
+        if dlg is not None:
             dlg.raise_()
             dlg.activateWindow()
             return
         self._tap_monitor = TapMonitorDialog(self)
+        self._tap_monitor.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self._tap_monitor.destroyed.connect(lambda: setattr(self, '_tap_monitor', None))
         self._tap_monitor.show()
 
     def _configured_value(self, setting_name):

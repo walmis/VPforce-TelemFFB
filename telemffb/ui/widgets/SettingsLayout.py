@@ -2298,7 +2298,6 @@ class SettingsLayout(QGridLayout):
                 gains_state = json.loads(value)
                 # utils.dbprint('blue', f'{G.device_type}" LOADING SETTINGS!!!!{gains_state}')
 
-            G.gain_override_dialog.accepted.connect(self.update_configurator_overrides)
             G.gain_override_dialog.load_and_show(gains_state)
 
     def erase_configurator_overrides(self):
