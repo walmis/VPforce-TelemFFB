@@ -83,6 +83,7 @@ class Aircraft(
     smoother = utils.Smoother()
     dampener = utils.Derivative()
     center_spring_on_pause = False
+    pause_spring_gain = 1.0
 
     use_legacy_bindings = False
 
@@ -321,8 +322,8 @@ class Aircraft(
         self.cyclic_spring_init = 0
 
         if self.center_spring_on_pause:
-            self.spring_x.set_coefficient(1.0)
-            self.spring_y.set_coefficient(1.0)
+            self.spring_x.set_coefficient(float(self.pause_spring_gain))
+            self.spring_y.set_coefficient(float(self.pause_spring_gain))
             self.spring_x.set_offset(0.0)
             self.spring_y.set_offset(0.0)
 
