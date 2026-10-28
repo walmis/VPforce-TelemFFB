@@ -42,6 +42,11 @@ class TestProtocol:
         assert protocol.decode(protocol.encode_keys(['b', 'a'])) == {"keys": ['a', 'b']}
         assert protocol.decode(protocol.encode_command(protocol.CMD_SHOW)) == {"cmd": "show"}
 
+    def test_keys_carry_their_units_when_they_have_any(self):
+        assert protocol.decode(protocol.encode_keys(['IAS'], {'IAS': ('kt', 1.94)})) == \
+            {"keys": ['IAS'], "units": {'IAS': ['kt', 1.94]}}
+        assert protocol.decode(protocol.encode_keys(['IAS'], {})) == {"keys": ['IAS']}
+
     def test_numpy_scalars_become_floats(self):
         import numpy as np
         message = protocol.decode(protocol.encode_frame(0.0, {'G': np.float64(1.25), 'L': [np.float32(0.5)]}))
@@ -109,6 +114,15 @@ class TestReceiver:
         receiver.handle(protocol.encode_command(protocol.CMD_QUIT))
         receiver.handle(b"not json")
         assert heard == [('frame', 2.0, {'IAS': 1.0}), ('keys', ['IAS']), ('show',), ('quit',)]
+
+    def test_a_keys_message_also_signals_its_units(self, qapp):
+        receiver = FeedReceiver()
+        heard = []
+        receiver.units.connect(heard.append)
+        receiver.handle(protocol.encode_keys(['IAS', 'AoA'], {'IAS': ('kt', 2.0)}))
+        receiver.handle(b'{"keys": ["IAS"], "units": {"IAS": "kt", "AoA": ["deg", "x"]}}')
+        receiver.handle(protocol.encode_keys(['IAS']))
+        assert heard == [{'IAS': ('kt', 2.0)}, {}, {}]
 
     def test_the_window_plots_from_the_first_frame_and_follows_the_keys(self, qapp):
         window = TelemetryPlotWindow(device='joystick')

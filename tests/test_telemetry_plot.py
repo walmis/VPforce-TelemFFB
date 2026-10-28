@@ -400,3 +400,51 @@ class TestZoomBox:
         box = vb.rbScaleBox.mapRectToParent(vb.rbScaleBox.rect())
         assert box.top() == pytest.approx(0.0) and box.bottom() == pytest.approx(20.0)
         assert box.left() == pytest.approx(10.0) and box.right() == pytest.approx(20.0)
+
+
+class TestUnits:
+    """Each key is plotted in the unit the Monitor table shows it in: the
+    feed's factor scales it, and the unit names it."""
+
+    def test_frames_are_scaled_by_their_keys_factor(self, plot):
+        plot.set_units({'IAS': ('kt', 2.0)})
+        plot.add_frame(0.0, {'IAS': 10.0, 'WoW': [1.0, True], 'AoA': 3.0}, ['IAS', 'WoW', 'AoA'])
+        assert plot._latest_values == {'IAS': 20.0, 'WoW[0]': 1.0, 'WoW[1]': 1.0, 'AoA': 3.0}
+
+    def test_list_elements_share_their_keys_factor(self):
+        assert series_from_frame({'W': [1.0, 2.0, False]}, ['W'], {'W': 3.0}) == \
+            {'W[0]': 3.0, 'W[1]': 6.0, 'W[2]': 0.0}
+
+    def test_a_change_of_unit_rescales_the_buffer(self, plot):
+        plot.set_units({'IAS': ('kt', 2.0)})
+        plot.add_frame(0.0, {'IAS': 10.0}, ['IAS'])
+        plot.set_units({'IAS': ('mph', 3.0)})
+        assert plot._series['IAS'].arrays()[1].tolist() == [30.0]
+        plot.set_units({})
+        assert plot._series['IAS'].arrays()[1].tolist() == [10.0]
+        assert plot._latest_values['IAS'] == 10.0
+
+    def test_titles_readouts_and_the_list_name_the_unit(self, plot):
+        plot.set_units({'IAS': ('kt', 1.0)})
+        plot.add_frame(0.0, {'IAS': 51.25, 'AoA': 3.0}, ['IAS', 'AoA'])
+        plot.refresh()
+        assert 'IAS (kt)' in plot._plots[0].titleLabel.text
+        assert 'AoA' in plot._plots[1].titleLabel.text and '(' not in plot._plots[1].titleLabel.text
+        assert '51.25 kt' in plot._label_text[0]
+        texts = [plot._list.item(i).text() for i in range(plot._list.count())]
+        assert texts == ['IAS   51.25 kt', 'AoA   3']
+
+    def test_csv_round_trips_the_units(self, plot, tmp_path):
+        plot.set_units({'IAS': ('kt', 1.0), 'WoW': ('%/100', 1.0)})
+        plot.add_frame(0.0, {'IAS': 1.0, 'AoA': 2.0, 'WoW': [0.5]}, ['IAS', 'AoA', 'WoW'])
+        path = str(tmp_path / "units.csv")
+        plot.write_csv(path)
+        with open(path, newline="", encoding="utf-8") as fh:
+            assert next(csv.reader(fh)) == ['t', 'IAS (kt)', 'AoA', 'WoW[0] (%/100)']
+        plot.set_units({'IAS': ('mph', 5.0)})
+        plot.load_csv(path)
+        assert plot.series_names() == ['IAS', 'AoA', 'WoW[0]']
+        assert plot._series['IAS'].arrays()[1].tolist() == [1.0]
+        assert (plot.unit_of('IAS'), plot.unit_of('AoA'), plot.unit_of('WoW[0]')) == ('kt', '', '%/100')
+        plot.back_to_live()
+        assert plot.unit_of('IAS') == 'mph'

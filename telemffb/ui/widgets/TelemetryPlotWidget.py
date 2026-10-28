@@ -31,6 +31,11 @@ buffered while it is in no tile.
 A telemetry key whose value is a list becomes one series per element,
 ``key[i]``; a bool becomes 0 or 1; a string is not a series.
 
+Each key is plotted in the unit the Monitor table shows it in
+(``set_units``: the unit and the factor from the value as reported), named
+in the tile titles, the readouts, the series list and the CSV header.  A
+change of unit rescales what is already buffered.
+
 The time axis is seconds since the first frame.  While *following*, the view
 ends at the latest frame and spans the chosen window.  A left-drag draws a
 zoom rectangle, the wheel zooms, a right-drag scales, and any of those
@@ -46,6 +51,7 @@ a spike narrower than a pixel survives).
 """
 
 import csv
+import re
 import time
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -81,26 +87,36 @@ _SERIES_MIME = "application/x-telemffb-series"
 _TILE_MIME = "application/x-telemffb-tile"
 _DROP_ACCENT = QColor("#2f8fdc")
 _DROP_MARKER_PX = 5
+#: A CSV column header with its unit: ``name (unit)``.
+_HEADER_UNIT = re.compile(r"^(.*) \(([^()]+)\)$")
 
 
-def series_from_frame(frame: Dict, keys: Iterable[str]) -> Dict[str, float]:
+def series_from_frame(frame: Dict, keys: Iterable[str],
+                      scales: Optional[Dict[str, float]] = None) -> Dict[str, float]:
     """The plottable series of ``frame`` for the marked ``keys``: a number
     under its key, a list as ``key[i]`` per element, a bool as 0 or 1.
-    Strings and anything else are left out."""
+    Strings and anything else are left out.  A number (not a bool) is
+    multiplied by its key's factor in ``scales``."""
     out: Dict[str, float] = {}
     for key in keys:
         value = frame.get(key)
+        scale = scales.get(key, 1.0) if scales else 1.0
         if isinstance(value, bool):
             out[key] = 1.0 if value else 0.0
         elif isinstance(value, (int, float)):
-            out[key] = float(value)
+            out[key] = float(value) * scale
         elif isinstance(value, (list, tuple)):
             for i, element in enumerate(value):
                 if isinstance(element, bool):
                     out[f"{key}[{i}]"] = 1.0 if element else 0.0
                 elif isinstance(element, (int, float)):
-                    out[f"{key}[{i}]"] = float(element)
+                    out[f"{key}[{i}]"] = float(element) * scale
     return out
+
+
+def base_key(name: str) -> str:
+    """The telemetry key of series ``name`` (``key[i]`` is ``key``'s)."""
+    return name.split("[", 1)[0]
 
 
 class _Series:
@@ -149,6 +165,10 @@ class _Series:
         ts, vs = self.arrays()
         i = int(np.searchsorted(ts, t, side="right")) - 1
         return float(vs[i]) if 0 <= i < len(vs) else None
+
+    def scale(self, factor: float) -> None:
+        """Multiply every buffered value by ``factor``."""
+        self._v[:self._n] *= factor
 
 
 class _Tile:
@@ -397,6 +417,13 @@ class TelemetryPlotWidget(QWidget):
         self._pause_t: Optional[float] = None
         self._latest_t: Optional[float] = None
         self._latest_values: Dict[str, float] = {}
+        #: The live feed's unit and factor per telemetry key, and the
+        #: factors alone where they scale (what ``add_frame`` applies).
+        self._live_units: Dict[str, Tuple[str, float]] = {}
+        self._factors: Dict[str, float] = {}
+        #: A loaded recording's units per series, from its CSV header;
+        #: these stand in for the live units while it is loaded.
+        self._recorded_units: Dict[str, str] = {}
         self._cursor_t: Optional[float] = None
         self._current_span: Optional[Tuple[float, float]] = None
         #: A loaded CSV recording stands in for the live feed until
@@ -466,7 +493,9 @@ class TelemetryPlotWidget(QWidget):
         monotonic origin).  A key that is marked but absent from the frame
         adds nothing this frame.  A series seen for the first time gets a
         tile of its own."""
-        values = series_from_frame(frame, keys)
+        self._record(t, series_from_frame(frame, keys, self._factors))
+
+    def _record(self, t: float, values: Dict[str, float]) -> None:
         for name, value in values.items():
             series = self._series.get(name)
             if series is None:
@@ -480,13 +509,48 @@ class TelemetryPlotWidget(QWidget):
         self._latest_values.update(values)
         self._dirty = True
 
+    def set_units(self, units: Dict[str, Tuple[str, float]]) -> None:
+        """The unit each telemetry key is plotted in, ``{key: (unit,
+        factor)}`` with ``factor`` taking the value as reported to it.  A
+        key absent from ``units`` is plotted as reported, unlabelled.  The
+        live samples already buffered are rescaled to a key's new factor."""
+        units = {str(k): (str(u), float(f)) for k, (u, f) in units.items()}
+        if units == self._live_units:
+            return
+        old = self._live_units
+        self._live_units = units
+        self._factors = {k: f for k, (_u, f) in units.items() if f != 1.0}
+        if self._recording is None:
+            for name in self._order:
+                key = base_key(name)
+                old_factor = old.get(key, ("", 1.0))[1]
+                new_factor = units.get(key, ("", 1.0))[1]
+                if new_factor != old_factor and old_factor != 0.0:
+                    ratio = new_factor / old_factor
+                    self._series[name].scale(ratio)
+                    if name in self._latest_values:
+                        self._latest_values[name] *= ratio
+        # titles and the series list name the units
+        self._list_text.clear()
+        self._rebuild_needed = True
+        self._dirty = True
+
+    def unit_of(self, name: str) -> str:
+        """The unit series ``name`` is plotted in; empty when it has none."""
+        if self._recording is not None:
+            return self._recorded_units.get(name, "")
+        return self._live_units.get(base_key(name), ("", 1.0))[0]
+
+    def _labelled(self, name: str) -> str:
+        unit = self.unit_of(name)
+        return f"{name} ({unit})" if unit else name
+
     def drop_series_not_in(self, keys: Iterable[str]) -> None:
         """Forget the series of keys no longer marked, so an unmarked key
         leaves the window rather than freezing in it."""
         wanted = set(keys)
         for name in list(self._order):
-            base = name.split("[", 1)[0]
-            if base not in wanted:
+            if base_key(name) not in wanted:
                 del self._series[name]
                 self._order.remove(name)
                 self._latest_values.pop(name, None)
@@ -639,6 +703,8 @@ class TelemetryPlotWidget(QWidget):
             self.stop_replay()
             self.clear()
             self._recording = None
+            self._recorded_units = {}
+            self._list_text.clear()
             self.recordingChanged.emit(False)
         self.set_paused(False)
 
@@ -646,14 +712,21 @@ class TelemetryPlotWidget(QWidget):
 
     def load_csv(self, path: str) -> int:
         """Replace the buffer with a recording written by ``write_csv``: a
-        ``t`` column and one column per series.  The view pauses over the
-        whole recording.  Returns the number of rows read."""
+        ``t`` column and one column per series, ``name (unit)`` where it has
+        a unit.  The view pauses over the whole recording.  Returns the
+        number of rows read."""
         with open(path, newline="", encoding="utf-8") as fh:
             reader = csv.reader(fh)
             header = next(reader, None)
             if not header or header[0] != "t":
                 raise ValueError("not a telemetry plot CSV: the first column must be t")
-            names = header[1:]
+            names, units = [], {}
+            for column in header[1:]:
+                match = _HEADER_UNIT.match(column)
+                name = match.group(1) if match else column
+                if match:
+                    units[name] = match.group(2)
+                names.append(name)
             rows = []
             for row in reader:
                 if not row:
@@ -667,9 +740,12 @@ class TelemetryPlotWidget(QWidget):
         self.clear()
         self._recording = None
         for t, values in rows:
-            self.add_frame(t, values, values)
+            self._record(t, values)
         if rows:
             self._recording = (rows[0][0], rows[-1][0])
+            self._recorded_units = units
+            self._list_text.clear()
+            self._rebuild_needed = True
             self.set_paused(True)
             self.refresh()
             self._set_x_range(*self._recording)
@@ -743,8 +819,9 @@ class TelemetryPlotWidget(QWidget):
 
     def write_csv(self, path: str) -> int:
         """Write every buffered sample as one row per frame time, a column
-        per series (blank where a series had no sample at that time).
-        Returns the number of rows written."""
+        per series (blank where a series had no sample at that time), named
+        ``name (unit)`` where it has a unit.  Returns the number of rows
+        written."""
         times: Dict[float, Dict[str, float]] = {}
         for name in self._order:
             ts, vs = self._series[name].arrays()
@@ -752,7 +829,7 @@ class TelemetryPlotWidget(QWidget):
                 times.setdefault(t, {})[name] = v
         with open(path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
-            writer.writerow(["t"] + list(self._order))
+            writer.writerow(["t"] + [self._labelled(name) for name in self._order])
             for t in sorted(times):
                 row = times[t]
                 writer.writerow([f"{t:.4f}"] + [("" if name not in row else repr(row[name]))
@@ -820,7 +897,8 @@ class TelemetryPlotWidget(QWidget):
         plot.hideButtons()
         plot.getAxis("left").setWidth(_AXIS_WIDTH_PX)
         plot.setLabel("bottom", "time", units="s")
-        plot.setTitle(" + ".join(f'<span style="color:{self._color(n)}">{n}</span>' for n in tile.names),
+        plot.setTitle(" + ".join(f'<span style="color:{self._color(n)}">{self._labelled(n)}</span>'
+                                 for n in tile.names),
                       size="9pt")
         plot.setMenuEnabled(False, enableViewBoxMenu=True)
         vb = plot.getViewBox()
@@ -1018,7 +1096,9 @@ class TelemetryPlotWidget(QWidget):
     def _update_list(self) -> None:
         for name, item in self._list_items.items():
             latest = self._latest_values.get(name)
-            text = name if latest is None else f"{name}   {latest:.4g}"
+            unit = self.unit_of(name)
+            text = (self._labelled(name) if latest is None
+                    else f"{name}   {latest:.4g} {unit}".rstrip())
             if self._list_text.get(name) != text:
                 self._list_text[name] = text
                 item.setText(text)
@@ -1026,14 +1106,16 @@ class TelemetryPlotWidget(QWidget):
     def _reading(self, name: str) -> str:
         """The value under the cursor with its time, else at the replay
         head, else the latest value."""
+        unit = self.unit_of(name)
+        unit = f" {unit}" if unit else ""
         if self._cursor_t is not None:
             value = self._series[name].value_at(self._cursor_t)
-            return "" if value is None else f"{value:.4g} @ {self._cursor_t:.2f}s"
+            return "" if value is None else f"{value:.4g}{unit} @ {self._cursor_t:.2f}s"
         if self._replay_t is not None:
             value = self._series[name].value_at(self._replay_t)
-            return "" if value is None else f"{value:.4g} @ {self._replay_t:.2f}s"
+            return "" if value is None else f"{value:.4g}{unit} @ {self._replay_t:.2f}s"
         latest = self._latest_values.get(name)
-        return "" if latest is None else f"{latest:.4g}"
+        return "" if latest is None else f"{latest:.4g}{unit}"
 
     def _stats(self, name: str) -> str:
         """Min, max, mean and standard deviation of the visible span."""

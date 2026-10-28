@@ -23,8 +23,8 @@ restart helper's recipe: the frozen exe, or the interpreter with the
 script), handed a free localhost port, the device name for its title and
 the theme.  ``send_frame`` is the telemetry thread's per-frame call and
 goes straight to the feed; everything else is main-thread control: a 1 s
-keepalive that repeats the marked keys, ``show`` (start if needed, then
-raise), ``set_keys``, ``stop``.
+keepalive that repeats the marked keys and their units, ``show`` (start
+if needed, then raise), ``set_keys``, ``set_units``, ``stop``.
 """
 
 import logging
@@ -32,7 +32,7 @@ import os
 import socket
 import subprocess
 import sys
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from PyQt6.QtCore import QTimer
 
@@ -64,6 +64,7 @@ class PlotProcess:
         self._device = device
         self._theme = 'dark' if dark else 'light'
         self._keys: tuple = ()
+        self._units: Dict[str, Tuple[str, float]] = {}
         self._feed: Optional[PlotFeed] = None
         self._process: Optional[subprocess.Popen] = None
         self._keepalive = QTimer()
@@ -86,6 +87,12 @@ class PlotProcess:
         self._keys = tuple(sorted(keys))
         if self._feed is not None:
             self._feed.set_keys(self._keys)
+
+    def set_units(self, units: Dict[str, Tuple[str, float]]) -> None:
+        """The unit each marked key is plotted in, ``(unit, factor)``."""
+        self._units = dict(units)
+        if self._feed is not None:
+            self._feed.set_units(self._units)
 
     def stop(self) -> None:
         """Ask the plotter to exit, and make sure it does."""
@@ -119,6 +126,7 @@ class PlotProcess:
             self._process = None
             return
         self._feed = PlotFeed(port)
+        self._feed.units = dict(self._units)
         self._feed.set_keys(self._keys)
         self._keepalive.start()
 

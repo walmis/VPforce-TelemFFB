@@ -20,8 +20,11 @@
 UDP datagram, from TelemFFB to the plotter only.
 
 - ``{"t": seconds, "v": {key: value, ...}}`` - one frame's marked keys.
-- ``{"keys": [key, ...]}`` - the marked keys; sent on every change and
-  once a second as the keepalive.
+- ``{"keys": [key, ...], "units": {key: [unit, factor], ...}}`` - the
+  marked keys, and the unit each is plotted in with the factor from the
+  value as reported to it (the Monitor table's choice, so the plotter
+  scales the frames itself); sent on every change and once a second as
+  the keepalive.  ``units`` is left out when no marked key has one.
 - ``{"cmd": "show" | "quit"}`` - show the window; exit.
 
 The plotter exits on its own after ``FEED_TIMEOUT_S`` without a datagram,
@@ -29,7 +32,7 @@ so a TelemFFB that dies never leaves a plotter behind.
 """
 
 import json
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Tuple
 
 #: How often TelemFFB repeats the key list while the plotter runs.
 KEEPALIVE_S = 1.0
@@ -53,8 +56,11 @@ def encode_frame(t: float, values: Dict) -> bytes:
     return json.dumps({"t": t, "v": {k: _plain(v) for k, v in values.items()}}).encode("utf-8")
 
 
-def encode_keys(keys: Iterable[str]) -> bytes:
-    return json.dumps({"keys": sorted(keys)}).encode("utf-8")
+def encode_keys(keys: Iterable[str], units: Optional[Dict[str, Tuple[str, float]]] = None) -> bytes:
+    message = {"keys": sorted(keys)}
+    if units:
+        message["units"] = {k: [unit, float(factor)] for k, (unit, factor) in units.items()}
+    return json.dumps(message).encode("utf-8")
 
 
 def encode_command(command: str) -> bytes:

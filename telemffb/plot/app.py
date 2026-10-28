@@ -44,6 +44,7 @@ class FeedReceiver(QObject):
 
     frame = pyqtSignal(float, object)
     keys = pyqtSignal(object)
+    units = pyqtSignal(object)
     show = pyqtSignal()
     quit = pyqtSignal()
     timedOut = pyqtSignal()
@@ -59,10 +60,25 @@ class FeedReceiver(QObject):
                 pass
         elif "keys" in message:
             self.keys.emit(list(message["keys"]))
+            self.units.emit(_units(message.get("units")))
         elif message.get("cmd") == CMD_SHOW:
             self.show.emit()
         elif message.get("cmd") == CMD_QUIT:
             self.quit.emit()
+
+
+def _units(raw) -> dict:
+    """The ``units`` of a keys message as ``{key: (unit, factor)}``,
+    skipping anything malformed."""
+    units = {}
+    if isinstance(raw, dict):
+        for key, pair in raw.items():
+            try:
+                unit, factor = pair
+                units[str(key)] = (str(unit), float(factor))
+            except (TypeError, ValueError):
+                continue
+    return units
 
 
 class FeedListener(threading.Thread):
@@ -116,6 +132,7 @@ def run(app: QApplication, args) -> int:
     receiver = FeedReceiver()
     receiver.frame.connect(window.add_frame)
     receiver.keys.connect(window.set_keys)
+    receiver.units.connect(window.set_units)
     receiver.show.connect(window.show_and_raise)
     receiver.quit.connect(app.quit)
     receiver.timedOut.connect(app.quit)

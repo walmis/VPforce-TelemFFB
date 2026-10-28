@@ -1040,3 +1040,33 @@ class TestPlotMarks:
         assert hidden.telem_view.isColumnHidden(_PLOT_COL)
         hidden.set_plotting_available(True)
         assert not hidden.telem_view.isColumnHidden(_PLOT_COL)
+
+
+class TestPlotUnits:
+    """Marked keys are plotted in the unit their row shows: the panel sends
+    the plot process each one's unit and factor when they change."""
+
+    class _FakePlot:
+        def __init__(self):
+            self.sent = []
+
+        def set_units(self, units):
+            self.sent.append(units)
+
+    def test_plot_units_follow_the_chosen_unit(self, panel):
+        panel.update_telemetry({'IAS': 100.0, 'AoA': 1.0, 'N': 'x', 'src': 'DCS'})
+        panel._plot_keys.update({'IAS', 'AoA', 'N'})
+        assert panel.plot_units(panel._last_data) == {'IAS': ('m/s', 1.0), 'AoA': ('deg', 1.0)}
+        panel.set_display_unit('IAS', 'kt')
+        unit, factor = panel.plot_units(panel._last_data)['IAS']
+        assert unit == 'kt' and factor == pytest.approx(1.94384, abs=1e-4)
+
+    def test_changes_are_sent_once(self, panel, monkeypatch):
+        fake = self._FakePlot()
+        monkeypatch.setattr(G, 'plot_process', fake, raising=False)
+        panel._plot_keys.add('IAS')
+        panel.update_telemetry({'IAS': 100.0, 'src': 'DCS'})
+        panel.update_telemetry({'IAS': 101.0, 'src': 'DCS'})
+        assert fake.sent == [{'IAS': ('m/s', 1.0)}]
+        panel.set_display_unit('IAS', 'kt')
+        assert len(fake.sent) == 2 and fake.sent[-1]['IAS'][0] == 'kt'

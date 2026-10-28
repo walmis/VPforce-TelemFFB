@@ -26,7 +26,7 @@ whole, never mutated, so the telemetry thread reads a consistent tuple.
 
 import socket
 import time
-from typing import Iterable, Tuple
+from typing import Dict, Iterable, Tuple
 
 from telemffb.plot.protocol import encode_command, encode_frame, encode_keys
 
@@ -38,13 +38,18 @@ class PlotFeed:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.connect(("127.0.0.1", port))
         self.keys: Tuple[str, ...] = ()
+        self.units: Dict[str, Tuple[str, float]] = {}
 
     def set_keys(self, keys: Iterable[str]) -> None:
         self.keys = tuple(sorted(keys))
         self.send_keys()
 
+    def set_units(self, units: Dict[str, Tuple[str, float]]) -> None:
+        self.units = dict(units)
+        self.send_keys()
+
     def send_keys(self) -> None:
-        self._send(encode_keys(self.keys))
+        self._send(encode_keys(self.keys, self.units))
 
     def send_command(self, command: str) -> None:
         self._send(encode_command(command))

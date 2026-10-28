@@ -53,7 +53,9 @@ A second gutter beside the star is the plot mark, shown with the debug
 setting enabled: click it to plot that key in the plot process the Plot
 button starts (``telemffb.plot``, a window of its own in a process of its
 own, fed from the telemetry thread), kept and shared the same way as the
-favorites and painted by ``PlotMarkDelegate``.
+favorites and painted by ``PlotMarkDelegate``. A marked key is plotted in
+the unit its row shows (``plot_units``), sent to the plot process whenever
+that changes.
 
 The last column is the value's unit (``telemffb.telem.telemetry_units``:
 for MSFS the unit each SimVar is subscribed in, otherwise a registry kept
@@ -227,6 +229,8 @@ class MonitorPanel(QWidget):
         # The unit each convertible row was last reported in, by row key -
         # what the conversion menu converts from.
         self._native_units: Dict[str, str] = {}
+        # The plotted keys' units as last sent to the plot process.
+        self._sent_plot_units: Optional[Dict[str, Tuple[str, float]]] = None
         # The last frame rendered, so toggling a star or the Favorites box
         # redraws the list now rather than at whatever point the next frame
         # arrives (which, with the sim closed, is never).
@@ -487,7 +491,32 @@ class MonitorPanel(QWidget):
             from telemffb.plot.process import PlotProcess
             G.plot_process = PlotProcess(G.device_type or '', bool(G.useDarkMode))
         G.plot_process.set_keys(self._plot_keys)
+        self._sent_plot_units = None
+        if self._last_data is not None:
+            self._sync_plot_units(self._last_data)
         G.plot_process.show()
+
+    def plot_units(self, data: Dict) -> Dict[str, Tuple[str, float]]:
+        """The unit each marked key is plotted in - the one its row shows -
+        with the factor from the value as reported to it. Keys with no
+        unit are left out."""
+        units = {}
+        for key in self._plot_keys:
+            unit = unit_for(key, data)
+            if not unit:
+                continue
+            shown = self._shown_unit(key, unit, conversions_for(unit))
+            units[key] = (shown, convert(1.0, unit, shown) if shown != unit else 1.0)
+        return units
+
+    def _sync_plot_units(self, data: Dict) -> None:
+        """Tell the plot process, if one runs, about a change of unit."""
+        if G.plot_process is None:
+            return
+        units = self.plot_units(data)
+        if units != self._sent_plot_units:
+            self._sent_plot_units = units
+            G.plot_process.set_units(units)
 
     # ---- detach toolbar visibility (MainWindow.detach_tab/reattach_tab) --
 
@@ -581,6 +610,7 @@ class MonitorPanel(QWidget):
     def _set_telemetry_rows(self, data: Dict) -> None:
         rows, tooltips = self._build_telemetry_rows(data)
         self._telem_model.set_rows(rows, tooltips)
+        self._sync_plot_units(data)
 
     def _build_telemetry_rows(self, data: Dict):
         """The table's rows for ``data``, and the hover text of the unit
@@ -627,10 +657,9 @@ class MonitorPanel(QWidget):
             choices = conversions_for(unit)
             if choices:
                 native_units[row_key] = unit
-                wanted = self._unit_prefs.get(row_key)
-                if wanted in choices and wanted != unit:
-                    v = convert(v, unit, wanted)
-                    shown_unit = wanted
+                shown_unit = self._shown_unit(row_key, unit, choices)
+                if shown_unit != unit:
+                    v = convert(v, unit, shown_unit)
                     unit_tip = f"Converted from {unit}\nClick to choose another unit"
                 else:
                     unit_tip = f"Reported in {unit}\nClick to show in another unit"
@@ -669,6 +698,12 @@ class MonitorPanel(QWidget):
         self.reload_favorites()
 
     # ---- unit conversion -----------------------------------------------------
+
+    def _shown_unit(self, key: str, unit: str, choices: List[str]) -> str:
+        """The unit row ``key``, reported in ``unit``, is shown in: the one
+        chosen for it when ``unit`` converts to that, else ``unit``."""
+        wanted = self._unit_prefs.get(key)
+        return wanted if wanted in choices else unit
 
     def unit_choices(self, key: str) -> List[str]:
         """The units the conversion menu offers for row ``key``; empty when
