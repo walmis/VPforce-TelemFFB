@@ -6895,11 +6895,10 @@
 		<value>Enter full path as if running from command prompt...</value>
 	</defaults>
 	<defaults>
+		<effecttype>spring</effecttype>
 		<grouping>System</grouping>
 		<parentgroup>system</parentgroup>
 		<order>80500</order>
-		<datatype>bool</datatype>
-		<name>center_spring_on_pause</name>
 		<displayname>Center on Pause/Slew</displayname>
 		<prereq>system_group</prereq>
 		<info>Force spring centering when in pause/slew mode</info>
@@ -6909,6 +6908,27 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<value>false</value>
+		<datatype>bool</datatype>
+		<name>center_spring_on_pause</name>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>System</grouping>
+		<parentgroup>system</parentgroup>
+		<order>80500.1</order>
+		<datatype>n_float</datatype>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<name>pause_spring_gain</name>
+		<displayname>Pause/Slew Centering Gain</displayname>
+		<prereq>center_spring_on_pause</prereq>
+		<info>Force spring centering when in pause/slew mode</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>1.0</value>
 	</defaults>
 	<defaults>
 		<grouping>System</grouping>
