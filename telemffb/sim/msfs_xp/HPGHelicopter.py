@@ -74,6 +74,7 @@ class HPGHelicopter(Helicopter):
         Pedal axis-deviation threshold for detecting initial foot contact (engage).
     feet_off_deadzone : float
         Pedal axis-deviation threshold for releasing foot-contact state (disengage).
+        Neither pedal deadzone is used while ``pedal_ft_release_button`` is bound.
     send_individual_hands_on : int
         When non-zero, sends separate X/Y hands-on L-vars in addition to the
         combined master L-var.
@@ -473,17 +474,17 @@ class HPGHelicopter(Helicopter):
 
         Feet-on detection
         -----------------
-        Pilot foot contact is detected in one of two ways, evaluated in priority
-        order each frame:
+        Pilot foot contact is detected in one of two ways:
 
-        1. **Button press** (FORCETRIM spring mode, ``pedal_ft_release_button``
-           configured): Takes unconditional priority.  While the button is held the
-           spring is disabled (or set to the optional damper coefficient), ``cpO_x``
-           is anchored to the current physical position, and ``L:FFB_FEET_ON_PEDALS``
-           is set to 1.  On release the spring re-engages centered at the pilot's
-           foot position, giving a smooth handoff without a snap.
+        1. **Button** (FORCETRIM spring mode, ``pedal_ft_release_button``
+           bound): the only signal while bound; the deadzones are not used (and
+           hidden in the settings).  While the button is held the spring is
+           disabled (or set to the optional damper coefficient), ``cpO_x`` is
+           anchored to the current physical position, and ``L:FFB_FEET_ON_PEDALS``
+           is 1; otherwise it is 0.  On release the spring re-engages centered at
+           the pilot's foot position, giving a smooth handoff without a snap.
 
-        2. **Axis-deviation** (fallback): ``check_feet_on()`` compares the physical
+        2. **Axis-deviation** (no button bound): ``check_feet_on()`` compares the physical
            pedal position to the trim reference.  Hysteresis is applied via two
            thresholds — ``feet_on_deadzone`` (engage) and ``feet_off_deadzone``
            (disengage) — using the sim's ``hpgFeetOnPedals`` state to select which
@@ -514,21 +515,18 @@ class HPGHelicopter(Helicopter):
             phys_x, phys_y = self._get_device_axes()
             telem_data.phys_x = phys_x
 
-            # Check for pedal trim release button press (if configured in FORCETRIM mode).
-            # This takes priority over deflection-based feet-on detection and allows the
-            # pilot to explicitly signal "feet on pedals" via a button rather than relying
-            # solely on the axis-deviation threshold.
-            pedal_trim_pressed = False
-            if self.spring_mode_is(SpringModeEnum.FORCETRIM) and self.pedal_ft_release_button:
-                pedal_trim_pressed = self.check_button_press(self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
+            # A bound pedal trim release button (FORCETRIM mode) is the only feet-on signal:
+            # deflection cannot tell a pilot's push from pedals lagging the follow-up trim.
+            pedal_trim_bound = bool(self.spring_mode_is(SpringModeEnum.FORCETRIM) and self.pedal_ft_release_button)
+            pedal_trim_pressed = pedal_trim_bound and self.check_button_press(
+                self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
 
-            if pedal_trim_pressed:
-                # Button held: pilot has feet on pedals.  Anchor the trim reference to the
-                # current physical position so the spring re-centers there on release.
-                self._simconnect.set_simdatum_to_msfs("L:FFB_FEET_ON_PEDALS", 1, units="number")
-                self.feet_on_active = True
-                self.cpO_x = utils.clamp(phys_x, -1, 1)
-
+            if pedal_trim_bound:
+                self._simconnect.set_simdatum_to_msfs("L:FFB_FEET_ON_PEDALS", int(pedal_trim_pressed), units="number")
+                self.feet_on_active = pedal_trim_pressed
+                if pedal_trim_pressed:
+                    # Anchor the trim reference so the spring re-centers here on release.
+                    self.cpO_x = utils.clamp(phys_x, -1, 1)
 
             else:
                 # Deflection-based feet-on detection (existing behaviour)

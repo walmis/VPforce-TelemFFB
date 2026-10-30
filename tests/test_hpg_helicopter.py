@@ -267,6 +267,20 @@ class TestHPGPedalSemaFollow(BaseTelemetryEffectTestCase):
         ac.msfs_update_pedals(self._telem(hpgSEMAyaw=0))
         assert ac._spring_handle.name == name
 
+    @pytest.mark.parametrize("pressed", [False, True])
+    def test_bound_release_button_alone_sets_feet_on(self, pressed):
+        from telemffb.SettingsManager import SpringModeEnum
+        ac = self._inst()
+        ac.spring_mode = SpringModeEnum.FORCETRIM
+        ac.pedal_ft_release_button = 1
+        self.mock_device._input_data.set_axis(x=0.3, y=0.0)
+        if pressed:
+            self.mock_device._input_data.press_button(1)
+        ac.msfs_update_pedals(self._telem(hpgSEMAyaw=10, hpgFeetOnPedals=1))
+        assert ac.feet_on_active is pressed
+        writes = [v for n, v, _ in self.mock_simconnect.sim_data_written if n == "L:FFB_FEET_ON_PEDALS"]
+        assert writes == [int(pressed)]
+
 
 @pytest.mark.unit
 @pytest.mark.msfs

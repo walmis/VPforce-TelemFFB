@@ -2482,6 +2482,7 @@
 		<name>feet_on_deadzone</name>
 		<displayname>Feet On Deadzone</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
+		<render_prereq>!pedal_ft_release_button</render_prereq>
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Distance required to trigger a feet-on condition</info>
 		<MSFS>true</MSFS>
@@ -2496,8 +2497,9 @@
 		<name>feet_off_deadzone</name>
 		<displayname>Feet Off Deadzone</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
+		<render_prereq>!pedal_ft_release_button</render_prereq>
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
-		<info>Distance at which feet-off resumes (set lower than hands-on)</info>
+		<info>Distance at which feet-off resumes (set lower than feet-on)</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
