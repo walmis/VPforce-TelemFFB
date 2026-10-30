@@ -41,6 +41,9 @@ DOWNLOAD_URL_BASE = "https://vpforcecontrols.com/downloads/TelemFFB/"
 LATEST_JSON = "latest.json"
 EXECUTABLE_NAME = "VPforce-TelemFFB.exe"
 BACKUP_FOLDER = "_previous_version_backup"
+#: What a release puts beside the executable.  The backup moves these and
+#: nothing else; any other entry in the folder is not TelemFFB's to touch.
+OWNED_ENTRIES = (EXECUTABLE_NAME, "assets", "_RELEASE_NOTES.txt")
 
 STYLESHEET = """
 QMainWindow, QWidget {
@@ -254,7 +257,6 @@ class UpdateWorker(QThread):
         self.url = url
         self.app_path = app_path
         self.debug_zip = debug_zip
-        self._folder_snapshot = os.listdir(app_path)
 
     def run(self):
         try:
@@ -357,17 +359,17 @@ class UpdateWorker(QThread):
         os.makedirs(backup_path)
         self.log.emit(f"Backing up to {backup_path}")
 
-        items = [n for n in self._folder_snapshot if n not in ("updater.exe", BACKUP_FOLDER)]
+        items = [n for n in OWNED_ENTRIES
+                 if os.path.lexists(os.path.join(self.app_path, n))]
+        if not items:
+            self.log.emit("Nothing of the current version to back up.")
+            return
         moved = []  # (backup_path, original_path) for rollback
         try:
             for i, name in enumerate(items):
                 src = os.path.join(self.app_path, name)
                 dst = os.path.join(backup_path, name)
-                if name.endswith(".ini") and name != "config.ini":
-                    self.status.emit(f"Preserving: {name}")
-                    shutil.copy(src, dst)
-                    self.log.emit(f"  Preserved (copy): {name}")
-                elif os.path.isdir(src):
+                if os.path.isdir(src):
                     self.status.emit(f"Backing up: {name}")
                     try:
                         # fast path: whole-directory rename

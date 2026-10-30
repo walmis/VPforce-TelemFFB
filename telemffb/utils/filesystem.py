@@ -91,11 +91,11 @@ def unsafe_install_location_reason(app_dir: str, locations: dict = None):
     """Return a human-readable reason when app_dir is an unsafe place for a
     TelemFFB installation, or None when it is acceptable.
 
-    The auto-updater manages the ENTIRE folder containing the executable
-    (backing up and replacing its contents), so running from a shared
-    location would sweep unrelated files into the update process.  Field
-    incident: a release unzipped directly onto the Desktop - the updater
-    moved the user's whole Desktop into the previous-version backup folder.
+    The auto-updater backs up and replaces TelemFFB's own entries in the
+    folder containing the executable, so the program needs a folder of its
+    own: a shared location mixes those entries with the user's files, a
+    drive root or Program Files needs elevation to write, and a temporary
+    folder is deleted behind it.
 
     Subfolders of shared locations are fine (e.g. Desktop\\TelemFFB); only
     the shared folder ITSELF (or a drive root, or anywhere under the temp

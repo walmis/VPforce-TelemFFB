@@ -1925,11 +1925,9 @@ def main():
         sys.exit(run_plot_process(app, G.args))
 
     # Refuse to run from unsafe locations (Desktop, drive roots, Downloads,
-    # ...).  The auto-updater manages the ENTIRE folder containing the
-    # executable, so a shared folder would be swept wholesale into the
-    # update/backup process (field incident: a release unzipped straight
-    # onto the Desktop - the updater relocated the user's whole Desktop
-    # into the previous-version backup folder).
+    # ...).  The auto-updater backs up and replaces TelemFFB's own entries
+    # in the folder containing the executable, so the program needs a
+    # folder of its own.
     if G.is_exe:
         unsafe_reason = utils.unsafe_install_location_reason(os.path.dirname(sys.executable))
         if unsafe_reason:
@@ -1937,8 +1935,8 @@ def main():
                 None, "Unsafe Install Location",
                 f"TelemFFB cannot run from this location: it is installed directly on {unsafe_reason}.\n\n"
                 "TelemFFB must live in its own dedicated folder (for example C:\\TelemFFB, "
-                "or a 'TelemFFB' folder on your Desktop), because the auto-updater manages "
-                "everything in the folder that contains VPforce-TelemFFB.exe.\n\n"
+                "or a 'TelemFFB' folder on your Desktop). The auto-updater replaces the "
+                "TelemFFB files in the folder that contains VPforce-TelemFFB.exe.\n\n"
                 "Please move all TelemFFB files into their own folder and start it from there.")
             sys.exit(1)
 

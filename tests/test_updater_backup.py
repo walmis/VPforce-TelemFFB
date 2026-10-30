@@ -35,18 +35,35 @@ def qapp():
     return app
 
 
+FOREIGN_FILE = "options.lua"
+FOREIGN_DIR = "Mods"
+
+
 def _make_install(tmp_path):
-    """A miniature install tree: a data file, an assets dir, an ini pair."""
+    """A miniature install tree in the release layout - the executable, the
+    assets dir, the release notes - unzipped into a folder that also holds
+    files of the user's own."""
     app = tmp_path / "install"
     app.mkdir()
-    (app / "defaults.xml").write_text("x")
+    (app / updater.EXECUTABLE_NAME).write_text("exe")
     assets = app / "assets"
     (assets / "PyQt6").mkdir(parents=True)
     (assets / "PyQt6" / "Qt6Core.dll").write_text("dll")
     (assets / "base_library.zip").write_text("stdlib")
-    (app / "config.ini").write_text("cfg")
-    (app / "userconfig.ini").write_text("user")
+    (assets / "defaults.xml").write_text("x")
+    (app / "_RELEASE_NOTES.txt").write_text("notes")
+    (app / FOREIGN_FILE).write_text("user data")
+    (app / FOREIGN_DIR / "aircraft").mkdir(parents=True)
+    (app / FOREIGN_DIR / "aircraft" / "entry.lua").write_text("mod")
     return app
+
+
+def _foreign_untouched(app):
+    backup = app / updater.BACKUP_FOLDER
+    return ((app / FOREIGN_FILE).read_text() == "user data"
+            and (app / FOREIGN_DIR / "aircraft" / "entry.lua").exists()
+            and not (backup / FOREIGN_FILE).exists()
+            and not (backup / FOREIGN_DIR).exists())
 
 
 class TestMoveWithRetry:
@@ -70,22 +87,48 @@ class TestBackupRollback:
     def _worker(self, app_path):
         w = UpdateWorker.__new__(UpdateWorker)  # skip QThread download wiring
         w.app_path = str(app_path)
-        w._folder_snapshot = os.listdir(app_path)
         w.status = types.SimpleNamespace(emit=lambda *a: None)
         w.log = types.SimpleNamespace(emit=lambda *a: None)
         w.progress = types.SimpleNamespace(emit=lambda *a: None)
         return w
 
-    def test_clean_backup_moves_everything(self, tmp_path):
+    def test_backup_moves_only_the_releases_own_entries(self, tmp_path):
         app = _make_install(tmp_path)
         w = self._worker(app)
         w._backup()
         backup = app / updater.BACKUP_FOLDER
+        assert (backup / updater.EXECUTABLE_NAME).exists()
         assert (backup / "assets" / "PyQt6" / "Qt6Core.dll").exists()
-        assert (backup / "defaults.xml").exists()
-        # ini preservation: copied, original left in place
-        assert (app / "userconfig.ini").exists() and (backup / "userconfig.ini").exists()
+        assert (backup / "assets" / "defaults.xml").exists()
+        assert (backup / "_RELEASE_NOTES.txt").exists()
         assert not (app / "assets").exists()
+        assert not (app / updater.EXECUTABLE_NAME).exists()
+        assert _foreign_untouched(app)
+
+    def test_missing_release_notes_are_not_a_failure(self, tmp_path):
+        app = _make_install(tmp_path)
+        (app / "_RELEASE_NOTES.txt").unlink()
+        self._worker(app)._backup()
+        backup = app / updater.BACKUP_FOLDER
+        assert (backup / "assets" / "PyQt6" / "Qt6Core.dll").exists()
+        assert not (backup / "_RELEASE_NOTES.txt").exists()
+
+    def test_a_folder_without_telemffb_files_backs_up_nothing(self, tmp_path):
+        app = tmp_path / "install"
+        app.mkdir()
+        (app / FOREIGN_FILE).write_text("user data")
+        self._worker(app)._backup()
+        assert (app / updater.BACKUP_FOLDER).is_dir()
+        assert os.listdir(app / updater.BACKUP_FOLDER) == []
+        assert (app / FOREIGN_FILE).read_text() == "user data"
+
+    @LOCK_TESTS
+    def test_a_locked_foreign_file_does_not_block_the_update(self, tmp_path):
+        app = _make_install(tmp_path)
+        with open(app / FOREIGN_FILE, "r"):
+            self._worker(app)._backup()
+        assert (app / updater.BACKUP_FOLDER / "assets" / "PyQt6" / "Qt6Core.dll").exists()
+        assert _foreign_untouched(app)
 
     def test_dir_lock_falls_back_to_per_file_move(self, tmp_path, monkeypatch):
         # the field case: the assets DIRECTORY rename fails persistently
@@ -138,17 +181,18 @@ class TestBackupRollback:
     def test_locked_file_aborts_and_restores_install(self, tmp_path):
         app = _make_install(tmp_path)
         w = self._worker(app)
-        locked = app / "zz_locked.dat"  # sorts last: earlier items get moved first
-        locked.write_text("busy")
-        w._folder_snapshot = sorted(os.listdir(app))
+        # the release notes are backed up last: the executable and the
+        # assets have been moved by the time the lock is hit
+        locked = app / "_RELEASE_NOTES.txt"
         with open(locked, "r"):
             with pytest.raises(RuntimeError, match="locked by another program"):
                 w._backup()
         # the cardinal rule: the install is intact after a failed update
+        assert (app / updater.EXECUTABLE_NAME).exists()
         assert (app / "assets" / "PyQt6" / "Qt6Core.dll").exists()
-        assert (app / "defaults.xml").exists()
-        assert (app / "config.ini").exists()
+        assert (app / "assets" / "defaults.xml").exists()
         assert locked.exists()
+        assert _foreign_untouched(app)
 
     @LOCK_TESTS
     def test_locked_file_inside_dir_aborts_and_restores(self, tmp_path):
@@ -163,7 +207,7 @@ class TestBackupRollback:
                 w._backup()
         assert (app / "assets" / "PyQt6" / "Qt6Core.dll").exists()
         assert locked.exists()
-        assert (app / "defaults.xml").exists()
+        assert (app / updater.EXECUTABLE_NAME).exists()
 
 
 class TestStaleBackupRemoval:
@@ -174,7 +218,6 @@ class TestStaleBackupRemoval:
     def _worker(self, app_path):
         w = UpdateWorker.__new__(UpdateWorker)
         w.app_path = str(app_path)
-        w._folder_snapshot = os.listdir(app_path)
         w.status = types.SimpleNamespace(emit=lambda *a: None)
         w.log = types.SimpleNamespace(emit=lambda *a: None)
         w.progress = types.SimpleNamespace(emit=lambda *a: None)

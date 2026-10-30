@@ -1,4 +1,4 @@
-"""Unsafe-install-location guard: the auto-updater manages the entire
+"""Unsafe-install-location guard: the auto-updater replaces its files in the
 folder containing the executable, so running from a shared location
 (Desktop, drive root, Downloads, ...) must be refused at startup.
 
