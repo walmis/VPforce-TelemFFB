@@ -169,19 +169,44 @@ def eliminate_no_prereq(datalist: list[DefaultDataRow]) -> list[DefaultDataRow]:
     return working
 
 
-def render_gate_passes(expr: str, values: dict) -> bool:
-    """Whether a ``render_prereq`` expression holds: comma-separated setting
-    names, each required true, or false when prefixed with ``!``.  A name
-    absent from ``values`` counts as false."""
+#: Values that leave a gate reference unset: a false bool, an unbound button.
+_GATE_UNSET_VALUES = frozenset({'', 'false', '0'})
+
+
+def gate_value_set(value) -> bool:
+    """Whether a value referenced by a ``render_prereq`` / ``enable_prereq``
+    gate counts as set: a true bool or a bound button."""
+    return str('' if value is None else value).strip().lower() not in _GATE_UNSET_VALUES
+
+
+def gate_references(expr: str) -> list[str]:
+    """The setting names a gate expression references."""
+    return [token.strip().lstrip('!').strip() for token in (expr or '').split(',') if token.strip()]
+
+
+def gate_failures(expr: str, values: dict) -> list[tuple[str, bool]]:
+    """The failing tokens of a ``render_prereq`` / ``enable_prereq``
+    expression, as (setting name, whether it is set) pairs.
+
+    The expression is comma-separated setting names, each required set (see
+    :func:`gate_value_set`), or unset when prefixed with ``!``.  A name
+    absent from ``values`` counts as unset."""
+    failing = []
     for token in (expr or '').split(','):
         token = token.strip()
         if not token:
             continue
-        want_true = not token.startswith('!')
+        want_set = not token.startswith('!')
         ref = token.lstrip('!').strip()
-        if (str(values.get(ref, '')).strip().lower() == 'true') != want_true:
-            return False
-    return True
+        is_set = gate_value_set(values.get(ref, ''))
+        if is_set != want_set:
+            failing.append((ref, is_set))
+    return failing
+
+
+def render_gate_passes(expr: str, values: dict) -> bool:
+    """Whether a ``render_prereq`` expression holds; see :func:`gate_failures`."""
+    return not gate_failures(expr, values)
 
 
 def visible_rows(data_list: list[DefaultDataRow]) -> list[DefaultDataRow]:

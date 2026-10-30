@@ -547,13 +547,14 @@ class TestExclusivityReferences:
 
 
 class TestConditionalGateReferences:
-    """`render_prereq` / `enable_prereq` reference existing bool settings.
+    """`render_prereq` / `enable_prereq` reference existing bool or button settings.
 
     These cross-tree gates hide (render_prereq) or disable (enable_prereq) a
-    setting based on another setting's value, evaluated as a boolean. So each
-    referenced name must exist in <defaults> and be datatype 'bool'. Grammar:
-    comma-separated tokens, each `name` (require true) or `!name` (require
-    false). Catches typos and gating on a non-boolean.
+    setting based on whether another setting is set: a true bool or a bound
+    button. So each referenced name must exist in <defaults> and be datatype
+    'bool' or 'button'. Grammar: comma-separated tokens, each `name` (require
+    set) or `!name` (require unset). Catches typos and gating on a value
+    with no set/unset meaning.
     """
 
     def _name_datatypes(self, root):
@@ -583,15 +584,15 @@ class TestConditionalGateReferences:
                     f"<defaults> '{elem.findtext('name')}' {tag}='{expr}' "
                     f"references unknown setting '{ref}'"
                 )
-                assert name_dt[ref] == "bool", (
+                assert name_dt[ref] in ("bool", "button"), (
                     f"<defaults> '{elem.findtext('name')}' {tag}='{expr}' references "
-                    f"'{ref}' which is datatype '{name_dt[ref]}', not bool"
+                    f"'{ref}' which is datatype '{name_dt[ref]}', not bool or button"
                 )
 
-    def test_render_prereq_refs_existing_bool(self, defaults_root):
+    def test_render_prereq_refs_existing_bool_or_button(self, defaults_root):
         self._check(defaults_root, "render_prereq")
 
-    def test_enable_prereq_refs_existing_bool(self, defaults_root):
+    def test_enable_prereq_refs_existing_bool_or_button(self, defaults_root):
         self._check(defaults_root, "enable_prereq")
 
 

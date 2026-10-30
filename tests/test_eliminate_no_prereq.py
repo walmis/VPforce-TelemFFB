@@ -121,6 +121,14 @@ class TestVisibleRows:
                 _item('fallback', value='0.5', render_prereq='!curve')]
         assert self._visible(data) == {'curve', 'fallback'}
 
+    def test_a_render_gate_on_a_button_follows_its_binding(self):
+        def data(binding):
+            return [_item('release', value=binding, datatype='button'),
+                    _item('deadzone', value='0.05', render_prereq='!release')]
+        assert 'deadzone' in self._visible(data('0'))
+        assert 'deadzone' not in self._visible(data('7'))
+        assert 'deadzone' not in self._visible(data('3344:0001:2'))
+
     def test_legacy_convert_rows_never_show(self):
         assert self._visible([_item('aircraft_is_fbw', value='true', datatype='convert')]) == set()
 

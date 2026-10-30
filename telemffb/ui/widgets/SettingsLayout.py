@@ -45,6 +45,7 @@ import telemffb.utils as utils
 import styles
 from telemffb import globals as G
 from telemffb import xmlutils
+from telemffb.xml.merge import gate_failures, gate_references
 
 PREVIEW_BUTTON_SIZE = 20          # matches the -/+ step buttons
 PREVIEW_ACTIVE_HANDLE = ACTIVE_GREEN  # the green the live loop paints active effects
@@ -139,6 +140,7 @@ class SettingsLayout(QGridLayout):
         # walking findChildren() every ~50ms. See bind()/repaint_active_settings().
         self._active_setting_sliders = []          # NoWheelSlider, excluding live-key number sliders
         self.live_key_sliders = []                 # [(NoWheelNumberSlider, live_telemetry_key), ...]
+        self._gate_refs = set()                    # settings named by a render/enable gate
         result = None
         if G.settings_mgr.current_sim != 'nothing':
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
@@ -320,39 +322,33 @@ class SettingsLayout(QGridLayout):
         """Apply the cross-tree `render_prereq` / `enable_prereq` gates.
 
         Unlike `prereq` (which is both tree parentage and visibility), these
-        gate a setting on the current value of *other* bool settings anywhere
-        in the tree:
+        gate a setting on the current value of *other* bool or button
+        settings anywhere in the tree:
 
           - `render_prereq` failing -> hide the row (is_visible = 'false').
           - `enable_prereq` failing -> keep it visible but disabled, with an
             explanatory tooltip stored on the item.
 
         Grammar (both fields): comma-separated tokens; `name` requires that
-        setting be true, `!name` requires it false; ALL tokens must pass.
-        A referenced setting absent from the resolved set is treated as false.
+        setting be set (a true bool, a bound button), `!name` requires it
+        unset; ALL tokens must pass.  A referenced setting absent from the
+        resolved set is treated as unset.
         Runs after is_visible() so it can override visibility, and before
         eliminate_invisible() so hidden rows are dropped.
         """
         values = {it['name']: (it.get('value') or '') for it in datalist}
         displaynames = {it['name']: (it.get('displayname') or it['name']).strip() for it in datalist}
+        datatypes = {it['name']: it.get('datatype') for it in datalist}
+        self._gate_refs = {ref for it in datalist for field in ('render_prereq', 'enable_prereq')
+                           for ref in gate_references(it.get(field))}
 
-        def evaluate(expr):
-            """Return (passed, [(ref, is_true), ...failing tokens])."""
-            failing = []
-            for token in expr.split(','):
-                token = token.strip()
-                if not token:
-                    continue
-                want_true = not token.startswith('!')
-                ref = token[1:].strip() if token.startswith('!') else token
-                is_true = str(values.get(ref, 'false')).strip().lower() == 'true'
-                if is_true != want_true:
-                    failing.append((ref, is_true))
-            return (not failing), failing
+        def state(ref, is_set):
+            if datatypes.get(ref) == 'button':
+                return 'bound' if is_set else 'not bound'
+            return 'enabled' if is_set else 'disabled'
 
         def reason(failing):
-            parts = [f"{displaynames.get(ref, ref)} is {'enabled' if is_true else 'disabled'}"
-                     for ref, is_true in failing]
+            parts = [f"{displaynames.get(ref, ref)} is {state(ref, is_set)}" for ref, is_set in failing]
             return "Disabled because " + " and ".join(parts)
 
         for item in datalist:
@@ -360,13 +356,13 @@ class SettingsLayout(QGridLayout):
             item['disabled_reason'] = ''
 
             render_expr = (item.get('render_prereq') or '').strip()
-            if render_expr and not evaluate(render_expr)[0]:
+            if render_expr and gate_failures(render_expr, values):
                 item['is_visible'] = 'false'
 
             enable_expr = (item.get('enable_prereq') or '').strip()
             if enable_expr and item.get('is_visible', 'false').lower() == 'true':
-                passed, failing = evaluate(enable_expr)
-                if not passed:
+                failing = gate_failures(enable_expr, values)
+                if failing:
                     item['force_disabled'] = True
                     item['disabled_reason'] = reason(failing)
         return datalist
@@ -2242,7 +2238,8 @@ class SettingsLayout(QGridLayout):
         button.setToolTip(str(value) if key else '')
 
     def update_button(self, button_name, value):
-        self.trigger_form_reload = False
+        # rebuild only when a binding shows or hides other rows
+        self.trigger_form_reload = button_name in self._gate_refs
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         self._show_binding(the_button, value)
         if str(value) != '0':

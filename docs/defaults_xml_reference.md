@@ -705,10 +705,10 @@ The settings form in TelemFFB itself is unaffected.
 ## The `render_prereq` and `enable_prereq` Fields
 
 Where `prereq` couples a setting's visibility to its **tree parent**, these two fields gate a
-setting on the current value of **any other bool setting(s)**, regardless of where they sit in
-the hierarchy. Use them when a setting is made irrelevant or conflicting by a control elsewhere
-in the tree — e.g. two legacy trim knobs that become inert once the auto-calibrated trim curve
-is enabled.
+setting on the current value of **any other bool or button setting(s)**, regardless of where they
+sit in the hierarchy. Use them when a setting is made irrelevant or conflicting by a control
+elsewhere in the tree — e.g. two legacy trim knobs that become inert once the auto-calibrated trim
+curve is enabled, or the HPG feet-on deadzones, unused once a pedal trim release button is bound.
 
 | Field | Effect when the condition **fails** |
 |-------|-------------------------------------|
@@ -723,10 +723,13 @@ enable_prereq = !name
 render_prereq = name1,!name2
 ```
 
-- Comma-separated list of tokens. `name` requires that setting be `true`; `!name` requires it
-  be `false`. **All** tokens must pass for the condition to hold.
-- Each referenced name must be an existing `bool` setting (enforced by the schema tests).
-- A referenced setting absent from the resolved set is treated as `false`.
+- Comma-separated list of tokens. `name` requires that setting be **set**; `!name` requires it
+  be unset. **All** tokens must pass for the condition to hold.
+- Set means a `bool` that is `true` or a `button` that is bound (any value but `0` or empty).
+  The test is `gate_value_set()` in `telemffb/xml/merge.py`.
+- Each referenced name must be an existing `bool` or `button` setting (enforced by the schema tests).
+- A referenced setting absent from the resolved set is treated as unset.
+- The disabled reason reads "is enabled/disabled" for a bool and "is bound/not bound" for a button.
 
 ### Evaluation
 
@@ -734,7 +737,12 @@ Unlike `debug_only` (a parse-time gate against a global), these depend on anothe
 **resolved value**, so they are evaluated in the view layer (`SettingsLayout.apply_conditional_gates`),
 after normal `prereq` visibility and before invisible rows are dropped. Evaluation is against the
 referenced setting's **value**, not its visibility — so the gate still works when the controlling
-toggle is itself collapsed or hidden.
+toggle is itself collapsed or hidden. `render_prereq` is also applied by `visible_rows()`
+(`telemffb/xml/merge.py`), with the same test.
+
+Binding a button normally leaves the form as it is; when another row's gate names that button,
+the form rebuilds so the gated rows show or hide at once. Clearing a binding (the erase button)
+always rebuilds.
 
 ### Precedence
 
