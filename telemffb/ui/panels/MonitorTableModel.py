@@ -23,8 +23,8 @@ Both tables are "a list of rows keyed by something stable, refreshed every
 telemetry frame" - telemetry rows keyed by their telemetry key (mostly the
 same set frame to frame), active-effects rows keyed by the rendered effect
 line itself (unique per effect, since it embeds the effect id). One generic
-model covers both: construct with the column headers wanted (two for
-telemetry - Key/Value - one for the effects list) and feed it ordered
+model covers both: construct with the column headers wanted (star/Key/
+Value/Unit for telemetry, name/intensity for the effects list) and feed it ordered
 ``(row_key, values)`` pairs on every update.
 
 Telemetry runs at 60-120 Hz, but ``on_update_telemetry`` already throttles

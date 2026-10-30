@@ -20,7 +20,7 @@
 
 Hosts a ``TelemetryPlotWidget`` under a toolbar (window length, pause,
 tile reset, clear, CSV export).  Frames and the marked keys arrive through
-``add_frame`` and ``set_keys`` from the feed listener (``telemffb.plot.app``);
+``add_frame``, ``set_keys`` and ``set_units`` from the feed listener (``telemffb.plot.app``);
 the frame times are the sender's clock, shown relative to the first frame.
 Closing hides; the buffered data survives until Clear.
 """
@@ -110,6 +110,10 @@ class TelemetryPlotWindow(QMainWindow):
         Newly marked keys appear with their next frame."""
         self._keys = list(keys)
         self._plot.drop_series_not_in(self._keys)
+
+    def set_units(self, units: dict) -> None:
+        """The unit each marked key is plotted in, ``{key: (unit, factor)}``."""
+        self._plot.set_units(units)
 
     def add_frame(self, t: float, values: dict) -> None:
         """One frame's marked keys at the sender's time ``t``.  Dropped

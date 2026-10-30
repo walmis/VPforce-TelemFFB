@@ -81,6 +81,35 @@ def clear_plot_keys() -> None:
     G.system_settings.setValue(PLOT_KEYS_KEY, '')
 
 
+#: The unit each telemetry key is shown in when it is not its own, as
+#: ``key=unit`` pairs in one registry value - global, like the favorites,
+#: for the same reason. Neither keys nor unit tokens carry commas or '='.
+UNIT_PREFS_KEY = 'monitorUnitPrefs'
+
+
+def load_unit_prefs() -> dict:
+    """The chosen display unit per telemetry key."""
+    raw = G.system_settings.get(UNIT_PREFS_KEY, '')
+    prefs = {}
+    for pair in str(raw or '').split(','):
+        key, sep, unit = pair.partition('=')
+        if sep and key.strip() and unit.strip():
+            prefs[key.strip()] = unit.strip()
+    return prefs
+
+
+def set_unit_pref(key: str, unit) -> None:
+    """Show ``key`` in ``unit`` from now on; ``None`` goes back to the unit
+    it is reported in. Re-reads first, as ``toggle_favorite`` does."""
+    prefs = load_unit_prefs()
+    if unit:
+        prefs[key] = unit
+    else:
+        prefs.pop(key, None)
+    G.system_settings.setValue(
+        UNIT_PREFS_KEY, ','.join(f"{k}={u}" for k, u in sorted(prefs.items())))
+
+
 def ordered_telemetry(frame: dict) -> OrderedDict:
     """A frame as a monitor lists it: the identifying keys first, the rest
     alphabetical."""
