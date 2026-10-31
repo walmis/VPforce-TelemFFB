@@ -933,9 +933,10 @@ class _DeviceRetryTicker:
 
     The presence check enumerates devices, and a DirectInput enumeration
     opens every force feedback device on the PC through its driver, which
-    a slow device can hold for seconds; so the check runs on a worker
-    thread, one at a time, and the switch runs on the main thread when the
-    result arrives.
+    a slow device can hold for seconds and which resets the effects some
+    bases hold in another instance; so the check enumerates only when the
+    set of USB devices present has changed, on a worker thread, one at a
+    time, and the switch runs on the main thread when the result arrives.
     """
     INTERVAL_MS = 2000
     #: Tests check inline.
@@ -944,6 +945,15 @@ class _DeviceRetryTicker:
     def __init__(self):
         self._timer = None
         self._check = None
+        self._usb_watch = utils.UsbDeviceWatch()
+        self._found = False
+
+    def _presence(self, devpath, pid) -> bool:
+        """The configured device's presence: enumerated when the devices
+        present have changed since the last check, else the last answer."""
+        if self._usb_watch.changed():
+            self._found = _configured_device_present(devpath, pid)
+        return self._found
 
     def start(self):
         if self._timer is None:
@@ -969,13 +979,13 @@ class _DeviceRetryTicker:
             self.stop()            # nothing selected: nothing to wait for
             return
         if not self.CHECK_THREADED:
-            self._checked(_configured_device_present(devpath, pid))
+            self._checked(self._presence(devpath, pid))
             return
         if self._check is not None and self._check.is_alive():
             return                 # the previous check has not come back yet
 
         def check():
-            found = _configured_device_present(devpath, pid)
+            found = self._presence(devpath, pid)
             utils.schedule_on_main_thread(lambda: self._checked(found))
 
         self._check = threading.Thread(

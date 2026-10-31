@@ -49,7 +49,7 @@ from telemffb.ui.panels.InstanceSettingsPanel import (
     STARTUP_FIELDS, SYSTEM_FIELDS, InstanceSettingsPanel,
 )
 from telemffb.utils import (
-    absent_device_entry,
+    UsbDeviceWatch, absent_device_entry,
     device_display_name, device_ident_key, device_ids_key, device_name_key, device_pid_key,
     directinput_selection_devices, format_usb_ids, recover_device_identity,
     schedule_on_main_thread, validate_vpconf_profile, HiDpiPixmap,
@@ -247,7 +247,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self._dinput_listing = None
         self._vpforce_scan = None
         self._dinput_scan = None
-        self._watch_ticks = 0
+        self._usb_watch = self.USB_WATCH()
         self._device_watch = QtCore.QTimer(self)
         self._device_watch.setInterval(self.DEVICE_WATCH_MS)
         self._device_watch.timeout.connect(self._watch_devices)
@@ -692,12 +692,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         except Exception:
             logging.exception("Device watch: listing the DirectInput devices failed")
 
-    #: How often an open dialog re-lists the VPforce devices, so a device
-    #: that is plugged in or unplugged shows as such without reopening it.
+    #: How often an open dialog checks the USB devices present, so a
+    #: device that is plugged in or unplugged shows as such without
+    #: reopening it.
     DEVICE_WATCH_MS = 2000
-    #: The DirectInput listing opens every force feedback device through
-    #: its driver, so it is refreshed once per this many ticks.
-    DINPUT_WATCH_TICKS = 2
+    #: What tells the watch that the devices present have changed; the
+    #: listings run only then.  The DirectInput listing opens every force
+    #: feedback device this instance does not hold through its driver,
+    #: and on some bases that resets the effects of the one it does hold.
+    USB_WATCH = UsbDeviceWatch
     #: The watch lists the VPforce devices on a worker thread: a HID open
     #: that a hub stalls must never hold the main thread.  Tests list inline.
     DEVICE_WATCH_THREADED = True
@@ -707,24 +710,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return frozenset(_device_path(device) for device in devices)
 
     def _watch_devices(self):
-        """One watch tick: list the VPforce devices (on a worker thread) and
-        hand the result to _vpforce_listed; every few ticks, re-list the
-        DirectInput devices the same way."""
+        """One watch tick: when the devices present have changed, list
+        the VPforce devices (on a worker thread) and hand the result to
+        _vpforce_listed, and re-list the DirectInput devices the same
+        way.  An unchanged set lists nothing."""
         if not self.isVisible():
             self._device_watch.stop()
             return
-        self._watch_ticks += 1
-        if self._watch_ticks % self.DINPUT_WATCH_TICKS == 0:
-            self._refresh_dinput_listing()
         if not self.DEVICE_WATCH_THREADED:
-            self._vpforce_listed(self._list_vpforce_devices())
+            if self._usb_watch.changed():
+                self._vpforce_listed(self._list_vpforce_devices())
+                self._refresh_dinput_listing()
             return
         if self._vpforce_scan is not None and self._vpforce_scan.is_alive():
             return      # the previous listing has not come back yet
 
         def listing():
+            if not self._usb_watch.changed():
+                return
             result = self._list_vpforce_devices()
             schedule_on_main_thread(lambda: self._vpforce_listed(result))
+            schedule_on_main_thread(self._refresh_dinput_listing)
 
         self._vpforce_scan = threading.Thread(
             target=listing, daemon=True, name='SystemSettings VPforce listing')
@@ -763,6 +769,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         now, the DirectInput devices from the last listing (the first one
         is started here and fills the selectors when it arrives)."""
         dinput_on = bool(G.system_settings.get('enableDirectInput', False))
+        # the devices present now are what these listings describe: the
+        # watch re-lists when that set changes
+        self._usb_watch.prime()
         if dinput_on and self._dinput_listing is None:
             self._list_dinput_devices()
         self._rebuild_selectors(self._list_vpforce_devices() or [],

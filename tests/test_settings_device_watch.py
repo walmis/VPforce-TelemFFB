@@ -1,6 +1,8 @@
-"""An open System Settings dialog re-lists the VPforce devices: a device
-that is plugged in replaces its 'not connected' entry, a listing that has
-not changed rebuilds nothing, and an unsaved pick survives a refresh."""
+"""An open System Settings dialog re-lists the devices when the USB
+devices present change: a device that is plugged in replaces its 'not
+connected' entry, a listing that has not changed rebuilds nothing, an
+unchanged device set lists nothing, and an unsaved pick survives a
+refresh."""
 import os
 
 import pytest
@@ -14,9 +16,25 @@ from tests.test_settings_device_repopulate import _FakeDevice, _Settings, _make_
 pytestmark = [pytest.mark.unit]
 
 
+class _ScriptedWatch:
+    """A USB watch that answers ``changed()`` from a script; empty or
+    exhausted, it reports a change every time."""
+    answers = ()
+
+    def __init__(self):
+        self._answers = list(self.answers)
+
+    def prime(self):
+        pass
+
+    def changed(self):
+        return self._answers.pop(0) if self._answers else True
+
+
 def _enumerate(monkeypatch, devices):
     from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
     monkeypatch.setattr(SystemSettingsDialog, 'DEVICE_WATCH_THREADED', False)
+    monkeypatch.setattr(SystemSettingsDialog, 'USB_WATCH', _ScriptedWatch)
     monkeypatch.setattr(
         'telemffb.ui.dialogs.SystemSettingsDialog.FFBRhino.enumerate',
         staticmethod(lambda *a, **k: list(devices)), raising=False)
@@ -175,17 +193,24 @@ def test_a_directinput_alternate_that_appears_is_listed_on_its_refresh(monkeypat
         app.processEvents()
 
 
-def test_the_directinput_listing_is_refreshed_every_few_ticks(monkeypatch):
+def test_listings_run_only_when_the_usb_devices_change(monkeypatch):
+    """Three ticks, one change: one VPforce listing and one DirectInput
+    listing, on that tick."""
     _enumerate(monkeypatch, [])
     app, dlg = _make_dialog(monkeypatch, _settings(enableDirectInput=True))
     try:
-        calls = []
-        monkeypatch.setattr(dlg, '_refresh_dinput_listing', lambda: calls.append(1))
+        from telemffb.ui.dialogs.SystemSettingsDialog import SystemSettingsDialog
+        dlg._usb_watch = _ScriptedWatch()
+        dlg._usb_watch._answers = [False, True, False]
+        listed, refreshed = [], []
+        monkeypatch.setattr(SystemSettingsDialog, '_list_vpforce_devices',
+                            staticmethod(lambda: listed.append(1) or []))
+        monkeypatch.setattr(dlg, '_refresh_dinput_listing', lambda: refreshed.append(1))
         dlg.show()
         app.processEvents()
-        for _ in range(dlg.DINPUT_WATCH_TICKS * 2):
+        for _ in range(3):
             dlg._watch_devices()
-        assert len(calls) == 2
+        assert (len(listed), len(refreshed)) == (1, 1)
     finally:
         dlg.close()
         dlg.deleteLater()
@@ -234,8 +259,10 @@ def test_the_threaded_listing_rebuilds_on_the_main_thread(monkeypatch):
         dlg._watch_devices()
         dlg._vpforce_scan.join(timeout=5)
         assert seen['thread'] != threading.main_thread().name
-        assert len(delivered) == 1
-        delivered[0]()                      # what the main thread would run
+        # the VPforce rebuild and the DirectInput refresh, in that order
+        assert len(delivered) == 2
+        for fn in delivered:
+            fn()                            # what the main thread would run
         assert dlg.cb_select_j.currentData() is live
     finally:
         dlg.close()

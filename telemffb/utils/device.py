@@ -36,6 +36,7 @@ __all__ = [
     "DEVICE_ROLES",
     "recover_device_identity",
     "directinput_selection_devices",
+    "UsbDeviceWatch",
     "dinput_slot_configured",
     "device_pid_key",
     "active_joystick_slot_suffix",
@@ -346,6 +347,48 @@ def directinput_selection_devices(settings, enabled=None):
             f"enumerated: {e}. DirectLink is required - see the "
             "TelemFFB DirectInput documentation.")
         return []
+
+
+class UsbDeviceWatch:
+    """Notices devices coming and going without touching any of them.
+
+    The set of USB devices present, as (bus, address, vendor id, product
+    id), read through libusb from the descriptors the OS already holds:
+    no device is opened.  ``changed()`` says whether that set differs
+    from the last call's, and the callers list the devices only then, so
+    a listing that opens devices through their drivers runs on a plug or
+    unplug and never on a timer.  A failed read counts as changed, so a
+    caller without a working libusb lists every time.
+    """
+
+    def __init__(self):
+        self._last = None
+
+    @staticmethod
+    def present():
+        """The devices present, or None when libusb cannot list them."""
+        try:
+            import usb1
+            with usb1.USBContext() as context:
+                return frozenset(
+                    (d.getBusNumber(), d.getDeviceAddress(),
+                     d.getVendorID(), d.getProductID())
+                    for d in context.getDeviceList(skip_on_error=True))
+        except Exception:
+            logging.debug("USB device listing failed", exc_info=True)
+            return None
+
+    def prime(self):
+        """Take the devices present now as the baseline."""
+        self._last = self.present()
+
+    def changed(self) -> bool:
+        """Whether the devices present differ from the previous call's;
+        True on the first call and whenever the read fails."""
+        now = self.present()
+        changed = now is None or now != self._last
+        self._last = now
+        return changed
 
 
 def dinput_slot_configured(settings) -> bool:
