@@ -1279,8 +1279,11 @@ class SimConnectManager(threading.Thread):
             # Before fetching: a resubscribe checked after GetNextDispatch
             # discarded whatever message that call had just returned.
             if self.resubscribe:
-                self._subscribe()
+                # Cleared before the rebuild: a variable added on the
+                # telemetry thread while _subscribe() runs raises the flag
+                # again and gets the next rebuild instead of being lost.
                 self.resubscribe = False
+                self._subscribe()
 
             try:
                 #print('Trying')
