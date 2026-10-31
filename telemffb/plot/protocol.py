@@ -29,6 +29,7 @@ so a TelemFFB that dies never leaves a plotter behind.
 """
 
 import json
+import re
 from typing import Dict, Iterable, Optional
 
 #: How often TelemFFB repeats the key list while the plotter runs.
@@ -38,6 +39,24 @@ FEED_TIMEOUT_S = 3.0
 
 CMD_SHOW = "show"
 CMD_QUIT = "quit"
+
+
+#: A number with a unit tacked on, as some telemetry strings are ("0.345ms").
+_NUMBER_WITH_UNIT = re.compile(r"^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*[A-Za-z%°/]*\s*$")
+
+
+def plottable(value):
+    """The number a telemetry value plots as, or ``None``: numbers as they
+    are, bools as 0 or 1, a string only when it is a number with a unit
+    suffix (``"0.345ms"`` is 0.345; ``"C172"`` is not plottable)."""
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        m = _NUMBER_WITH_UNIT.match(value)
+        return float(m.group(1)) if m else None
+    return None
 
 
 def _plain(value):

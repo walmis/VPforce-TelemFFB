@@ -55,10 +55,10 @@ class TestProtocol:
 class TestFeed:
     def test_sends_only_the_marked_numeric_keys(self, receiver_socket):
         feed = PlotFeed(receiver_socket.getsockname()[1])
-        feed.keys = ('IAS', 'N', 'WoW', 'Absent')
-        feed.send_frame({'IAS': 51.0, 'N': 'C172', 'WoW': [0.2, 0.4], 'TAS': 55.0})
+        feed.keys = ('IAS', 'N', 'WoW', 'Absent', 'perf')
+        feed.send_frame({'IAS': 51.0, 'N': 'C172', 'WoW': [0.2, 0.4], 'TAS': 55.0, 'perf': '0.345ms'})
         message = protocol.decode(receiver_socket.recv(65535))
-        assert message["v"] == {'IAS': 51.0, 'WoW': [0.2, 0.4]}
+        assert message["v"] == {'IAS': 51.0, 'WoW': [0.2, 0.4], 'perf': 0.345}
         assert message["t"] > 0
         feed.close()
 

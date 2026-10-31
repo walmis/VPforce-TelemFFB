@@ -47,6 +47,11 @@ class TestSeriesFromFrame:
     def test_only_marked_keys_are_taken(self):
         assert series_from_frame({'IAS': 1.0, 'TAS': 2.0}, ['TAS']) == {'TAS': 2.0}
 
+    def test_a_number_with_a_unit_suffix_plots_as_the_number(self):
+        frame = {'perf': '0.345ms', 'N': 'C172', 'pct': '85%', 'neg': '-1.5e2 deg', 'blank': ''}
+        assert series_from_frame(frame, ['perf', 'N', 'pct', 'neg', 'blank']) == \
+            {'perf': 0.345, 'pct': 85.0, 'neg': -150.0}
+
 
 class TestSeriesBuffer:
     def test_keeps_the_history_window_and_grows_when_it_must(self):

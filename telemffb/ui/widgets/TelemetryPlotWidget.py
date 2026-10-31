@@ -56,6 +56,8 @@ from PyQt6.QtGui import QColor, QDrag, QPen, QTransform
 from PyQt6.QtWidgets import (QAbstractItemView, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
                              QMenu, QScrollArea, QSplitter, QVBoxLayout, QWidget)
 
+from telemffb.plot.protocol import plottable
+
 #: Seconds of history every series keeps, whatever window is shown.
 HISTORY_SECONDS = 300.0
 #: The window lengths the toolbar offers, seconds.
@@ -85,21 +87,21 @@ _DROP_MARKER_PX = 5
 
 def series_from_frame(frame: Dict, keys: Iterable[str]) -> Dict[str, float]:
     """The plottable series of ``frame`` for the marked ``keys``: a number
-    under its key, a list as ``key[i]`` per element, a bool as 0 or 1.
-    Strings and anything else are left out."""
+    under its key, a list as ``key[i]`` per element, a bool as 0 or 1, a
+    string only when it is a number with a unit suffix.  Anything else is
+    left out."""
     out: Dict[str, float] = {}
     for key in keys:
         value = frame.get(key)
-        if isinstance(value, bool):
-            out[key] = 1.0 if value else 0.0
-        elif isinstance(value, (int, float)):
-            out[key] = float(value)
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, (list, tuple)):
             for i, element in enumerate(value):
-                if isinstance(element, bool):
-                    out[f"{key}[{i}]"] = 1.0 if element else 0.0
-                elif isinstance(element, (int, float)):
-                    out[f"{key}[{i}]"] = float(element)
+                number = plottable(element)
+                if number is not None:
+                    out[f"{key}[{i}]"] = number
+        else:
+            number = plottable(value)
+            if number is not None:
+                out[key] = number
     return out
 
 

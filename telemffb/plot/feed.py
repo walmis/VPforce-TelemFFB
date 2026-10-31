@@ -28,7 +28,7 @@ import socket
 import time
 from typing import Iterable, Tuple
 
-from telemffb.plot.protocol import encode_command, encode_frame, encode_keys
+from telemffb.plot.protocol import encode_command, encode_frame, encode_keys, plottable
 
 
 class PlotFeed:
@@ -58,8 +58,12 @@ class PlotFeed:
         values = {}
         for key in keys:
             value = telem_data.get(key)
-            if isinstance(value, (bool, int, float, list, tuple)):
+            if isinstance(value, (list, tuple)):
                 values[key] = value
+            else:
+                number = plottable(value)
+                if number is not None:
+                    values[key] = number
         if values:
             self._send(encode_frame(time.perf_counter(), values))
 
