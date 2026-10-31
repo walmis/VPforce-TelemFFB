@@ -1677,6 +1677,11 @@ class DInputFFBDevice(ffb_backend.BaseFFBDevice):
                 logging.exception("live axis-map re-apply failed")
         try:
             self._poll_once()
+        except DIBridgeError as e:
+            # the bridge's answer names the cause (an unplugged device,
+            # mostly): an event, reported once, without a traceback
+            logging.warning(f"DirectInput device lost, reconnecting: {e}")
+            self._begin_reconnect()
         except Exception:
             logging.exception("DInput poll failed, device lost")
             self._begin_reconnect()
