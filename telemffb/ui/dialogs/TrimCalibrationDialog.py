@@ -107,7 +107,7 @@ class TrimCalibrationDialog(QDialog):
     GLIDER_VS_STEP_FPM = 10
     # States in which the control-response combo may still be changed live
     # (from the sweep onward it locks so the measurement dynamics stay fixed).
-    RESPONSE_LIVE_STATES = ("PROBE", "STABILIZE", "TRIM_NEUTRAL",
+    RESPONSE_LIVE_STATES = ("STABILIZE", "TRIM_NEUTRAL",
                             "ASSIST_HOLD", "SPEED_SETTLE")
 
     # Guided-flow step tracker: the engine's states map onto three
@@ -118,7 +118,7 @@ class TrimCalibrationDialog(QDialog):
     # state enum leaves the (non-debug) UI.
     TRACKER_STEPS = ("Level &amp; neutral trim", "Test speed", "Trim sweep")  # HTML-ready
     TRACKER_STEP_OF_STATE = {
-        "PROBE": 1, "STABILIZE": 1, "TRIM_NEUTRAL": 1,
+        "STABILIZE": 1, "TRIM_NEUTRAL": 1,
         "ASSIST_HOLD": 2,
         "SPEED_SETTLE": 3, "SWEEP": 3, "SOLVE": 3, "RESTORE": 3,
     }
@@ -281,8 +281,7 @@ class TrimCalibrationDialog(QDialog):
                 "if a slow porpoise gets worse as you lower it, go the other way.\n\n"
                 "Can be changed during a run up until the sweep begins — e.g. adjust it\n"
                 "while watching a porpoise develop during stabilization. The change applies\n"
-                "immediately (during the brief polarity probe it is applied when the probe\n"
-                "completes); once the sweep starts the setting locks for the rest of the run."))
+                "immediately; once the sweep starts the setting locks for the rest of the run."))
         # InfoLabel's internal minimum is broken (width pinned to text
         # HEIGHT), so it truncates under squeeze — enforce content width.
         lbl_response.setMinimumWidth(lbl_response.sizeHint().width())

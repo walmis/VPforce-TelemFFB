@@ -14,6 +14,7 @@ from unittest.mock import Mock
 import telemffb.globals as G
 from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.TrimCalibrator import TrimCalibrator, CalState
+from telemffb.telem.SimConnectManager import SimConnectManager
 from telemffb.utils import clamp
 
 pytestmark = [pytest.mark.unit, pytest.mark.msfs, pytest.mark.joystick]
@@ -232,12 +233,14 @@ class FakePlantAircraft:
         self.pitch = max(-15.0, min(15.0, self.vs * 2.0))
 
     def telem(self, **over):
+        # MSFS reports pitch nose-down and roll left-roll positive.
+        attitude_sign = -1.0 if self._sim_is_msfs() else 1.0
         data = {
             "FFBType": "joystick",
             "SimOnGround": 0,
             "VerticalSpeed": self.vs,
-            "Pitch": self.pitch,
-            "Roll": self.roll,
+            "Pitch": attitude_sign * self.pitch,
+            "Roll": attitude_sign * self.roll,
             "IAS": self.ias,
             "ElevTrimPct": self.trim,
             "APMaster": 0,
@@ -367,7 +370,7 @@ class TestClosedLoop:
         assert state == CalState.DONE
         assert ac.trim == pytest.approx(cal.result["trim0"], abs=0.01)
 
-    def test_detects_polarity_and_gain_with_negative_coupling(self, clock):
+    def test_detects_gain_with_negative_coupling(self, clock):
         # coupling=-0.8, physical_y=1.0 -> virtual_y = 1 - (-0.8) = 1.8
         ac = FakePlantAircraft(coupling=-0.8, physical_y=1.0)
         cal = TrimCalibrator(ac)
@@ -552,7 +555,7 @@ class TestDiagnosticTrace:
         assert len(lines) > 100, "a full run must record hundreds of frames"
         # spot-check a data row: state column populated, floats parse
         row = dict(zip(header, lines[1].split(",")))
-        assert row["state"] in ("PROBE", "STABILIZE")
+        assert row["state"] == "STABILIZE"
         float(row["vs_ms"])
         float(row["u_elev"])
         # rows are cleared after the dump (no growth across runs)
@@ -739,29 +742,14 @@ class TestSafety:
         assert cal.state == CalState.ABORT
         assert "Roll" in cal.abort_reason
 
-    def test_polarity_signs_persist_across_runs(self, clock):
-        # Control polarity is an aircraft property: a re-run must start from
-        # the previously detected signs, not reset to defaults (a wrong-sign
-        # prior feeds on residual bank from the previous run's handoff).
-        ac = FakePlantAircraft()
-        cal = TrimCalibrator(ac)
-        cal._elev_sign = -1.0
-        cal._ail_sign = -1.0
-        cal.start()
-        assert cal._elev_sign == -1.0
-        assert cal._ail_sign == -1.0
-
-    def test_probe_detects_polarity_despite_roll_drift(self, clock):
+    def test_completes_despite_roll_drift(self, clock):
         # Aircraft rolling on its own (torque, or residual motion right after
-        # a previous run) must not fool the aileron polarity probe: the
-        # baseline window measures the drift and the probe response is judged
-        # against it.
+        # a previous run).
         ac = FakePlantAircraft()
         ac.roll_bias_rate = -3.5    # rolling left on its own, deg/s
         cal = TrimCalibrator(ac)
         cal.start()
         state = run_to_completion(cal, ac, clock)
-        assert cal._ail_sign == 1.0, "drift must not flip the detected sign"
         assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
 
     def test_can_start_rejects_banked_start(self, clock):
@@ -806,7 +794,7 @@ class TestSafety:
     def test_takeover_is_bumpless_on_axis_output(self, clock):
         # With trim-following active, the normal path was delivering
         # phys_y - trim*P*(1-V). The calibrator's first elevator command must
-        # ride on that baseline (plus the probe nudge), not restart from 0.
+        # ride on that baseline, not restart from 0.
         ac = FakePlantAircraft(physical_y=1.0)
         ac.joystick_trim_follow_gain_virtual_y = 0.5
         ac.trim = 0.2                 # aircraft trimmed before starting
@@ -814,18 +802,15 @@ class TestSafety:
         cal.start()
         clock.advance(1 / 30.0)
         cal.update(ac.telem())
-        # First frames are the probe's no-input baseline window: the command
-        # must sit exactly on the takeover baseline (no step, no nudge yet).
+        # The first frame's command sits exactly on the takeover baseline.
         expected_base = 0.0 - 0.2 * 1.0 * (1 - 0.5)   # -0.10
         assert ac.cmd_elev == pytest.approx(expected_base, abs=1e-6)
-        # Through the baseline window and into the probe, the command must
-        # never jump — it stays on the baseline, then the probe eases in.
         prev = ac.cmd_elev
-        for _ in range(int(cal.PROBE_BASELINE_S * 30) + 4):
+        for _ in range(30):
             clock.advance(1 / 30.0)
             cal.update(ac.telem())
             ac.step(1 / 30.0)
-            assert abs(ac.cmd_elev - prev) < cal.PROBE_U * 0.3, "command stepped"
+            assert abs(ac.cmd_elev - prev) < 0.02, "command stepped"
             prev = ac.cmd_elev
 
     def test_abort_on_telemetry_gap(self, clock):
@@ -1073,58 +1058,54 @@ class TestSpeedSettle:
 # --------------------------------------------------------------------------- #
 
 class TestPitchCascade:
-    def test_cascade_engaged_with_pitch_telemetry(self, clock):
+    def test_attitude_sign_follows_the_sim(self, clock):
+        msfs = TrimCalibrator(FakePlantAircraft())
+        msfs.start()
+        assert msfs._attitude_sign == -1.0
+        xplane = TrimCalibrator(FakeXPDatarefTrimAircraft())
+        xplane.start()
+        assert xplane._attitude_sign == 1.0
+
+    def test_attitude_sign_matches_the_msfs_subscription(self):
+        # _attitude_sign undoes the raw MSFS convention, so a subscription
+        # that normalizes Pitch or Roll must take the sign out with it.
+        scales = {v.name: v.scale for v in SimConnectManager.sim_vars
+                  if v.name in ("Pitch", "Roll")}
+        assert scales == {"Pitch": None, "Roll": None}
+
+    def test_start_adds_no_input_on_a_trimmed_aircraft(self, clock):
+        ac = FakePlantAircraft()
+        cal = TrimCalibrator(ac)
+        cal.start()
+        assert cal.state == CalState.STABILIZE
+        for _ in range(90):
+            clock.advance(1 / 30.0)
+            cal.update(ac.telem())
+            ac.step(1 / 30.0)
+            assert abs(ac.cmd_elev) < 0.01
+            assert abs(ac.cmd_ail) < 0.01
+            assert abs(ac.roll) < 0.1
+
+    def test_levels_from_a_disturbed_start(self, clock):
+        # Field failure: a restart while the aircraft was still moving from
+        # the previous run railed the leveling loops into a pitch-guard abort.
+        ac = FakePlantAircraft()
+        ac.vs = -2.0
+        ac.pitch = -4.0
+        ac.roll = 5.0
+        cal = TrimCalibrator(ac)
+        cal.start()
+        assert run_until(cal, ac, clock,
+                         lambda: cal.state == CalState.TRIM_NEUTRAL, 30), \
+            f"never leveled ({cal.state}, {cal.abort_reason})"
+
+    def test_cascade_holds_level_with_pitch_telemetry(self, clock):
         ac = FakePlantAircraft()
         cal = TrimCalibrator(ac)
         cal.start()
         state = run_to_completion(cal, ac, clock)
         assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
-        assert cal._pitch_mode == "cascade"
-        assert cal._pitch_sign_known and cal._pitch_sign == 1.0
         assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
-
-    def test_msfs_style_inverted_pitch_sign(self, clock):
-        # MSFS reports pitch nose-up NEGATIVE (X-Plane positive). The probe
-        # must detect the polarity and the cascade must calibrate accurately.
-        class MsfsPitchPlant(FakePlantAircraft):
-            def step(self, dt):
-                super().step(dt)
-                self.pitch = -self.pitch
-
-        ac = MsfsPitchPlant()
-        cal = TrimCalibrator(ac)
-        cal.start()
-        state = run_to_completion(cal, ac, clock)
-        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
-        assert cal._pitch_mode == "cascade"
-        assert cal._pitch_sign == -1.0
-        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
-
-    def test_probe_early_exit_waits_for_ramp_completion(self, clock):
-        # Field failure: with the aircraft still surging from a previous
-        # aborted run, drift-compensated VS crossed the exit threshold in
-        # 0.15-0.22s — before the ramp had applied meaningful input — and the
-        # phugoid's dPitch/dVS phase coin-flipped the pitch polarity, railing
-        # the cascade. The early exit must not fire before PROBE_RAMP_S.
-        ac = FakePlantAircraft(K_E=80.0)   # strong response: exit threshold
-        cal = TrimCalibrator(ac)           # is reached well inside the ramp
-        cal.start()
-        probe_started_t = None
-        exit_elapsed = None
-        for _ in range(400):
-            clock.advance(1 / 30.0)
-            cal.update(ac.telem())
-            ac.step(1 / 30.0)
-            if cal.state != CalState.PROBE or cal._probe_stage != 0:
-                break
-            if cal._probe_phase == "probe" and probe_started_t is None:
-                probe_started_t = clock.t
-            if cal._probe_phase == "rampdown" and exit_elapsed is None:
-                exit_elapsed = clock.t - probe_started_t
-        assert exit_elapsed is not None, "elevator probe never concluded"
-        assert exit_elapsed >= cal.PROBE_RAMP_S - 1 / 30.0, \
-            f"probe exited {exit_elapsed:.2f}s in, before the ramp completed"
-        assert cal._elev_sign == 1.0
 
     def test_can_start_rejects_climbing_aircraft(self, clock):
         ac = FakePlantAircraft()
@@ -1134,68 +1115,6 @@ class TestPitchCascade:
         assert "Level off" in msg
         ok, _ = cal.can_start(ac.telem(VerticalSpeed=1.0))
         assert ok
-
-    def test_probe_input_is_ramped_not_stepped(self, clock):
-        # An abrupt (step) probe rings the phugoid on sensitive aircraft; the
-        # probe must ease its input in over several frames, and still detect
-        # polarity.
-        ac = FakePlantAircraft()
-        cal = TrimCalibrator(ac)
-        cal.start()
-        prev = ac.cmd_elev
-        max_jump = 0.0
-        for _ in range(400):
-            clock.advance(1 / 30.0)
-            cal.update(ac.telem())
-            ac.step(1 / 30.0)
-            # Measure across BOTH the ramp-up and the ramp-down of the
-            # elevator probe: neither onset nor release may step.
-            if cal.state == CalState.PROBE and cal._probe_stage == 0 \
-                    and cal._probe_phase != "baseline":
-                max_jump = max(max_jump, abs(ac.cmd_elev - prev))
-            prev = ac.cmd_elev
-            if cal._probe_stage == 1 or cal.state != CalState.PROBE:
-                break
-        assert max_jump < cal.PROBE_U * 0.3, f"probe stepped ({max_jump:.3f}); should ramp"
-        assert cal._elev_sign == 1.0, "polarity must still be detected from the ramped probe"
-
-    def test_probe_magnitude_scales_with_control_response(self, clock):
-        # Minimal control response must gentle the probe too, not just the
-        # leveling loop — but never below the response floor.
-        ac = FakePlantAircraft()
-        cal = TrimCalibrator(ac)
-        cal.initial_gain_scale = 0.25
-        cal.start()
-        peak = 0.0
-        for _ in range(400):
-            clock.advance(1 / 30.0)
-            cal.update(ac.telem())
-            ac.step(1 / 30.0)
-            if cal.state == CalState.PROBE and cal._probe_stage == 0 \
-                    and cal._probe_phase == "probe":
-                peak = max(peak, abs(ac.cmd_elev))
-            if cal._probe_stage == 1 or cal.state != CalState.PROBE:
-                break
-        # 0.08 * 0.25 = 0.02, floored at PROBE_U_MIN (0.03); well under full 0.08
-        assert peak <= cal.PROBE_U * 0.6, f"derated probe too strong ({peak:.3f})"
-        assert peak >= cal.PROBE_U_MIN * 0.8, f"derated probe below floor ({peak:.3f})"
-
-    def test_legacy_fallback_when_pitch_unresponsive(self, clock):
-        # No usable pitch response (e.g. bad telemetry): polarity stays
-        # unknown, so the safe legacy VS-only loop must fly the run.
-        class DeadPitchPlant(FakePlantAircraft):
-            def step(self, dt):
-                super().step(dt)
-                self.pitch = 0.0
-
-        ac = DeadPitchPlant()
-        cal = TrimCalibrator(ac)
-        cal.start()
-        state = run_to_completion(cal, ac, clock)
-        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
-        assert cal._pitch_mode == "legacy"
-        assert not cal._pitch_sign_known
-        assert cal.result["virtual_y"] == pytest.approx(0.5, abs=0.05)
 
 
 # --------------------------------------------------------------------------- #
@@ -1221,11 +1140,11 @@ class TestOscillationWatchdog:
         ac = FakePlantAircraft()
         cal = TrimCalibrator(ac)
         cal.start()
-        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP)
+        assert cal._pitch_pid.kp == pytest.approx(cal.CASC_INNER_KP)
         _feed_oscillation(cal, GROWING)
         assert cal._gain_scale == pytest.approx(0.5)
-        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP * 0.5)
-        assert cal._pitch_pid.ki == pytest.approx(cal.PITCH_KI * 0.5)
+        assert cal._pitch_pid.kp == pytest.approx(cal.CASC_INNER_KP * 0.5)
+        assert cal._pitch_pid.ki == pytest.approx(cal.CASC_INNER_KI * 0.5)
 
     def test_detects_oscillation_on_nonzero_mean(self, clock):
         # The original zero-crossing detector was blind to oscillation riding
@@ -1253,7 +1172,7 @@ class TestOscillationWatchdog:
         cal.initial_gain_scale = 0.5
         cal.start()
         assert cal._gain_scale == pytest.approx(0.5)
-        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP * 0.5)
+        assert cal._pitch_pid.kp == pytest.approx(cal.CASC_INNER_KP * 0.5)
         _feed_oscillation(cal, GROWING)
         assert cal._gain_scale == pytest.approx(0.25)
 
@@ -1312,7 +1231,7 @@ class TestOscillationWatchdog:
         cal.update(ac.telem())
         cal.start()
         assert cal._gain_scale == pytest.approx(1.0)
-        assert cal._pitch_pid.kp == pytest.approx(cal.PITCH_KP)
+        assert cal._pitch_pid.kp == pytest.approx(cal.CASC_INNER_KP)
 
 
 # --------------------------------------------------------------------------- #
@@ -2190,7 +2109,7 @@ class TestTrimReadbackClosedLoop:
 # --------------------------------------------------------------------------- #
 
 class TestLiveGainScale:
-    def test_applies_live_after_probe(self, clock):
+    def test_applies_live(self, clock):
         ac = FakePlantAircraft(coupling=0.5)
         cal = TrimCalibrator(ac)
         cal.start()
@@ -2202,34 +2121,8 @@ class TestLiveGainScale:
         clock.advance(1 / 30.0)
         cal.update(ac.telem())
         assert cal._gain_scale == pytest.approx(0.25)
-        kp, _, _ = cal._pitch_base_gains
+        kp = cal.CASC_INNER_KP
         assert cal._pitch_pid.kp == pytest.approx(kp * 0.25)
-
-    def test_deferred_during_probe(self, clock):
-        # A mid-probe change must NOT step the probe's input amplitude; it
-        # applies the moment the probe completes.
-        ac = FakePlantAircraft(coupling=0.5)
-        cal = TrimCalibrator(ac)
-        cal.start()
-        dt = 1 / 30.0
-        clock.advance(dt)
-        cal.update(ac.telem())
-        ac.step(dt)
-        assert cal.state == CalState.PROBE
-
-        cal.set_gain_scale(0.5)
-        clock.advance(dt)
-        cal.update(ac.telem())
-        ac.step(dt)
-        assert cal._gain_scale == pytest.approx(1.0), "must not apply mid-probe"
-        assert cal._gain_scale_request == pytest.approx(0.5)
-
-        assert run_until(cal, ac, clock,
-                         lambda: cal.state == CalState.STABILIZE, 60)
-        clock.advance(dt)
-        cal.update(ac.telem())
-        assert cal._gain_scale == pytest.approx(0.5)
-        assert cal._gain_scale_request is None
 
     def test_request_clamped_to_floor(self, clock):
         ac = FakePlantAircraft()
@@ -2361,7 +2254,7 @@ class TestSlowPhugoidProtection:
         assert run_until(cal, ac, clock,
                          lambda: cal.state == CalState.STABILIZE, 60)
         assert cal._gain_scale == pytest.approx(1.5)
-        kp, _, _ = cal._pitch_base_gains
+        kp = cal.CASC_INNER_KP
         assert cal._pitch_pid.kp == pytest.approx(kp * 1.5)
 
     def test_live_request_clamps_to_increased_ceiling(self, clock):
@@ -3637,6 +3530,32 @@ class FakeXPCommandTrimAircraft(FakePlantAircraft):
             self.step(dt)
 
 
+class FittedJetAircraft(FakeXPCommandTrimAircraft):
+    """X-Plane 737-800 pitch dynamics fitted from a calibration trace at 259 kt:
+    q' and VS' linear in pitch, VS, q and the elevator, with trim acting as
+    elevator of the slope the sweep stations measured."""
+
+    MA, MV, MQ, MD = -1.19, 0.52, -0.71, 29.9
+    ZA, ZV, ZQ, ZD = 1.00, -0.22, -0.88, 8.49
+    TRIM_SLOPE = 0.78
+
+    def __init__(self, **kw):
+        kw.setdefault("cmd_trim_rate", 0.019)
+        super().__init__(**kw)
+        self.ias = 133.0
+        self._th = self._q = self._v = 0.0
+
+    def step(self, dt):
+        super().step(dt)
+        u = self.cmd_elev + self.TRIM_SLOPE * (self.trim - self.trim_natural)
+        q_dot = self.MA * self._th + self.MV * self._v + self.MQ * self._q + self.MD * u
+        v_dot = self.ZA * self._th + self.ZV * self._v + self.ZQ * self._q + self.ZD * u
+        self._th += self._q * dt
+        self._q += q_dot * dt
+        self._v += v_dot * dt
+        self.pitch, self.vs = self._th, self._v
+
+
 class FakeXPDatarefTrimAircraft(FakePlantAircraft):
     """X-Plane aircraft that honors the trim dataref write (the default write
     method): ``sim/cockpit2/controls/elevator_trim`` sets the trim directly."""
@@ -3713,6 +3632,8 @@ class TestXPlaneCommandTrim:
     # Trim rate (full range = 2.0 per second), command delay in frames, frame
     # time: slow and fast trims, short and long delays.
     @pytest.mark.parametrize("rate, latency, dt", [
+        (0.01, 2, 1 / 30.0),
+        (0.019, 2, 1 / 30.0),
         (0.05, 2, 1 / 30.0),
         (0.15, 2, 1 / 30.0),
         (0.3, 5, 1 / 30.0),
@@ -3734,6 +3655,15 @@ class TestXPlaneCommandTrim:
         assert ac.trim == pytest.approx(cal.result["trim0"], abs=cal.TRIM_STATION_TOL)
         assert _longest_hold(ac.command_log, clock.t) <= cal.XP_PULSE_MAX_S + 2 * dt
         assert cal._xp_polarity == 1
+
+    def test_full_run_holds_level_on_a_fast_jet(self, clock):
+        ac = FittedJetAircraft(coupling=0.78, physical_y=1.0)
+        cal = self._cal(ac)
+        cal.start()
+        state = run_to_completion(cal, ac, clock)
+
+        assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
+        assert cal._gain_scale == 1.0, "the leveling loop must not oscillate"
 
     def test_inverted_command_response_is_learned(self, clock):
         ac = FakeXPCommandTrimAircraft(coupling=0.5, physical_y=1.0,
