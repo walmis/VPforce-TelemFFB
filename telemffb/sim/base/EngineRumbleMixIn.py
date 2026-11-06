@@ -1,3 +1,6 @@
+import math
+import time
+
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import EFFECT_SINE, EFFECT_TRIANGLE
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
@@ -15,6 +18,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
     """
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
     engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
+    engine_prop_rumble_simplified: bool = False  # Propeller rumble as one effect per axis
     engine_rotor_rumble_enabled: bool = False  # Engine Rumble - Helicopter specific - based on Rotor RPM
 
     engine_rumble_intensity: float = 0.02
@@ -29,11 +33,21 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
 
     afterburner_effect_enabled: bool = True
 
+    # Most device updates per second for the simplified propeller rumble.
+    # The beat it carries is at most 3 Hz, so this is ten or more updates
+    # per beat whatever the telemetry rate.
+    _PROP_BEAT_UPDATE_HZ = 30.0
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # No per-instance runtime state currently required for engine rumble;
         # placeholder in case future smoothing/filters are needed.
         self._engine_rumble_last = None
+        # beat phase (radians) of each axis's twin against its tone, and the
+        # time it was last advanced; None until the simplified rumble plays
+        self._prop_beat_phase = [0.0, 0.0]
+        self._prop_beat_time = None
+        self._prop_beat_sent = None
 
     def ac_update_piston_engine_rumble(self, telem_data: BaseTelemetryData):
         """Apply piston/propeller engine rumble based on RPM.
@@ -47,7 +61,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
             Read (IL2):         RPM       - Union[float, List[float]] (RPM, ≥ 0)
         """
         if not self.engine_prop_rumble_enabled:
-            self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+            self._dispose_prop_rumble()
             return
 
         if self._sim_is('DCS'):
@@ -64,7 +78,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
             rpm = max(rpm)
 
         if rpm < 5:
-            self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+            self._dispose_prop_rumble()
             return
 
         frequency = float(rpm) / 60
@@ -103,12 +117,65 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
                 dynamic_rumble_intensity * (2.0 - beat_depth ** 2) ** 0.5, 0.0, 1.0)
             twin_mag = utils.clamp(dynamic_rumble_intensity * beat_depth, 0.0, 1.0)
 
+            if self.engine_prop_rumble_simplified:
+                self.effects.dispose("prop_rpm0-2", "prop_rpm1-2")
+                self._play_prop_rumble_beats(
+                    (("prop_rpm0-1", frequency, r1_modulation, 0),
+                     ("prop_rpm1-1", frequency2, r2_modulation, 90)),
+                    main_mag, twin_mag)
+                return
+            self._prop_beat_time = None
+            self._prop_beat_sent = None
             self.effects["prop_rpm0-1"].periodic(frequency, main_mag, 0).start()
             self.effects["prop_rpm0-2"].periodic(frequency + r1_modulation, twin_mag, 0).start()
             self.effects["prop_rpm1-1"].periodic(frequency2, main_mag, 90).start()
             self.effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, twin_mag, 90).start()
         else:
-            self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+            self._dispose_prop_rumble()
+
+    def _play_prop_rumble_beats(self, axes, main_mag: float, twin_mag: float):
+        """Play each axis's tone and detuned twin as one sine.
+
+        A tone of magnitude A and a twin of magnitude B detuned by d Hz sum to
+        one sine whose magnitude is sqrt(A^2 + B^2 + 2AB cos(phi)), where phi
+        is the twin's phase against the tone, and whose frequency is the
+        magnitude-weighted mean, f + d * B / (A + B).  The phase advances
+        every frame; the effects are updated at most ``_PROP_BEAT_UPDATE_HZ``
+        times a second.
+
+        :param axes: (effect name, tone frequency, detune in Hz, direction) per axis
+        :param main_mag: tone magnitude, 0.0..1.0
+        :param twin_mag: twin magnitude, 0.0..1.0
+        """
+        now = time.perf_counter()
+        dt = 0.0 if self._prop_beat_time is None else now - self._prop_beat_time
+        self._prop_beat_time = now
+        # a frame arriving a little early still sends, so telemetry at the
+        # cap rate updates every frame
+        send = (self._prop_beat_sent is None
+                or now - self._prop_beat_sent >= 0.8 / self._PROP_BEAT_UPDATE_HZ)
+        if send:
+            self._prop_beat_sent = now
+        pair_mag = main_mag + twin_mag
+        for i, (name, frequency, detune, direction) in enumerate(axes):
+            # advanced per frame from the current detune: the detune's
+            # amplitude follows RPM, so its closed-form integral would jump
+            # whenever the RPM changes
+            phase = (self._prop_beat_phase[i] + 2.0 * math.pi * detune * dt) % (2.0 * math.pi)
+            self._prop_beat_phase[i] = phase
+            if not send:
+                continue
+            magnitude = math.sqrt(max(main_mag ** 2 + twin_mag ** 2
+                                      + 2.0 * main_mag * twin_mag * math.cos(phase), 0.0))
+            if pair_mag > 0:
+                frequency += detune * twin_mag / pair_mag
+            self.effects[name].periodic(frequency, utils.clamp(magnitude, 0.0, 1.0), direction).start()
+
+    def _dispose_prop_rumble(self):
+        self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+        self._prop_beat_phase = [0.0, 0.0]
+        self._prop_beat_time = None
+        self._prop_beat_sent = None
 
     def ac_calc_engine_intensity(self, rpm) -> float:
         """

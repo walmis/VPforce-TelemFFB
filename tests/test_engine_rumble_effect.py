@@ -117,3 +117,98 @@ class TestPropEngineRumble(BaseTelemetryEffectTestCase):
         inst.engine_prop_rumble_enabled = False
         self._update(inst, self._telem(PropRPM=2400.0))
         assert self.mock_effects.get("prop_rpm0-1") is None
+
+
+class TestSimplifiedPropEngineRumble(BaseTelemetryEffectTestCase):
+    """One sine per axis carrying the tone and twin's beat."""
+
+    def _inst(self, simplified=True):
+        inst = self.create_test_instance(EngineRumbleMixIn)
+        inst.engine_prop_rumble_enabled = True
+        inst.engine_prop_rumble_simplified = simplified
+        inst.engine_rumble_lowrpm = 650
+        inst.engine_rumble_lowrpm_intensity = 0.06
+        inst.engine_rumble_highrpm = 2800
+        inst.engine_rumble_highrpm_intensity = 0.03
+        return inst
+
+    def _update(self, inst, rpm):
+        telem = TelemetryDataBuilder().ffb_type("joystick").build()
+        telem["PropRPM"] = rpm
+        inst._telem_data = telem
+        inst.ac_update_piston_engine_rumble(telem)
+
+    def _clock(self, monkeypatch, detune_hz):
+        import telemffb.sim.base.EngineRumbleMixIn as module
+        clock = {"now": 100.0}
+        monkeypatch.setattr(module.time, "perf_counter", lambda: clock["now"])
+        monkeypatch.setattr(utils, "sine_point_in_time",
+                            lambda amplitude, period_ms, phase_offset_deg=0: detune_hz)
+        return clock
+
+    def test_plays_two_effects(self):
+        inst = self._inst()
+        self._update(inst, 2400.0)
+        assert self.mock_effects.get("prop_rpm0-1") is not None
+        assert self.mock_effects.get("prop_rpm1-1") is not None
+        assert self.mock_effects.get("prop_rpm0-2") is None
+        assert self.mock_effects.get("prop_rpm1-2") is None
+
+    def test_full_depth_beat_swings_from_the_pair_sum_to_a_null(self, monkeypatch):
+        clock = self._clock(monkeypatch, 2.0)
+        inst = self._inst()
+        self._update(inst, 650.0)
+        base = inst.ac_calc_engine_intensity(650.0)
+        f, m, d, _ = self.mock_effects["prop_rpm0-1"]._periodic
+        assert m == pytest.approx(2 * base, abs=1e-6)
+        assert f == pytest.approx(650.0 / 60 + 1.0)  # mean of the tone and its twin
+        assert d == 0
+        clock["now"] += 0.25  # half a beat at 2 Hz
+        self._update(inst, 650.0)
+        assert self.mock_effects["prop_rpm0-1"]._periodic[1] == pytest.approx(0.0, abs=1e-6)
+        clock["now"] += 0.25
+        self._update(inst, 650.0)
+        assert self.mock_effects["prop_rpm0-1"]._periodic[1] == pytest.approx(2 * base, abs=1e-6)
+        assert self.mock_effects["prop_rpm1-1"]._periodic[2] == 90
+
+    def test_cruise_beat_is_residual(self, monkeypatch):
+        clock = self._clock(monkeypatch, 1.0)
+        inst = self._inst()
+        self._update(inst, 2400.0)
+        peak = self.mock_effects["prop_rpm0-1"]._periodic[1]
+        clock["now"] += 0.5
+        self._update(inst, 2400.0)
+        trough = self.mock_effects["prop_rpm0-1"]._periodic[1]
+        assert trough < peak
+        assert trough / peak > 0.85
+
+    def test_updates_are_capped_whatever_the_telemetry_rate(self, monkeypatch):
+        clock = self._clock(monkeypatch, 2.0)
+        inst = self._inst()
+        sends = []
+        self._update(inst, 650.0)
+        effect = self.mock_effects["prop_rpm0-1"]
+        real_periodic = effect.periodic
+        monkeypatch.setattr(effect, "periodic",
+                            lambda *a, **kw: sends.append(clock["now"]) or real_periodic(*a, **kw))
+        for fps, expected in ((120, 30), (60, 30), (30, 30)):
+            sends.clear()
+            for _ in range(fps):
+                clock["now"] += 1.0 / fps
+                self._update(inst, 650.0)
+            assert len(sends) == pytest.approx(expected, abs=1)
+        # the beat keeps its timing between sends: half a beat on is a null
+        clock["now"] += 0.25
+        self._update(inst, 650.0)
+        assert effect._periodic[1] == pytest.approx(0.0, abs=1e-6)
+
+    def test_switching_modes_swaps_the_twins(self):
+        inst = self._inst(simplified=False)
+        self._update(inst, 2400.0)
+        assert self.mock_effects.get("prop_rpm0-2") is not None
+        inst.engine_prop_rumble_simplified = True
+        self._update(inst, 2400.0)
+        assert self.mock_effects.get("prop_rpm0-2") is None
+        inst.engine_prop_rumble_simplified = False
+        self._update(inst, 2400.0)
+        assert self.mock_effects.get("prop_rpm0-2") is not None

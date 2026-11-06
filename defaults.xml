@@ -5531,6 +5531,27 @@
 		<effecttype>periodic</effecttype>
 		<grouping>Rumble</grouping>
 		<parentgroup>mechanical</parentgroup>
+		<order>40300.6</order>
+		<datatype>bool</datatype>
+		<name>engine_prop_rumble_simplified</name>
+		<displayname>Simplified Effect</displayname>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<info>Plays the propeller rumble as two device effects instead of four. TelemFFB computes the beat between each tone and its detuned twin and plays it as one effect per axis, which leaves two more effect slots free on the device.</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<IL2K>true</IL2K>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<grouping>Rumble</grouping>
+		<parentgroup>mechanical</parentgroup>
 		<order>40350</order>
 		<name>il2_jet_eng_shake_enabled</name>
 		<displayname>Engine Rumble (Shake Telemetry)</displayname>
