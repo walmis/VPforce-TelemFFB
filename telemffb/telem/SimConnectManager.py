@@ -846,26 +846,31 @@ class SimConnectManager(threading.Thread):
             self._request_input_event_enumeration()
 
     def _note_aircraft_title(self, title):
-        """A new aircraft carries new hashes: drop the old subscriptions
-        and enumerate again when anything is wanted."""
+        """A new aircraft carries new hashes: drop the old table, its
+        subscriptions and pending writes, and enumerate again when anything
+        is wanted.  A write-only aircraft enumerates on its first write."""
         if title == self._last_title:
             return
         first = self._last_title is None
         self._last_title = title
-        if not (self._b_vars or self._b_pending_writes):
-            return
         self._b_enum_retries = 0
         if first:
             # Frames only flow with an aircraft loaded, so a table already
             # in hand belongs to this one; an empty table means the
             # enumeration ran from the menu and must be asked again.
-            if not self._input_events:
+            if (self._b_vars or self._b_pending_writes) and not self._input_events:
                 self._request_input_event_enumeration()
             return
         self._drop_input_event_subscriptions()
         self._input_events = {}
+        self._b_pending_writes = {}
         self._b_unresolved_logged = set()
-        self._request_input_event_enumeration()
+        # an answer still in flight lists the previous aircraft's events
+        self._b_enum_req = None
+        self._b_enum_found = {}
+        self._b_enum_retry_at = None
+        if self._b_vars:
+            self._request_input_event_enumeration()
 
     def _drop_input_event_subscriptions(self):
         for h in list(self._b_hash_to_vars):

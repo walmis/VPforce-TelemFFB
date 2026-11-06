@@ -216,6 +216,34 @@ def test_an_aircraft_change_drops_the_old_hashes_and_enumerates_again():
     assert len(m.sc.named("EnumerateInputEvents")) == 1
 
 
+def test_a_write_only_aircraft_change_enumerates_again_on_the_next_write():
+    m = make_manager()
+    m._note_aircraft_title("AS365 N2")
+    m.send_event_to_msfs("B:AS65_COLLECTIVE_AS365", 0.5)
+    m.tx_events_to_msfs()
+    m._handle_recv(enumeration(m._b_enum_req, [("AS65_COLLECTIVE_AS365", 0x1, scdefs.INPUT_EVENT_TYPE_DOUBLE)]))
+    assert [args[0] for args in m.sc.named("SetInputEvent")] == [0x1]
+    m.sc.clear()
+    m._note_aircraft_title("HH65B Dolphin")
+    assert m._input_events == {}
+    assert m.sc.named("EnumerateInputEvents") == []
+    m.send_event_to_msfs("B:AS65_COLLECTIVE_HH65", 0.5)
+    m.tx_events_to_msfs()
+    assert len(m.sc.named("EnumerateInputEvents")) == 1
+    m._handle_recv(enumeration(m._b_enum_req, [("AS65_COLLECTIVE_HH65", 0x2, scdefs.INPUT_EVENT_TYPE_DOUBLE)]))
+    assert [args[0] for args in m.sc.named("SetInputEvent")] == [0x2]
+
+
+def test_an_aircraft_change_ignores_the_previous_aircraft_enumeration_answer():
+    m = make_manager(("APMaster", "B:AUTOPILOT_Master", "number"))
+    m._note_aircraft_title("Cessna 172")
+    old_req = m._b_enum_req
+    m._note_aircraft_title("PMDG 737")
+    assert m._b_enum_req != old_req
+    m._handle_recv(enumeration(old_req, [("AUTOPILOT_Master", 0x1234, scdefs.INPUT_EVENT_TYPE_DOUBLE)]))
+    assert m._input_events == {} and m.sc.named("SubscribeInputEvent") == []
+
+
 def test_an_unanswered_enumeration_is_given_up_and_retried_a_bounded_number_of_times(monkeypatch):
     now = [1000.0]
     monkeypatch.setattr("telemffb.telem.SimConnectManager.time.time", lambda: now[0])
