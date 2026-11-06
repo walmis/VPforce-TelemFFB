@@ -14,9 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import ctypes
+import logging
 import random
 import re
 import socket
+import sys
 import threading
 import time
 
@@ -30,6 +33,7 @@ from ._math import to_number
 
 __all__ = [
     "schedule_on_main_thread",
+    "allow_foreground_switch",
     "EffectTranslator",
     "Destroyable",
     "sanitize_dict",
@@ -238,6 +242,24 @@ class EffectTranslator:
 class Destroyable:
     def destroy(self):
         raise NotImplementedError
+
+
+_ASFW_ANY = -1
+
+
+def allow_foreground_switch():
+    """Let another process take the foreground with its next window.
+
+    Windows gives the foreground only to the process the user last
+    interacted with, so a window another instance opens on this one's
+    request appears behind this one's. Call before sending the request.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.user32.AllowSetForegroundWindow(_ASFW_ANY)
+    except (AttributeError, OSError) as e:
+        logging.debug(f"AllowSetForegroundWindow failed: {e}")
 
 
 def sanitize_dict(d):

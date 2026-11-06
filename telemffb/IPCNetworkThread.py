@@ -53,6 +53,7 @@ class IPCNetworkThread(QObject, threading.Thread):
     hide_signal = pyqtSignal()
     show_settings_signal = pyqtSignal()
     show_adv_spr_signal = pyqtSignal(str)
+    show_adv_g_signal = pyqtSignal(str)
     show_cfg_ovds_signal = pyqtSignal()
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
@@ -338,6 +339,13 @@ class IPCNetworkThread(QObject, threading.Thread):
                 if target_dev == G.device_type:
                     logging.info('Show advanced spring override config command received via IPC')
                     self.show_adv_spr_signal.emit(value)
+        elif msg.startswith('SHOW ADV G;'):
+            parts = msg.split(';')  # semicolon delimiter: the value is JSON and contains colons
+            if len(parts) == 3:
+                _, target_dev, value = parts
+                if target_dev == G.device_type:
+                    logging.info('Show advanced G-force config command received via IPC')
+                    self.show_adv_g_signal.emit(value)
         elif msg.startswith('SHOW GAIN OVD:'):
             dev = msg.removeprefix('SHOW GAIN OVD:')
             if dev == G.device_type:

@@ -2251,7 +2251,8 @@ class SettingsLayout(QGridLayout):
         if value is None:
             value = self.advanced_g_settings
         if G.master_instance and G.device_type != G.current_device_config_scope:
-            G.ipc_instance.send_broadcast_message(f'SHOW ADV SPR:{G.current_device_config_scope}')
+            utils.allow_foreground_switch()
+            G.ipc_instance.send_broadcast_message(f'SHOW ADV G;{G.current_device_config_scope};{value}')
         else:
             if self.adv_g_dialog is None:
                 self.adv_g_dialog = AdvancedGDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope)
@@ -2265,6 +2266,7 @@ class SettingsLayout(QGridLayout):
         if value is None:
             value = self.advanced_spring_settings
         if G.master_instance and G.device_type != G.current_device_config_scope:
+            utils.allow_foreground_switch()
             G.ipc_instance.send_broadcast_message(f'SHOW ADV SPR;{G.current_device_config_scope};{value}')  # use semicolon for delimiter as value contains colons
         else:
             if self.adv_spr_dialog is None:
@@ -2282,6 +2284,7 @@ class SettingsLayout(QGridLayout):
         pop its dialog window.
         """
         if G.master_instance and G.device_type != G.current_device_config_scope:
+            utils.allow_foreground_switch()
             G.ipc_instance.send_broadcast_message(f'SHOW GAIN OVD:{G.current_device_config_scope}')
         else:
             # utils.dbprint('red', f"CFG Clicked: {value}")

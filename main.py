@@ -1520,6 +1520,7 @@ def _setup_ipc_and_connections():
         # unassigned; nothing asks a child to open its own.
         G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
     G.ipc_instance.show_adv_spr_signal.connect(G.main_window.settings_layout.advanced_spring_button_clicked)
+    G.ipc_instance.show_adv_g_signal.connect(G.main_window.settings_layout.advanced_g_button_clicked)
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.reload_caller_signal.connect(G.main_window.settings_layout.reload_caller)
