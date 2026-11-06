@@ -17,7 +17,7 @@
 #
 """Dialog front-end for the elevator ``virtual_y`` auto-calibration engine.
 
-Runs on the master (joystick) instance. It arms/aborts the ``TrimCalibrator``
+Runs on the joystick instance. It arms/aborts the ``TrimCalibrator``
 that lives on ``G.telem_manager.currentAircraft`` and displays live status +
 the result; the control loop itself runs in the telemetry thread. See
 :mod:`telemffb.sim.msfs_xp.TrimCalibrator`.
@@ -1023,7 +1023,7 @@ class TrimCalibrationDialog(QDialog):
             self._update_vs_target(data, cal)
 
             if G.device_type != "joystick":
-                self._set_ready(False, "Run from the joystick (master) instance")
+                self._set_ready(False, "Run from the joystick instance")
                 self._set_running(False)
                 self._apply_wizard("Begin Calibration", False)
                 self._set_tracker(0)
@@ -2418,7 +2418,7 @@ class TrimCalibrationDialog(QDialog):
             self._clear_result_labels()
             self._show_stored_curve()
         if G.device_type != "joystick":
-            self._set_ready(False, "Run from the joystick (master) instance")
+            self._set_ready(False, "Run from the joystick instance")
         elif cal is None:
             self._set_ready(False, "Load an MSFS / X-Plane aircraft")
         else:

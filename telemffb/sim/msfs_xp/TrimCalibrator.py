@@ -2978,15 +2978,16 @@ class TrimCalibrator:
         """Mute/unmute trimwheel instances' sim writes while we own the trim.
 
         Sets the local deadline directly (covers a trimwheel on this instance)
-        and broadcasts to children over IPC. The hold self-expires after
-        TRIMWHEEL_HOLD_TTL_S without a refresh, and the trimwheel re-syncs its
-        wheel position before resuming writes (see MsfsXpTrimwheelMixIn).
+        and sends the hold to the other instances over IPC. The hold
+        self-expires after TRIMWHEEL_HOLD_TTL_S without a refresh, and the
+        trimwheel re-syncs its wheel position before resuming writes (see
+        MsfsXpTrimwheelMixIn).
         """
         G.trimcal_hold_until = \
             (time.perf_counter() + self.TRIMWHEEL_HOLD_TTL_S) if active else 0.0
         ipc = getattr(G, "ipc_instance", None)
         if ipc is not None:
             try:
-                ipc.send_broadcast_message(f"TRIMCAL HOLD:{1 if active else 0}")
+                ipc.send_trimcal_hold(active)
             except Exception as e:
                 logger.debug(f"trimwheel hold broadcast failed: {e}")

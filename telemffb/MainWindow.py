@@ -153,6 +153,11 @@ class MainWindow(QMainWindow):
         # construct nothing (see on_update_telemetry and PromptStack).
         self._new_craft_prompt_active = False
         self._new_craft_target = None  # (sim, cls, name) the prompt names
+        # Trim calibration prompt: a joystick child reports its aircraft's
+        # prompt in its STATUS keepalive (trim_cal_report); the master shows
+        # it and records dismissals by the key it was shown with.
+        self.trim_cal_report = None
+        self._trim_cal_shown_key = None
         self._profile_change_prompt_active = False  # for the same one-shot-toast gating
         # Error-onset/hold/clear state machine + timed-out flag - reports
         # to G.app_state.set_sim_status; HeaderPanel/TrayController.bind()
@@ -1672,7 +1677,17 @@ class MainWindow(QMainWindow):
         Trim calibration is MSFS/X-Plane FIXED-WING only, so refuse to open
         (with an explanation) when nothing is loaded, the active aircraft is
         for a different simulator, or its class cannot be calibrated.
+
+        The calibrator runs in the joystick instance's telemetry thread, so a
+        master without the joystick has the joystick child open its dialog.
         """
+        ipc = getattr(G, "ipc_instance", None)
+        if G.master_instance and G.device_type != "joystick" \
+                and ipc is not None and ipc.child_reporting("joystick"):
+            utils.allow_foreground_switch()
+            ipc.send_broadcast_message("SHOW TRIMCAL:joystick")
+            return
+
         # Offline editing with no aircraft selected: the settings manager
         # still carries the ONLINE aircraft's identity and offline writes go
         # nowhere (scope fall-through) — the dialog would show a misleading
@@ -1735,9 +1750,9 @@ class MainWindow(QMainWindow):
                 self.settings_layout.save_trimwheel_setting)
             self.trim_cal_dialog.destroyed.connect(
                 lambda: setattr(self, 'trim_cal_dialog', None))
+        self.trim_cal_dialog.show()
         self.trim_cal_dialog.raise_()
         self.trim_cal_dialog.activateWindow()
-        self.trim_cal_dialog.show()
 
     def update_settings(self):
         # utils.debug_caller_args('blue')
@@ -2136,6 +2151,7 @@ class MainWindow(QMainWindow):
         # The prompts belong to the aircraft that left, and only telemetry
         # frames re-evaluate them; the next load raises them afresh.
         G.app_state.set_prompt('trim_cal', None)
+        self.trim_cal_report = None
         G.app_state.set_prompt('new_craft', None)
         self._new_craft_prompt_active = False
         self._new_craft_target = None
@@ -2301,6 +2317,7 @@ class MainWindow(QMainWindow):
                 new_aircraft = data.get('N', None)
                 new_class = G.settings_mgr.current_class
                 G.app_state.set_prompt('trim_cal', None)  # profile creation first
+                self.trim_cal_report = None
                 if G.master_instance:
                     target = (new_sim, new_class, new_aircraft)
                     if not self._new_craft_prompt_active or target != self._new_craft_target:
@@ -2498,13 +2515,21 @@ class MainWindow(QMainWindow):
 
         Self-maintaining thereafter: a saved (or imported) calibration
         populates the aircraft's parsed curve family and hides the prompt;
-        deleting the last calibration brings it back."""
-        ac = G.telem_manager.currentAircraft if G.telem_manager else None
-        show = (G.master_instance and G.device_type == "joystick"
-                and ac is not None
-                and getattr(ac, "_trim_cal_available", False)
-                and getattr(ac, "_trim_curve_y_fam", None) is None
-                and self._trim_cal_prompt_key() not in self._trim_cal_dismissals())
+        deleting the last calibration brings it back.
+
+        The joystick instance decides; only the master shows the prompt. A
+        joystick child stores its decision in ``trim_cal_report`` for its
+        STATUS keepalive, and a master without the joystick shows what the
+        joystick child last reported."""
+        report = self._own_trim_cal_prompt() if G.device_type == "joystick" else None
+        if G.child_instance:
+            self.trim_cal_report = report
+            return
+        ipc = getattr(G, "ipc_instance", None)
+        if G.device_type != "joystick" and ipc is not None:
+            report = ipc.child_trim_cal_prompt("joystick")
+        show = report is not None and report not in self._trim_cal_dismissals()
+        self._trim_cal_shown_key = report if show else None
         G.app_state.set_prompt('trim_cal', Notice(
             notice_id='trim_cal', priority=TRIM_CAL_PRIORITY, style='trim_cal', pulse=True,
             dismiss_label="Dismiss for this aircraft",
@@ -2512,6 +2537,23 @@ class MainWindow(QMainWindow):
                  "<span style='font-weight:500;'>No Trim Calibration Found for this "
                  "Aircraft — </span><b>Click Here</b><span style='font-weight:500;'>"
                  " to Set Up Realistic Trim</span></a>") if show else None)
+
+    def on_child_trim_cal_prompt_changed(self):
+        """Master: re-evaluate the prompt when the joystick child reports a
+        change. Aircraft loaded from the sim's menus deliver a frame or two
+        before telemetry stops, so the master's own frames can all precede
+        the child's report for the new aircraft."""
+        if G.master_instance and not self._new_craft_prompt_active:
+            self._update_trim_cal_prompt()
+
+    def _own_trim_cal_prompt(self):
+        """This instance's aircraft's prompt: its dismissal key ('' when it
+        has none), or None when it needs no prompt."""
+        ac = G.telem_manager.currentAircraft if G.telem_manager else None
+        if ac is None or not getattr(ac, "_trim_cal_available", False) \
+                or getattr(ac, "_trim_curve_y_fam", None) is not None:
+            return None
+        return self._trim_cal_prompt_key() or ""
 
     #: System setting holding the aircraft whose trim-calibration prompt was
     #: dismissed: per machine, outside the config, so a dismissal neither
@@ -2552,8 +2594,8 @@ class MainWindow(QMainWindow):
         is dismissable, and only for the aircraft it names."""
         if notice_id != 'trim_cal':
             return
-        key = self._trim_cal_prompt_key()
-        if key is None:
+        key = self._trim_cal_shown_key
+        if not key:
             return
         self._save_trim_cal_dismissals(self._trim_cal_dismissals() | {key})
         logging.info(f"Trim calibration prompt dismissed for {key}")

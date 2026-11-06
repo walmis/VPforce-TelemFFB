@@ -1521,6 +1521,8 @@ def _setup_ipc_and_connections():
         G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
     G.ipc_instance.show_adv_spr_signal.connect(G.main_window.settings_layout.advanced_spring_button_clicked)
     G.ipc_instance.show_adv_g_signal.connect(G.main_window.settings_layout.advanced_g_button_clicked)
+    G.ipc_instance.show_trim_cal_signal.connect(G.main_window.open_trim_calibration_dialog)
+    G.ipc_instance.child_trim_cal_prompt_changed.connect(G.main_window.on_child_trim_cal_prompt_changed)
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.reload_caller_signal.connect(G.main_window.settings_layout.reload_caller)

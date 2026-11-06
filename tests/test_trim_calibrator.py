@@ -563,16 +563,16 @@ class TestDiagnosticTrace:
 
 class FakeIPC:
     def __init__(self):
-        self.broadcasts = []
+        self.holds = []
 
-    def send_broadcast_message(self, msg):
-        self.broadcasts.append(msg)
+    def send_trimcal_hold(self, active):
+        self.holds.append(active)
 
 
 class TestTrimwheelHold:
     def test_hold_broadcast_lifecycle(self, clock):
         # While the run owns the trim, a self-expiring hold must be set
-        # locally, broadcast to children, refreshed during the run, and
+        # locally, sent to the other instances, refreshed during the run, and
         # released on completion.
         ac = FakePlantAircraft()
         cal = TrimCalibrator(ac)
@@ -584,13 +584,13 @@ class TestTrimwheelHold:
             cal.update(ac.telem())
             ac.step(1 / 30.0)
             assert G.trimcal_hold_until > time.perf_counter(), "hold must be active"
-            assert ipc.broadcasts[0] == "TRIMCAL HOLD:1"
+            assert ipc.holds[0] is True
             state = run_to_completion(cal, ac, clock)
             assert state == CalState.DONE, f"ended in {state} ({cal.abort_reason})"
             assert G.trimcal_hold_until == 0.0, "hold must be released on finish"
-            assert ipc.broadcasts[-1] == "TRIMCAL HOLD:0"
+            assert ipc.holds[-1] is False
             # refreshed ~1/s over a multi-second run, not sent just once
-            assert ipc.broadcasts.count("TRIMCAL HOLD:1") >= 3
+            assert ipc.holds.count(True) >= 3
         finally:
             del G.ipc_instance
 

@@ -54,6 +54,8 @@ class IPCNetworkThread(QObject, threading.Thread):
     show_settings_signal = pyqtSignal()
     show_adv_spr_signal = pyqtSignal(str)
     show_adv_g_signal = pyqtSignal(str)
+    show_trim_cal_signal = pyqtSignal()
+    child_trim_cal_prompt_changed = pyqtSignal()
     show_cfg_ovds_signal = pyqtSignal()
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
@@ -253,7 +255,7 @@ class IPCNetworkThread(QObject, threading.Thread):
 
     def send_ipc_status(self):
         """Child -> master device-status report (vpconf profile / gain
-        overrides), sent on the keepalive tick.
+        overrides / trim calibration prompt), sent on the keepalive tick.
 
         The effects payload also carries these keys, but it only flows while
         telemetry is arriving — a startup vpconf profile is pushed before any
@@ -265,6 +267,8 @@ class IPCNetworkThread(QObject, threading.Thread):
             f'{G.device_type}_vpconf_profile': G.current_vpconf_profile or '',
             f'{G.device_type}_gain_ovd_active':
                 bool(G.telem_manager.gain_overrides_active) if G.telem_manager else False,
+            f'{G.device_type}_trim_cal_prompt':
+                getattr(getattr(G, 'main_window', None), 'trim_cal_report', None),
         }
         self.send_message(f"STATUS:{json.dumps(payload)}")
 
@@ -409,7 +413,12 @@ class IPCNetworkThread(QObject, threading.Thread):
             payload = msg.removeprefix("STATUS:")
             try:
                 status_dict = json.loads(payload)
+                prompt_changed = any(
+                    self._ipc_telem_effects.get(k) != v for k, v in status_dict.items()
+                    if k.endswith('_trim_cal_prompt'))
                 self._ipc_telem_effects.update(status_dict)
+                if prompt_changed:
+                    self.child_trim_cal_prompt_changed.emit()
                 self._report_child_status(status_dict)
             except json.JSONDecodeError:
                 pass
@@ -439,13 +448,20 @@ class IPCNetworkThread(QObject, threading.Thread):
             G.master_buttons = json.loads(payload)
             # print(f"MB: {G.master_buttons}")
         elif msg.startswith("TRIMCAL HOLD:"):
-            # Master is running a trim calibration: hold/release this
-            # instance's trimwheel sim writes. Refreshed ~1/s while active and
-            # self-expiring, so a crashed master cannot mute the wheel forever.
+            # The joystick instance is running a trim calibration: hold/release
+            # this instance's trimwheel sim writes. Refreshed ~1/s while active
+            # and self-expiring, so a crashed instance cannot mute the wheel
+            # forever. The master relays a child's hold to the other children.
             if msg.removeprefix("TRIMCAL HOLD:") == "1":
                 G.trimcal_hold_until = time.perf_counter() + 3.0
             else:
                 G.trimcal_hold_until = 0.0
+            if self._master:
+                self.send_broadcast_message(msg)
+        elif msg.startswith("SHOW TRIMCAL:"):
+            if msg.removeprefix("SHOW TRIMCAL:") == G.device_type:
+                logging.info("Show trim calibration command received via IPC")
+                self.show_trim_cal_signal.emit()
         elif msg.startswith("BUTTONS:"):
             payload = msg.removeprefix("BUTTONS:").split("_")
             dev = payload[0]
@@ -662,6 +678,30 @@ class IPCNetworkThread(QObject, threading.Thread):
         keepalive, or None when that child has never reported."""
         info = self._child_keepalive_info.get(role)
         return None if info is None else bool(info.get("connected"))
+
+    def child_reporting(self, role) -> bool:
+        """Master: True while ``role``'s instance keeps its keepalives
+        within the missed-keepalive window."""
+        info = self._child_keepalive_info.get(role)
+        return info is not None and \
+            time.time() - info["timestamp"] <= self._keepalive_sec * self._missed_keepalive
+
+    def child_trim_cal_prompt(self, role):
+        """Master: the trim calibration prompt ``role``'s instance last
+        reported (its dismissal key, '' when it has none), or None when it
+        reports no prompt or has stopped reporting."""
+        if not self.child_reporting(role):
+            return None
+        return self._ipc_telem_effects.get(f'{role}_trim_cal_prompt')
+
+    def send_trimcal_hold(self, active):
+        """Hold or release every other instance's trimwheel sim writes. A
+        child's hold goes to the master, which applies and relays it."""
+        msg = f"TRIMCAL HOLD:{1 if active else 0}"
+        if self._master:
+            self.send_broadcast_message(msg)
+        else:
+            self.send_message(msg)
 
     def send_broadcast_message(self, message):
         for addr in self._child_addrs.values():
