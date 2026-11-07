@@ -122,6 +122,7 @@ class HPGHelicopter(Helicopter):
     hands_on_force_threshold = 0.03
     handsoff_force_duration = 500  # ms
     handson_force_debug = False
+    force_trim_send_reset = True
     # end of user parameters
 
     def __init__(self, name, **kwargs):

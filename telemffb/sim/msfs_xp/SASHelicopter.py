@@ -40,6 +40,7 @@ class SASHelicopter(Helicopter):
     send_individual_hands_on = 0
     vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
+    force_trim_send_reset = True
     # end of user parameters
 
     def __init__(self, name, **kwargs):

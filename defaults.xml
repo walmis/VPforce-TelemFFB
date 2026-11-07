@@ -1436,10 +1436,10 @@
 		<name>force_trim_send_reset</name>
 		<displayname>Zero Trim with TR</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
-		<info>When enabled (default), TelemFFB sends "ROTOR_TRIM_RESET" to zero trim when force trim is repositioned, </info>
+		<info>When enabled, TelemFFB sends "ROTOR_TRIM_RESET" when the trim release is pressed and released. Enable it only for aircraft that use this event as their trim release; on other aircraft it zeroes the sim's trim, which changes the flight path.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<value>true</value>
+		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -9142,6 +9142,20 @@
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_send_reset</name>
+			<type>HPGHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_send_reset</name>
+			<type>SASHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_x_axis</name>
@@ -25914,13 +25928,6 @@
 		<value>0.6</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>force_trim_send_reset</name>
-		<model>S-76C++.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>

@@ -1684,6 +1684,68 @@ class TestHelicopterParameterConfiguration(BaseTelemetryEffectTestCase):
 
 
 @pytest.mark.unit
+@pytest.mark.helicopter
+class TestCyclicTrimFollowingWithoutReset(BaseTelemetryEffectTestCase):
+    """The sim's trim stays where it is: the spring center stays on the stick
+    and the sent axis stays continuous."""
+
+    TRIM = 0.3
+
+    def _make_instance(self, msfs):
+        sim = "_test_sim_is_msfs" if msfs else "_test_sim_is_xplane"
+        inst = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_device_type="joystick", **{sim: True})
+        inst.spring_mode = SpringModeEnum.FORCETRIM
+        inst.force_trim_button = 1
+        inst.force_trim_send_reset = False
+        inst.trim_following = True
+        inst.telemffb_controls_axes = True
+        inst.local_disable_axis_control = False
+        inst.joystick_trim_follow_gain_physical_y = 1.0
+        inst.joystick_trim_follow_gain_virtual_y = 0.2
+        inst.joystick_x_axis_scale = 1.0
+        inst.joystick_y_axis_scale = 1.0
+        inst.cyclic_spring_init = 1
+        inst._use_firmware_axis_backend = lambda: True
+        inst._send_firmware_fixed_axes = lambda x_value, y_value: setattr(self, "sent_y", y_value)
+        self.msfs = msfs
+        return inst
+
+    def _frame(self, inst, stick, pressed=False):
+        """Run a frame with the stick at ``stick``; returns the spring center."""
+        telem = TelemetryDataBuilder() \
+            .on_ground(False) \
+            .with_field("FFBType", "joystick") \
+            .with_field("N", 100.0) \
+            .with_field("CyclicTrimY" if self.msfs else "ElevTrimPct", self.TRIM) \
+            .build()
+        self.set_telemetry(inst, telem)
+        if pressed:
+            self.mock_device._input_data.press_button(1)
+        else:
+            self.mock_device._input_data.release_button(1)
+        self.mock_device._input_data.set_axis(x=0.0, y=stick)
+        inst.msfs_update_heli_controls(telem)
+        return inst.cpO_y + inst.cyclic_physical_trim_y_offs
+
+    def _settle(self, inst):
+        stick = self._frame(inst, 0.0)
+        assert stick == pytest.approx(self.TRIM)
+        assert self._frame(inst, stick) == pytest.approx(stick)
+        return stick
+
+    @pytest.mark.parametrize("msfs", [True, False], ids=["msfs", "xplane"])
+    def test_a_release_with_no_movement_changes_nothing(self, msfs):
+        inst = self._make_instance(msfs)
+        stick = self._settle(inst)
+        sent = self.sent_y
+        for _ in range(2):
+            assert self._frame(inst, stick, pressed=True) == pytest.approx(stick)
+            assert self.sent_y == pytest.approx(sent)
+            assert self._frame(inst, stick) == pytest.approx(stick)
+            assert self.sent_y == pytest.approx(sent)
+
+
+@pytest.mark.unit
 @pytest.mark.msfs
 @pytest.mark.helicopter
 class TestMsfsAxisHelpers(BaseTelemetryEffectTestCase):

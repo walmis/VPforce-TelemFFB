@@ -18,7 +18,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
     force_trim_reset_button = 0
     cyclic_spring_gain = 1.0
     trim_release_spring_gain = 0
-    force_trim_send_reset = True
+    force_trim_send_reset = False
 
     # end of user parameters
 
@@ -45,6 +45,24 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
     def _force_trim_release_pressed(self, telem_data: BaseTelemetryData, report) -> bool:
         """Whether the cyclic force trim release is held this frame."""
         return self.check_button_press(self.force_trim_button, report=report)
+
+    def _release_zeroes_trim(self) -> bool:
+        """Whether a trim release zeroes the sim's trim, which removes the trim offsets too."""
+        return self._sim_is_msfs() and self.force_trim_send_reset
+
+    def _center_cyclic_on_stick(self, x, y):
+        """Put the spring center on the stick.
+
+        The center is ``cpO`` plus the physical trim offsets, so the offsets are
+        taken out of ``cpO``.
+        """
+        self.cpO_x = utils.clamp(x, -1, 1) - self.cyclic_physical_trim_x_offs
+        self.cpO_y = utils.clamp(y, -1, 1) - self.cyclic_physical_trim_y_offs
+
+        self.spring_x.set_offset(self.cpO_x + self.cyclic_physical_trim_x_offs)
+        self.spring_y.set_offset(self.cpO_y + self.cyclic_physical_trim_y_offs)
+
+        self.cyclic_center = [x, y]
 
     def _initialize_cyclic_if_needed(self, telem_data: BaseTelemetryData) -> bool:
         """Initialize cyclic spring to ground-center or last-saved position.
@@ -74,16 +92,18 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             self.last_pos_x_pos = 0
             self.last_pos_y_pos = 0
         else:
-            self.cpO_x = utils.clamp(self.last_device_x, -1, 1)
-            self.cpO_y = utils.clamp(self.last_device_y, -1, 1)
+            self.cpO_x = utils.clamp(self.last_device_x, -1, 1) - self.cyclic_physical_trim_x_offs
+            self.cpO_y = utils.clamp(self.last_device_y, -1, 1) - self.cyclic_physical_trim_y_offs
 
-        self.spring_x.set_offset(self.cpO_x)
-        self.spring_y.set_offset(self.cpO_y)
+        target_x = self.cpO_x + self.cyclic_physical_trim_x_offs
+        target_y = self.cpO_y + self.cyclic_physical_trim_y_offs
+        self.spring_x.set_offset(target_x)
+        self.spring_y.set_offset(target_y)
         self._spring_handle.setCondition(self.spring_x)
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.start()
-        if (self.cpO_x - 0.15 < phys_x < self.cpO_x + 0.15) and (
-            self.cpO_y - 0.15 < phys_y < self.cpO_y + 0.15
+        if (target_x - 0.15 < phys_x < target_x + 0.15) and (
+            target_y - 0.15 < phys_y < target_y + 0.15
         ):
             self.cyclic_spring_init = 1
             logging.info("Cyclic Spring Initialized")
@@ -121,7 +141,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         self.spring_x.set_offset(self.cpO_x)
         self.spring_y.set_offset(self.cpO_y)
 
-        if self._sim_is_msfs() and self.force_trim_send_reset:
+        if self._release_zeroes_trim():
             self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
     def _update_cyclic_force_trim(self, telem_data: BaseTelemetryData, x, y, force_trim_active) -> bool:
@@ -151,35 +171,26 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             if self._initialize_cyclic_if_needed(telem_data):
                 return True
             elif force_trim_pressed:
-                # Force trim button depressed: absorb trim offsets, soften spring, follow stick
+                # Force trim button depressed: soften spring, follow stick
                 if self.tr_state_change:
                     total_x = self.cpO_x + self.cyclic_physical_trim_x_offs
                     total_y = self.cpO_y + self.cyclic_physical_trim_y_offs
 
-                    self.cpO_x = total_x
-                    self.cpO_y = total_y
-                    self.cyclic_physical_trim_x_offs = 0
-                    self.cyclic_physical_trim_y_offs = 0
-                    self.cyclic_virtual_trim_x_offs = 0.0
-                    self.cyclic_virtual_trim_y_offs = 0.0
-
-                    if self._sim_is_msfs() and self.force_trim_send_reset:
+                    if self._release_zeroes_trim():
+                        self.cyclic_physical_trim_x_offs = 0
+                        self.cyclic_physical_trim_y_offs = 0
+                        self.cyclic_virtual_trim_x_offs = 0.0
+                        self.cyclic_virtual_trim_y_offs = 0.0
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 1)
 
-                    logging.info(f"Force Trim Disengaged total={self.cpO_x}:{self.cpO_y}")
+                    logging.info(f"Force Trim Disengaged total={total_x}:{total_y}")
 
                 self._spring_handle.name = "cyclic_ft_release_button"
                 gain = int(self.trim_release_spring_gain * 4096)
                 self.spring_x.set_coefficient(gain)
                 self.spring_y.set_coefficient(gain)
 
-                self.cpO_x = utils.clamp(x, -1, 1)
-                self.cpO_y = utils.clamp(y, -1, 1)
-
-                self.spring_x.set_offset(self.cpO_x)
-                self.spring_y.set_offset(self.cpO_y)
-
-                self.cyclic_center = [x, y]
+                self._center_cyclic_on_stick(x, y)
                 self.cyclic_trim_release_active = 1
 
             elif not force_trim_pressed and self.cyclic_trim_release_active:
@@ -187,14 +198,9 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                 self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
                 self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
 
-                self.cpO_x = utils.clamp(x, -1, 1)
-                self.cpO_y = utils.clamp(y, -1, 1)
-                self.spring_x.set_offset(self.cpO_x)
-                self.spring_y.set_offset(self.cpO_y)
+                self._center_cyclic_on_stick(x, y)
 
-                self.cyclic_center = [x, y]
-
-                if self._sim_is_msfs() and self.force_trim_send_reset:
+                if self._release_zeroes_trim():
                     self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
                 logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
@@ -220,13 +226,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             self.spring_x.set_coefficient(gain)
             self.spring_y.set_coefficient(gain)
 
-            self.cpO_x = utils.clamp(x, -1, 1)
-            self.cpO_y = utils.clamp(y, -1, 1)
-
-            self.spring_x.set_offset(self.cpO_x)
-            self.spring_y.set_offset(self.cpO_y)
-
-            self.cyclic_center = [x, y]
+            self._center_cyclic_on_stick(x, y)
 
         else:
             # The active-force-trim branch only restores the gain when coming
@@ -295,8 +295,6 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             Read: ForceTrimSW        - bool; cockpit force-trim switch state; only subscribed
                                        when custom_ft_sw_var_enabled is True; defaults to True
             Read (via _initialize_cyclic_if_needed): SimOnGround - int (0 or 1)
-            Read (via _update_cyclic_trim, when trim_following):
-                  ForceTrimSW          - bool; suppresses trim offset updates when False
             Read (MSFS trim-following): CyclicTrimX - float (percent, –100 to 100);
                                                         lateral cyclic trim position
                                          CyclicTrimY - float (percent, –100 to 100);
@@ -360,15 +358,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if not self.trim_following:
             return
 
-        if self.custom_ft_sw_var_enabled and not telem_data.get('ForceTrimSW', True):  # non-zero default: keep .get()
-            self.cyclic_physical_trim_x_offs = 0
-            self.cyclic_physical_trim_y_offs = 0
-            self.cyclic_virtual_trim_x_offs = 0
-            self.cyclic_virtual_trim_y_offs = 0
-            return
-
-        # NEW: don't mutate offsets while trim-release is active
-        if getattr(self, "cyclic_trim_release_active", 0):
+        # The sim's trim lags the reset event, so it must not restore the offsets during the release
+        if getattr(self, "cyclic_trim_release_active", 0) and self._release_zeroes_trim():
             return
         if self._sim_is_msfs():
             cyclic_x_trim = telem_data.CyclicTrimX or 0
