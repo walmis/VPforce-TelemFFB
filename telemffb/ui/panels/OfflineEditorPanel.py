@@ -69,6 +69,10 @@ class OfflineEditorPanel(QWidget):
     """The "Offline Editor Setup" group box and the sim/class/aircraft/
     profile selection cascade behind it."""
 
+    #: Debug menu toggle: list every sim, not only those enabled in System
+    #: Settings.  Process-wide, like SettingsLayout's debug flags.
+    offline_show_all_sims: bool = False
+
     def __init__(self, parent=None, mainwindow=None):
         super().__init__(parent)
         self.mainwindow = mainwindow
@@ -237,12 +241,21 @@ class OfflineEditorPanel(QWidget):
 
     # ---- IPC mirroring (child instances replicate the master's selection) --
 
+    def _offline_sims(self) -> list[str]:
+        """The sims the editor offers: those enabled in System Settings, or
+        every sim when the debug toggle is on or none is enabled."""
+        sims = xmlutils.get_sims()
+        if self.offline_show_all_sims:
+            return sims
+        enabled = [s for s in sims if SettingsManager.sim_enabled(s)]
+        return enabled or sims
+
     def _fill_sims(self) -> None:
-        """The sim combo: a blank entry, then every sim by label with its
-        key as item data."""
+        """The sim combo: a blank entry, then each offered sim by label with
+        its key as item data."""
         self.offline_sim.clear()
         self.offline_sim.addItem('', '')
-        for sim in xmlutils.get_sims():
+        for sim in self._offline_sims():
             self.offline_sim.addItem(SettingsManager.sim_label(sim), sim)
 
     @property
@@ -251,8 +264,34 @@ class OfflineEditorPanel(QWidget):
         return self.offline_sim.currentData() or ''
 
     def select_sim(self, sim: str) -> None:
-        """Select a sim by key; an unknown key selects the blank entry."""
+        """Select a sim by key; an unknown key selects the blank entry.
+
+        A known sim left out of the combo (disabled in System Settings) is
+        added first, so the profile manager and the master's IPC selection
+        can still open it."""
+        if sim and self.offline_sim.findData(sim) < 0 and sim in xmlutils.get_sims():
+            self.offline_sim.addItem(SettingsManager.sim_label(sim), sim)
         self.offline_sim.setCurrentIndex(max(0, self.offline_sim.findData(sim)))
+
+    def select_only_sim(self) -> None:
+        """With nothing selected and exactly one sim offered, select it
+        (running the normal sim cascade)."""
+        if not self.selected_sim and self.offline_sim.count() == 2:
+            self.offline_sim.setCurrentIndex(1)
+
+    def refresh_sims(self) -> None:
+        """Refill the sim combo (after the debug toggle changed), keeping the
+        current selection when it is still offered."""
+        current = self.selected_sim
+        self.offline_sim.blockSignals(True)
+        self._fill_sims()
+        index = self.offline_sim.findData(current) if current else 0
+        self.offline_sim.setCurrentIndex(max(0, index))
+        self.offline_sim.blockSignals(False)
+        if current and index < 0:
+            # the selected sim is no longer offered: reset the cascade
+            self.offline_sim_changed('')
+        self.select_only_sim()
 
     def mirror_sim(self, sim: str) -> None:
         """Replicate the master's 'Sim' selection - child instances only,
@@ -328,7 +367,7 @@ class OfflineEditorPanel(QWidget):
             cb.addItem('')
 
         try:
-            for s in xmlutils.get_sims():
+            for s in self._offline_sims():
                 self.offline_sim.addItem(SettingsManager.sim_label(s), s)
             self.select_sim(sim)
 

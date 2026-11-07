@@ -59,6 +59,7 @@ from telemffb.preview.engine import PREVIEW_SPECS
 from telemffb.ui.dialogs.restart_offer import ask_to_restart
 from telemffb.ui.dialogs.SCOverridesEditor import SCOverridesEditor
 from telemffb.ui.dialogs.TeleplotSetupDialog import TeleplotSetupDialog
+from telemffb.ui.panels.OfflineEditorPanel import OfflineEditorPanel
 from telemffb.ui.widgets.SettingsLayout import SettingsLayout
 from telemffb.utils import exit_application
 
@@ -532,6 +533,18 @@ class MainMenu:
         show_settingname_action.triggered.connect(do_toggle_settingsnames)
         show_settingname_action.setCheckable(True)
         debug_menu.addAction(show_settingname_action)
+
+        show_all_sims_action = QAction("Show all sims in offline mode", mw)
+        def do_toggle_offline_show_all_sims():
+            OfflineEditorPanel.offline_show_all_sims = not OfflineEditorPanel.offline_show_all_sims
+            show_all_sims_action.setChecked(OfflineEditorPanel.offline_show_all_sims)
+            if G.settings_mgr.offline_mode:
+                mw.offline_editor.refresh_sims()
+
+        show_all_sims_action.triggered.connect(do_toggle_offline_show_all_sims)
+        show_all_sims_action.setCheckable(True)
+        show_all_sims_action.setChecked(OfflineEditorPanel.offline_show_all_sims)
+        debug_menu.addAction(show_all_sims_action)
 
         # Effect preview (hardware check for the preview runner): one
         # entry per shipped spec, played on the device with synthetic

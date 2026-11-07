@@ -106,9 +106,29 @@ def broadcasts(monkeypatch):
     return sent
 
 
+class FakeSystemSettings:
+    """Stand-in for G.system_settings: just the enable<SIM> switches."""
+
+    def __init__(self, enabled=('DCS', 'MSFS')):
+        self.enabled = set(enabled)
+
+    def get(self, key, default=None):
+        if key.startswith('enable'):
+            return key[len('enable'):] in self.enabled
+        return default
+
+
 @pytest.fixture
-def panel(qapp, fake_xml, fake_settings_mgr, broadcasts, monkeypatch):
+def system_settings(monkeypatch):
+    ss = FakeSystemSettings()
+    monkeypatch.setattr(G, 'system_settings', ss, raising=False)
+    return ss
+
+
+@pytest.fixture
+def panel(qapp, fake_xml, fake_settings_mgr, broadcasts, system_settings, monkeypatch):
     monkeypatch.setattr(G, 'master_instance', False, raising=False)
+    monkeypatch.setattr(OfflineEditorPanel, 'offline_show_all_sims', False)
     # offline_aircraft_changed calls this - reachable any time a combo's
     # currentTextChanged actually fires (including via the premature
     # blockSignals(False) inside filter_offline_name_list - see
@@ -208,6 +228,82 @@ class TestResetForEntry:
         panel.reset_for_entry()
         assert panel.offline_profile.count() == 0
         assert not panel.offline_profile.signalsBlocked()
+
+
+def _sim_keys(panel):
+    return [panel.offline_sim.itemData(i) for i in range(panel.offline_sim.count())]
+
+
+class TestEnabledSimsOnly:
+    def test_only_enabled_sims_are_listed(self, panel, system_settings):
+        system_settings.enabled = {'MSFS'}
+        panel.reset_for_entry()
+        assert _sim_keys(panel) == ['', 'MSFS']
+
+    def test_no_sim_enabled_lists_every_sim(self, panel, system_settings):
+        system_settings.enabled = set()
+        panel.reset_for_entry()
+        assert _sim_keys(panel) == ['', 'DCS', 'MSFS']
+
+    def test_debug_toggle_lists_every_sim(self, panel, system_settings, monkeypatch):
+        system_settings.enabled = {'MSFS'}
+        monkeypatch.setattr(OfflineEditorPanel, 'offline_show_all_sims', True)
+        panel.reset_for_entry()
+        assert _sim_keys(panel) == ['', 'DCS', 'MSFS']
+
+    def test_a_single_enabled_sim_is_picked(self, panel, system_settings, fake_settings_mgr):
+        system_settings.enabled = {'DCS'}
+        panel.reset_for_entry()
+        panel.select_only_sim()
+        assert panel.selected_sim == 'DCS'
+        assert fake_settings_mgr.offline_scope == 'SIM'
+
+    def test_two_enabled_sims_pick_nothing(self, panel):
+        panel.reset_for_entry()
+        panel.select_only_sim()
+        assert panel.selected_sim == ''
+
+    def test_selecting_a_disabled_sim_adds_it(self, panel, system_settings):
+        system_settings.enabled = {'MSFS'}
+        panel.reset_for_entry()
+        panel.select_sim('DCS')
+        assert panel.selected_sim == 'DCS'
+
+    def test_an_unknown_sim_is_not_added(self, panel):
+        panel.select_sim('NOPE')
+        assert panel.selected_sim == ''
+        assert 'NOPE' not in _sim_keys(panel)
+
+    def test_load_single_offline_model_opens_a_disabled_sim(self, panel, system_settings):
+        system_settings.enabled = {'MSFS'}
+        panel.load_single_offline_model('DCS', 'JetAircraft', 'F-16C', 'Auto User')
+        assert panel.selected_sim == 'DCS'
+        assert panel.offline_name.currentText() == 'F-16C'
+
+
+class TestRefreshSims:
+    def test_keeps_the_selection_when_still_offered(self, panel, system_settings, monkeypatch):
+        system_settings.enabled = {'MSFS'}
+        monkeypatch.setattr(OfflineEditorPanel, 'offline_show_all_sims', True)
+        panel.reset_for_entry()
+        panel.select_sim('MSFS')
+        monkeypatch.setattr(OfflineEditorPanel, 'offline_show_all_sims', False)
+        panel.refresh_sims()
+        assert _sim_keys(panel) == ['', 'MSFS']
+        assert panel.selected_sim == 'MSFS'
+
+    def test_drops_a_sim_no_longer_offered(self, panel, system_settings, monkeypatch,
+                                           fake_settings_mgr):
+        system_settings.enabled = {'MSFS'}
+        monkeypatch.setattr(OfflineEditorPanel, 'offline_show_all_sims', True)
+        panel.reset_for_entry()
+        panel.select_sim('DCS')
+        monkeypatch.setattr(OfflineEditorPanel, 'offline_show_all_sims', False)
+        panel.refresh_sims()
+        # DCS is gone; the one remaining sim is picked
+        assert _sim_keys(panel) == ['', 'MSFS']
+        assert panel.selected_sim == 'MSFS'
+        assert panel.offline_scope_label.text() == "Editing SIM Defaults (MSFS)"
 
 
 class TestFilterNameList:
