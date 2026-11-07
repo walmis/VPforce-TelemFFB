@@ -13320,6 +13320,28 @@
 			<device>any</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
+			<name>overspeed_effect_enable</name>
+			<type>XAW109Helicopter</type>
+			<value>true</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>overspeed_shake_intensity</name>
+			<type>XAW109Helicopter</type>
+			<value>0.2</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>overspeed_shake_start</name>
+			<type>XAW109Helicopter</type>
+			<value>168</value>
+			<unit>kt</unit>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
 			<name>pedal_ft_damper_enabled</name>
 			<type>XAW109Helicopter</type>
 			<value>true</value>
