@@ -2359,7 +2359,7 @@
 		<order>1250</order>
 		<datatype>bool</datatype>
 		<name>handson_force_mode</name>
-		<displayname>Force Mode ( &lt;b&gt;Experimental&lt;/b&gt;)</displayname>
+		<displayname>Force Mode (&lt;b&gt;Experimental&lt;/b&gt;)</displayname>
 		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>When enabled, uses force output from Rhino vs. deflection to determine hands-on detection&lt;br&gt;&lt;br&gt;The force settings below replace the hands on/off deadzone sliders while force mode is enabled.&lt;br&gt;&lt;br&gt;For best results, disable adaptive recentering in configurator</info>
@@ -2720,13 +2720,13 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2400</order>
+		<order>1975</order>
 		<datatype>bool</datatype>
 		<name>trim_following</name>
-		<displayname>Trim / AP Following</displayname>
-		<prereq>axis_control_group</prereq>
+		<displayname>Trim Following</displayname>
+		<prereq>basic_group</prereq>
 		<enable_prereq>!local_disable_axis_control</enable_prereq>
 		<info>Enable physical stick movement with in-game trims and auto-pilot.&lt;br&gt;&lt;br&gt;Note: Not all aircraft types support AP following</info>
 		<MSFS>true</MSFS>
@@ -2737,9 +2737,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2405</order>
+		<order>1976</order>
 		<name>joystick_trim_follow_use_curve_y</name>
 		<displayname>Use Calibrated Trim Curve</displayname>
 		<prereq>trim_following</prereq>
@@ -2752,9 +2752,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2405.2</order>
+		<order>1976.2</order>
 		<name>joystick_trim_follow_curve_y</name>
 		<displayname>Trim Curve Calibration</displayname>
 		<prereq>joystick_trim_follow_use_curve_y</prereq>
@@ -2767,9 +2767,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2405.4</order>
+		<order>1976.4</order>
 		<name>joystick_trim_follow_curve_gain_y</name>
 		<displayname>Calibrated Trim Stick Travel</displayname>
 		<prereq>joystick_trim_follow_use_curve_y</prereq>
@@ -2784,9 +2784,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2405.6</order>
+		<order>1976.6</order>
 		<name>joystick_trim_follow_stick_position</name>
 		<displayname>Trimmed Stick Position</displayname>
 		<prereq>joystick_trim_follow_use_curve_y</prereq>
@@ -2801,9 +2801,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2410</order>
+		<order>1977</order>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<displayname>X Trim Gain Physical</displayname>
@@ -2818,9 +2818,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2415</order>
+		<order>1978</order>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<displayname>X Trim Gain Virtual</displayname>
@@ -2835,9 +2835,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2420</order>
+		<order>1979</order>
 		<enable_prereq>!joystick_trim_follow_use_curve_y,!local_disable_axis_control</enable_prereq>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_physical_y</name>
@@ -2852,9 +2852,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2425</order>
+		<order>1980</order>
 		<datatype>negfloat</datatype>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<displayname>Y Trim Gain Virtual</displayname>
@@ -2869,9 +2869,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2430</order>
+		<order>1981</order>
 		<datatype>negfloat</datatype>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<displayname>Rudder Trim Gain (physical)</displayname>
@@ -2886,9 +2886,9 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2435</order>
+		<order>1982</order>
 		<datatype>negfloat</datatype>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
@@ -2902,14 +2902,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450</order>
+		<order>1985</order>
 		<datatype>bool</datatype>
 		<name>ap_following</name>
 		<displayname>Autopilot Following</displayname>
-		<prereq>trim_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<prereq>basic_group</prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Enable physical stick following of autopilot movements</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2918,14 +2918,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.2</order>
+		<order>1985.2</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_x_follow_deadzone</name>
 		<displayname>Roll Deadzone</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2935,14 +2935,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.3</order>
+		<order>1985.3</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_physical_x</name>
 		<displayname>AP Roll Physical Gain</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Amount of aileron surface deflection translated into physical movement of the stick</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2952,41 +2952,41 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.4</order>
+		<order>1985.4</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_virtual_x</name>
 		<displayname>AP Roll Virtual Gain</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.5</order>
+		<order>1985.5</order>
 		<datatype>bool</datatype>
 		<name>invert_ap_x_axis</name>
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
 		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.6</order>
+		<order>1985.6</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_y_follow_deadzone</name>
 		<displayname>Pitch Deadzone</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2995,14 +2995,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.7</order>
+		<order>1985.7</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_physical_y</name>
 		<displayname>AP Pitch Physical Gain</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Amount of elevator trim deflection translated into physical movement of the stick</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3012,29 +3012,29 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.8</order>
+		<order>1985.8</order>
 		<datatype>float</datatype>
 		<name>joystick_ap_follow_gain_virtual_y</name>
 		<displayname>AP Pitch Virtual Gain</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2450.9</order>
+		<order>1985.9</order>
 		<datatype>bool</datatype>
 		<name>joystick_ap_y_follow_axis</name>
 		<displayname>AP Pitch - Follow axis instead of trim</displayname>
 		<exclusive_with>custom_ap_follow_y_var_enabled</exclusive_with>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!joystick_trim_follow_use_curve_y,!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!joystick_trim_follow_use_curve_y,!local_disable_axis_control</enable_prereq>
 		<info>Elevator AP will attempt to follow the axis position rather than the trim value</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3042,14 +3042,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2470</order>
+		<order>1991</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_var_enabled</name>
 		<displayname>Custom Autopilot Variable</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Read the autopilot state from a variable of your choice instead of AUTOPILOT MASTER, for an aircraft whose autopilot does not set it</info>
 		<MSFS>true</MSFS>
@@ -3059,14 +3059,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2470</order>
+		<order>1991</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_var_enabled</name>
 		<displayname>Custom Autopilot Variable</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<in_sim_panel>false</in_sim_panel>
 		<info>Read the autopilot state from a dataref of your choice instead of sim/cockpit2/autopilot/servos_on, for an aircraft whose autopilot does not set it</info>
 		<XPLANE>true</XPLANE>
@@ -3076,14 +3076,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2470.1</order>
+		<order>1991.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_var</name>
 		<displayname>Custom Autopilot Variable</displayname>
 		<prereq>custom_ap_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A variable that needs converting belongs in the SimConnect Overrides Editor as APMaster instead. Turn this setting off for that entry to be used: while it is on, this variable is the one read.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3093,14 +3093,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2470.1</order>
+		<order>1991.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_var</name>
 		<displayname>Custom Autopilot Variable</displayname>
 		<prereq>custom_ap_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A dataref that shows whether the autopilot is engaged: 0 is off, anything else is on.&lt;br&gt;&lt;br&gt;Set it on each device that follows the autopilot. A dataref that needs converting belongs in the overrides editor as APServos instead. Disable this setting for that entry to be used: while it is enabled, this dataref is the one read.</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3110,14 +3110,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2480</order>
+		<order>1994</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_x_var_enabled</name>
 		<displayname>Custom Roll Follow Variable</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in roll through a variable of your choice instead of the aileron deflection, for an aircraft that publishes its control wheel position in its own variable</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3125,14 +3125,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2480</order>
+		<order>1994</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_x_var_enabled</name>
 		<displayname>Custom Roll Follow Variable</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in roll through a dataref of your choice instead of the autopilot roll servo, for an aircraft that publishes its control position in its own dataref</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3140,14 +3140,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2480.1</order>
+		<order>1994.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_x_var</name>
 		<displayname>Custom Roll Follow Variable</displayname>
 		<prereq>custom_ap_follow_x_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) holding the roll position the stick follows, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3156,14 +3156,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2480.1</order>
+		<order>1994.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_x_var</name>
 		<displayname>Custom Roll Follow Variable</displayname>
 		<prereq>custom_ap_follow_x_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A dataref holding the roll position the stick follows, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3172,14 +3172,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2480.2</order>
+		<order>1994.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_x_transform</name>
 		<displayname>Roll Transform to -1..1</displayname>
 		<prereq>custom_ap_follow_x_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowX</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3188,15 +3188,15 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2490</order>
+		<order>1996</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_y_var_enabled</name>
 		<displayname>Custom Pitch Follow Variable</displayname>
 		<exclusive_with>joystick_ap_y_follow_axis</exclusive_with>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in pitch through a variable of your choice instead of the trim or the elevator deflection, for an aircraft that publishes its control column position in its own variable</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3204,14 +3204,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2490</order>
+		<order>1996</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_y_var_enabled</name>
 		<displayname>Custom Pitch Follow Variable</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in pitch through a dataref of your choice instead of the autopilot pitch servo, for an aircraft that publishes its control position in its own dataref</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3219,14 +3219,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2490.1</order>
+		<order>1996.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_y_var</name>
 		<displayname>Custom Pitch Follow Variable</displayname>
 		<prereq>custom_ap_follow_y_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) holding the pitch position the stick follows, -1 (full forward) to 1 (full aft). A value on another scale needs the transform below.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3235,14 +3235,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2490.1</order>
+		<order>1996.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_y_var</name>
 		<displayname>Custom Pitch Follow Variable</displayname>
 		<prereq>custom_ap_follow_y_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A dataref holding the pitch position the stick follows, -1 (full forward) to 1 (full aft). A value on another scale needs the transform below.</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3251,14 +3251,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2490.2</order>
+		<order>1996.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_y_transform</name>
 		<displayname>Pitch Transform to -1..1</displayname>
 		<prereq>custom_ap_follow_y_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x - 1: a value that reads 0 to 2&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowY</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3267,14 +3267,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2492</order>
+		<order>1998</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_rudder_var_enabled</name>
 		<displayname>Custom Yaw Follow Variable</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot through a variable of your choice instead of the rudder deflection, for an aircraft that publishes its pedal position in its own variable</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -3282,14 +3282,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2492</order>
+		<order>1998</order>
 		<datatype>bool</datatype>
 		<name>custom_ap_follow_rudder_var_enabled</name>
 		<displayname>Custom Yaw Follow Variable</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Follow the autopilot in yaw through a dataref of your choice instead of the autopilot yaw servo, for an aircraft that publishes its control position in its own dataref</info>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -3297,14 +3297,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2492.1</order>
+		<order>1998.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_rudder_var</name>
 		<displayname>Custom Yaw Follow Variable</displayname>
 		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A SimVar, an L:Var or an input event (B:) holding the yaw position the pedals follow, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
@@ -3313,14 +3313,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2492.1</order>
+		<order>1998.1</order>
 		<datatype>anylist</datatype>
 		<name>custom_ap_follow_rudder_var</name>
 		<displayname>Custom Yaw Follow Variable</displayname>
 		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A dataref holding the yaw position the pedals follow, -1 (full left) to 1 (full right). A value on another scale needs the transform below.</info>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -3329,14 +3329,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2492.2</order>
+		<order>1998.2</order>
 		<datatype>text</datatype>
 		<name>custom_ap_follow_rudder_transform</name>
 		<displayname>Yaw Transform to -1..1</displayname>
 		<prereq>custom_ap_follow_rudder_var_enabled</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Turns the variable's value into -1 to 1, with x standing for the value. The syntax is the same as the Scale field in the overrides editor.&lt;br&gt;&lt;br&gt;Blank: a value that already reads -1 to 1&lt;br&gt;x/50 - 1: a percentage&lt;br&gt;-x: a value with the opposite sign&lt;br&gt;&lt;br&gt;The Monitor tab shows the raw value as APFollowRudder</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3345,14 +3345,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2460</order>
+		<order>1988</order>
 		<datatype>bool</datatype>
 		<name>ap_disconnect_on_override</name>
 		<displayname>Disconnect Autopilot on Override</displayname>
 		<prereq>ap_following</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Send a disconnect once the stick is held past the deflection below, for an autopilot that does not let go on its own</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3361,14 +3361,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2460.2</order>
+		<order>1988.2</order>
 		<datatype>float</datatype>
 		<name>ap_disconnect_deflection</name>
 		<displayname>Disconnect Deflection</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>Stick travel from the autopilot's command, as a share of full travel, that sends the disconnect. Keep it above the deadzone.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3378,14 +3378,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2460.3</order>
+		<order>1988.3</order>
 		<datatype>anylist</datatype>
 		<name>ap_disconnect_event</name>
 		<displayname>Disconnect Event</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>The key event, L:Var, B: input event or SimVar to send. AUTOPILOT_DISENGAGE_SET is the yoke disconnect switch; AUTOPILOT_OFF is the master switch.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3394,14 +3394,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2460.3</order>
+		<order>1988.3</order>
 		<datatype>anylist</datatype>
 		<name>ap_disconnect_event</name>
 		<displayname>Disconnect Command</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>The X-Plane command to send. sim/autopilot/servos_off_any disconnects the autopilot servos and leaves the flight director; sim/autopilot/servos_fdir_off also turns the flight director off.</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3410,14 +3410,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2460.4</order>
+		<order>1988.4</order>
 		<datatype>text</datatype>
 		<name>ap_disconnect_value</name>
 		<displayname>Disconnect Value</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>The value sent with the event</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3425,14 +3425,14 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<grouping>Axis Control</grouping>
+		<grouping>Basic</grouping>
 		<parentgroup>axis_control</parentgroup>
-		<order>2460.5</order>
+		<order>1988.5</order>
 		<datatype>text</datatype>
 		<name>ap_disconnect_release_value</name>
 		<displayname>Release Value</displayname>
 		<prereq>ap_disconnect_on_override</prereq>
-		<enable_prereq>!local_disable_axis_control</enable_prereq>
+		<enable_prereq>trim_following,!local_disable_axis_control</enable_prereq>
 		<info>A second value sent 100 ms later, the switch letting go. Blank sends none.</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -5110,7 +5110,7 @@
 		<order>30400</order>
 		<datatype>bool</datatype>
 		<name>steering_friction</name>
-		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<displayname>Steering Friction &lt;br&gt;(&lt;b&gt;Experimental&lt;/b&gt;)</displayname>
 		<prereq>ground_group</prereq>
 		<info>Enable pedal friction for steering gear wheel&lt;br&gt;** REQUIRES friction overrides to be enabled **</info>
 		<MSFS>true</MSFS>
@@ -6252,7 +6252,7 @@
 		<order>41800</order>
 		<datatype>bool</datatype>
 		<name>enable_hydraulic_loss_effect</name>
-		<displayname>Low Hydraulic Pressure Effect&lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<displayname>Low Hydraulic Pressure Effect&lt;br&gt;(&lt;b&gt;Experimental&lt;/b&gt;)</displayname>
 		<prereq>mechanical_group</prereq>
 		<info>Raise damper and friction as hydraulic pressure is lost.&lt;br&gt;Below the threshold they rise from the Damper Override and Friction Override values to the values set here at zero pressure.&lt;br&gt;&lt;br&gt;** Requires the Damper Override and Friction Override under Basic FFB Effects **</info>
 		<DCS>true</DCS>

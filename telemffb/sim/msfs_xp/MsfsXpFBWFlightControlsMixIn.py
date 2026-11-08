@@ -607,7 +607,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                         self._simconnect.send_event_to_msfs(y_var, 0)
 
             # update spring data
-            if self.ap_following and ap_active:
+            if self.trim_following and self.ap_following and ap_active:
                 y_coeff = 1.0
                 x_coeff = 1.0
             else:
@@ -704,7 +704,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
                 # update spring data
 
-            if self.ap_following and ap_active:
+            if self.trim_following and self.ap_following and ap_active:
                 x_coeff = 1.0
             else:
                 # normalized -1..1 float; the setter scales by 4096 (matches the joystick branch)

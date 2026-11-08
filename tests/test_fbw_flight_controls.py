@@ -355,6 +355,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         # Arrange
         instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
         instance._test_sim_is_msfs = True
+        instance.trim_following = True
         instance.ap_following = True
         instance.telemffb_controls_axes = True
         instance._simconnect = self.mock_simconnect
@@ -567,6 +568,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         # Arrange
         instance = self.create_test_instance(MsfsXpFBWFlightControlsMixIn)
         instance._test_sim_is_msfs = True
+        instance.trim_following = True
         instance.ap_following = True
         instance.telemffb_controls_axes = True
         instance._simconnect = self.mock_simconnect
