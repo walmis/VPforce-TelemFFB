@@ -7190,6 +7190,14 @@
 	<scale>5000</scale>
 </sc_overrides>
 	<sc_overrides>
+		<name>HydSys</name>
+		<model></model>
+		<class>FlyInsideHelicopter</class>
+		<sim>MSFS</sim>
+		<var>L:Aircraft.Hydraulics.Enabled</var>
+		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
 		<name>RotorRPM</name>
 		<model>FlyInside B206.*</model>
 		<sim>MSFS</sim>
@@ -7212,6 +7220,22 @@
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.6</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>HydSwitch</name>
+		<model>FlyInside Gazelle.*</model>
+		<sim>MSFS</sim>
+		<var>L:HYDRAULIC_SWITCH</var>
+		<sc_unit>bool</sc_unit>
+		<scale></scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>RotorRPM</name>
+		<model>FlyInside Gazelle.*</model>
+		<sim>MSFS</sim>
+		<var>L:Aircraft.Rotor.RPM.Percent</var>
+		<sc_unit>Percent Over 100</sc_unit>
+		<scale>3.78</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>PropRPM</name>
@@ -24339,6 +24363,269 @@
 		<name>enable_custom_x_axis</name>
 		<model>FlyInside B47.*</model>
 		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>7</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>15</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>45</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>3</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>FlyInsideHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+		<notes>This aircraft uses the custom FlyInsideHelicopter aircraft class. If you load a livery whose title does not automatically match this profile, you must CLONE this profile for the new livery rather than create a new one. The rotor RPM source this class reads is specific to each aircraft and only a clone carries it, so the New Aircraft Wizard requires the clone for this class.</notes>
+	</models>
+	<models>
+		<name>damper_force</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>enable_friction_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>friction_force</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>FI_vibration_enable</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>FI_vibration_expo</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>FI_vibration_intensity</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.29</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>blade_slap_enable</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>L:HELO_FORCE_TRIM_ACTIVE</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var_enabled</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>damper_force</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.4</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_friction_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_hydraulic_loss_effect</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_inertia_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>engine_rotor_rumble_enabled</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>friction_force</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>heli_engine_rumble_intensity</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.12</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_friction</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>FI_vibration_intensity</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>damper_force</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.27</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_friction_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_hydraulic_loss_effect</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_inertia_ovd</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>friction_force</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_damper</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_inertia</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>inertia_force</name>
+		<model>FlyInside Gazelle.*</model>
+		<value>0.14</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
