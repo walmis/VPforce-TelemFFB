@@ -163,6 +163,8 @@ coll = COLLECT(
 import shutil
 import os
 shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt'))
+shutil.copyfile('Install to Local Programs folder.bat',
+                os.path.join(distpath, 'Install to Local Programs folder.bat'))
 
 # The MSFS toolbar panel is bundled via _collect_msfs_panel_datas() above and
 # installed at runtime through System Settings > MSFS > Install (see
