@@ -1481,6 +1481,11 @@ class MainWindow(QMainWindow):
             if broadcast:
                 G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
+        if state:
+            # After the TOGGLE OFFLINE broadcast, so children are offline
+            # before the OFFLINE_SIM this sends reaches them
+            self.offline_editor.select_only_sim()
+
     @pyqtSlot(str, str, str, str)
     def load_single_offline_model(self, sim, cls, model, profile, from_profile_manager=True):
         """Thin passthrough kept on MainWindow: IPCNetworkThread.show_offline_model_signal
